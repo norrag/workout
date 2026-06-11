@@ -19,6 +19,10 @@ test-results/
 supabase/.temp/
 supabase/.branches/
 
+# serwist build output
+public/sw.js
+public/sw.js.map
+
 # misc
 .DS_Store
 *.tsbuildinfo
