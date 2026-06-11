@@ -1,0 +1,361 @@
+-- Seed: muscle groups, stock exercises, stock templates, default engine params.
+-- Stock rows have user_id null and are written only here (service context).
+
+-- ---------------------------------------------------------------------------
+-- muscle groups
+-- ---------------------------------------------------------------------------
+
+insert into public.muscle_groups (name) values
+  ('chest'), ('back'), ('quads'), ('hamstrings'), ('glutes'), ('biceps'),
+  ('triceps'), ('shoulders'), ('calves'), ('abs'), ('forearms'), ('traps')
+on conflict (name) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- stock exercises
+-- ---------------------------------------------------------------------------
+
+with ex (name, equipment_type, primary_mg, secondary_mg) as (
+  values
+    -- chest
+    ('Barbell Bench Press', 'barbell', 'chest', 'triceps'),
+    ('Incline Barbell Bench Press', 'barbell', 'chest', 'shoulders'),
+    ('Dumbbell Bench Press', 'dumbbell', 'chest', 'triceps'),
+    ('Incline Dumbbell Press', 'dumbbell', 'chest', 'shoulders'),
+    ('Dumbbell Fly', 'dumbbell', 'chest', null),
+    ('Cable Fly', 'cable', 'chest', null),
+    ('Pec Deck', 'machine', 'chest', null),
+    ('Machine Chest Press', 'machine', 'chest', 'triceps'),
+    ('Smith Machine Bench Press', 'smith', 'chest', 'triceps'),
+    ('Push-Up', 'bodyweight', 'chest', 'triceps'),
+    ('Weighted Dip', 'bodyweight', 'chest', 'triceps'),
+    -- back
+    ('Deadlift', 'barbell', 'back', 'hamstrings'),
+    ('Barbell Row', 'barbell', 'back', 'biceps'),
+    ('Pendlay Row', 'barbell', 'back', 'biceps'),
+    ('Dumbbell Row', 'dumbbell', 'back', 'biceps'),
+    ('Chest-Supported Row', 'machine', 'back', 'biceps'),
+    ('Seated Cable Row', 'cable', 'back', 'biceps'),
+    ('Lat Pulldown', 'cable', 'back', 'biceps'),
+    ('Pull-Up', 'bodyweight', 'back', 'biceps'),
+    ('Chin-Up', 'bodyweight', 'back', 'biceps'),
+    ('Straight-Arm Pulldown', 'cable', 'back', null),
+    ('T-Bar Row', 'machine', 'back', 'biceps'),
+    ('Rack Pull', 'barbell', 'back', 'traps'),
+    -- quads
+    ('Back Squat', 'barbell', 'quads', 'glutes'),
+    ('Front Squat', 'barbell', 'quads', 'abs'),
+    ('Leg Press', 'machine', 'quads', 'glutes'),
+    ('Hack Squat', 'machine', 'quads', 'glutes'),
+    ('Smith Machine Squat', 'smith', 'quads', 'glutes'),
+    ('Leg Extension', 'machine', 'quads', null),
+    ('Bulgarian Split Squat', 'dumbbell', 'quads', 'glutes'),
+    ('Walking Lunge', 'dumbbell', 'quads', 'glutes'),
+    ('Goblet Squat', 'dumbbell', 'quads', 'glutes'),
+    -- hamstrings
+    ('Romanian Deadlift', 'barbell', 'hamstrings', 'glutes'),
+    ('Dumbbell Romanian Deadlift', 'dumbbell', 'hamstrings', 'glutes'),
+    ('Seated Leg Curl', 'machine', 'hamstrings', null),
+    ('Lying Leg Curl', 'machine', 'hamstrings', null),
+    ('Nordic Curl', 'bodyweight', 'hamstrings', null),
+    ('Good Morning', 'barbell', 'hamstrings', 'back'),
+    -- glutes
+    ('Barbell Hip Thrust', 'barbell', 'glutes', 'hamstrings'),
+    ('Machine Hip Thrust', 'machine', 'glutes', 'hamstrings'),
+    ('Cable Kickback', 'cable', 'glutes', null),
+    ('Hip Abduction Machine', 'machine', 'glutes', null),
+    ('Sumo Deadlift', 'barbell', 'glutes', 'hamstrings'),
+    -- biceps
+    ('Barbell Curl', 'barbell', 'biceps', 'forearms'),
+    ('EZ-Bar Curl', 'barbell', 'biceps', 'forearms'),
+    ('Dumbbell Curl', 'dumbbell', 'biceps', null),
+    ('Hammer Curl', 'dumbbell', 'biceps', 'forearms'),
+    ('Incline Dumbbell Curl', 'dumbbell', 'biceps', null),
+    ('Cable Curl', 'cable', 'biceps', null),
+    ('Preacher Curl', 'machine', 'biceps', null),
+    -- triceps
+    ('Cable Pushdown', 'cable', 'triceps', null),
+    ('Overhead Cable Extension', 'cable', 'triceps', null),
+    ('Skull Crusher', 'barbell', 'triceps', null),
+    ('Dumbbell Overhead Extension', 'dumbbell', 'triceps', null),
+    ('Close-Grip Bench Press', 'barbell', 'triceps', 'chest'),
+    ('Machine Triceps Extension', 'machine', 'triceps', null),
+    -- shoulders
+    ('Overhead Press', 'barbell', 'shoulders', 'triceps'),
+    ('Seated Dumbbell Press', 'dumbbell', 'shoulders', 'triceps'),
+    ('Machine Shoulder Press', 'machine', 'shoulders', 'triceps'),
+    ('Dumbbell Lateral Raise', 'dumbbell', 'shoulders', null),
+    ('Cable Lateral Raise', 'cable', 'shoulders', null),
+    ('Reverse Pec Deck', 'machine', 'shoulders', 'back'),
+    ('Face Pull', 'cable', 'shoulders', 'traps'),
+    ('Arnold Press', 'dumbbell', 'shoulders', 'triceps'),
+    -- calves
+    ('Standing Calf Raise', 'machine', 'calves', null),
+    ('Seated Calf Raise', 'machine', 'calves', null),
+    ('Smith Machine Calf Raise', 'smith', 'calves', null),
+    ('Single-Leg Calf Raise', 'bodyweight', 'calves', null),
+    -- abs
+    ('Cable Crunch', 'cable', 'abs', null),
+    ('Hanging Leg Raise', 'bodyweight', 'abs', null),
+    ('Ab Wheel Rollout', 'other', 'abs', null),
+    ('Plank', 'bodyweight', 'abs', null),
+    ('Machine Crunch', 'machine', 'abs', null),
+    ('Decline Sit-Up', 'bodyweight', 'abs', null),
+    -- forearms
+    ('Barbell Wrist Curl', 'barbell', 'forearms', null),
+    ('Reverse Curl', 'barbell', 'forearms', 'biceps'),
+    ('Farmer Carry', 'dumbbell', 'forearms', 'traps'),
+    -- traps
+    ('Barbell Shrug', 'barbell', 'traps', null),
+    ('Dumbbell Shrug', 'dumbbell', 'traps', null),
+    ('Cable Shrug', 'cable', 'traps', null)
+),
+inserted as (
+  insert into public.exercises (user_id, name, equipment_type)
+  select null, ex.name, ex.equipment_type from ex
+  where not exists (
+    select 1 from public.exercises e where e.name = ex.name and e.user_id is null
+  )
+  returning id, name
+)
+insert into public.exercise_muscle_groups (exercise_id, muscle_group_id, role)
+select i.id, mg.id, r.role
+from inserted i
+join ex on ex.name = i.name
+cross join lateral (
+  values (ex.primary_mg, 'primary'), (ex.secondary_mg, 'secondary')
+) as r (mg_name, role)
+join public.muscle_groups mg on mg.name = r.mg_name
+where r.mg_name is not null
+on conflict (exercise_id, muscle_group_id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- stock templates
+-- ---------------------------------------------------------------------------
+
+create or replace function pg_temp.seed_template(
+  p_name text,
+  p_emphasis text,
+  p_days int,
+  p_description text,
+  p_days_spec jsonb -- [{ "label": "...", "exercises": [{ "name": "...", "sets": 3, "reps": [8,12] }] }]
+) returns void language plpgsql as $$
+declare
+  v_template_id uuid;
+  v_day jsonb;
+  v_day_id uuid;
+  v_ex jsonb;
+  v_day_number int := 0;
+  v_position int;
+  v_exercise_id uuid;
+begin
+  if exists (select 1 from public.templates where name = p_name and user_id is null) then
+    return;
+  end if;
+
+  insert into public.templates (user_id, name, emphasis, intended_gender, days_per_week, description)
+  values (null, p_name, p_emphasis, 'any', p_days, p_description)
+  returning id into v_template_id;
+
+  for v_day in select * from jsonb_array_elements(p_days_spec) loop
+    v_day_number := v_day_number + 1;
+    insert into public.template_days (template_id, day_number, label)
+    values (v_template_id, v_day_number, v_day ->> 'label')
+    returning id into v_day_id;
+
+    v_position := 0;
+    for v_ex in select * from jsonb_array_elements(v_day -> 'exercises') loop
+      v_position := v_position + 1;
+      select id into v_exercise_id from public.exercises
+      where name = v_ex ->> 'name' and user_id is null;
+      if v_exercise_id is null then
+        raise exception 'seed template references unknown exercise: %', v_ex ->> 'name';
+      end if;
+      insert into public.template_exercises (template_day_id, exercise_id, position, default_sets, default_rep_range)
+      values (
+        v_day_id, v_exercise_id, v_position,
+        coalesce((v_ex ->> 'sets')::int, 3),
+        int4range((v_ex -> 'reps' ->> 0)::int, (v_ex -> 'reps' ->> 1)::int, '[]')
+      );
+    end loop;
+  end loop;
+end;
+$$;
+
+select pg_temp.seed_template(
+  'Upper / Lower — 4 day', 'upper_lower', 4,
+  'Balanced upper/lower split. Compound-led, moderate volume.',
+  '[
+    { "label": "Upper A", "exercises": [
+      { "name": "Barbell Bench Press", "sets": 3, "reps": [6, 10] },
+      { "name": "Barbell Row", "sets": 3, "reps": [6, 10] },
+      { "name": "Seated Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Lat Pulldown", "sets": 3, "reps": [8, 12] },
+      { "name": "Dumbbell Curl", "sets": 2, "reps": [10, 15] },
+      { "name": "Cable Pushdown", "sets": 2, "reps": [10, 15] } ] },
+    { "label": "Lower A", "exercises": [
+      { "name": "Back Squat", "sets": 3, "reps": [5, 8] },
+      { "name": "Romanian Deadlift", "sets": 3, "reps": [8, 12] },
+      { "name": "Leg Press", "sets": 3, "reps": [10, 15] },
+      { "name": "Seated Leg Curl", "sets": 2, "reps": [10, 15] },
+      { "name": "Standing Calf Raise", "sets": 3, "reps": [10, 15] },
+      { "name": "Cable Crunch", "sets": 3, "reps": [10, 15] } ] },
+    { "label": "Upper B", "exercises": [
+      { "name": "Overhead Press", "sets": 3, "reps": [6, 10] },
+      { "name": "Pull-Up", "sets": 3, "reps": [6, 10] },
+      { "name": "Incline Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Seated Cable Row", "sets": 3, "reps": [8, 12] },
+      { "name": "Dumbbell Lateral Raise", "sets": 3, "reps": [12, 20] },
+      { "name": "Hammer Curl", "sets": 2, "reps": [10, 15] } ] },
+    { "label": "Lower B", "exercises": [
+      { "name": "Deadlift", "sets": 3, "reps": [4, 6] },
+      { "name": "Hack Squat", "sets": 3, "reps": [8, 12] },
+      { "name": "Bulgarian Split Squat", "sets": 2, "reps": [8, 12] },
+      { "name": "Lying Leg Curl", "sets": 2, "reps": [10, 15] },
+      { "name": "Seated Calf Raise", "sets": 3, "reps": [12, 20] },
+      { "name": "Hanging Leg Raise", "sets": 3, "reps": [8, 15] } ] }
+  ]'::jsonb
+);
+
+select pg_temp.seed_template(
+  'Push / Pull / Legs — 6 day', 'push_pull_legs', 6,
+  'High-frequency PPL for intermediate and advanced lifters.',
+  '[
+    { "label": "Push A", "exercises": [
+      { "name": "Barbell Bench Press", "sets": 3, "reps": [6, 10] },
+      { "name": "Seated Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Cable Fly", "sets": 3, "reps": [10, 15] },
+      { "name": "Dumbbell Lateral Raise", "sets": 3, "reps": [12, 20] },
+      { "name": "Cable Pushdown", "sets": 3, "reps": [10, 15] } ] },
+    { "label": "Pull A", "exercises": [
+      { "name": "Barbell Row", "sets": 3, "reps": [6, 10] },
+      { "name": "Lat Pulldown", "sets": 3, "reps": [8, 12] },
+      { "name": "Face Pull", "sets": 3, "reps": [12, 20] },
+      { "name": "Barbell Curl", "sets": 3, "reps": [8, 12] },
+      { "name": "Barbell Shrug", "sets": 3, "reps": [10, 15] } ] },
+    { "label": "Legs A", "exercises": [
+      { "name": "Back Squat", "sets": 3, "reps": [5, 8] },
+      { "name": "Romanian Deadlift", "sets": 3, "reps": [8, 12] },
+      { "name": "Leg Press", "sets": 3, "reps": [10, 15] },
+      { "name": "Seated Leg Curl", "sets": 2, "reps": [10, 15] },
+      { "name": "Standing Calf Raise", "sets": 4, "reps": [10, 15] } ] },
+    { "label": "Push B", "exercises": [
+      { "name": "Overhead Press", "sets": 3, "reps": [6, 10] },
+      { "name": "Incline Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Weighted Dip", "sets": 3, "reps": [8, 12] },
+      { "name": "Cable Lateral Raise", "sets": 3, "reps": [12, 20] },
+      { "name": "Overhead Cable Extension", "sets": 3, "reps": [10, 15] } ] },
+    { "label": "Pull B", "exercises": [
+      { "name": "Pull-Up", "sets": 3, "reps": [6, 10] },
+      { "name": "Seated Cable Row", "sets": 3, "reps": [8, 12] },
+      { "name": "Reverse Pec Deck", "sets": 3, "reps": [12, 20] },
+      { "name": "Incline Dumbbell Curl", "sets": 3, "reps": [10, 15] },
+      { "name": "Hammer Curl", "sets": 2, "reps": [10, 15] } ] },
+    { "label": "Legs B", "exercises": [
+      { "name": "Deadlift", "sets": 3, "reps": [4, 6] },
+      { "name": "Hack Squat", "sets": 3, "reps": [8, 12] },
+      { "name": "Walking Lunge", "sets": 2, "reps": [10, 15] },
+      { "name": "Lying Leg Curl", "sets": 2, "reps": [10, 15] },
+      { "name": "Seated Calf Raise", "sets": 4, "reps": [12, 20] } ] }
+  ]'::jsonb
+);
+
+select pg_temp.seed_template(
+  'Full Body — 3 day', 'full_body', 3,
+  'Three full-body sessions. Good for beginners and time-constrained lifters.',
+  '[
+    { "label": "Day 1", "exercises": [
+      { "name": "Back Squat", "sets": 3, "reps": [5, 8] },
+      { "name": "Barbell Bench Press", "sets": 3, "reps": [6, 10] },
+      { "name": "Barbell Row", "sets": 3, "reps": [6, 10] },
+      { "name": "Standing Calf Raise", "sets": 3, "reps": [10, 15] },
+      { "name": "Cable Crunch", "sets": 3, "reps": [10, 15] } ] },
+    { "label": "Day 2", "exercises": [
+      { "name": "Deadlift", "sets": 3, "reps": [4, 6] },
+      { "name": "Overhead Press", "sets": 3, "reps": [6, 10] },
+      { "name": "Lat Pulldown", "sets": 3, "reps": [8, 12] },
+      { "name": "Dumbbell Curl", "sets": 2, "reps": [10, 15] },
+      { "name": "Cable Pushdown", "sets": 2, "reps": [10, 15] } ] },
+    { "label": "Day 3", "exercises": [
+      { "name": "Leg Press", "sets": 3, "reps": [10, 15] },
+      { "name": "Incline Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Seated Cable Row", "sets": 3, "reps": [8, 12] },
+      { "name": "Romanian Deadlift", "sets": 3, "reps": [8, 12] },
+      { "name": "Dumbbell Lateral Raise", "sets": 3, "reps": [12, 20] } ] }
+  ]'::jsonb
+);
+
+select pg_temp.seed_template(
+  'Glute Emphasis — 4 day', 'lower', 4,
+  'Lower-biased split with glute emphasis; upper maintenance volume.',
+  '[
+    { "label": "Glutes & Quads", "exercises": [
+      { "name": "Barbell Hip Thrust", "sets": 3, "reps": [8, 12] },
+      { "name": "Back Squat", "sets": 3, "reps": [5, 8] },
+      { "name": "Walking Lunge", "sets": 2, "reps": [10, 15] },
+      { "name": "Hip Abduction Machine", "sets": 3, "reps": [12, 20] },
+      { "name": "Standing Calf Raise", "sets": 3, "reps": [10, 15] } ] },
+    { "label": "Upper", "exercises": [
+      { "name": "Dumbbell Bench Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Lat Pulldown", "sets": 3, "reps": [8, 12] },
+      { "name": "Seated Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Seated Cable Row", "sets": 3, "reps": [8, 12] },
+      { "name": "Dumbbell Lateral Raise", "sets": 2, "reps": [12, 20] } ] },
+    { "label": "Glutes & Hamstrings", "exercises": [
+      { "name": "Sumo Deadlift", "sets": 3, "reps": [4, 6] },
+      { "name": "Romanian Deadlift", "sets": 3, "reps": [8, 12] },
+      { "name": "Machine Hip Thrust", "sets": 3, "reps": [10, 15] },
+      { "name": "Seated Leg Curl", "sets": 3, "reps": [10, 15] },
+      { "name": "Cable Kickback", "sets": 2, "reps": [12, 20] } ] },
+    { "label": "Full Body", "exercises": [
+      { "name": "Leg Press", "sets": 3, "reps": [10, 15] },
+      { "name": "Incline Dumbbell Press", "sets": 3, "reps": [8, 12] },
+      { "name": "Chest-Supported Row", "sets": 3, "reps": [8, 12] },
+      { "name": "Bulgarian Split Squat", "sets": 2, "reps": [8, 12] },
+      { "name": "Cable Crunch", "sets": 3, "reps": [10, 15] } ] }
+  ]'::jsonb
+);
+
+-- ---------------------------------------------------------------------------
+-- default engine params (version 1) — mirrors src/lib/engine/params.ts
+-- ---------------------------------------------------------------------------
+
+insert into public.engine_params (version, params, is_active, notes)
+select 1, '{
+  "increment_kg": {
+    "barbell": 2.5,
+    "smith": 2.5,
+    "dumbbell": 2.0,
+    "machine": 2.5,
+    "cable": 2.5,
+    "bodyweight": 2.5,
+    "other": 2.5
+  },
+  "lb_increment_factor": 2,
+  "experience_increment_scale": {
+    "beginner": 1.5,
+    "intermediate": 1.0,
+    "advanced": 0.5
+  },
+  "progression_style": {
+    "gain": "load_first",
+    "cut": "hold",
+    "maintain": "hold"
+  },
+  "small_miss_reps": 2,
+  "regression_pct": 0.9,
+  "pain_gate": 2,
+  "strain_volume_threshold": 2,
+  "fatigue_volume_threshold": 2,
+  "pump_low_threshold": 1,
+  "set_add_pump_min": 3,
+  "set_add_fatigue_max": 0,
+  "min_sets": 2,
+  "max_sets_per_exercise": 6,
+  "mg_set_ceiling": 20,
+  "session_fatigue_dampen_threshold": 3,
+  "session_performance_dampen_threshold": 1,
+  "deload": { "load_pct": 0.55, "set_pct": 0.5, "target_rir": 4 },
+  "meso_seed_backoff_pct": 0.925,
+  "rounding_kg": { "barbell": 2.5, "smith": 2.5, "dumbbell": 2.0, "machine": 2.5, "cable": 2.5, "bodyweight": 2.5, "other": 2.5 }
+}'::jsonb, true, 'v1 defaults from docs/04-feedback-engine.md'
+where not exists (select 1 from public.engine_params where version = 1);

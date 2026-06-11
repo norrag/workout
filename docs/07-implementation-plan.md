@@ -6,12 +6,12 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 
 **Goal:** a deployed empty shell with CI, types, and design tokens in place.
 
-- [ ] Scaffold Next.js (App Router, TypeScript, Tailwind) per the structure in [02-architecture.md](02-architecture.md)
-- [ ] PWA baseline: manifest, icons, Serwist service worker, installability
-- [ ] Design tokens + `ui/` primitives (Button, Card, Input, BottomNav) from [06-design-system.md](06-design-system.md)
-- [ ] Supabase project + local CLI workflow (`supabase start`, migration scripts in package.json)
-- [ ] `.env.example`, ESLint, Prettier, Vitest, Playwright wiring
-- [ ] GitHub Actions CI: typecheck, lint, unit tests, build
+- [x] Scaffold Next.js (App Router, TypeScript, Tailwind) per the structure in [02-architecture.md](02-architecture.md)
+- [x] PWA baseline: manifest, icons, Serwist service worker, installability
+- [x] Design tokens + `ui/` primitives (Button, Card, Input, BottomNav) from [06-design-system.md](06-design-system.md)
+- [x] Local CLI workflow (`supabase/config.toml`, migration scripts in package.json) — hosted Supabase project still to be provisioned
+- [x] `.env.example`, ESLint, Prettier, Vitest wiring — Playwright wiring pending (Phase 3 e2e)
+- [x] GitHub Actions CI: typecheck, lint, unit tests, build
 - [ ] Vercel project connected: preview deploys per PR, prod from `main`
 
 **Accept:** PR previews deploy; CI green; app installs as a PWA showing the dark shell.
@@ -20,12 +20,12 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 
 **Goal:** users exist; the full schema exists.
 
-- [ ] Migrations for the entire schema in [03-data-model.md](03-data-model.md), with RLS policies on every table
-- [ ] RLS test suite (policy tests run in CI against local Supabase)
-- [ ] Seed data: muscle groups, ~80 stock exercises, 3–4 stock templates, default `engine_params`
-- [ ] Supabase Auth: email/password + at least one OAuth provider; session handling (SSR-safe)
-- [ ] Onboarding flow: profile capture (age, gender, experience, equipment prefs, units)
-- [ ] Generated DB types + `src/lib/queries/` data-access layer
+- [x] Migrations for the entire schema in [03-data-model.md](03-data-model.md), with RLS policies on every table
+- [x] RLS test suite (policy tests run in CI against local Supabase)
+- [x] Seed data: muscle groups, ~80 stock exercises, 3–4 stock templates, default `engine_params`
+- [x] Supabase Auth: email/password with SSR-safe session handling — OAuth provider still to be enabled in the hosted project
+- [x] Onboarding flow: profile capture (age, gender, experience, equipment prefs, units)
+- [x] DB types (hand-authored, `npm run db:types` to regenerate) + `src/lib/queries/` data-access layer
 
 **Accept:** new user can sign up, onboard, and see an empty Today screen; cross-user data access provably blocked by RLS tests.
 
@@ -60,11 +60,11 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 
 **Goal:** next week's numbers are computed, explainable, and tunable.
 
-- [ ] `src/lib/engine/` pure package per [04-feedback-engine.md](04-feedback-engine.md): types, param schema, rule modules
+- [x] `src/lib/engine/` pure package per [04-feedback-engine.md](04-feedback-engine.md): types, param schema, rule modules (built early — pure code, no infra needed)
 - [ ] Week N → N+1 generation job (on micro completion or first open of new week)
 - [ ] Deload prescription; meso-seeding from prior meso peak
 - [ ] `engine_decisions` audit writes with rationale; rationale surfaced in logging UI
-- [ ] Unit tests (rule branches), golden meso simulations, property tests on hard bounds
+- [x] Unit tests (rule branches), golden meso simulations, property tests on hard bounds
 - [ ] Progress scoring v1 + `v_exercise_history` / `v_meso_summary` views
 
 **Accept:** golden-fixture meso produces the expected 3→0 RIR progression; every prescription shows a sensible rationale; pain gate provably blocks load increases.
