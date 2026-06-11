@@ -12,7 +12,7 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 - [x] Local CLI workflow (`supabase/config.toml`, migration scripts in package.json) — hosted Supabase project still to be provisioned
 - [x] `.env.example`, ESLint, Prettier, Vitest wiring — Playwright wiring pending (Phase 3 e2e)
 - [x] GitHub Actions CI: typecheck, lint, unit tests, build
-- [ ] Vercel project connected: preview deploys per PR, prod from `main`
+- [x] Vercel project connected: preview deploys per PR, prod from `main`
 
 **Accept:** PR previews deploy; CI green; app installs as a PWA showing the dark shell.
 
@@ -33,12 +33,12 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 
 **Goal:** users can build the macro → meso → micro structure.
 
-- [ ] Macrocycle CRUD (goal type, metrics, timeline, status)
-- [ ] Mesocycle builder: weeks (3–6), days/week, deload toggle, RIR ramp preview; add exercises per day (from library) with initial sets/reps/weight
-- [ ] Microcycle generation with per-week target RIR
-- [ ] Workout generation for week 1 from the meso plan
-- [ ] Cycles screen: timeline of position in macro/meso/micro
-- [ ] Exercise library v1: browse/search stock exercises, create custom exercises
+- [x] Macrocycle CRUD (goal type, metrics, timeline, status) — create/list shipped; edit/archive still open
+- [x] Mesocycle builder: weeks (3–6), days/week, deload toggle, RIR ramp preview; add exercises per day (from library) with initial sets/reps/weight
+- [x] Microcycle generation with per-week target RIR
+- [x] Workout generation for week 1 from the meso plan
+- [x] Cycles screen: timeline of position in macro/meso/micro
+- [x] Exercise library v1: browse/search stock exercises, create custom exercises
 
 **Accept:** user creates a macro, builds a 4-week meso from scratch, and sees week 1 workouts scheduled.
 

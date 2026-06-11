@@ -2,6 +2,34 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-11 (later) — Hosted deploy verified; Phase 2 cycle management
+
+### Done
+
+**Deploys** — hosted Supabase + Vercel are live; smoke test passed end to end (sign-up, login, macrocycle creation, all pages render). Phase 0 and Phase 1 acceptance criteria are now met in production.
+
+**Phase 2 — Cycle management** (code-complete)
+
+- Mesocycle builder (`/cycles/[macroId]/new-meso`): name, weeks 3–6, days/week, deload toggle, RIR start/end with live ramp preview (uses `rirRamp` with the active `engine_params`), per-day exercise slots from the library with initial sets/reps/weight; payload zod-validated server-side (ramp validity, day coverage, slot bounds)
+- Mesocycle detail (`/cycles/meso/[mesoId]`): week-by-week RIR plan (microcycles once started, ramp preview while planned), per-day exercise plan, and the start action
+- Activation: `src/lib/plan/activation.ts` — a pure planner (engine-style: no I/O, params injected, unit-tested) that computes all microcycle rows (week 1 active, weekly start dates) and week-1 workouts with prescriptions seeded via `seedMeso` from plan initials; `applyActivationPlan` persists microcycles → workouts → workout_exercises and flips the meso to active. Starting is guarded: planned status only, one active meso per macro
+- Cycles screen: macros now list their mesocycles with status/structure, link to detail, and a "Plan mesocycle" entry point; Today already surfaces the next planned workout and week position
+- Exercise library v1 complete: custom exercise creation (name, equipment, primary/secondary muscle, notes) alongside existing browse/search
+- New queries: `engine.ts` (active `engine_params`, schema-gated), meso plan create/detail/list, activation persistence
+- 7 new unit tests on the activation planner (ramp mapping, week-1 statuses/dates, slot ordering, seeded prescriptions, missing-equipment guard); suite now 36 tests
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (36/36), `npm run build` all green locally.
+
+### Not done yet / next
+
+1. **Phase 3 — logging flow**: `/log/[workoutId]` route (Today already links to it), set logging with steppers, feedback sheets, offline outbox + sync, Playwright e2e
+2. **Phase 2 leftovers**: macrocycle edit/archive; richer exercise picker (search inside the builder) if the native select proves clumsy on phones
+3. **Phase 4 remainder**: week N→N+1 generation job wiring `prescribe()` to logged data + `engine_decisions` audit writes (service role)
+4. Regenerate `src/lib/types/database.ts` from the live schema (`npm run db:types`) now that a hosted stack exists
+5. Phases 5–8 per the plan
+
 ## 2026-06-11 — Foundation, data model, engine core
 
 ### Done

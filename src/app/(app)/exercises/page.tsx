@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/server";
-import { listExercises } from "@/lib/queries/exercises";
+import { listExercises, listMuscleGroups } from "@/lib/queries/exercises";
+import { NewExerciseForm } from "./NewExerciseForm";
 
 export default async function ExercisesPage({
   searchParams,
@@ -15,7 +16,10 @@ export default async function ExercisesPage({
   if (!user) redirect("/sign-in");
 
   const { q } = await searchParams;
-  const exercises = await listExercises(supabase, { search: q });
+  const [exercises, muscleGroups] = await Promise.all([
+    listExercises(supabase, { search: q }),
+    listMuscleGroups(supabase),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -58,6 +62,10 @@ export default async function ExercisesPage({
             })}
           </ul>
         )}
+      </Card>
+
+      <Card header="Custom">
+        <NewExerciseForm muscleGroups={muscleGroups} />
       </Card>
     </div>
   );
