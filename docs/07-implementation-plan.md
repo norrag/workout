@@ -46,11 +46,11 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 
 **Goal:** the core daily loop, excellent on a phone in a gym.
 
-- [ ] Today screen with current workout and cycle position
-- [ ] Logging flow: per-exercise set logging (steppers), add/remove/swap sets & exercises, notes
-- [ ] Exercise feedback sheet (joint pain, strain, pump, fatigue) after final set
-- [ ] Workout feedback on completion (overall fatigue, effort, performance)
-- [ ] Full cycle-context stamping on `logged_sets`
+- [x] Today screen with current workout and cycle position
+- [x] Logging flow: per-exercise set logging (steppers), add/remove sets — swap/add exercises mid-workout and notes still open
+- [x] Exercise feedback sheet (joint pain, strain, pump, fatigue) after final set
+- [x] Workout feedback on completion (overall fatigue, effort, performance)
+- [x] Full cycle-context stamping on `logged_sets`
 - [ ] Offline outbox: log without connectivity, sync on reconnect, conflict-safe
 - [ ] Playwright e2e: complete a full workout offline → sync
 

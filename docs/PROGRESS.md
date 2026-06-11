@@ -18,13 +18,21 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 - New queries: `engine.ts` (active `engine_params`, schema-gated), meso plan create/detail/list, activation persistence
 - 7 new unit tests on the activation planner (ramp mapping, week-1 statuses/dates, slot ordering, seeded prescriptions, missing-equipment guard); suite now 36 tests
 
+**Phase 3 — logging flow core** (online path code-complete)
+
+- `/log/[workoutId]`: one exercise at a time, prescription shown above the sets, big weight/reps steppers (kg steps 2.5, lb steps 5), optional per-set reported RIR, add/remove sets, tap a logged set to correct it (update, never delete — history stays append-only)
+- Set ids are client-generated UUIDs and writes are upserts on id, so retries can't double-log — the groundwork for the offline outbox
+- Cycle stamps on `logged_sets` (macro/meso/micro/workout/exercise) are resolved server-side from `workout_exercises`; the client payload is just id + numbers, zod-validated
+- First logged set flips the workout to `in_progress` and stamps `performed_at`; exercise feedback sheet (pain/strain/pump/fatigue) after the final set; session feedback (fatigue/effort/performance) completes the workout and returns to Today
+- Resume behavior: reopening a mid-workout session jumps to the first exercise without feedback; completed workouts render read-only
+
 ### Verified
 
 `npm run typecheck`, `npm run lint`, `npm run test` (36/36), `npm run build` all green locally.
 
 ### Not done yet / next
 
-1. **Phase 3 — logging flow**: `/log/[workoutId]` route (Today already links to it), set logging with steppers, feedback sheets, offline outbox + sync, Playwright e2e
+1. **Phase 3 remainder**: offline outbox + sync (idempotent set ids are already in place), mid-workout exercise swap/add, set/workout notes, Playwright e2e for the full loop
 2. **Phase 2 leftovers**: macrocycle edit/archive; richer exercise picker (search inside the builder) if the native select proves clumsy on phones
 3. **Phase 4 remainder**: week N→N+1 generation job wiring `prescribe()` to logged data + `engine_decisions` audit writes (service role)
 4. Regenerate `src/lib/types/database.ts` from the live schema (`npm run db:types`) now that a hosted stack exists
