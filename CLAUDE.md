@@ -9,6 +9,7 @@ WORKOUT is a PWA-first workout tracker built on periodized training cycles (macr
 - `docs/05-mcp-connector.md` — MCP tool surface and auth rules
 - `docs/06-design-system.md` — tokens, accent discipline, copy voice
 - `docs/07-implementation-plan.md` — phase order; implement phases in sequence
+- `docs/08-ui-design-corpus.md` — binding interaction rules; check every screen against it
 
 ## Stack
 
@@ -23,6 +24,7 @@ Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres/Auth/RLS), Verc
 5. **MCP tools never take a `user_id` argument** — identity comes from the auth session only. Write tools create drafts; no deletes of logged history.
 6. **Validate every boundary with zod** (forms, route handlers, MCP tool args, engine params).
 7. **Design discipline:** orange accent only for active states/primary actions/progress marks; all-caps only for logo and key labels; no hype copy, no exclamation marks.
+8. **UI discipline (`docs/08-ui-design-corpus.md`):** no dropdowns/selects ever; one job per screen — split flows into steps/tabs/sheets; plan at the right cycle altitude (meso = days × muscles × exercises; sets/reps/weights belong to the week and the engine); the 3→0 RIR ramp is built in, never a user option; categorical muscle-group color is separate from the accent.
 
 ## Commands (once scaffolded)
 

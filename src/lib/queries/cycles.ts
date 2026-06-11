@@ -134,7 +134,10 @@ export async function createMesocyclePlan(
 
 export interface MesocycleDetail {
   meso: MesocycleRow;
-  planItems: (MesoExerciseRow & { exercise_name: string })[];
+  planItems: (MesoExerciseRow & {
+    exercise_name: string;
+    primary_muscle: string | null;
+  })[];
   microcycles: MicrocycleRow[];
 }
 
@@ -170,14 +173,31 @@ export async function getMesocycleDetail(
   if (microError) throw microError;
 
   const exerciseIds = [...new Set((planItems ?? []).map((p) => p.exercise_id))];
-  let nameById = new Map<string, string>();
+  const nameById = new Map<string, string>();
+  const muscleById = new Map<string, string>();
   if (exerciseIds.length > 0) {
-    const { data: exercises, error: exError } = await supabase
-      .from("exercises")
-      .select("id, name")
-      .in("id", exerciseIds);
+    const [
+      { data: exercises, error: exError },
+      { data: links, error: linkError },
+      { data: groups, error: mgError },
+    ] = await Promise.all([
+      supabase.from("exercises").select("id, name").in("id", exerciseIds),
+      supabase
+        .from("exercise_muscle_groups")
+        .select("exercise_id, muscle_group_id, role")
+        .in("exercise_id", exerciseIds)
+        .eq("role", "primary"),
+      supabase.from("muscle_groups").select("id, name"),
+    ]);
     if (exError) throw exError;
-    nameById = new Map((exercises ?? []).map((e) => [e.id, e.name]));
+    if (linkError) throw linkError;
+    if (mgError) throw mgError;
+    const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]));
+    for (const e of exercises ?? []) nameById.set(e.id, e.name);
+    for (const l of links ?? []) {
+      const name = groupName.get(l.muscle_group_id);
+      if (name) muscleById.set(l.exercise_id, name);
+    }
   }
 
   return {
@@ -185,6 +205,7 @@ export async function getMesocycleDetail(
     planItems: (planItems ?? []).map((p) => ({
       ...p,
       exercise_name: nameById.get(p.exercise_id) ?? "",
+      primary_muscle: muscleById.get(p.exercise_id) ?? null,
     })),
     microcycles: microcycles ?? [],
   };

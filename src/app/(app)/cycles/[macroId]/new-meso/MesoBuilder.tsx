@@ -3,10 +3,14 @@
 import { useActionState, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ChoiceChips } from "@/components/ui/ChoiceChips";
 import { Input } from "@/components/ui/Input";
+import { MuscleChip } from "@/components/ui/MuscleChip";
+import { PickerSheet, type PickerItem } from "@/components/ui/PickerSheet";
 import { RirBadge } from "@/components/ui/RirBadge";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { rirRamp, type EngineParams } from "@/lib/engine";
-import type { Units } from "@/lib/types/database";
+import { DEFAULT_INITIAL_SETS } from "@/lib/plan/constants";
 import { createMesocycleAction, type MesoFormState } from "../../actions";
 
 export interface ExerciseOption {
@@ -16,23 +20,20 @@ export interface ExerciseOption {
   primaryMuscle: string | null;
 }
 
-interface Slot {
-  exerciseId: string;
-  sets: number;
-  reps: string; // raw input, "" = unset
-  weight: string; // raw input, "" = unset
-}
-
 const initialState: MesoFormState = { error: null };
+const WEEK_OPTIONS = [3, 4, 5, 6] as const;
 
+/**
+ * Board → confirm flow (docs/08-ui-design-corpus.md): the board is day tabs
+ * with exercise slots; sets/reps/weights and the RIR ramp are not asked —
+ * they belong to the week and the engine.
+ */
 export function MesoBuilder({
   macroId,
-  units,
   engineParams,
   exercises,
 }: {
   macroId: string;
-  units: Units;
   engineParams: EngineParams;
   exercises: ExerciseOption[];
 }) {
@@ -41,121 +42,109 @@ export function MesoBuilder({
     initialState,
   );
 
+  const [step, setStep] = useState<"board" | "confirm">("board");
+  const [days, setDays] = useState<string[][]>([[], [], []]); // exercise ids per day
+  const [activeDay, setActiveDay] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [name, setName] = useState("");
   const [weeks, setWeeks] = useState(4);
-  const [daysPerWeek, setDaysPerWeek] = useState(2);
   const [includesDeload, setIncludesDeload] = useState(true);
-  const [rirStart, setRirStart] = useState(3);
-  const [rirEnd, setRirEnd] = useState(0);
-  const [days, setDays] = useState<Slot[][]>([[], []]);
 
-  const ramp = useMemo(() => {
-    try {
-      return rirRamp(weeks, includesDeload, rirStart, rirEnd, engineParams);
-    } catch {
-      return null;
+  const exerciseById = useMemo(
+    () => new Map(exercises.map((e) => [e.id, e])),
+    [exercises],
+  );
+
+  const pickerItems: PickerItem[] = useMemo(
+    () =>
+      exercises.map((e) => ({
+        id: e.id,
+        name: e.name,
+        detail: e.equipment,
+        muscle: e.primaryMuscle,
+      })),
+    [exercises],
+  );
+
+  // weekly working-set tally per muscle group, the board's balancing readout
+  const muscleTally = useMemo(() => {
+    const tally = new Map<string, number>();
+    for (const day of days) {
+      for (const id of day) {
+        const muscle = exerciseById.get(id)?.primaryMuscle ?? "other";
+        tally.set(muscle, (tally.get(muscle) ?? 0) + DEFAULT_INITIAL_SETS);
+      }
     }
-  }, [weeks, includesDeload, rirStart, rirEnd, engineParams]);
+    return [...tally.entries()].sort((a, b) => b[1] - a[1]);
+  }, [days, exerciseById]);
 
-  function setDayCount(count: number) {
-    setDaysPerWeek(count);
-    setDays((prev) =>
-      Array.from({ length: count }, (_, i) => prev[i] ?? []),
-    );
+  const ramp = rirRamp(weeks, includesDeload, 3, 0, engineParams);
+  const emptyDay = days.findIndex((d) => d.length === 0);
+  const boardError =
+    emptyDay !== -1 ? `Day ${emptyDay + 1} needs at least one exercise.` : null;
+
+  function patchDay(dayIdx: number, next: string[]) {
+    setDays((prev) => prev.map((d, i) => (i === dayIdx ? next : d)));
   }
 
-  function updateSlot(day: number, idx: number, patch: Partial<Slot>) {
-    setDays((prev) =>
-      prev.map((slots, d) =>
-        d === day
-          ? slots.map((s, i) => (i === idx ? { ...s, ...patch } : s))
-          : slots,
-      ),
-    );
+  function move(dayIdx: number, idx: number, dir: -1 | 1) {
+    const day = [...days[dayIdx]];
+    const target = idx + dir;
+    if (target < 0 || target >= day.length) return;
+    [day[idx], day[target]] = [day[target], day[idx]];
+    patchDay(dayIdx, day);
   }
 
-  function addSlot(day: number) {
-    setDays((prev) =>
-      prev.map((slots, d) =>
-        d === day
-          ? [...slots, { exerciseId: "", sets: 3, reps: "", weight: "" }]
-          : slots,
-      ),
-    );
+  function addDay() {
+    if (days.length >= 7) return;
+    setDays((prev) => [...prev, []]);
+    setActiveDay(days.length);
   }
 
-  function removeSlot(day: number, idx: number) {
-    setDays((prev) =>
-      prev.map((slots, d) =>
-        d === day ? slots.filter((_, i) => i !== idx) : slots,
-      ),
-    );
+  function removeDay(dayIdx: number) {
+    if (days.length <= 1) return;
+    setDays((prev) => prev.filter((_, i) => i !== dayIdx));
+    setActiveDay(Math.max(0, dayIdx - 1));
   }
-
-  const clientError = validate(name, days);
 
   const plan = JSON.stringify({
     macrocycle_id: macroId,
     name,
     weeks,
-    days_per_week: daysPerWeek,
+    days_per_week: days.length,
     includes_deload: includesDeload,
-    rir_start: rirStart,
-    rir_end: rirEnd,
-    exercises: days.flatMap((slots, dayIdx) =>
-      slots
-        .filter((s) => s.exerciseId)
-        .map((s, i) => ({
-          day_of_week: dayIdx + 1,
-          position: i + 1,
-          exercise_id: s.exerciseId,
-          initial_sets: s.sets,
-          initial_reps: s.reps === "" ? null : Number(s.reps),
-          initial_weight: s.weight === "" ? null : Number(s.weight),
-        })),
+    exercises: days.flatMap((day, dayIdx) =>
+      day.map((exerciseId, i) => ({
+        day_of_week: dayIdx + 1,
+        position: i + 1,
+        exercise_id: exerciseId,
+      })),
     ),
   });
 
-  return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="plan" value={plan} />
+  if (step === "confirm") {
+    return (
+      <form action={formAction} className="flex flex-col gap-4">
+        <input type="hidden" name="plan" value={plan} />
 
-      <Card header="Structure">
-        <div className="flex flex-col gap-4">
+        <Card header="Name">
           <Input
-            label="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Meso 1"
+            aria-label="Mesocycle name"
             required
           />
-          <div className="grid grid-cols-2 gap-3">
-            <SelectField
-              label="Weeks"
-              value={weeks}
-              onChange={setWeeks}
-              options={[3, 4, 5, 6]}
-            />
-            <SelectField
-              label="Days / week"
-              value={daysPerWeek}
-              onChange={setDayCount}
-              options={[1, 2, 3, 4, 5, 6, 7]}
-            />
-            <SelectField
-              label="Start RIR"
-              value={rirStart}
-              onChange={setRirStart}
-              options={[5, 4, 3, 2, 1, 0]}
-            />
-            <SelectField
-              label="End RIR"
-              value={rirEnd}
-              onChange={setRirEnd}
-              options={[5, 4, 3, 2, 1, 0]}
-            />
-          </div>
-          <label className="flex min-h-11 items-center gap-3 text-sm">
+        </Card>
+
+        <Card header="Weeks">
+          <ChoiceChips
+            label="Weeks"
+            options={WEEK_OPTIONS}
+            value={weeks}
+            onChange={setWeeks}
+          />
+          <label className="mt-4 flex min-h-11 items-center gap-3 text-sm">
             <input
               type="checkbox"
               checked={includesDeload}
@@ -164,11 +153,13 @@ export function MesoBuilder({
             />
             Final week is a deload
           </label>
-        </div>
-      </Card>
+        </Card>
 
-      <Card header="RIR ramp">
-        {ramp ? (
+        <Card header="Intensity">
+          <p className="mb-3 text-sm text-text-secondary">
+            Weekly targets ramp from 3 RIR to the 0 RIR peak. Weights and
+            reps are prescribed week to week from your logged performance.
+          </p>
           <ol className="flex flex-wrap gap-2">
             {ramp.map((week) => (
               <li key={week.weekNumber} className="flex items-center gap-1.5">
@@ -179,150 +170,155 @@ export function MesoBuilder({
               </li>
             ))}
           </ol>
-        ) : (
-          <p className="text-sm text-warning">
-            End RIR must be at or below start RIR.
-          </p>
-        )}
-      </Card>
+        </Card>
 
-      {days.map((slots, dayIdx) => (
-        <Card key={dayIdx} header={`Day ${dayIdx + 1}`}>
-          <div className="flex flex-col gap-3">
-            {slots.length === 0 && (
-              <p className="text-sm text-text-secondary">
-                No exercises yet.
-              </p>
-            )}
-            {slots.map((slot, idx) => (
-              <div
-                key={idx}
-                className="flex flex-col gap-2 rounded-[6px] border border-border-subtle bg-bg-raised p-3"
-              >
-                <div className="flex items-center gap-2">
-                  <select
-                    value={slot.exerciseId}
-                    onChange={(e) =>
-                      updateSlot(dayIdx, idx, { exerciseId: e.target.value })
-                    }
-                    required
-                    className="min-h-11 w-full rounded-[6px] border border-border-subtle bg-bg-surface px-2 text-sm focus:border-accent focus:outline-none"
-                  >
-                    <option value="">Choose exercise</option>
-                    {exercises.map((ex) => (
-                      <option key={ex.id} value={ex.id}>
-                        {ex.name}
-                        {ex.primaryMuscle ? ` — ${ex.primaryMuscle}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
+        {state.error && <p className="text-sm text-warning">{state.error}</p>}
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={pending || !name.trim()}
+        >
+          {pending ? "Creating" : "Create mesocycle"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setStep("board")}>
+          Back to plan
+        </Button>
+      </form>
+    );
+  }
+
+  const day = days[activeDay];
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SegmentedTabs
+        label="Training day"
+        items={days.map((_, i) => i)}
+        value={activeDay}
+        onChange={setActiveDay}
+        render={(i) => `Day ${i + 1}`}
+      />
+
+      <Card>
+        {day.length === 0 ? (
+          <p className="text-sm text-text-secondary">
+            No exercises yet. Add the first one.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border-subtle">
+            {day.map((exerciseId, idx) => {
+              const ex = exerciseById.get(exerciseId);
+              return (
+                <li
+                  key={`${exerciseId}-${idx}`}
+                  className="flex items-center gap-2 py-2"
+                >
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      aria-label={`Move ${ex?.name} up`}
+                      disabled={idx === 0}
+                      onClick={() => move(activeDay, idx, -1)}
+                      className="flex size-8 items-center justify-center text-text-secondary disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${ex?.name} down`}
+                      disabled={idx === day.length - 1}
+                      onClick={() => move(activeDay, idx, 1)}
+                      className="flex size-8 items-center justify-center text-text-secondary disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <MuscleChip name={ex?.primaryMuscle ?? null} />
+                    <p className="truncate text-sm">{ex?.name}</p>
+                  </div>
+                  <button
                     type="button"
-                    variant="ghost"
-                    onClick={() => removeSlot(dayIdx, idx)}
-                    aria-label={`Remove exercise ${idx + 1} from day ${dayIdx + 1}`}
-                    className="shrink-0 px-2"
+                    aria-label={`Remove ${ex?.name}`}
+                    onClick={() =>
+                      patchDay(
+                        activeDay,
+                        day.filter((_, i) => i !== idx),
+                      )
+                    }
+                    className="label-caps min-h-11 px-2 text-[10px] font-semibold text-text-secondary"
                   >
                     Remove
-                  </Button>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    label="Sets"
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={slot.sets}
-                    onChange={(e) =>
-                      updateSlot(dayIdx, idx, {
-                        sets: Math.max(1, Number(e.target.value) || 1),
-                      })
-                    }
-                  />
-                  <Input
-                    label="Reps"
-                    type="number"
-                    min={1}
-                    max={100}
-                    placeholder="—"
-                    value={slot.reps}
-                    onChange={(e) =>
-                      updateSlot(dayIdx, idx, { reps: e.target.value })
-                    }
-                  />
-                  <Input
-                    label={`Weight (${units})`}
-                    type="number"
-                    min={0}
-                    step="any"
-                    placeholder="—"
-                    value={slot.weight}
-                    onChange={(e) =>
-                      updateSlot(dayIdx, idx, { weight: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <Button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="mt-3 w-full"
+        >
+          Add exercise
+        </Button>
+      </Card>
+
+      {muscleTally.length > 0 && (
+        <Card header="Weekly sets by muscle">
+          <ul className="flex flex-col gap-2">
+            {muscleTally.map(([muscle, sets]) => (
+              <li
+                key={muscle}
+                className="flex items-center justify-between text-sm"
+              >
+                <MuscleChip name={muscle} />
+                <span className="numeral text-text-secondary">{sets}</span>
+              </li>
             ))}
-            <Button type="button" onClick={() => addSlot(dayIdx)}>
-              Add exercise
-            </Button>
-          </div>
+          </ul>
         </Card>
-      ))}
-
-      {(state.error ?? clientError) && (
-        <p className="text-sm text-warning">{state.error ?? clientError}</p>
       )}
+
+      <div className="flex gap-2">
+        {days.length < 7 && (
+          <Button type="button" onClick={addDay} className="flex-1">
+            Add day
+          </Button>
+        )}
+        {days.length > 1 && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => removeDay(activeDay)}
+            className="flex-1"
+          >
+            Remove day {activeDay + 1}
+          </Button>
+        )}
+      </div>
+
+      {boardError && <p className="text-sm text-warning">{boardError}</p>}
       <Button
-        type="submit"
+        type="button"
         variant="primary"
-        disabled={pending || clientError !== null || !ramp}
+        disabled={boardError !== null}
+        onClick={() => setStep("confirm")}
       >
-        {pending ? "Saving" : "Save mesocycle"}
+        Continue
       </Button>
-    </form>
-  );
-}
 
-function validate(name: string, days: Slot[][]): string | null {
-  if (!name.trim()) return "Name the mesocycle.";
-  for (let d = 0; d < days.length; d++) {
-    if (!days[d].some((s) => s.exerciseId)) {
-      return `Day ${d + 1} needs at least one exercise.`;
-    }
-  }
-  return null;
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  options: number[];
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="label-caps text-xs font-semibold text-text-secondary">
-        {label}
-      </span>
-      <select
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        aria-label={label}
-        className="min-h-11 rounded-[6px] border border-border-subtle bg-bg-raised px-3 text-base focus:border-accent focus:outline-none"
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
+      {pickerOpen && (
+        <PickerSheet
+          title={`Add to day ${activeDay + 1}`}
+          items={pickerItems}
+          onPick={(item) => {
+            patchDay(activeDay, [...day, item.id]);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMacrocycle } from "@/lib/queries/cycles";
 import { getActiveEngineParams } from "@/lib/queries/engine";
-import { getProfile } from "@/lib/queries/profiles";
 import { listExercises } from "@/lib/queries/exercises";
 import { MesoBuilder } from "./MesoBuilder";
 
@@ -18,9 +17,8 @@ export default async function NewMesocyclePage({
   if (!user) redirect("/sign-in");
 
   const { macroId } = await params;
-  const [macro, profile, exercises, engine] = await Promise.all([
+  const [macro, exercises, engine] = await Promise.all([
     getMacrocycle(supabase, macroId),
-    getProfile(supabase, user.id),
     listExercises(supabase),
     getActiveEngineParams(supabase),
   ]);
@@ -36,7 +34,6 @@ export default async function NewMesocyclePage({
       </header>
       <MesoBuilder
         macroId={macro.id}
-        units={profile?.units ?? "lb"}
         engineParams={engine.params}
         exercises={exercises.map((e) => ({
           id: e.id,

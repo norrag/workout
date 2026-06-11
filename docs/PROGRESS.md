@@ -2,6 +2,26 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-11 (evening) — UI design corpus; builder realigned
+
+Direction-setting pause requested after reviewing the first functional build against reference UI. Outcome:
+
+### Done
+
+- **New binding doc: [08-ui-design-corpus.md](08-ui-design-corpus.md)** — interaction rules distilled from the reference review: one job per screen (board → confirm flows, tabs/sheets over long forms), a total ban on dropdowns with concrete replacements per option count, categorical muscle-group color as an information channel separate from the accent, the **planning-altitude rule** (macro = goal; meso = days × muscles × exercises; sets/reps/weights belong to the week and the engine), and **RIR as built-in science** (3→0 ramp + deload, never a user option). Includes a per-PR review checklist. Linked from CLAUDE.md (hard rule 8) and 06.
+- **New shared patterns** (`src/components/ui/`): `SegmentedTabs`, `ChoiceChips`, `PickerSheet` (full-height search + muscle-filter picker), `MuscleChip` (categorical label; palette tokens in `globals.css`)
+- **Meso builder rebuilt to the corpus**: day tabs with exercise slots (muscle chip, up/down reorder, remove), exercises added via the picker sheet, live **weekly sets-per-muscle tally** for balancing, then a minimal confirm step (name, weeks, deload) showing the fixed ramp read-only. RIR pickers and per-slot sets/reps/weight inputs are gone; the server pins the 3→0 ramp and seeds `initial_sets` from `DEFAULT_INITIAL_SETS` (`src/lib/plan/constants.ts`) — week 1 anchors on what the user actually lifts
+- **Dropdowns removed everywhere**: custom-exercise form now uses chip groups; exercise rows and meso detail show muscle chips instead of text metadata
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (36/36), `npm run build` all green locally.
+
+### Notes
+
+- `mesocycles.rir_start/rir_end` columns stay (schema unchanged, defaults 3/0) — they're now written only with the built-in values; engine and views are unaffected
+- The library page still uses a GET search form — fine per corpus (it's a filter, not a dropdown), but it should converge with `PickerSheet` styling in a later polish pass
+
 ## 2026-06-11 (later) — Hosted deploy verified; Phase 2 cycle management
 
 ### Done

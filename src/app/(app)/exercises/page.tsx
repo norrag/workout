@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { MuscleChip } from "@/components/ui/MuscleChip";
 import { createClient } from "@/lib/supabase/server";
 import { listExercises, listMuscleGroups } from "@/lib/queries/exercises";
 import { NewExerciseForm } from "./NewExerciseForm";
@@ -41,15 +42,15 @@ export default async function ExercisesPage({
         ) : (
           <ul className="divide-y divide-border-subtle">
             {exercises.map((ex) => {
-              const primary = ex.muscles.find(
-                (m) => m.role === "primary",
-              )?.name;
+              const primary =
+                ex.muscles.find((m) => m.role === "primary")?.name ?? null;
               return (
                 <li key={ex.id} className="flex items-center justify-between py-3">
                   <div>
+                    <MuscleChip name={primary} />
                     <p className="text-sm">{ex.name}</p>
                     <p className="text-xs text-text-secondary">
-                      {[primary, ex.equipment_type].filter(Boolean).join(" · ")}
+                      {ex.equipment_type}
                     </p>
                   </div>
                   {ex.user_id !== null && (

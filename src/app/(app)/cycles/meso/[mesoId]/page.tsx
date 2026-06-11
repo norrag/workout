@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { MuscleChip } from "@/components/ui/MuscleChip";
 import { RirBadge } from "@/components/ui/RirBadge";
 import { createClient } from "@/lib/supabase/server";
 import { getMesocycleDetail } from "@/lib/queries/cycles";
@@ -84,18 +85,9 @@ export default async function MesocyclePage({
             ) : (
               <ul className="divide-y divide-border-subtle">
                 {slots.map((slot) => (
-                  <li
-                    key={slot.id}
-                    className="flex items-baseline justify-between py-2 text-sm"
-                  >
-                    <span>{slot.exercise_name}</span>
-                    <span className="numeral text-text-secondary">
-                      {slot.initial_sets} ×{" "}
-                      {slot.initial_reps ?? "—"}
-                      {slot.initial_weight != null
-                        ? ` @ ${slot.initial_weight}`
-                        : ""}
-                    </span>
+                  <li key={slot.id} className="py-2">
+                    <MuscleChip name={slot.primary_muscle} />
+                    <p className="text-sm">{slot.exercise_name}</p>
                   </li>
                 ))}
               </ul>

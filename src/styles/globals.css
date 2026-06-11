@@ -13,6 +13,20 @@
   --color-positive: #4caf7d;
   --color-warning: #e0b23c;
 
+  /* Muscle-group categorical palette — docs/08-ui-design-corpus.md */
+  --color-mg-chest: #c96a6a;
+  --color-mg-back: #6a9bc9;
+  --color-mg-shoulders: #c96ab0;
+  --color-mg-biceps: #6ac9a8;
+  --color-mg-triceps: #c9a86a;
+  --color-mg-quads: #8e6ac9;
+  --color-mg-hamstrings: #c9866a;
+  --color-mg-glutes: #6ac96e;
+  --color-mg-calves: #6ac0c9;
+  --color-mg-abs: #b5c96a;
+  --color-mg-forearms: #9a8e78;
+  --color-mg-traps: #7e86c9;
+
   --radius-card: 8px;
   --radius-control: 6px;
 

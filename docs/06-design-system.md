@@ -1,5 +1,7 @@
 # 06 — Design System
 
+Visual foundations live here; the **interaction rules** (no dropdowns, one job per screen, planning altitude, picker sheets, muscle-group color) live in [08-ui-design-corpus.md](08-ui-design-corpus.md) and are equally binding.
+
 ## Attitude
 
 Strong, restrained, deliberate — never loud or motivational. The interface is a **serious tool for people who train consistently**, not a lifestyle brand trying to hype them up. Minimal copy, obvious actions, clean tracking screens, a slightly counterculture visual attitude: disciplined, useful, quiet, distinct.
@@ -23,6 +25,8 @@ Deep charcoal and near-black surfaces, softened by subtle gradients, shadow, and
 | `--warning` | `#E0B23C` | pain/strain flags (muted) |
 
 **Accent discipline:** orange is for active states, primary actions, progress marks, and small highlights — never full-screen energy, never large filled backgrounds, at most one primary accent element per screen.
+
+**Categorical color:** muscle groups carry a fixed muted palette (`--color-mg-*`, table in [08-ui-design-corpus.md](08-ui-design-corpus.md)) rendered via `MuscleChip` — labels only, never buttons, never mixed with the accent's meaning.
 
 Surfaces may use very subtle top-light gradients (≤4% luminance shift) and soft shadow; optional fine grain/noise texture at low opacity for the premium feel. No glows, no neon.
 

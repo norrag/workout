@@ -14,6 +14,11 @@ import {
 import { getActiveEngineParams } from "@/lib/queries/engine";
 import { getProfile } from "@/lib/queries/profiles";
 import { buildActivationPlan } from "@/lib/plan/activation";
+import {
+  DEFAULT_INITIAL_SETS,
+  RIR_END,
+  RIR_START,
+} from "@/lib/plan/constants";
 import type { EquipmentType } from "@/lib/types/database";
 
 const macroSchema = z.object({
@@ -59,11 +64,10 @@ const slotSchema = z.object({
   day_of_week: z.number().int().min(1).max(7),
   position: z.number().int().min(1),
   exercise_id: z.string().uuid(),
-  initial_weight: z.number().min(0).nullable(),
-  initial_reps: z.number().int().min(1).max(100).nullable(),
-  initial_sets: z.number().int().min(1).max(20),
 });
 
+// The RIR ramp is built in (docs/08-ui-design-corpus.md §5) and set/rep
+// detail belongs to the week — the plan payload is structure + exercises only.
 const mesoPlanSchema = z
   .object({
     macrocycle_id: z.string().uuid(),
@@ -71,12 +75,7 @@ const mesoPlanSchema = z
     weeks: z.number().int().min(3).max(6),
     days_per_week: z.number().int().min(1).max(7),
     includes_deload: z.boolean(),
-    rir_start: z.number().int().min(0).max(5),
-    rir_end: z.number().int().min(0).max(5),
     exercises: z.array(slotSchema).min(1),
-  })
-  .refine((p) => p.rir_end <= p.rir_start, {
-    message: "End RIR must be at or below start RIR",
   })
   .refine(
     (p) => p.exercises.every((e) => e.day_of_week <= p.days_per_week),
@@ -117,7 +116,15 @@ export async function createMesocycleAction(
 
   const meso = await createMesocyclePlan(supabase, user.id, {
     ...parsed.data,
+    rir_start: RIR_START,
+    rir_end: RIR_END,
     start_date: null,
+    exercises: parsed.data.exercises.map((slot) => ({
+      ...slot,
+      initial_weight: null,
+      initial_reps: null,
+      initial_sets: DEFAULT_INITIAL_SETS,
+    })),
   });
   revalidatePath("/cycles");
   redirect(`/cycles/meso/${meso.id}`);
