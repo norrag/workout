@@ -63,13 +63,13 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** the section-1 daily loop, excellent on a phone in a gym. Online-only.
 
-- [ ] Workout tab resting logic (08 §2): show latest uncompleted workout; else latest completed meso's stats view
-- [ ] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
-- [ ] Exercise menu (fig 1.2): history, new note, replace exercise, move, add set, skip remaining, remove
-- [ ] Set menu (fig 1.3): add set below, set type (straight/drop), skip set, delete set; prescription rationale surfaced as short clinical lines
-- [ ] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
-- [ ] Workout complete sheet (fig 1.5): summary rows, autoregulation summary from engine output, workout notes saved with the session, link to meso stats, next-workout button
-- [ ] Deload logging = standard day view + `DELOAD` badge and engine-reduced prescriptions
+- [~] Workout tab resting logic (08 §2): latest uncompleted workout shown; resting state shows the last completed meso's summary rows (full 4.1 stats view lands in Phase 5)
+- [x] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
+- [~] Exercise menu (fig 1.2): new/replace pinned note, add set, skip remaining, remove (blocked once sets are logged); history / replace exercise / move pending
+- [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets; prescription rationale surfaced in the exercise menu. No deletes of logged sets by design (append-only history)
+- [x] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
+- [~] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary needs the Phase 4 engine wiring
+- [x] Deload logging = standard day view + `DELOAD` badge (engine-reduced prescriptions arrive with the Phase 4 week-generation job)
 - [ ] Playwright e2e: log a full workout including feedback and completion
 
 **Accept:** a full workout can be logged one-thumbed; feedback writes the redesigned rows; completion shows a real engine-derived autoregulation summary.

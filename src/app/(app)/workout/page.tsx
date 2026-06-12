@@ -18,6 +18,21 @@ export default async function WorkoutPage() {
 
   const state = await getCurrentState(supabase, user.id);
 
+  // resting logic (08 §2): no active meso → latest completed meso's stats
+  let restingSummary = null;
+  if (!state.mesocycle) {
+    const { data, error } = await supabase
+      .from("v_meso_summary")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    restingSummary = data;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="border-b-[1.5px] border-ink pb-3">
@@ -28,6 +43,32 @@ export default async function WorkoutPage() {
           </p>
         )}
       </header>
+
+      {!state.mesocycle && restingSummary && (
+        <Card header={`LAST MESO — ${restingSummary.name.toUpperCase()}`}>
+          <dl className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between border-b border-ink/15 pb-2">
+              <dt className="text-ink/55">Workouts</dt>
+              <dd className="numeral">
+                {restingSummary.workouts_completed} /{" "}
+                {restingSummary.workouts_total}
+              </dd>
+            </div>
+            <div className="flex justify-between border-b border-ink/15 pb-2">
+              <dt className="text-ink/55">Working sets</dt>
+              <dd className="numeral">{restingSummary.working_sets}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-ink/55">Best e1RM</dt>
+              <dd className="numeral">
+                {restingSummary.best_e1rm != null
+                  ? Math.round(restingSummary.best_e1rm)
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+        </Card>
+      )}
 
       {!state.mesocycle && (
         <Card header="No active mesocycle">
