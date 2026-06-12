@@ -1,19 +1,27 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import "@/styles/globals.css";
 
+const archivo = localFont({
+  src: "./fonts/archivo-latin-variable.woff2",
+  weight: "100 900",
+  display: "swap",
+  variable: "--font-archivo",
+});
+
 export const metadata: Metadata = {
-  title: "WORKOUT",
+  title: "workout",
   description: "Periodized workout tracking with RIR-based progression",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black",
-    title: "WORKOUT",
+    statusBarStyle: "default",
+    title: "workout",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B0B0C",
+  themeColor: "#F4F0E6",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -24,10 +32,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh bg-bg-base text-text-primary">
-        {children}
-      </body>
+    <html lang="en" className={archivo.variable}>
+      <body className="min-h-dvh bg-bg-base text-ink">{children}</body>
     </html>
   );
 }

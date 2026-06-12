@@ -1,11 +1,11 @@
-// Generates the PWA icons (flat barbell mark, orange accent on near-black)
+// Generates the PWA icons (flat barbell mark, accent bar + ink plates on cream)
 // without external image dependencies. Run: node scripts/generate-icons.mjs
 import { deflateSync } from "node:zlib";
 import { writeFileSync, mkdirSync } from "node:fs";
 
-const BG = [0x0b, 0x0b, 0x0c];
-const ACCENT = [0xf2, 0x5c, 0x05];
-const TEXT = [0xf2, 0xf2, 0xf0];
+const BG = [0xf4, 0xf0, 0xe6];
+const ACCENT = [0xc1, 0x4b, 0x2a];
+const TEXT = [0x17, 0x14, 0x0f];
 
 function crc32(buf) {
   let c,

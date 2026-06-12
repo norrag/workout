@@ -15,17 +15,17 @@ Scope changes folded into this plan:
 Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest/ESLint/Prettier, primitives. Remaining items absorbed into Phase R and Phase 1b:
 
 - [ ] Vercel project connected: preview deploys per PR, prod from `main`
-- [ ] Remove the Serwist offline-logging assumptions; keep installability + shell precache only
+- [x] Remove the Serwist offline-logging assumptions; keep installability + shell precache only (verified: SW was already shell-precache + runtime cache only)
 
 ## Phase R — Design-system retheme (new)
 
 **Goal:** the app shell and primitives match the light ledger system before any feature screens are built on them.
 
-- [ ] Replace token set in `src/styles/globals.css` per 08 §1: `#F4F0E6` base, `#17140F` ink, `#C14B2A` accent, hairlines/rules, square corners everywhere; PWA theme color → `#F4F0E6`
-- [ ] Typography: Archivo (self-hosted via `next/font`), 800-weight lowercase titles, tracked all-caps labels, tabular-lining numerals
-- [ ] Rework primitives: Button, Input, segmented control (filled-ink active state), chips, dashed "planned/empty" variants, snap-to-stop slider, bottom sheet, menu card (offset hard shadow), week-track component
-- [ ] BottomNav → canon tabs `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`
-- [ ] Manifest/icons regenerated for the light system
+- [x] Replace token set in `src/styles/globals.css` per 08 §1: `#F4F0E6` base, `#17140F` ink, `#C14B2A` accent, hairlines/rules, square corners everywhere; PWA theme color → `#F4F0E6`
+- [x] Typography: Archivo (self-hosted via `next/font`), 800-weight lowercase titles, tracked all-caps labels, tabular-lining numerals
+- [x] Rework primitives: Button, Input, segmented control (filled-ink active state), chips, dashed "planned/empty" variants, snap-to-stop slider, bottom sheet, menu card (offset hard shadow), week-track component
+- [x] BottomNav → canon tabs `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`
+- [x] Manifest/icons regenerated for the light system
 - [ ] Visual QA against mockup figures 1.1–4.5 (`docs/design/mockups/workout - App Screens v2.dc.html`)
 
 **Accept:** shell + primitives render pixel-faithful to the mockups; no rounded corners, no shadows except menu cards, orange only on current/selected.
@@ -34,8 +34,8 @@ Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest
 
 Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
-- [ ] Migration `20260612000001_design_pivot.sql`: profile body data + week start, equipment vocabulary, excluded exercises, pinned exercise notes, macro slots, standalone mesos, 3–8 week mesos, groups-first plan tables (`meso_days`, `meso_day_groups`), workout-exercise group/status, set types + units, feedback redesign (pump/workload 0–10 sliders, per-group scope), `template_day_groups`, `mcp_write_audit`, meso-stats views — with RLS + tests in the same PR
-- [ ] Update `database.ts` types and `src/lib/queries/` for the new shapes
+- [x] Migration `20260612000001_design_pivot.sql`: profile body data + week start, equipment vocabulary, excluded exercises, pinned exercise notes, macro slots, standalone mesos, 3–8 week mesos, groups-first plan tables (`meso_days`, `meso_day_groups`), workout-exercise group/status, set types + units, feedback redesign (pump/workload 0–10 sliders, per-group scope), `template_day_groups`, `mcp_write_audit`, meso-stats views — with RLS + tests in the same PR
+- [~] Update `database.ts` types (done with the migration) and `src/lib/queries/` for the new shapes (queries pending)
 - [ ] Onboarding rebuilt as the 08 §4 sequence: name/age/height/bodyweight → experience level → equipment access → units; land on Cycles with the create-macro empty state
 - [ ] Profile screen (fig 4.5): data rows, experience segmented control, equipment chips, excluded-exercise management
 - [ ] More tab (fig 4.4): profile card, LB/KG toggle, AI connector row (placeholder until Phase 6), CSV export stub, version line

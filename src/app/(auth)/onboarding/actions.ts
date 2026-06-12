@@ -45,5 +45,5 @@ export async function completeOnboarding(
     onboarded_at: new Date().toISOString(),
   });
 
-  redirect("/today");
+  redirect("/cycles");
 }

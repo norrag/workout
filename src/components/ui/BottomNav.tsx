@@ -3,29 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// canon tab bar — docs/08-design-decisions.md §2
 const items = [
-  { href: "/today", label: "Today" },
+  { href: "/workout", label: "Workout" },
   { href: "/cycles", label: "Cycles" },
-  { href: "/insights", label: "Insights" },
-  { href: "/exercises", label: "Library" },
-  { href: "/settings", label: "Settings" },
+  { href: "/templates", label: "Templates" },
+  { href: "/exercises", label: "Exercises" },
+  { href: "/more", label: "More" },
 ] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 border-t border-border-subtle bg-bg-surface pb-[env(safe-area-inset-bottom)]">
-      <ul className="mx-auto flex max-w-lg justify-around">
+    <nav className="fixed inset-x-0 bottom-0 border-t-2 border-ink bg-bg-base pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto flex max-w-lg">
         {items.map(({ href, label }) => {
           const active = pathname?.startsWith(href);
           return (
-            <li key={href}>
+            <li key={href} className="flex-1">
               <Link
                 href={href}
-                className={`label-caps flex min-h-12 min-w-14 flex-col items-center justify-center px-2 text-[11px] font-semibold ${
-                  active ? "text-accent" : "text-text-secondary"
+                aria-current={active ? "page" : undefined}
+                className={`label-caps flex min-h-12 items-center justify-center px-1 text-[9px] ${
+                  active ? "font-bold text-ink" : "font-medium text-ink/45"
                 }`}
               >
+                {active && <span aria-hidden>■&nbsp;</span>}
                 {label}
               </Link>
             </li>

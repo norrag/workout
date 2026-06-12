@@ -29,7 +29,7 @@ export async function signIn(
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) return { error: error.message };
 
-  redirect("/today");
+  redirect("/workout");
 }
 
 export async function signUp(

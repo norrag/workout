@@ -27,13 +27,13 @@ export default function SignInPage() {
         autoComplete="current-password"
         required
       />
-      {state.error && <p className="text-sm text-warning">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent">{state.error}</p>}
       <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Signing in" : "Sign in"}
       </Button>
-      <p className="text-center text-sm text-text-secondary">
+      <p className="text-center text-sm text-ink/55">
         No account?{" "}
-        <Link href="/sign-up" className="text-text-primary underline">
+        <Link href="/sign-up" className="text-ink underline">
           Create one
         </Link>
       </p>
