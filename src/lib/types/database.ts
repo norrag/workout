@@ -17,6 +17,7 @@ type Table<R> = {
 };
 
 export type GoalType = "cut" | "gain" | "maintain";
+export type SlotGoalType = "cut" | "gain" | "maintain" | "peak";
 export type EquipmentType =
   | "dumbbell"
   | "barbell"
@@ -24,18 +25,26 @@ export type EquipmentType =
   | "cable"
   | "smith"
   | "bodyweight"
+  | "bands"
+  | "kettlebell"
   | "other";
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
 export type Units = "kg" | "lb";
+export type SetType = "straight" | "drop";
 
 export type ProfileRow = {
   id: string;
   display_name: string | null;
   age: number | null;
   gender: "female" | "male" | "other" | "undisclosed" | null;
+  height_cm: number | null;
+  bodyweight: number | null;
+  bodyweight_updated_at: string | null;
+  training_since: string | null;
   experience_level: ExperienceLevel | null;
   preferred_equipment: string[];
   units: Units;
+  week_starts_on: number;
   role: "user" | "admin";
   onboarded_at: string | null;
   created_at: string;
@@ -54,9 +63,29 @@ export type ExerciseRow = {
   user_id: string | null;
   name: string;
   equipment_type: EquipmentType;
+  description: string | null;
   notes: string | null;
   video_url: string | null;
   source_exercise_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ExcludedExerciseRow = {
+  id: string;
+  user_id: string;
+  exercise_id: string;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ExerciseNoteRow = {
+  id: string;
+  user_id: string;
+  exercise_id: string;
+  body: string;
+  is_pinned: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -84,9 +113,21 @@ export type MacrocycleRow = {
   updated_at: string;
 }
 
-export type MesocycleRow = {
+export type MacroSlotRow = {
   id: string;
   macrocycle_id: string;
+  user_id: string;
+  slot_number: number;
+  goal_type: SlotGoalType;
+  label: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MesocycleRow = {
+  id: string;
+  macrocycle_id: string | null;
+  macro_slot_id: string | null;
   user_id: string;
   name: string;
   weeks: number;
@@ -101,10 +142,33 @@ export type MesocycleRow = {
   updated_at: string;
 }
 
+export type MesoDayRow = {
+  id: string;
+  mesocycle_id: string;
+  user_id: string;
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MesoDayGroupRow = {
+  id: string;
+  meso_day_id: string;
+  muscle_group_id: string;
+  position: number;
+  exercise_slots: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type MesoExerciseRow = {
   id: string;
   mesocycle_id: string;
-  day_of_week: number;
+  day_of_week: number | null;
+  meso_day_group_id: string | null;
+  slot_number: number | null;
   position: number;
   exercise_id: string;
   initial_weight: number | null;
@@ -144,11 +208,13 @@ export type WorkoutExerciseRow = {
   id: string;
   workout_id: string;
   exercise_id: string;
+  muscle_group_id: string | null;
   position: number;
   prescribed_weight: number | null;
   prescribed_reps: number | null;
   prescribed_sets: number | null;
   target_rir: number | null;
+  status: "pending" | "completed" | "skipped";
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -159,14 +225,16 @@ export type LoggedSetRow = {
   workout_exercise_id: string;
   user_id: string;
   exercise_id: string;
-  macrocycle_id: string;
+  macrocycle_id: string | null;
   mesocycle_id: string;
   microcycle_id: string;
   workout_id: string;
   performed_at: string;
   set_number: number;
   weight: number;
+  unit: Units;
   reps: number;
+  set_type: SetType;
   rir_reported: number | null;
   is_warmup: boolean;
   notes: string | null;
@@ -178,10 +246,10 @@ export type ExerciseFeedbackRow = {
   id: string;
   workout_exercise_id: string;
   user_id: string;
+  muscle_group_id: string | null;
   joint_pain: number | null;
-  muscle_strain: number | null;
   pump: number | null;
-  fatigue: number | null;
+  workload: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -221,9 +289,21 @@ export type TemplateDayRow = {
   updated_at: string;
 }
 
+export type TemplateDayGroupRow = {
+  id: string;
+  template_day_id: string;
+  muscle_group_id: string;
+  position: number;
+  exercise_slots: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type TemplateExerciseRow = {
   id: string;
   template_day_id: string;
+  template_day_group_id: string | null;
+  slot_number: number | null;
   exercise_id: string;
   position: number;
   default_sets: number;
@@ -265,6 +345,15 @@ export type EngineDecisionRow = {
   created_at: string;
 }
 
+export type McpWriteAuditRow = {
+  id: string;
+  user_id: string;
+  tool: string;
+  args_hash: string;
+  summary: string | null;
+  created_at: string;
+}
+
 export type VExerciseHistoryRow = {
   user_id: string;
   exercise_id: string;
@@ -290,6 +379,27 @@ export type VMuscleGroupVolumeRow = {
   primary_sets: number;
   secondary_sets: number;
   volume: number | null;
+}
+
+export type VMesoWeekSetsRow = {
+  user_id: string;
+  mesocycle_id: string;
+  week_number: number;
+  is_deload: boolean;
+  muscle_group_id: string | null;
+  muscle_group: string | null;
+  planned_sets: number | null;
+  logged_sets: number;
+}
+
+export type VExercisePrsRow = {
+  user_id: string;
+  exercise_id: string;
+  exercise_name: string;
+  best_weight: number | null;
+  best_reps: number | null;
+  best_e1rm: number | null;
+  last_performed_at: string | null;
 }
 
 export type VMesoSummaryRow = {
@@ -321,8 +431,13 @@ export type Database = {
       muscle_groups: Table<MuscleGroupRow>;
       exercises: Table<ExerciseRow>;
       exercise_muscle_groups: Table<ExerciseMuscleGroupRow>;
+      excluded_exercises: Table<ExcludedExerciseRow>;
+      exercise_notes: Table<ExerciseNoteRow>;
       macrocycles: Table<MacrocycleRow>;
+      macro_slots: Table<MacroSlotRow>;
       mesocycles: Table<MesocycleRow>;
+      meso_days: Table<MesoDayRow>;
+      meso_day_groups: Table<MesoDayGroupRow>;
       meso_exercises: Table<MesoExerciseRow>;
       microcycles: Table<MicrocycleRow>;
       workouts: Table<WorkoutRow>;
@@ -332,15 +447,19 @@ export type Database = {
       workout_feedback: Table<WorkoutFeedbackRow>;
       templates: Table<TemplateRow>;
       template_days: Table<TemplateDayRow>;
+      template_day_groups: Table<TemplateDayGroupRow>;
       template_exercises: Table<TemplateExerciseRow>;
       shares: Table<ShareRow>;
       engine_params: Table<EngineParamsRow>;
       engine_decisions: Table<EngineDecisionRow>;
+      mcp_write_audit: Table<McpWriteAuditRow>;
     };
     Views: {
       v_exercise_history: { Row: VExerciseHistoryRow; Relationships: [] };
       v_muscle_group_volume: { Row: VMuscleGroupVolumeRow; Relationships: [] };
       v_meso_summary: { Row: VMesoSummaryRow; Relationships: [] };
+      v_meso_week_sets: { Row: VMesoWeekSetsRow; Relationships: [] };
+      v_exercise_prs: { Row: VExercisePrsRow; Relationships: [] };
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };

@@ -41,15 +41,15 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 ### F3 — Workout logging
 - Today's planned workout with prescribed exercises, target weight × reps × sets, and target RIR.
 - Log actual weight/reps per set; add/remove/swap sets and exercises; notes per set/exercise/workout.
-- **Set/exercise feedback**: joint or muscle pain/strain level, muscle "pump" rating, fatigue rating.
-- **Workout feedback**: overall tiredness/fatigue today, perceived effort/performance rating.
+- **Per-exercise feedback** (fig 1.4): joint pain during the exercise, plus muscle-group pump and workload sliders.
+- **Workout feedback**: session summary, autoregulation summary, and free-text workout notes on completion.
 - Every logged entry is stamped with macro/meso/micro/day context and date.
-- Offline-tolerant logging (PWA): queue writes, sync on reconnect.
+- Logging requires connectivity (decision, 08 §3 era): the app is online-only; no offline queue/sync.
 
 ### F4 — Feedback & progression engine
 - Computes next-week prescriptions (weight, reps, sets) per exercise from the signals listed in [04-feedback-engine.md](04-feedback-engine.md).
 - Progress scoring per exercise, muscle group, meso, and macro.
-- **Admin/dev tuning interface**: inspect inputs/outputs, adjust algorithm parameters, replay decisions against historical data.
+- **Admin/dev tuning via MCP** (no admin UI): inspect inputs/outputs, adjust algorithm parameters, replay decisions against historical data — all through admin-gated MCP tools, with Claude as the tuning console.
 
 ### F5 — Exercise library
 - **Stock exercises** visible to all users; **custom exercises** visible only to their author.
@@ -60,10 +60,9 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 - Reusable groups of workouts/exercises with filterable criteria: emphasis (arms, legs, upper, lower, full body…), author, intended gender, days per week.
 - Start a mesocycle from a template; save a meso as a template; share templates.
 
-### F7 — Insights
-- Per-exercise history charts (weight, volume, estimated 1RM, average performance over time).
-- Muscle-group volume tracking.
-- Meso-over-meso and macro-level progress views tied to goals.
+### F7 — Meso stats & history (not a tab — see 08 §2)
+- Meso stats behind `MESO STATS` on meso detail: volume (sets per muscle group per week, logged + autoregulated plan), balance (push/pull/legs, per-muscle bars), performance (top set by week, e1RM across the macro, PRs).
+- Per-exercise history (weight × reps by session, e1RM) in the exercise library and picker.
 
 ### F8 — MCP connector
 - An MCP server exposing the user's training data and planning tools to their LLM of choice: analysis of macro/meso/micro performance, mesocycle planning/creation, template creation, goal editing, and personalized recommendations. See [05-mcp-connector.md](05-mcp-connector.md).
@@ -81,6 +80,8 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 - Wearable/health-platform integrations.
 - Social feed / community features beyond direct sharing.
 - Nutrition tracking (macro goals reference body-weight direction only).
+- Offline logging / background sync (online-only; revisit post-launch if demanded).
+- Admin/tuning UI screens (the capability ships as MCP tools instead).
 
 ## Primary user stories
 
@@ -89,4 +90,4 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 3. As a lifter, I open today's workout and see exactly what weight/reps/sets to do, log my sets in a few taps, and answer three quick feedback prompts.
 4. As a lifter, next week's plan reflects how last week actually went — heavier where I was strong, backed off where joints complained.
 5. As a lifter, I connect Claude to my data over MCP and ask "how did my last meso go, and what should the next one look like?" and get analysis grounded in my real numbers — and it can draft the next meso for me.
-6. As an admin/developer, I can inspect why the engine prescribed what it did and tune its parameters safely.
+6. As an admin/developer, I connect Claude over MCP and inspect why the engine prescribed what it did, replay history against candidate parameters, and activate a tuned version safely — no deploy, no admin UI.

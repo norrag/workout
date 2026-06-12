@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&amp;family=Anton&amp;family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; background: #E2E0DA; }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; background: #E2E0DA; padding: 56px 48px 80px; font-family: 'Archivo', sans-serif; color: #17140F;">
+
+  <!-- ===================== INTRO / RATIONALE ===================== -->
+  <div style="max-width: 860px; margin-bottom: 56px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(23,20,15,0.55); margin-bottom: 14px;">workout — design exploration 01</div>
+    <h1 style="font-size: 40px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 18px; line-height: 1.05;">Logging screen — three brutalist-paper directions</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 10px; max-width: 720px;">All three commit to the agreed system: light cream paper, ink-black type, clinical copy, lowercase <strong>workout</strong> brand, compound coordinates (W2·D1), and an ambient RIR week header. They differ in attitude — how loud the ink is, and what carries the hierarchy.</p>
+    <div style="display: flex; gap: 28px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.5; color: rgba(23,20,15,0.7); max-width: 860px;">
+      <div style="flex: 1;"><strong style="color: #17140F;">A — ledger.</strong> Quietest. Hairline-ruled accounting table, everything earns its ink. By-the-book brutalism.</div>
+      <div style="flex: 1;"><strong style="color: #17140F;">B — stamp.</strong> Loudest. Black blocks, condensed display numerals, logged sets get a literal red rubber stamp.</div>
+      <div style="flex: 1;"><strong style="color: #17140F;">C — index.</strong> Graph-paper field with offset-shadow index cards; the meso track lives at the top of every screen.</div>
+    </div>
+  </div>
+
+  <!-- ===================== THE THREE PHONES ===================== -->
+  <div style="display: flex; gap: 56px; align-items: flex-start; flex-wrap: wrap;">
+
+    <!-- ============ DIRECTION A — LEDGER ============ -->
+    <div style="display: flex; flex-direction: column; gap: 16px;" data-screen-label="Direction A — Ledger">
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.14em;">A — LEDGER</div>
+        <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 3px;">hairline rules · tabular numerals · zero decoration</div>
+      </div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 70px 20px 0;">
+
+            <!-- brand row -->
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.22em;">workout</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+
+            <!-- coordinate -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 18px;">
+              <div style="font-size: 54px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; color: rgba(23,20,15,0.6); text-align: right; line-height: 1.5;">MON<br>12 JUN</div>
+            </div>
+
+            <!-- ambient RIR strip -->
+            <div style="display: flex; justify-content: space-between; border-top: 1.5px solid #17140F; border-bottom: 1px solid rgba(23,20,15,0.25); padding: 7px 0; margin-top: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.1em;">
+              <span>WEEK 2 OF 4</span>
+              <span style="font-weight: 600;">TARGET 2 RIR</span>
+              <span style="color: rgba(23,20,15,0.5);">DELOAD W5</span>
+            </div>
+
+            <!-- exercise 01 -->
+            <div style="margin-top: 22px;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.18em; color: rgba(23,20,15,0.55);">01 — QUADS</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 5px;">
+                <div style="font-size: 21px; font-weight: 700; letter-spacing: -0.01em;">Hack Squat</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">MACHINE</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 30px 1fr 1fr 44px; gap: 0; margin-top: 12px; border-bottom: 1px solid rgba(23,20,15,0.25); padding-bottom: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">
+                <div>SET</div><div style="text-align: right;">KG</div><div style="text-align: right;">REPS</div><div style="text-align: center;">LOG</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 30px 1fr 1fr 44px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-family: 'IBM Plex Mono', monospace; font-size: 16px;">
+                <div style="font-size: 10px; color: rgba(23,20,15,0.5);">1</div>
+                <div style="text-align: right; font-weight: 600;">112.5</div>
+                <div style="text-align: right; font-weight: 600;">8</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 21px; height: 21px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div></div>
+              </div>
+              <div style="display: grid; grid-template-columns: 30px 1fr 1fr 44px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-family: 'IBM Plex Mono', monospace; font-size: 16px;">
+                <div style="font-size: 10px; color: rgba(23,20,15,0.5);">2</div>
+                <div style="text-align: right;">112.5</div>
+                <div style="text-align: right;">6</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 21px; height: 21px; border: 1.5px solid #17140F; box-sizing: border-box;"></div></div>
+              </div>
+            </div>
+
+            <!-- exercise 02 -->
+            <div style="margin-top: 24px;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.18em; color: rgba(23,20,15,0.55);">02 — TRICEPS</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 5px;">
+                <div style="font-size: 21px; font-weight: 700; letter-spacing: -0.01em;">Cable Pushdown <span style="font-weight: 400; font-size: 15px;">(1-arm)</span></div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">CABLE</div>
+              </div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; margin-top: 7px; padding: 5px 0 5px 10px; border-left: 2px solid #17140F; color: rgba(23,20,15,0.7);">PINNED — handle grip, underhand, strict</div>
+              <div style="display: grid; grid-template-columns: 30px 1fr 1fr 44px; margin-top: 10px; border-bottom: 1px solid rgba(23,20,15,0.25); padding-bottom: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">
+                <div>SET</div><div style="text-align: right;">KG</div><div style="text-align: right;">REPS</div><div style="text-align: center;">LOG</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 30px 1fr 1fr 44px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-family: 'IBM Plex Mono', monospace; font-size: 16px;">
+                <div style="font-size: 10px; color: rgba(23,20,15,0.5);">1</div>
+                <div style="text-align: right; font-weight: 600;">20</div>
+                <div style="text-align: right; font-weight: 600;">13</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 21px; height: 21px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div></div>
+              </div>
+              <div style="display: grid; grid-template-columns: 30px 1fr 1fr 44px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-family: 'IBM Plex Mono', monospace; font-size: 16px;">
+                <div style="font-size: 10px; color: rgba(23,20,15,0.5);">2</div>
+                <div style="text-align: right;">20</div>
+                <div style="text-align: right;">13</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 21px; height: 21px; border: 1.5px solid #17140F; box-sizing: border-box;"></div></div>
+              </div>
+            </div>
+
+            <!-- exercise 03 (peek) -->
+            <div style="margin-top: 24px;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.18em; color: rgba(23,20,15,0.55);">03 — BACK</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 5px;">
+                <div style="font-size: 21px; font-weight: 700;">Seated Row <span style="font-weight: 400; font-size: 15px;">(1-arm)</span></div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">MACHINE</div>
+              </div>
+            </div>
+
+          </div>
+          <!-- tab bar -->
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; font-weight: 600;">■ WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45);">MESOS</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ DIRECTION B — STAMP ============ -->
+    <div style="display: flex; flex-direction: column; gap: 16px;" data-screen-label="Direction B — Stamp">
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.14em;">B — STAMP</div>
+        <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 3px;">black blocks · display numerals · red rubber stamp on logged sets</div>
+      </div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F2EDE0; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden;">
+
+            <!-- black header block -->
+            <div style="background: #17140F; color: #F2EDE0; padding: 66px 20px 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.24em;">WORKOUT</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(242,237,224,0.6);">MON 12 JUN</div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px;">
+                <div style="font-family: 'Anton', sans-serif; font-size: 64px; line-height: 0.85; letter-spacing: 0.01em;">W2 D1</div>
+                <div style="text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.1em; line-height: 1.6; color: rgba(242,237,224,0.75);">GARRON JUN '26<br><span style="color: #D45A38; font-weight: 600;">BULK — 2 RIR</span></div>
+              </div>
+            </div>
+
+            <div style="padding: 18px 20px 0;">
+              <!-- exercise 1 -->
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="background: #17140F; color: #F2EDE0; font-family: 'Anton', sans-serif; font-size: 12px; letter-spacing: 0.14em; padding: 4px 10px 3px;">QUADS</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.5);">MACHINE</div>
+              </div>
+              <div style="font-family: 'Anton', sans-serif; font-size: 27px; letter-spacing: 0.01em; margin-top: 8px; text-transform: uppercase;">Hack Squat</div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid #17140F; margin-top: 6px;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px;">112.5</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(23,20,15,0.45);">×</span>
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px;">8</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.45);">KG / REPS</span>
+                </div>
+                <div style="border: 2.5px solid #B3401F; color: #B3401F; font-family: 'Anton', sans-serif; font-size: 13px; letter-spacing: 0.18em; padding: 4px 9px 3px; transform: rotate(-7deg);">LOGGED</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid #17140F;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px; color: rgba(23,20,15,0.85);">112.5</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(23,20,15,0.45);">×</span>
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px; color: rgba(23,20,15,0.85);">6</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.45);">KG / REPS</span>
+                </div>
+                <div style="width: 27px; height: 27px; border: 2.5px solid #17140F; box-sizing: border-box;"></div>
+              </div>
+
+              <!-- exercise 2 -->
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 26px;">
+                <div style="background: #17140F; color: #F2EDE0; font-family: 'Anton', sans-serif; font-size: 12px; letter-spacing: 0.14em; padding: 4px 10px 3px;">TRICEPS</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.5);">CABLE</div>
+              </div>
+              <div style="font-family: 'Anton', sans-serif; font-size: 27px; margin-top: 8px; text-transform: uppercase;">Cable Pushdown</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; margin-top: 7px; color: rgba(23,20,15,0.65);">▌PINNED — handle grip, underhand, strict</div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid #17140F; margin-top: 4px;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px;">20</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(23,20,15,0.45);">×</span>
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px;">13</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.45);">KG / REPS</span>
+                </div>
+                <div style="border: 2.5px solid #B3401F; color: #B3401F; font-family: 'Anton', sans-serif; font-size: 13px; letter-spacing: 0.18em; padding: 4px 9px 3px; transform: rotate(-7deg);">LOGGED</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid #17140F;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px;">20</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(23,20,15,0.45);">×</span>
+                  <span style="font-family: 'Anton', sans-serif; font-size: 36px;">13</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.45);">KG / REPS</span>
+                </div>
+                <div style="width: 27px; height: 27px; border: 2.5px solid #17140F; box-sizing: border-box;"></div>
+              </div>
+            </div>
+
+          </div>
+          <!-- tab bar -->
+          <div style="background: #17140F; display: flex; padding: 14px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; font-weight: 600; color: #D45A38;">WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(242,237,224,0.5);">MESOS</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(242,237,224,0.5);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(242,237,224,0.5);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(242,237,224,0.5);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ DIRECTION C — INDEX ============ -->
+    <div style="display: flex; flex-direction: column; gap: 16px;" data-screen-label="Direction C — Index">
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.14em;">C — INDEX</div>
+        <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 3px;">graph paper · offset-shadow cards · meso track always in view</div>
+      </div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F6F3EB; background-image: linear-gradient(rgba(23,20,15,0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(23,20,15,0.055) 1px, transparent 1px); background-size: 26px 26px; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 18px 0;">
+
+            <!-- brand + meso track -->
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.22em;">workout</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+
+            <!-- track: weeks as blocks -->
+            <div style="display: flex; gap: 5px; margin-top: 16px; align-items: stretch;">
+              <div style="flex: 1; height: 34px; background: #17140F; color: #F6F3EB; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.08em;">W1</div>
+              <div style="flex: 1; height: 34px; border: 2px solid #17140F; box-sizing: border-box; background: #F6F3EB; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; position: relative;">W2<div style="position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: #B3401F; border-radius: 50%;"></div></div>
+              <div style="flex: 1; height: 34px; border: 1px solid rgba(23,20,15,0.3); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: rgba(23,20,15,0.45); letter-spacing: 0.08em;">W3</div>
+              <div style="flex: 1; height: 34px; border: 1px solid rgba(23,20,15,0.3); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: rgba(23,20,15,0.45); letter-spacing: 0.08em;">W4</div>
+              <div style="flex: 0.8; height: 34px; border: 1px dashed rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: rgba(23,20,15,0.45); letter-spacing: 0.08em;">DL</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: rgba(23,20,15,0.5);">
+              <span>MESO 02 / MACRO "26-1"</span>
+              <span style="color: #B3401F; font-weight: 600;">● YOU ARE HERE — 2 RIR</span>
+            </div>
+
+            <!-- coordinate -->
+            <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-top: 20px;">
+              <div style="font-size: 44px; font-weight: 800; letter-spacing: -0.02em; line-height: 0.95;">DAY 1<span style="font-size: 15px; font-weight: 500; color: rgba(23,20,15,0.55); letter-spacing: 0;"> / 4</span></div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.14em; color: rgba(23,20,15,0.6);">MON 12 JUN</div>
+            </div>
+
+            <!-- exercise card 1 -->
+            <div style="background: #FCFAF4; border: 1.5px solid #17140F; box-shadow: 4px 4px 0 rgba(23,20,15,0.9); margin-top: 18px; padding: 14px 16px 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.18em; color: rgba(23,20,15,0.55);">QUADS · MACHINE</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.4);">01/06</div>
+              </div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 5px;">Hack Squat</div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(23,20,15,0.18); margin-top: 10px; font-family: 'IBM Plex Mono', monospace;">
+                <span style="font-size: 9px; color: rgba(23,20,15,0.45);">1</span>
+                <span style="font-size: 15px; font-weight: 600;">112.5 kg</span>
+                <span style="flex: 1; border-bottom: 1.5px dotted rgba(23,20,15,0.4); height: 1px;"></span>
+                <span style="font-size: 15px; font-weight: 600;">8 reps</span>
+                <div style="width: 20px; height: 20px; background: #17140F; color: #FCFAF4; display: flex; align-items: center; justify-content: center; font-size: 11px;">✓</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(23,20,15,0.18); font-family: 'IBM Plex Mono', monospace;">
+                <span style="font-size: 9px; color: rgba(23,20,15,0.45);">2</span>
+                <span style="font-size: 15px;">112.5 kg</span>
+                <span style="flex: 1; border-bottom: 1.5px dotted rgba(23,20,15,0.4); height: 1px;"></span>
+                <span style="font-size: 15px;">6 reps</span>
+                <div style="width: 20px; height: 20px; border: 1.5px solid #17140F; box-sizing: border-box;"></div>
+              </div>
+            </div>
+
+            <!-- exercise card 2 -->
+            <div style="background: #FCFAF4; border: 1.5px solid #17140F; box-shadow: 4px 4px 0 rgba(23,20,15,0.9); margin-top: 16px; padding: 14px 16px 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.18em; color: rgba(23,20,15,0.55);">TRICEPS · CABLE</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.4);">02/06</div>
+              </div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 5px;">Cable Pushdown (1-arm)</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; margin-top: 6px; color: rgba(23,20,15,0.65);">▌PINNED — handle grip, underhand, strict</div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(23,20,15,0.18); margin-top: 9px; font-family: 'IBM Plex Mono', monospace;">
+                <span style="font-size: 9px; color: rgba(23,20,15,0.45);">1</span>
+                <span style="font-size: 15px; font-weight: 600;">20 kg</span>
+                <span style="flex: 1; border-bottom: 1.5px dotted rgba(23,20,15,0.4); height: 1px;"></span>
+                <span style="font-size: 15px; font-weight: 600;">13 reps</span>
+                <div style="width: 20px; height: 20px; background: #17140F; color: #FCFAF4; display: flex; align-items: center; justify-content: center; font-size: 11px;">✓</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(23,20,15,0.18); font-family: 'IBM Plex Mono', monospace;">
+                <span style="font-size: 9px; color: rgba(23,20,15,0.45);">2</span>
+                <span style="font-size: 15px;">20 kg</span>
+                <span style="flex: 1; border-bottom: 1.5px dotted rgba(23,20,15,0.4); height: 1px;"></span>
+                <span style="font-size: 15px;">13 reps</span>
+                <div style="width: 20px; height: 20px; border: 1.5px solid #17140F; box-sizing: border-box;"></div>
+              </div>
+            </div>
+
+            <!-- card 3 peek -->
+            <div style="background: #FCFAF4; border: 1.5px solid #17140F; box-shadow: 4px 4px 0 rgba(23,20,15,0.9); margin-top: 16px; padding: 14px 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.18em; color: rgba(23,20,15,0.55);">BACK · MACHINE</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(23,20,15,0.4);">03/06</div>
+              </div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 5px;">Seated Row (1-arm)</div>
+            </div>
+
+          </div>
+          <!-- tab bar -->
+          <div style="border-top: 1.5px solid #17140F; background: #F6F3EB; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center;"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; font-weight: 600; border: 1px solid #17140F; padding: 3px 6px;">WORKOUT</span></div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45); padding-top: 4px;">MESOS</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45); padding-top: 4px;">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45); padding-top: 4px;">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.12em; color: rgba(23,20,15,0.45); padding-top: 4px;">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <!-- ===================== NEXT STEPS ===================== -->
+  <div style="max-width: 720px; margin-top: 64px; border-top: 1.5px solid #17140F; padding-top: 20px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 12px;">next steps</div>
+    <ul style="font-size: 14px; line-height: 1.7; margin: 0; padding-left: 18px; color: rgba(23,20,15,0.8);">
+      <li>Pick a direction (or a mix — e.g. A's table discipline + C's meso track + B's stamp for logged sets).</li>
+      <li>I'll then build the full flow set in the winning language: meso list &amp; macro timeline, meso planner, feedback prompts, workout complete, exercise library + history.</li>
+      <li>Open question: kg vs lb default, and whether the note row should support multiple pinned notes.</li>
+    </ul>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

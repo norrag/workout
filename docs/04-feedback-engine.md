@@ -7,7 +7,7 @@ The engine is the core of the app: it converts user performance and feedback int
 1. **Pure and deterministic.** `prescribe(inputs, params) → { weight, reps, sets, targetRir, rationale }`. No I/O, no randomness. Same inputs + same params ⇒ same output, forever replayable.
 2. **Tunable without deploys.** All coefficients/thresholds live in `engine_params` (versioned jsonb). The active version is loaded at call time.
 3. **Auditable.** Every decision is persisted to `engine_decisions` with full inputs, output, rationale, and params version.
-4. **Explainable.** The output includes a human-readable rationale ("+2.5kg: hit all reps at 2 RIR with low strain; pump high") surfaced in the UI and to MCP.
+4. **Explainable.** The output includes a short clinical rationale ("+5 lb: hit all reps at 2 RIR") surfaced in the set/exercise menus (figs 1.2/1.3), the workout-complete autoregulation summary (fig 1.5), and to MCP.
 
 ## Inputs (signal inventory)
 
@@ -16,7 +16,7 @@ In priority order (most → least weight in v1):
 | Signal | Source | Use |
 |---|---|---|
 | **Recent performance of the exercise** | last `workout_exercises` + `logged_sets` for this exercise | baseline: what weight/reps/sets were actually done vs prescribed |
-| Exercise feedback after most recent sets | `exercise_feedback` (joint pain, muscle strain, pump, fatigue) | modulate load/volume; pain gates progression |
+| Exercise feedback after most recent sets | `exercise_feedback` (joint pain 0–3 per exercise; pump 0–10 and workload 0–10 per muscle group — fig 1.4) | pain gates progression; workload anchors set-count changes (5 = "just right"); pump corroborates |
 | Workout feedback | `workout_feedback` (overall fatigue, effort, performance) | session-level dampening |
 | This week's target RIR | `microcycles.target_rir` | the intensity anchor |
 | Macrocycle goal | `macrocycles.goal_type` (cut/gain/maintain) | progression aggressiveness & volume bias |
@@ -37,8 +37,9 @@ Per exercise, when generating week *N+1* from week *N*:
    - Missed badly → decrease load (`params.regression_pct`).
 4. **Feedback modulation.**
    - `joint_pain ≥ params.pain_gate` → block load increases on this exercise; suggest hold or reduce, flag in rationale.
-   - High muscle strain/fatigue + low pump → reduce volume (sets −1, floor at `params.min_sets`).
-   - Low fatigue + good pump + goal = gain → consider set addition up to muscle-group weekly ceiling (`params.mg_set_ceiling`).
+   - `workload` above `params.workload_high` (toward "too much") → reduce the muscle group's volume (sets −1, floor at `params.min_sets`).
+   - `workload` below `params.workload_low` (toward "too easy") + adequate pump + goal = gain → consider set addition up to muscle-group weekly ceiling (`params.mg_set_ceiling`).
+   - Low pump with on-target workload → flag exercise selection in rationale rather than adjust load.
    - Poor `overall_fatigue`/performance on the session → dampen all increases that session fed into.
 5. **Goal bias.** cut → prioritize maintaining load, resist volume increases; gain → prioritize adding load/sets; maintain → hold prescriptions stable, progress only on clear overperformance.
 6. **Deload week.** If `is_deload`: prescribe `params.deload.load_pct` (≈ 50–60%) of week-peak load and `params.deload.set_pct` of sets, target RIR 4+.
@@ -60,13 +61,16 @@ engine/
 └── __tests__/        # table-driven unit tests + golden scenario fixtures
 ```
 
-## Admin & dev tooling (`/admin`)
+## Admin & dev tooling — via MCP (revised June 2026, 08 §3)
 
-Role-gated UI providing:
-- **Decision inspector** — browse `engine_decisions`; see inputs, output, rationale, params version for any prescription.
-- **Param editor** — edit/clone param sets as new versions; activate with confirmation; diff against previous version.
+**No admin UI is built.** The same capabilities ship as admin-gated MCP tools (`profiles.role = 'admin'`), operated conversationally with Claude as the tuning console (see [05-mcp-connector.md](05-mcp-connector.md) §Admin tools):
+
+- **Decision inspector** — query `engine_decisions`; see inputs, output, rationale, params version for any prescription.
+- **Param editing** — propose param sets as new inactive versions; activate with an explicit confirmation step; diff against previous version.
 - **Replay harness** — re-run any historical decision (or a whole user's meso) against a candidate param version and diff outcomes before activating. This is the primary tuning loop for obtaining quality outputs.
-- **Scenario fixtures** — curated synthetic users/histories used both in unit tests and the replay harness.
+- **Scenario fixtures** — curated synthetic users/histories used both in unit tests and replay.
+
+The underlying tables, param versioning, and replay functions are unchanged — only the interface moved. A UI can be layered on later once the tuning workflow is understood.
 
 ## Testing requirements
 

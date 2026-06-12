@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; background: #E2E0DA; }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; background: #E2E0DA; padding: 56px 48px 80px; font-family: 'Archivo', sans-serif; color: #17140F;">
+
+  <!-- ===================== INTRO ===================== -->
+  <div style="max-width: 860px; margin-bottom: 64px;">
+    <div style="font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(23,20,15,0.55); margin-bottom: 14px;">workout — design exploration 02 · full app screens</div>
+    <h1 style="font-size: 40px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 18px; line-height: 1.05;">Ledger system, built out</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0; max-width: 740px;">Locked from your feedback: direction A's ruled-table discipline + C's meso track header on every workout screen. Mono typeface dropped — everything is Archivo, with tabular numerals for data. Monochrome ink on paper; <span style="color: #C14B2A; font-weight: 600;">orange</span> is budgeted strictly for "current position" and "selected" states. Weights/reps sit in boxed fields to read as editable; every exercise gets history + an overflow menu; every set gets a handle menu.</p>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 01 — LOGGING FLOW                                     -->
+  <!-- ============================================================= -->
+  <div style="max-width: 860px; border-top: 1.5px solid #17140F; padding-top: 16px; margin-bottom: 32px;">
+    <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em;">01 — LOGGING FLOW</div>
+    <div style="font-size: 13px; color: rgba(23,20,15,0.6); margin-top: 4px;">The heart. Day view → set &amp; exercise management → feedback prompt → workout complete.</div>
+  </div>
+
+  <div style="display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 80px;">
+
+    <!-- ============ S1: DAY VIEW ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Day view — W2·D1">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">1.1 — DAY VIEW</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+
+            <!-- brand row -->
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.22em;">workout</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+
+            <!-- meso track -->
+            <div style="display: flex; gap: 5px; margin-top: 14px; align-items: stretch;">
+              <div style="flex: 1; height: 32px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;">W1</div>
+              <div style="flex: 1; height: 32px; border: 2px solid #17140F; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; position: relative;">W2<div style="position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: #C14B2A; border-radius: 50%;"></div></div>
+              <div style="flex: 1; height: 32px; border: 1px solid rgba(23,20,15,0.3); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 500; color: rgba(23,20,15,0.45); letter-spacing: 0.08em;">W3</div>
+              <div style="flex: 1; height: 32px; border: 1px solid rgba(23,20,15,0.3); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 500; color: rgba(23,20,15,0.45); letter-spacing: 0.08em;">W4</div>
+              <div style="flex: 0.8; height: 32px; border: 1px dashed rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 500; color: rgba(23,20,15,0.45); letter-spacing: 0.08em;">DL</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.5);">
+              <span>MESO 2 OF 4 · MACRO 26-1</span>
+              <span style="color: #C14B2A; font-weight: 700;">● WEEK 2 — TARGET 2 RIR</span>
+            </div>
+
+            <!-- coordinate -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-bottom: 1.5px solid #17140F; padding-bottom: 12px;">
+              <div style="font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.6); text-align: right; line-height: 1.5;">MON 12 JUN<br>3 OF 14 SETS LOGGED</div>
+            </div>
+
+            <!-- exercise 01 -->
+            <div style="margin-top: 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.16em; color: rgba(23,20,15,0.55);">01 — QUADS</div>
+                <div style="display: flex; gap: 8px;">
+                  <div style="width: 28px; height: 28px; border: 1px solid rgba(23,20,15,0.35); display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#17140F" stroke-width="1.3"></circle><path d="M7 4v3l2 1.5" fill="none" stroke="#17140F" stroke-width="1.3"></path></svg></div>
+                  <div style="width: 28px; height: 28px; border: 1px solid rgba(23,20,15,0.35); display: flex; align-items: center; justify-content: center; font-size: 13px; letter-spacing: 1px; padding-bottom: 5px;">…</div>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                <div style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">Hack Squat</div>
+                <div style="font-size: 9.5px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.5);">MACHINE</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; margin-top: 10px; padding-bottom: 5px; border-bottom: 1px solid rgba(23,20,15,0.25); font-size: 9px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">
+                <div></div><div style="text-align: center;">KG</div><div style="text-align: center;">REPS</div><div style="text-align: center;">LOG</div>
+              </div>
+              <!-- set 1 logged -->
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+                <div style="color: rgba(23,20,15,0.4); font-size: 16px; text-align: center; line-height: 0.5;">⋮</div>
+                <div style="height: 42px; background: rgba(23,20,15,0.05); border: 1px solid rgba(23,20,15,0.3); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">112.5</div>
+                <div style="height: 42px; background: rgba(23,20,15,0.05); border: 1px solid rgba(23,20,15,0.3); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">8</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 14px;">✓</div></div>
+              </div>
+              <!-- set 2 next -->
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+                <div style="color: rgba(23,20,15,0.4); font-size: 16px; text-align: center; line-height: 0.5;">⋮</div>
+                <div style="height: 42px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">112.5</div>
+                <div style="height: 42px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">6</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; border: 2px solid #17140F; box-sizing: border-box;"></div></div>
+              </div>
+            </div>
+
+            <!-- exercise 02 -->
+            <div style="margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.16em; color: rgba(23,20,15,0.55);">02 — TRICEPS</div>
+                <div style="display: flex; gap: 8px;">
+                  <div style="width: 28px; height: 28px; border: 1px solid rgba(23,20,15,0.35); display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#17140F" stroke-width="1.3"></circle><path d="M7 4v3l2 1.5" fill="none" stroke="#17140F" stroke-width="1.3"></path></svg></div>
+                  <div style="width: 28px; height: 28px; border: 1px solid rgba(23,20,15,0.35); display: flex; align-items: center; justify-content: center; font-size: 13px; letter-spacing: 1px; padding-bottom: 5px;">…</div>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                <div style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">Cable Pushdown <span style="font-weight: 400; font-size: 14px;">(1-arm)</span></div>
+                <div style="font-size: 9.5px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.5);">CABLE</div>
+              </div>
+              <div style="font-size: 11px; font-weight: 500; margin-top: 7px; padding: 5px 0 5px 10px; border-left: 2px solid #17140F; color: rgba(23,20,15,0.7);">PINNED — handle grip, underhand, strict</div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; margin-top: 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(23,20,15,0.25); font-size: 9px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">
+                <div></div><div style="text-align: center;">KG</div><div style="text-align: center;">REPS</div><div style="text-align: center;">LOG</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+                <div style="color: rgba(23,20,15,0.4); font-size: 16px; text-align: center; line-height: 0.5;">⋮</div>
+                <div style="height: 42px; background: rgba(23,20,15,0.05); border: 1px solid rgba(23,20,15,0.3); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">20</div>
+                <div style="height: 42px; background: rgba(23,20,15,0.05); border: 1px solid rgba(23,20,15,0.3); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">13</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 14px;">✓</div></div>
+              </div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+                <div style="color: rgba(23,20,15,0.4); font-size: 16px; text-align: center; line-height: 0.5;">⋮</div>
+                <div style="height: 42px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">20</div>
+                <div style="height: 42px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;">13</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; border: 2px solid #17140F; box-sizing: border-box;"></div></div>
+              </div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0;">
+                <div style="color: rgba(23,20,15,0.4); font-size: 16px; text-align: center; line-height: 0.5;">⋮</div>
+                <div style="height: 42px; border: 1px solid rgba(23,20,15,0.25); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 500; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">20</div>
+                <div style="height: 42px; border: 1px solid rgba(23,20,15,0.25); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 500; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">13</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; border: 1.5px solid rgba(23,20,15,0.35); box-sizing: border-box;"></div></div>
+              </div>
+            </div>
+
+          </div>
+          <!-- tab bar -->
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 700;">■ WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MESOS</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S2: EXERCISE MENU ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Exercise menu open">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">1.2 — EXERCISE MENU</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; position: relative; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif; overflow: hidden;">
+          <div style="padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.22em;">workout</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-bottom: 1.5px solid #17140F; padding-bottom: 12px;">
+              <div style="font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.6); text-align: right;">MON 12 JUN</div>
+            </div>
+            <div style="margin-top: 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.16em; color: rgba(23,20,15,0.55);">02 — TRICEPS</div>
+                <div style="display: flex; gap: 8px;">
+                  <div style="width: 28px; height: 28px; border: 1px solid rgba(23,20,15,0.35); display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#17140F" stroke-width="1.3"></circle><path d="M7 4v3l2 1.5" fill="none" stroke="#17140F" stroke-width="1.3"></path></svg></div>
+                  <div style="width: 28px; height: 28px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 13px; letter-spacing: 1px; padding-bottom: 5px;">…</div>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                <div style="font-size: 20px; font-weight: 700;">Cable Pushdown <span style="font-weight: 400; font-size: 14px;">(1-arm)</span></div>
+                <div style="font-size: 9.5px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.5);">CABLE</div>
+              </div>
+            </div>
+          </div>
+          <!-- backdrop -->
+          <div style="position: absolute; inset: 0; background: rgba(23,20,15,0.35);"></div>
+          <!-- menu card -->
+          <div style="position: absolute; top: 218px; right: 20px; width: 248px; background: #F4F0E6; border: 1.5px solid #17140F; box-shadow: 5px 5px 0 rgba(23,20,15,0.85);">
+            <div style="padding: 12px 16px 9px; border-bottom: 1px solid rgba(23,20,15,0.25); font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; color: rgba(23,20,15,0.55);">EXERCISE — CABLE PUSHDOWN</div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">History<span style="color: rgba(23,20,15,0.4); font-size: 12px;">›</span></div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600;">New note</div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">Replace exercise<span style="color: rgba(23,20,15,0.4); font-size: 12px;">›</span></div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600;">Move down</div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600;">Add set</div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600;">Skip remaining sets</div>
+            <div style="padding: 13px 16px; font-size: 14px; font-weight: 700; color: #C14B2A;">Remove exercise</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S3: SET MENU ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Set menu open">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">1.3 — SET MENU</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; position: relative; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif; overflow: hidden;">
+          <div style="padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.22em;">workout</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-bottom: 1.5px solid #17140F; padding-bottom: 12px;">
+              <div style="font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.6); text-align: right;">MON 12 JUN</div>
+            </div>
+            <div style="margin-top: 18px;">
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.16em; color: rgba(23,20,15,0.55);">01 — QUADS</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                <div style="font-size: 20px; font-weight: 700;">Hack Squat</div>
+                <div style="font-size: 9.5px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.5);">MACHINE</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(23,20,15,0.15); margin-top: 8px;">
+                <div style="color: rgba(23,20,15,0.4); font-size: 16px; text-align: center; line-height: 0.5;">⋮</div>
+                <div style="height: 42px; background: rgba(23,20,15,0.05); border: 1px solid rgba(23,20,15,0.3); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600;">112.5</div>
+                <div style="height: 42px; background: rgba(23,20,15,0.05); border: 1px solid rgba(23,20,15,0.3); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600;">8</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 14px;">✓</div></div>
+              </div>
+              <div style="display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 7px 0;">
+                <div style="color: #17140F; font-size: 16px; text-align: center; line-height: 0.5; font-weight: 700;">⋮</div>
+                <div style="height: 42px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600;">112.5</div>
+                <div style="height: 42px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600;">6</div>
+                <div style="display: flex; justify-content: center;"><div style="width: 26px; height: 26px; border: 2px solid #17140F; box-sizing: border-box;"></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="position: absolute; inset: 0; background: rgba(23,20,15,0.35);"></div>
+          <div style="position: absolute; top: 300px; left: 20px; width: 248px; background: #F4F0E6; border: 1.5px solid #17140F; box-shadow: 5px 5px 0 rgba(23,20,15,0.85);">
+            <div style="padding: 12px 16px 9px; border-bottom: 1px solid rgba(23,20,15,0.25); font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; color: rgba(23,20,15,0.55);">SET 2 — HACK SQUAT</div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600;">Add set below</div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">Set type<span style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.5);">STRAIGHT ›</span></div>
+            <div style="padding: 13px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 14px; font-weight: 600;">Skip set</div>
+            <div style="padding: 13px 16px; font-size: 14px; font-weight: 700; color: #C14B2A;">Delete set</div>
+          </div>
+          <!-- set type submenu hint -->
+          <div style="position: absolute; top: 380px; left: 130px; width: 190px; background: #F4F0E6; border: 1.5px solid #17140F; box-shadow: 5px 5px 0 rgba(23,20,15,0.85);">
+            <div style="padding: 11px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 13.5px; font-weight: 700; display: flex; justify-content: space-between;">Straight<span>✓</span></div>
+            <div style="padding: 11px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 13.5px; font-weight: 600;">Drop set</div>
+            <div style="padding: 11px 16px; border-bottom: 1px solid rgba(23,20,15,0.12); font-size: 13.5px; font-weight: 600;">Myorep</div>
+            <div style="padding: 11px 16px; font-size: 13.5px; font-weight: 600;">Myorep match</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S4: FEEDBACK ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Feedback prompt">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">1.4 — FEEDBACK PROMPT</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; position: relative; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif; overflow: hidden;">
+          <div style="padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.22em;">workout</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-bottom: 1.5px solid #17140F; padding-bottom: 12px;">
+              <div style="font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+            </div>
+          </div>
+          <div style="position: absolute; inset: 0; background: rgba(23,20,15,0.45);"></div>
+          <!-- sheet -->
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #F4F0E6; border-top: 2px solid #17140F; padding: 22px 20px 44px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Feedback</div>
+              <div style="font-size: 16px; color: rgba(23,20,15,0.5);">✕</div>
+            </div>
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES — AFTER DEADLIFT · FEEDS W3 TARGETS</div>
+
+            <div style="margin-top: 22px;">
+              <div style="font-size: 13px; font-weight: 700;">Joint pain <span style="font-weight: 400; color: rgba(23,20,15,0.55); font-size: 12px;">— during deadlift</span></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 7px; margin-top: 9px;">
+                <div style="height: 46px; background: #C14B2A; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">None</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;">Low</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;">Moderate</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;">High</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <div style="font-size: 13px; font-weight: 700;">Glutes pump <span style="font-weight: 400; color: rgba(23,20,15,0.55); font-size: 12px;">— today</span></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-top: 9px;">
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;">Low</div>
+                <div style="height: 46px; background: #C14B2A; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">Moderate</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;">Amazing</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <div style="font-size: 13px; font-weight: 700;">Glutes workload <span style="font-weight: 400; color: rgba(23,20,15,0.55); font-size: 12px;">— hard sets today</span></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 7px; margin-top: 9px;">
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 500; text-align: center; line-height: 1.2;">Not<br>enough</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 500; text-align: center; line-height: 1.2;">Just<br>right</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 500; text-align: center; line-height: 1.2;">Pushed<br>limits</div>
+                <div style="height: 46px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 500; text-align: center; line-height: 1.2;">Too<br>much</div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 26px; align-items: center; justify-content: flex-end;">
+              <div style="font-size: 13px; font-weight: 600; padding: 12px 18px; color: rgba(23,20,15,0.6);">Cancel</div>
+              <div style="background: #17140F; color: #F4F0E6; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 14px 32px;">SAVE</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S5: COMPLETE ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Workout complete">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">1.5 — WORKOUT COMPLETE</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; position: relative; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif; overflow: hidden;">
+          <div style="padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.22em;">workout</div>
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55);">GARRON JUN '26 — BULK</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-bottom: 1.5px solid #17140F; padding-bottom: 12px;">
+              <div style="font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+            </div>
+          </div>
+          <div style="position: absolute; inset: 0; background: rgba(23,20,15,0.45);"></div>
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #F4F0E6; border-top: 2px solid #17140F; padding: 24px 20px 44px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 30px; font-weight: 800; letter-spacing: -0.02em;">W2·D1 complete.</div>
+              <div style="font-size: 16px; color: rgba(23,20,15,0.5);">✕</div>
+            </div>
+
+            <div style="margin-top: 20px; border-top: 1.5px solid #17140F;">
+              <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-size: 14px;">
+                <span style="font-weight: 500; color: rgba(23,20,15,0.7);">Exercises completed</span><span style="font-weight: 700; font-variant-numeric: tabular-nums;">7</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-size: 14px;">
+                <span style="font-weight: 500; color: rgba(23,20,15,0.7);">Sets logged</span><span style="font-weight: 700; font-variant-numeric: tabular-nums;">14 / 14</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.18); font-size: 14px;">
+                <span style="font-weight: 500; color: rgba(23,20,15,0.7);">Skipped</span><span style="font-weight: 700; font-variant-numeric: tabular-nums;">0</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 18px; border: 1px solid rgba(23,20,15,0.35); padding: 14px 16px;">
+              <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: #C14B2A;">AUTOREGULATION</div>
+              <div style="font-size: 13px; line-height: 1.55; margin-top: 6px; color: rgba(23,20,15,0.8);">Feedback recorded. W3 targets recalculated — Hack Squat +2.5 kg, Cable Pushdown +1 set. Ramp holds at 1 RIR next week.</div>
+            </div>
+
+            <div style="text-align: center; margin-top: 22px; font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; color: rgba(23,20,15,0.7);">View meso stats</div>
+            <div style="background: #17140F; color: #F4F0E6; text-align: center; font-size: 14px; font-weight: 700; letter-spacing: 0.1em; padding: 17px 0; margin-top: 14px;">NEXT — W2·D2 · WED 14 JUN</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 02 — STRUCTURE: MACRO / MESO / PLANNER                -->
+  <!-- ============================================================= -->
+  <div style="max-width: 860px; border-top: 1.5px solid #17140F; padding-top: 16px; margin-bottom: 32px;">
+    <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em;">02 — STRUCTURE</div>
+    <div style="font-size: 13px; color: rgba(23,20,15,0.6); margin-top: 4px;">Macro → meso → micro hierarchy, and the planner flow for building a new mesocycle.</div>
+  </div>
+
+  <div style="display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 80px;">
+
+    <!-- ============ S6: MESOS LIST ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Mesocycles list">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">2.1 — MESOCYCLES</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em;">mesocycles</div>
+              <div style="border: 1.5px solid #17140F; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 9px 14px;">+ NEW</div>
+            </div>
+
+            <!-- macro context -->
+            <div style="margin-top: 18px; border: 1px solid rgba(23,20,15,0.35); padding: 13px 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.16em;">MACRO 26-1 — "PRO CARD"</div>
+                <div style="font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.5);">JAN — AUG '26</div>
+              </div>
+              <div style="display: flex; gap: 5px; margin-top: 10px;">
+                <div style="flex: 1; height: 26px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em;">CUT</div>
+                <div style="flex: 1; height: 26px; border: 2px solid #17140F; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; position: relative;">BULK<div style="position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: #C14B2A; border-radius: 50%;"></div></div>
+                <div style="flex: 1; height: 26px; border: 1px solid rgba(23,20,15,0.3); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 500; color: rgba(23,20,15,0.45); letter-spacing: 0.06em;">BULK</div>
+                <div style="flex: 1; height: 26px; border: 1px dashed rgba(23,20,15,0.4); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 500; color: rgba(23,20,15,0.45); letter-spacing: 0.06em;">PEAK</div>
+              </div>
+              <div style="font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; color: #C14B2A; margin-top: 7px; font-weight: 700;">● MESO 2 OF 4 — W2·D1</div>
+            </div>
+
+            <!-- list -->
+            <div style="margin-top: 20px; border-top: 1.5px solid #17140F;">
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="font-size: 17px; font-weight: 700;">Garron Jun '26 — Bulk</div>
+                  <div style="border: 1.5px solid #C14B2A; color: #C14B2A; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; padding: 4px 8px;">CURRENT</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: rgba(23,20,15,0.55);">
+                  <span>5 WK · 4 D/WK</span><span style="font-weight: 700; color: #17140F;">AT W2·D1</span>
+                </div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 17px; font-weight: 700;">Early Summer Girl Squad</div>
+                  <div style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: rgba(23,20,15,0.55); margin-top: 5px;">5 WK · 2 D/WK</div>
+                </div>
+                <div style="width: 22px; height: 22px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 17px; font-weight: 700;">Garron May '26</div>
+                  <div style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: rgba(23,20,15,0.55); margin-top: 5px;">5 WK · 4 D/WK</div>
+                </div>
+                <div style="width: 22px; height: 22px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 17px; font-weight: 700;">Madeline's 2-Day Spring</div>
+                  <div style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: rgba(23,20,15,0.55); margin-top: 5px;">5 WK · 2 D/WK</div>
+                </div>
+                <div style="width: 22px; height: 22px; border: 1.5px solid rgba(23,20,15,0.35); box-sizing: border-box;"></div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 17px; font-weight: 700;">Garron Cut Apr '26</div>
+                  <div style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: rgba(23,20,15,0.55); margin-top: 5px;">5 WK · 4 D/WK</div>
+                </div>
+                <div style="width: 22px; height: 22px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+              </div>
+            </div>
+          </div>
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 700;">■ MESOS</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S7: MESO DETAIL ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Meso detail — week matrix">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">2.2 — MESO DETAIL · RIR RAMP</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+            <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">‹ MESOCYCLES</div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px;">
+              <div style="font-size: 27px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;">Garron Jun '26<br>— Bulk</div>
+              <div style="border: 1.5px solid #C14B2A; color: #C14B2A; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; padding: 4px 8px;">CURRENT</div>
+            </div>
+            <div style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 8px;">MESO 2 OF 4 · MACRO 26-1 · 5 WEEKS · 4 DAYS/WK</div>
+
+            <!-- ramp matrix -->
+            <div style="margin-top: 20px; border-top: 1.5px solid #17140F;">
+              <div style="display: grid; grid-template-columns: 44px 52px 1fr 1fr 1fr 1fr; gap: 6px; padding: 9px 0 5px; font-size: 9px; font-weight: 600; letter-spacing: 0.12em; color: rgba(23,20,15,0.5); align-items: center;">
+                <div>WK</div><div>RIR</div><div style="text-align: center;">MON</div><div style="text-align: center;">WED</div><div style="text-align: center;">FRI</div><div style="text-align: center;">SUN</div>
+              </div>
+              <!-- W1 -->
+              <div style="display: grid; grid-template-columns: 44px 52px 1fr 1fr 1fr 1fr; gap: 6px; padding: 6px 0; align-items: center; border-top: 1px solid rgba(23,20,15,0.15);">
+                <div style="font-size: 15px; font-weight: 700;">1</div>
+                <div style="font-size: 12px; font-weight: 600; color: rgba(23,20,15,0.6); font-variant-numeric: tabular-nums;">3</div>
+                <div style="height: 38px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+                <div style="height: 38px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+                <div style="height: 38px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+                <div style="height: 38px; background: #17140F; color: #F4F0E6; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</div>
+              </div>
+              <!-- W2 -->
+              <div style="display: grid; grid-template-columns: 44px 52px 1fr 1fr 1fr 1fr; gap: 6px; padding: 6px 0; align-items: center; border-top: 1px solid rgba(23,20,15,0.15);">
+                <div style="font-size: 15px; font-weight: 700;">2</div>
+                <div style="font-size: 12px; font-weight: 700; color: #C14B2A; font-variant-numeric: tabular-nums;">2</div>
+                <div style="height: 38px; border: 2px solid #C14B2A; box-sizing: border-box; color: #C14B2A; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;">D1</div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.35); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 500; color: rgba(23,20,15,0.5);">D2</div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.35); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 500; color: rgba(23,20,15,0.5);">D3</div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.35); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 500; color: rgba(23,20,15,0.5);">D4</div>
+              </div>
+              <!-- W3 -->
+              <div style="display: grid; grid-template-columns: 44px 52px 1fr 1fr 1fr 1fr; gap: 6px; padding: 6px 0; align-items: center; border-top: 1px solid rgba(23,20,15,0.15);">
+                <div style="font-size: 15px; font-weight: 700; color: rgba(23,20,15,0.5);">3</div>
+                <div style="font-size: 12px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">1</div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+              </div>
+              <!-- W4 -->
+              <div style="display: grid; grid-template-columns: 44px 52px 1fr 1fr 1fr 1fr; gap: 6px; padding: 6px 0; align-items: center; border-top: 1px solid rgba(23,20,15,0.15);">
+                <div style="font-size: 15px; font-weight: 700; color: rgba(23,20,15,0.5);">4</div>
+                <div style="font-size: 12px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">0</div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px solid rgba(23,20,15,0.22); box-sizing: border-box;"></div>
+              </div>
+              <!-- DL -->
+              <div style="display: grid; grid-template-columns: 44px 52px 1fr 1fr 1fr 1fr; gap: 6px; padding: 6px 0 10px; align-items: center; border-top: 1px solid rgba(23,20,15,0.15); border-bottom: 1.5px solid #17140F;">
+                <div style="font-size: 13px; font-weight: 700; color: rgba(23,20,15,0.5); letter-spacing: 0.06em;">DL</div>
+                <div style="font-size: 12px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">8</div>
+                <div style="height: 38px; border: 1px dashed rgba(23,20,15,0.35); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px dashed rgba(23,20,15,0.35); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px dashed rgba(23,20,15,0.35); box-sizing: border-box;"></div>
+                <div style="height: 38px; border: 1px dashed rgba(23,20,15,0.35); box-sizing: border-box;"></div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.5);">
+              <span>RAMP 3 → 0 RIR</span><span>DELOAD W5 — 8 RIR</span>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 22px;">
+              <div style="flex: 1; border: 1.5px solid #17140F; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 13px 0;">EDIT WEEKS</div>
+              <div style="flex: 1; background: #17140F; color: #F4F0E6; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 13px 0;">GO TO W2·D1</div>
+            </div>
+          </div>
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 700;">■ MESOS</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S8: PLAN A MESO ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Plan a mesocycle">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">2.3 — PLAN A MESOCYCLE</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+            <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">‹ MESOCYCLES</div>
+            <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin-top: 12px;">plan a meso</div>
+
+            <div style="margin-top: 22px; border-top: 1.5px solid #17140F;">
+              <div style="display: flex; gap: 14px; padding: 18px 0; border-bottom: 1px solid rgba(23,20,15,0.18); align-items: baseline;">
+                <div style="font-size: 11px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">01</div>
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; font-weight: 700;">Copy a mesocycle</div>
+                  <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 4px; line-height: 1.45;">Carry progressive overload forward — start from where you left off.</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="display: flex; gap: 14px; padding: 18px 0; border-bottom: 1px solid rgba(23,20,15,0.18); align-items: baseline;">
+                <div style="font-size: 11px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">02</div>
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; font-weight: 700;">Start with a template</div>
+                  <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 4px; line-height: 1.45;">Pick a saved split and adjust from there.</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="display: flex; gap: 14px; padding: 18px 0; border-bottom: 1px solid rgba(23,20,15,0.18); align-items: baseline;">
+                <div style="font-size: 11px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">03</div>
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; font-weight: 700;">Meso builder</div>
+                  <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 4px; line-height: 1.45;">Generated from your muscle-group priorities — emphasize, grow, maintain.</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="display: flex; gap: 14px; padding: 18px 0; border-bottom: 1px solid rgba(23,20,15,0.18); align-items: baseline;">
+                <div style="font-size: 11px; font-weight: 600; color: rgba(23,20,15,0.45); font-variant-numeric: tabular-nums;">04</div>
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; font-weight: 700;">From scratch</div>
+                  <div style="font-size: 12.5px; color: rgba(23,20,15,0.6); margin-top: 4px; line-height: 1.45;">Blank board. You know what you're doing.</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+            </div>
+          </div>
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 700;">■ MESOS</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S9: PLANNER BOARD ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Meso planner board">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">2.4 — PLANNER BOARD</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">‹ BACK</div>
+              <div style="font-size: 15px; color: rgba(23,20,15,0.5);">✕</div>
+            </div>
+            <div style="font-size: 27px; font-weight: 800; letter-spacing: -0.02em; margin-top: 10px;">new meso plan</div>
+            <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.55); margin-top: 4px;">FROM TEMPLATE — JANINE'S PRO DEBUT PREP</div>
+
+            <!-- day tabs -->
+            <div style="display: flex; border: 1.5px solid #17140F; margin-top: 16px;">
+              <div style="flex: 1; background: #17140F; color: #F4F0E6; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 11px 0;">MON</div>
+              <div style="flex: 1; text-align: center; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; padding: 11px 0; border-left: 1px solid rgba(23,20,15,0.25);">TUE</div>
+              <div style="flex: 1; text-align: center; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; padding: 11px 0; border-left: 1px solid rgba(23,20,15,0.25);">THU</div>
+              <div style="flex: 1; text-align: center; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; padding: 11px 0; border-left: 1px solid rgba(23,20,15,0.25);">FRI</div>
+            </div>
+
+            <!-- exercise rows -->
+            <div style="margin-top: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(23,20,15,0.18);">
+                <div style="color: rgba(23,20,15,0.35); font-size: 13px; letter-spacing: -1px;">⋮⋮</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 7px;">
+                    <div style="display: flex; gap: 2px; align-items: flex-end;"><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div></div>
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em;">GLUTES</div>
+                  </div>
+                  <div style="font-size: 15.5px; font-weight: 600; margin-top: 3px;">Smith Machine Split Squat</div>
+                </div>
+                <div style="font-size: 13px; color: rgba(23,20,15,0.4);">✕</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(23,20,15,0.18);">
+                <div style="color: rgba(23,20,15,0.35); font-size: 13px; letter-spacing: -1px;">⋮⋮</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 7px;">
+                    <div style="display: flex; gap: 2px; align-items: flex-end;"><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div></div>
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em;">GLUTES</div>
+                  </div>
+                  <div style="font-size: 15.5px; font-weight: 600; margin-top: 3px;">Machine Hip Thrust</div>
+                </div>
+                <div style="font-size: 13px; color: rgba(23,20,15,0.4);">✕</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(23,20,15,0.18);">
+                <div style="color: rgba(23,20,15,0.35); font-size: 13px; letter-spacing: -1px;">⋮⋮</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 7px;">
+                    <div style="display: flex; gap: 2px; align-items: flex-end;"><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box;"></div></div>
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em;">HAMSTRINGS</div>
+                  </div>
+                  <div style="font-size: 15.5px; font-weight: 600; margin-top: 3px;">Seated Leg Curl</div>
+                </div>
+                <div style="font-size: 13px; color: rgba(23,20,15,0.4);">✕</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(23,20,15,0.18);">
+                <div style="color: rgba(23,20,15,0.35); font-size: 13px; letter-spacing: -1px;">⋮⋮</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 7px;">
+                    <div style="display: flex; gap: 2px; align-items: flex-end;"><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; background: #17140F;"></div></div>
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em;">SHOULDERS</div>
+                  </div>
+                  <div style="font-size: 15.5px; font-weight: 600; margin-top: 3px;">Cable Lateral Raise (1-arm)</div>
+                </div>
+                <div style="font-size: 13px; color: rgba(23,20,15,0.4);">✕</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(23,20,15,0.18);">
+                <div style="color: rgba(23,20,15,0.35); font-size: 13px; letter-spacing: -1px;">⋮⋮</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 7px;">
+                    <div style="display: flex; gap: 2px; align-items: flex-end;"><div style="width: 4px; height: 10px; background: #17140F;"></div><div style="width: 4px; height: 10px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box;"></div><div style="width: 4px; height: 10px; border: 1px solid rgba(23,20,15,0.4); box-sizing: border-box;"></div></div>
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em;">CALVES</div>
+                  </div>
+                  <div style="font-size: 15.5px; font-weight: 600; margin-top: 3px;">Donkey Calf Raise</div>
+                </div>
+                <div style="font-size: 13px; color: rgba(23,20,15,0.4);">✕</div>
+              </div>
+              <div style="border: 1.5px dashed rgba(23,20,15,0.45); text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; padding: 14px 0; margin-top: 14px; color: rgba(23,20,15,0.65);">+ ADD EXERCISE</div>
+            </div>
+          </div>
+          <div style="padding: 14px 20px 44px; border-top: 1.5px solid #17140F;">
+            <div style="background: #17140F; color: #F4F0E6; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; padding: 16px 0;">CREATE MESOCYCLE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S10: CREATE MODAL ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Create mesocycle modal">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">2.5 — CREATE MESOCYCLE</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; position: relative; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif; overflow: hidden;">
+          <div style="padding: 68px 20px 0;">
+            <div style="font-size: 27px; font-weight: 800; letter-spacing: -0.02em; margin-top: 24px;">new meso plan</div>
+            <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(23,20,15,0.55); margin-top: 4px;">FROM TEMPLATE — JANINE'S PRO DEBUT PREP</div>
+          </div>
+          <div style="position: absolute; inset: 0; background: rgba(23,20,15,0.45);"></div>
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #F4F0E6; border-top: 2px solid #17140F; padding: 22px 20px 44px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Create mesocycle</div>
+              <div style="font-size: 16px; color: rgba(23,20,15,0.5);">✕</div>
+            </div>
+
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.55); margin-top: 22px;">NAME</div>
+            <div style="height: 48px; background: #FCFAF4; border: 1.5px solid #17140F; display: flex; align-items: center; padding: 0 14px; font-size: 15px; font-weight: 600; margin-top: 8px;">Garron Jul '26 — Bulk II</div>
+
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.55); margin-top: 20px;">WEEKS — INCLUDING DELOAD</div>
+            <div style="display: flex; border: 1.5px solid #17140F; margin-top: 8px;">
+              <div style="flex: 1; text-align: center; font-size: 15px; font-weight: 500; padding: 13px 0; font-variant-numeric: tabular-nums;">4</div>
+              <div style="flex: 1; text-align: center; font-size: 15px; font-weight: 700; padding: 13px 0; background: #17140F; color: #F4F0E6; font-variant-numeric: tabular-nums;">5</div>
+              <div style="flex: 1; text-align: center; font-size: 15px; font-weight: 500; padding: 13px 0; border-left: 1px solid rgba(23,20,15,0.25); font-variant-numeric: tabular-nums;">6</div>
+              <div style="flex: 1; text-align: center; font-size: 15px; font-weight: 500; padding: 13px 0; border-left: 1px solid rgba(23,20,15,0.25); font-variant-numeric: tabular-nums;">7</div>
+              <div style="flex: 1; text-align: center; font-size: 15px; font-weight: 500; padding: 13px 0; border-left: 1px solid rgba(23,20,15,0.25); font-variant-numeric: tabular-nums;">8</div>
+            </div>
+            <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.08em; color: rgba(23,20,15,0.5); margin-top: 7px;">RIR RAMP: 3 → 0 · W5 DELOAD AT 8 RIR</div>
+
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.55); margin-top: 20px;">UNITS</div>
+            <div style="display: flex; border: 1.5px solid #17140F; margin-top: 8px;">
+              <div style="flex: 1; text-align: center; font-size: 13px; font-weight: 700; padding: 13px 0; background: #17140F; color: #F4F0E6; letter-spacing: 0.08em;">KG</div>
+              <div style="flex: 1; text-align: center; font-size: 13px; font-weight: 500; padding: 13px 0; letter-spacing: 0.08em;">LB</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 26px; align-items: center; justify-content: flex-end;">
+              <div style="font-size: 13px; font-weight: 600; padding: 12px 18px; color: rgba(23,20,15,0.6);">Cancel</div>
+              <div style="background: #17140F; color: #F4F0E6; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 14px 32px;">CREATE</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 03 — LIBRARY                                          -->
+  <!-- ============================================================= -->
+  <div style="max-width: 860px; border-top: 1.5px solid #17140F; padding-top: 16px; margin-bottom: 32px;">
+    <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em;">03 — LIBRARY</div>
+    <div style="font-size: 13px; color: rgba(23,20,15,0.6); margin-top: 4px;">Exercises, per-exercise history, and templates.</div>
+  </div>
+
+  <div style="display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 80px;">
+
+    <!-- ============ S11: EXERCISES ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Exercise library">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">3.1 — EXERCISES</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em;">exercises</div>
+              <div style="border: 1.5px solid #17140F; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 9px 14px;">+ NEW</div>
+            </div>
+            <div style="height: 46px; border: 1.5px solid #17140F; background: #FCFAF4; display: flex; align-items: center; padding: 0 14px; font-size: 14px; color: rgba(23,20,15,0.45); margin-top: 16px;">Search</div>
+            <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: rgba(23,20,15,0.55);">FILTERS</div>
+              <div style="background: #17140F; color: #F4F0E6; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; padding: 6px 10px; display: flex; gap: 8px; align-items: center;">GLUTES <span style="opacity: 0.6;">✕</span></div>
+            </div>
+
+            <div style="margin-top: 16px; border-top: 1.5px solid #17140F;">
+              <div style="padding: 14px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">Barbell Hip Thrust</div>
+                  <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES · BARBELL · LAST 06/12/25</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 14px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">Barbell Squat (Sumo)</div>
+                  <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES · BARBELL · LAST 02/19/26</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 14px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">Belt Squat (Wide)</div>
+                  <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES · MACHINE · LAST 09/14/25</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 14px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">Booty Builder Hip Thrust</div>
+                  <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES · MACHINE · LAST 02/19/26</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 14px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">Bulgarian Split Squat</div>
+                  <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES · DUMBBELL</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 14px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">Cable Kickback</div>
+                  <div style="font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); margin-top: 4px;">GLUTES · CABLE</div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+            </div>
+          </div>
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MESOS</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 700;">■ EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S12: HISTORY SHEET ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Exercise history">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">3.2 — EXERCISE HISTORY</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; position: relative; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif; overflow: hidden;">
+          <div style="padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.22em;">workout</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-bottom: 1.5px solid #17140F; padding-bottom: 12px;">
+              <div style="font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.9;">W2·D1</div>
+            </div>
+          </div>
+          <div style="position: absolute; inset: 0; background: rgba(23,20,15,0.45);"></div>
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; top: 150px; background: #F4F0E6; border-top: 2px solid #17140F; padding: 22px 20px 44px; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">History</div>
+              <div style="font-size: 16px; color: rgba(23,20,15,0.5);">✕</div>
+            </div>
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.55); margin-top: 4px;">HACK SQUAT — MACHINE</div>
+
+            <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em; margin-top: 22px; padding-bottom: 6px; border-bottom: 1.5px solid #17140F;">GARRON JUN '26 — BULK</div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+              <div style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">245 kg <span style="font-weight: 400; color: rgba(23,20,15,0.5); font-size: 13px;">×</span> 10, 10</div>
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); text-align: right;">W2·D2 — 10 JUN</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+              <div style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">225 kg <span style="font-weight: 400; color: rgba(23,20,15,0.5); font-size: 13px;">×</span> 13, 9</div>
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); text-align: right;">W1·D4 — 7 JUN</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.15);">
+              <div style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">240 kg <span style="font-weight: 400; color: rgba(23,20,15,0.5); font-size: 13px;">×</span> 10, 10</div>
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.55); text-align: right;">W1·D2 — 3 JUN</div>
+            </div>
+
+            <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em; margin-top: 24px; padding-bottom: 6px; border-bottom: 1.5px solid #17140F; color: rgba(23,20,15,0.55);">EARLY SUMMER GIRL SQUAD</div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.15); color: rgba(23,20,15,0.55);">
+              <div style="font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;">95 kg <span style="font-weight: 400; font-size: 13px;">×</span> 8, 8 <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; padding: 2px 5px; margin-left: 6px; vertical-align: 2px;">DELOAD</span></div>
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-align: right;">W5·D1 — 9 MAY</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.15); color: rgba(23,20,15,0.55);">
+              <div style="font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;">115 kg <span style="font-weight: 400; font-size: 13px;">×</span> 13, 12</div>
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-align: right;">W4·D1 — 2 MAY</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(23,20,15,0.15); color: rgba(23,20,15,0.55);">
+              <div style="font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;">115 kg <span style="font-weight: 400; font-size: 13px;">×</span> 12, 11</div>
+              <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-align: right;">W3·D1 — 26 APR</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ S13: TEMPLATES ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px;" data-screen-label="Templates">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: rgba(23,20,15,0.7);">3.3 — TEMPLATES</div>
+      <x-import component="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #F4F0E6; color: #17140F; font-family: 'Archivo', sans-serif;">
+          <div style="flex: 1; overflow: hidden; padding: 68px 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em;">templates</div>
+              <div style="border: 1.5px solid #17140F; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 9px 14px;">+ NEW</div>
+            </div>
+            <div style="height: 46px; border: 1.5px solid #17140F; background: #FCFAF4; display: flex; align-items: center; padding: 0 14px; font-size: 14px; color: rgba(23,20,15,0.45); margin-top: 16px;">Search</div>
+            <div style="border: 1px solid rgba(23,20,15,0.35); text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; padding: 12px 0; margin-top: 12px; color: rgba(23,20,15,0.7);">CONTINUE EDITING DRAFT ›</div>
+
+            <div style="margin-top: 16px; border-top: 1.5px solid #17140F;">
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 9.5px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">WHOLE BODY</div>
+                  <div style="font-size: 17px; font-weight: 700; margin-top: 3px;">B.Rexx Blueprint</div>
+                  <div style="display: flex; gap: 6px; margin-top: 7px;">
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">4 D/WK</span>
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">FEMALE</span>
+                  </div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 9.5px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">ARMS &amp; SHOULDERS</div>
+                  <div style="font-size: 17px; font-weight: 700; margin-top: 3px;">3-Day Delt Annihilation</div>
+                  <div style="display: flex; gap: 6px; margin-top: 7px;">
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">3 D/WK</span>
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">MALE</span>
+                  </div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 9.5px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">UPPER BODY</div>
+                  <div style="font-size: 17px; font-weight: 700; margin-top: 3px;">Bench Press Rep Max Plan</div>
+                  <div style="display: flex; gap: 6px; margin-top: 7px;">
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">3 D/WK</span>
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">MALE</span>
+                  </div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+              <div style="padding: 15px 0; border-bottom: 1px solid rgba(23,20,15,0.18); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 9.5px; font-weight: 600; letter-spacing: 0.14em; color: rgba(23,20,15,0.5);">WHOLE BODY</div>
+                  <div style="font-size: 17px; font-weight: 700; margin-top: 3px;">Janine's Pro Debut Prep</div>
+                  <div style="display: flex; gap: 6px; margin-top: 7px;">
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">4 D/WK</span>
+                    <span style="border: 1px solid rgba(23,20,15,0.4); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 7px;">FEMALE</span>
+                  </div>
+                </div>
+                <div style="font-size: 16px; color: rgba(23,20,15,0.4);">›</div>
+              </div>
+            </div>
+          </div>
+          <div style="border-top: 2px solid #17140F; background: #F4F0E6; display: flex; padding: 12px 8px 30px;">
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">WORKOUT</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MESOS</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 700;">■ TEMPLATES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">EXERCISES</div>
+            <div style="flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.1em; font-weight: 500; color: rgba(23,20,15,0.45);">MORE</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <!-- ===================== NEXT STEPS ===================== -->
+  <div style="max-width: 720px; border-top: 1.5px solid #17140F; padding-top: 20px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 12px;">next steps</div>
+    <ul style="font-size: 14px; line-height: 1.7; margin: 0; padding-left: 18px; color: rgba(23,20,15,0.8);">
+      <li>Review the orange budget — currently: current-position dots, CURRENT tags, selected feedback chips, destructive menu items, and the autoregulation label. Trim or extend as you see fit.</li>
+      <li>The set-state language: logged = tinted box + filled ✓, next up = bright white box + bold border, future = dimmed. Confirm this reads right before I wire interactivity.</li>
+      <li>Candidates for round 3: replace-exercise picker, note editing, meso stats view, "More" tab, and a clickable single-flow prototype.</li>
+    </ul>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
