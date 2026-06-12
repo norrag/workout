@@ -233,6 +233,154 @@ describe("logged history", () => {
   });
 });
 
+describe("design-pivot tables (0002)", () => {
+  it("exclusions and pinned notes are owner-only", async () => {
+    const { data: stock } = await alice
+      .from("exercises")
+      .select("id")
+      .is("user_id", null)
+      .limit(1)
+      .single();
+
+    const { data: exclusion, error: exclusionError } = await alice
+      .from("excluded_exercises")
+      .insert({ user_id: aliceId, exercise_id: stock!.id, reason: "LOW BACK" })
+      .select()
+      .single();
+    expect(exclusionError).toBeNull();
+    const { data: bobExclusions } = await bob
+      .from("excluded_exercises")
+      .select("*")
+      .eq("id", exclusion!.id);
+    expect(bobExclusions).toEqual([]);
+
+    const { data: note, error: noteError } = await alice
+      .from("exercise_notes")
+      .insert({ user_id: aliceId, exercise_id: stock!.id, body: "pinned grip note" })
+      .select()
+      .single();
+    expect(noteError).toBeNull();
+    const { data: bobNotes } = await bob
+      .from("exercise_notes")
+      .select("*")
+      .eq("id", note!.id);
+    expect(bobNotes).toEqual([]);
+  });
+
+  it("bob cannot spoof rows into alice's account", async () => {
+    const { data: stock } = await bob
+      .from("exercises")
+      .select("id")
+      .is("user_id", null)
+      .limit(1)
+      .single();
+    const { error } = await bob
+      .from("excluded_exercises")
+      .insert({ user_id: aliceId, exercise_id: stock!.id });
+    expect(error).not.toBeNull();
+  });
+
+  it("macro slots and groups-first plan rows are gated through their parents", async () => {
+    const { data: slot, error: slotError } = await alice
+      .from("macro_slots")
+      .insert({
+        macrocycle_id: aliceMacroId,
+        user_id: aliceId,
+        slot_number: 1,
+        goal_type: "gain",
+        label: "Bulk",
+      })
+      .select()
+      .single();
+    expect(slotError).toBeNull();
+    const { data: bobSlots } = await bob
+      .from("macro_slots")
+      .select("*")
+      .eq("id", slot!.id);
+    expect(bobSlots).toEqual([]);
+
+    // standalone meso (no macro) + groups-first day/group chain
+    const { data: meso, error: mesoError } = await alice
+      .from("mesocycles")
+      .insert({ user_id: aliceId, name: "standalone", weeks: 5, days_per_week: 4 })
+      .select()
+      .single();
+    expect(mesoError).toBeNull();
+    expect(meso!.macrocycle_id).toBeNull();
+
+    const { data: day } = await alice
+      .from("meso_days")
+      .insert({
+        mesocycle_id: meso!.id,
+        user_id: aliceId,
+        day_number: 1,
+        label: "Lower A",
+        weekday: 1,
+      })
+      .select()
+      .single();
+    const { data: mg } = await alice
+      .from("muscle_groups")
+      .select("id")
+      .limit(1)
+      .single();
+    const { data: group, error: groupError } = await alice
+      .from("meso_day_groups")
+      .insert({ meso_day_id: day!.id, muscle_group_id: mg!.id, exercise_slots: 2 })
+      .select()
+      .single();
+    expect(groupError).toBeNull();
+
+    const { data: bobGroups } = await bob
+      .from("meso_day_groups")
+      .select("*")
+      .eq("id", group!.id);
+    expect(bobGroups).toEqual([]);
+    const { error: bobGroupInsert } = await bob
+      .from("meso_day_groups")
+      .insert({ meso_day_id: day!.id, muscle_group_id: mg!.id });
+    expect(bobGroupInsert).not.toBeNull();
+  });
+
+  it("stock template day groups are readable; users cannot write them", async () => {
+    const { data: stockDay } = await bob
+      .from("template_days")
+      .select("id, template_id, templates!inner(user_id)")
+      .limit(1)
+      .single();
+    const { data: mg } = await bob
+      .from("muscle_groups")
+      .select("id")
+      .limit(1)
+      .single();
+    const { data: visible, error: readError } = await bob
+      .from("template_day_groups")
+      .select("*")
+      .eq("template_day_id", stockDay!.id);
+    expect(readError).toBeNull();
+    expect(Array.isArray(visible)).toBe(true);
+    const { error: writeError } = await bob
+      .from("template_day_groups")
+      .insert({ template_day_id: stockDay!.id, muscle_group_id: mg!.id });
+    expect(writeError).not.toBeNull();
+  });
+
+  it("users cannot write the MCP audit log directly", async () => {
+    const { error } = await alice.from("mcp_write_audit").insert({
+      user_id: aliceId,
+      tool: "create_mesocycle",
+      args_hash: "deadbeef",
+    });
+    expect(error).not.toBeNull();
+    const { data: bobView, error: bobError } = await bob
+      .from("mcp_write_audit")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(bobError).toBeNull();
+    expect(bobView).toEqual([]);
+  });
+});
+
 describe("engine tables", () => {
   it("authenticated users can read engine params", async () => {
     const { data, error } = await bob

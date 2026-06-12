@@ -1,5 +1,7 @@
 # 06 — Design System
 
+> **Partially superseded (June 2026).** [08-design-decisions.md](08-design-decisions.md) is now the authoritative design source: the dark-mode-first color system, the key-screen list, and the Today/Insights/Settings navigation below are **replaced** by the light "ledger" system, the canon tab bar, and the mockups in `docs/design/`. The attitude, motion guidance, accessibility targets, and copy voice in this document still apply unchanged.
+
 ## Attitude
 
 Strong, restrained, deliberate — never loud or motivational. The interface is a **serious tool for people who train consistently**, not a lifestyle brand trying to hype them up. Minimal copy, obvious actions, clean tracking screens, a slightly counterculture visual attitude: disciplined, useful, quiet, distinct.

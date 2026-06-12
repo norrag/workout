@@ -18,6 +18,7 @@ const eslintConfig = [
       "out/**",
       "public/sw.js",
       "next-env.d.ts",
+      "docs/design/**", // design-prototype artifacts, not app code
     ],
   },
 ];

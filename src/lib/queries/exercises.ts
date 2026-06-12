@@ -54,6 +54,7 @@ export async function createCustomExercise(
   input: {
     name: string;
     equipment_type: EquipmentType;
+    description?: string | null;
     notes?: string | null;
     muscle_groups: { muscle_group_id: string; role: "primary" | "secondary" }[];
   },
@@ -64,6 +65,7 @@ export async function createCustomExercise(
       user_id: userId,
       name: input.name,
       equipment_type: input.equipment_type,
+      description: input.description ?? null,
       notes: input.notes ?? null,
       video_url: null,
       source_exercise_id: null,

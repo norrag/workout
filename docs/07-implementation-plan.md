@@ -1,119 +1,129 @@
 # 07 — Implementation Plan
 
-Phased plan to build WORKOUT to production quality. Each phase ends in a deployable, demoable state with acceptance criteria. Phases are sequenced so the data model and engine — the riskiest parts — are validated early.
+Rewritten for the June 2026 design pivot ([08-design-decisions.md](08-design-decisions.md) is the authoritative design source; mockups in `docs/design/`). Each phase ends in a deployable, demoable state with acceptance criteria. The data model and engine — the riskiest parts — were validated first and largely survive the pivot; the UI phases now build the light-ledger screens directly rather than an interim design.
 
-## Phase 0 — Foundation & scaffolding
+Scope changes folded into this plan:
 
-**Goal:** a deployed empty shell with CI, types, and design tokens in place.
+- **No offline sync.** The app requires connectivity; the service worker only makes the shell installable and fast. The outbox/IndexedDB work is cut.
+- **No admin UI.** Engine inspection, param editing, and replay ship as admin-gated **MCP tools** (Claude is the tuning console). The underlying tables, versioning, and replay functions remain.
+- **Navigation canon:** `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`. Insights is not a tab — meso stats hang off meso detail; exercise history lives in the library/picker.
+- **Groups-first planning** replaces the exercise-first meso builder.
+- **lb is the default unit**; all engine increments expressed per-equipment in the user's unit.
 
-- [x] Scaffold Next.js (App Router, TypeScript, Tailwind) per the structure in [02-architecture.md](02-architecture.md)
-- [x] PWA baseline: manifest, icons, Serwist service worker, installability
-- [x] Design tokens + `ui/` primitives (Button, Card, Input, BottomNav) from [06-design-system.md](06-design-system.md)
-- [x] Local CLI workflow (`supabase/config.toml`, migration scripts in package.json) — hosted Supabase project still to be provisioned
-- [x] `.env.example`, ESLint, Prettier, Vitest wiring — Playwright wiring pending (Phase 3 e2e)
-- [x] GitHub Actions CI: typecheck, lint, unit tests, build
+## Phase 0 — Foundation & scaffolding ✅ (re-skin pending)
+
+Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest/ESLint/Prettier, primitives. Remaining items absorbed into Phase R and Phase 1b:
+
 - [ ] Vercel project connected: preview deploys per PR, prod from `main`
+- [ ] Remove the Serwist offline-logging assumptions; keep installability + shell precache only
 
-**Accept:** PR previews deploy; CI green; app installs as a PWA showing the dark shell.
+## Phase R — Design-system retheme (new)
 
-## Phase 1 — Auth, profiles & data model
+**Goal:** the app shell and primitives match the light ledger system before any feature screens are built on them.
 
-**Goal:** users exist; the full schema exists.
+- [ ] Replace token set in `src/styles/globals.css` per 08 §1: `#F4F0E6` base, `#17140F` ink, `#C14B2A` accent, hairlines/rules, square corners everywhere; PWA theme color → `#F4F0E6`
+- [ ] Typography: Archivo (self-hosted via `next/font`), 800-weight lowercase titles, tracked all-caps labels, tabular-lining numerals
+- [ ] Rework primitives: Button, Input, segmented control (filled-ink active state), chips, dashed "planned/empty" variants, snap-to-stop slider, bottom sheet, menu card (offset hard shadow), week-track component
+- [ ] BottomNav → canon tabs `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`
+- [ ] Manifest/icons regenerated for the light system
+- [ ] Visual QA against mockup figures 1.1–4.5 (`docs/design/mockups/workout - App Screens v2.dc.html`)
 
-- [x] Migrations for the entire schema in [03-data-model.md](03-data-model.md), with RLS policies on every table
-- [x] RLS test suite (policy tests run in CI against local Supabase)
-- [x] Seed data: muscle groups, ~80 stock exercises, 3–4 stock templates, default `engine_params`
-- [x] Supabase Auth: email/password with SSR-safe session handling — OAuth provider still to be enabled in the hosted project
-- [x] Onboarding flow: profile capture (age, gender, experience, equipment prefs, units)
-- [x] DB types (hand-authored, `npm run db:types` to regenerate) + `src/lib/queries/` data-access layer
+**Accept:** shell + primitives render pixel-faithful to the mockups; no rounded corners, no shadows except menu cards, orange only on current/selected.
 
-**Accept:** new user can sign up, onboard, and see an empty Today screen; cross-user data access provably blocked by RLS tests.
+## Phase 1 — Auth, profiles & data model ✅ (delta pending)
 
-## Phase 2 — Cycle management
+Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
-**Goal:** users can build the macro → meso → micro structure.
+- [ ] Migration `20260612000001_design_pivot.sql`: profile body data + week start, equipment vocabulary, excluded exercises, pinned exercise notes, macro slots, standalone mesos, 3–8 week mesos, groups-first plan tables (`meso_days`, `meso_day_groups`), workout-exercise group/status, set types + units, feedback redesign (pump/workload 0–10 sliders, per-group scope), `template_day_groups`, `mcp_write_audit`, meso-stats views — with RLS + tests in the same PR
+- [ ] Update `database.ts` types and `src/lib/queries/` for the new shapes
+- [ ] Onboarding rebuilt as the 08 §4 sequence: name/age/height/bodyweight → experience level → equipment access → units; land on Cycles with the create-macro empty state
+- [ ] Profile screen (fig 4.5): data rows, experience segmented control, equipment chips, excluded-exercise management
+- [ ] More tab (fig 4.4): profile card, LB/KG toggle, AI connector row (placeholder until Phase 6), CSV export stub, version line
+- [ ] Provision hosted Supabase + Vercel; apply migrations + seed; regenerate types from the live schema
 
-- [ ] Macrocycle CRUD (goal type, metrics, timeline, status)
-- [ ] Mesocycle builder: weeks (3–6), days/week, deload toggle, RIR ramp preview; add exercises per day (from library) with initial sets/reps/weight
-- [ ] Microcycle generation with per-week target RIR
-- [ ] Workout generation for week 1 from the meso plan
-- [ ] Cycles screen: timeline of position in macro/meso/micro
-- [ ] Exercise library v1: browse/search stock exercises, create custom exercises
+**Accept:** new user onboards through the 4-step sequence and lands on Cycles; exclusions and equipment persist; RLS tests cover every new table.
 
-**Accept:** user creates a macro, builds a 4-week meso from scratch, and sees week 1 workouts scheduled.
+## Phase 2 — Cycles & groups-first planning
+
+**Goal:** the full structure flow of section 2 of the mockups.
+
+- [ ] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
+- [ ] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
+- [ ] Plan-a-meso entry (fig 2.3): copy a mesocycle / start with a template / meso builder / from scratch (builder option may stub to scratch in v1 with a clear path)
+- [ ] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
+- [ ] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
+- [ ] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-set data, full-history link; exclusions never appear
+- [ ] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
+- [ ] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `EDIT WEEKS`, `GO TO W#·D#`, `MESO STATS` entry
+- [ ] Microcycle + week-1 workout generation on create (engine `seedMeso` / `rirRamp` are ready)
+
+**Accept:** user creates a macro with a goal arc, plans a meso groups-first from scratch, and sees week-1 workouts generated with the planner's structure (groups, slots, start sets).
 
 ## Phase 3 — Workout logging
 
-**Goal:** the core daily loop, excellent on a phone in a gym.
+**Goal:** the section-1 daily loop, excellent on a phone in a gym. Online-only.
 
-- [ ] Today screen with current workout and cycle position
-- [ ] Logging flow: per-exercise set logging (steppers), add/remove/swap sets & exercises, notes
-- [ ] Exercise feedback sheet (joint pain, strain, pump, fatigue) after final set
-- [ ] Workout feedback on completion (overall fatigue, effort, performance)
-- [ ] Full cycle-context stamping on `logged_sets`
-- [ ] Offline outbox: log without connectivity, sync on reconnect, conflict-safe
-- [ ] Playwright e2e: complete a full workout offline → sync
+- [ ] Workout tab resting logic (08 §2): show latest uncompleted workout; else latest completed meso's stats view
+- [ ] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
+- [ ] Exercise menu (fig 1.2): history, new note, replace exercise, move, add set, skip remaining, remove
+- [ ] Set menu (fig 1.3): add set below, set type (straight/drop), skip set, delete set; prescription rationale surfaced as short clinical lines
+- [ ] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
+- [ ] Workout complete sheet (fig 1.5): summary rows, autoregulation summary from engine output, workout notes saved with the session, link to meso stats, next-workout button
+- [ ] Deload logging = standard day view + `DELOAD` badge and engine-reduced prescriptions
+- [ ] Playwright e2e: log a full workout including feedback and completion
 
-**Accept:** a full workout can be logged one-thumbed, offline, in under the time between sets.
+**Accept:** a full workout can be logged one-thumbed; feedback writes the redesigned rows; completion shows a real engine-derived autoregulation summary.
 
-## Phase 4 — Progression engine v1
+## Phase 4 — Progression engine alignment & wiring
 
-**Goal:** next week's numbers are computed, explainable, and tunable.
+**Goal:** next week's numbers are computed from the new signals, explainable, and tunable.
 
-- [x] `src/lib/engine/` pure package per [04-feedback-engine.md](04-feedback-engine.md): types, param schema, rule modules (built early — pure code, no infra needed)
-- [ ] Week N → N+1 generation job (on micro completion or first open of new week)
-- [ ] Deload prescription; meso-seeding from prior meso peak
-- [ ] `engine_decisions` audit writes with rationale; rationale surfaced in logging UI
-- [x] Unit tests (rule branches), golden meso simulations, property tests on hard bounds
-- [ ] Progress scoring v1 + `v_exercise_history` / `v_meso_summary` views
+- [x] Pure engine core, param schema, rule modules, golden/property tests (built pre-pivot)
+- [ ] Re-align engine inputs to the redesigned feedback: pump 0–10 and workload 0–10 (replacing strain/fatigue), joint-pain gate per exercise, workload anchored at "just right" = 5 driving set-count adjustment; update params + golden fixtures
+- [ ] Per-equipment increments in the user's unit (lb default), incl. bands/kettlebell
+- [ ] Week N → N+1 generation job (on workout completion / first open of new week), writing `engine_decisions` with rationale
+- [ ] Autoregulation summary composer (the 1.5 copy: "+5 lb: hit all reps at 2 RIR", "Cable Pushdown +1 set", "Ramp holds…")
+- [ ] Meso seeding from prior meso peak; deload prescriptions (target RIR 4+)
+- [ ] Progress scoring v1 via the shared views
 
-**Accept:** golden-fixture meso produces the expected 3→0 RIR progression; every prescription shows a sensible rationale; pain gate provably blocks load increases.
+**Accept:** golden-fixture meso produces the expected ramp; every prescription shows a sensible rationale in the set/exercise menus; pain gate provably blocks load increases.
 
-## Phase 5 — Admin & tuning tooling
+## Phase 5 — Meso stats, library & templates
 
-**Goal:** the team can obtain quality engine outputs safely.
+**Goal:** the section-3/4 screens — one definition of progress everywhere.
 
-- [ ] Role-gated `/admin` area
-- [ ] Decision inspector (browse/filter `engine_decisions`)
-- [ ] Param editor with versioning, diff, activate-with-confirm
-- [ ] Replay harness: re-run historical decisions/mesos against candidate params, diff outcomes
-- [ ] Synthetic scenario fixtures shared with the test suite
+- [ ] Meso stats (figs 4.1–4.3) behind `MESO STATS` on meso detail: volume table (logged + autoregulated plan per group per week), balance (push/pull/legs cards, per-muscle bars, balance-check callout), performance (top set by week, e1RM across macro, PRs this meso) — all from `v_meso_week_sets`, `v_exercise_history`, `v_exercise_prs`
+- [ ] Exercises tab (fig 3.1): search, muscle-group filter, last-logged dates; create custom exercise form; exercise detail page (description, equipment, last performed, inline history, notes)
+- [ ] Exercise history sheet (fig 3.2) shared by library, picker, and exercise menu
+- [ ] Templates tab (fig 3.3): list, start-from-template → planner board prefilled, save meso as template (`template_day_groups` round-trip)
+- [ ] Sharing: share codes/grants for custom exercises, templates, mesos; copy-on-accept with provenance + dedupe
+- [ ] Stock template/seed polish for the groups-first shape
 
-**Accept:** an admin can change a progression increment, replay a real meso against it, see the diff, and activate — without a deploy.
+**Accept:** stats match raw logged data; a template round-trips through the planner; user A shares a template with a custom exercise and user B starts a meso from it.
 
-## Phase 6 — Templates, sharing & insights
+## Phase 6 — MCP connector (including admin & tuning)
 
-**Goal:** reuse, community sharing, and visible progress.
+**Goal:** any MCP client can analyze, plan, and — for admins — tune the engine. This phase absorbs the old Phase 5 admin tooling.
 
-- [ ] Template CRUD + filters (emphasis, gender, days/week, author); start meso from template; save meso as template
-- [ ] Sharing: share codes/grants for custom exercises, templates, mesos; copy-on-accept with custom-exercise resolution & dedupe
-- [ ] Insights screens: exercise history (weight/volume/e1RM), muscle-group weekly volume, meso summaries, macro progress vs goals
-- [ ] Stock template polish pass with seeded content
+- [ ] `/api/mcp` server (Streamable HTTP) with OAuth bridge to Supabase Auth; connector row + token revocation in More
+- [ ] Read tools: profile, current state, cycles, exercise history, muscle-group volume/balance, meso summaries, PRs, explain_prescription, search
+- [ ] Write tools (drafts only, audited to `mcp_write_audit`): create_mesocycle (groups-first shape), create_template, create_custom_exercise, update_macrocycle_goals, manage_exclusions, log_note
+- [ ] **Admin tools (role-gated by `profiles.role`):** get_engine_params / list versions, propose_engine_params (new inactive version), activate_engine_params (explicit confirm step), get_engine_decisions (filterable inspector), replay_decisions (re-run historical decisions/mesos against a candidate version, return diffs)
+- [ ] Replay functions + synthetic scenario fixtures shared with the test suite
+- [ ] Resources + server instructions; tool-handler tests against a seeded fixture user; manual verification from Claude
 
-**Accept:** user A shares a template containing a custom exercise; user B accepts and starts a meso from it; insights match raw logged data.
+**Accept:** from Claude, a user gets a grounded meso summary and a drafted next meso appearing in-app as planned; an admin changes a progression increment, replays a real meso against it, sees the diff, and activates — all via MCP, no deploy, no admin UI.
 
-## Phase 7 — MCP connector
-
-**Goal:** any MCP client can analyze and plan with the user's data.
-
-- [ ] `/api/mcp` server (Streamable HTTP) with OAuth bridge to Supabase Auth; token management UI in Settings
-- [ ] Read tools: profile, current state, cycles, exercise history, muscle-group volume, meso summaries, explain_prescription, search
-- [ ] Write tools: create_mesocycle (draft), create_template, create_custom_exercise, update_macrocycle_goals, log_note
-- [ ] Resources + server instructions; MCP write audit log
-- [ ] Tool-handler tests against a seeded fixture user; manual verification from Claude
-
-**Accept:** from Claude, a user can ask "summarize my last meso and draft the next one"; the draft appears in-app as a planned meso with engine-generated numbers.
-
-## Phase 8 — Production hardening & launch
+## Phase 7 — Production hardening & launch
 
 **Goal:** production quality, end to end.
 
-- [ ] Security pass: RLS audit (Supabase advisors), service-role usage audit, rate limiting, headers
-- [ ] Performance pass: bundle, query plans on hot paths, Lighthouse PWA ≥ 90
+- [ ] Security pass: RLS audit (Supabase advisors), service-role usage audit, MCP rate limiting, headers
+- [ ] Performance pass: bundle, query plans on hot paths, Lighthouse PWA ≥ 90 (installability + fast shell; offline support not required beyond a clean "no connection" state)
 - [ ] Error handling/observability: structured logging, Sentry (or equivalent), Supabase log review
-- [ ] Accessibility audit on the logging flow
-- [ ] Data lifecycle: account deletion/export
-- [ ] Seed-content polish; empty/edge states; final design QA against [06-design-system.md](06-design-system.md)
+- [ ] Accessibility audit on the logging flow (≥44px targets, one-thumb reach, slider keyboard support)
+- [ ] Data lifecycle: account deletion + CSV export (the More-tab row)
+- [ ] Final design QA against 08 + mockups; empty/edge states (no active meso, all-complete resting state)
 - [ ] Production deploy, custom domain, smoke checklist
 
 **Accept:** real users can be onboarded; the daily loop, engine, and MCP connector all work in production with monitoring in place.
@@ -125,14 +135,15 @@ Phased plan to build WORKOUT to production quality. Each phase ends in a deploya
 - **Vertical slices:** every PR keeps `main` deployable; features land behind their phase.
 - **Migrations are append-only** and reviewed; schema changes always update generated types and RLS tests in the same PR.
 - **Engine changes require fixtures:** no rule change merges without a golden/unit test demonstrating it.
-- **Design discipline:** any new screen is checked against the accent-restraint and copy-voice rules before merge.
+- **Design discipline:** any new screen is checked against 08 (orange budget, square corners, dashed-planned, copy voice) before merge.
 
 ## Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Engine quality is subjective and hard to get right | params in DB + replay harness (Phase 5) makes tuning cheap; rationale strings expose bad logic early |
-| Offline sync conflicts | outbox is append-only set logs keyed by client-generated UUIDs; last-write-wins on notes only |
+| Engine quality is subjective and hard to get right | params in DB + MCP replay tools make tuning cheap and conversational; rationale strings expose bad logic early |
+| No admin UI makes tuning opaque to non-MCP users | tuning is an internal activity; `mcp_write_audit` + versioned params keep it reviewable; a UI can be added later once the system is understood |
+| Online-only logging fails in dead-zone gyms | clean failure state + instant retry; revisit an outbox only if real usage demands it |
+| Groups-first planner complexity | planner state is plain tables (`meso_days`/`meso_day_groups`/slots); template prefill reuses the same board |
 | Sharing custom exercises creates cross-user coupling | copy-on-accept with provenance IDs, no cross-user FKs |
-| MCP auth complexity | standard OAuth bridge; identity from token only; read-mostly tool surface in v1 |
 | Scope creep in v1 | out-of-scope list in [01-product-spec.md](01-product-spec.md) is binding until launch |
