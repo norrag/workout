@@ -18,8 +18,8 @@ export function rirRamp(
   rirEnd: number,
   params: EngineParams,
 ): WeekPlan[] {
-  if (weeks < 3 || weeks > 6) {
-    throw new Error(`meso weeks must be 3..6, got ${weeks}`);
+  if (weeks < 3 || weeks > 8) {
+    throw new Error(`meso weeks must be 3..8, got ${weeks}`);
   }
   if (rirEnd > rirStart) {
     throw new Error("rir_end must be <= rir_start");

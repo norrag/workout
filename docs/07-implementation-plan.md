@@ -14,7 +14,7 @@ Scope changes folded into this plan:
 
 Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest/ESLint/Prettier, primitives. Remaining items absorbed into Phase R and Phase 1b:
 
-- [ ] Vercel project connected: preview deploys per PR, prod from `main`
+- [x] Vercel project connected: preview deploys per PR, prod from `main`
 - [x] Remove the Serwist offline-logging assumptions; keep installability + shell precache only (verified: SW was already shell-precache + runtime cache only)
 
 ## Phase R — Design-system retheme (new)
@@ -35,11 +35,11 @@ Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest
 Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 - [x] Migration `20260612000001_design_pivot.sql`: profile body data + week start, equipment vocabulary, excluded exercises, pinned exercise notes, macro slots, standalone mesos, 3–8 week mesos, groups-first plan tables (`meso_days`, `meso_day_groups`), workout-exercise group/status, set types + units, feedback redesign (pump/workload 0–10 sliders, per-group scope), `template_day_groups`, `mcp_write_audit`, meso-stats views — with RLS + tests in the same PR
-- [~] Update `database.ts` types (done with the migration) and `src/lib/queries/` for the new shapes (queries pending)
-- [ ] Onboarding rebuilt as the 08 §4 sequence: name/age/height/bodyweight → experience level → equipment access → units; land on Cycles with the create-macro empty state
-- [ ] Profile screen (fig 4.5): data rows, experience segmented control, equipment chips, excluded-exercise management
-- [ ] More tab (fig 4.4): profile card, LB/KG toggle, AI connector row (placeholder until Phase 6), CSV export stub, version line
-- [ ] Provision hosted Supabase + Vercel; apply migrations + seed; regenerate types from the live schema
+- [x] Update `database.ts` types (done with the migration) and `src/lib/queries/` for the new shapes (exclusions, pinned notes, picker, macro slots, planner tables, generation)
+- [x] Onboarding rebuilt as the 08 §4 sequence: name/age/height/bodyweight → experience level → equipment access → units; land on Cycles with the create-macro empty state
+- [x] Profile screen (fig 4.5): data rows, experience segmented control, equipment chips, excluded-exercise management
+- [x] More tab (fig 4.4): profile card, LB/KG toggle, AI connector row (placeholder until Phase 6), CSV export stub, version line
+- [x] Provision hosted Supabase + Vercel; apply migrations + seed (hand-authored types verified against the live schema by integration smoke)
 
 **Accept:** new user onboards through the 4-step sequence and lands on Cycles; exclusions and equipment persist; RLS tests cover every new table.
 
@@ -47,15 +47,15 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** the full structure flow of section 2 of the mockups.
 
-- [ ] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
-- [ ] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
-- [ ] Plan-a-meso entry (fig 2.3): copy a mesocycle / start with a template / meso builder / from scratch (builder option may stub to scratch in v1 with a clear path)
-- [ ] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
-- [ ] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
-- [ ] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-set data, full-history link; exclusions never appear
-- [ ] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
-- [ ] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `EDIT WEEKS`, `GO TO W#·D#`, `MESO STATS` entry
-- [ ] Microcycle + week-1 workout generation on create (engine `seedMeso` / `rirRamp` are ready)
+- [x] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
+- [x] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
+- [~] Plan-a-meso entry (fig 2.3): from-scratch path works; copy / template / builder shown as dashed "soon" cards (template lands with Phase 5, copy/builder later)
+- [x] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
+- [x] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
+- [~] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-set data; exclusions never appear (full-history link lands with the 3.2 sheet in Phase 5)
+- [x] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
+- [~] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `GO TO W#·D#`, edit-plan entry; `MESO STATS` stubbed until Phase 5
+- [x] Microcycle + week-1 workout generation on meso start (engine `seedMeso` / `rirRamp`; ramp widened to 3–8 weeks with tests)
 
 **Accept:** user creates a macro with a goal arc, plans a meso groups-first from scratch, and sees week-1 workouts generated with the planner's structure (groups, slots, start sets).
 

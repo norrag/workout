@@ -6,12 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/queries/profiles";
 
 const onboardingSchema = z.object({
-  display_name: z.string().min(1).max(60),
+  display_name: z.string().min(1, "Name is required").max(60),
   age: z.coerce.number().int().min(13).max(120),
-  gender: z.enum(["female", "male", "other", "undisclosed"]),
+  height_cm: z.coerce.number().min(90).max(250).nullable(),
+  bodyweight: z.coerce.number().positive().max(1000).nullable(),
   experience_level: z.enum(["beginner", "intermediate", "advanced"]),
-  units: z.enum(["kg", "lb"]),
   preferred_equipment: z.array(z.string()).default([]),
+  units: z.enum(["lb", "kg"]),
 });
 
 export interface OnboardingState {
@@ -25,10 +26,11 @@ export async function completeOnboarding(
   const parsed = onboardingSchema.safeParse({
     display_name: formData.get("display_name"),
     age: formData.get("age"),
-    gender: formData.get("gender"),
+    height_cm: formData.get("height_cm") || null,
+    bodyweight: formData.get("bodyweight") || null,
     experience_level: formData.get("experience_level"),
-    units: formData.get("units"),
     preferred_equipment: formData.getAll("preferred_equipment"),
+    units: formData.get("units"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -42,8 +44,12 @@ export async function completeOnboarding(
 
   await updateProfile(supabase, user.id, {
     ...parsed.data,
+    bodyweight_updated_at: parsed.data.bodyweight
+      ? new Date().toISOString()
+      : null,
     onboarded_at: new Date().toISOString(),
   });
 
+  // land on Cycles with the create-macro empty state (08 §4)
   redirect("/cycles");
 }

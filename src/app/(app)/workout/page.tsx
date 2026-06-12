@@ -29,11 +29,11 @@ export default async function WorkoutPage() {
         )}
       </header>
 
-      {!state.macrocycle && (
-        <Card header="No active cycle">
+      {!state.mesocycle && (
+        <Card header="No active mesocycle">
           <p className="mb-4 text-sm text-ink/70">
-            Training starts with a macrocycle: a goal and a timeline. Build
-            yours, then plan your first mesocycle.
+            Training runs in cycles. Set up a macrocycle — or a standalone
+            meso — and plan your first block.
           </p>
           <Link
             href="/cycles"
@@ -44,21 +44,27 @@ export default async function WorkoutPage() {
         </Card>
       )}
 
-      {state.macrocycle && (
+      {state.mesocycle && (
         <Card header="Cycle position">
           <dl className="flex flex-col gap-2 text-sm">
-            <div className="flex justify-between border-b border-ink/15 pb-2">
-              <dt className="text-ink/55">Macro</dt>
-              <dd>
-                {state.macrocycle.name}{" "}
-                <span className="text-ink/55">
-                  ({state.macrocycle.goal_type})
-                </span>
-              </dd>
-            </div>
+            {state.macrocycle && (
+              <div className="flex justify-between border-b border-ink/15 pb-2">
+                <dt className="text-ink/55">Macro</dt>
+                <dd>
+                  {state.macrocycle.name}{" "}
+                  <span className="text-ink/55">
+                    ({state.macrocycle.goal_type})
+                  </span>
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between border-b border-ink/15 pb-2">
               <dt className="text-ink/55">Meso</dt>
-              <dd>{state.mesocycle?.name ?? "none planned"}</dd>
+              <dd>
+                <Link href={`/cycles/meso/${state.mesocycle.id}`}>
+                  {state.mesocycle.name}
+                </Link>
+              </dd>
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-ink/55">Week</dt>
@@ -66,7 +72,7 @@ export default async function WorkoutPage() {
                 {state.microcycle ? (
                   <span className="flex items-center gap-2">
                     <span className="numeral">
-                      {state.microcycle.week_number} / {state.mesocycle?.weeks}
+                      {state.microcycle.week_number} / {state.mesocycle.weeks}
                     </span>
                     <RirBadge
                       rir={state.microcycle.target_rir}
@@ -82,23 +88,24 @@ export default async function WorkoutPage() {
         </Card>
       )}
 
-      {state.nextWorkout && (
+      {state.nextWorkout && state.microcycle && (
         <Card header="Next workout">
           <p className="numeral mb-4 text-2xl font-bold">
-            Day {state.nextWorkout.day_number}
+            W{state.microcycle.week_number} · D{state.nextWorkout.day_number}
           </p>
           <Link
             href={`/log/${state.nextWorkout.id}`}
             className="label-caps inline-flex min-h-11 w-full items-center justify-center bg-ink px-5 text-xs font-bold text-bg-base"
           >
-            Start workout
+            Open workout
           </Link>
         </Card>
       )}
 
-      {state.macrocycle && !state.nextWorkout && state.mesocycle && (
+      {state.mesocycle && !state.nextWorkout && (
         <p className="text-sm text-ink/55">
-          No workout scheduled. Check your cycle plan.
+          Every workout this week is complete. Next week generates when the
+          engine runs.
         </p>
       )}
     </div>

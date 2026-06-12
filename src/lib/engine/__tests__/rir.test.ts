@@ -28,9 +28,21 @@ describe("rirRamp", () => {
     expect(ramp[2].isDeload).toBe(true);
   });
 
+  it("8 weeks with deload: monotonic 3 → 0 ramp across 7 working weeks", () => {
+    const ramp = rirRamp(8, true, 3, 0, params);
+    expect(ramp).toHaveLength(8);
+    const working = ramp.slice(0, 7).map((w) => w.targetRir);
+    expect(working[0]).toBe(3);
+    expect(working.at(-1)).toBe(0);
+    for (let i = 1; i < working.length; i++) {
+      expect(working[i]).toBeLessThanOrEqual(working[i - 1]);
+    }
+    expect(ramp.at(-1)).toEqual({ weekNumber: 8, targetRir: 4, isDeload: true });
+  });
+
   it("rejects invalid week counts and inverted ramps", () => {
     expect(() => rirRamp(2, false, 3, 0, params)).toThrow();
-    expect(() => rirRamp(7, false, 3, 0, params)).toThrow();
+    expect(() => rirRamp(9, false, 3, 0, params)).toThrow();
     expect(() => rirRamp(4, false, 0, 3, params)).toThrow();
   });
 });
