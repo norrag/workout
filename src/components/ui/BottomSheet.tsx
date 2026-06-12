@@ -34,7 +34,7 @@ export function BottomSheet({
         className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6"
       >
         <div className="flex items-baseline justify-between">
-          <h2 className="text-2xl font-extrabold tracking-[-0.02em]">
+          <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">
             {title}
           </h2>
           <button

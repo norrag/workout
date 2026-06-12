@@ -57,6 +57,7 @@ export async function logSetAction(input: {
     unit: profile?.units ?? "lb",
   });
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 const amendSchema = z.object({
@@ -82,6 +83,7 @@ export async function amendSetAction(input: {
     rir_reported: parsed.rir_reported,
   });
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 const weTargetSchema = z.object({
@@ -97,6 +99,7 @@ export async function addSetAction(input: {
   const { supabase } = await requireUser();
   await adjustPrescribedSets(supabase, parsed.workout_exercise_id, 1);
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 export async function skipSetAction(input: {
@@ -107,6 +110,7 @@ export async function skipSetAction(input: {
   const { supabase } = await requireUser();
   await adjustPrescribedSets(supabase, parsed.workout_exercise_id, -1);
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 export async function skipRemainingAction(input: {
@@ -117,6 +121,7 @@ export async function skipRemainingAction(input: {
   const { supabase } = await requireUser();
   await setExerciseStatus(supabase, parsed.workout_exercise_id, "skipped");
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 export async function removeExerciseAction(input: {
@@ -130,6 +135,7 @@ export async function removeExerciseAction(input: {
     parsed.workout_exercise_id,
   );
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
   return result;
 }
 
@@ -148,6 +154,7 @@ export async function savePinnedNoteAction(input: {
   const { supabase, user } = await requireUser();
   await savePinnedNote(supabase, user.id, parsed.exercise_id, parsed.body);
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 const feedbackSchema = z.object({
@@ -177,6 +184,113 @@ export async function saveFeedbackAction(input: {
     workload: parsed.workload,
   });
   revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+export interface HistoryEntry {
+  meso_name: string;
+  coordinate: string;
+  performed_on: string;
+  top_weight: number | null;
+  reps: string;
+  is_deload: boolean;
+}
+
+/** Exercise history (fig 3.2): sessions grouped by meso, newest first. */
+export async function getExerciseHistoryAction(
+  exerciseId: string,
+): Promise<HistoryEntry[]> {
+  const parsed = z.string().uuid().parse(exerciseId);
+  const { supabase, user } = await requireUser();
+
+  const { data: sets, error } = await supabase
+    .from("logged_sets")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("exercise_id", parsed)
+    .eq("is_warmup", false)
+    .order("performed_at", { ascending: false })
+    .limit(120);
+  if (error) throw error;
+  if (!sets || sets.length === 0) return [];
+
+  const mesoIds = [...new Set(sets.map((s) => s.mesocycle_id))];
+  const microIds = [...new Set(sets.map((s) => s.microcycle_id))];
+  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
+  const [
+    { data: mesos, error: mesoError },
+    { data: micros, error: microError },
+    { data: workouts, error: workoutError },
+  ] = await Promise.all([
+    supabase.from("mesocycles").select("id, name").in("id", mesoIds),
+    supabase
+      .from("microcycles")
+      .select("id, week_number, is_deload")
+      .in("id", microIds),
+    supabase.from("workouts").select("id, day_number").in("id", workoutIds),
+  ]);
+  if (mesoError) throw mesoError;
+  if (microError) throw microError;
+  if (workoutError) throw workoutError;
+  const mesoById = new Map((mesos ?? []).map((m) => [m.id, m]));
+  const microById = new Map((micros ?? []).map((m) => [m.id, m]));
+  const workoutById = new Map((workouts ?? []).map((w) => [w.id, w]));
+
+  // one entry per workout: top weight and its reps across the session
+  const byWorkout = new Map<string, typeof sets>();
+  for (const s of sets) {
+    const cur = byWorkout.get(s.workout_id) ?? [];
+    cur.push(s);
+    byWorkout.set(s.workout_id, cur);
+  }
+  return [...byWorkout.entries()].map(([workoutId, group]) => {
+    const top = Math.max(...group.map((s) => s.weight));
+    const reps = group
+      .filter((s) => s.weight === top)
+      .sort((a, b) => a.set_number - b.set_number)
+      .map((s) => s.reps)
+      .join(", ");
+    const micro = microById.get(group[0].microcycle_id);
+    const workout = workoutById.get(workoutId);
+    return {
+      meso_name: mesoById.get(group[0].mesocycle_id)?.name ?? "",
+      coordinate: `W${micro?.week_number ?? "?"}·D${workout?.day_number ?? "?"}`,
+      performed_on: group[0].performed_at.slice(0, 10),
+      top_weight: top,
+      reps,
+      is_deload: micro?.is_deload ?? false,
+    };
+  });
+}
+
+export async function moveExerciseDownAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  const { supabase } = await requireUser();
+  const { data: wes, error } = await supabase
+    .from("workout_exercises")
+    .select("id, position")
+    .eq("workout_id", parsed.workout_id)
+    .order("position");
+  if (error) throw error;
+  const idx = (wes ?? []).findIndex((w) => w.id === parsed.workout_exercise_id);
+  if (idx < 0 || idx >= (wes ?? []).length - 1) return;
+  const a = wes![idx];
+  const b = wes![idx + 1];
+  const { error: e1 } = await supabase
+    .from("workout_exercises")
+    .update({ position: b.position })
+    .eq("id", a.id);
+  if (e1) throw e1;
+  const { error: e2 } = await supabase
+    .from("workout_exercises")
+    .update({ position: a.position })
+    .eq("id", b.id);
+  if (e2) throw e2;
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 const completeSchema = z.object({

@@ -5,6 +5,7 @@ import { getProfile } from "@/lib/queries/profiles";
 import { listExclusions } from "@/lib/queries/exercises";
 import { ProfileEditor } from "./ProfileEditor";
 
+/** Profile screen (fig 4.5). */
 export default async function ProfilePage() {
   const supabase = await createClient();
   const {
@@ -21,16 +22,16 @@ export default async function ProfilePage() {
   if (!profile) redirect("/onboarding");
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="border-b-[1.5px] border-ink pb-3">
-        <Link
-          href="/more"
-          className="label-caps text-[10px] font-semibold text-ink/45"
-        >
-          ← MORE
-        </Link>
-        <h1 className="title-display mt-1 text-4xl">profile</h1>
-      </header>
+    <div>
+      <Link
+        href="/more"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+      >
+        ‹ MORE
+      </Link>
+      <h1 className="mt-3 text-[27px] font-extrabold leading-none tracking-[-0.02em]">
+        Profile
+      </h1>
       <ProfileEditor
         profile={profile}
         exclusions={exclusions}

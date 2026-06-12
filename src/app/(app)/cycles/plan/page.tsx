@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-/** Plan-a-meso entry (fig 2.3). Copy/template/builder paths land later
- * phases; from-scratch is the working path in v1. */
+/** Plan-a-meso entry (fig 2.3). Copy/template/builder land in later phases. */
 export default async function PlanMesoPage({
   searchParams,
 }: {
@@ -12,64 +11,81 @@ export default async function PlanMesoPage({
 
   const options = [
     {
-      label: "FROM SCRATCH",
-      detail: "Build days and muscle groups on an empty board",
+      n: "01",
+      title: "Copy a mesocycle",
+      detail: "Carry progressive overload forward — start from where you left off.",
+      href: null,
+    },
+    {
+      n: "02",
+      title: "Start with a template",
+      detail: "Pick a saved split and adjust from there.",
+      href: null,
+    },
+    {
+      n: "03",
+      title: "Meso builder",
+      detail: "Generated from your muscle-group priorities — emphasize, grow, maintain.",
+      href: null,
+    },
+    {
+      n: "04",
+      title: "From scratch",
+      detail: "Blank board. You know what you're doing.",
       href: `/cycles/plan/new${slotQuery}`,
-    },
-    {
-      label: "START WITH A TEMPLATE",
-      detail: "Prefill the board from a template — soon",
-      href: null,
-    },
-    {
-      label: "COPY A MESOCYCLE",
-      detail: "Repeat a previous meso's structure — soon",
-      href: null,
-    },
-    {
-      label: "MESO BUILDER",
-      detail: "Guided build from your goals — soon",
-      href: null,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="border-b-[1.5px] border-ink pb-3">
-        <Link
-          href="/cycles"
-          className="label-caps text-[10px] font-semibold text-ink/45"
-        >
-          ← CYCLES
-        </Link>
-        <h1 className="title-display mt-1 text-4xl">plan a mesocycle</h1>
-      </header>
+    <div>
+      <Link
+        href="/cycles"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+      >
+        ‹ CYCLES
+      </Link>
+      <h1 className="title-display mt-3 text-[32px]">plan a meso</h1>
 
-      <div className="flex flex-col gap-2">
-        {options.map((opt) =>
-          opt.href ? (
+      <div className="mt-5 border-t-[1.5px] border-ink">
+        {options.map((opt) => {
+          const inner = (
+            <>
+              <div className="numeral text-[11px] font-semibold text-ink/45">
+                {opt.n}
+              </div>
+              <div className="flex-1">
+                <div
+                  className={`text-lg font-bold ${opt.href ? "" : "text-ink/45"}`}
+                >
+                  {opt.title}
+                </div>
+                <div
+                  className={`mt-1 text-[12.5px] leading-[1.45] ${opt.href ? "text-ink/60" : "text-ink/35"}`}
+                >
+                  {opt.detail}
+                  {!opt.href && " (soon)"}
+                </div>
+              </div>
+              <div className="text-base text-ink/40">›</div>
+            </>
+          );
+          return opt.href ? (
             <Link
-              key={opt.label}
+              key={opt.n}
               href={opt.href}
-              className="border-[1.5px] border-ink px-4 py-4"
+              className="flex items-baseline gap-3.5 border-b border-ink/[0.18] py-[18px]"
             >
-              <p className="label-caps text-[11px] font-bold tracking-[0.12em]">
-                {opt.label}
-              </p>
-              <p className="mt-1 text-sm text-ink/55">{opt.detail}</p>
+              {inner}
             </Link>
           ) : (
             <div
-              key={opt.label}
-              className="border border-dashed border-ink/40 px-4 py-4"
+              key={opt.n}
+              className="flex items-baseline gap-3.5 border-b border-ink/[0.18] py-[18px]"
             >
-              <p className="label-caps text-[11px] font-semibold tracking-[0.12em] text-ink/45">
-                {opt.label}
-              </p>
-              <p className="mt-1 text-sm text-ink/40">{opt.detail}</p>
+              {inner}
             </div>
-          ),
-        )}
+          );
+        })}
       </div>
     </div>
   );

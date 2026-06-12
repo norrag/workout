@@ -24,7 +24,8 @@ Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres/Auth/RLS), Verc
 5. **MCP tools never take a `user_id` argument** — identity comes from the auth session only. Write tools create drafts; no deletes of logged history.
 6. **Validate every boundary with zod** (forms, route handlers, MCP tool args, engine params).
 7. **Design discipline (per 08):** light ledger system — cream `#F4F0E6` / ink `#17140F`; orange `#C14B2A` marks current position + selection only; square corners everywhere, dashed borders = planned/empty; lowercase logotype + tracked all-caps labels; no hype copy, no exclamation marks.
-8. **No offline sync, no admin UI.** The app is online-only; engine inspection/tuning/replay ship exclusively as admin-gated MCP tools.
+8. **Pixel fidelity to the mockups is mandatory.** Before building or changing ANY screen, open `docs/design/mockups/workout - App Screens v2.dc.html`, find the figure (1.1–4.5), and transcribe its exact structure, control patterns, copy, sizes, weights, and colors — never improvise a layout or label from the spec prose alone. Cross-check `docs/design/screenshots/`. Deviate only where a hard rule forces it (e.g. no deletes of logged history) and record the deviation in `docs/PROGRESS.md`.
+9. **No offline sync, no admin UI.** The app is online-only; engine inspection/tuning/replay ship exclusively as admin-gated MCP tools.
 
 ## Commands (once scaffolded)
 

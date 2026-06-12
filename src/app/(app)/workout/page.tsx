@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card } from "@/components/ui/Card";
-import { RirBadge } from "@/components/ui/RirBadge";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentState } from "@/lib/queries/cycles";
+import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
+import { DayView } from "../log/[workoutId]/DayView";
 
+/**
+ * Workout tab (08 §2): the latest uncompleted workout IS the tab (fig 1.1).
+ * With no active workout, fall back to the latest completed meso's summary.
+ */
 export default async function WorkoutPage() {
   const supabase = await createClient();
   const {
@@ -18,136 +22,92 @@ export default async function WorkoutPage() {
 
   const state = await getCurrentState(supabase, user.id);
 
-  // resting logic (08 §2): no active meso → latest completed meso's stats
-  let restingSummary = null;
-  if (!state.mesocycle) {
-    const { data, error } = await supabase
-      .from("v_meso_summary")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("status", "completed")
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-    restingSummary = data;
+  if (state.nextWorkout) {
+    const detail = await getWorkoutDetail(
+      supabase,
+      user.id,
+      state.nextWorkout.id,
+    );
+    if (detail) {
+      return <DayView detail={detail} units={profile?.units ?? "lb"} />;
+    }
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      <header className="border-b-[1.5px] border-ink pb-3">
-        <h1 className="title-display text-4xl">workout</h1>
-        {profile?.display_name && (
-          <p className="label-caps mt-2 text-[10px] font-medium text-ink/55">
-            {profile.display_name}
-          </p>
-        )}
-      </header>
+  // resting state — latest completed meso's summary
+  const { data: restingSummary, error } = await supabase
+    .from("v_meso_summary")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("status", "completed")
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
 
-      {!state.mesocycle && restingSummary && (
-        <Card header={`LAST MESO — ${restingSummary.name.toUpperCase()}`}>
-          <dl className="flex flex-col gap-2 text-sm">
-            <div className="flex justify-between border-b border-ink/15 pb-2">
-              <dt className="text-ink/55">Workouts</dt>
-              <dd className="numeral">
-                {restingSummary.workouts_completed} /{" "}
-                {restingSummary.workouts_total}
-              </dd>
-            </div>
-            <div className="flex justify-between border-b border-ink/15 pb-2">
-              <dt className="text-ink/55">Working sets</dt>
-              <dd className="numeral">{restingSummary.working_sets}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-ink/55">Best e1RM</dt>
-              <dd className="numeral">
-                {restingSummary.best_e1rm != null
-                  ? Math.round(restingSummary.best_e1rm)
-                  : "—"}
-              </dd>
-            </div>
-          </dl>
-        </Card>
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <div className="logotype text-[13px] font-semibold">workout</div>
+        {profile?.display_name && (
+          <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
+            {profile.display_name.toUpperCase()}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 border-b-[1.5px] border-ink pb-3">
+        <h1 className="title-display text-4xl">workout</h1>
+      </div>
+
+      {state.mesocycle && !state.nextWorkout && (
+        <p className="mt-5 text-sm text-ink/60">
+          Every workout this week is logged. Next week&apos;s targets generate
+          when the engine runs.
+        </p>
+      )}
+
+      {restingSummary && (
+        <div className="mt-6">
+          <div className="border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
+            LAST MESO — {restingSummary.name.toUpperCase()}
+          </div>
+          <div className="flex justify-between border-b border-ink/15 py-3 text-sm">
+            <span className="font-medium text-ink/70">Workouts</span>
+            <span className="numeral font-bold">
+              {restingSummary.workouts_completed} /{" "}
+              {restingSummary.workouts_total}
+            </span>
+          </div>
+          <div className="flex justify-between border-b border-ink/15 py-3 text-sm">
+            <span className="font-medium text-ink/70">Working sets</span>
+            <span className="numeral font-bold">
+              {restingSummary.working_sets}
+            </span>
+          </div>
+          <div className="flex justify-between border-b border-ink/15 py-3 text-sm">
+            <span className="font-medium text-ink/70">Best e1RM</span>
+            <span className="numeral font-bold">
+              {restingSummary.best_e1rm != null
+                ? Math.round(restingSummary.best_e1rm)
+                : "—"}
+            </span>
+          </div>
+        </div>
       )}
 
       {!state.mesocycle && (
-        <Card header="No active mesocycle">
-          <p className="mb-4 text-sm text-ink/70">
+        <div className="mt-6">
+          <p className="text-sm leading-relaxed text-ink/70">
             Training runs in cycles. Set up a macrocycle — or a standalone
             meso — and plan your first block.
           </p>
           <Link
             href="/cycles"
-            className="label-caps inline-flex min-h-11 items-center justify-center bg-ink px-5 text-xs font-bold text-bg-base"
+            className="mt-4 block w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
           >
-            Set up cycles
+            SET UP CYCLES
           </Link>
-        </Card>
-      )}
-
-      {state.mesocycle && (
-        <Card header="Cycle position">
-          <dl className="flex flex-col gap-2 text-sm">
-            {state.macrocycle && (
-              <div className="flex justify-between border-b border-ink/15 pb-2">
-                <dt className="text-ink/55">Macro</dt>
-                <dd>
-                  {state.macrocycle.name}{" "}
-                  <span className="text-ink/55">
-                    ({state.macrocycle.goal_type})
-                  </span>
-                </dd>
-              </div>
-            )}
-            <div className="flex justify-between border-b border-ink/15 pb-2">
-              <dt className="text-ink/55">Meso</dt>
-              <dd>
-                <Link href={`/cycles/meso/${state.mesocycle.id}`}>
-                  {state.mesocycle.name}
-                </Link>
-              </dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-ink/55">Week</dt>
-              <dd>
-                {state.microcycle ? (
-                  <span className="flex items-center gap-2">
-                    <span className="numeral">
-                      {state.microcycle.week_number} / {state.mesocycle.weeks}
-                    </span>
-                    <RirBadge
-                      rir={state.microcycle.target_rir}
-                      isDeload={state.microcycle.is_deload}
-                    />
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </dd>
-            </div>
-          </dl>
-        </Card>
-      )}
-
-      {state.nextWorkout && state.microcycle && (
-        <Card header="Next workout">
-          <p className="numeral mb-4 text-2xl font-bold">
-            W{state.microcycle.week_number} · D{state.nextWorkout.day_number}
-          </p>
-          <Link
-            href={`/log/${state.nextWorkout.id}`}
-            className="label-caps inline-flex min-h-11 w-full items-center justify-center bg-ink px-5 text-xs font-bold text-bg-base"
-          >
-            Open workout
-          </Link>
-        </Card>
-      )}
-
-      {state.mesocycle && !state.nextWorkout && (
-        <p className="text-sm text-ink/55">
-          Every workout this week is complete. Next week generates when the
-          engine runs.
-        </p>
+        </div>
       )}
     </div>
   );

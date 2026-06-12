@@ -34,6 +34,10 @@ export interface WorkoutDetail {
   /** all weeks of the meso, for the week track */
   microcycles: MicrocycleRow[];
   dayLabel: string | null;
+  /** caption under the week track (fig 1.1): "MESO 2 OF 4 · MACRO 26-1" */
+  contextLabel: string;
+  /** all workouts of this week, for the 1.5 next-workout button */
+  siblingWorkouts: WorkoutRow[];
   exercises: LoggedExercise[];
 }
 
@@ -62,6 +66,7 @@ export async function getWorkoutDetail(
     { data: microcycles, error: microsError },
     { data: workoutExercises, error: weError },
     { data: day, error: dayError },
+    { data: siblings, error: siblingError },
   ] = await Promise.all([
     supabase
       .from("mesocycles")
@@ -84,11 +89,17 @@ export async function getWorkoutDetail(
       .eq("mesocycle_id", microcycle.mesocycle_id)
       .eq("day_number", workout.day_number)
       .maybeSingle(),
+    supabase
+      .from("workouts")
+      .select("*")
+      .eq("microcycle_id", workout.microcycle_id)
+      .order("day_number"),
   ]);
   if (mesoError) throw mesoError;
   if (microsError) throw microsError;
   if (weError) throw weError;
   if (dayError) throw dayError;
+  if (siblingError) throw siblingError;
 
   const wes = workoutExercises ?? [];
   const weIds = wes.map((we) => we.id);
@@ -148,12 +159,38 @@ export async function getWorkoutDetail(
     (feedback ?? []).map((f) => [f.workout_exercise_id, f]),
   );
 
+  // macro context caption (fig 1.1)
+  let contextLabel = "STANDALONE MESO";
+  if (mesocycle.macrocycle_id) {
+    const [{ data: macro, error: macroError }, { data: slots, error: slotError }] =
+      await Promise.all([
+        supabase
+          .from("macrocycles")
+          .select("name")
+          .eq("id", mesocycle.macrocycle_id)
+          .single(),
+        supabase
+          .from("macro_slots")
+          .select("id, slot_number")
+          .eq("macrocycle_id", mesocycle.macrocycle_id)
+          .order("slot_number"),
+      ]);
+    if (macroError) throw macroError;
+    if (slotError) throw slotError;
+    const slot = (slots ?? []).find((s) => s.id === mesocycle.macro_slot_id);
+    contextLabel = slot
+      ? `MESO ${slot.slot_number} OF ${(slots ?? []).length} · ${macro.name.toUpperCase()}`
+      : `MACRO ${macro.name.toUpperCase()}`;
+  }
+
   return {
     workout,
     microcycle,
     mesocycle,
     microcycles: microcycles ?? [],
     dayLabel: day?.label ?? null,
+    contextLabel,
+    siblingWorkouts: siblings ?? [],
     exercises: wes.map((we) => ({
       ...we,
       exercise_name: exerciseById.get(we.exercise_id)?.name ?? "",

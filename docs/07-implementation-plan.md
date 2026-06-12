@@ -26,7 +26,7 @@ Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest
 - [x] Rework primitives: Button, Input, segmented control (filled-ink active state), chips, dashed "planned/empty" variants, snap-to-stop slider, bottom sheet, menu card (offset hard shadow), week-track component
 - [x] BottomNav → canon tabs `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`
 - [x] Manifest/icons regenerated for the light system
-- [ ] Visual QA against mockup figures 1.1–4.5 (`docs/design/mockups/workout - App Screens v2.dc.html`)
+- [~] Visual QA against mockup figures 1.1–4.5: all screens transcribed 1:1 from the mockup HTML (fidelity pass, see PROGRESS 2026-06-12); in-browser pixel pass on a device still pending
 
 **Accept:** shell + primitives render pixel-faithful to the mockups; no rounded corners, no shadows except menu cards, orange only on current/selected.
 

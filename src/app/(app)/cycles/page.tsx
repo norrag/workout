@@ -4,31 +4,40 @@ import { createClient } from "@/lib/supabase/server";
 import { getCyclesOverview } from "@/lib/queries/cycles";
 import type { MesocycleRow } from "@/lib/types/database";
 
-function MesoRow({ meso }: { meso: MesocycleRow }) {
-  const isCurrent = meso.status === "active";
+function StatusMark({ meso }: { meso: MesocycleRow }) {
+  if (meso.status === "completed")
+    return (
+      <div className="flex h-5 w-5 items-center justify-center bg-ink text-[11px] text-bg-base">
+        ✓
+      </div>
+    );
+  if (meso.status === "active")
+    return (
+      <div className="border-[1.5px] border-accent px-[7px] py-[3px] text-[8.5px] font-bold tracking-[0.12em] text-accent">
+        CURRENT
+      </div>
+    );
+  return <div className="h-5 w-5 border-[1.5px] border-ink/35" />;
+}
+
+function MesoRow({ meso }: { meso: MesocycleRow & { slotLine?: string } }) {
   return (
     <Link
       href={`/cycles/meso/${meso.id}${meso.status === "planned" ? "/plan" : ""}`}
-      className="flex min-h-12 items-center justify-between py-2"
+      className="block border-b border-ink/[0.18] py-[11px] last:border-b-0"
     >
-      <span className="flex items-center gap-2 text-sm font-semibold">
-        {isCurrent && <span className="h-2 w-2 bg-accent" aria-hidden />}
-        {meso.name}
-      </span>
-      <span className="label-caps text-[9px] font-semibold text-ink/45">
-        {meso.status === "active"
-          ? "CURRENT"
-          : meso.status === "planned"
-            ? "PLANNED"
-            : meso.status.toUpperCase()}
-        {" · "}
-        <span className="numeral">{meso.weeks}W</span>
-      </span>
+      <div className="flex items-center justify-between">
+        <div className="text-[15px] font-bold">{meso.name}</div>
+        <StatusMark meso={meso} />
+      </div>
+      <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.08em] text-ink/55">
+        {meso.slotLine ?? `${meso.weeks} WK · ${meso.days_per_week} D/WK`}
+      </div>
     </Link>
   );
 }
 
-/** Cycles tab (fig 2.1): macros with goal-arc slots, standalone mesos. */
+/** Cycles tab (fig 2.1): expandable macros with goal-arc slots, standalone mesos. */
 export default async function CyclesPage() {
   const supabase = await createClient();
   const {
@@ -43,104 +52,147 @@ export default async function CyclesPage() {
   const empty = macros.length === 0 && standaloneMesos.length === 0;
 
   return (
-    <div className="flex flex-col gap-7">
-      <header className="border-b-[1.5px] border-ink pb-3">
-        <h1 className="title-display text-4xl">cycles</h1>
-      </header>
+    <div>
+      <div className="flex items-center justify-between">
+        <h1 className="title-display text-[32px]">cycles</h1>
+        <Link
+          href="/cycles/new"
+          className="border-[1.5px] border-ink px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em]"
+        >
+          + NEW
+        </Link>
+      </div>
 
       {empty && (
-        <section>
-          <p className="text-sm text-ink/55">
-            A macrocycle sets your long-term direction as an ordered arc of
-            goals — cut, gain, maintain, peak. Mesocycles fill the slots and
+        <div className="mt-6">
+          <p className="text-sm leading-relaxed text-ink/70">
+            A macrocycle sets the long-term direction as an ordered arc of
+            goals — cut, bulk, maintain, peak. Mesocycles fill the slots and
             do the work.
           </p>
           <Link
             href="/cycles/new"
-            className="label-caps mt-5 flex min-h-12 items-center justify-center border border-dashed border-ink/40 text-[11px] font-semibold text-ink/55"
+            className="mt-5 block border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
           >
             + NEW MACROCYCLE
           </Link>
           <Link
             href="/cycles/plan"
-            className="label-caps mt-2 flex min-h-12 items-center justify-center border border-dashed border-ink/40 text-[11px] font-semibold text-ink/55"
+            className="mt-2.5 block border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
           >
             + PLAN A STANDALONE MESO
           </Link>
-        </section>
+        </div>
       )}
 
-      {macros.map((macro) => (
-        <section key={macro.id}>
-          <div className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5">
-            <h2 className="label-caps text-[10px] font-bold tracking-[0.14em]">
-              {macro.name}
-            </h2>
-            <span className="numeral text-[10px] font-semibold text-ink/45">
-              {macro.start_date}
-              {macro.target_end_date ? ` — ${macro.target_end_date}` : ""}
-            </span>
-          </div>
-          <div className="flex flex-col divide-y divide-ink/15">
-            {macro.slots.map((slot) => (
-              <div key={slot.id} className="py-1">
-                <div className="flex items-center justify-between pt-2">
-                  <span className="label-caps text-[9px] font-semibold text-ink/45">
-                    <span className="numeral">
-                      {String(slot.slot_number).padStart(2, "0")}
-                    </span>
-                    {" — "}
-                    {(slot.label ?? slot.goal_type).toUpperCase()}
-                  </span>
-                </div>
-                {slot.mesocycle ? (
-                  <MesoRow meso={slot.mesocycle} />
-                ) : (
-                  <Link
-                    href={`/cycles/plan?slot=${slot.id}`}
-                    className="label-caps my-2 flex min-h-11 items-center justify-center border border-dashed border-ink/40 text-[10px] font-semibold text-ink/55"
-                  >
-                    + PLAN
-                  </Link>
-                )}
+      {macros.map((macro) => {
+        const currentSlot = macro.slots.find(
+          (s) => s.mesocycle?.status === "active",
+        );
+        const arc = macro.slots
+          .map((s) => (s.label ?? s.goal_type).toUpperCase())
+          .join(" → ");
+        const allComplete =
+          macro.slots.length > 0 &&
+          macro.slots.every((s) => s.mesocycle?.status === "completed");
+        return (
+          <details
+            key={macro.id}
+            open={!allComplete}
+            className="group mt-4 border-t-[1.5px] border-ink"
+          >
+            <summary className="flex cursor-pointer list-none items-start gap-2.5 py-[13px] [&::-webkit-details-marker]:hidden">
+              <div className="mt-1 text-[10px]">
+                <span className="hidden group-open:inline">▼</span>
+                <span className="group-open:hidden">▶</span>
               </div>
-            ))}
-            {macro.unslotted.map((meso) => (
-              <MesoRow key={meso.id} meso={meso} />
-            ))}
-            {macro.slots.length === 0 && macro.unslotted.length === 0 && (
-              <p className="py-3 text-sm text-ink/45">No goal slots.</p>
-            )}
-          </div>
-        </section>
-      ))}
+              <div className="flex-1">
+                <div className="flex items-baseline justify-between">
+                  <div
+                    className={`text-sm font-extrabold tracking-[0.04em] ${allComplete ? "text-ink/65" : ""}`}
+                  >
+                    {macro.name.toUpperCase()}
+                  </div>
+                  <div className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+                    <span className="numeral">{macro.start_date}</span>
+                    {macro.target_end_date ? (
+                      <>
+                        {" — "}
+                        <span className="numeral">{macro.target_end_date}</span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-1 text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                  {arc ? `GOAL ARC: ${arc}` : "NO GOAL SLOTS"}
+                  {currentSlot && (
+                    <>
+                      {" · "}
+                      <span className="font-bold text-accent">
+                        ● NOW IN SLOT {currentSlot.slot_number}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </summary>
+            <div className="mb-3 ml-1 border-l-2 border-ink pl-3.5">
+              {macro.slots.map((slot) =>
+                slot.mesocycle ? (
+                  <MesoRow
+                    key={slot.id}
+                    meso={{
+                      ...slot.mesocycle,
+                      slotLine: `SLOT ${slot.slot_number} — ${(slot.label ?? slot.goal_type).toUpperCase()} · ${slot.mesocycle.weeks} WK · ${slot.mesocycle.days_per_week} D/WK`,
+                    }}
+                  />
+                ) : (
+                  <div
+                    key={slot.id}
+                    className="flex items-center justify-between border-b border-ink/[0.18] py-[11px] last:border-b-0"
+                  >
+                    <div>
+                      <div className="text-[15px] font-bold text-ink/50">
+                        Slot {slot.slot_number} —{" "}
+                        {(slot.label ?? slot.goal_type)
+                          .charAt(0)
+                          .toUpperCase() +
+                          (slot.label ?? slot.goal_type).slice(1)}
+                      </div>
+                      <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.08em] text-ink/45">
+                        NOT PLANNED YET
+                      </div>
+                    </div>
+                    <Link
+                      href={`/cycles/plan?slot=${slot.id}`}
+                      className="border-[1.5px] border-dashed border-ink/50 px-2.5 py-1.5 text-[9px] font-bold tracking-[0.1em] text-ink/65"
+                    >
+                      + PLAN
+                    </Link>
+                  </div>
+                ),
+              )}
+              {macro.unslotted.map((meso) => (
+                <MesoRow key={meso.id} meso={meso} />
+              ))}
+            </div>
+          </details>
+        );
+      })}
 
-      {standaloneMesos.length > 0 && (
-        <section>
-          <h2 className="label-caps border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
-            STANDALONE
-          </h2>
-          <div className="flex flex-col divide-y divide-ink/15">
-            {standaloneMesos.map((meso) => (
-              <MesoRow key={meso.id} meso={meso} />
-            ))}
+      {(standaloneMesos.length > 0 || !empty) && (
+        <div className="mt-4 border-t-[1.5px] border-ink">
+          <div className="pb-0.5 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/50">
+            STANDALONE — NO MACRO
           </div>
-        </section>
-      )}
-
-      {!empty && (
-        <div className="flex flex-col gap-2">
+          {standaloneMesos.map((meso) => (
+            <MesoRow key={meso.id} meso={meso} />
+          ))}
           <Link
             href="/cycles/plan"
-            className="label-caps flex min-h-12 items-center justify-center border border-dashed border-ink/40 text-[11px] font-semibold text-ink/55"
+            className="my-3 block border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[10.5px] font-semibold tracking-[0.1em] text-ink/60"
           >
             + PLAN A MESOCYCLE
-          </Link>
-          <Link
-            href="/cycles/new"
-            className="label-caps flex min-h-12 items-center justify-center border border-dashed border-ink/40 text-[11px] font-semibold text-ink/55"
-          >
-            + NEW MACROCYCLE
           </Link>
         </div>
       )}

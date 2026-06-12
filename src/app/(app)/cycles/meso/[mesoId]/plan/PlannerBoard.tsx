@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
-import { Input } from "@/components/ui/Input";
-import { NumberStepper } from "@/components/ui/NumberStepper";
 import type { MesoPlan, PlannedDay, PlannedGroup } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
 import {
@@ -29,6 +26,11 @@ const WEEKDAYS = [
   { value: 7, label: "SUN" },
 ] as const;
 
+export interface MacroContext {
+  label: string;
+  slots: { state: "filled" | "this" | "open" }[];
+}
+
 export interface PickerExerciseLite {
   id: string;
   name: string;
@@ -39,33 +41,49 @@ export interface PickerExerciseLite {
   muscle_group_ids: string[];
 }
 
-type PickerTarget = {
-  group: PlannedGroup;
-  slotNumber: number;
-};
+type PickerTarget = { group: PlannedGroup; slotNumber: number; day: PlannedDay };
+type Commit = (fn: () => Promise<void>) => void;
+
+function badge(name: string): string {
+  return name.slice(0, 2).toUpperCase();
+}
+
+function dayTabLabel(day: PlannedDay): string {
+  return day.weekday
+    ? (WEEKDAYS.find((w) => w.value === day.weekday)?.label ?? `D${day.day_number}`)
+    : `DAY ${day.day_number}`;
+}
+
+function shortDate(iso: string): string {
+  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  return `${d.getDate()} ${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+}
 
 /** Planner board (figs 2.4/2.5/2.6). */
 export function PlannerBoard({
   plan,
+  macroContext,
   muscleGroups,
   exercises,
 }: {
   plan: MesoPlan;
+  macroContext: MacroContext | null;
   muscleGroups: MuscleGroupRow[];
   exercises: PickerExerciseLite[];
 }) {
   const { meso, days } = plan;
+  const router = useRouter();
   const [activeDayId, setActiveDayId] = useState<string | null>(
     days[0]?.id ?? null,
   );
   const [daySetup, setDaySetup] = useState<PlannedDay | "new" | null>(
     days.length === 0 ? "new" : null,
   );
-  const [groupSheetOpen, setGroupSheetOpen] = useState(false);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const commit: Commit = (fn) => startTransition(fn);
 
-  // keep the active tab valid as days are added/removed/re-sorted
   useEffect(() => {
     if (!days.some((d) => d.id === activeDayId)) {
       setActiveDayId(days[0]?.id ?? null);
@@ -73,91 +91,112 @@ export function PlannerBoard({
   }, [days, activeDayId]);
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
+  const totalSlots = activeDay
+    ? activeDay.groups.reduce((n, g) => n + g.exercise_slots, 0)
+    : 0;
+  const pickedSlots = activeDay
+    ? activeDay.groups.reduce((n, g) => n + g.fills.length, 0)
+    : 0;
+  const daySets = activeDay
+    ? activeDay.groups.reduce(
+        (n, g) => n + g.fills.reduce((s, f) => s + f.initial_sets, 0),
+        0,
+      )
+    : 0;
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* day tabs, auto-sorted by weekday */}
-      <div className="flex gap-1 overflow-x-auto">
-        {days.map((day) => {
+    <div>
+      {/* macro context strip */}
+      {macroContext && (
+        <div className="mt-3 flex items-center justify-between border border-ink/35 px-3 py-2">
+          <div className="text-[9px] font-bold tracking-[0.12em]">
+            {macroContext.label}
+          </div>
+          <div className="flex items-center gap-[3px]">
+            {macroContext.slots.map((slot, i) => (
+              <div
+                key={i}
+                className={`h-2 w-3.5 ${
+                  slot.state === "filled"
+                    ? "bg-ink"
+                    : slot.state === "this"
+                      ? "border-[1.5px] border-accent"
+                      : "border border-dashed border-ink/40"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* day tabs */}
+      <div className="mt-4 flex border-[1.5px] border-ink">
+        {days.map((day, i) => {
           const active = day.id === activeDayId;
           return (
             <button
               key={day.id}
               type="button"
               onClick={() => setActiveDayId(day.id)}
-              className={`label-caps min-h-11 shrink-0 border px-3 text-[10px] ${
+              className={`flex-1 py-[11px] text-center text-[11px] tracking-[0.08em] ${
                 active
-                  ? "border-ink bg-ink font-bold text-bg-base"
-                  : "border-ink/30 font-medium text-ink/55"
+                  ? "bg-ink font-bold text-bg-base"
+                  : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
               }`}
             >
-              {day.weekday
-                ? WEEKDAYS.find((w) => w.value === day.weekday)?.label
-                : `DAY ${day.day_number}`}
-              {day.label ? ` · ${day.label.toUpperCase()}` : ""}
+              {dayTabLabel(day)}
             </button>
           );
         })}
         <button
           type="button"
+          aria-label="add day"
           onClick={() => setDaySetup("new")}
-          className="label-caps min-h-11 shrink-0 border border-dashed border-ink/40 px-3 text-[10px] font-medium text-ink/55"
+          className={`flex-[0_0_40px] py-[9px] text-center text-sm font-semibold text-ink/60 ${days.length > 0 ? "border-l border-ink/25" : ""}`}
         >
-          + DAY
+          +
         </button>
       </div>
 
-      {activeDay ? (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <p className="label-caps text-[10px] font-semibold text-ink/55">
-              {activeDay.label?.toUpperCase() ?? `DAY ${activeDay.day_number}`}
-              {" · "}
-              <span className="numeral">
-                {activeDay.groups.reduce(
-                  (n, g) =>
-                    n + g.fills.reduce((s, f) => s + f.initial_sets, 0),
-                  0,
-                )}
-              </span>{" "}
-              SETS
-            </p>
+      {activeDay && (
+        <>
+          <div className="mt-2 flex items-center justify-between text-[9px] font-semibold tracking-[0.1em] text-ink/55">
+            <span>
+              {dayTabLabel(activeDay)}
+              {activeDay.label ? ` "${activeDay.label.toUpperCase()}"` : ""} —{" "}
+              <span className="numeral">{pickedSlots}</span> OF{" "}
+              <span className="numeral">{totalSlots}</span> PICKED ·{" "}
+              <span className="numeral">{daySets}</span> SETS
+            </span>
             <button
               type="button"
               onClick={() => setDaySetup(activeDay)}
-              className="label-caps min-h-11 px-2 text-[10px] font-bold"
+              className="font-bold text-ink underline underline-offset-2"
             >
-              DAY SETUP
+              ✎ DAY SETUP
             </button>
           </div>
 
-          {activeDay.groups.map((group, gi) => (
-            <section key={group.id} className="border-t-[1.5px] border-ink pt-2">
-              <div className="flex items-center justify-between">
-                <h3 className="label-caps text-[10px] font-bold tracking-[0.14em]">
-                  <span className="numeral">
-                    {String(gi + 1).padStart(2, "0")}
-                  </span>
-                  {" — "}
-                  {group.muscle_group.toUpperCase()}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() =>
-                    startTransition(() =>
-                      removeGroupAction({
-                        group_id: group.id,
-                        meso_id: meso.id,
-                      }),
-                    )
-                  }
-                  className="label-caps min-h-11 px-2 text-[9px] font-bold text-accent"
-                >
-                  REMOVE
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-1">
+          {/* day board — groups with slots */}
+          <div className="mt-3">
+            {activeDay.groups.map((group) => (
+              <div key={group.id} className="mt-3 first:mt-0">
+                <div className="flex items-center gap-2 border-b-[1.5px] border-ink py-1.5">
+                  <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
+                    {badge(group.muscle_group)}
+                  </div>
+                  <div className="flex-1 text-[10px] font-extrabold tracking-[0.14em]">
+                    {group.muscle_group.toUpperCase()} —{" "}
+                    <span className="numeral">{group.exercise_slots}</span>{" "}
+                    {group.exercise_slots === 1 ? "EXERCISE" : "EXERCISES"}
+                  </div>
+                  <div className="text-[9px] font-semibold tracking-[0.1em] text-ink/50">
+                    <span className="numeral">
+                      {group.fills.reduce((s, f) => s + f.initial_sets, 0)}
+                    </span>{" "}
+                    SETS
+                  </div>
+                </div>
                 {Array.from({ length: group.exercise_slots }, (_, i) => {
                   const slotNumber = i + 1;
                   const fill = group.fills.find(
@@ -166,31 +205,40 @@ export function PlannerBoard({
                   return fill ? (
                     <div
                       key={slotNumber}
-                      className="flex min-h-12 items-center justify-between border border-ink/30 px-3 py-2"
+                      className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-1.5 last:border-b-0"
                     >
+                      <div className="text-[13px] tracking-[-1px] text-ink/35">
+                        ⋮⋮
+                      </div>
                       <button
                         type="button"
-                        className="flex-1 text-left text-sm font-semibold"
-                        onClick={() => setPicker({ group, slotNumber })}
+                        className="flex-1 text-left"
+                        onClick={() =>
+                          setPicker({ group, slotNumber, day: activeDay })
+                        }
                       >
-                        {fill.exercise_name}
-                        <span className="label-caps ml-2 text-[9px] font-medium text-ink/45">
-                          <span className="numeral">{fill.initial_sets}</span>{" "}
-                          SETS
-                        </span>
+                        <div className="text-[15px] font-semibold">
+                          {fill.exercise_name}
+                        </div>
+                        <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                          {exercises
+                            .find((e) => e.id === fill.exercise_id)
+                            ?.equipment_type.toUpperCase() ?? ""}{" "}
+                          · START <span className="numeral">{fill.initial_sets}</span> SETS
+                        </div>
                       </button>
                       <button
                         type="button"
-                        aria-label={`clear ${fill.exercise_name}`}
+                        aria-label={`remove ${fill.exercise_name}`}
                         onClick={() =>
-                          startTransition(() =>
+                          commit(() =>
                             clearSlotAction({
                               meso_id: meso.id,
                               meso_exercise_id: fill.id,
                             }),
                           )
                         }
-                        className="label-caps min-h-11 pl-3 text-[10px] font-bold text-ink/40"
+                        className="px-1 text-[13px] text-ink/40"
                       >
                         ✕
                       </button>
@@ -199,89 +247,105 @@ export function PlannerBoard({
                     <button
                       key={slotNumber}
                       type="button"
-                      onClick={() => setPicker({ group, slotNumber })}
-                      className="label-caps flex min-h-12 items-center justify-center border border-dashed border-ink/40 text-[10px] font-semibold text-ink/55"
+                      onClick={() =>
+                        setPicker({ group, slotNumber, day: activeDay })
+                      }
+                      className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5 text-left"
                     >
-                      + EXERCISE
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-ink/60">
+                          Slot <span className="numeral">{slotNumber}</span> — pick exercise
+                        </div>
+                        <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/45">
+                          PICKER FILTERED TO {group.muscle_group.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="text-[15px] font-bold">›</div>
                     </button>
                   );
                 })}
               </div>
-            </section>
-          ))}
+            ))}
 
-          <Chip dashed className="w-full" onClick={() => setGroupSheetOpen(true)}>
-            + ADD MUSCLE GROUP
-          </Chip>
-        </div>
-      ) : (
-        <p className="text-sm text-ink/55">
+            <button
+              type="button"
+              onClick={() => setDaySetup(activeDay)}
+              className="mt-3.5 w-full border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
+            >
+              + ADD MUSCLE GROUP
+            </button>
+          </div>
+        </>
+      )}
+
+      {!activeDay && days.length === 0 && (
+        <p className="mt-5 text-sm text-ink/60">
           Add a training day to start planning.
         </p>
       )}
 
+      <button
+        type="button"
+        onClick={() => router.push(`/cycles/meso/${meso.id}`)}
+        className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
+      >
+        {meso.status === "planned" ? "DONE — REVIEW MESO" : "DONE"}
+      </button>
+
       <DaySetupSheet
         key={daySetup === "new" ? "new" : (daySetup?.id ?? "closed")}
         target={daySetup}
+        days={days}
         mesoId={meso.id}
-        canRemove={days.length > 0}
-        pending={pending}
+        muscleGroups={muscleGroups}
         onClose={() => setDaySetup(null)}
-        onCommit={(fn) => startTransition(fn)}
+        commit={commit}
       />
-
-      {activeDay && (
-        <AddGroupSheet
-          open={groupSheetOpen}
-          day={activeDay}
-          mesoId={meso.id}
-          muscleGroups={muscleGroups}
-          onClose={() => setGroupSheetOpen(false)}
-          onCommit={(fn) => startTransition(fn)}
-        />
-      )}
-
       <ExercisePicker
         target={picker}
         mesoId={meso.id}
         exercises={exercises}
         onClose={() => setPicker(null)}
-        onCommit={(fn) => startTransition(fn)}
+        commit={commit}
       />
     </div>
   );
 }
 
-/** Day setup sheet (fig 2.5): label, weekday, week start, slot steppers, remove. */
+// ---------------------------------------------------------------------------
+// day setup sheet (fig 2.5): label, weekday, week start, groups & counts
+// ---------------------------------------------------------------------------
+
 function DaySetupSheet({
   target,
+  days,
   mesoId,
-  canRemove,
-  pending,
+  muscleGroups,
   onClose,
-  onCommit,
+  commit,
 }: {
   target: PlannedDay | "new" | null;
+  days: PlannedDay[];
   mesoId: string;
-  canRemove: boolean;
-  pending: boolean;
+  muscleGroups: MuscleGroupRow[];
   onClose: () => void;
-  onCommit: (fn: () => Promise<void>) => void;
+  commit: Commit;
 }) {
   const isNew = target === "new";
   const day = isNew || target === null ? null : target;
   const [label, setLabel] = useState(day?.label ?? "");
   const [weekday, setWeekday] = useState<number | null>(day?.weekday ?? null);
   const [weekStartsHere, setWeekStartsHere] = useState(false);
+  const [addingGroup, setAddingGroup] = useState(false);
 
   if (target === null) return null;
 
+  const taken = new Set(day?.groups.map((g) => g.muscle_group_id) ?? []);
+  const available = muscleGroups.filter((g) => !taken.has(g.id));
+
   const save = () => {
-    const value = {
-      label: label.trim() || null,
-      weekday,
-    };
-    onCommit(async () => {
+    const value = { label: label.trim() || null, weekday };
+    commit(async () => {
       if (isNew) {
         await addDayAction({ meso_id: mesoId, ...value });
       } else if (day) {
@@ -296,180 +360,241 @@ function DaySetupSheet({
     onClose();
   };
 
+  const stepBtn =
+    "flex h-9 w-9 items-center justify-center border-[1.5px] border-ink text-[17px] font-semibold";
+
   return (
     <BottomSheet
       open
       onClose={onClose}
-      title={isNew ? "add day" : "day setup"}
-      subtitle={isNew ? "NEW TRAINING DAY" : `DAY ${day?.day_number}`}
+      title={isNew ? "Add day" : "Day setup"}
+      subtitle={
+        isNew
+          ? `DAY ${days.length + 1} OF ${days.length + 1}`
+          : `${day?.weekday ? (WEEKDAYS.find((w) => w.value === day.weekday)?.label ?? "") : ""} — DAY ${day?.day_number} OF ${days.length}`
+      }
     >
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Label — optional"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          maxLength={40}
-          placeholder="e.g. Lower A"
-        />
-        <fieldset>
-          <legend className="label-caps mb-2 text-[10px] font-semibold text-ink/55">
-            Weekday — days auto-sort by this
-          </legend>
-          <div className="grid grid-cols-4 gap-1.5">
-            {WEEKDAYS.map((wd) => (
-              <Chip
-                key={wd.value}
-                selected={weekday === wd.value}
-                onClick={() =>
-                  setWeekday(weekday === wd.value ? null : wd.value)
-                }
-              >
-                {wd.label}
-              </Chip>
-            ))}
+      <div className="flex gap-2.5">
+        <div className="flex-1">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            LABEL
           </div>
-        </fieldset>
-        {!isNew && weekday !== null && (
-          <Chip
-            selected={weekStartsHere}
-            onClick={() => setWeekStartsHere((v) => !v)}
-            className="w-full"
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            maxLength={40}
+            placeholder="e.g. Lower A"
+            className="mt-[7px] h-11 w-full border-[1.5px] border-ink bg-paper px-3 text-sm font-semibold text-ink placeholder:text-ink/40 focus:outline-none"
+          />
+        </div>
+        <div className="w-[110px]">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            WEEKDAY
+          </div>
+          <select
+            value={weekday ?? ""}
+            onChange={(e) =>
+              setWeekday(e.target.value ? Number(e.target.value) : null)
+            }
+            className="mt-[7px] h-11 w-full appearance-none border-[1.5px] border-ink bg-bg-base px-3 text-sm font-bold text-ink focus:outline-none"
           >
-            WEEK STARTS ON THIS DAY
-          </Chip>
-        )}
-
-        {!isNew && day && (
-          <div className="flex flex-col gap-3 border-t border-ink/15 pt-3">
-            {day.groups.map((group) => (
-              <div
-                key={group.id}
-                className="flex items-center justify-between"
-              >
-                <span className="label-caps text-[10px] font-semibold">
-                  {group.muscle_group.toUpperCase()}
-                </span>
-                <NumberStepper
-                  value={group.exercise_slots}
-                  min={1}
-                  max={10}
-                  onChange={(next) =>
-                    onCommit(() =>
-                      updateGroupAction({
-                        group_id: group.id,
-                        meso_id: mesoId,
-                        exercise_slots: next,
-                      }),
-                    )
-                  }
-                />
-              </div>
+            <option value="">—</option>
+            {WEEKDAYS.map((wd) => (
+              <option key={wd.value} value={wd.value}>
+                {wd.label}
+              </option>
             ))}
-          </div>
-        )}
+          </select>
+        </div>
+      </div>
 
-        <Button type="button" variant="primary" onClick={save} disabled={pending}>
-          {isNew ? "Add day" : "Save day"}
-        </Button>
-        {!isNew && day && canRemove && (
-          <Button
+      <div className="mt-3.5 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setWeekStartsHere((v) => !v)}
+          disabled={weekday === null}
+          className="flex items-center gap-2 disabled:opacity-40"
+        >
+          <div
+            className={`flex h-[18px] w-[18px] items-center justify-center text-[11px] ${
+              weekStartsHere
+                ? "bg-ink text-bg-base"
+                : "border-[1.5px] border-ink/40"
+            }`}
+          >
+            {weekStartsHere ? "✓" : ""}
+          </div>
+          <span className="text-xs font-semibold">Week starts on this day</span>
+        </button>
+        {!isNew && day && (
+          <button
             type="button"
-            variant="ghost"
-            className="text-accent"
             onClick={() => {
-              onCommit(() =>
+              commit(() =>
                 removeDayAction({ day_id: day.id, meso_id: mesoId }),
               );
               onClose();
             }}
+            className="text-[11px] font-bold text-accent"
           >
             Remove day
-          </Button>
+          </button>
         )}
       </div>
-    </BottomSheet>
-  );
-}
 
-function AddGroupSheet({
-  open,
-  day,
-  mesoId,
-  muscleGroups,
-  onClose,
-  onCommit,
-}: {
-  open: boolean;
-  day: PlannedDay;
-  mesoId: string;
-  muscleGroups: MuscleGroupRow[];
-  onClose: () => void;
-  onCommit: (fn: () => Promise<void>) => void;
-}) {
-  const [slots, setSlots] = useState(2);
-  const taken = new Set(day.groups.map((g) => g.muscle_group_id));
-  const available = muscleGroups.filter((g) => !taken.has(g.id));
-
-  return (
-    <BottomSheet
-      open={open}
-      onClose={onClose}
-      title="add muscle group"
-      subtitle={day.label?.toUpperCase() ?? `DAY ${day.day_number}`}
-    >
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <span className="label-caps text-[10px] font-semibold text-ink/55">
-            EXERCISE SLOTS
-          </span>
-          <NumberStepper value={slots} min={1} max={10} onChange={setSlots} />
-        </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {available.map((group) => (
-            <Chip
+      {!isNew && day && (
+        <>
+          <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            MUSCLE GROUPS — EXERCISES PER GROUP
+          </div>
+          {day.groups.map((group) => (
+            <div
               key={group.id}
-              onClick={() => {
-                onCommit(() =>
-                  addGroupAction({
-                    day_id: day.id,
-                    meso_id: mesoId,
-                    muscle_group_id: group.id,
-                    exercise_slots: slots,
-                  }),
-                );
-                onClose();
-              }}
+              className="flex items-center gap-2.5 border-b border-ink/15 py-2"
             >
-              {group.name.toUpperCase()}
-            </Chip>
+              <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
+                {badge(group.muscle_group)}
+              </div>
+              <div className="flex-1 text-sm font-bold">
+                {group.muscle_group}
+              </div>
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  aria-label={`fewer ${group.muscle_group} exercises`}
+                  className={stepBtn}
+                  onClick={() =>
+                    group.exercise_slots > 1 &&
+                    commit(() =>
+                      updateGroupAction({
+                        group_id: group.id,
+                        meso_id: mesoId,
+                        exercise_slots: group.exercise_slots - 1,
+                      }),
+                    )
+                  }
+                >
+                  −
+                </button>
+                <div className="numeral flex h-9 w-[38px] items-center justify-center border-y-[1.5px] border-ink text-[15px] font-extrabold">
+                  {group.exercise_slots}
+                </div>
+                <button
+                  type="button"
+                  aria-label={`more ${group.muscle_group} exercises`}
+                  className={stepBtn}
+                  onClick={() =>
+                    group.exercise_slots < 10 &&
+                    commit(() =>
+                      updateGroupAction({
+                        group_id: group.id,
+                        meso_id: mesoId,
+                        exercise_slots: group.exercise_slots + 1,
+                      }),
+                    )
+                  }
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                aria-label={`remove ${group.muscle_group}`}
+                onClick={() =>
+                  commit(() =>
+                    removeGroupAction({ group_id: group.id, meso_id: mesoId }),
+                  )
+                }
+                className="px-1 text-xs text-ink/40"
+              >
+                ✕
+              </button>
+            </div>
           ))}
-        </div>
-        {available.length === 0 && (
-          <p className="text-sm text-ink/45">
-            Every muscle group is already on this day.
+
+          {addingGroup ? (
+            <div className="mt-3 grid grid-cols-2 gap-1.5">
+              {available.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => {
+                    commit(() =>
+                      addGroupAction({
+                        day_id: day.id,
+                        meso_id: mesoId,
+                        muscle_group_id: g.id,
+                        exercise_slots: 1,
+                      }),
+                    );
+                    setAddingGroup(false);
+                  }}
+                  className="border border-ink/40 px-2 py-2.5 text-[10px] font-semibold tracking-[0.1em]"
+                >
+                  {g.name.toUpperCase()}
+                </button>
+              ))}
+              {available.length === 0 && (
+                <p className="col-span-2 text-sm text-ink/45">
+                  Every muscle group is already on this day.
+                </p>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingGroup(true)}
+              className="mt-3 w-full border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
+            >
+              + ADD MUSCLE GROUP
+            </button>
+          )}
+          <p className="mt-3 text-[11px] leading-normal text-ink/60">
+            Slots are created for each group — you&apos;ll pick the exact
+            exercises on the board next.
           </p>
-        )}
+        </>
+      )}
+
+      <div className="mt-4 flex items-center justify-end gap-2.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+        >
+          DONE
+        </button>
       </div>
     </BottomSheet>
   );
 }
 
-/** Exercise picker (fig 2.6): pre-filtered to the slot's muscle group. */
+// ---------------------------------------------------------------------------
+// exercise picker (fig 2.6): pre-filtered, select then add
+// ---------------------------------------------------------------------------
+
 function ExercisePicker({
   target,
   mesoId,
   exercises,
   onClose,
-  onCommit,
+  commit,
 }: {
   target: PickerTarget | null;
   mesoId: string;
   exercises: PickerExerciseLite[];
   onClose: () => void;
-  onCommit: (fn: () => Promise<void>) => void;
+  commit: Commit;
 }) {
   const [search, setSearch] = useState("");
-  const [sets, setSets] = useState(3);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const candidates = useMemo(() => {
     if (!target) return [];
@@ -480,77 +605,109 @@ function ExercisePicker({
   }, [exercises, target, search]);
 
   if (!target) return null;
+  const selected = candidates.find((e) => e.id === selectedId) ?? null;
+  const dayName = `${dayTabLabel(target.day)}${target.day.label ? ` — ${target.day.label.toUpperCase()}` : ""}`;
+
+  const close = () => {
+    setSearch("");
+    setSelectedId(null);
+    onClose();
+  };
 
   return (
     <BottomSheet
       open
-      onClose={() => {
-        setSearch("");
-        onClose();
-      }}
-      title="pick exercise"
-      subtitle={`${target.group.muscle_group.toUpperCase()} · SLOT ${target.slotNumber}`}
+      onClose={close}
+      title="Pick exercise"
+      subtitle={`${target.group.muscle_group.toUpperCase()} — SLOT ${target.slotNumber} · ${dayName}`}
     >
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Search"
+      <div className="flex items-center gap-2">
+        <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Exercise name"
+          placeholder="Search"
+          className="h-[42px] flex-1 border-[1.5px] border-ink bg-paper px-3 text-[13px] text-ink placeholder:text-ink/45 focus:outline-none"
         />
-        <div className="flex items-center justify-between">
-          <span className="label-caps text-[10px] font-semibold text-ink/55">
-            START SETS
-          </span>
-          <NumberStepper value={sets} min={1} max={10} onChange={setSets} />
+        <div className="flex h-[42px] items-center bg-ink px-3 text-[10px] font-bold tracking-[0.1em] text-bg-base">
+          {target.group.muscle_group.toUpperCase()}
         </div>
-        <div className="flex max-h-[40dvh] flex-col overflow-y-auto">
-          {candidates.map((e) => (
+      </div>
+
+      <div className="mt-3.5 max-h-[42dvh] overflow-y-auto">
+        {selected && (
+          <div className="border-2 border-accent px-3.5 py-3">
+            <div className="flex items-center justify-between">
+              <div className="text-base font-bold">{selected.name}</div>
+              <div className="text-[9px] font-bold tracking-[0.12em] text-accent">
+                SELECTED
+              </div>
+            </div>
+            <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink/55">
+              {selected.equipment_type.toUpperCase()}
+              {selected.last_performed_at
+                ? ` · LAST PERFORMED ${shortDate(selected.last_performed_at)}`
+                : " · NEVER PERFORMED"}
+            </div>
+            {selected.best_weight != null && (
+              <div className="mt-2.5 flex items-baseline justify-between border-t border-ink/[0.18] pt-2">
+                <div className="numeral text-[13px] font-bold">
+                  {selected.best_weight} lb{" "}
+                  <span className="font-normal text-ink/50">×</span>{" "}
+                  {selected.best_reps}
+                </div>
+                <div className="text-[9px] font-semibold tracking-[0.1em] text-ink/55">
+                  ALL-TIME BEST
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {candidates
+          .filter((e) => e.id !== selectedId)
+          .map((e) => (
             <button
               key={e.id}
               type="button"
-              onClick={() => {
-                onCommit(() =>
-                  fillSlotAction({
-                    meso_id: mesoId,
-                    group_id: target.group.id,
-                    slot_number: target.slotNumber,
-                    exercise_id: e.id,
-                    initial_sets: sets,
-                  }),
-                );
-                setSearch("");
-                onClose();
-              }}
-              className="flex min-h-12 items-center justify-between border-b border-ink/15 py-2 text-left"
+              onClick={() => setSelectedId(e.id)}
+              className="flex w-full items-center justify-between border-b border-ink/[0.18] px-0.5 py-[13px] text-left"
             >
-              <span>
-                <span className="block text-sm font-semibold">{e.name}</span>
-                <span className="label-caps text-[9px] font-medium text-ink/45">
-                  {e.equipment_type.toUpperCase()}
-                </span>
-              </span>
-              <span className="label-caps text-right text-[9px] font-medium text-ink/45">
-                {e.last_performed_at ? (
-                  <>
-                    LAST {e.last_performed_at.slice(0, 10)}
-                    {e.best_weight != null && (
-                      <span className="numeral block">
-                        {e.best_weight} × {e.best_reps}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  "NEVER LOGGED"
-                )}
-              </span>
+              <div>
+                <div className="text-[15px] font-bold">{e.name}</div>
+                <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                  {e.equipment_type.toUpperCase()} ·{" "}
+                  {e.last_performed_at
+                    ? `LAST ${shortDate(e.last_performed_at)}`
+                    : "NEVER PERFORMED"}
+                </div>
+              </div>
+              <div className="text-[15px] text-ink/40">›</div>
             </button>
           ))}
-          {candidates.length === 0 && (
-            <p className="py-4 text-sm text-ink/45">No matches.</p>
-          )}
-        </div>
+        {candidates.length === 0 && (
+          <p className="py-4 text-sm text-ink/45">No matches.</p>
+        )}
       </div>
+
+      <button
+        type="button"
+        disabled={!selected}
+        onClick={() => {
+          if (!selected) return;
+          commit(() =>
+            fillSlotAction({
+              meso_id: mesoId,
+              group_id: target.group.id,
+              slot_number: target.slotNumber,
+              exercise_id: selected.id,
+              initial_sets: 3,
+            }),
+          );
+          close();
+        }}
+        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+      >
+        ADD TO {dayName}
+      </button>
     </BottomSheet>
   );
 }

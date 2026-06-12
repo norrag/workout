@@ -78,6 +78,34 @@ export async function saveProfileDetails(
   return { error: null, saved: true };
 }
 
+const fieldSchemas = {
+  display_name: z.string().min(1).max(60),
+  age: z.coerce.number().int().min(13).max(120),
+  height_cm: z.coerce.number().min(90).max(250),
+  bodyweight: z.coerce.number().positive().max(1000),
+  training_since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+} as const;
+
+export async function updateProfileField(
+  field: keyof typeof fieldSchemas,
+  value: string,
+): Promise<{ error: string | null }> {
+  const schema = fieldSchemas[field];
+  if (!schema) return { error: "Unknown field." };
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { supabase, user } = await requireUser();
+  await updateProfile(supabase, user.id, {
+    [field]: parsed.data,
+    ...(field === "bodyweight"
+      ? { bodyweight_updated_at: new Date().toISOString() }
+      : {}),
+  });
+  revalidate();
+  return { error: null };
+}
+
 export async function setExperience(level: string): Promise<void> {
   const parsed = experienceSchema.parse(level);
   const { supabase, user } = await requireUser();
