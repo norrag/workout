@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 
+/**
+ * Ruled section — the ledger system builds structure from rules, not
+ * boxes: a tracked all-caps header over a 1.5px ink rule, content below.
+ */
 export function Card({
   header,
   children,
@@ -10,15 +14,13 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section
-      className={`surface-gradient rounded-[8px] border border-border-subtle bg-bg-surface p-4 ${className}`}
-    >
+    <section className={className}>
       {header !== undefined && (
-        <h2 className="label-caps mb-3 text-xs font-semibold text-text-secondary">
+        <h2 className="label-caps border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
           {header}
         </h2>
       )}
-      {children}
+      <div className={header !== undefined ? "pt-3" : ""}>{children}</div>
     </section>
   );
 }

@@ -1,11 +1,11 @@
 {
-  "name": "WORKOUT",
-  "short_name": "WORKOUT",
+  "name": "workout",
+  "short_name": "workout",
   "description": "Periodized workout tracking with RIR-based progression",
-  "start_url": "/today",
+  "start_url": "/workout",
   "display": "standalone",
-  "background_color": "#0B0B0C",
-  "theme_color": "#0B0B0C",
+  "background_color": "#F4F0E6",
+  "theme_color": "#F4F0E6",
   "orientation": "portrait",
   "icons": [
     {

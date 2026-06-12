@@ -14,12 +14,14 @@ export default async function CyclesPage() {
   const macrocycles = await listMacrocycles(supabase);
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="label-caps text-lg font-bold">Cycles</h1>
+    <div className="flex flex-col gap-6">
+      <header className="border-b-[1.5px] border-ink pb-3">
+        <h1 className="title-display text-4xl">cycles</h1>
+      </header>
 
       {macrocycles.length === 0 ? (
         <Card header="New macrocycle">
-          <p className="mb-4 text-sm text-text-secondary">
+          <p className="mb-4 text-sm text-ink/55">
             The macrocycle sets your long-term direction: cut, gain, or
             maintain. Mesocycles inside it do the work.
           </p>
@@ -30,15 +32,15 @@ export default async function CyclesPage() {
           <Card key={macro.id} header={macro.status}>
             <div className="flex items-baseline justify-between">
               <p className="font-semibold">{macro.name}</p>
-              <p className="label-caps text-xs text-text-secondary">
+              <p className="label-caps text-xs text-ink/55">
                 {macro.goal_type}
               </p>
             </div>
-            <p className="numeral mt-1 text-sm text-text-secondary">
+            <p className="numeral mt-1 text-sm text-ink/55">
               {macro.start_date}
               {macro.target_end_date ? ` — ${macro.target_end_date}` : ""}
             </p>
-            <p className="mt-3 text-sm text-text-secondary">
+            <p className="mt-3 text-sm text-ink/55">
               Mesocycle planning lands in the next phase.
             </p>
           </Card>

@@ -43,12 +43,12 @@ export function NumberStepper({
   };
 
   const btn =
-    "flex h-11 w-11 items-center justify-center rounded-[6px] border border-border-subtle bg-bg-raised text-lg text-text-primary active:border-accent select-none";
+    "flex h-11 w-11 items-center justify-center border border-ink/35 bg-paper text-lg text-ink active:border-ink select-none";
 
   return (
     <div className="flex flex-col items-center gap-1">
       {label && (
-        <span className="label-caps text-[10px] font-semibold text-text-secondary">
+        <span className="label-caps text-[10px] font-semibold text-ink/55">
           {label}
         </span>
       )}

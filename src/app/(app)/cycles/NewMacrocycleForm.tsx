@@ -17,7 +17,7 @@ export function NewMacrocycleForm() {
     <form action={formAction} className="flex flex-col gap-4">
       <Input label="Name" name="name" placeholder="Summer block" required />
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="label-caps mb-1.5 text-xs font-semibold text-text-secondary">
+        <legend className="label-caps mb-1.5 text-xs font-semibold text-ink/55">
           Goal
         </legend>
         <div className="flex gap-2">
@@ -30,7 +30,7 @@ export function NewMacrocycleForm() {
                 className="peer sr-only"
                 required
               />
-              <span className="label-caps flex min-h-11 cursor-pointer items-center justify-center rounded-[6px] border border-border-subtle bg-bg-raised text-xs font-semibold text-text-secondary peer-checked:border-accent peer-checked:text-accent">
+              <span className="label-caps flex min-h-11 cursor-pointer items-center justify-center border border-ink/40 text-xs font-medium text-ink peer-checked:border-ink peer-checked:bg-ink peer-checked:font-bold peer-checked:text-bg-base">
                 {goal}
               </span>
             </label>
@@ -39,7 +39,7 @@ export function NewMacrocycleForm() {
       </fieldset>
       <Input label="Start date" name="start_date" type="date" required />
       <Input label="Target end date" name="target_end_date" type="date" />
-      {state.error && <p className="text-sm text-warning">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent">{state.error}</p>}
       <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Creating" : "Create macrocycle"}
       </Button>

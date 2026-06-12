@@ -28,13 +28,13 @@ export default function SignUpPage() {
         minLength={8}
         required
       />
-      {state.error && <p className="text-sm text-warning">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent">{state.error}</p>}
       <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Creating account" : "Create account"}
       </Button>
-      <p className="text-center text-sm text-text-secondary">
+      <p className="text-center text-sm text-ink/55">
         Have an account?{" "}
-        <Link href="/sign-in" className="text-text-primary underline">
+        <Link href="/sign-in" className="text-ink underline">
           Sign in
         </Link>
       </p>

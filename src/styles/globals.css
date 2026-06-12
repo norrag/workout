@@ -1,34 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  /* Design tokens — docs/06-design-system.md */
-  --color-bg-base: #0b0b0c;
-  --color-bg-surface: #141416;
-  --color-bg-raised: #1c1c1f;
-  --color-border-subtle: #26262a;
-  --color-text-primary: #f2f2f0;
-  --color-text-secondary: #9a9aa0;
-  --color-accent: #f25c05;
-  --color-accent-pressed: #d14f04;
-  --color-positive: #4caf7d;
-  --color-warning: #e0b23c;
+  /* Light ledger system — docs/08-design-decisions.md §1 */
+  --color-bg-base: #f4f0e6; /* warm cream app background */
+  --color-paper: #fcfaf4; /* active input / sheet surfaces */
+  --color-ink: #17140f; /* text, rules, filled/active elements */
+  --color-accent: #c14b2a; /* current position + selected states ONLY */
 
-  --radius-card: 8px;
-  --radius-control: 6px;
+  --font-sans: var(--font-archivo), "Archivo", ui-sans-serif, system-ui,
+    sans-serif;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --tracking-caps: 0.12em;
 
-  --tracking-caps: 0.06em;
+  /* menu cards are the single permitted shadow: offset, hard-edged */
+  --shadow-menu: 5px 5px 0 rgba(23, 20, 15, 0.85);
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
 body {
   background: var(--color-bg-base);
-  color: var(--color-text-primary);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -38,17 +33,23 @@ body {
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* All-caps key labels */
+/* Tracked all-caps key labels */
 .label-caps {
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
 }
 
-/* Subtle top-light gradient for surfaces (≤4% luminance shift) */
-.surface-gradient {
-  background-image: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.03),
-    rgba(255, 255, 255, 0) 40%
-  );
+/* Big 800-weight lowercase screen titles */
+.title-display {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-transform: lowercase;
+}
+
+/* Lowercase wide-tracked logotype */
+.logotype {
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
 }

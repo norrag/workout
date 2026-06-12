@@ -7,29 +7,29 @@ export default async function LandingPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (user) redirect("/today");
+  if (user) redirect("/workout");
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-10 px-6">
-      <div className="text-center">
-        <h1 className="label-caps text-4xl font-bold tracking-[0.08em]">
-          WORK<span className="text-accent">OUT</span>
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-10 px-6">
+      <div>
+        <h1 className="logotype border-b-[1.5px] border-ink pb-4 text-2xl">
+          workout
         </h1>
-        <p className="mt-3 max-w-sm text-text-secondary">
+        <p className="mt-4 text-sm leading-relaxed text-ink/70">
           Periodized training, tracked. RIR-based progression that plans next
           week from how this week actually went.
         </p>
       </div>
-      <div className="flex w-full max-w-xs flex-col gap-3">
+      <div className="flex flex-col gap-3">
         <Link
           href="/sign-in"
-          className="label-caps flex min-h-11 items-center justify-center rounded-[6px] bg-accent text-sm font-semibold text-bg-base"
+          className="label-caps flex min-h-11 items-center justify-center bg-ink text-xs font-bold text-bg-base"
         >
           Sign in
         </Link>
         <Link
           href="/sign-up"
-          className="label-caps flex min-h-11 items-center justify-center rounded-[6px] border border-border-subtle bg-bg-raised text-sm font-semibold"
+          className="label-caps flex min-h-11 items-center justify-center border-[1.5px] border-ink text-xs font-bold text-ink"
         >
           Create account
         </Link>
