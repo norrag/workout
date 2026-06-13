@@ -49,10 +49,10 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 - [x] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
 - [x] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
-- [~] Plan-a-meso entry (fig 2.3): from-scratch path works; copy / template / builder shown as dashed "soon" cards (template lands with Phase 5, copy/builder later)
+- [~] Plan-a-meso entry (fig 2.3): from-scratch and template paths live; copy / builder shown as dashed "soon" cards (later)
 - [x] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
 - [x] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
-- [~] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-set data; exclusions never appear (full-history link lands with the 3.2 sheet in Phase 5)
+- [x] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-session data, FULL HISTORY sheet; exclusions never appear
 - [x] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
 - [~] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `GO TO W#·D#`, edit-plan entry; `MESO STATS` stubbed until Phase 5
 - [x] Microcycle + week-1 workout generation on meso start (engine `seedMeso` / `rirRamp`; ramp widened to 3–8 weeks with tests)
@@ -63,9 +63,9 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** the section-1 daily loop, excellent on a phone in a gym. Online-only.
 
-- [~] Workout tab resting logic (08 §2): latest uncompleted workout shown; resting state shows the last completed meso's summary rows (full 4.1 stats view lands in Phase 5)
+- [x] Workout tab resting logic (08 §2): latest uncompleted workout shown; resting state shows the last completed meso's full 4.1 volume view with a link to all stats
 - [x] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
-- [~] Exercise menu (fig 1.2): new/replace pinned note, add set, skip remaining, remove (blocked once sets are logged); history / replace exercise / move pending
+- [x] Exercise menu (fig 1.2): history sheet, new/replace pinned note, replace exercise (group-filtered picker, blocked once sets are logged), move down, add set, skip remaining, remove (blocked once sets are logged)
 - [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets; prescription rationale surfaced in the exercise menu. No deletes of logged sets by design (append-only history)
 - [x] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
 - [x] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary is engine-derived (Phase 4 wiring landed)
@@ -92,12 +92,12 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** the section-3/4 screens — one definition of progress everywhere.
 
-- [ ] Meso stats (figs 4.1–4.3) behind `MESO STATS` on meso detail: volume table (logged + autoregulated plan per group per week), balance (push/pull/legs cards, per-muscle bars, balance-check callout), performance (top set by week, e1RM across macro, PRs this meso) — all from `v_meso_week_sets`, `v_exercise_history`, `v_exercise_prs`
-- [ ] Exercises tab (fig 3.1): search, muscle-group filter, last-logged dates; create custom exercise form; exercise detail page (description, equipment, last performed, inline history, notes)
-- [ ] Exercise history sheet (fig 3.2) shared by library, picker, and exercise menu
-- [ ] Templates tab (fig 3.3): list, start-from-template → planner board prefilled, save meso as template (`template_day_groups` round-trip)
-- [ ] Sharing: share codes/grants for custom exercises, templates, mesos; copy-on-accept with provenance + dedupe
-- [ ] Stock template/seed polish for the groups-first shape
+- [x] Meso stats (figs 4.1–4.3) behind `MESO STATS` on meso detail: volume table (logged + autoregulated plan per group per week), balance (push/pull/legs cards, per-muscle bars, balance-check callout), performance (top set by week, e1RM across macro, PRs this meso) — all from `v_meso_week_sets`, `v_exercise_history`, `v_exercise_prs`
+- [x] Exercises tab (fig 3.1): search, muscle-group filter, last-logged dates; create custom exercise form; exercise detail page (description, equipment, last performed, inline history, notes)
+- [x] Exercise history sheet (fig 3.2) shared by library, picker, and exercise menu
+- [~] Templates tab (fig 3.3): list, start-from-template → planner board prefilled, save meso as template (`template_day_groups` round-trip); from-scratch template editor (`+ NEW`) and drafts not planned for v1
+- [x] Sharing: one-time share codes for custom exercises, templates, mesos; copy-on-accept with provenance + dedupe
+- [x] Stock template/seed polish for the groups-first shape (seed + hosted backfill)
 
 **Accept:** stats match raw logged data; a template round-trips through the planner; user A shares a template with a custom exercise and user B starts a meso from it.
 

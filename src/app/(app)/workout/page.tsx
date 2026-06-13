@@ -5,7 +5,9 @@ import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
 import { catchUpProgression } from "@/lib/queries/progression";
+import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
+import { VolumeView } from "@/components/stats/MesoStatsViews";
 import { DayView } from "../log/[workoutId]/DayView";
 
 /**
@@ -61,6 +63,9 @@ export default async function WorkoutPage() {
     .limit(1)
     .maybeSingle();
   if (error) throw error;
+  const restingStats = restingSummary
+    ? await getMesoStats(supabase, user.id, restingSummary.mesocycle_id)
+    : null;
 
   return (
     <div>
@@ -84,32 +89,20 @@ export default async function WorkoutPage() {
         </p>
       )}
 
-      {restingSummary && (
+      {restingStats && restingSummary && (
         <div className="mt-6">
-          <div className="border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
-            LAST MESO — {restingSummary.name.toUpperCase()}
+          <div className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5">
+            <div className="text-[10px] font-bold tracking-[0.14em]">
+              LAST MESO — {restingSummary.name.toUpperCase()}
+            </div>
+            <Link
+              href={`/cycles/meso/${restingSummary.mesocycle_id}/stats`}
+              className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
+            >
+              ALL STATS ›
+            </Link>
           </div>
-          <div className="flex justify-between border-b border-ink/15 py-3 text-sm">
-            <span className="font-medium text-ink/70">Workouts</span>
-            <span className="numeral font-bold">
-              {restingSummary.workouts_completed} /{" "}
-              {restingSummary.workouts_total}
-            </span>
-          </div>
-          <div className="flex justify-between border-b border-ink/15 py-3 text-sm">
-            <span className="font-medium text-ink/70">Working sets</span>
-            <span className="numeral font-bold">
-              {restingSummary.working_sets}
-            </span>
-          </div>
-          <div className="flex justify-between border-b border-ink/15 py-3 text-sm">
-            <span className="font-medium text-ink/70">Best e1RM</span>
-            <span className="numeral font-bold">
-              {restingSummary.best_e1rm != null
-                ? Math.round(restingSummary.best_e1rm)
-                : "—"}
-            </span>
-          </div>
+          <VolumeView stats={restingStats} />
         </div>
       )}
 

@@ -4,16 +4,19 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
   completeWorkout,
   logSet,
   removeWorkoutExercise,
+  replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
   setExerciseStatus,
 } from "@/lib/queries/logging";
+import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
 import { getProfile } from "@/lib/queries/profiles";
 import {
   advanceWeekAfterWorkout,
@@ -192,80 +195,61 @@ export async function saveFeedbackAction(input: {
   revalidatePath("/workout");
 }
 
-export interface HistoryEntry {
-  meso_name: string;
-  coordinate: string;
-  performed_on: string;
-  top_weight: number | null;
-  reps: string;
-  is_deload: boolean;
-}
-
 /** Exercise history (fig 3.2): sessions grouped by meso, newest first. */
 export async function getExerciseHistoryAction(
   exerciseId: string,
 ): Promise<HistoryEntry[]> {
   const parsed = z.string().uuid().parse(exerciseId);
   const { supabase, user } = await requireUser();
+  return getExerciseHistory(supabase, user.id, parsed);
+}
 
-  const { data: sets, error } = await supabase
-    .from("logged_sets")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("exercise_id", parsed)
-    .eq("is_warmup", false)
-    .order("performed_at", { ascending: false })
-    .limit(120);
-  if (error) throw error;
-  if (!sets || sets.length === 0) return [];
+const replaceSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  exercise_id: z.string().uuid(),
+});
 
-  const mesoIds = [...new Set(sets.map((s) => s.mesocycle_id))];
-  const microIds = [...new Set(sets.map((s) => s.microcycle_id))];
-  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
-  const [
-    { data: mesos, error: mesoError },
-    { data: micros, error: microError },
-    { data: workouts, error: workoutError },
-  ] = await Promise.all([
-    supabase.from("mesocycles").select("id, name").in("id", mesoIds),
-    supabase
-      .from("microcycles")
-      .select("id, week_number, is_deload")
-      .in("id", microIds),
-    supabase.from("workouts").select("id, day_number").in("id", workoutIds),
-  ]);
-  if (mesoError) throw mesoError;
-  if (microError) throw microError;
-  if (workoutError) throw workoutError;
-  const mesoById = new Map((mesos ?? []).map((m) => [m.id, m]));
-  const microById = new Map((micros ?? []).map((m) => [m.id, m]));
-  const workoutById = new Map((workouts ?? []).map((w) => [w.id, w]));
+export async function replaceExerciseAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  exercise_id: string;
+}): Promise<{ error: string | null }> {
+  const parsed = replaceSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  const result = await replaceWorkoutExercise(
+    supabase,
+    user.id,
+    parsed.workout_exercise_id,
+    parsed.exercise_id,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+  return result;
+}
 
-  // one entry per workout: top weight and its reps across the session
-  const byWorkout = new Map<string, typeof sets>();
-  for (const s of sets) {
-    const cur = byWorkout.get(s.workout_id) ?? [];
-    cur.push(s);
-    byWorkout.set(s.workout_id, cur);
-  }
-  return [...byWorkout.entries()].map(([workoutId, group]) => {
-    const top = Math.max(...group.map((s) => s.weight));
-    const reps = group
-      .filter((s) => s.weight === top)
-      .sort((a, b) => a.set_number - b.set_number)
-      .map((s) => s.reps)
-      .join(", ");
-    const micro = microById.get(group[0].microcycle_id);
-    const workout = workoutById.get(workoutId);
-    return {
-      meso_name: mesoById.get(group[0].mesocycle_id)?.name ?? "",
-      coordinate: `W${micro?.week_number ?? "?"}·D${workout?.day_number ?? "?"}`,
-      performed_on: group[0].performed_at.slice(0, 10),
-      top_weight: top,
-      reps,
-      is_deload: micro?.is_deload ?? false,
-    };
+export interface ReplacementCandidate {
+  id: string;
+  name: string;
+  equipment_type: string;
+  last_performed_at: string | null;
+}
+
+/** Candidates for replace-exercise: the slot's muscle group, exclusions out. */
+export async function listReplacementCandidatesAction(
+  muscleGroupId: string,
+): Promise<ReplacementCandidate[]> {
+  const parsed = z.string().uuid().parse(muscleGroupId);
+  const { supabase, user } = await requireUser();
+  const exercises = await listPickerExercises(supabase, user.id, {
+    muscleGroupId: parsed,
   });
+  return exercises.map((e) => ({
+    id: e.id,
+    name: e.name,
+    equipment_type: e.equipment_type,
+    last_performed_at: e.last_performed_at,
+  }));
 }
 
 export async function moveExerciseDownAction(input: {

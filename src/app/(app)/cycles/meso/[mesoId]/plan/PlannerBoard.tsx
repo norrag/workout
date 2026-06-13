@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { HistorySheet } from "@/components/HistorySheet";
+import { getExerciseHistoryAction } from "@/app/(app)/log/actions";
+import type { HistoryEntry } from "@/lib/queries/history";
 import type { MesoPlan, PlannedDay, PlannedGroup } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
 import {
@@ -595,6 +598,8 @@ function ExercisePicker({
 }) {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [lastSession, setLastSession] = useState<HistoryEntry | null>(null);
+  const [historyFor, setHistoryFor] = useState<PickerExerciseLite | null>(null);
 
   const candidates = useMemo(() => {
     if (!target) return [];
@@ -603,6 +608,19 @@ function ExercisePicker({
       .filter((e) => e.muscle_group_ids.includes(target.group.muscle_group_id))
       .filter((e) => !q || e.name.toLowerCase().includes(q));
   }, [exercises, target, search]);
+
+  // last-session line for the selected card (fig 2.6)
+  useEffect(() => {
+    setLastSession(null);
+    if (!selectedId) return;
+    let stale = false;
+    getExerciseHistoryAction(selectedId).then((entries) => {
+      if (!stale) setLastSession(entries[0] ?? null);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [selectedId]);
 
   if (!target) return null;
   const selected = candidates.find((e) => e.id === selectedId) ?? null;
@@ -648,17 +666,26 @@ function ExercisePicker({
                 ? ` · LAST PERFORMED ${shortDate(selected.last_performed_at)}`
                 : " · NEVER PERFORMED"}
             </div>
-            {selected.best_weight != null && (
+            {lastSession && (
               <div className="mt-2.5 flex items-baseline justify-between border-t border-ink/[0.18] pt-2">
                 <div className="numeral text-[13px] font-bold">
-                  {selected.best_weight} lb{" "}
+                  {lastSession.top_weight} lb{" "}
                   <span className="font-normal text-ink/50">×</span>{" "}
-                  {selected.best_reps}
+                  {lastSession.reps}
                 </div>
                 <div className="text-[9px] font-semibold tracking-[0.1em] text-ink/55">
-                  ALL-TIME BEST
+                  {lastSession.meso_name.toUpperCase()} — {lastSession.coordinate}
                 </div>
               </div>
+            )}
+            {selected.last_performed_at && (
+              <button
+                type="button"
+                onClick={() => setHistoryFor(selected)}
+                className="mt-2 text-[10px] font-bold tracking-[0.1em] underline underline-offset-2"
+              >
+                FULL HISTORY ›
+              </button>
             )}
           </div>
         )}
@@ -708,6 +735,19 @@ function ExercisePicker({
       >
         ADD TO {dayName}
       </button>
+
+      <HistorySheet
+        target={
+          historyFor
+            ? {
+                exercise_id: historyFor.id,
+                exercise_name: historyFor.name,
+                equipment_type: historyFor.equipment_type,
+              }
+            : null
+        }
+        onClose={() => setHistoryFor(null)}
+      />
     </BottomSheet>
   );
 }

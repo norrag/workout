@@ -2,7 +2,44 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-13 (latest) — Phase 4: progression engine alignment & wiring
+## 2026-06-13 (latest) — Phase 5: meso stats, library, templates & sharing
+
+### Done
+
+**Phase 5 — meso stats, library & templates** (complete except a from-scratch template editor, which is not planned for v1)
+
+- **Meso stats (figs 4.1–4.3)** at `/cycles/meso/[id]/stats` — one screen, three views via the segmented control, everything off the shared views (one definition of progress):
+  - *Volume:* sets-per-group-per-week matrix from `v_meso_week_sets` — closed weeks show logged, the active week shows logged-so-far (orange `● W#` + `N OF M PLANNED SETS` footer), generated future weeks show the autoregulated plan, ungenerated weeks fall back to the planner baseline; TOTAL row; `W#–W# = AUTOREGULATED PLAN` caption
+  - *Balance:* PUSH/PULL/LEGS cards (avg planned sets/wk; classification over the seeded vocabulary, abs excluded), per-muscle bars, BALANCE CHECK callout (push:pull ratio + lowest-volume group)
+  - *Performance:* top-set-by-week grid for the meso's three biggest lifts (orange cell = in-progress week, `+N LB VS W1` badge), e1RM-across-macro bars for the lead lift (filled past / accent current / dashed future slots), PRS THIS MESO (ALL-TIME = heavier top weight than all pre-meso history; REP PR = better e1RM at or below the old top weight; lifts with no prior history can't PR)
+  - Entered from meso detail, the 1.5 complete sheet, and the **Workout-tab resting state**, which now renders the last completed meso's full 4.1 view (08 §2)
+- **Exercises tab (3.1) build-out:** rows link to an exercise detail page (description, primary/secondary groups + equipment, last performed, all-time best, pinned note, inline 3.2 history); `+ NEW` creates custom exercises (name, equipment, primary + secondary groups, description/notes; zod-validated)
+- **Exercise history (3.2) shared everywhere:** query moved to `src/lib/queries/history.ts` with one presentational component; used by the day-view menu, the exercise detail page, and the **picker (2.6)**, whose selected card now shows the last-session line (`115 lb × 13, 12 · MESO — W4·D1`) and the underlined `FULL HISTORY ›` sheet per the mockup
+- **Templates (3.3):** live tab (search, emphasis label, `N D/WK` + gender chips) → template detail page → `START A MESO FROM THIS` (2.7 create sheet with `FROM TEMPLATE — NAME` subtitle, then the planner board opens prefilled — days, groups, slot fills; **excluded exercises never carry over**, their slots stay open); `SAVE AS TEMPLATE` on meso detail round-trips the full `template_day_groups` shape; plan-a-meso (2.3) option 02 is live via a slot-aware template picker
+- **Sharing (F5/F6):** one-time share codes (8 chars, no 0/O/1/I) for custom exercises, templates, and mesocycles — SHARE row on each detail page, redeem form on the Templates tab. Copy-on-accept with provenance ids (`source_exercise_id`/`source_template_id`) and per-grantee dedupe; custom exercises referenced by shared templates/mesos are copied (and deduped) too; shared mesos copy as **planned standalone structure** — the owner's loads don't carry, the engine seeds the grantee's numbers at start. Acceptance reads run on the service client (grantee can't read the owner's rows) with every write explicitly scoped to the redeeming user
+- **Seed polish:** stock templates now seed `template_day_groups` (groups derived from each exercise's primary muscle group, slots linked); idempotent backfill added to the seed and **applied to the hosted project** (64 groups, 89/89 exercises linked)
+
+**Phase 3 leftover — replace exercise (1.2 menu):** live picker pre-filtered to the slot's muscle group; blocked once sets are logged (row shows a LOGGED state); the prescription reseeds from the user's all-time best on the incoming movement with a clinical rationale line
+
+### Recorded deviations
+
+- **Templates `+ NEW` stays dimmed** and the 3.3 `CONTINUE EDITING DRAFT ›` row is omitted: templates come from save-meso-as-template (and Phase 6's MCP `create_template`); a from-scratch template editor + draft model is out of v1 scope
+- **Share/redeem UI is not mocked** — built in the house style (bordered rows, redeem input on the Templates tab). Codes are single-redemption: mint again to share again
+- **Volume view, ungenerated weeks:** workouts generate week-by-week, so far-future weeks show the planner baseline under the mockup's `AUTOREGULATED PLAN` caption until the engine generates them; ungenerated **deload** weeks show `—` (the engine sizes deload sets at generation)
+- The performance macro chart labels itself `ACROSS MACRO — {LIFT} EST. 1RM` (no macro short-code; macros have names, not codes)
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (62/62 — 14 new unit tests over the volume matrix, balance copy, key-lift grid, PR detection, emphasis vocabulary, share-code format), `npm run build` green. Hosted-DB smoke through the real modules: signup → stock template detail carries the backfilled groups-first shape → exclusion added → meso created from template (board prefilled, excluded movement's slot left open, slot counts intact) → saved back as a template (groups round-trip) → meso started → 2 sets logged → `getMesoStats` (current-week volume, key-lift cell, balance note), `getExerciseHistory` (W1·D1 entry) → custom exercise share code minted (format + dedupe on re-mint, stock objects refused). Smoke user + data deleted after; `acceptShareCode` itself isn't integration-tested (needs the service key, not available in this environment) — its helpers are unit-tested and all writes are user-scoped
+
+### Not done yet / next
+
+1. Phase 3 leftover: Playwright e2e for the logging loop (still no browser runtime in this environment)
+2. Phase 6 — MCP connector at `/api/mcp`: OAuth bridge, read tools over the same views, draft write tools with `mcp_write_audit`, admin param/replay tools (`engine_decisions` + versioned params are flowing)
+3. Phase 7 — production hardening (RLS/advisor audit, rate limiting, Sentry, accessibility pass, CSV export + account deletion, final design QA)
+4. In-browser pixel QA of the new screens (stats, exercise detail, templates) against `docs/design/screenshots/`
+
+## 2026-06-13 — Phase 4: progression engine alignment & wiring
 
 ### Done
 

@@ -20,7 +20,7 @@ export default async function PlanMesoPage({
       n: "02",
       title: "Start with a template",
       detail: "Pick a saved split and adjust from there.",
-      href: null,
+      href: `/cycles/plan/template${slotQuery}`,
     },
     {
       n: "03",

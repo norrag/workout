@@ -18,6 +18,10 @@ import {
 } from "@/lib/queries/cycles";
 import { startMeso } from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
+import {
+  applyTemplateToMeso,
+  saveMesoAsTemplate,
+} from "@/lib/queries/templates";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -99,6 +103,7 @@ const mesoSchema = z.object({
   includes_deload: z.boolean(),
   rir_start: z.coerce.number().int().min(0).max(5),
   rir_end: z.coerce.number().int().min(0).max(5),
+  template_id: z.string().uuid().nullable(),
 });
 
 export async function createMesocycleAction(
@@ -112,6 +117,7 @@ export async function createMesocycleAction(
     includes_deload: formData.get("includes_deload") === "true",
     rir_start: formData.get("rir_start"),
     rir_end: formData.get("rir_end"),
+    template_id: formData.get("template_id") || null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -122,8 +128,28 @@ export async function createMesocycleAction(
 
   const { supabase, user } = await requireUser();
   const meso = await createMesocycle(supabase, user.id, parsed.data);
+  if (parsed.data.template_id) {
+    await applyTemplateToMeso(supabase, user.id, meso.id, parsed.data.template_id);
+  }
   revalidatePath("/cycles");
   redirect(`/cycles/meso/${meso.id}/plan`);
+}
+
+// ---------------------------------------------------------------------------
+// save meso as template (07 Phase 5) — template_day_groups round-trip
+// ---------------------------------------------------------------------------
+
+export async function saveMesoAsTemplateAction(
+  formData: FormData,
+): Promise<void> {
+  const mesoId = z.string().uuid().parse(formData.get("meso_id"));
+  const { supabase, user } = await requireUser();
+  const { template, error } = await saveMesoAsTemplate(supabase, user.id, mesoId);
+  if (error || !template) {
+    redirect(`/cycles/meso/${mesoId}?error=template`);
+  }
+  revalidatePath("/templates");
+  redirect(`/templates/${template.id}`);
 }
 
 // ---------------------------------------------------------------------------

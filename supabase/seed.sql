@@ -147,6 +147,10 @@ declare
   v_day_number int := 0;
   v_position int;
   v_exercise_id uuid;
+  v_mg_id uuid;
+  v_group_id uuid;
+  v_group_position int;
+  v_slot int;
 begin
   if exists (select 1 from public.templates where name = p_name and user_id is null) then
     return;
@@ -163,6 +167,7 @@ begin
     returning id into v_day_id;
 
     v_position := 0;
+    v_group_position := 0;
     for v_ex in select * from jsonb_array_elements(v_day -> 'exercises') loop
       v_position := v_position + 1;
       select id into v_exercise_id from public.exercises
@@ -170,9 +175,31 @@ begin
       if v_exercise_id is null then
         raise exception 'seed template references unknown exercise: %', v_ex ->> 'name';
       end if;
-      insert into public.template_exercises (template_day_id, exercise_id, position, default_sets, default_rep_range)
+
+      -- groups-first shape: one template_day_group per primary muscle group,
+      -- in first-appearance order; exercises slot into their group
+      select emg.muscle_group_id into v_mg_id
+      from public.exercise_muscle_groups emg
+      where emg.exercise_id = v_exercise_id and emg.role = 'primary';
+
+      select g.id into v_group_id from public.template_day_groups g
+      where g.template_day_id = v_day_id and g.muscle_group_id = v_mg_id;
+      if v_group_id is null then
+        v_group_position := v_group_position + 1;
+        insert into public.template_day_groups (template_day_id, muscle_group_id, position, exercise_slots)
+        values (v_day_id, v_mg_id, v_group_position, 1)
+        returning id into v_group_id;
+        v_slot := 1;
+      else
+        update public.template_day_groups
+        set exercise_slots = exercise_slots + 1
+        where id = v_group_id
+        returning exercise_slots into v_slot;
+      end if;
+
+      insert into public.template_exercises (template_day_id, template_day_group_id, slot_number, exercise_id, position, default_sets, default_rep_range)
       values (
-        v_day_id, v_exercise_id, v_position,
+        v_day_id, v_group_id, v_slot, v_exercise_id, v_position,
         coalesce((v_ex ->> 'sets')::int, 3),
         int4range((v_ex -> 'reps' ->> 0)::int, (v_ex -> 'reps' ->> 1)::int, '[]')
       );
@@ -314,6 +341,56 @@ select pg_temp.seed_template(
       { "name": "Cable Crunch", "sets": 3, "reps": [10, 15] } ] }
   ]'::jsonb
 );
+
+-- ---------------------------------------------------------------------------
+-- groups-first backfill for stock templates seeded before the pivot shape:
+-- derive template_day_groups from each exercise's primary muscle group and
+-- link the exercises. Idempotent — only touches unlinked stock rows.
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_row record;
+  v_group_id uuid;
+  v_slot int;
+begin
+  for v_row in
+    select te.id as te_id, te.template_day_id, emg.muscle_group_id
+    from public.template_exercises te
+    join public.template_days td on td.id = te.template_day_id
+    join public.templates t on t.id = td.template_id
+    join public.exercise_muscle_groups emg
+      on emg.exercise_id = te.exercise_id and emg.role = 'primary'
+    where t.user_id is null and te.template_day_group_id is null
+    order by te.template_day_id, te.position
+  loop
+    select g.id into v_group_id from public.template_day_groups g
+    where g.template_day_id = v_row.template_day_id
+      and g.muscle_group_id = v_row.muscle_group_id;
+    if v_group_id is null then
+      insert into public.template_day_groups (template_day_id, muscle_group_id, position, exercise_slots)
+      values (
+        v_row.template_day_id,
+        v_row.muscle_group_id,
+        coalesce((select max(position) from public.template_day_groups
+                  where template_day_id = v_row.template_day_id), 0) + 1,
+        1
+      )
+      returning id into v_group_id;
+      v_slot := 1;
+    else
+      update public.template_day_groups
+      set exercise_slots = exercise_slots + 1
+      where id = v_group_id
+      returning exercise_slots into v_slot;
+    end if;
+
+    update public.template_exercises
+    set template_day_group_id = v_group_id, slot_number = v_slot
+    where id = v_row.te_id;
+  end loop;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- default engine params (version 2) — mirrors src/lib/engine/params.ts
