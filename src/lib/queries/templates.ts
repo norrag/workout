@@ -283,14 +283,14 @@ const LOWER_GROUPS = new Set([
   "calves",
 ]);
 
-/** Emphasis label for a saved template, from the groups it trains. */
+/** Emphasis for a saved template (schema vocabulary), from the groups it trains. */
 export function templateEmphasis(groupNames: string[]): string {
   const hasUpper = groupNames.some((g) => UPPER_GROUPS.has(g.toLowerCase()));
   const hasLower = groupNames.some((g) => LOWER_GROUPS.has(g.toLowerCase()));
-  if (hasUpper && hasLower) return "whole body";
-  if (hasUpper) return "upper body";
-  if (hasLower) return "lower body";
-  return "general";
+  if (hasUpper && hasLower) return "full_body";
+  if (hasUpper) return "upper";
+  if (hasLower) return "lower";
+  return "other";
 }
 
 /** Save a planned/run meso back as a reusable template (`template_day_groups` round-trip). */

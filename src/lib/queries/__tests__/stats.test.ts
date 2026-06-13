@@ -158,10 +158,10 @@ describe("buildPrs", () => {
 });
 
 describe("templateEmphasis", () => {
-  it("classifies saved templates from their groups", () => {
-    expect(templateEmphasis(["chest", "quads"])).toBe("whole body");
-    expect(templateEmphasis(["chest", "back", "biceps"])).toBe("upper body");
-    expect(templateEmphasis(["quads", "glutes"])).toBe("lower body");
-    expect(templateEmphasis(["abs"])).toBe("general");
+  it("classifies saved templates within the schema vocabulary", () => {
+    expect(templateEmphasis(["chest", "quads"])).toBe("full_body");
+    expect(templateEmphasis(["chest", "back", "biceps"])).toBe("upper");
+    expect(templateEmphasis(["quads", "glutes"])).toBe("lower");
+    expect(templateEmphasis(["abs"])).toBe("other");
   });
 });
