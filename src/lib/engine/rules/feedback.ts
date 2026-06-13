@@ -11,7 +11,10 @@ export interface FeedbackModulation {
   notes: string[];
 }
 
-/** §4 feedback modulation + §5 goal bias on volume. */
+/**
+ * §4 feedback modulation + §5 goal bias on volume. The workload slider
+ * (0–10, 5 = "just right") anchors set-count changes; pump corroborates.
+ */
 export function modulateFromFeedback(
   inputs: EngineInputs,
   params: EngineParams,
@@ -24,26 +27,28 @@ export function modulateFromFeedback(
   if (painGated) notes.push(`joint pain ${fb!.jointPain}/3: load increase blocked`);
 
   let setDelta: -1 | 0 | 1 = 0;
-  const strained =
-    (fb?.muscleStrain != null && fb.muscleStrain >= params.strain_volume_threshold) ||
-    (fb?.fatigue != null && fb.fatigue >= params.fatigue_volume_threshold);
-  const pumpLow = fb?.pump != null && fb.pump <= params.pump_low_threshold;
+  const workloadHot = fb?.workload != null && fb.workload >= params.workload_high;
+  const workloadEasy = fb?.workload != null && fb.workload <= params.workload_low;
+  const workloadOnTarget =
+    fb?.workload != null && !workloadHot && !workloadEasy;
   const pumpGood = fb?.pump != null && fb.pump >= params.set_add_pump_min;
-  const fatigueLow =
-    fb?.fatigue != null && fb.fatigue <= params.set_add_fatigue_max;
+  const pumpLow = fb?.pump != null && fb.pump <= params.pump_low;
 
-  if (strained && pumpLow) {
+  if (workloadHot) {
     setDelta = -1;
-    notes.push("high strain/fatigue with low pump: volume reduced");
+    notes.push(`workload ${fb!.workload}/10 past just right: set removed`);
   } else if (
-    fatigueLow &&
+    workloadEasy &&
     pumpGood &&
     inputs.goalType === "gain" &&
     (inputs.muscleGroupWeeklySets === null ||
       inputs.muscleGroupWeeklySets < params.mg_set_ceiling)
   ) {
     setDelta = 1;
-    notes.push("low fatigue, good pump: set added");
+    notes.push(`workload ${fb!.workload}/10 easy with strong pump: set added`);
+  } else if (pumpLow && workloadOnTarget) {
+    // dose is right but the stimulus isn't landing — selection, not load
+    notes.push("low pump at the right workload: consider a different exercise");
   }
 
   const sessionDampened =

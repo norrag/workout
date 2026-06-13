@@ -18,6 +18,12 @@ import { incrementFor, roundToStep } from "./rules/rounding";
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS } from "./params";
 export { engineInputsSchema } from "./types";
+export {
+  composeAutoregulationSummary,
+  composeMesoCompleteSummary,
+  type SummaryContext,
+  type SummaryDelta,
+} from "./summary";
 export type { EngineInputs, Prescription, EngineParams };
 
 export function prescribe(
@@ -90,7 +96,7 @@ export function prescribe(
     if (wantsLoad && !mod.painGated && !mod.sessionDampened) {
       weight = baseWeight + increment;
       reasons.unshift(
-        `+${increment}${inputs.user.units}: ${perf.detail}`,
+        `+${increment} ${inputs.user.units}: ${perf.detail}`,
       );
       if (rirStepped) {
         reasons.push(
@@ -103,7 +109,7 @@ export function prescribe(
     } else {
       weight = baseWeight;
       if (mod.painGated || mod.sessionDampened) {
-        reasons.unshift(`hold ${baseWeight}${inputs.user.units}: ${perf.detail}`);
+        reasons.unshift(`hold ${baseWeight} ${inputs.user.units}: ${perf.detail}`);
       } else {
         reasons.unshift(
           rirStepped

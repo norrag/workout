@@ -2,16 +2,18 @@ import type { EngineParams } from "../params";
 import type { equipmentTypes } from "../params";
 
 type Equipment = (typeof equipmentTypes)[number];
+type Units = "kg" | "lb";
+
+const FALLBACK_STEP = { kg: 2.5, lb: 5 };
 
 /** Round a weight to the loadable step for the equipment, in the user's units. */
 export function roundToStep(
   weight: number,
   equipment: Equipment,
-  units: "kg" | "lb",
+  units: Units,
   params: EngineParams,
 ): number {
-  const stepKg = params.rounding_kg[equipment] ?? 2.5;
-  const step = units === "lb" ? stepKg * params.lb_increment_factor : stepKg;
+  const step = (params.rounding[equipment] ?? FALLBACK_STEP)[units];
   if (step <= 0) return weight;
   return Math.round((Math.round(weight / step) * step) * 100) / 100;
 }
@@ -20,10 +22,9 @@ export function roundToStep(
 export function incrementFor(
   equipment: Equipment,
   experience: "beginner" | "intermediate" | "advanced",
-  units: "kg" | "lb",
+  units: Units,
   params: EngineParams,
 ): number {
-  const baseKg = params.increment_kg[equipment] ?? 2.5;
-  const scaled = baseKg * (params.experience_increment_scale[experience] ?? 1);
-  return units === "lb" ? scaled * params.lb_increment_factor : scaled;
+  const base = (params.increment[equipment] ?? FALLBACK_STEP)[units];
+  return base * (params.experience_increment_scale[experience] ?? 1);
 }

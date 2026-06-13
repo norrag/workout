@@ -6,6 +6,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { WeekTrack, type WeekTrackWeek } from "@/components/ui/WeekTrack";
 import type { LoggedExercise, WorkoutDetail } from "@/lib/queries/logging";
+import type { AdvanceResult } from "@/lib/queries/progression";
 import type { Units } from "@/lib/types/database";
 import {
   addSetAction,
@@ -187,7 +188,6 @@ export function DayView({
         open={completeOpen}
         detail={detail}
         onClose={() => setCompleteOpen(false)}
-        commit={commit}
       />
     </div>
   );
@@ -1017,17 +1017,18 @@ function CompleteSheet({
   open,
   detail,
   onClose,
-  commit,
 }: {
   open: boolean;
   detail: WorkoutDetail;
   onClose: () => void;
-  commit: Commit;
 }) {
+  const router = useRouter();
   const [notes, setNotes] = useState("");
+  const [completing, startCompleting] = useTransition();
+  const [result, setResult] = useState<AdvanceResult | null>(null);
   if (!open) return null;
 
-  const { workout, microcycle, exercises, siblingWorkouts } = detail;
+  const { workout, microcycle, exercises } = detail;
   const loggedExercises = exercises.filter((we) => we.sets.length > 0);
   const loggedSets = exercises.reduce((n, we) => n + we.sets.length, 0);
   const totalSets = exercises
@@ -1035,11 +1036,14 @@ function CompleteSheet({
     .reduce((n, we) => n + Math.max(we.prescribed_sets ?? 1, we.sets.length), 0);
   const skippedCount = exercises.length - loggedExercises.length;
 
-  const next = siblingWorkouts.find(
-    (w) =>
-      w.day_number > workout.day_number &&
-      (w.status === "planned" || w.status === "in_progress"),
-  );
+  const complete = () =>
+    startCompleting(async () => {
+      const res = await completeWorkoutAction({
+        workout_id: workout.id,
+        notes: notes.trim() || null,
+      });
+      setResult(res);
+    });
 
   return (
     <div className="fixed inset-0 z-50">
@@ -1081,8 +1085,9 @@ function CompleteSheet({
             AUTOREGULATION
           </div>
           <div className="mt-1.5 text-[13px] leading-[1.55] text-ink/80">
-            Feedback recorded. W{microcycle.week_number + 1} targets
-            recalculate from this session when the engine job runs.
+            {result
+              ? result.summary
+              : `Feedback feeds W${microcycle.week_number + 1} targets — they recalculate when you complete.`}
           </div>
         </div>
 
@@ -1095,7 +1100,8 @@ function CompleteSheet({
             onChange={(e) => setNotes(e.target.value)}
             maxLength={2000}
             rows={3}
-            className="mt-[7px] min-h-16 w-full border-[1.5px] border-ink bg-paper px-3 py-2.5 text-[13px] leading-normal text-ink placeholder:text-ink/40 focus:outline-none"
+            disabled={result !== null}
+            className="mt-[7px] min-h-16 w-full border-[1.5px] border-ink bg-paper px-3 py-2.5 text-[13px] leading-normal text-ink placeholder:text-ink/40 focus:outline-none disabled:text-ink/60"
             placeholder="Anything worth remembering about this session"
           />
         </div>
@@ -1106,22 +1112,30 @@ function CompleteSheet({
         >
           View meso stats
         </a>
-        <button
-          type="button"
-          onClick={() =>
-            commit(() =>
-              completeWorkoutAction({
-                workout_id: workout.id,
-                notes: notes.trim() || null,
-              }),
-            )
-          }
-          className="mt-3.5 w-full bg-ink py-[17px] text-center text-sm font-bold tracking-[0.1em] text-bg-base"
-        >
-          {next
-            ? `NEXT — W${microcycle.week_number}·D${next.day_number}`
-            : "COMPLETE WEEK"}
-        </button>
+        {result ? (
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                result.nextWorkoutId ? `/log/${result.nextWorkoutId}` : "/workout",
+              )
+            }
+            className="mt-3.5 w-full bg-ink py-[17px] text-center text-sm font-bold tracking-[0.1em] text-bg-base"
+          >
+            {result.nextLabel ? `NEXT — ${result.nextLabel}` : "DONE"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={completing}
+            onClick={complete}
+            className="mt-3.5 w-full bg-ink py-[17px] text-center text-sm font-bold tracking-[0.1em] text-bg-base disabled:opacity-60"
+          >
+            {completing
+              ? "RECALCULATING…"
+              : `COMPLETE W${microcycle.week_number}·D${workout.day_number}`}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -29,7 +29,7 @@ function randomInputs(r: () => number): EngineInputs {
   const targetRir = int(0, 3);
   return {
     exercise: {
-      equipmentType: pick(["barbell", "dumbbell", "machine", "cable", "smith", "bodyweight", "other"] as const),
+      equipmentType: pick(["barbell", "dumbbell", "machine", "cable", "smith", "bodyweight", "bands", "kettlebell", "other"] as const),
     },
     user: {
       experienceLevel: pick(["beginner", "intermediate", "advanced"] as const),
@@ -47,9 +47,8 @@ function randomInputs(r: () => number): EngineInputs {
     })),
     exerciseFeedback: {
       jointPain: int(0, 3),
-      muscleStrain: int(0, 3),
-      pump: int(0, 3),
-      fatigue: int(0, 3),
+      pump: int(0, 10),
+      workload: int(0, 10),
     },
     workoutFeedback: {
       overallFatigue: int(0, 4),
@@ -113,7 +112,7 @@ describe("hard bounds hold over randomized inputs", () => {
 describe("param schema gate", () => {
   it("rejects a malformed engine_params payload", () => {
     expect(() =>
-      engineParamsSchema.parse({ increment_kg: { barbell: -1 } }),
+      engineParamsSchema.parse({ increment: { barbell: { kg: -1, lb: 5 } } }),
     ).toThrow();
   });
 
