@@ -14,7 +14,7 @@ Scope changes folded into this plan:
 
 Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest/ESLint/Prettier, primitives. Remaining items absorbed into Phase R and Phase 1b:
 
-- [ ] Vercel project connected: preview deploys per PR, prod from `main`
+- [x] Vercel project connected: preview deploys per PR, prod from `main`
 - [x] Remove the Serwist offline-logging assumptions; keep installability + shell precache only (verified: SW was already shell-precache + runtime cache only)
 
 ## Phase R — Design-system retheme (new)
@@ -26,7 +26,7 @@ Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest
 - [x] Rework primitives: Button, Input, segmented control (filled-ink active state), chips, dashed "planned/empty" variants, snap-to-stop slider, bottom sheet, menu card (offset hard shadow), week-track component
 - [x] BottomNav → canon tabs `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`
 - [x] Manifest/icons regenerated for the light system
-- [ ] Visual QA against mockup figures 1.1–4.5 (`docs/design/mockups/workout - App Screens v2.dc.html`)
+- [~] Visual QA against mockup figures 1.1–4.5: all screens transcribed 1:1 from the mockup HTML (fidelity pass, see PROGRESS 2026-06-12); in-browser pixel pass on a device still pending
 
 **Accept:** shell + primitives render pixel-faithful to the mockups; no rounded corners, no shadows except menu cards, orange only on current/selected.
 
@@ -35,11 +35,11 @@ Done per PROGRESS.md: Next.js + TS + Tailwind scaffold, PWA baseline, CI, Vitest
 Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 - [x] Migration `20260612000001_design_pivot.sql`: profile body data + week start, equipment vocabulary, excluded exercises, pinned exercise notes, macro slots, standalone mesos, 3–8 week mesos, groups-first plan tables (`meso_days`, `meso_day_groups`), workout-exercise group/status, set types + units, feedback redesign (pump/workload 0–10 sliders, per-group scope), `template_day_groups`, `mcp_write_audit`, meso-stats views — with RLS + tests in the same PR
-- [~] Update `database.ts` types (done with the migration) and `src/lib/queries/` for the new shapes (queries pending)
-- [ ] Onboarding rebuilt as the 08 §4 sequence: name/age/height/bodyweight → experience level → equipment access → units; land on Cycles with the create-macro empty state
-- [ ] Profile screen (fig 4.5): data rows, experience segmented control, equipment chips, excluded-exercise management
-- [ ] More tab (fig 4.4): profile card, LB/KG toggle, AI connector row (placeholder until Phase 6), CSV export stub, version line
-- [ ] Provision hosted Supabase + Vercel; apply migrations + seed; regenerate types from the live schema
+- [x] Update `database.ts` types (done with the migration) and `src/lib/queries/` for the new shapes (exclusions, pinned notes, picker, macro slots, planner tables, generation)
+- [x] Onboarding rebuilt as the 08 §4 sequence: name/age/height/bodyweight → experience level → equipment access → units; land on Cycles with the create-macro empty state
+- [x] Profile screen (fig 4.5): data rows, experience segmented control, equipment chips, excluded-exercise management
+- [x] More tab (fig 4.4): profile card, LB/KG toggle, AI connector row (placeholder until Phase 6), CSV export stub, version line
+- [x] Provision hosted Supabase + Vercel; apply migrations + seed (hand-authored types verified against the live schema by integration smoke)
 
 **Accept:** new user onboards through the 4-step sequence and lands on Cycles; exclusions and equipment persist; RLS tests cover every new table.
 
@@ -47,15 +47,15 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** the full structure flow of section 2 of the mockups.
 
-- [ ] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
-- [ ] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
-- [ ] Plan-a-meso entry (fig 2.3): copy a mesocycle / start with a template / meso builder / from scratch (builder option may stub to scratch in v1 with a clear path)
-- [ ] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
-- [ ] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
-- [ ] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-set data, full-history link; exclusions never appear
-- [ ] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
-- [ ] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `EDIT WEEKS`, `GO TO W#·D#`, `MESO STATS` entry
-- [ ] Microcycle + week-1 workout generation on create (engine `seedMeso` / `rirRamp` are ready)
+- [x] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
+- [x] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
+- [~] Plan-a-meso entry (fig 2.3): from-scratch path works; copy / template / builder shown as dashed "soon" cards (template lands with Phase 5, copy/builder later)
+- [x] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
+- [x] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
+- [~] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-set data; exclusions never appear (full-history link lands with the 3.2 sheet in Phase 5)
+- [x] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
+- [~] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `GO TO W#·D#`, edit-plan entry; `MESO STATS` stubbed until Phase 5
+- [x] Microcycle + week-1 workout generation on meso start (engine `seedMeso` / `rirRamp`; ramp widened to 3–8 weeks with tests)
 
 **Accept:** user creates a macro with a goal arc, plans a meso groups-first from scratch, and sees week-1 workouts generated with the planner's structure (groups, slots, start sets).
 
@@ -63,13 +63,13 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** the section-1 daily loop, excellent on a phone in a gym. Online-only.
 
-- [ ] Workout tab resting logic (08 §2): show latest uncompleted workout; else latest completed meso's stats view
-- [ ] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
-- [ ] Exercise menu (fig 1.2): history, new note, replace exercise, move, add set, skip remaining, remove
-- [ ] Set menu (fig 1.3): add set below, set type (straight/drop), skip set, delete set; prescription rationale surfaced as short clinical lines
-- [ ] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
-- [ ] Workout complete sheet (fig 1.5): summary rows, autoregulation summary from engine output, workout notes saved with the session, link to meso stats, next-workout button
-- [ ] Deload logging = standard day view + `DELOAD` badge and engine-reduced prescriptions
+- [~] Workout tab resting logic (08 §2): latest uncompleted workout shown; resting state shows the last completed meso's summary rows (full 4.1 stats view lands in Phase 5)
+- [x] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
+- [~] Exercise menu (fig 1.2): new/replace pinned note, add set, skip remaining, remove (blocked once sets are logged); history / replace exercise / move pending
+- [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets; prescription rationale surfaced in the exercise menu. No deletes of logged sets by design (append-only history)
+- [x] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
+- [~] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary needs the Phase 4 engine wiring
+- [x] Deload logging = standard day view + `DELOAD` badge (engine-reduced prescriptions arrive with the Phase 4 week-generation job)
 - [ ] Playwright e2e: log a full workout including feedback and completion
 
 **Accept:** a full workout can be logged one-thumbed; feedback writes the redesigned rows; completion shows a real engine-derived autoregulation summary.

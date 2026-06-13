@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Database,
   EquipmentType,
+  ExcludedExerciseRow,
+  ExerciseNoteRow,
   ExerciseRow,
 } from "@/lib/types/database";
 
@@ -96,4 +98,149 @@ export async function listMuscleGroups(supabase: Client) {
     .order("name");
   if (error) throw error;
   return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// exclusions (fig 4.5) — excluded exercises never appear in pickers
+// ---------------------------------------------------------------------------
+
+export interface ExclusionWithExercise extends ExcludedExerciseRow {
+  exercise_name: string;
+}
+
+export async function listExclusions(
+  supabase: Client,
+  userId: string,
+): Promise<ExclusionWithExercise[]> {
+  const { data, error } = await supabase
+    .from("excluded_exercises")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  const { data: exercises, error: exError } = await supabase
+    .from("exercises")
+    .select("id, name")
+    .in(
+      "id",
+      data.map((x) => x.exercise_id),
+    );
+  if (exError) throw exError;
+  const nameById = new Map((exercises ?? []).map((e) => [e.id, e.name]));
+  return data.map((x) => ({
+    ...x,
+    exercise_name: nameById.get(x.exercise_id) ?? "",
+  }));
+}
+
+export async function addExclusion(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+  reason: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("excluded_exercises")
+    .upsert(
+      { user_id: userId, exercise_id: exerciseId, reason },
+      { onConflict: "user_id,exercise_id" },
+    );
+  if (error) throw error;
+}
+
+export async function removeExclusion(
+  supabase: Client,
+  userId: string,
+  exclusionId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("excluded_exercises")
+    .delete()
+    .eq("id", exclusionId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// pinned notes (figs 1.1/1.2)
+// ---------------------------------------------------------------------------
+
+export async function listPinnedNotes(
+  supabase: Client,
+  userId: string,
+  exerciseIds: string[],
+): Promise<ExerciseNoteRow[]> {
+  if (exerciseIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("exercise_notes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_pinned", true)
+    .in("exercise_id", exerciseIds)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// exercise picker (fig 2.6) — pre-filtered to a muscle group, exclusions
+// removed, with last-performed data
+// ---------------------------------------------------------------------------
+
+export interface PickerExercise extends ExerciseRow {
+  last_performed_at: string | null;
+  best_weight: number | null;
+  best_reps: number | null;
+}
+
+export async function listPickerExercises(
+  supabase: Client,
+  userId: string,
+  opts: { muscleGroupId?: string; search?: string } = {},
+): Promise<PickerExercise[]> {
+  let exerciseIds: string[] | null = null;
+  if (opts.muscleGroupId) {
+    const { data: links, error: linkError } = await supabase
+      .from("exercise_muscle_groups")
+      .select("exercise_id")
+      .eq("muscle_group_id", opts.muscleGroupId);
+    if (linkError) throw linkError;
+    exerciseIds = (links ?? []).map((l) => l.exercise_id);
+    if (exerciseIds.length === 0) return [];
+  }
+
+  let query = supabase.from("exercises").select("*").order("name");
+  if (exerciseIds) query = query.in("id", exerciseIds);
+  if (opts.search) query = query.ilike("name", `%${opts.search}%`);
+  const { data: exercises, error } = await query;
+  if (error) throw error;
+  if (!exercises || exercises.length === 0) return [];
+
+  const [{ data: exclusions, error: exclError }, { data: prs, error: prError }] =
+    await Promise.all([
+      supabase
+        .from("excluded_exercises")
+        .select("exercise_id")
+        .eq("user_id", userId),
+      supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+    ]);
+  if (exclError) throw exclError;
+  if (prError) throw prError;
+
+  const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
+  const prById = new Map((prs ?? []).map((p) => [p.exercise_id, p]));
+
+  return exercises
+    .filter((e) => !excluded.has(e.id))
+    .map((e) => {
+      const pr = prById.get(e.id);
+      return {
+        ...e,
+        last_performed_at: pr?.last_performed_at ?? null,
+        best_weight: pr?.best_weight ?? null,
+        best_reps: pr?.best_reps ?? null,
+      };
+    });
 }

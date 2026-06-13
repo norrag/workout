@@ -25,9 +25,14 @@ export async function updateProfile(
       | "display_name"
       | "age"
       | "gender"
+      | "height_cm"
+      | "bodyweight"
+      | "bodyweight_updated_at"
+      | "training_since"
       | "experience_level"
       | "preferred_equipment"
       | "units"
+      | "week_starts_on"
       | "onboarded_at"
     >
   >,
