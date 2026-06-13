@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTemplateDetail } from "@/lib/queries/templates";
+import { ShareRow } from "@/components/ShareRow";
 
 /**
  * Template detail (08 §4, described not mocked): the template's days, groups
@@ -97,6 +98,9 @@ export default async function TemplateDetailPage({
         Opens the planner board prefilled — excluded movements never carry
         over.
       </p>
+      {template.user_id === user.id && (
+        <ShareRow objectType="template" objectId={template.id} />
+      )}
     </div>
   );
 }

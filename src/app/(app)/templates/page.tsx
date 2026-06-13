@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
+import { RedeemForm } from "@/components/RedeemForm";
 
 /** Templates tab (fig 3.3): stock + own templates, search, start-from-template. */
 export default async function TemplatesPage({
@@ -36,6 +37,7 @@ export default async function TemplatesPage({
           className="mt-4 h-[46px] w-full border-[1.5px] border-ink bg-paper px-3.5 text-sm text-ink placeholder:text-ink/45 focus:outline-none"
         />
       </form>
+      <RedeemForm />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         {templates.length === 0 && (

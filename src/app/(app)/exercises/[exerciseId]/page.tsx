@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getExerciseHistory } from "@/lib/queries/history";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
+import { ShareRow } from "@/components/ShareRow";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -153,6 +154,10 @@ export default async function ExerciseDetailPage({
         </div>
         <ExerciseHistoryList entries={history} />
       </div>
+
+      {exercise.user_id === user.id && (
+        <ShareRow objectType="exercise" objectId={exercise.id} />
+      )}
     </div>
   );
 }

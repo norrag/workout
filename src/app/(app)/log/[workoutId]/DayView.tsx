@@ -13,13 +13,16 @@ import {
   addSetAction,
   amendSetAction,
   completeWorkoutAction,
+  listReplacementCandidatesAction,
   logSetAction,
   moveExerciseDownAction,
   removeExerciseAction,
+  replaceExerciseAction,
   saveFeedbackAction,
   savePinnedNoteAction,
   skipRemainingAction,
   skipSetAction,
+  type ReplacementCandidate,
 } from "../actions";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -53,6 +56,7 @@ export function DayView({
     setNumber: number;
   } | null>(null);
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
+  const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
   const [noteFor, setNoteFor] = useState<LoggedExercise | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<LoggedExercise | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
@@ -143,6 +147,7 @@ export function DayView({
           }
           onCloseSetMenu={() => setSetMenu(null)}
           onHistory={() => setHistoryFor(we)}
+          onReplace={() => setReplaceFor(we)}
           onNote={() => setNoteFor(we)}
           onToggleDrop={() =>
             setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
@@ -172,6 +177,11 @@ export function DayView({
         we={noteFor}
         workoutId={workout.id}
         onClose={() => setNoteFor(null)}
+        commit={commit}
+      />
+      <ReplaceSheet
+        we={replaceFor}
+        onClose={() => setReplaceFor(null)}
         commit={commit}
       />
       <HistorySheet
@@ -221,6 +231,7 @@ function ExerciseBlock({
   onOpenSetMenu,
   onCloseSetMenu,
   onHistory,
+  onReplace,
   onNote,
   onToggleDrop,
   onLogged,
@@ -239,6 +250,7 @@ function ExerciseBlock({
   onOpenSetMenu: (setNumber: number) => void;
   onCloseSetMenu: () => void;
   onHistory: () => void;
+  onReplace: () => void;
   onNote: () => void;
   onToggleDrop: () => void;
   onLogged: (wasLastPlannedSet: boolean) => void;
@@ -366,7 +378,18 @@ function ExerciseBlock({
                 onNote();
               }}
             />
-            <MenuRow label="Replace exercise" trailing="SOON" disabled />
+            {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
+              <MenuRow
+                label="Replace exercise"
+                trailing="›"
+                onClick={() => {
+                  onCloseMenu();
+                  onReplace();
+                }}
+              />
+            ) : (
+              <MenuRow label="Replace exercise" trailing="LOGGED" disabled />
+            )}
             {!readOnly && (
               <>
                 {!isLast && (
@@ -761,6 +784,96 @@ function NoteSheet({
         >
           SAVE
         </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// replace exercise (from the 1.2 menu) — picker filtered to the slot's group
+// ---------------------------------------------------------------------------
+
+function ReplaceSheet({
+  we,
+  onClose,
+  commit,
+}: {
+  we: LoggedExercise | null;
+  onClose: () => void;
+  commit: Commit;
+}) {
+  const [candidates, setCandidates] = useState<ReplacementCandidate[] | null>(
+    null,
+  );
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    setCandidates(null);
+    setSearch("");
+    if (!we?.muscle_group_id) return;
+    listReplacementCandidatesAction(we.muscle_group_id).then(setCandidates);
+  }, [we]);
+
+  if (!we) return null;
+  const q = search.trim().toLowerCase();
+  const visible = (candidates ?? []).filter(
+    (c) => c.id !== we.exercise_id && (!q || c.name.toLowerCase().includes(q)),
+  );
+
+  return (
+    <BottomSheet
+      open
+      onClose={onClose}
+      title="Replace exercise"
+      subtitle={`${we.muscle_group.toUpperCase()} — SWAPS ${we.exercise_name.toUpperCase()}`}
+    >
+      <div className="flex items-center gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search"
+          className="h-[42px] flex-1 border-[1.5px] border-ink bg-paper px-3 text-[13px] text-ink placeholder:text-ink/45 focus:outline-none"
+        />
+        <div className="flex h-[42px] items-center bg-ink px-3 text-[10px] font-bold tracking-[0.1em] text-bg-base">
+          {we.muscle_group.toUpperCase()}
+        </div>
+      </div>
+
+      <div className="mt-3.5 max-h-[46dvh] overflow-y-auto">
+        {candidates === null ? (
+          <p className="py-4 text-sm text-ink/45">Loading…</p>
+        ) : visible.length === 0 ? (
+          <p className="py-4 text-sm text-ink/45">No matches.</p>
+        ) : (
+          visible.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                commit(async () => {
+                  await replaceExerciseAction({
+                    workout_id: we.workout_id,
+                    workout_exercise_id: we.id,
+                    exercise_id: c.id,
+                  });
+                });
+                onClose();
+              }}
+              className="flex w-full items-center justify-between border-b border-ink/[0.18] px-0.5 py-[13px] text-left"
+            >
+              <div>
+                <div className="text-[15px] font-bold">{c.name}</div>
+                <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                  {c.equipment_type.toUpperCase()} ·{" "}
+                  {c.last_performed_at
+                    ? `LAST ${shortDate(c.last_performed_at)}`
+                    : "NEVER PERFORMED"}
+                </div>
+              </div>
+              <div className="text-[15px] text-ink/40">›</div>
+            </button>
+          ))
+        )}
       </div>
     </BottomSheet>
   );

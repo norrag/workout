@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoPlan } from "@/lib/queries/cycles";
 import { saveMesoAsTemplateAction } from "../../actions";
+import { ShareRow } from "@/components/ShareRow";
 import { StartMesoForm } from "./StartMesoForm";
 
 const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -260,6 +261,9 @@ export default async function MesoDetailPage({
             SAVE AS TEMPLATE
           </button>
         </form>
+      )}
+      {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
+        <ShareRow objectType="mesocycle" objectId={meso.id} />
       )}
     </div>
   );

@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
   completeWorkout,
   logSet,
   removeWorkoutExercise,
+  replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
   setExerciseStatus,
@@ -200,6 +202,54 @@ export async function getExerciseHistoryAction(
   const parsed = z.string().uuid().parse(exerciseId);
   const { supabase, user } = await requireUser();
   return getExerciseHistory(supabase, user.id, parsed);
+}
+
+const replaceSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  exercise_id: z.string().uuid(),
+});
+
+export async function replaceExerciseAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  exercise_id: string;
+}): Promise<{ error: string | null }> {
+  const parsed = replaceSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  const result = await replaceWorkoutExercise(
+    supabase,
+    user.id,
+    parsed.workout_exercise_id,
+    parsed.exercise_id,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+  return result;
+}
+
+export interface ReplacementCandidate {
+  id: string;
+  name: string;
+  equipment_type: string;
+  last_performed_at: string | null;
+}
+
+/** Candidates for replace-exercise: the slot's muscle group, exclusions out. */
+export async function listReplacementCandidatesAction(
+  muscleGroupId: string,
+): Promise<ReplacementCandidate[]> {
+  const parsed = z.string().uuid().parse(muscleGroupId);
+  const { supabase, user } = await requireUser();
+  const exercises = await listPickerExercises(supabase, user.id, {
+    muscleGroupId: parsed,
+  });
+  return exercises.map((e) => ({
+    id: e.id,
+    name: e.name,
+    equipment_type: e.equipment_type,
+    last_performed_at: e.last_performed_at,
+  }));
 }
 
 export async function moveExerciseDownAction(input: {

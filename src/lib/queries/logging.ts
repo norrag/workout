@@ -353,6 +353,48 @@ export async function removeWorkoutExercise(
   return { error: null };
 }
 
+/**
+ * Replace the movement behind an unstarted workout exercise (fig 1.2 menu).
+ * Blocked once sets exist — logged history stays attached to what was done.
+ * The prescription seeds from the user's best on the incoming exercise.
+ */
+export async function replaceWorkoutExercise(
+  supabase: Client,
+  userId: string,
+  workoutExerciseId: string,
+  newExerciseId: string,
+): Promise<{ error: string | null }> {
+  const { count, error: countError } = await supabase
+    .from("logged_sets")
+    .select("*", { count: "exact", head: true })
+    .eq("workout_exercise_id", workoutExerciseId);
+  if (countError) throw countError;
+  if ((count ?? 0) > 0)
+    return { error: "Sets are logged on this exercise. Skip it instead." };
+
+  const { data: pr, error: prError } = await supabase
+    .from("v_exercise_prs")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("exercise_id", newExerciseId)
+    .maybeSingle();
+  if (prError) throw prError;
+
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({
+      exercise_id: newExerciseId,
+      prescribed_weight: pr?.best_weight ?? null,
+      prescribed_reps: pr?.best_reps ?? null,
+      notes: pr?.best_weight
+        ? `Swapped in at your all-time best ${pr.best_weight} × ${pr.best_reps}; this week's sets seed next week`
+        : "Swapped in — no history yet; this week's sets seed next week",
+    })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+  return { error: null };
+}
+
 export async function savePinnedNote(
   supabase: Client,
   userId: string,
