@@ -8,14 +8,25 @@ import { NewMesoForm, type PlacementMacro } from "./NewMesoForm";
 export default async function NewMesoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ slot?: string }>;
+  searchParams: Promise<{ slot?: string; template?: string }>;
 }) {
-  const { slot } = await searchParams;
+  const { slot, template: templateId } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
+
+  let template: { id: string; name: string } | null = null;
+  if (templateId) {
+    const { data, error } = await supabase
+      .from("templates")
+      .select("id, name")
+      .eq("id", templateId)
+      .maybeSingle();
+    if (error) throw error;
+    template = data;
+  }
 
   const { macros } = await getCyclesOverview(supabase, user.id);
   const placementMacros: PlacementMacro[] = macros
@@ -48,9 +59,16 @@ export default async function NewMesoPage({
       </Link>
       <h1 className="title-display mt-3 text-[27px]">create mesocycle</h1>
       <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink/55">
-        FROM SCRATCH
+        {template
+          ? `FROM TEMPLATE — ${template.name.toUpperCase()}`
+          : "FROM SCRATCH"}
       </div>
-      <NewMesoForm macros={placementMacros} preselectedSlot={slot ?? null} />
+      <NewMesoForm
+        macros={placementMacros}
+        preselectedSlot={slot ?? null}
+        templateId={template?.id ?? null}
+        defaultName={template?.name ?? ""}
+      />
     </div>
   );
 }

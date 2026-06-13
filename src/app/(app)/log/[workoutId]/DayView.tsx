@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { WeekTrack, type WeekTrackWeek } from "@/components/ui/WeekTrack";
+import { HistorySheet } from "@/components/HistorySheet";
 import type { LoggedExercise, WorkoutDetail } from "@/lib/queries/logging";
 import type { AdvanceResult } from "@/lib/queries/progression";
 import type { Units } from "@/lib/types/database";
@@ -12,7 +13,6 @@ import {
   addSetAction,
   amendSetAction,
   completeWorkoutAction,
-  getExerciseHistoryAction,
   logSetAction,
   moveExerciseDownAction,
   removeExerciseAction,
@@ -20,7 +20,6 @@ import {
   savePinnedNoteAction,
   skipRemainingAction,
   skipSetAction,
-  type HistoryEntry,
 } from "../actions";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -175,7 +174,18 @@ export function DayView({
         onClose={() => setNoteFor(null)}
         commit={commit}
       />
-      <HistorySheet we={historyFor} onClose={() => setHistoryFor(null)} />
+      <HistorySheet
+        target={
+          historyFor
+            ? {
+                exercise_id: historyFor.exercise_id,
+                exercise_name: historyFor.exercise_name,
+                equipment_type: historyFor.equipment_type,
+              }
+            : null
+        }
+        onClose={() => setHistoryFor(null)}
+      />
       <FeedbackSheet
         we={feedbackFor}
         workoutId={workout.id}
@@ -757,83 +767,6 @@ function NoteSheet({
 }
 
 // ---------------------------------------------------------------------------
-// history sheet (fig 3.2)
-// ---------------------------------------------------------------------------
-
-function HistorySheet({
-  we,
-  onClose,
-}: {
-  we: LoggedExercise | null;
-  onClose: () => void;
-}) {
-  const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
-
-  useEffect(() => {
-    if (!we) {
-      setEntries(null);
-      return;
-    }
-    getExerciseHistoryAction(we.exercise_id).then(setEntries);
-  }, [we]);
-
-  if (!we) return null;
-
-  // group consecutive entries by meso
-  const groups: { meso: string; rows: HistoryEntry[] }[] = [];
-  for (const e of entries ?? []) {
-    const last = groups.at(-1);
-    if (last && last.meso === e.meso_name) last.rows.push(e);
-    else groups.push({ meso: e.meso_name, rows: [e] });
-  }
-
-  return (
-    <BottomSheet
-      open
-      onClose={onClose}
-      title="History"
-      subtitle={`${we.exercise_name.toUpperCase()} — ${we.equipment_type.toUpperCase()}`}
-    >
-      {entries === null ? (
-        <p className="py-4 text-sm text-ink/45">Loading…</p>
-      ) : groups.length === 0 ? (
-        <p className="py-4 text-sm text-ink/45">Never logged.</p>
-      ) : (
-        groups.map((group, gi) => (
-          <div key={gi} className={gi > 0 ? "mt-6" : ""}>
-            <div
-              className={`border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em] ${gi > 0 ? "text-ink/55" : ""}`}
-            >
-              {group.meso.toUpperCase()}
-            </div>
-            {group.rows.map((row, ri) => (
-              <div
-                key={ri}
-                className={`flex items-baseline justify-between border-b border-ink/15 py-3 ${gi > 0 ? "text-ink/55" : ""}`}
-              >
-                <div className="numeral text-base font-bold">
-                  {row.top_weight} lb{" "}
-                  <span className="text-[13px] font-normal text-ink/50">×</span>{" "}
-                  {row.reps}
-                  {row.is_deload && (
-                    <span className="ml-1.5 border border-ink/40 px-[5px] py-[2px] align-[2px] text-[8.5px] font-bold tracking-[0.1em]">
-                      DELOAD
-                    </span>
-                  )}
-                </div>
-                <div className="text-right text-[10px] font-semibold tracking-[0.1em] text-ink/55">
-                  {row.coordinate} — {shortDate(row.performed_on).slice(4)}
-                </div>
-              </div>
-            ))}
-          </div>
-        ))
-      )}
-    </BottomSheet>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // feedback prompt (fig 1.4)
 // ---------------------------------------------------------------------------
 
@@ -1107,7 +1040,7 @@ function CompleteSheet({
         </div>
 
         <a
-          href={`/cycles/meso/${detail.mesocycle.id}`}
+          href={`/cycles/meso/${detail.mesocycle.id}/stats`}
           className="mt-5 block text-center text-xs font-semibold text-ink/70 underline underline-offset-[3px]"
         >
           View meso stats

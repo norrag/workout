@@ -33,9 +33,13 @@ function shortMonthYear(iso: string): string {
 export function NewMesoForm({
   macros,
   preselectedSlot,
+  templateId = null,
+  defaultName = "",
 }: {
   macros: PlacementMacro[];
   preselectedSlot: string | null;
+  templateId?: string | null;
+  defaultName?: string;
 }) {
   const [state, formAction, pending] = useActionState(
     createMesocycleAction,
@@ -62,6 +66,7 @@ export function NewMesoForm({
       <input type="hidden" name="macro_slot_id" value={slotId ?? ""} />
       <input type="hidden" name="rir_start" value={RIR_START} />
       <input type="hidden" name="rir_end" value={RIR_END} />
+      {templateId && <input type="hidden" name="template_id" value={templateId} />}
 
       <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
         NAME
@@ -70,6 +75,7 @@ export function NewMesoForm({
         name="name"
         required
         maxLength={80}
+        defaultValue={defaultName}
         className="mt-2 h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink placeholder:text-ink/40 focus:outline-none"
         placeholder="e.g. Jul '26 — Bulk II"
       />

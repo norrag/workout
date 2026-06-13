@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoPlan } from "@/lib/queries/cycles";
+import { saveMesoAsTemplateAction } from "../../actions";
 import { StartMesoForm } from "./StartMesoForm";
 
 const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -243,9 +244,23 @@ export default async function MesoDetailPage({
           </div>
         ) : null}
       </div>
-      <div className="mt-2.5 border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70">
+      <Link
+        href={`/cycles/meso/${meso.id}/stats`}
+        className="mt-2.5 block border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70"
+      >
         MESO STATS — VOLUME · BALANCE · PERFORMANCE ›
-      </div>
+      </Link>
+      {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
+        <form action={saveMesoAsTemplateAction}>
+          <input type="hidden" name="meso_id" value={meso.id} />
+          <button
+            type="submit"
+            className="mt-2.5 w-full border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70"
+          >
+            SAVE AS TEMPLATE
+          </button>
+        </form>
+      )}
     </div>
   );
 }

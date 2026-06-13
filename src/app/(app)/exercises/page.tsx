@@ -45,9 +45,12 @@ export default async function ExercisesPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="title-display text-[32px]">exercises</h1>
-        <div className="border-[1.5px] border-ink/30 px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em] text-ink/40">
+        <Link
+          href="/exercises/new"
+          className="border-[1.5px] border-ink px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em]"
+        >
           + NEW
-        </div>
+        </Link>
       </div>
 
       <form method="get">
@@ -101,8 +104,9 @@ export default async function ExercisesPage({
             .filter(Boolean)
             .join(" · ");
           return (
-            <div
+            <Link
               key={ex.id}
+              href={`/exercises/${ex.id}`}
               className="flex items-center justify-between border-b border-ink/[0.18] py-3.5"
             >
               <div>
@@ -112,7 +116,7 @@ export default async function ExercisesPage({
                 </div>
               </div>
               <div className="text-base text-ink/40">›</div>
-            </div>
+            </Link>
           );
         })}
       </div>
