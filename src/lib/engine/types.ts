@@ -14,11 +14,12 @@ export const loggedSetInputSchema = z.object({
   isWarmup: z.boolean().default(false),
 });
 
+// fig 1.4: joint pain 0–3 per exercise; pump and workload 0–10 sliders
+// scoped to the exercise's muscle group ("just right" workload = 5)
 export const exerciseFeedbackInputSchema = z.object({
   jointPain: z.number().int().min(0).max(3).nullable(),
-  muscleStrain: z.number().int().min(0).max(3).nullable(),
-  pump: z.number().int().min(0).max(3).nullable(),
-  fatigue: z.number().int().min(0).max(3).nullable(),
+  pump: z.number().int().min(0).max(10).nullable(),
+  workload: z.number().int().min(0).max(10).nullable(),
 });
 
 export const workoutFeedbackInputSchema = z.object({

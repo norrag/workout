@@ -5,36 +5,26 @@ import {
   seedMeso,
   type EngineParams,
 } from "@/lib/engine";
-import type {
-  Database,
-  EquipmentType,
-  ProfileRow,
-} from "@/lib/types/database";
+import type { Database, ProfileRow } from "@/lib/types/database";
 import { getMesoPlan } from "./cycles";
 
 type Client = SupabaseClient<Database>;
 
+export interface ActiveEngineParams {
+  version: number;
+  params: EngineParams;
+}
+
 export async function getActiveEngineParams(
   supabase: Client,
-): Promise<EngineParams> {
+): Promise<ActiveEngineParams> {
   const { data, error } = await supabase
     .from("engine_params")
     .select("*")
     .eq("is_active", true)
     .single();
   if (error) throw error;
-  return engineParamsSchema.parse(data.params);
-}
-
-/**
- * Equipment added in the pivot (bands/kettlebell) doesn't have dedicated
- * engine increments until Phase 4 re-alignment; treat as `other` for now.
- */
-function engineEquipment(
-  equipment: EquipmentType,
-): "barbell" | "smith" | "dumbbell" | "machine" | "cable" | "bodyweight" | "other" {
-  if (equipment === "bands" || equipment === "kettlebell") return "other";
-  return equipment;
+  return { version: data.version, params: engineParamsSchema.parse(data.params) };
 }
 
 /**
@@ -58,7 +48,7 @@ export async function startMeso(
   if (!hasExercise)
     return { error: "Fill at least one exercise slot before starting." };
 
-  const params = await getActiveEngineParams(supabase);
+  const { params } = await getActiveEngineParams(supabase);
   const ramp = rirRamp(
     meso.weeks,
     meso.includes_deload,
@@ -124,9 +114,7 @@ export async function startMeso(
     let position = 1;
     const rows = day.groups.flatMap((group) =>
       group.fills.map((fill) => {
-        const equipment = engineEquipment(
-          equipmentById.get(fill.exercise_id) ?? "other",
-        );
+        const equipment = equipmentById.get(fill.exercise_id) ?? "other";
         const pr = prById.get(fill.exercise_id);
         const seeded = seedMeso(
           pr?.best_weight != null

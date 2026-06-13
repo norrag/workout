@@ -14,7 +14,7 @@ export function baseInputs(
       { setNumber: 2, weight: 100, reps: 8, rirReported: 3, isWarmup: false },
       { setNumber: 3, weight: 100, reps: 8, rirReported: 3, isWarmup: false },
     ],
-    exerciseFeedback: { jointPain: 0, muscleStrain: 1, pump: 2, fatigue: 1 },
+    exerciseFeedback: { jointPain: 0, pump: 5, workload: 5 },
     workoutFeedback: { overallFatigue: 1, effortRating: 2, performanceRating: 3 },
     muscleGroupWeeklySets: 10,
     weekPeak: null,

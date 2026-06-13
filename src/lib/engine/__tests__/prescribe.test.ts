@@ -11,7 +11,7 @@ describe("prescribe — performance delta (§3)", () => {
     expect(out.weight).toBe(102.5);
     expect(out.sets).toBe(3);
     expect(out.targetRir).toBe(2);
-    expect(out.rationale).toMatch(/\+2\.5kg/);
+    expect(out.rationale).toMatch(/\+2\.5 kg/);
   });
 
   it("scales the increment by experience level", () => {
@@ -23,13 +23,45 @@ describe("prescribe — performance delta (§3)", () => {
     expect(out.weight).toBe(105);
   });
 
-  it("uses lb increments for lb users", () => {
+  it("uses per-equipment lb increments for lb users", () => {
     const out = prescribe(
       baseInputs({ user: { experienceLevel: "intermediate", units: "lb" } }),
       params,
     );
-    // 2.5kg base × lb factor 2 = +5lb
+    // barbell lb increment is 5
     expect(out.weight).toBe(105);
+    expect(out.rationale).toMatch(/\+5 lb/);
+  });
+
+  it("kettlebell steps in kettlebell jumps, not plate math", () => {
+    const out = prescribe(
+      baseInputs({
+        exercise: { equipmentType: "kettlebell" },
+        user: { experienceLevel: "intermediate", units: "kg" },
+        previous: { weight: 16, reps: 10, sets: 3, targetRir: 3 },
+        actualSets: [
+          { setNumber: 1, weight: 16, reps: 10, rirReported: 3, isWarmup: false },
+        ],
+      }),
+      params,
+    );
+    // 16 + 4 kg kettlebell jump
+    expect(out.weight).toBe(20);
+  });
+
+  it("bands progress in coarse band steps", () => {
+    const out = prescribe(
+      baseInputs({
+        exercise: { equipmentType: "bands" },
+        user: { experienceLevel: "intermediate", units: "lb" },
+        previous: { weight: 30, reps: 12, sets: 3, targetRir: 3 },
+        actualSets: [
+          { setNumber: 1, weight: 30, reps: 12, rirReported: 3, isWarmup: false },
+        ],
+      }),
+      params,
+    );
+    expect(out.weight).toBe(40);
   });
 
   it("small miss: holds the weight actually achieved", () => {
@@ -110,11 +142,11 @@ describe("prescribe — goal bias (§5)", () => {
   });
 });
 
-describe("prescribe — feedback modulation (§4)", () => {
+describe("prescribe — feedback modulation (§4, pump/workload 0–10)", () => {
   it("pain at the gate blocks load increases", () => {
     const out = prescribe(
       baseInputs({
-        exerciseFeedback: { jointPain: 2, muscleStrain: 1, pump: 2, fatigue: 1 },
+        exerciseFeedback: { jointPain: 2, pump: 5, workload: 5 },
       }),
       params,
     );
@@ -122,37 +154,61 @@ describe("prescribe — feedback modulation (§4)", () => {
     expect(out.rationale).toMatch(/joint pain/);
   });
 
-  it("high strain with low pump cuts a set (floored at min_sets)", () => {
+  it("workload past just right cuts a set (floored at min_sets)", () => {
     const out = prescribe(
       baseInputs({
-        exerciseFeedback: { jointPain: 0, muscleStrain: 3, pump: 0, fatigue: 1 },
+        exerciseFeedback: { jointPain: 0, pump: 5, workload: 9 },
       }),
       params,
     );
     expect(out.sets).toBe(2);
-    expect(out.rationale).toMatch(/volume reduced/);
+    expect(out.rationale).toMatch(/set removed/);
   });
 
-  it("low fatigue + good pump + gain goal adds a set under the ceiling", () => {
+  it("easy workload with strong pump + gain goal adds a set under the ceiling", () => {
     const out = prescribe(
       baseInputs({
-        exerciseFeedback: { jointPain: 0, muscleStrain: 0, pump: 3, fatigue: 0 },
+        exerciseFeedback: { jointPain: 0, pump: 7, workload: 2 },
         muscleGroupWeeklySets: 10,
       }),
       params,
     );
     expect(out.sets).toBe(4);
+    expect(out.rationale).toMatch(/set added/);
+  });
+
+  it("easy workload without pump corroboration holds volume", () => {
+    const out = prescribe(
+      baseInputs({
+        exerciseFeedback: { jointPain: 0, pump: 3, workload: 2 },
+        muscleGroupWeeklySets: 10,
+      }),
+      params,
+    );
+    expect(out.sets).toBe(3);
   });
 
   it("does not add a set at the muscle-group ceiling", () => {
     const out = prescribe(
       baseInputs({
-        exerciseFeedback: { jointPain: 0, muscleStrain: 0, pump: 3, fatigue: 0 },
+        exerciseFeedback: { jointPain: 0, pump: 7, workload: 2 },
         muscleGroupWeeklySets: 20,
       }),
       params,
     );
     expect(out.sets).toBe(3);
+  });
+
+  it("low pump at the right workload flags exercise selection, not load", () => {
+    const out = prescribe(
+      baseInputs({
+        exerciseFeedback: { jointPain: 0, pump: 1, workload: 5 },
+      }),
+      params,
+    );
+    expect(out.sets).toBe(3);
+    expect(out.weight).toBe(102.5);
+    expect(out.rationale).toMatch(/different exercise/);
   });
 
   it("a rough session dampens load increases", () => {

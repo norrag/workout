@@ -68,7 +68,7 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 - [~] Exercise menu (fig 1.2): new/replace pinned note, add set, skip remaining, remove (blocked once sets are logged); history / replace exercise / move pending
 - [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets; prescription rationale surfaced in the exercise menu. No deletes of logged sets by design (append-only history)
 - [x] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
-- [~] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary needs the Phase 4 engine wiring
+- [x] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary is engine-derived (Phase 4 wiring landed)
 - [x] Deload logging = standard day view + `DELOAD` badge (engine-reduced prescriptions arrive with the Phase 4 week-generation job)
 - [ ] Playwright e2e: log a full workout including feedback and completion
 
@@ -79,12 +79,12 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 **Goal:** next week's numbers are computed from the new signals, explainable, and tunable.
 
 - [x] Pure engine core, param schema, rule modules, golden/property tests (built pre-pivot)
-- [ ] Re-align engine inputs to the redesigned feedback: pump 0–10 and workload 0–10 (replacing strain/fatigue), joint-pain gate per exercise, workload anchored at "just right" = 5 driving set-count adjustment; update params + golden fixtures
-- [ ] Per-equipment increments in the user's unit (lb default), incl. bands/kettlebell
-- [ ] Week N → N+1 generation job (on workout completion / first open of new week), writing `engine_decisions` with rationale
-- [ ] Autoregulation summary composer (the 1.5 copy: "+5 lb: hit all reps at 2 RIR", "Cable Pushdown +1 set", "Ramp holds…")
-- [ ] Meso seeding from prior meso peak; deload prescriptions (target RIR 4+)
-- [ ] Progress scoring v1 via the shared views
+- [x] Re-align engine inputs to the redesigned feedback: pump 0–10 and workload 0–10 (replacing strain/fatigue), joint-pain gate per exercise, workload anchored at "just right" = 5 driving set-count adjustment; params v2 (migration `20260613000001`) + updated golden fixtures
+- [x] Per-equipment increments in the user's unit (lb default), incl. bands/kettlebell
+- [x] Week N → N+1 generation job (on workout completion + first-open-of-new-week catch-up), writing `engine_decisions` with rationale (`src/lib/queries/progression.ts`)
+- [x] Autoregulation summary composer (the 1.5 copy: "Hack Squat +5 lb, Cable Pushdown +1 set. Ramp holds…") shown on the complete sheet
+- [x] Meso seeding from prior meso peak (`seedMeso` via `v_exercise_prs`); deload prescriptions via the generation job (load/sets pulled back from meso peak, target RIR 4+)
+- [x] Progress scoring v1 via the shared views (`getMesoProgressScores` over `v_exercise_history`; surfaced by Phase 5 stats / Phase 6 MCP)
 
 **Accept:** golden-fixture meso produces the expected ramp; every prescription shows a sensible rationale in the set/exercise menus; pain gate provably blocks load increases.
 

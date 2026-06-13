@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
+import { catchUpProgression } from "@/lib/queries/progression";
+import { createServiceClient } from "@/lib/supabase/service";
 import { DayView } from "../log/[workoutId]/DayView";
 
 /**
@@ -20,7 +22,23 @@ export default async function WorkoutPage() {
   const profile = await getProfile(supabase, user.id);
   if (profile && !profile.onboarded_at) redirect("/onboarding");
 
-  const state = await getCurrentState(supabase, user.id);
+  let state = await getCurrentState(supabase, user.id);
+
+  // first-open-of-new-week fallback (07 Phase 4): if the active week closed
+  // but generation didn't run (e.g. completion raced or failed), run the
+  // engine job now and re-read the position.
+  if (state.mesocycle && !state.nextWorkout) {
+    try {
+      const advanced = await catchUpProgression(
+        createServiceClient(),
+        user.id,
+        state.mesocycle.id,
+      );
+      if (advanced) state = await getCurrentState(supabase, user.id);
+    } catch (error) {
+      console.error("progression catch-up failed", error);
+    }
+  }
 
   if (state.nextWorkout) {
     const detail = await getWorkoutDetail(

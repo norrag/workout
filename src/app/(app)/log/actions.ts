@@ -15,6 +15,11 @@ import {
   setExerciseStatus,
 } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
+import {
+  advanceWeekAfterWorkout,
+  type AdvanceResult,
+} from "@/lib/queries/progression";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -301,7 +306,7 @@ const completeSchema = z.object({
 export async function completeWorkoutAction(input: {
   workout_id: string;
   notes: string | null;
-}): Promise<void> {
+}): Promise<AdvanceResult> {
   const parsed = completeSchema.parse(input);
   const { supabase, user } = await requireUser();
   await completeWorkout(
@@ -310,7 +315,27 @@ export async function completeWorkoutAction(input: {
     parsed.workout_id,
     parsed.notes?.trim() || null,
   );
+
+  // week N → N+1 generation (Phase 4): engine_decisions are service-role
+  // writes, scoped to the session user. A failure here must not lose the
+  // completion — the workout tab re-runs the job on next open.
+  let result: AdvanceResult;
+  try {
+    result = await advanceWeekAfterWorkout(
+      createServiceClient(),
+      user.id,
+      parsed.workout_id,
+    );
+  } catch (error) {
+    console.error("week generation failed after completion", error);
+    result = {
+      summary:
+        "Feedback recorded. Next week's targets recalculate when you next open the app.",
+      nextWorkoutId: null,
+      nextLabel: null,
+    };
+  }
   revalidatePath("/workout");
   revalidatePath(`/log/${parsed.workout_id}`);
-  redirect("/workout");
+  return result;
 }

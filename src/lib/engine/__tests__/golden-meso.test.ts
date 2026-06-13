@@ -48,7 +48,7 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100kg start"
           week: { targetRir: week.targetRir, isDeload: week.isDeload },
           previous: prev,
           actualSets: simulateCleanWeek(prev),
-          exerciseFeedback: { jointPain: 0, muscleStrain: 1, pump: 2, fatigue: 1 },
+          exerciseFeedback: { jointPain: 0, pump: 6, workload: 5 },
           workoutFeedback: { overallFatigue: 1, effortRating: 2, performanceRating: 3 },
           muscleGroupWeeklySets: 12,
           weekPeak: { weight: peak.weight, reps: peak.reps, sets: peak.sets, targetRir: peak.targetRir },

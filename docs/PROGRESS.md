@@ -2,7 +2,37 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-12 (latest) — Design-fidelity pass: every screen transcribed from the v2 mockup HTML
+## 2026-06-13 (latest) — Phase 4: progression engine alignment & wiring
+
+### Done
+
+**Phase 4 — engine re-alignment + week N→N+1 generation** (complete)
+
+- **Feedback re-alignment:** engine inputs now take the redesigned 1.4 signals — joint pain 0–3 per exercise, pump and workload 0–10 per muscle group. The workload slider anchors set counts ("just right" = 5): `workload ≥ workload_high (8)` pulls a set; `workload ≤ workload_low (3)` with pump ≥ `set_add_pump_min (6)` under the gain goal adds one up to the group ceiling; low pump at the right dose flags exercise selection in the rationale instead of touching load. Strain/fatigue thresholds removed
+- **Per-equipment per-unit increments:** `engine_params` v2 expresses increment + rounding per equipment in **both units** (`{ kg, lb }`) — lb users get real plate math (barbell +5 lb, not 2.5 kg × factor) — with first-class **bands (10 lb / 5 kg)** and **kettlebell (9 lb / 4 kg)** steps; the `engineEquipment` shim in generation is gone. Rationale copy now reads "+5 lb" (mockup voice)
+- **Params v2** shipped as append-only migration `20260613000001_engine_params_v2.sql` (v1 deactivated and kept for replay; single-active index holds), mirrored in `params.ts` defaults and seed; **applied to the hosted project**; RLS test updated to expect v2 active
+- **Week N→N+1 generation job** (`src/lib/queries/progression.ts`): on workout completion, `advanceWeekAfterWorkout` builds the same day of week N+1 from week-N actuals + feedback (group-scoped pump/workload resolved from whichever exercise closed the group, weekly group set totals, meso peak per exercise for deload sizing, goal from macro slot → macro → gain for standalone, peak slots train as gain), inserts the workout + prescriptions with rationale strings, and writes one `engine_decisions` row per exercise (inputs/output/params version) via the **service client** with explicit user scoping. Idempotent per day; on week close it backfills skipped days (prescriptions carry forward) and activates microcycle N+1; the final week closes the meso. `catchUpProgression` re-runs the job on first open of the Workout tab if completion-time generation failed
+- **Autoregulation summary composer** (`src/lib/engine/summary.ts`, pure + unit-tested): the 1.5 copy — "Feedback recorded. W3 targets recalculated — Hack Squat +5 lb, Cable Pushdown +1 set. Ramp moves to 1 RIR next week.", deload and meso-close variants, clause cap with "and N more"
+- **Complete sheet wired** (fig 1.5): `COMPLETE W2·D1` completes + recalculates in one action and the AUTOREGULATION callout swaps to the real engine summary; the primary becomes `NEXT — W2·D2` (next sibling, or W(N+1)·D1 once the week closes; `DONE` after the meso)
+- **Progress scoring v1:** `getMesoProgressScores` (`src/lib/queries/stats.ts`) — per-exercise e1RM trend across a meso from `v_exercise_history` via `scoreProgress`, ready for Phase 5 stats and MCP
+- Tests: 48 passing — reworked golden meso/prescribe/bounds fixtures to the new feedback shape, new cases for workload-anchored volume, pump corroboration, selection flag, kettlebell/bands steps, summary composer, and pure progression helpers (`buildEngineInputs`, `weeklySetsByGroup`, `peakByExercise`, `engineGoal`)
+
+### Recorded deviations
+
+- **Complete sheet is two-phase** (confirm → recalculated state): the 1.5 mockup shows the post-completion state; a confirm step is kept so opening the sheet can't silently mark untouched exercises skipped. After confirming, the sheet matches the mockup (real summary + NEXT button)
+- Week-1 seeding decisions (from `startMeso`) are not yet audited to `engine_decisions` — the rationale lives on `workout_exercises.notes`; folding seeding into the decisions audit is noted for Phase 6 (replay wants it)
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (48/48), `npm run build` green. Migration applied to the hosted project (v2 active, v1 kept inactive). Hosted-DB integration smoke through the real modules: signup → standalone 4-week meso (2 exercises, one group) → start (hosted params v2 parse) → 6 clean sets logged → group feedback (pump 7, workload 2) → complete → **advance**: week-2 workout generated with +5 lb on barbell, +1 set group-wide, RIR 3→2, full rationale strings, microcycle 2 activated, summary exactly in the mockup voice (`engine_decisions` insert shimmed in the smoke — no service key in this environment; covered by RLS tests). Smoke user deleted afterwards (and the leftover `smoke-test-claude@example.com` from the earlier session cleaned up too)
+
+### Not done yet / next
+
+1. Phase 3 leftover: Playwright e2e for the logging loop (still no browser runtime in this environment); exercise-menu replace/move
+2. Phase 5 — meso stats screens (figs 4.1–4.3) off the shared views, exercises tab build-out, history sheet integration in picker/menu, templates round-trip, sharing
+3. Phase 6 — MCP connector incl. admin param/replay tools (`engine_decisions` + versioned params are now flowing, so the decision inspector and replay harness have real data)
+
+## 2026-06-12 — Design-fidelity pass: every screen transcribed from the v2 mockup HTML
 
 The first builds of the 1.x–4.x screens improvised layouts from the spec prose; this pass re-reads `docs/design/mockups/workout - App Screens v2.dc.html` figure by figure and rebuilds each screen to its exact structure, copy, sizes, and colors. **New CLAUDE.md hard rule #8:** pixel fidelity to the mockup HTML is mandatory before building or changing any screen.
 

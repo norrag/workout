@@ -316,21 +316,24 @@ select pg_temp.seed_template(
 );
 
 -- ---------------------------------------------------------------------------
--- default engine params (version 1) — mirrors src/lib/engine/params.ts
+-- default engine params (version 2) — mirrors src/lib/engine/params.ts
+-- (version 1 is historical; migration 20260613000001 owns the v2 row on
+-- existing databases, so this insert is guarded)
 -- ---------------------------------------------------------------------------
 
 insert into public.engine_params (version, params, is_active, notes)
-select 1, '{
-  "increment_kg": {
-    "barbell": 2.5,
-    "smith": 2.5,
-    "dumbbell": 2.0,
-    "machine": 2.5,
-    "cable": 2.5,
-    "bodyweight": 2.5,
-    "other": 2.5
+select 2, '{
+  "increment": {
+    "barbell": { "kg": 2.5, "lb": 5 },
+    "smith": { "kg": 2.5, "lb": 5 },
+    "dumbbell": { "kg": 2.0, "lb": 5 },
+    "machine": { "kg": 2.5, "lb": 5 },
+    "cable": { "kg": 2.5, "lb": 5 },
+    "bodyweight": { "kg": 2.5, "lb": 5 },
+    "bands": { "kg": 5.0, "lb": 10 },
+    "kettlebell": { "kg": 4.0, "lb": 9 },
+    "other": { "kg": 2.5, "lb": 5 }
   },
-  "lb_increment_factor": 2,
   "experience_increment_scale": {
     "beginner": 1.5,
     "intermediate": 1.0,
@@ -344,11 +347,10 @@ select 1, '{
   "small_miss_reps": 2,
   "regression_pct": 0.9,
   "pain_gate": 2,
-  "strain_volume_threshold": 2,
-  "fatigue_volume_threshold": 2,
-  "pump_low_threshold": 1,
-  "set_add_pump_min": 3,
-  "set_add_fatigue_max": 0,
+  "workload_high": 8,
+  "workload_low": 3,
+  "set_add_pump_min": 6,
+  "pump_low": 2,
   "min_sets": 2,
   "max_sets_per_exercise": 6,
   "mg_set_ceiling": 20,
@@ -356,6 +358,16 @@ select 1, '{
   "session_performance_dampen_threshold": 1,
   "deload": { "load_pct": 0.55, "set_pct": 0.5, "target_rir": 4 },
   "meso_seed_backoff_pct": 0.925,
-  "rounding_kg": { "barbell": 2.5, "smith": 2.5, "dumbbell": 2.0, "machine": 2.5, "cable": 2.5, "bodyweight": 2.5, "other": 2.5 }
-}'::jsonb, true, 'v1 defaults from docs/04-feedback-engine.md'
-where not exists (select 1 from public.engine_params where version = 1);
+  "rounding": {
+    "barbell": { "kg": 2.5, "lb": 5 },
+    "smith": { "kg": 2.5, "lb": 5 },
+    "dumbbell": { "kg": 2.0, "lb": 5 },
+    "machine": { "kg": 2.5, "lb": 5 },
+    "cable": { "kg": 2.5, "lb": 5 },
+    "bodyweight": { "kg": 2.5, "lb": 5 },
+    "bands": { "kg": 5.0, "lb": 10 },
+    "kettlebell": { "kg": 4.0, "lb": 9 },
+    "other": { "kg": 2.5, "lb": 5 }
+  }
+}'::jsonb, true, 'v2 — pivot feedback re-alignment (pump/workload 0-10), per-equipment per-unit increments incl. bands/kettlebell'
+where not exists (select 1 from public.engine_params where version = 2);
