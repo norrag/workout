@@ -1,10 +1,16 @@
 # 08 — Design Decisions (mockup round, June 2026)
 
-Status: **authoritative**. This document records the design direction settled in the mockup
-project ("workout — App Screens v2") and supersedes conflicting guidance in
+Status: **authoritative baseline**. This document records the design direction settled in the
+mockup project ("workout — App Screens v2") and supersedes conflicting guidance in
 [06-design-system.md](06-design-system.md) and the key-screen list therein. Figure numbers
-(1.1–4.5) refer to the mockup file, which ships alongside the repo docs as the visual source
+refer to the mockup file, which ships alongside the repo docs as the visual source
 of truth.
+
+> **Amendments after the June 2026 mockup round are logged, dated, in
+> [09-design-changelog.md](09-design-changelog.md).** Where a dated entry there conflicts with
+> this document, the changelog wins. Check 09 before building any screen. The figure index in
+> §5 below has been reconciled with the 2026-06-13/14 sessions (Section 02 renumbered, the
+> Volume stats tab removed, the Exercise page and `+ NEW` chooser added).
 
 ## 1. Visual direction — the light ledger system
 
@@ -31,9 +37,9 @@ Principles observed throughout the mockups:
   per screen. `#D14F04` pressed-state and the green/yellow status colors from 06 are dropped;
   status is carried by weight, opacity, and dashed-vs-solid borders instead.
 - **Filled-ink active states:** segmented controls and selected chips invert to
-  ink-on-cream → cream-on-ink (see VOLUME/BALANCE/PERFORMANCE in 4.1, LB/KG in 4.4,
+  ink-on-cream → cream-on-ink (see BALANCE/PERFORMANCE in 4.1, LB/KG in 4.4,
   equipment chips in 4.5).
-- **Dashed borders = empty/planned** (unfilled exercise slot 2.4, future macro bars 4.3,
+- **Dashed borders = empty/planned** (unfilled exercise slot 2.5, future macro bars 4.2,
   "+ ADD EXCLUSION" 4.5).
 - **Typography:** Archivo throughout. Lowercase logotype `workout` (wide tracking); big
   800-weight lowercase screen titles; all-caps 0.1–0.14em tracked labels; tabular-lining
@@ -45,26 +51,33 @@ Principles observed throughout the mockups:
 
 `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE` (replaces Today/Cycles/Insights/Library/Settings).
 
-- **Insights is not a tab.** Meso stats (volume / balance / performance, figs 4.1–4.3) live
-  behind a `MESO STATS` button on meso detail (2.2). Exercise history (3.2) lives in the
-  exercise library and picker.
+- **Insights is not a tab.** Meso stats (**Balance · Performance**, figs 4.1–4.2 — the Volume
+  tab was removed, see 09 2026-06-14 §4) are reached via the **`PLAN | STATS` toggle on the
+  planner board (2.5)**; stats open on **Balance**. Their back-nav reads `‹ PLAN`.
+  **Macrocycle stats** live on the **Macrocycle Overview (2.2)**. Exercise history (3.2) and the
+  full Exercise page (3.1a/3.1b Overview · History) live in the exercise library and picker.
 - **Library is split** into Templates (3.3) and Exercises (3.1) tabs.
 - **Settings lives inside More** (4.4) — no separate tab.
 
 ### Workout tab resting logic
 No designed "rest day" state. The Workout tab shows the **latest uncompleted workout**; if
 all workouts are complete (or no active meso), it shows the **latest completed meso's stats**
-(the 4.1 view). Nothing else.
+(the Balance view, fig 4.1). Nothing else.
 
 ## 3. Decisions log (from mockup rounds)
 
 | Area | Decision |
 |---|---|
 | Units | **lb is the app default** (profile-level LB/KG toggle in More → Settings). All engine increments expressed per-equipment in the user's unit. |
-| Meso planning | **Groups-first flow:** create meso (2.7 → 2.3) → planner board (2.4) shows days as columns of muscle-group slots → day setup sheet (2.5) sets label, weekday, groups + set counts → tapping an unfilled slot opens the exercise picker **pre-filtered to that muscle group** (2.6). |
-| Day ordering | **No manual day reorder.** Days auto-sort by their assigned weekday, respecting the user's week-start setting (in day setup, 2.5). |
+| Macrocycle = goal layer | A macrocycle carries a single long-term **goal** (`HYPERTROPHY · STRENGTH · CUT · MAINTAIN`) and organizes several mesocycles toward it. Its name taps through to the **Macrocycle Overview (2.2)**; the **Create Macrocycle engine (2.3)** computes evenly-spaced mesos + suggested phases + a realistic target from goal/duration/meso-length/profile. Mesos are created **unplanned** and planned as the user reaches each (see 09 2026-06-13 §3). |
+| Realistic target | The Overview and the create engine show a **realistic target range** (e.g. `+8–11 lb lean mass`) plus a **per-month rate** (`≈ +1.1–1.6 lb / month`), derived from the target range ÷ duration. No body-weight/lean-mass progress tracking — the app tracks only the workout data it collects (see 09 2026-06-14 §3). |
+| Meso planning | **Groups-first flow:** create meso (2.8 → 2.4 "plan a meso") → planner board (2.5, doubles as the meso view/edit surface) shows days as columns of muscle-group slots → day setup sheet (2.6) sets label, weekday, groups + set counts → tapping an unfilled slot opens the exercise picker **pre-filtered to that muscle group** (2.7). The planner enforces a **partial-completion lock**: logged/active weeks are read-only, edits apply forward only (see 09 2026-06-13 §5). |
+| Plan-a-meso paths | The 2.4 chooser offers four paths: **Copy a mesocycle**, **Start with a template**, **Meso builder** (generated from muscle-group priorities — emphasize / grow / maintain), **From scratch**. |
+| Day ordering | **No manual day reorder.** Days auto-sort by their assigned weekday, respecting the user's week-start setting (in day setup, 2.6). |
 | Per-exercise feedback | Captured in the post-exercise prompt (1.4), **including joint pain per exercise** — the engine's pain gate operates on this. Session-level feedback captured at workout complete (1.5). |
-| Workout notes | Free text on the complete sheet (1.5), after the autoregulation summary; saved with the session. |
+| Workout complete (1.5) | Redesigned sheet: counts (exercises / sets / skipped) + **session feedback sliders** (overall fatigue / effort / performance, same UI as the 1.4 prompt) + free-text notes + `NEXT WORKOUT →`. **No autoregulation panel, no stats link** (autoregulation still recomputes silently; 09 2026-06-13 §2). The session sliders were dropped from the mockup in error and are restored (09 2026-06-14 session 4). |
+| Exercise tracking | Custom exercises declare a **TRACK PER SET** type — `WEIGHT × REPS` (default), `REPS`, or `TIME` (fig 3.1c). Logging and history render to the chosen type. |
+| Set edit / delete + lock | Sets can be amended **and deleted** from the day-view set menu (1.3 `Delete set`) **while the workout is in progress**. **Completing a workout locks it** — its sets/feedback become immutable — because completion runs the engine's next-week generation and we don't recompute the chain. Edit-meso never touches completed workouts (the planner lock, 09 2026-06-13 §5). Refines hard rule #5: logged history is append-only *after completion*. |
 | Engine transparency | The prescription rationale surfaces in the set/exercise menus (1.2/1.3) as short clinical lines ("+5 lb: hit all reps at 2 RIR"). |
 | Profile | Lives in More → Profile (4.5): data rows, experience level (drives starting volumes + ramp aggressiveness), equipment access chips, and **excluded exercises** — exclusions never appear in pickers or templates. |
 | Admin & tuning | **No admin UI will be built.** Decision inspection, param editing, and replay are operated **entirely through the MCP connector** (Claude as the tuning console). 04 §Admin tooling and the `/admin` phase in 07 should be read accordingly; the underlying tables, param versioning, and replay functions are still required — they just ship as MCP tools, not screens. |
@@ -77,25 +90,41 @@ Build these in the established system; no further mockups planned.
   name/age/height/bodyweight → experience level → equipment access → units. Then land on
   Cycles with the create-macro empty state. No marketing carousel.
 - **Template detail / start-from-template** — selecting a template opens the **planner board
-  (2.4) prefilled** with the template's days, groups, and exercises; from there the flow is
+  (2.5) prefilled** with the template's days, groups, and exercises; from there the flow is
   identical to a scratch meso.
-- **Exercise detail** — simple page: description, equipment + muscle group, last performed,
-  exercise history (the 3.2 content inline), and notes.
-- **Create custom exercise** — simple form page in the house style: name, muscle group(s),
-  equipment type, optional description/notes. Custom exercises are author-visible per F5.
+- **Exercise page** — now mocked (3.1a Overview / 3.1b History). Overview: equipment + muscle
+  group, last performed, all-time bests (weight PR, est. 1RM, volume PR, best session volume),
+  est. 1RM by meso across the current macro, lifetime totals (times trained, total volume,
+  first logged). History: per-session weight × reps grouped by meso, with PR/deload badges and
+  a "N earlier sessions ›" expander. Reached from the exercises list and the day-view exercise
+  menu's **"View exercise ›"** (1.2, formerly "History ›").
+- **Create custom exercise** — mocked (3.1c): name, primary muscle group (+ more), equipment
+  type, and a **TRACK PER SET** type (`WEIGHT × REPS` / `REPS` / `TIME`), optional
+  description/notes. Custom exercises are author-visible per F5.
 - **Deload week logging** — the standard day view (1.1) with a `DELOAD` badge in the header
   and reduced prescriptions from the engine; target RIR 4+. No bespoke layout.
 
 ## 5. Mockup index
 
+Reconciled with the updated `workout - App Screens v2.dc.html` after the 2026-06-13/14 sessions
+(see [09-design-changelog.md](09-design-changelog.md) for the deltas and the old→new
+renumbering).
+
 | Fig | Screen | Fig | Screen |
 |---|---|---|---|
-| 1.1 | Day view (logging) | 2.5 | Day setup sheet |
-| 1.2 | Exercise menu | 2.6 | Exercise picker (pre-filtered) |
-| 1.3 | Set menu | 2.7 | Create mesocycle |
-| 1.4 | Per-exercise feedback prompt | 3.1 | Exercise library |
-| 1.5 | Workout complete + session feedback | 3.2 | Exercise history sheet |
-| 2.1 | Cycles — macro → meso | 3.3 | Templates |
-| 2.2 | Meso detail — RIR ramp | 4.1–4.3 | Meso stats — volume / balance / performance |
-| 2.3 | Plan a mesocycle | 4.4 | More — profile card + settings |
-| 2.4 | Planner board (groups first) | 4.5 | Profile |
+| 1.1 | Day view (logging) — locked header + progress bar | 2.7 | Exercise picker (pre-filtered) |
+| 1.2 | Exercise menu (`View exercise ›`) | 2.8 | Create mesocycle |
+| 1.3 | Set menu | 3.1 | Exercises (MUSCLE + EQUIP filters) |
+| 1.4 | Per-exercise feedback prompt | 3.1a | Exercise page — Overview |
+| 1.5 | Workout complete (simplified) | 3.1b | Exercise page — History |
+| 2.1 | Cycles — macrocycle → mesocycle | 3.1c | New exercise (+ TRACK PER SET) |
+| 2.1b | `+ NEW` chooser (macrocycle / standalone meso) | 3.2 | Exercise history sheet |
+| 2.2 | Macrocycle Overview (+ macro stats) | 3.3 | Templates |
+| 2.3 | Create Macrocycle (the engine) | 4.1 | Meso stats — Balance |
+| 2.4 | Plan a mesocycle (4 paths) | 4.2 | Meso stats — Performance |
+| 2.5 | Planner board — view/edit meso (`PLAN \| STATS`, lock) | 4.4 | More — profile card + settings |
+| 2.6 | Day setup · groups & counts | 4.5 | Profile |
+| 2.6b | Add muscle group | | |
+
+> The Volume stats tab (old 4.1) was removed; Balance→4.1, Performance→4.2. There is no 4.3.
+> Old 2.2 "Meso detail — RIR ramp" is gone — the planner board (2.5) is the single meso surface.

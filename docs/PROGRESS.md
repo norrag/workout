@@ -2,7 +2,95 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-13 (latest) — Phase 5: meso stats, library, templates & sharing
+## 2026-06-14 (latest) — Metrics & engine-params research lock-down (no code)
+
+Research + documentation pass turning every mockup metric into a precise, research-backed
+definition with default `engine_params`. Ran a multi-source sports-science review (e1RM accuracy,
+rate-of-gain models, volume landmarks, subjective-feedback validity, progression/deload, push/pull
+balance) with primary citations. **No code changed.**
+
+### Done
+
+- **New [10-metrics-spec.md](10-metrics-spec.md)** — authoritative metric/param doc: e1RM
+  (effective-reps = reps+RIR, avg Epley/Brzycki, confidence weighting), fractional volume counting
+  (1.0/0.5), MEV/MAV/MRV landmarks, workload/pump/joint-pain → set-count autoregulation, RIR ramp,
+  increments/regression/deload, the profile-personalized macrocycle target + recommended-timeframe
+  engine, key-lifts-by-frequency, stats rollups (total volume, adherence, progress score, advisory
+  push:pull), consolidated default `engine_params`, and §9 honesty guardrails.
+- **Decisions locked (user, 2026-06-14):** (1) macrocycle target personalized from the full profile
+  + engine recommends timeframe; shown as an estimate, no progress bar; (2) **session feedback
+  sliders restored** to a redesigned Workout Complete sheet (mockup dropped them in error); (3)
+  fractional 1.0/0.5 volume counting; (4) key lifts = most-logged (by frequency). Defaults: female
+  absolute-target ×0.5 (relative %s equal); pump = secondary nudge only.
+- Threaded through 01 (F2/F3), 03 (`workout_feedback` kept + redesigned sheet; macro recommended
+  duration; fractional counting), 04 (`planMacrocycle` profile inputs + recommend-timeframe; metric
+  pointers), 05, 07 (backlog: Complete redesign, profile-driven target, params seeding), 08
+  (decisions log), 09 (new 2026-06-14 session-4 entry), CLAUDE.md (10 in read-first list).
+
+### Recorded deviation
+
+- **Workout Complete (1.5) re-adds session sliders** — authorized deviation from the mockup, which
+  dropped overall fatigue / effort / performance. Sheet = counts + the three session sliders (1.4
+  slider UI) + paragraph notes + `NEXT WORKOUT →`; autoregulation panel stays removed.
+
+### Not done yet / next
+
+- Implement the metrics/params per 10 (engine + migrations + the Complete-sheet redesign), in the
+  07 reconciliation backlog. Hard rules in force; engine changes need golden fixtures.
+
+## 2026-06-14 — Design v2 handoff: docs integration (no code)
+
+Documentation-only pass folding the **2026-06-13/14 design sessions** into the spec docs ahead of
+implementation. New design assets imported and every doc reconciled; **no schema, engine, or UI
+code changed** — the implementation lands in future sessions per the new reconciliation backlog.
+
+### Done
+
+- **Imported design artifacts** into `docs/design/`: updated source-of-truth mockup
+  `workout - App Screens v2.dc.html`; new interactive prototype `WorkoutApp.dc.html` +
+  `workout - Interactive Prototype.dc.html`; session-3 render screenshots under
+  `screenshots/v2-session3/`; and the new **`docs/09-design-changelog.md`** (authoritative for its
+  dated deltas).
+- **08-design-decisions** — added the 09 amendment pointer; reconciled the §5 figure index
+  (Section 02 renumbered, `+ NEW` chooser 2.1b, Macrocycle Overview 2.2, Create Macrocycle 2.3,
+  planner board 2.5; Exercise page 3.1a/b/c; Volume stats tab removed → Balance 4.1 / Performance
+  4.2); repointed stats to the planner `STATS` toggle; logged new decisions (macrocycle goal layer,
+  realistic target, plan-a-meso paths, exercise tracking type, simplified complete sheet).
+- **01-product-spec** — macrocycle as a single-goal layer (hypertrophy/strength/cut/maintain) with
+  the create engine + realistic target; F2 cycle flow (chooser, 4-path plan, planner lock); F3
+  complete sheet simplified; F5 tracking type + two-axis filter + Exercise page; F7 stats restructure.
+- **03-data-model** — `DATA` target shape: `macrocycles` goal vocab + `duration_months` /
+  `meso_length_weeks` / derived target columns; **retire `macro_slots`** → `mesocycles.position` +
+  `phase` + `unplanned` status; `exercises.tracking_type`; `logged_sets` nullable weight/reps +
+  `duration_seconds`; new views `v_exercise_overview` / `v_macro_summary`; week→day completion +
+  `exercises(equipment_type)` index. Marked as migration deltas (not yet migrated).
+- **04-feedback-engine** — goal vocab (gain→hypertrophy, +strength) + phase modulation; new pure
+  `planMacrocycle()` (meso count, suggested phases, realistic target + per-month rate from
+  goal/duration/block-length/profile); module layout + golden/property test requirements.
+- **05-mcp-connector** — `create_macrocycle` (engine-computed) + `get_macro_summary`; goal-update
+  tool reworked; new views added to the data-shape contract.
+- **06-design-system** — addendum for the SetRow density, locked Day View header + progress bar,
+  two-axis filter, `PLAN | STATS` toggle, and the exploratory dark theme (→ 09 §5a).
+- **07-implementation-plan** — added the **Design v2 reconciliation backlog** (retrofit/net-new
+  mapped to Phases 2/3/5 with `DATA`/`ENGINE` tags) for future execution.
+- **CLAUDE.md** — 09 added to the read-first list and pixel-fidelity rule; mockup-over-prototype
+  source-of-truth note; shared-views list extended.
+
+### Not done yet / next
+
+- Everything in the **07 reconciliation backlog** — the actual migrations, engine functions, and
+  screen retrofits. Execute in future sessions, hard rules in force (append-only migration + RLS +
+  tests per PR; engine changes need fixtures; pixel fidelity to the mockup, checking 09 first).
+- **Resolved (2026-06-14):** the set menu (1.3) `Delete set` is allowed for **any set while the
+  workout is `in_progress`** (not just unlogged). **Completing a workout locks it** — sets/feedback
+  become immutable — since completion runs the engine's next-week generation and we don't want to
+  recompute the chain. RLS gates `logged_sets`/`exercise_feedback` `update`/`delete` on the parent
+  workout being `in_progress`; this refines hard rule #5 (append-only *after* completion). Edit-meso
+  already can't touch completed weeks (planner lock). Captured in 03/07/08.
+- Note: the interactive prototype is a **functional-testing** artifact and is not pixel-perfect —
+  the **mockup is the source of truth** for every detail (already enforced in CLAUDE.md / 09).
+
+## 2026-06-13 — Phase 5: meso stats, library, templates & sharing
 
 ### Done
 

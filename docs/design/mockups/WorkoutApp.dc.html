@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    .wk-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  </style>
+</helmet>
+<div style="{{ rootStyle }}">
+  {{ statusBar }}
+  {{ screen }}
+  {{ tabBar }}
+  {{ overlay }}
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:824},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;paper&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;paper&quot;,&quot;tsType&quot;:&quot;'paper'|'dark'&quot;},&quot;instance&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;a&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    loaded: false,
+    tab: 'workout',
+    phase: 'logging',          // logging | feedback | complete
+    headerOpen: false,
+    week: 'W2', day: 'D1',
+    exercises: this.defaultExercises(false),
+    edit: null,                // { ei, si, field }
+    exMenu: null,              // ei
+    feedback: { pain: 'none', pump: 6, workload: 5 },
+    notes: '',
+    units: 'lb',
+    expandedMacro: '26-1',
+    chooser: false,
+    completedDays: [],
+    macros: this.defaultMacros(),
+    cyView: 'list', cyMacro: null, cyMeso: null, mesoTab: 'balance', mesoModal: null, mesoDraft: null, exTab: 'overview', draft: null, moreView: 'main', exDetail: null, tplDetail: null, exType: 'ALL',
+    exFilter: 'ALL', exSearch: '',
+    tpl: 0,
+  };
+
+  // ---------- data ----------
+  defaultExercises(fresh) {
+    const e = [
+      { n: 'Hack Squat', g: 'QUADS', q: 'MACHINE', sets: [ {w:250,r:8}, {w:250,r:7}, {w:250,r:6}, {w:250,r:6} ] },
+      { n: 'Leg Extension', g: 'QUADS', q: 'MACHINE', sets: [ {w:130,r:12}, {w:130,r:12}, {w:130,r:11} ] },
+      { n: 'Cable Pushdown (1-arm)', g: 'TRICEPS', q: 'CABLE', note: 'PINNED — handle grip, underhand, strict', sets: [ {w:45,r:13}, {w:45,r:13}, {w:45,r:12}, {w:45,r:11} ] },
+      { n: 'Overhead Cable Ext', g: 'TRICEPS', q: 'CABLE', sets: [ {w:60,r:12}, {w:60,r:11}, {w:60,r:10} ] },
+    ];
+    e.forEach(x => x.sets.forEach(s => { s.d = false; }));
+    if (!fresh) { e[0].sets[0].d = true; e[0].sets[1].d = true; e[2].sets[0].d = true; }
+    return e;
+  }
+
+  // ---------- persistence ----------
+  key() { return 'workout-proto-' + (this.props.instance || this.props.theme || 'a'); }
+  persistState() {
+    const s = this.state;
+    return { tab: s.tab, phase: s.phase, week: s.week, day: s.day, exercises: s.exercises,
+      feedback: s.feedback, notes: s.notes, units: s.units, expandedMacro: s.expandedMacro,
+      completedDays: s.completedDays, exFilter: s.exFilter, tpl: s.tpl, macros: s.macros, exType: s.exType };
+  }
+  componentDidMount() {
+    try {
+      const raw = localStorage.getItem(this.key());
+      if (raw) {
+        const p = JSON.parse(raw);
+        const merged = Object.assign({}, p, { loaded: true, edit: null, exMenu: null, chooser: false, headerOpen: false, exSearch: '', cyView: 'list', cyMacro: null, cyMeso: null, mesoTab: 'balance', mesoModal: null, mesoDraft: null, exTab: 'overview', draft: null });
+        if (!merged.macros || !merged.macros[0] || !merged.macros[0].ov) merged.macros = this.defaultMacros();
+        this.setState(merged);
+        return;
+      }
+    } catch (e) {}
+    this.setState({ loaded: true });
+  }
+  componentDidUpdate() {
+    if (this.state.loaded) { try { localStorage.setItem(this.key(), JSON.stringify(this.persistState())); } catch (e) {} }
+  }
+
+  // ---------- tokens ----------
+  t() {
+    if (this.props.theme === 'dark') return {
+      bg:'#0B0B0C', surface:'#141416', raised:'#1C1C1F', field:'#1C1C1F',
+      ink:'#F2F2F0', soft:'#9A9AA0', softer:'rgba(154,154,160,0.65)', faint:'rgba(154,154,160,0.32)',
+      line:'#26262A', lineSoft:'rgba(154,154,160,0.16)', heavy:'#34343A',
+      accent:'#C8593B', accentDim:'rgba(200,89,59,0.18)', onAccent:'#0B0B0C',
+      positive:'#5E9B79', warning:'#C7A050',
+      rCard:6, rInput:4, bw:1, dark:true,
+      statusInk:'#F2F2F0', pop:'0 16px 40px rgba(0,0,0,0.6)', navBorder:'1px solid #26262A',
+      cardFill:'#141416', selFill:'#F2F2F0', selInk:'#0B0B0C',
+    };
+    return {
+      bg:'#F4F0E6', surface:'#F4F0E6', raised:'rgba(23,20,15,0.05)', field:'#FCFAF4',
+      ink:'#17140F', soft:'rgba(23,20,15,0.55)', softer:'rgba(23,20,15,0.45)', faint:'rgba(23,20,15,0.3)',
+      line:'#17140F', lineSoft:'rgba(23,20,15,0.18)', heavy:'#17140F',
+      accent:'#C14B2A', accentDim:'rgba(193,75,42,0.12)', onAccent:'#F4F0E6',
+      positive:'#3C7A55', warning:'#B98A2E',
+      rCard:0, rInput:0, bw:1.5, dark:false,
+      statusInk:'#17140F', pop:'5px 5px 0 rgba(23,20,15,0.85)', navBorder:'2px solid #17140F',
+      cardFill:'transparent', selFill:'#17140F', selInk:'#F4F0E6',
+    };
+  }
+
+  // ---------- helpers ----------
+  totals() { let logged=0,total=0; this.state.exercises.forEach(ex=>ex.sets.forEach(s=>{total++; if(s.d)logged++;})); return {logged,total}; }
+  go(id) { this.setState({ tab:id, phase:'logging', chooser:false, edit:null, exMenu:null, cyView:'list', cyMacro:null, draft:null, moreView:'main', exDetail:null, tplDetail:null }); }
+  toggleLog(ei,si) { this.setState(s=>({ exercises: s.exercises.map((x,i)=> i!==ei?x:Object.assign({},x,{sets:x.sets.map((st,j)=> j!==si?st:Object.assign({},st,{d:!st.d}))})) })); }
+  openStep(ei,si,field) { this.setState({ edit:{ei,si,field} }); }
+  stepEdit(dir) {
+    const e=this.state.edit; if(!e) return;
+    const step = e.field==='w' ? (this.state.units==='kg'?2.5:5) : 1;
+    this.setState(s=>({ exercises: s.exercises.map((x,i)=> i!==e.ei?x:Object.assign({},x,{sets:x.sets.map((st,j)=>{
+      if(j!==e.si) return st; const v=Math.max(0,(e.field==='w'?st.w:st.r)+dir*step);
+      return Object.assign({}, st, e.field==='w'?{w:v}:{r:v});
+    })})) }));
+  }
+  addSet(ei){ this.setState(s=>({ exercises:s.exercises.map((x,i)=>{ if(i!==ei)return x; const last=x.sets[x.sets.length-1]||{w:0,r:0}; return Object.assign({},x,{sets:x.sets.concat([{w:last.w,r:last.r,d:false}])}); }), exMenu:null })); }
+  removeExercise(ei){ this.setState(s=>({ exercises:s.exercises.filter((_,i)=>i!==ei), exMenu:null })); }
+  startFeedback(){ this.setState({ phase:'feedback', edit:null, exMenu:null }); }
+  nextWorkout(){
+    const order=['D1','D2','D3','D4','D5'];
+    const idx=order.indexOf(this.state.day);
+    const nextDay=order[Math.min(idx+1,order.length-1)];
+    const cd=(this.state.completedDays||[]).concat([this.state.week+'·'+this.state.day]);
+    this.setState({ completedDays:cd, day:nextDay, exercises:this.defaultExercises(true), phase:'logging', notes:'', feedback:{pain:'none',pump:6,workload:5}, headerOpen:false });
+  }
+  unit(){ return this.state.units.toUpperCase(); }
+
+  // ====================================================================
+  renderVals() {
+    const T = this.t();
+    const rootStyle = { position:'relative', width:'100%', height:'100%', background:T.bg, color:T.ink,
+      fontFamily:"'Archivo', sans-serif", display:'flex', flexDirection:'column', overflow:'hidden', WebkitFontSmoothing:'antialiased' };
+    if (!this.state.loaded) return { rootStyle, statusBar:null, screen:null, tabBar:null, overlay:null };
+    let screen;
+    switch (this.state.tab) {
+      case 'cycles': screen=this.renderCycles(T); break;
+      case 'templates': screen=this.renderTemplates(T); break;
+      case 'exercises': screen=this.renderExercises(T); break;
+      case 'more': screen=this.renderMore(T); break;
+      default: screen=this.renderWorkout(T);
+    }
+    return { rootStyle, statusBar:this.renderStatus(T), screen, tabBar:this.renderTabBar(T), overlay:this.renderOverlay(T) };
+  }
+
+  // ---------- status bar ----------
+  renderStatus(T){ const h=React.createElement; const c=T.statusInk;
+    const icons=h('div',{style:{display:'flex',alignItems:'center',gap:'7px'}},
+      h('svg',{key:'s',width:18,height:11,viewBox:'0 0 18 11'},
+        h('rect',{key:1,x:0,y:7,width:3,height:4,rx:0.6,fill:c}),
+        h('rect',{key:2,x:4.5,y:4.5,width:3,height:6.5,rx:0.6,fill:c}),
+        h('rect',{key:3,x:9,y:2,width:3,height:9,rx:0.6,fill:c}),
+        h('rect',{key:4,x:13.5,y:0,width:3,height:11,rx:0.6,fill:c})),
+      h('svg',{key:'w',width:16,height:11,viewBox:'0 0 16 11'},
+        h('path',{d:'M8 3C10.2 3 12.2 3.9 13.6 5.3L14.7 4.2C13 2.5 10.6 1.4 8 1.4C5.4 1.4 3 2.5 1.3 4.2L2.4 5.3C3.8 3.9 5.8 3 8 3Z',fill:c}),
+        h('circle',{cx:8,cy:9.4,r:1.4,fill:c})),
+      h('svg',{key:'b',width:25,height:12,viewBox:'0 0 25 12'},
+        h('rect',{x:0.5,y:0.5,width:21,height:11,rx:3,stroke:c,strokeOpacity:0.4,fill:'none'}),
+        h('rect',{x:2,y:2,width:18,height:8,rx:1.6,fill:c}),
+        h('path',{d:'M23 4V8C23.7 7.7 24.2 7 24.2 6C24.2 5 23.7 4.3 23 4Z',fill:c,fillOpacity:0.4})));
+    return h('div',{style:{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'15px 26px 5px',position:'relative',zIndex:6}},
+      h('div',{style:{fontSize:'15px',fontWeight:700,letterSpacing:'0.01em',fontFamily:'-apple-system, system-ui',color:c}},'9:41'),
+      icons);
+  }
+
+  // ---------- tab bar ----------
+  renderTabBar(T){ const h=React.createElement;
+    const tabs=[['workout','WORKOUT'],['cycles','CYCLES'],['templates','TEMPLATES'],['exercises','EXERCISES'],['more','MORE']];
+    return h('div',{style:{flexShrink:0,borderTop:T.navBorder,background:T.bg,display:'flex',padding:'11px 4px 26px',position:'relative',zIndex:5}},
+      tabs.map(([id,label])=>{ const active=this.state.tab===id;
+        return h('div',{key:id,onClick:()=>this.go(id),style:{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'4px',fontSize:'8.5px',letterSpacing:'0.09em',fontWeight:active?700:500,color:active?T.ink:T.softer,cursor:'pointer'}},
+          active?h('span',{key:'m',style:{width:'5px',height:'5px',background:T.accent,display:'inline-block'}}):null, label);
+      }));
+  }
+
+  // ---------- workout ----------
+  renderWorkout(T){ const h=React.createElement;
+    const list=h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'2px 20px 14px'}},
+      this.state.exercises.map((ex,ei)=>this.renderExBlock(T,ex,ei)),
+      this.state.exercises.length===0?h('div',{style:{padding:'40px 0',textAlign:'center',color:T.softer,fontSize:'13px'}},'No exercises'):null);
+    const tt=this.totals(); const remaining=tt.total-tt.logged;
+    const finish=h('div',{style:{flexShrink:0,padding:'10px 20px',borderTop:'1px solid '+T.lineSoft,background:T.bg}},
+      h('div',{onClick:()=>this.startFeedback(),style:{height:'52px',background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',gap:'9px',fontSize:'13px',fontWeight:700,letterSpacing:'0.12em',cursor:'pointer',borderRadius:T.rInput+'px'}},
+        remaining>0?('FINISH — '+remaining+' SET'+(remaining===1?'':'S')+' LEFT'):'FINISH WORKOUT',
+        h('span',{style:{fontSize:'15px'}},'→')));
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}}, this.renderDayHeader(T), list, finish);
+  }
+
+  renderExBlock(T,ex,ei){ const h=React.createElement;
+    const iconBtn=(child,onClick)=>h('div',{onClick,style:{width:28,height:28,border:T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.35)'),borderRadius:T.rInput+'px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:T.ink}},child);
+    const head=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+      h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.16em',color:T.soft}}, this.pad(ei+1)+' — '+ex.g),
+      h('div',{style:{display:'flex',gap:'7px'}},
+        iconBtn(h('svg',{width:13,height:13,viewBox:'0 0 14 14'},h('circle',{cx:7,cy:7,r:5.5,fill:'none',stroke:T.ink,strokeWidth:1.3}),h('path',{d:'M7 4v3l2 1.5',fill:'none',stroke:T.ink,strokeWidth:1.3})), ()=>this.go('exercises')),
+        iconBtn(h('div',{style:{fontSize:'13px',letterSpacing:'1px',marginTop:'-7px'}},'…'), ()=>this.setState({exMenu:ei}))));
+    const title=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:'2px'}},
+      h('div',{style:{fontSize:'20px',fontWeight:700,letterSpacing:'-0.01em'}}, ex.n),
+      h('div',{style:{fontSize:'9.5px',fontWeight:500,letterSpacing:'0.12em',color:T.softer}}, ex.q));
+    const note=ex.note?h('div',{style:{fontSize:'11px',fontWeight:500,marginTop:'7px',padding:'4px 0 5px 10px',borderLeft:'2px solid '+T.accent,color:T.soft}}, ex.note):null;
+    const colHead=h('div',{style:{display:'grid',gridTemplateColumns:'20px 1fr 1fr 44px',gap:'10px',marginTop:ex.note?'8px':'10px',paddingBottom:'5px',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.25)'),fontSize:'9px',fontWeight:600,letterSpacing:'0.14em',color:T.softer}},
+      h('div',null),h('div',{style:{textAlign:'center'}},this.unit()),h('div',{style:{textAlign:'center'}},'REPS'),h('div',{style:{textAlign:'center'}},'LOG'));
+    const rows=ex.sets.map((st,si)=>this.renderSetRow(T,ex,ei,st,si));
+    return h('div',{key:ei,style:{marginTop:ei===0?'14px':'20px'}}, head, title, note, colHead, rows);
+  }
+
+  renderSetRow(T,ex,ei,st,si){ const h=React.createElement;
+    const isNext = !st.d && ex.sets.findIndex(x=>!x.d)===si;
+    const numBox=(field,val)=>{
+      let style={ height:'32px',borderRadius:T.rInput+'px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',fontWeight:600,fontVariantNumeric:'tabular-nums',cursor:'pointer',transition:'background .12s' };
+      if(st.d){ style.background=T.dark?T.raised:'rgba(23,20,15,0.05)'; style.border=T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.3)'); style.color=T.soft; }
+      else if(isNext){ style.background=T.field; style.border=(T.bw+0.0)+'px solid '+T.accent; style.color=T.ink; }
+      else { style.background=T.dark?'transparent':T.field; style.border=T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.25)'); style.color=T.ink; }
+      return h('div',{onClick:()=>this.openStep(ei,si,field),style},this.fmt(val,field));
+    };
+    let chk;
+    if(st.d) chk=h('div',{style:{width:21,height:21,background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',borderRadius:T.dark?'5px':'0',cursor:'pointer'}},'✓');
+    else if(isNext) chk=h('div',{style:{width:21,height:21,border:'2px solid '+T.accent,boxSizing:'border-box',borderRadius:T.dark?'5px':'0',cursor:'pointer'}});
+    else chk=h('div',{style:{width:21,height:21,border:'2px solid '+(T.dark?T.heavy:'rgba(23,20,15,0.35)'),boxSizing:'border-box',borderRadius:T.dark?'5px':'0',cursor:'pointer'}});
+    return h('div',{key:si,style:{display:'grid',gridTemplateColumns:'20px 1fr 1fr 44px',gap:'10px',alignItems:'center',padding:'4px 0',borderBottom:'1px solid '+T.lineSoft}},
+      h('div',{style:{color:T.faint,fontSize:'14px',textAlign:'center',lineHeight:0.5}},'⋮'),
+      numBox('w',st.w), numBox('r',st.r),
+      h('div',{onClick:()=>this.toggleLog(ei,si),style:{display:'flex',justifyContent:'center',alignItems:'center',height:'44px',cursor:'pointer'}}, chk));
+  }
+
+  renderDayHeader(T){ const h=React.createElement;
+    const open=this.state.headerOpen, selWeek=this.state.week, selDay=this.state.day;
+    const weeks=[{w:'W1',s:'past',t:'3 RIR'},{w:'W2',s:'current',t:'2 RIR'},{w:'W3',s:'future',t:'1 RIR'},{w:'W4',s:'future',t:'0 RIR'},{w:'DL',s:'deload',t:'DELOAD'}];
+    const dayData={ W1:[['D1','done'],['D2','done'],['D3','done'],['D4','done'],['D5','done']],
+      W2:[['D1','current'],['D2','todo'],['D3','todo'],['D4','todo'],['D5','todo']],
+      W3:[['D1','todo'],['D2','todo'],['D3','todo'],['D4','todo'],['D5','todo']],
+      W4:[['D1','todo'],['D2','todo'],['D3','todo'],['D4','todo'],['D5','todo']],
+      DL:[['D1','todo'],['D2','todo'],['D3','todo']] };
+    const cur=weeks.find(x=>x.w===selWeek)||weeks[1];
+    const days=dayData[selWeek]||[];
+    const lastIdx=weeks.length-1;
+    const weekTabs=weeks.map((wk,i)=>{ const isSel=wk.w===selWeek;
+      const st={flex:wk.w==='DL'?'0.82':'1',height:'36px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',letterSpacing:'0.08em',position:'relative',cursor:'pointer',borderRight:i<lastIdx?'1px solid '+T.lineSoft:'none',transition:'background .15s,color .15s'};
+      if(isSel){st.background=T.selFill;st.color=T.selInk;st.fontWeight=700;}
+      else if(wk.s==='past'){st.color=T.soft;st.fontWeight=600;}
+      else {st.color=T.softer;st.fontWeight=wk.s==='deload'?600:500;}
+      const dot=wk.s==='current'?h('div',{key:'c',style:{position:'absolute',top:'5px',right:'5px',width:'5px',height:'5px',background:T.accent,borderRadius:'50%'}}):null;
+      return h('div',{key:wk.w,onClick:()=>this.setState({week:wk.w}),style:st},wk.w,dot);
+    });
+    const dayChips=days.map(([d,s])=>{ const isSel=d===selDay; const isActual=selWeek==='W2'&&d==='D1';
+      const st={flex:'1',height:'30px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10.5px',letterSpacing:'0.04em',position:'relative',cursor:'pointer',transition:'background .15s,color .15s',border:T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.22)'),borderRadius:T.rInput+'px',color:T.softer,fontWeight:500};
+      if(isSel){st.background=T.selFill;st.color=T.selInk;st.fontWeight=700;st.border=T.bw+'px solid '+T.selFill;}
+      else if(s==='done'){st.background=T.dark?T.raised:'rgba(23,20,15,0.07)';st.color=T.soft;st.fontWeight=600;}
+      const dot=(isActual&&!isSel)?h('div',{key:'c',style:{position:'absolute',top:'4px',right:'4px',width:'5px',height:'5px',background:T.accent,borderRadius:'50%'}}):null;
+      const tick=(s==='done'&&!isSel)?h('span',{key:'t',style:{marginLeft:'3px',fontSize:'8px',opacity:0.6}},'✓'):null;
+      return h('div',{key:d,onClick:()=>this.setState({day:d}),style:st},d,tick,dot);
+    });
+    const selector=h('div',{style:{border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',overflow:'hidden'}},
+      h('div',{style:{display:'flex'}},weekTabs),
+      h('div',{style:{borderTop:T.bw+'px solid '+T.line,padding:'11px',background:T.dark?T.raised:'rgba(23,20,15,0.03)'}},
+        h('div',{style:{display:'flex',gap:'5px'}},dayChips)));
+    const panel=h('div',{style:{display:'grid',gridTemplateRows:open?'1fr':'0fr',opacity:open?1:0,marginTop:open?'14px':'0px',transition:'grid-template-rows .3s ease, opacity .25s ease, margin-top .3s ease'}},
+      h('div',{style:{overflow:'hidden',minHeight:0}},selector));
+    // live progress for active day
+    const tt=this.totals();
+    let dateLine,logged,total;
+    if(selWeek==='W2'&&selDay==='D1'){dateLine='MON 12 JUN';logged=tt.logged;total=tt.total;}
+    else { const ds=(days.find(([d])=>d===selDay)||[])[1]; if(ds==='done'){dateLine='COMPLETED';logged=14;total=14;}else{dateLine='SCHEDULED';logged=0;total=14;} }
+    const pct=total?Math.round((logged/total)*100):0;
+    const rir=cur.s==='deload'?'DELOAD WEEK':('TARGET '+cur.t);
+    const coord=h('div',{style:{marginTop:'15px'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-end',paddingBottom:'10px'}},
+        h('div',{style:{fontSize:'44px',fontWeight:800,letterSpacing:'-0.03em',lineHeight:0.9}},selWeek+'·'+selDay),
+        h('div',{style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.1em',color:T.soft,textAlign:'right',lineHeight:1.5}},
+          dateLine,h('br',{key:'b'}),h('span',{key:'r',style:{color:T.accent,fontWeight:700}},rir))),
+      h('div',{style:{position:'relative',height:'3px',background:T.dark?T.heavy:T.ink}},
+        h('div',{style:{position:'absolute',left:0,top:0,bottom:0,width:pct+'%',background:T.accent,transition:'width .3s ease'}})));
+    const chevron=h('svg',{width:12,height:12,viewBox:'0 0 12 12',style:{display:'block',transform:open?'rotate(180deg)':'rotate(0deg)',transition:'transform .25s ease'}},
+      h('path',{d:'M2.5 4.5 L6 8 L9.5 4.5',fill:'none',stroke:T.ink,strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}));
+    const brand=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+      h('div',{onClick:()=>this.setState(s=>({headerOpen:!s.headerOpen})),style:{display:'flex',alignItems:'center',gap:'7px',cursor:'pointer'}},
+        h('div',{style:{fontSize:'13px',fontWeight:600,letterSpacing:'0.22em'}},'workout'),chevron),
+      h('div',{style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.1em',color:T.soft}},"GARRON JUN '26 — BULK"));
+    return h('div',{style:{flexShrink:0,padding:'4px 20px 14px',background:T.bg,position:'relative',zIndex:2,boxShadow:T.dark?'0 10px 18px -14px #000':'0 8px 16px -12px rgba(23,20,15,0.55)'}},
+      brand,panel,coord);
+  }
+
+  // ---------- cycles : engine ----------
+  durWeeks(mo){ return {3:13,6:26,12:52}[mo] || Math.round(mo*4.345); }
+  mesoCount(weeks,len){ return Math.max(1, Math.floor(weeks/len)); }
+  phaseSeq(goal,n){ const A='Accumulation',I='Intensification',P='Peak',M='Maintenance';
+    if(n<=0) return [];
+    if(goal==='Maintain') return Array(n).fill(M);
+    if(goal==='Cut') return Array.from({length:n},(_,i)=> i===n-1?I : (i%2?M:A));
+    if(goal==='Strength') return Array.from({length:n},(_,i)=>{const f=n>1?i/(n-1):0; return f<0.34?A:(f<0.84?I:P);});
+    return Array.from({length:n},(_,i)=>{const f=n>1?i/(n-1):0; return f<0.45?A:(f<0.85?I:P);});
+  }
+  targetFor(goal,weeks){ const m=weeks/4.345, R=x=>Math.max(1,Math.round(x));
+    if(goal==='Hypertrophy') return {band:'+'+R(m*0.6)+'–'+R(m*1.0)+' lb lean mass', rate:'≈ +0.6–1.0 lb / month', basis:'Intermediate · 198 lb · 3 yr training'};
+    if(goal==='Strength') return {band:'+'+R(m*1)+'–'+R(m*2)+'% on key lifts', rate:'≈ +1–2% / month', basis:'Intermediate · 3 main lifts'};
+    if(goal==='Cut') return {band:'\u2212'+R(m*2.2)+' to \u2212'+R(m*3.4)+' lb fat', rate:'≈ −2.2–3.4 lb / month', basis:'Strength retained · 198 lb start'};
+    return {band:'+'+R(m*0.6)+'\u2013'+R(m*1.0)+'% work capacity', rate:'≈ +0.6–1.0% / month', basis:'Hold composition · recover'};
+  }
+  defaultMacros(){ return [
+    { id:'26-1', code:'26-1', sub:'Pro Card', goal:'Hypertrophy', span:"JAN \u2014 AUG '26", active:true, months:7,
+      target:{metric:'LEAN MASS', big:'+8\u201311 lb', over:'over 7 mo', rate:'\u2248 +1.1\u20131.6 lb / month', chips:['4 YR TRAINING AGE','198 LB','INTERMEDIATE']},
+      ov:{label:'PROGRESS \u00B7 LEAN MASS', delta:'+4.3 LB \u00B7 ON TRACK', fill:43, marker:80, start:"JAN \u00B7 178 LB", end:"AUG \u00B7 ~187 LB"},
+      stats:[['+14%','EST. STRENGTH \u00B7 KEY LIFTS'],['312k','TOTAL VOLUME \u00B7 LB'],['38','SESSIONS LOGGED'],['94%','ADHERENCE']],
+      mesos:[ {name:'Foundation \u2014 Apr \u201926',phase:'Accumulation',wk:5,days:4,status:'done',seg:100},
+              {name:'Garron Jun \u201926 \u2014 Bulk',phase:'Intensification',wk:5,days:4,status:'current',pos:'W2\u00B7D1',seg:40},
+              {name:null,phase:'Intensification',wk:5,days:4,status:'unplanned'},
+              {name:null,phase:'Peak',wk:5,days:4,status:'unplanned'} ] },
+    { id:'25-2', code:'25-2', sub:'Foundation', goal:'Strength', span:"SEP \u2014 DEC '25", complete:true, months:4,
+      target:{metric:'KEY LIFTS', big:'+9%', over:'over 4 mo', rate:'\u2248 +2\u20133% / month', chips:['4 YR TRAINING AGE','198 LB','INTERMEDIATE']},
+      ov:{label:'PROGRESS \u00B7 KEY LIFTS', delta:'+9% \u00B7 COMPLETE', fill:100, marker:100, start:"SEP \u00B7 +0%", end:"DEC \u00B7 +9%"},
+      stats:[['+9.1%','EST. STRENGTH \u00B7 KEY LIFTS'],['176k','TOTAL VOLUME \u00B7 LB'],['51','SESSIONS LOGGED'],['100%','ADHERENCE']],
+      mesos:[ {name:'Base \u2014 Sep \u201925',phase:'Accumulation',wk:5,days:4,status:'done',seg:100},
+              {name:'Build \u2014 Oct \u201925',phase:'Intensification',wk:5,days:4,status:'done',seg:100},
+              {name:'Peak \u2014 Nov \u201925',phase:'Peak',wk:5,days:4,status:'done',seg:100} ] },
+  ]; }
+  standaloneMesos(){ return [ {name:'Early Summer Girl Squad',sub:'5 WK · 2 D/WK',status:'done'},
+                              {name:'Madeline\u2019s 2-Day Spring',sub:'5 WK · 2 D/WK',status:'planned'} ]; }
+  macroById(id){ return (this.state.macros||[]).find(m=>m.id===id); }
+  openOverview(id){ this.setState({cyView:'overview', cyMacro:id}); }
+  toggleMacro(id){ this.setState(s=>({expandedMacro:s.expandedMacro===id?null:id})); }
+  startCreate(){ this.setState({chooser:false, cyView:'create', draft:{name:'Macrocycle 26-2', goal:'Hypertrophy', mo:6, len:5}}); }
+  setDraft(patch){ this.setState(s=>({draft:Object.assign({},s.draft,patch)})); }
+  createMacro(){ const d=this.state.draft; const weeks=this.durWeeks(d.mo); const n=this.mesoCount(weeks,d.len);
+    const phases=this.phaseSeq(d.goal,n); const tgt=this.targetFor(d.goal,weeks); const id='m'+Date.now(); const mo=Math.round(weeks/4.345);
+    const metric={Hypertrophy:'LEAN MASS',Strength:'KEY LIFTS',Cut:'FAT LOSS',Maintain:'WORK CAPACITY'}[d.goal];
+    const macro={ id, code:(d.name.replace(/^macrocycle\s*/i,'').trim()||'NEW'), sub:d.goal, goal:d.goal, span:'STARTS JUL \u201926', fresh:true, months:mo,
+      target:{metric, big:tgt.band, over:'over '+mo+' mo', rate:tgt.rate, chips:['4 YR TRAINING AGE','198 LB','INTERMEDIATE']},
+      ov:{label:'PROGRESS \u00B7 '+metric, delta:'NOT STARTED', fill:0, marker:0, start:'JUL \u00B7 BASELINE', end:'+'+mo+' MO \u00B7 TARGET'},
+      stats:[['\u2014','EST. STRENGTH \u00B7 KEY LIFTS'],['0','TOTAL VOLUME \u00B7 LB'],['0','SESSIONS LOGGED'],['\u2014','ADHERENCE']],
+      mesos:phases.map(p=>({name:null,phase:p,wk:d.len,days:4,status:'unplanned'})) };
+    this.setState(s=>({macros:[macro].concat(s.macros), cyView:'overview', cyMacro:id, draft:null, expandedMacro:id}));
+  }
+  planMeso(id,idx){ this.setState(s=>({macros:s.macros.map(m=> m.id!==id?m:Object.assign({},m,{mesos:m.mesos.map((ms,i)=> i!==idx?ms:Object.assign({},ms,{status:'planned', name:'Mesocycle '+(i+1), seg:0}))}))})); }
+  openMeso(macroId,idx){ this.setState({cyView:'meso', cyMacro:macroId, cyMeso:idx, mesoTab:'balance'}); }
+  openExercise(ex){ const found=this.exData().find(x=>x.n===ex.n)||{n:ex.n,g:ex.g,q:ex.q}; this.setState({tab:'exercises',exDetail:found,exTab:'overview',exMenu:null,edit:null}); }
+  startCreateMeso(macroId,idx){ this.setState({mesoModal:{macroId,idx}, mesoDraft:{name:"Garron Jul '26 \u2014 Bulk II", weeks:5}}); }
+  confirmCreateMeso(){ const mm=this.state.mesoModal; if(mm){ this.planMeso(mm.macroId,mm.idx); } this.setState({mesoModal:null, mesoDraft:null}); }
+
+  backBar(T,kicker,title,onBack){ const h=React.createElement;
+    return h('div',{style:{flexShrink:0,padding:'4px 20px 12px',borderBottom:'1px solid '+T.lineSoft,background:T.bg}},
+      h('div',{onClick:onBack,style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',color:T.ink}},
+        h('div',{style:{fontSize:'19px',lineHeight:1,marginTop:'-2px'}},'\u2039'),
+        h('div',{style:{fontSize:'10px',fontWeight:700,letterSpacing:'0.14em',color:T.soft}},kicker)),
+      h('div',{style:{fontSize:'26px',fontWeight:800,letterSpacing:'-0.02em',marginTop:'8px'}},title));
+  }
+
+  renderCycles(T){ if(this.state.cyView==='create') return this.renderCreateMacro(T); if(this.state.cyView==='meso') return this.renderMesoStats(T); if(this.state.cyView==='overview') return this.renderMacroOverview(T); return this.renderCycleList(T); }
+
+  // ---------- cycles : list ----------
+  renderCycleList(T){ const h=React.createElement; const macros=this.state.macros||[];
+    const mesoRows=(macro)=> macro.mesos.map((ms,i)=>{ const planned=ms.status!=='unplanned';
+      const idxLabel='MESO '+(i+1)+' · '+ms.phase.toUpperCase()+' · '+ms.wk+' WK'+(ms.days?(' · '+ms.days+' D/WK'):'');
+      const onClick= ms.status==='unplanned'?null : ()=>this.openMeso(macro.id,i);
+      return h('div',{key:i,onClick,style:{padding:'11px 0',borderBottom:'1px solid '+T.lineSoft,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:onClick?'pointer':'default'}},
+        h('div',null,
+          h('div',{style:{fontSize:'14px',fontWeight:700,color:planned?T.ink:T.softer}}, ms.name||('Mesocycle '+(i+1))),
+          h('div',{style:{fontSize:'9.5px',fontWeight:500,letterSpacing:'0.08em',color:T.softer,marginTop:'3px'}}, planned?idxLabel:('SUGGESTED \u2014 '+ms.phase.toUpperCase()+' · NOT PLANNED'))),
+        ms.status==='unplanned'
+          ? h('div',{onClick:(e)=>{e.stopPropagation();this.startCreateMeso(macro.id,i);},style:{border:'1.5px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.5)'),fontSize:'9px',fontWeight:700,letterSpacing:'0.1em',padding:'6px 10px',color:T.soft,borderRadius:T.rInput+'px',cursor:'pointer'}},'+ PLAN')
+          : ms.status==='current'?h('div',{style:{border:'1.5px solid '+T.accent,color:T.accent,fontSize:'8.5px',fontWeight:700,letterSpacing:'0.12em',padding:'3px 7px',borderRadius:T.rInput+'px'}},'CURRENT')
+          : ms.status==='done'?h('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},h('div',{style:{fontSize:'9px',fontWeight:700,letterSpacing:'0.1em',color:T.softer}},'STATS'),h('div',{style:{width:20,height:20,background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',borderRadius:T.dark?'5px':'0'}},'✓'))
+          : h('div',{style:{fontSize:'9px',fontWeight:700,letterSpacing:'0.1em',color:T.soft}},'STATS ›'));
+    });
+    const macroBlock=(macro,i)=>{ const exp=this.state.expandedMacro===macro.id; const dim=!!macro.complete;
+      return h('div',{key:macro.id,style:{borderTop:T.bw+'px solid '+T.line,marginTop:i===0?'16px':'0'}},
+        h('div',{style:{display:'flex',alignItems:'flex-start',gap:'10px',padding:'13px 0 10px'}},
+          h('div',{onClick:()=>this.toggleMacro(macro.id),style:{fontSize:'10px',marginTop:'4px',color:dim?T.soft:T.ink,cursor:'pointer'}},exp?'\u25BC':'\u25B6'),
+          h('div',{style:{flex:1}},
+            h('div',{onClick:()=>this.openOverview(macro.id),style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',cursor:'pointer'}},
+              h('div',{style:{fontSize:'14px',fontWeight:800,letterSpacing:'0.03em',color:dim?T.soft:T.ink}},'MACROCYCLE '+macro.code+(macro.sub?(' \u00B7 '+macro.sub.toUpperCase()):'')),
+              h('div',{style:{fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',color:T.softer}},macro.span)),
+            h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'5px'}},
+              h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.soft}},'GOAL '+macro.goal.toUpperCase()+' · '+macro.mesos.length+' MESOCYCLES'+(macro.complete?' · COMPLETE':'')),
+              h('div',{onClick:(e)=>{e.stopPropagation();this.openOverview(macro.id);},style:{fontSize:'9px',fontWeight:700,letterSpacing:'0.1em',color:T.ink,borderBottom:'1.5px solid '+T.ink,cursor:'pointer'}},'OVERVIEW \u203A')))),
+        exp?h('div',{style:{marginLeft:'4px',borderLeft:'2px solid '+(T.dark?T.heavy:T.ink),paddingLeft:'14px',marginBottom:'12px'}}, mesoRows(macro)):null);
+    };
+    const standalone=h('div',{style:{borderTop:T.bw+'px solid '+T.line}},
+      h('div',{style:{fontSize:'9px',fontWeight:600,letterSpacing:'0.16em',color:T.softer,padding:'12px 0 2px'}},'STANDALONE \u2014 NO MACROCYCLE'),
+      this.standaloneMesos().map((ms,i)=>h('div',{key:i,style:{padding:'11px 0',borderBottom:i<this.standaloneMesos().length-1?'1px solid '+T.lineSoft:'none',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+        h('div',null,h('div',{style:{fontSize:'14px',fontWeight:700}},ms.name),
+          h('div',{style:{fontSize:'9.5px',fontWeight:500,letterSpacing:'0.08em',color:T.soft,marginTop:'3px'}},ms.sub)),
+        ms.status==='done'?h('div',{style:{width:20,height:20,background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',borderRadius:T.dark?'5px':'0'}},'\u2713')
+          :h('div',{style:{width:20,height:20,border:'1.5px solid '+(T.dark?T.heavy:'rgba(23,20,15,0.35)'),boxSizing:'border-box',borderRadius:T.dark?'5px':'0'}}))));
+    return h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'24px 20px 20px'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+        h('div',{style:{fontSize:'32px',fontWeight:800,letterSpacing:'-0.02em'}},'cycles'),
+        h('div',{onClick:()=>this.setState({chooser:true}),style:{border:T.bw+'px solid '+T.line,fontSize:'11px',fontWeight:700,letterSpacing:'0.1em',padding:'9px 14px',cursor:'pointer',borderRadius:T.rInput+'px'}},'+ NEW')),
+      macros.map((m,i)=>macroBlock(m,i)), standalone);
+  }
+
+  // ---------- cycles : create engine (2.3) ----------
+  renderCreateMacro(T){ const h=React.createElement; const d=this.state.draft||{name:'',goal:'Hypertrophy',mo:6,len:5};
+    const weeks=this.durWeeks(d.mo); const n=this.mesoCount(weeks,d.len); const tgt=this.targetFor(d.goal,weeks); const mo=Math.round(weeks/4.345);
+    const metricWord={Hypertrophy:'lean mass',Strength:'key lifts',Cut:'fat loss',Maintain:'work capacity'}[d.goal];
+    const label=(t,right)=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:'16px'}},
+      h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.14em',color:T.softer}},t),
+      right?h('div',{style:{fontSize:'9px',fontWeight:500,letterSpacing:'0.06em',color:T.softer}},right):null);
+    const cell=(txt,sel,onClick,extra)=>h('div',{onClick,style:Object.assign({height:'40px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10.5px',fontWeight:sel?700:600,letterSpacing:'0.08em',cursor:'pointer',borderRadius:T.rInput+'px',background:sel?T.selFill:'transparent',color:sel?T.selInk:T.soft,border:sel?'none':T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.35)')},extra||{})},txt);
+    const strip=Array.from({length:n},(_,i)=>h('div',{key:i,style:{flex:1,height:'30px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'8px',fontWeight:i===0?700:600,letterSpacing:'0.04em',borderRadius:T.rInput+'px',background:i===0?T.selFill:'transparent',color:i===0?T.selInk:T.softer,border:i===0?'none':'1.5px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.4)')}},'M'+(i+1)));
+    const engine=h('div',{style:{marginTop:'18px',border:T.bw+'px solid '+T.line,background:T.field,padding:'14px 15px',borderRadius:T.rCard+'px'}},
+      h('div',{style:{fontSize:'9.5px',fontWeight:700,letterSpacing:'0.14em',color:T.accent}},'YOUR TARGET'),
+      h('div',{style:{display:'flex',alignItems:'baseline',gap:'8px',marginTop:'6px'}},
+        h('div',{style:{fontSize:'30px',fontWeight:800,letterSpacing:'-0.02em',lineHeight:1}},tgt.band),
+        h('div',{style:{fontSize:'12px',fontWeight:600,color:T.soft}}, metricWord+' \u00B7 '+mo+' mo')),
+      h('div',{style:{fontSize:'11px',fontWeight:600,color:T.accent,marginTop:'6px',letterSpacing:'0.01em'}},tgt.rate),
+      h('div',{style:{fontSize:'11px',lineHeight:1.5,color:T.soft,marginTop:'7px'}}, mo+' months at '+d.len+'-week blocks fits ',h('strong',{style:{color:T.ink}},n+' mesocycles'),'. We\u2019ve spaced suggested phases \u2014 you\u2019ll plan each as you reach it.'),
+      h('div',{style:{display:'flex',gap:'4px',marginTop:'12px'}}, strip),
+      h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'6px',fontSize:'8px',fontWeight:600,letterSpacing:'0.06em',color:T.softer}},
+        h('span',null,'ACCUMULATE'),h('span',null,'INTENSIFY'),h('span',null,'PEAK')));
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'4px 20px 14px'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:'2px'}},
+          h('div',{onClick:()=>this.setState({cyView:'list',draft:null}),style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.12em',color:T.soft,cursor:'pointer'}},'\u2039 CYCLES'),
+          h('div',{onClick:()=>this.setState({cyView:'list',draft:null}),style:{fontSize:'14px',color:T.soft,cursor:'pointer'}},'\u2715')),
+        h('div',{style:{fontSize:'30px',fontWeight:800,letterSpacing:'-0.02em',marginTop:'10px'}},'new macrocycle'),
+        h('div',{style:{fontSize:'11px',lineHeight:1.5,color:T.soft,marginTop:'5px'}},'A long-term arc that gives your mesocycles a shared direction.'),
+        label('NAME'),
+        h('input',{value:d.name,onChange:(e)=>this.setDraft({name:e.target.value}),style:{width:'100%',marginTop:'7px',height:'44px',padding:'0 13px',background:T.field,border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',fontFamily:"'Archivo',sans-serif",fontSize:'14px',fontWeight:600,color:T.ink,outline:'none',boxSizing:'border-box'}}),
+        label('GOAL'),
+        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginTop:'7px'}},
+          ['Hypertrophy','Strength','Cut','Maintain'].map(g=>cell(g.toUpperCase(),d.goal===g,()=>this.setDraft({goal:g})))),
+        label('DURATION'),
+        h('div',{style:{display:'flex',gap:'6px',marginTop:'7px'}},
+          [3,6,12].map(o=>h('div',{key:o,style:{flex:1}},cell(o+' MO',d.mo===o,()=>this.setDraft({mo:o}))) ).concat([
+            h('div',{key:'c',style:{flex:1}},cell('CUSTOM',false,null,{border:'1.5px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.4)'),color:T.softer}))])),
+        label('MESOCYCLE LENGTH','incl. deload'),
+        h('div',{style:{display:'flex',gap:'6px',marginTop:'7px'}},
+          [4,5,6].map(o=>h('div',{key:o,style:{flex:1}},cell(o+' WK',d.len===o,()=>this.setDraft({len:o}))))),
+        engine,
+        h('div',{onClick:()=>this.createMacro(),style:{background:T.selFill,color:T.selInk,textAlign:'center',fontSize:'13px',fontWeight:700,letterSpacing:'0.12em',padding:'16px 0',marginTop:'18px',marginBottom:'8px',cursor:'pointer',borderRadius:T.rInput+'px'}},'CREATE MACROCYCLE')));
+  }
+
+  // ---------- cycles : overview (2.2) ----------
+  renderMacroOverview(T){ const h=React.createElement; const m=this.macroById(this.state.cyMacro); if(!m) return this.renderCycleList(T);
+    const badge= m.complete
+      ? h('div',{style:{border:T.bw+'px solid '+(T.dark?T.heavy:'rgba(23,20,15,0.5)'),color:T.soft,fontSize:'9px',fontWeight:700,letterSpacing:'0.12em',padding:'4px 8px',borderRadius:T.rInput+'px'}},'COMPLETE')
+      : h('div',{style:{border:'1.5px solid '+T.accent,color:T.accent,fontSize:'9px',fontWeight:700,letterSpacing:'0.12em',padding:'4px 8px',borderRadius:T.rInput+'px'}}, m.fresh?'PLANNED':'ACTIVE');
+    const head=(t,right)=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:'18px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line,paddingTop:'13px'}},
+      h('div',{style:{fontSize:'9.5px',fontWeight:700,letterSpacing:'0.14em',color:T.softer}},t), right||null);
+    // target card
+    const targetCard=h('div',{style:{marginTop:'16px',border:T.bw+'px solid '+T.line,background:T.field,padding:'14px 15px',borderRadius:T.rCard+'px'}},
+      h('div',{style:{fontSize:'9.5px',fontWeight:700,letterSpacing:'0.14em',color:T.softer}},'REALISTIC TARGET \u00B7 '+m.target.metric),
+      h('div',{style:{display:'flex',alignItems:'baseline',gap:'8px',marginTop:'6px'}},
+        h('div',{style:{fontSize:'34px',fontWeight:800,letterSpacing:'-0.02em',lineHeight:1}},m.target.big),
+        h('div',{style:{fontSize:'12px',fontWeight:600,color:T.soft}},m.target.over)),
+      m.target.rate?h('div',{style:{fontSize:'11px',fontWeight:600,color:T.accent,marginTop:'7px',letterSpacing:'0.01em'}},m.target.rate):null,
+      h('div',{style:{display:'flex',gap:'6px',marginTop:'12px',flexWrap:'wrap'}},
+        m.target.chips.map((c,i)=>h('div',{key:i,style:{border:'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.3)'),fontSize:'8.5px',fontWeight:600,letterSpacing:'0.1em',padding:'4px 8px',color:T.soft,borderRadius:T.rInput+'px'}},c))));
+    // progress bar
+    // timeline
+    const seg=(ms)=>{ if(ms.status==='unplanned') return h('div',{onClick:(e)=>{e.stopPropagation();this.startCreateMeso(m.id,m.mesos.indexOf(ms));},style:{fontSize:'8.5px',fontWeight:700,letterSpacing:'0.08em',color:T.soft,border:'1.5px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.45)'),padding:'4px 7px',borderRadius:T.rInput+'px',cursor:'pointer'}},'+ PLAN');
+      const isCur=ms.status==='current';
+      return h('div',{style:{position:'relative',width:'46px',height:'6px',background:isCur?(T.dark?T.raised:'rgba(23,20,15,0.15)'):'transparent',flexShrink:0}},
+        h('div',{style:{position:'absolute',left:0,top:0,bottom:0,width:(ms.seg||0)+'%',background:isCur?T.accent:T.ink}}));
+    };
+    const timeline=h('div',{style:{marginTop:'11px',display:'flex',flexDirection:'column',gap:'8px'}},
+      m.mesos.map((ms,i)=>{ const planned=ms.status!=='unplanned'; const isCur=ms.status==='current'; const isDone=ms.status==='done';
+        const onClick = planned?()=>this.openMeso(m.id,i):null;
+        const dot=h('div',{style:{width:22,height:22,flexShrink:0,boxSizing:'border-box',borderRadius:T.dark?'6px':'0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:isDone?'11px':'10px',fontWeight:isDone?600:800,
+          background:isDone?T.selFill:'transparent',color:isDone?T.selInk:(isCur?T.accent:T.softer),
+          border:isDone?'none':(isCur?'2px solid '+T.accent:'1.5px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.45)'))}}, isDone?'\u2713':(i+1));
+        const sub= isCur?('MESO '+(i+1)+' \u00B7 '+ms.phase.toUpperCase()+' \u00B7 '+(ms.pos||'W1\u00B7D1'))
+          : isDone?('MESO '+(i+1)+' \u00B7 '+ms.phase.toUpperCase()+' \u00B7 DONE')
+          : planned?('MESO '+(i+1)+' \u00B7 '+ms.phase.toUpperCase()+' \u00B7 PLANNED')
+          : ('SUGGESTED '+ms.phase.toUpperCase()+' \u00B7 UNPLANNED');
+        return h('div',{key:i,onClick,style:{display:'flex',alignItems:'center',gap:'11px',cursor:onClick?'pointer':'default'}}, dot,
+          h('div',{style:{flex:1}},
+            h('div',{style:{fontSize:'13px',fontWeight:700,color:planned?T.ink:T.softer}}, ms.name||('Mesocycle '+(i+1))),
+            h('div',{style:{fontSize:'8.5px',fontWeight:600,letterSpacing:'0.1em',color:isCur?T.accent:T.softer,marginTop:'1px'}}, sub)),
+          seg(ms));
+      }));
+    // stats grid
+    const statsGrid=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:(T.dark?1:1.5)+'px',marginTop:'11px',background:T.line,border:(T.dark?T.bw:1.5)+'px solid '+T.line,borderRadius:T.rCard+'px',overflow:'hidden'}},
+      m.stats.map(([v,k],i)=>h('div',{key:i,style:{background:T.bg,padding:'11px 12px'}},
+        h('div',{style:{fontSize:'22px',fontWeight:800,letterSpacing:'-0.01em',fontVariantNumeric:'tabular-nums'}},v),
+        h('div',{style:{fontSize:'8.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer,marginTop:'2px'}},k))));
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'4px 20px 20px'}},
+        h('div',{onClick:()=>this.setState({cyView:'list',cyMacro:null}),style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.12em',color:T.soft,cursor:'pointer',paddingTop:'2px'}},'\u2039 CYCLES'),
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginTop:'12px'}},
+          h('div',null,
+            h('div',{style:{fontSize:'27px',fontWeight:800,letterSpacing:'-0.02em',lineHeight:1}},'Macrocycle '+m.code),
+            m.sub?h('div',{style:{fontSize:'13px',fontWeight:600,color:T.soft,marginTop:'3px'}},m.sub):null),
+          badge),
+        h('div',{style:{fontSize:'10.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer,marginTop:'10px'}},'GOAL ',h('span',{style:{color:T.ink}},m.goal.toUpperCase()),' \u00B7 '+m.span+' \u00B7 '+m.months+' MONTHS'),
+        targetCard,
+        head('MESOCYCLE TIMELINE'),
+        timeline,
+        head('MACROCYCLE STATS \u00B7 TO DATE', h('div',{style:{fontSize:'9px',fontWeight:700,letterSpacing:'0.08em',color:T.ink,borderBottom:'1.5px solid '+T.ink}},'FULL \u203A')),
+        statsGrid,
+        h('div',{style:{fontSize:'10px',lineHeight:1.45,color:T.soft,marginTop:'9px'}},'Per-meso detail in each meso\u2019s ',h('strong',{style:{color:T.ink}},'STATS'),' tab.'),
+        h('div',{style:{border:T.bw+'px solid '+T.line,textAlign:'center',fontSize:'11px',fontWeight:700,letterSpacing:'0.1em',padding:'13px 0',marginTop:'18px',cursor:'pointer',borderRadius:T.rInput+'px'}},'EDIT MACROCYCLE')));
+  }
+
+  // ---------- cycles : meso stats (4.1-4.3) ----------
+  renderMesoStats(T){ const h=React.createElement; const m=this.macroById(this.state.cyMacro);
+    const idx=this.state.cyMeso; const ms=m&&m.mesos[idx]; if(!ms) return this.renderCycleList(T);
+    const tab=this.state.mesoTab||'balance';
+    const badge= ms.status==='current'?['CURRENT',T.accent] : ms.status==='done'?['DONE',T.soft] : ['PLANNED',T.soft];
+    const sub=(m.code? m.code : '')+' \u00B7 '+(ms.name||('MESO '+(idx+1))).toUpperCase()+' \u00B7 MESO '+(idx+1)+' OF '+m.mesos.length+(ms.status==='current'?' \u00B7 W2 IN PROGRESS':(ms.status==='done'?' \u00B7 COMPLETE':' \u00B7 PLANNED'));
+    const tabBar=h('div',{style:{display:'flex',marginTop:'16px',border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',overflow:'hidden'}},
+      [['balance','BALANCE'],['performance','PERFORMANCE']].map(([id,lbl],i)=>{const on=tab===id;
+        return h('div',{key:id,onClick:()=>this.setState({mesoTab:id}),style:{flex:1,textAlign:'center',fontSize:'10px',fontWeight:on?700:500,letterSpacing:'0.1em',padding:'10px 0',cursor:'pointer',background:on?T.selFill:'transparent',color:on?T.selInk:T.soft,borderLeft:i>0?'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.3)'):'none'}},lbl);}));
+    let body;
+    if(tab==='performance') body=this.mesoPerformance(T);
+    else body=this.mesoBalance(T);
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'4px 20px 24px'}},
+        h('div',{onClick:()=>this.setState({cyView:'overview'}),style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.12em',color:T.soft,cursor:'pointer',paddingTop:'2px'}},'\u2039 '+('Macrocycle '+m.code).toUpperCase()),
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:'12px'}},
+          h('div',{style:{fontSize:'27px',fontWeight:800,letterSpacing:'-0.02em',lineHeight:1}},'Meso stats'),
+          h('div',{style:{border:'1.5px solid '+badge[1],color:badge[1],fontSize:'9px',fontWeight:700,letterSpacing:'0.12em',padding:'4px 8px',borderRadius:T.rInput+'px'}},badge[0])),
+        h('div',{style:{fontSize:'10.5px',fontWeight:500,letterSpacing:'0.1em',color:T.softer,marginTop:'8px'}},sub),
+        tabBar,
+        body));
+  }
+  mesoVolume(T,ms){ const h=React.createElement; const cur=ms.status==='current';
+    const rows=[['BACK',12,6,13,14],['CHEST',10,5,11,12],['QUADS',8,4,9,10],['DELTS',8,4,8,9],['HAMSTRINGS',6,2,7,8],['BICEPS',6,3,6,7],['TRICEPS',6,3,7,8],['GLUTES',4,2,4,5],['CALVES',4,2,4,4]];
+    const tot=['TOTAL',64,31,69,77];
+    const gt='1fr 42px 42px 42px 42px';
+    const cell=(v,kind)=>h('div',{style:{textAlign:'center',fontSize:'13px',fontVariantNumeric:'tabular-nums',fontWeight:kind==='cur'?700:(kind==='future'?500:600),color:kind==='future'?T.softer:(kind==='curtot'?T.accent:T.ink)}},v);
+    return h('div',{style:{marginTop:'18px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line}},
+      h('div',{style:{display:'grid',gridTemplateColumns:gt,gap:'6px',padding:'9px 0 5px',fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.softer}},
+        h('div',null,'SETS / WEEK'),h('div',{style:{textAlign:'center'}},'W1'),h('div',{style:{textAlign:'center',color:T.accent,fontWeight:700}},'\u25CF W2'),h('div',{style:{textAlign:'center'}},'W3'),h('div',{style:{textAlign:'center'}},'W4')),
+      rows.map((r,i)=>h('div',{key:i,style:{display:'grid',gridTemplateColumns:gt,gap:'6px',padding:'8px 0',alignItems:'baseline',borderTop:'1px solid '+T.lineSoft}},
+        h('div',{style:{fontSize:'10.5px',fontWeight:700,letterSpacing:'0.1em'}},r[0]), cell(r[1]), cell(r[2],'cur'), cell(r[3],'future'), cell(r[4],'future'))),
+      h('div',{style:{display:'grid',gridTemplateColumns:gt,gap:'6px',padding:'9px 0 10px',alignItems:'baseline',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line,borderBottom:(T.dark?T.bw:1.5)+'px solid '+T.line}},
+        h('div',{style:{fontSize:'10.5px',fontWeight:700,letterSpacing:'0.1em'}},'TOTAL'), cell(tot[1]), cell(tot[2],'curtot'), cell(tot[3],'future'), cell(tot[4],'future')),
+      h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'8px',fontSize:'9.5px',fontWeight:500,letterSpacing:'0.1em',color:T.softer}},
+        h('span',{style:{color:T.accent,fontWeight:700}},'\u25CF W2 \u2014 31 OF 66 PLANNED SETS'),h('span',null,'W3\u2013W4 = AUTOREGULATED PLAN')));
+  }
+  mesoBalance(T){ const h=React.createElement;
+    const card=(l,v)=>h('div',{style:{flex:1,border:'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.35)'),padding:'10px 12px',borderRadius:T.rInput+'px'}},
+      h('div',{style:{fontSize:'9px',fontWeight:600,letterSpacing:'0.14em',color:T.softer}},l),
+      h('div',{style:{fontSize:'24px',fontWeight:800,marginTop:'4px',fontVariantNumeric:'tabular-nums'}},v),
+      h('div',{style:{fontSize:'8.5px',fontWeight:500,letterSpacing:'0.1em',color:T.softer,marginTop:'2px'}},'SETS / WK'));
+    const bars=[['BACK',100,13],['CHEST',85,11],['QUADS',69,9],['DELTS',62,8],['HAMSTRINGS',54,7],['TRICEPS',54,7],['BICEPS',46,6],['GLUTES',31,4],['CALVES',31,4]];
+    return h('div',null,
+      h('div',{style:{display:'flex',gap:'10px',marginTop:'18px'}}, card('PUSH','26'), card('PULL','19'), card('LEGS','24')),
+      h('div',{style:{marginTop:'18px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line,paddingTop:'10px'}},
+        h('div',{style:{fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.softer,marginBottom:'6px'}},'AVG SETS / WEEK \u2014 PLANNED'),
+        bars.map((b,i)=>h('div',{key:i,style:{display:'grid',gridTemplateColumns:'92px 1fr 30px',gap:'10px',alignItems:'center',padding:'4px 0'}},
+          h('div',{style:{fontSize:'10.5px',fontWeight:700,letterSpacing:'0.1em'}},b[0]),
+          h('div',{style:{height:'14px',background:T.dark?T.raised:'rgba(23,20,15,0.08)'}},h('div',{style:{height:'100%',width:b[1]+'%',background:T.ink}})),
+          h('div',{style:{fontSize:'12px',fontWeight:600,textAlign:'right',fontVariantNumeric:'tabular-nums'}},b[2])))),
+      h('div',{style:{marginTop:'16px',border:'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.35)'),padding:'14px 16px',borderRadius:T.rInput+'px'}},
+        h('div',{style:{fontSize:'10px',fontWeight:700,letterSpacing:'0.14em',color:T.accent}},'BALANCE CHECK'),
+        h('div',{style:{fontSize:'13px',lineHeight:1.55,marginTop:'6px',color:T.ink}},'Push : pull is 1.4 : 1 this meso. Hamstrings carry the lowest volume of your prioritized groups \u2014 autoregulation adds a W3 set if recovery feedback holds.')));
+  }
+  mesoPerformance(T){ const h=React.createElement;
+    const lift=(name,delta,w1,w2)=>h('div',{style:{padding:'10px 0',borderBottom:'1px solid '+T.lineSoft}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},
+        h('div',{style:{fontSize:'14px',fontWeight:700}},name),
+        h('div',{style:{fontSize:'9px',fontWeight:700,letterSpacing:'0.1em',border:T.bw+'px solid '+T.ink,padding:'2px 6px',borderRadius:T.rInput+'px'}},delta)),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'6px',marginTop:'8px'}},
+        h('div',{style:{border:'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.3)'),textAlign:'center',padding:'5px 0',fontSize:'11.5px',fontWeight:600,fontVariantNumeric:'tabular-nums',borderRadius:T.rInput+'px'}},w1),
+        h('div',{style:{border:'2px solid '+T.accent,color:T.accent,boxSizing:'border-box',textAlign:'center',padding:'5px 0',fontSize:'11.5px',fontWeight:700,fontVariantNumeric:'tabular-nums',borderRadius:T.rInput+'px'}},w2),
+        h('div',{style:{border:'1px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.3)'),textAlign:'center',padding:'5px 0',fontSize:'11.5px',color:T.softer,borderRadius:T.rInput+'px'}},'\u2014'),
+        h('div',{style:{border:'1px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.3)'),textAlign:'center',padding:'5px 0',fontSize:'11.5px',color:T.softer,borderRadius:T.rInput+'px'}},'\u2014')));
+    const mbar=(v,label,h2,kind)=>h('div',{style:{flex:1,display:'flex',flexDirection:'column',gap:'4px'}},
+      h('div',{style:{fontSize:'11px',fontWeight:kind==='cur'?700:(kind==='future'?500:700),textAlign:'center',color:kind==='cur'?T.accent:(kind==='future'?T.softer:T.ink),fontVariantNumeric:'tabular-nums'}},v),
+      h('div',{style:{height:'48px',display:'flex',alignItems:'flex-end'}},h('div',{style:{width:'100%',height:h2,boxSizing:'border-box',background:kind==='done'?T.ink:'transparent',border:kind==='cur'?'2px solid '+T.accent:(kind==='future'?'1px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.3)'):'none')}})),
+      h('div',{style:{fontSize:'8.5px',fontWeight:kind==='cur'?700:600,letterSpacing:'0.1em',textAlign:'center',color:kind==='cur'?T.accent:T.softer}},label));
+    return h('div',null,
+      h('div',{style:{marginTop:'18px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line,paddingTop:'9px'}},
+        h('div',{style:{fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.softer}},'TOP SET BY WEEK \u2014 KEY LIFTS \u00B7 LB'),
+        lift('Hack Squat','+10 LB VS W1','240 \u00D7 10','250 \u00D7 8'),
+        lift('Lying Leg Curl','+5 LB VS W1','115 \u00D7 12','120 \u00D7 10'),
+        lift('Incline DB Press','+5 LB VS W1','80 \u00D7 9','85 \u00D7 8')),
+      h('div',{style:{marginTop:'16px'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.softer}},
+          h('span',null,'ACROSS MACROCYCLE \u2014 HACK SQUAT EST. 1RM'),h('span',{style:{color:T.accent,fontWeight:700}},'M2 TO DATE')),
+        h('div',{style:{display:'flex',gap:'8px',alignItems:'stretch',marginTop:'10px'}},
+          mbar('285','M1','72%','done'), mbar('320','M2','84%','cur'), mbar('\u2014','M3','100%','future'), mbar('\u2014','M4','100%','future'))),
+      h('div',{style:{marginTop:'16px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line}},
+        h('div',{style:{fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.softer,paddingTop:'9px'}},'PRS THIS MESO'),
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'10px 0',borderBottom:'1px solid '+T.lineSoft}},
+          h('div',{style:{fontSize:'14px',fontWeight:700,fontVariantNumeric:'tabular-nums'}},'Hack Squat \u2014 250 \u00D7 8'),
+          h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer}},'W2\u00B7D1 \u00B7 ALL-TIME')),
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'10px 0'}},
+          h('div',{style:{fontSize:'14px',fontWeight:700,fontVariantNumeric:'tabular-nums'}},'Lying Leg Curl \u2014 120 \u00D7 10'),
+          h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer}},'W2\u00B7D1 \u00B7 REP PR'))));
+  }
+
+  // ---------- templates ----------
+  tplData(){ return [
+    {cat:'WHOLE BODY',n:'B.Rexx Blueprint',tags:['4 D/WK','FEMALE'],days:['Push','Pull','Legs','Full Body']},
+    {cat:'ARMS & SHOULDERS',n:'3-Day Delt Annihilation',tags:['3 D/WK','MALE'],days:['Delts + Arms','Push Emphasis','Pull Emphasis']},
+    {cat:'UPPER BODY',n:'Bench Press Rep Max Plan',tags:['3 D/WK','MALE'],days:['Bench Focus','Upper Volume','Bench Peak']},
+    {cat:'WHOLE BODY',n:'Janine\u2019s Pro Debut Prep',tags:['4 D/WK','FEMALE'],days:['Lower','Upper','Glute Focus','Full Body']},
+  ]; }
+  renderTemplates(T){ const h=React.createElement;
+    if(this.state.tplDetail) return this.renderTemplateDetail(T,this.state.tplDetail);
+    return h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'24px 20px 20px'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+        h('div',{style:{fontSize:'32px',fontWeight:800,letterSpacing:'-0.02em'}},'templates'),
+        h('div',{style:{border:T.bw+'px solid '+T.line,fontSize:'11px',fontWeight:700,letterSpacing:'0.1em',padding:'9px 14px',cursor:'pointer',borderRadius:T.rInput+'px'}},'+ NEW')),
+      h('input',{value:this.state.tplSearch||'',onChange:(e)=>this.setState({tplSearch:e.target.value}),placeholder:'Search',style:{width:'100%',marginTop:'16px',height:'46px',padding:'0 14px',background:T.field,border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',fontFamily:"'Archivo',sans-serif",fontSize:'14px',color:T.ink,outline:'none',boxSizing:'border-box'}}),
+      h('div',{style:{border:T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.35)'),textAlign:'center',fontSize:'11px',fontWeight:600,letterSpacing:'0.1em',padding:'12px 0',marginTop:'12px',color:T.soft,cursor:'pointer',borderRadius:T.rInput+'px'}},'CONTINUE EDITING DRAFT \u203A'),
+      h('div',{style:{marginTop:'16px',borderTop:T.bw+'px solid '+T.line}},
+        this.tplData().map((tp,i)=>h('div',{key:i,onClick:()=>this.setState({tplDetail:tp}),style:{padding:'15px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.18)'),display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}},
+          h('div',null,
+            h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.14em',color:T.softer}},tp.cat),
+            h('div',{style:{fontSize:'14px',fontWeight:700,marginTop:'3px'}},tp.n),
+            h('div',{style:{display:'flex',gap:'6px',marginTop:'7px'}}, tp.tags.map((tg,j)=>h('span',{key:j,style:{border:T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.4)'),fontSize:'9px',fontWeight:600,letterSpacing:'0.08em',padding:'3px 7px',borderRadius:T.rInput+'px'}},tg)))),
+          h('div',{style:{fontSize:'16px',color:T.faint}},'\u203A')))));
+  }
+  renderTemplateDetail(T,tp){ const h=React.createElement;
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      this.backBar(T,'TEMPLATES',tp.n,()=>this.setState({tplDetail:null})),
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'14px 20px 20px'}},
+        h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.14em',color:T.softer}},tp.cat),
+        h('div',{style:{display:'flex',gap:'6px',marginTop:'10px'}}, tp.tags.map((tg,j)=>h('span',{key:j,style:{border:T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.4)'),fontSize:'9px',fontWeight:600,letterSpacing:'0.08em',padding:'3px 7px',borderRadius:T.rInput+'px',color:T.soft}},tg))),
+        h('div',{style:{fontSize:'9.5px',fontWeight:700,letterSpacing:'0.16em',color:T.softer,marginTop:'22px',borderTop:T.bw+'px solid '+T.line,paddingTop:'13px'}},'PROGRAM'),
+        h('div',{style:{marginTop:'4px'}}, tp.days.map((d,i)=>h('div',{key:i,style:{display:'flex',gap:'12px',alignItems:'center',padding:'13px 0',borderBottom:'1px solid '+T.lineSoft}},
+          h('div',{style:{width:26,height:26,flexShrink:0,borderRadius:T.dark?'6px':'0',border:T.bw+'px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:800}},'D'+(i+1)),
+          h('div',{style:{fontSize:'15px',fontWeight:700}},d)))),
+        h('div',{style:{marginTop:'20px',background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',gap:'9px',fontSize:'13px',fontWeight:700,letterSpacing:'0.1em',padding:'15px 0',cursor:'pointer',borderRadius:T.rInput+'px'}},'USE TEMPLATE \u2192')));
+  }
+
+  // ---------- exercises ----------
+  exData(){ return [
+    {n:'Barbell Hip Thrust',g:'GLUTES',q:'BARBELL',last:'06/12/25'},
+    {n:'Barbell Squat (Sumo)',g:'GLUTES',q:'BARBELL',last:'02/19/26'},
+    {n:'Belt Squat (Wide)',g:'GLUTES',q:'MACHINE',last:'09/14/25'},
+    {n:'Booty Builder Hip Thrust',g:'GLUTES',q:'MACHINE',last:'02/19/26'},
+    {n:'Bulgarian Split Squat',g:'GLUTES',q:'DUMBBELL'},
+    {n:'Cable Kickback',g:'GLUTES',q:'CABLE'},
+    {n:'Hack Squat',g:'QUADS',q:'MACHINE',last:'06/12/25'},
+    {n:'Leg Extension',g:'QUADS',q:'MACHINE',last:'06/12/25'},
+    {n:'Romanian Deadlift',g:'HAMSTRINGS',q:'BARBELL',last:'06/03/25'},
+    {n:'Seated Leg Curl',g:'HAMSTRINGS',q:'MACHINE',last:'06/03/25'},
+    {n:'Cable Pushdown',g:'TRICEPS',q:'CABLE',last:'06/12/25'},
+    {n:'Overhead Cable Ext',g:'TRICEPS',q:'CABLE',last:'05/28/25'},
+    {n:'Incline DB Press',g:'CHEST',q:'DUMBBELL',last:'06/05/25'},
+    {n:'Lat Pulldown',g:'BACK',q:'CABLE',last:'06/08/25'},
+    {n:'DB Lateral Raise',g:'SHOULDERS',q:'DUMBBELL',last:'06/08/25'},
+    {n:'Barbell Curl',g:'BICEPS',q:'BARBELL',last:'06/01/25'},
+  ]; }
+  renderExercises(T){ const h=React.createElement;
+    if(this.state.exDetail) return this.renderExerciseDetail(T,this.state.exDetail);
+    const groups=['ALL','GLUTES','QUADS','HAMSTRINGS','CHEST','BACK','SHOULDERS','TRICEPS','BICEPS'];
+    const types=['ALL','BARBELL','DUMBBELL','MACHINE','CABLE'];
+    const q=(this.state.exSearch||'').trim().toLowerCase();
+    const sel=this.state.exFilter; const selT=this.state.exType||'ALL';
+    const list=this.exData().filter(x=>(sel==='ALL'||x.g===sel)&&(selT==='ALL'||x.q===selT)&&(!q||x.n.toLowerCase().indexOf(q)>=0));
+    const chipRow=(label,opts,value,key)=>h('div',{style:{display:'flex',gap:'8px',marginTop:'10px',alignItems:'center'}},
+      h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.12em',color:T.soft,flexShrink:0,width:'52px'}},label),
+      h('div',{className:'wk-scroll',style:{display:'flex',gap:'7px',overflowX:'auto'}},
+        opts.map(g=>{const on=value===g; return h('div',{key:g,onClick:()=>this.setState({[key]:(on&&g!=='ALL')?'ALL':g}),style:{flexShrink:0,display:'flex',alignItems:'center',gap:'7px',fontSize:'10.5px',fontWeight:on?700:600,letterSpacing:'0.08em',padding:'6px 10px',borderRadius:T.rInput+'px',cursor:'pointer',background:on?T.selFill:'transparent',color:on?T.selInk:T.soft,border:on?'none':T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.4)')}},g,(on&&g!=='ALL')?h('span',{style:{opacity:0.6}},'\u2715'):null);})));
+    const activeCount=(sel!=='ALL'?1:0)+(selT!=='ALL'?1:0);
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      h('div',{style:{flexShrink:0,padding:'24px 20px 12px',background:T.bg}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          h('div',{style:{fontSize:'32px',fontWeight:800,letterSpacing:'-0.02em'}},'exercises'),
+          h('div',{style:{border:T.bw+'px solid '+T.line,fontSize:'11px',fontWeight:700,letterSpacing:'0.1em',padding:'9px 14px',cursor:'pointer',borderRadius:T.rInput+'px'}},'+ NEW')),
+        h('input',{value:this.state.exSearch,onChange:(e)=>this.setState({exSearch:e.target.value}),placeholder:'Search',style:{width:'100%',marginTop:'16px',height:'46px',padding:'0 14px',background:T.field,border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',fontFamily:"'Archivo',sans-serif",fontSize:'14px',color:T.ink,outline:'none',boxSizing:'border-box'}}),
+        chipRow('MUSCLE',groups,sel,'exFilter'),
+        chipRow('EQUIP',types,selT,'exType'),
+        activeCount>0?h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:'10px'}},
+          h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer}}, list.length+' OF '+this.exData().length+' EXERCISES'),
+          h('div',{onClick:()=>this.setState({exFilter:'ALL',exType:'ALL'}),style:{fontSize:'9.5px',fontWeight:700,letterSpacing:'0.1em',color:T.ink,borderBottom:'1.5px solid '+T.ink,cursor:'pointer'}},'CLEAR'+(activeCount>1?' ALL':''))):null),
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'2px 20px 20px'}},
+        h('div',{style:{borderTop:T.bw+'px solid '+T.line,marginTop:'4px'}},
+          list.map((x,i)=>h('div',{key:i,onClick:()=>this.setState({exDetail:x}),style:{padding:'14px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.18)'),display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}},
+            h('div',null,
+              h('div',{style:{fontSize:'16px',fontWeight:700}},x.n),
+              h('div',{style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.1em',color:T.soft,marginTop:'4px'}}, x.g+' \u00B7 '+x.q+(x.last?(' \u00B7 LAST '+x.last):''))),
+            h('div',{style:{fontSize:'16px',color:T.faint}},'\u203A')))),
+        list.length===0?h('div',{style:{padding:'40px 0',textAlign:'center',color:T.softer,fontSize:'13px'}},'No matches'):null));
+  }
+  renderExerciseDetail(T,x){ const h=React.createElement; const tab=this.state.exTab||'overview';
+    const tabs=h('div',{style:{display:'flex',marginTop:'16px',border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',overflow:'hidden'}},
+      [['overview','OVERVIEW'],['history','HISTORY']].map(([id,lbl],i)=>{const on=tab===id; return h('div',{key:id,onClick:()=>this.setState({exTab:id}),style:{flex:1,textAlign:'center',fontSize:'10px',fontWeight:on?700:500,letterSpacing:'0.1em',padding:'10px 0',cursor:'pointer',background:on?T.selFill:'transparent',color:on?T.selInk:T.soft,borderLeft:i>0?'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.3)'):'none'}},lbl);}));
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'4px 20px 24px'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:'2px'}},
+          h('div',{onClick:()=>this.setState({exDetail:null}),style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.12em',color:T.soft,cursor:'pointer'}},'\u2039 EXERCISES'),
+          h('div',{style:{fontSize:'16px',color:T.softer}},'\u22EF')),
+        h('div',{style:{fontSize:'30px',fontWeight:800,letterSpacing:'-0.02em',lineHeight:1,marginTop:'12px'}},x.n),
+        h('div',{style:{fontSize:'10.5px',fontWeight:600,letterSpacing:'0.12em',color:T.softer,marginTop:'8px'}}, x.g+' \u00B7 '+x.q),
+        tabs,
+        tab==='overview'?this.exOverview(T,x):this.exHistory(T)));
+  }
+  exOverview(T,x){ const h=React.createElement;
+    const statCell=(big,small,k)=>h('div',{style:{background:T.bg,padding:'11px 12px'}},
+      h('div',{style:{fontSize:'20px',fontWeight:800,letterSpacing:'-0.01em',fontVariantNumeric:'tabular-nums'}},big,small?h('span',{style:{fontSize:'12px',fontWeight:600,color:T.softer}},' '+small):null),
+      h('div',{style:{fontSize:'8.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer,marginTop:'3px'}},k));
+    const mbar=(v,label,hh,kind)=>h('div',{style:{flex:1,display:'flex',flexDirection:'column',gap:'4px'}},
+      h('div',{style:{fontSize:'11px',fontWeight:kind==='future'?500:700,textAlign:'center',color:kind==='cur'?T.accent:(kind==='future'?T.softer:T.ink),fontVariantNumeric:'tabular-nums'}},v),
+      h('div',{style:{height:'44px',display:'flex',alignItems:'flex-end'}},h('div',{style:{width:'100%',height:hh,boxSizing:'border-box',background:kind==='done'?T.ink:'transparent',border:kind==='cur'?'2px solid '+T.accent:(kind==='future'?'1px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.3)'):'none')}})),
+      h('div',{style:{fontSize:'8.5px',fontWeight:kind==='cur'?700:600,letterSpacing:'0.1em',textAlign:'center',color:kind==='cur'?T.accent:T.softer}},label));
+    const bottom=(v,k,first)=>h('div',{style:{flex:1,borderLeft:first?'none':'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.2)'),paddingLeft:first?0:'14px'}},
+      h('div',{style:{fontSize:'18px',fontWeight:800,fontVariantNumeric:'tabular-nums'}},v),
+      h('div',{style:{fontSize:'8.5px',fontWeight:600,letterSpacing:'0.1em',color:T.softer,marginTop:'2px'}},k));
+    return h('div',null,
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:'14px',paddingBottom:'10px',borderBottom:(T.dark?T.bw:1.5)+'px solid '+T.line}},
+        h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.12em',color:T.softer}},'LAST PERFORMED'),
+        h('div',{style:{fontSize:'11px',fontWeight:700,letterSpacing:'0.06em'}}, x.last? (x.last+' \u00B7 W2\u00B7D2') : 'NEVER LOGGED')),
+      h('div',{style:{fontSize:'9.5px',fontWeight:700,letterSpacing:'0.14em',color:T.softer,marginTop:'16px'}},'ALL-TIME BESTS'),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:(T.dark?1:1.5)+'px',marginTop:'10px',background:T.line,border:(T.dark?T.bw:1.5)+'px solid '+T.line,borderRadius:T.rCard+'px',overflow:'hidden'}},
+        statCell('255','\u00D7 5','WEIGHT PR \u00B7 LB'), statCell('320','lb','EST. 1RM'), statCell('225','\u00D7 14','VOLUME PR \u00B7 3,150 LB'), statCell('4.2k','lb','BEST SESSION VOL')),
+      h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'18px',fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.softer}},
+        h('span',null,'EST. 1RM \u2014 ACROSS 26-1'),h('span',{style:{color:T.accent,fontWeight:700}},'M2 TO DATE')),
+      h('div',{style:{display:'flex',gap:'8px',alignItems:'stretch',marginTop:'10px'}},
+        mbar('285','M1','72%','done'), mbar('320','M2','84%','cur'), mbar('\u2014','M3','100%','future'), mbar('\u2014','M4','100%','future')),
+      h('div',{style:{display:'flex',marginTop:'18px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line,paddingTop:'12px'}},
+        bottom('47','TIMES TRAINED',true), bottom('612k','TOTAL VOLUME \u00B7 LB'), bottom("Sep '24",'FIRST LOGGED')));
+  }
+  exHistory(T){ const h=React.createElement;
+    const sess=(big,date,tag)=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'11px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.15)')}},
+      h('div',{style:{fontSize:'16px',fontWeight:700,fontVariantNumeric:'tabular-nums'}},big, tag?h('span',{style:{border:T.bw+'px solid '+(tag==='DELOAD'?(T.dark?T.heavy:'rgba(23,20,15,0.4)'):T.ink),color:T.ink,fontSize:'8px',fontWeight:700,letterSpacing:'0.1em',padding:'2px 5px',marginLeft:'6px',borderRadius:T.rInput+'px'}},tag):null),
+      h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.1em',color:T.softer,textAlign:'right'}},date));
+    const blockHead=(t,kind)=>h('div',{style:{fontSize:'10px',fontWeight:700,letterSpacing:'0.14em',marginTop:kind===2?'22px':'18px',paddingBottom:'6px',borderBottom:(T.dark?T.bw:1.5)+'px solid '+T.line,color:kind===2?T.softer:T.ink}},t, kind===1?h('span',{style:{color:T.accent}},' \u00B7 CURRENT'):null);
+    return h('div',null,
+      blockHead("GARRON JUN '26 \u2014 BULK",1),
+      sess('245 lb \u00D7 10, 10','W2\u00B7D2 \u2014 10 JUN'),
+      sess('225 lb \u00D7 13, 9','W1\u00B7D4 \u2014 7 JUN'),
+      sess('240 lb \u00D7 10, 10','W1\u00B7D2 \u2014 3 JUN'),
+      blockHead('EARLY SUMMER GIRL SQUAD',2),
+      sess('135 lb \u00D7 8, 8','W5\u00B7D1 \u2014 9 MAY','DELOAD'),
+      sess('225 lb \u00D7 14, 12','W4\u00B7D1 \u2014 2 MAY','REP PR'),
+      sess('205 lb \u00D7 12, 11','W3\u00B7D1 \u2014 26 APR'),
+      h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.1em',color:T.softer,textAlign:'center',padding:'14px 0',cursor:'pointer'}},'12 EARLIER SESSIONS \u203A'));
+  }
+
+  // ---------- more ----------
+  renderMore(T){ const h=React.createElement;
+    if(this.state.moreView==='profile') return this.renderProfile(T);
+    const seg=(opts,val,onPick)=>h('div',{style:{display:'flex',border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',overflow:'hidden'}},
+      opts.map((o,i)=>h('div',{key:o,onClick:()=>onPick(o),style:{padding:'7px 16px',fontSize:'10px',fontWeight:700,letterSpacing:'0.1em',cursor:'pointer',borderLeft:i>0?'1px solid '+T.line:'none',background:val===o?T.selFill:'transparent',color:val===o?T.selInk:T.soft}},o.toUpperCase())));
+    const row=(label,right)=>h('div',{onClick:()=>{},style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.15)'),cursor:'pointer'}},
+      h('div',{style:{fontSize:'14px',fontWeight:600}},label),
+      h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.soft}},right));
+    return h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'24px 20px 20px'}},
+      h('div',{style:{fontSize:'13px',fontWeight:600,letterSpacing:'0.22em'}},'workout'),
+      h('div',{style:{fontSize:'32px',fontWeight:800,letterSpacing:'-0.02em',marginTop:'14px'}},'more'),
+      h('div',{onClick:()=>this.setState({moreView:'profile'}),style:{marginTop:'16px',border:T.bw+'px solid '+T.line,borderRadius:T.rCard+'px',padding:'16px',cursor:'pointer'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          h('div',null,
+            h('div',{style:{fontSize:'20px',fontWeight:800,letterSpacing:'-0.01em'}},'Garron'),
+            h('div',{style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.1em',color:T.soft,marginTop:'4px'}},'34 \u00B7 INTERMEDIATE \u00B7 198 LB \u00B7 5\u203211\u2033')),
+          h('div',{style:{fontSize:'16px',color:T.softer}},'\u203A')),
+        h('div',{style:{display:'flex',gap:'8px',marginTop:'12px',paddingTop:'12px',borderTop:'1px solid '+T.lineSoft,fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.soft}},
+          h('span',null,'TRAINING SINCE \u201921'),h('span',null,'\u00B7'),h('span',null,'312 WORKOUTS LOGGED'))),
+      h('div',{style:{fontSize:'10px',fontWeight:700,letterSpacing:'0.14em',marginTop:'26px',paddingBottom:'6px',borderBottom:T.bw+'px solid '+T.line}},'SETTINGS'),
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.15)')}},
+        h('div',{style:{fontSize:'14px',fontWeight:600}},'Units'),
+        seg(['lb','kg'],this.state.units,(o)=>this.setState({units:o}))),
+      row('AI connector','CLAUDE \u2014 CONNECTED \u203A'),
+      row('Export training data','CSV \u203A'),
+      h('div',{style:{fontSize:'9.5px',fontWeight:500,letterSpacing:'0.12em',color:T.softer,marginTop:'26px'}},'WORKOUT 0.4 (112)'));
+  }
+  renderProfile(T){ const h=React.createElement;
+    const dataRow=(k,v,extra)=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'12px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.15)')}},
+      h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.soft}},k),
+      h('div',{style:{fontSize:'14px',fontWeight:700,fontVariantNumeric:'tabular-nums'}},v, extra?h('span',{style:{fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',color:T.softer,marginLeft:'8px'}},extra):null));
+    const lbl=(t)=>h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.soft,marginTop:'22px'}},t);
+    const exp=['BEGINNER','INTERMEDIATE','ADVANCED'];
+    const equip=[['BARBELL',1],['DUMBBELL',1],['MACHINE',1],['CABLE',1],['BANDS',0],['KETTLEBELL',0]];
+    return h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column'}},
+      h('div',{style:{flexShrink:0,padding:'24px 20px 12px',background:T.bg}},
+        h('div',{onClick:()=>this.setState({moreView:'main'}),style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.12em',color:T.soft,cursor:'pointer'}},'\u2039 MORE'),
+        h('div',{style:{fontSize:'27px',fontWeight:800,letterSpacing:'-0.02em',lineHeight:1,marginTop:'12px'}},'Profile')),
+      h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'2px 20px 24px'}},
+        h('div',{style:{borderTop:T.bw+'px solid '+T.line,marginTop:'6px'}},
+          dataRow('NAME','Garron'), dataRow('AGE','34'), dataRow('HEIGHT','5\u203211\u2033'), dataRow('BODYWEIGHT','198 LB','UPDATED 8 JUN')),
+        lbl('TRAINING EXPERIENCE'),
+        h('div',{style:{display:'flex',marginTop:'8px',border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',overflow:'hidden'}},
+          exp.map((e,i)=>{const on=e==='INTERMEDIATE'; return h('div',{key:e,style:{flex:1,textAlign:'center',fontSize:'10px',fontWeight:on?700:500,letterSpacing:'0.1em',padding:'10px 0',color:on?T.selInk:T.soft,background:on?T.selFill:'transparent',borderLeft:i>0?'1px solid '+T.line:'none'}},e);})),
+        h('div',{style:{fontSize:'11px',fontWeight:500,color:T.soft,marginTop:'7px',lineHeight:1.5}},'Drives starting volumes and how aggressively autoregulation ramps.'),
+        lbl('EQUIPMENT ACCESS'),
+        h('div',{style:{display:'flex',flexWrap:'wrap',gap:'8px',marginTop:'10px'}},
+          equip.map(([e,on])=>h('div',{key:e,style:{fontSize:'10px',fontWeight:on?700:500,letterSpacing:'0.1em',padding:'8px 12px',borderRadius:T.rInput+'px',background:on?T.selFill:'transparent',color:on?T.selInk:T.soft,border:on?'none':T.bw+'px solid '+(T.dark?T.line:'rgba(23,20,15,0.35)')}},e))),
+        lbl('EXCLUDED EXERCISES'),
+        h('div',{style:{marginTop:'4px'}},
+          [['Conventional Deadlift','LOW BACK'],['Upright Row','SHOULDER']].map((p,i)=>h('div',{key:i,style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'11px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.15)')}},
+            h('div',{style:{fontSize:'14px',fontWeight:600}},p[0]),
+            h('div',{style:{fontSize:'9.5px',fontWeight:600,letterSpacing:'0.1em',color:T.soft}},p[1]+' \u00B7 \u2715')))),
+        h('div',{style:{border:'1px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.4)'),textAlign:'center',fontSize:'10.5px',fontWeight:600,letterSpacing:'0.1em',padding:'11px 0',marginTop:'12px',color:T.soft,borderRadius:T.rInput+'px',cursor:'pointer'}},'+ ADD EXCLUSION'),
+        h('div',{style:{fontSize:'11px',fontWeight:500,color:T.soft,marginTop:'7px',lineHeight:1.5}},'Excluded movements never appear in pickers or templates.')));
+  }
+
+  // ---------- overlays ----------
+  renderOverlay(T){
+    if(this.state.phase==='complete') return this.renderComplete(T);
+    if(this.state.phase==='feedback') return this.renderFeedback(T);
+    if(this.state.edit) return this.renderStepper(T);
+    if(this.state.exMenu!=null) return this.renderExMenu(T);
+    if(this.state.chooser) return this.renderChooser(T);
+    if(this.state.mesoModal) return this.renderCreateMeso(T);
+    return null;
+  }
+
+  dim(onClose){ const h=React.createElement; return h('div',{onClick:onClose,style:{position:'absolute',inset:0,background:'rgba(10,8,4,0.45)',zIndex:30}}); }
+
+  renderStepper(T){ const h=React.createElement;
+    const e=this.state.edit; const ex=this.state.exercises[e.ei]; const st=ex.sets[e.si];
+    const val=e.field==='w'?st.w:st.r; const label=e.field==='w'?('WEIGHT · '+this.unit()):'REPS';
+    const btn=(txt,dir)=>h('div',{onClick:()=>this.stepEdit(dir),style:{width:64,height:64,borderRadius:T.dark?'14px':'0',border:T.bw+'px solid '+T.line,background:T.field,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'30px',fontWeight:600,cursor:'pointer',userSelect:'none'}},txt);
+    return h('div',{style:{position:'absolute',inset:0,zIndex:31}}, this.dim(()=>this.setState({edit:null})),
+      h('div',{style:{position:'absolute',left:0,right:0,bottom:0,background:T.bg,borderTop:T.bw+'px solid '+T.line,borderTopLeftRadius:T.dark?'18px':'0',borderTopRightRadius:T.dark?'18px':'0',padding:'18px 22px 40px',zIndex:32,boxShadow:T.dark?'0 -16px 40px rgba(0,0,0,0.5)':'0 -6px 0 rgba(23,20,15,0.06)'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          h('div',{style:{fontSize:'10px',fontWeight:700,letterSpacing:'0.14em',color:T.soft}},ex.n.toUpperCase()+' · SET '+(e.si+1)),
+          h('div',{onClick:()=>this.setState({edit:null}),style:{fontSize:'16px',color:T.soft,cursor:'pointer'}},'✕')),
+        h('div',{style:{fontSize:'9px',fontWeight:700,letterSpacing:'0.16em',color:T.softer,marginTop:'12px'}},label),
+        h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:'10px'}},
+          btn('−',-1),
+          h('div',{style:{fontSize:'56px',fontWeight:800,letterSpacing:'-0.02em',fontVariantNumeric:'tabular-nums'}},this.fmt(val,e.field)),
+          btn('+',1)),
+        h('div',{onClick:()=>this.setState({edit:null}),style:{marginTop:'18px',height:'50px',background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',fontWeight:700,letterSpacing:'0.14em',cursor:'pointer',borderRadius:T.rInput+'px'}},'DONE')));
+  }
+
+  renderExMenu(T){ const h=React.createElement; const ei=this.state.exMenu; const ex=this.state.exercises[ei];
+    const item=(txt,onClick,danger)=>h('div',{onClick,style:{padding:'13px 16px',borderBottom:'1px solid '+T.lineSoft,fontSize:'14px',fontWeight:600,cursor:'pointer',color:danger?T.accent:T.ink}},txt);
+    return h('div',{style:{position:'absolute',inset:0,zIndex:31}}, this.dim(()=>this.setState({exMenu:null})),
+      h('div',{style:{position:'absolute',top:'120px',right:'20px',width:'230px',background:T.bg,border:T.bw+'px solid '+T.line,borderRadius:T.rCard+'px',boxShadow:T.pop,zIndex:32}},
+        h('div',{style:{padding:'12px 16px 9px',borderBottom:T.bw+'px solid '+T.lineSoft,fontSize:'9.5px',fontWeight:600,letterSpacing:'0.16em',color:T.soft}},'EXERCISE — '+ex.n.toUpperCase()),
+        item('Add set',()=>this.addSet(ei)),
+        item('View exercise',()=>this.openExercise(ex)),
+        item('Swap exercise',()=>this.setState({exMenu:null})),
+        item('Remove exercise',()=>this.removeExercise(ei),true)));
+  }
+
+  renderChooser(T){ const h=React.createElement;
+    const opt=(big,sub,onClick)=>h('div',{onClick,style:{padding:'16px',border:T.bw+'px solid '+T.line,borderRadius:T.rCard+'px',marginTop:'10px',cursor:'pointer'}},
+      h('div',{style:{fontSize:'16px',fontWeight:700}},big),
+      h('div',{style:{fontSize:'12px',color:T.soft,marginTop:'4px',lineHeight:1.4}},sub));
+    return h('div',{style:{position:'absolute',inset:0,zIndex:31}}, this.dim(()=>this.setState({chooser:false})),
+      h('div',{style:{position:'absolute',left:0,right:0,bottom:0,background:T.bg,borderTop:T.bw+'px solid '+T.line,borderTopLeftRadius:T.dark?'18px':'0',borderTopRightRadius:T.dark?'18px':'0',padding:'18px 22px 40px',zIndex:32,boxShadow:T.dark?'0 -16px 40px rgba(0,0,0,0.5)':'none'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          h('div',{style:{fontSize:'13px',fontWeight:700,letterSpacing:'0.04em'}},'Create new'),
+          h('div',{onClick:()=>this.setState({chooser:false}),style:{fontSize:'16px',color:T.soft,cursor:'pointer'}},'✕')),
+        opt('Macrocycle','A long-term goal organizing several mesocycles.',()=>this.startCreate()),
+        opt('Standalone mesocycle','A single training block, not tied to a macrocycle.',()=>{ const m=(this.state.macros||[])[0]; const idx=m?m.mesos.findIndex(x=>x.status==='unplanned'):-1; if(m&&idx>=0){ this.setState({chooser:false}); this.startCreateMeso(m.id,idx); } else { this.setState({chooser:false}); } })));
+  }
+
+  renderCreateMeso(T){ const h=React.createElement; const d=this.state.mesoDraft||{name:'',weeks:5};
+    const mm=this.state.mesoModal; const m=mm&&this.macroById(mm.macroId); const idx=mm&&mm.idx;
+    const close=()=>this.setState({mesoModal:null,mesoDraft:null});
+    const placement= m?m.mesos.map((ms,i)=>{ const done=ms.status==='done'||ms.status==='current'; const isThis=i===idx;
+      return h('div',{key:i,style:{flex:1,height:'34px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9.5px',fontWeight:isThis?800:600,letterSpacing:'0.06em',boxSizing:'border-box',
+        background:done?T.selFill:'transparent',color:done?T.selInk:(isThis?T.accent:T.softer),
+        border:done?'none':(isThis?'2px solid '+T.accent:'1px dashed '+(T.dark?T.heavy:'rgba(23,20,15,0.4)'))}},'M'+(i+1)+(done?' \u2713':''));
+    }):null;
+    const weeks=[4,5,6,7,8];
+    return h('div',{style:{position:'absolute',inset:0,zIndex:31}}, this.dim(close),
+      h('div',{style:{position:'absolute',left:0,right:0,bottom:0,maxHeight:'94%',overflowY:'auto',background:T.bg,borderTop:(T.dark?T.bw:2)+'px solid '+T.line,borderTopLeftRadius:(T.dark?T.rCard:0)+'px',borderTopRightRadius:(T.dark?T.rCard:0)+'px',padding:'22px 20px 40px',zIndex:32,boxShadow:T.dark?'0 -16px 40px rgba(0,0,0,0.55)':'none'},className:'wk-scroll'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},
+          h('div',{style:{fontSize:'26px',fontWeight:800,letterSpacing:'-0.02em'}},'Create mesocycle'),
+          h('div',{onClick:close,style:{fontSize:'16px',color:T.soft,cursor:'pointer'}},'\u2715')),
+        h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.softer,marginTop:'22px'}},'NAME'),
+        h('input',{value:d.name,onChange:(e)=>this.setState(s=>({mesoDraft:Object.assign({},s.mesoDraft,{name:e.target.value})})),style:{width:'100%',height:'48px',background:T.field,border:T.bw+'px solid '+T.line,padding:'0 14px',fontSize:'14px',fontWeight:600,marginTop:'8px',fontFamily:"'Archivo',sans-serif",color:T.ink,outline:'none',borderRadius:T.rInput+'px',boxSizing:'border-box'}}),
+        m?h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.softer,marginTop:'20px'}},'MACROCYCLE PLACEMENT \u2014 '+m.code+(m.sub?(' \u00B7 '+m.sub.toUpperCase()):'')):null,
+        m?h('div',{style:{display:'flex',gap:'5px',marginTop:'8px'}}, placement):null,
+        m?h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'6px',fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',color:T.softer}},
+          h('span',null,m.span.split('\u2014')[0].trim()),h('span',{style:{color:T.accent,fontWeight:700}},'MESO '+(idx+1)+' OF '+m.mesos.length+' \u00B7 '+(m.mesos[idx]?m.mesos[idx].phase.toUpperCase():'')),h('span',null,m.span.split('\u2014')[1]?m.span.split('\u2014')[1].trim():'')):null,
+        h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.softer,marginTop:'20px'}},'WEEKS \u2014 INCLUDING DELOAD'),
+        h('div',{style:{display:'flex',border:T.bw+'px solid '+T.line,marginTop:'8px',borderRadius:T.rInput+'px',overflow:'hidden'}},
+          weeks.map((w,i)=>{const on=d.weeks===w; return h('div',{key:w,onClick:()=>this.setState(s=>({mesoDraft:Object.assign({},s.mesoDraft,{weeks:w})})),style:{flex:1,textAlign:'center',fontSize:'14px',fontWeight:on?700:500,padding:'13px 0',fontVariantNumeric:'tabular-nums',cursor:'pointer',background:on?T.selFill:'transparent',color:on?T.selInk:T.ink,borderLeft:i>0?'1px solid '+(T.dark?T.line:'rgba(23,20,15,0.25)'):'none'}},w);})),
+        h('div',{style:{fontSize:'10px',fontWeight:500,letterSpacing:'0.08em',color:T.softer,marginTop:'7px'}},'RIR RAMP: 3 \u2192 0 \u00B7 W'+d.weeks+' DELOAD AT 8 RIR'),
+        h('div',{style:{display:'flex',gap:'10px',marginTop:'26px',alignItems:'center',justifyContent:'flex-end'}},
+          h('div',{onClick:close,style:{fontSize:'13px',fontWeight:600,padding:'12px 18px',color:T.soft,cursor:'pointer'}},'Cancel'),
+          h('div',{onClick:()=>this.confirmCreateMeso(),style:{background:T.selFill,color:T.selInk,fontSize:'13px',fontWeight:700,letterSpacing:'0.08em',padding:'14px 32px',cursor:'pointer',borderRadius:T.rInput+'px'}},'CREATE'))));
+  }
+
+  renderFeedback(T){ const h=React.createElement; const fb=this.state.feedback;
+    const set=(patch)=>this.setState(s=>({feedback:Object.assign({},s.feedback,patch)}));
+    const painOpts=[['none','None'],['low','Low'],['moderate','Moderate'],['high','High']];
+    const pain=h('div',{style:{marginTop:'22px'}},
+      h('div',{style:{fontSize:'13px',fontWeight:700}},'Joint pain ',h('span',{style:{fontWeight:400,color:T.soft,fontSize:'12px'}},'\u2014 during deadlift')),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'7px',marginTop:'9px'}},
+        painOpts.map(([k,lbl])=>{const sel=fb.pain===k; return h('div',{key:k,onClick:()=>set({pain:k}),style:{height:'46px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',fontWeight:sel?700:500,cursor:'pointer',borderRadius:T.rInput+'px',background:sel?T.accent:'transparent',color:sel?T.onAccent:T.ink,border:T.bw+'px solid '+(sel?T.accent:(T.dark?T.line:'rgba(23,20,15,0.4)'))}},lbl);})));
+    const slider=(key,labelMain,labelSpan,info,leftL,rightL,centerL,tipBox)=>{const v=fb[key]; const stops=11; const pct=(v/(stops-1))*100;
+      return h('div',{style:{marginTop:'22px'}},
+        h('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+          h('div',{style:{fontSize:'13px',fontWeight:700}},labelMain,h('span',{style:{fontWeight:400,color:T.soft,fontSize:'12px'}},labelSpan)),
+          h('div',{style:{width:17,height:17,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:700,border:info==='filled'?'none':'1px solid '+(T.dark?T.heavy:'rgba(23,20,15,0.5)'),background:info==='filled'?T.ink:'transparent',color:info==='filled'?T.bg:T.soft}},'i')),
+        tipBox?h('div',{style:{borderLeft:'2px solid '+(T.dark?T.heavy:T.ink),padding:'6px 0 6px 10px',marginTop:'9px',fontSize:'11.5px',lineHeight:1.5,color:T.soft}},tipBox):null,
+        h('div',{style:{position:'relative',height:'34px',marginTop:'12px'}},
+          h('div',{style:{position:'absolute',left:0,right:0,top:'16px',height:'2px',background:T.dark?T.heavy:'rgba(23,20,15,0.2)'}}),
+          h('div',{style:{position:'absolute',left:0,width:pct+'%',top:'16px',height:'2px',background:T.ink}}),
+          h('div',{style:{position:'absolute',left:0,right:0,top:'12px',height:'10px',display:'flex',justifyContent:'space-between'}},
+            Array.from({length:stops},(_,i)=>h('div',{key:i,style:{width:'1.5px',background:T.dark?T.heavy:'rgba(23,20,15,0.4)'}}))),
+          h('div',{style:{position:'absolute',left:pct+'%',top:'3px',width:'20px',height:'28px',background:T.accent,transform:'translateX(-50%)',borderRadius:(T.dark?3:0)+'px'}}),
+          h('div',{style:{position:'absolute',inset:0,display:'flex'}},
+            Array.from({length:stops},(_,i)=>h('div',{key:i,onClick:()=>set({[key]:i}),style:{flex:1,cursor:'pointer'}})))),
+        h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'5px',fontSize:'9px',fontWeight:600,letterSpacing:'0.12em',color:T.soft}},
+          h('span',null,leftL), centerL?h('span',{style:{color:T.ink,fontWeight:700}},centerL):null, h('span',null,rightL)));
+    };
+    const cancel=()=>this.setState({phase:'logging'});
+    return h('div',{style:{position:'absolute',inset:0,zIndex:31}},
+      this.dim(cancel),
+      h('div',{style:{position:'absolute',left:0,right:0,bottom:0,maxHeight:'92%',display:'flex',flexDirection:'column',background:T.bg,borderTop:(T.dark?T.bw:2)+'px solid '+T.line,borderTopLeftRadius:(T.dark?T.rCard:0)+'px',borderTopRightRadius:(T.dark?T.rCard:0)+'px',zIndex:32,boxShadow:T.dark?'0 -16px 40px rgba(0,0,0,0.55)':'none'}},
+        h('div',{style:{flexShrink:0,padding:'20px 20px 0'}},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},
+            h('div',{style:{fontSize:'26px',fontWeight:800,letterSpacing:'-0.02em'}},'Feedback'),
+            h('div',{onClick:cancel,style:{fontSize:'16px',color:T.soft,cursor:'pointer'}},'\u2715')),
+          h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.soft,marginTop:'4px'}},'GLUTES \u2014 AFTER DEADLIFT \u00B7 FEEDS W3 TARGETS')),
+        h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'0 20px 6px'}},
+          pain,
+          slider('pump','Glutes pump','\u2014 today','outline','NO PUMP','BEST EVER',null,null),
+          slider('workload','Glutes workload','\u2014 whole session','filled','TOO EASY','TOO MUCH','JUST RIGHT',"How taxing all of today\u2019s glute work felt, recovery included. The middle means the dose was right \u2014 this sets next week\u2019s set count.")),
+        h('div',{style:{flexShrink:0,display:'flex',gap:'10px',alignItems:'center',justifyContent:'flex-end',padding:'14px 20px 40px'}},
+          h('div',{onClick:cancel,style:{fontSize:'13px',fontWeight:600,padding:'12px 18px',color:T.soft,cursor:'pointer'}},'Cancel'),
+          h('div',{onClick:()=>this.setState({phase:'complete'}),style:{background:T.selFill,color:T.selInk,fontSize:'13px',fontWeight:700,letterSpacing:'0.08em',padding:'14px 32px',cursor:'pointer',borderRadius:T.rInput+'px'}},'SAVE'))));
+  }
+
+  renderComplete(T){ const h=React.createElement; const tt=this.totals();
+    const doneEx=this.state.exercises.filter(ex=>ex.sets.length>0&&ex.sets.every(s=>s.d)).length;
+    const skipped=tt.total-tt.logged;
+    const statRow=(l,r)=>h('div',{style:{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px solid '+(T.dark?T.lineSoft:'rgba(23,20,15,0.18)'),fontSize:'14px'}},
+      h('span',{style:{fontWeight:500,color:T.soft}},l),h('span',{style:{fontWeight:700,fontVariantNumeric:'tabular-nums'}},r));
+    const cancel=()=>this.setState({phase:'logging'});
+    return h('div',{style:{position:'absolute',inset:0,zIndex:33}},
+      this.dim(cancel),
+      h('div',{style:{position:'absolute',left:0,right:0,bottom:0,maxHeight:'92%',display:'flex',flexDirection:'column',background:T.bg,borderTop:(T.dark?T.bw:2)+'px solid '+T.line,borderTopLeftRadius:(T.dark?T.rCard:0)+'px',borderTopRightRadius:(T.dark?T.rCard:0)+'px',zIndex:34,boxShadow:T.dark?'0 -16px 40px rgba(0,0,0,0.55)':'none'}},
+        h('div',{className:'wk-scroll',style:{flex:1,minHeight:0,overflowY:'auto',padding:'24px 20px 0'}},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},
+            h('div',{style:{fontSize:'30px',fontWeight:800,letterSpacing:'-0.02em'}},this.state.week+'\u00B7'+this.state.day+' complete.'),
+            h('div',{onClick:cancel,style:{fontSize:'16px',color:T.soft,cursor:'pointer'}},'\u2715')),
+          h('div',{style:{marginTop:'20px',borderTop:(T.dark?T.bw:1.5)+'px solid '+T.line}},
+            statRow('Exercises completed',doneEx),
+            statRow('Sets logged',tt.logged+' / '+tt.total),
+            statRow('Skipped',skipped)),
+          h('div',{style:{marginTop:'18px'}},
+            h('div',{style:{fontSize:'10px',fontWeight:600,letterSpacing:'0.14em',color:T.soft}},'WORKOUT NOTES \u2014 SAVED WITH SESSION'),
+            h('textarea',{value:this.state.notes,onChange:(e)=>this.setState({notes:e.target.value}),placeholder:'Anything worth remembering for next time\u2026',style:{width:'100%',minHeight:'64px',marginTop:'7px',background:T.field,border:T.bw+'px solid '+T.line,borderRadius:T.rInput+'px',padding:'10px 12px',fontFamily:"'Archivo',sans-serif",fontSize:'13px',lineHeight:1.5,color:T.ink,resize:'none',outline:'none',boxSizing:'border-box'}}))),
+        h('div',{style:{flexShrink:0,padding:'14px 20px 40px'}},
+          h('div',{onClick:()=>this.nextWorkout(),style:{background:T.selFill,color:T.selInk,display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',fontSize:'14px',fontWeight:700,letterSpacing:'0.1em',padding:'17px 0',cursor:'pointer',borderRadius:T.rInput+'px'}},'NEXT WORKOUT ',h('span',{style:{fontSize:'15px'}},'\u2192')))));
+  }
+
+  // ---------- format ----------
+  pad(n){ return n<10?('0'+n):(''+n); }
+  fmt(v,field){ if(field==='w'){ return (Math.round(v*10)/10).toString().replace(/\.0$/,''); } return ''+v; }
+}
+</script>
+</body>
+</html>

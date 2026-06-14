@@ -25,16 +25,18 @@ The MCP connector lets users plug their training data into the LLM of their choi
 | `get_exercise_history` | time series for an exercise (weights, reps, volume, e1RM, feedback) with date-range / cycle filters |
 | `get_muscle_group_volume` | weekly volume per muscle group |
 | `get_meso_summary` | per-meso rollup: adherence, progression achieved, feedback patterns, progress score |
+| `get_macro_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
 | `search_exercises` / `search_templates` | library queries with the same filters the UI uses |
 | `explain_prescription` | surface the engine's `engine_decisions` rationale for a given prescription |
 
 ### Write / planning (always explicit, never destructive-by-default)
 | Tool | Purpose |
 |---|---|
-| `create_mesocycle` | draft a meso in the groups-first shape (weeks, days with weekday + label, muscle-group blocks, slot fills, RIR ramp) — created in `planned` status for in-app review before activation |
+| `create_macrocycle` | draft a macrocycle from `goal` (hypertrophy/strength/cut/maintain) + `meso_length_weeks` (+ optional `duration_months`); the **engine** (`planMacrocycle`) computes the profile-personalized target, a **recommended timeframe**, the meso count, and suggested phases — the LLM never invents the numbers (defaults in 10). Creates the macro + its `unplanned` meso placeholders |
+| `create_mesocycle` | draft/plan a meso in the groups-first shape (weeks, days with weekday + label, muscle-group blocks, slot fills, RIR ramp); attaches at a macro `position` or as standalone — created in `planned` status for in-app review before activation |
 | `create_template` | build a reusable template from a spec or from an existing meso |
-| `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, description) |
-| `update_macrocycle_goals` | edit goal type/metrics/timeline/goal-arc slots |
+| `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, **tracking type**, description) |
+| `update_macrocycle_goals` | edit goal / duration / block length / timeline (the engine recomputes the target + phases); no goal-arc slots — superseded by positioned mesos |
 | `manage_exclusions` | add/remove excluded exercises with a reason |
 | `log_note` | attach a note to a cycle/workout/exercise |
 
@@ -61,7 +63,7 @@ The tuning loop: inspect decisions → propose a version → replay real history
 
 ## Data-shape contract
 
-MCP tools return the **same view-layer shapes** as the meso-stats screens (`v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs`, …) so analysis in chat always matches what the user sees in-app. This is why the data model treats those views as a public contract (see [03-data-model.md](03-data-model.md)).
+MCP tools return the **same view-layer shapes** as the stats screens (`v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs`, `v_exercise_overview`, `v_macro_summary`, …) so analysis in chat always matches what the user sees in-app. This is why the data model treats those views as a public contract (see [03-data-model.md](03-data-model.md)).
 
 ## Module layout (`src/lib/mcp/`)
 
