@@ -17,7 +17,28 @@ import { incrementFor, roundToStep } from "./rules/rounding";
 
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS } from "./params";
+export { macroGoalTypes, phaseNames } from "./params";
 export { engineInputsSchema } from "./types";
+export {
+  planMacrocycle,
+  spreadPhases,
+  macroPlanInputSchema,
+  macroProfileSchema,
+  type MacroPlan,
+  type MacroPlanInput,
+  type MacroPlanArgs,
+  type MacroProfile,
+  type MacroGoal,
+  type MacroRange,
+  type PhaseName,
+} from "./macro";
+export {
+  estimateE1rm,
+  epley,
+  brzycki,
+  type E1rmEstimate,
+  type E1rmConfidence,
+} from "./e1rm";
 export {
   composeAutoregulationSummary,
   composeMesoCompleteSummary,

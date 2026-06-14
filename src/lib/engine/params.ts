@@ -20,12 +20,37 @@ export const experienceLevels = [
 
 export const goalTypes = ["cut", "gain", "maintain"] as const;
 
+// long-term macrocycle goal vocabulary (figs 2.2/2.3, doc 09/10). Distinct
+// from the per-set `goalTypes` that drive `prescribe()`: a macrocycle carries
+// one of these; the engine maps them to per-meso phases + per-set bias.
+export const macroGoalTypes = [
+  "hypertrophy",
+  "strength",
+  "cut",
+  "maintain",
+] as const;
+
+// mesocycle phases the macrocycle engine spreads across positions (10 §5)
+export const phaseNames = [
+  "accumulation",
+  "intensification",
+  "peak",
+] as const;
+
 // loadable step / progression jump per equipment, expressed per unit so lb
 // users get real plate math (lb is the app default)
 const perEquipmentStep = z.record(
   z.enum(equipmentTypes),
   z.object({ kg: z.number().min(0), lb: z.number().min(0) }),
 );
+
+// a [low, high] range; low/high tunables seeded from 10-metrics-spec.md
+const rangeTuple = z.tuple([z.number(), z.number()]);
+const experienceRanges = z.object({
+  beginner: rangeTuple,
+  intermediate: rangeTuple,
+  advanced: rangeTuple,
+});
 
 /**
  * Schema for `engine_params.params` (version 2 — pivot feedback shape).
@@ -70,6 +95,114 @@ export const engineParamsSchema = z.object({
   meso_seed_backoff_pct: z.number().min(0.7).max(1),
   // weights are rounded to this loadable step per equipment, in each unit
   rounding: perEquipmentStep,
+
+  // ----- metric blocks (10-metrics-spec.md §8) -------------------------------
+  // Added with `.default()` so the active v2 row (which predates them) still
+  // parses; an explicit v3 row seeds the values for admin tuning.
+
+  // §1 estimated 1RM: effective-reps + Epley/Brzycki average + confidence
+  e1rm: z
+    .object({
+      rir_offset: z.number().min(0),
+      high_max_eff_reps: z.number().int().positive(),
+      mod_max_eff_reps: z.number().int().positive(),
+      high_max_rir: z.number().int().min(0),
+      mod_max_rir: z.number().int().min(0),
+    })
+    .default({
+      rir_offset: 1.0,
+      high_max_eff_reps: 8,
+      mod_max_eff_reps: 12,
+      high_max_rir: 2,
+      mod_max_rir: 3,
+    }),
+
+  // §5 profile-personalized macrocycle target + recommended-timeframe engine
+  macro_target: z
+    .object({
+      sex_factor_female: z.number().min(0).max(1),
+      career_cap_lb: z.object({
+        male: z.number().positive(),
+        female: z.number().positive(),
+      }),
+      career_tau_years: z.number().positive(),
+      hypertrophy_pct_bw_month: experienceRanges,
+      strength_pct_month: experienceRanges,
+      strength_cap_total_pct: z.object({
+        beginner: z.number().positive(),
+        intermediate: z.number().positive(),
+        advanced: z.number().positive(),
+      }),
+      cut_pct_bw_week: z.object({
+        high_bf: rangeTuple,
+        average: rangeTuple,
+        lean: rangeTuple,
+      }),
+      cut_bmi_high: z.number().positive(),
+      cut_bmi_lean: z.number().positive(),
+      age_taper: z.boolean(),
+      age_taper_start: z.number().positive(),
+      age_taper_per_year: z.number().min(0),
+      age_taper_floor: z.number().min(0).max(1),
+      recommend_target_lb: z.object({
+        male: z.number().positive(),
+        female: z.number().positive(),
+      }),
+      recommend_strength_total_pct: z.number().positive(),
+      recommend_cut_bw_pct: z.number().positive(),
+      recommend_min_months: z.number().int().positive(),
+      recommend_max_months: z.number().int().positive(),
+      present: z.enum(["conservative_end", "range"]),
+    })
+    .default({
+      sex_factor_female: 0.5,
+      career_cap_lb: { male: 40, female: 20 },
+      career_tau_years: 3,
+      hypertrophy_pct_bw_month: {
+        beginner: [1.0, 1.5],
+        intermediate: [0.5, 1.0],
+        advanced: [0.25, 0.5],
+      },
+      strength_pct_month: {
+        beginner: [4, 8],
+        intermediate: [1.5, 3],
+        advanced: [0.5, 1.5],
+      },
+      strength_cap_total_pct: { beginner: 60, intermediate: 30, advanced: 15 },
+      cut_pct_bw_week: {
+        high_bf: [1.0, 1.5],
+        average: [0.5, 1.0],
+        lean: [0.25, 0.5],
+      },
+      cut_bmi_high: 27,
+      cut_bmi_lean: 22,
+      age_taper: true,
+      age_taper_start: 40,
+      age_taper_per_year: 0.02,
+      age_taper_floor: 0.6,
+      recommend_target_lb: { male: 8, female: 4 },
+      recommend_strength_total_pct: 10,
+      recommend_cut_bw_pct: 8,
+      recommend_min_months: 2,
+      recommend_max_months: 12,
+      present: "conservative_end",
+    }),
+
+  // §5 phase spread across mesocycle positions
+  phase_plan: z
+    .object({
+      order: z.array(z.enum(phaseNames)).min(1),
+      accumulation_fraction: z.number().min(0).max(1),
+    })
+    .default({ order: [...phaseNames], accumulation_fraction: 0.6 }),
+
+  // §6 key lifts = most-logged exercises across the macro
+  key_lifts: z
+    .object({
+      n: z.number().int().positive(),
+      selection: z.enum(["frequency"]),
+    })
+    .default({ n: 5, selection: "frequency" }),
 });
 
 export type EngineParams = z.infer<typeof engineParamsSchema>;
