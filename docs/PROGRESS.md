@@ -2,7 +2,54 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-13 (latest) — Phase 5: meso stats, library, templates & sharing
+## 2026-06-14 (latest) — Design v2 handoff: docs integration (no code)
+
+Documentation-only pass folding the **2026-06-13/14 design sessions** into the spec docs ahead of
+implementation. New design assets imported and every doc reconciled; **no schema, engine, or UI
+code changed** — the implementation lands in future sessions per the new reconciliation backlog.
+
+### Done
+
+- **Imported design artifacts** into `docs/design/`: updated source-of-truth mockup
+  `workout - App Screens v2.dc.html`; new interactive prototype `WorkoutApp.dc.html` +
+  `workout - Interactive Prototype.dc.html`; session-3 render screenshots under
+  `screenshots/v2-session3/`; and the new **`docs/09-design-changelog.md`** (authoritative for its
+  dated deltas).
+- **08-design-decisions** — added the 09 amendment pointer; reconciled the §5 figure index
+  (Section 02 renumbered, `+ NEW` chooser 2.1b, Macrocycle Overview 2.2, Create Macrocycle 2.3,
+  planner board 2.5; Exercise page 3.1a/b/c; Volume stats tab removed → Balance 4.1 / Performance
+  4.2); repointed stats to the planner `STATS` toggle; logged new decisions (macrocycle goal layer,
+  realistic target, plan-a-meso paths, exercise tracking type, simplified complete sheet).
+- **01-product-spec** — macrocycle as a single-goal layer (hypertrophy/strength/cut/maintain) with
+  the create engine + realistic target; F2 cycle flow (chooser, 4-path plan, planner lock); F3
+  complete sheet simplified; F5 tracking type + two-axis filter + Exercise page; F7 stats restructure.
+- **03-data-model** — `DATA` target shape: `macrocycles` goal vocab + `duration_months` /
+  `meso_length_weeks` / derived target columns; **retire `macro_slots`** → `mesocycles.position` +
+  `phase` + `unplanned` status; `exercises.tracking_type`; `logged_sets` nullable weight/reps +
+  `duration_seconds`; new views `v_exercise_overview` / `v_macro_summary`; week→day completion +
+  `exercises(equipment_type)` index. Marked as migration deltas (not yet migrated).
+- **04-feedback-engine** — goal vocab (gain→hypertrophy, +strength) + phase modulation; new pure
+  `planMacrocycle()` (meso count, suggested phases, realistic target + per-month rate from
+  goal/duration/block-length/profile); module layout + golden/property test requirements.
+- **05-mcp-connector** — `create_macrocycle` (engine-computed) + `get_macro_summary`; goal-update
+  tool reworked; new views added to the data-shape contract.
+- **06-design-system** — addendum for the SetRow density, locked Day View header + progress bar,
+  two-axis filter, `PLAN | STATS` toggle, and the exploratory dark theme (→ 09 §5a).
+- **07-implementation-plan** — added the **Design v2 reconciliation backlog** (retrofit/net-new
+  mapped to Phases 2/3/5 with `DATA`/`ENGINE` tags) for future execution.
+- **CLAUDE.md** — 09 added to the read-first list and pixel-fidelity rule; mockup-over-prototype
+  source-of-truth note; shared-views list extended.
+
+### Not done yet / next
+
+- Everything in the **07 reconciliation backlog** — the actual migrations, engine functions, and
+  screen retrofits. Execute in future sessions, hard rules in force (append-only migration + RLS +
+  tests per PR; engine changes need fixtures; pixel fidelity to the mockup, checking 09 first).
+- Open question for implementation: the set menu (1.3) shows **`Delete set`** — restrict to
+  **unlogged** sets only (hard rule #5 keeps logged history append-only); confirm against the
+  mockup when building.
+
+## 2026-06-13 — Phase 5: meso stats, library, templates & sharing
 
 ### Done
 

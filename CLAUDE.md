@@ -9,7 +9,8 @@ WORKOUT is a PWA-first workout tracker built on periodized training cycles (macr
 - `docs/05-mcp-connector.md` — MCP tool surface and auth rules
 - `docs/06-design-system.md` — attitude, motion, copy voice (color system/nav superseded by 08)
 - `docs/07-implementation-plan.md` — phase order; implement phases in sequence
-- `docs/08-design-decisions.md` — **authoritative design source** (June 2026 pivot): light ledger system, canon tab bar, decisions log; mockups + screenshots in `docs/design/`
+- `docs/08-design-decisions.md` — **authoritative design baseline** (June 2026 pivot): light ledger system, canon tab bar, decisions log, figure index; mockups + screenshots in `docs/design/`
+- `docs/09-design-changelog.md` — **authoritative for the dated deltas** amending 08 (2026-06-13/14 sessions: macrocycle goal layer + Overview + create engine, planner board as the single meso surface, Day View header + progress bar, simplified Workout Complete, Exercise page, two-axis exercise filter, Volume stats tab removed, per-set tracking type). **Where 09 conflicts with 08/06, 09 wins.** Check it before building any screen.
 
 ## Stack
 
@@ -24,7 +25,7 @@ Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres/Auth/RLS), Verc
 5. **MCP tools never take a `user_id` argument** — identity comes from the auth session only. Write tools create drafts; no deletes of logged history.
 6. **Validate every boundary with zod** (forms, route handlers, MCP tool args, engine params).
 7. **Design discipline (per 08):** light ledger system — cream `#F4F0E6` / ink `#17140F`; orange `#C14B2A` marks current position + selection only; square corners everywhere, dashed borders = planned/empty; lowercase logotype + tracked all-caps labels; no hype copy, no exclamation marks.
-8. **Pixel fidelity to the mockups is mandatory.** Before building or changing ANY screen, open `docs/design/mockups/workout - App Screens v2.dc.html`, find the figure (1.1–4.5), and transcribe its exact structure, control patterns, copy, sizes, weights, and colors — never improvise a layout or label from the spec prose alone. Cross-check `docs/design/screenshots/`. Deviate only where a hard rule forces it (e.g. no deletes of logged history) and record the deviation in `docs/PROGRESS.md`.
+8. **Pixel fidelity to the mockups is mandatory.** Before building or changing ANY screen, open `docs/design/mockups/workout - App Screens v2.dc.html`, find the figure (see the 08 §5 index), check `docs/09-design-changelog.md` for any dated amendment to it, and transcribe its exact structure, control patterns, copy, sizes, weights, and colors — never improvise a layout or label from the spec prose alone. Cross-check `docs/design/screenshots/`. The **mockup is the source of truth over the interactive prototype** (`WorkoutApp.dc.html` / `workout - Interactive Prototype.dc.html`) — where they diverge, follow the mockup. The dark theme in the prototype is exploratory (dark mode is out of scope). Deviate only where a hard rule forces it (e.g. no deletes of logged history) and record the deviation in `docs/PROGRESS.md`.
 9. **No offline sync, no admin UI.** The app is online-only; engine inspection/tuning/replay ship exclusively as admin-gated MCP tools.
 
 ## Commands (once scaffolded)
@@ -42,5 +43,5 @@ npm run lint && npm run typecheck
 
 - snake_case in SQL; camelCase in TS; DB types generated, domain types in `src/lib/types/`.
 - Data access goes through `src/lib/queries/` — no inline supabase queries in components.
-- Meso stats and MCP must share the same views (`v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs`) — one definition of progress.
+- Stats screens and MCP must share the same views (`v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs`, plus `v_exercise_overview` and `v_macro_summary` per the 09 deltas) — one definition of progress.
 - Keep `main` deployable; vertical-slice PRs.

@@ -9,9 +9,9 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 ## Domain model (conceptual)
 
 ### Macrocycle
-- The broad phase lasting **months to years** in which the user defines long-term fitness goals: **cutting, gaining, or maintaining**.
-- Defines goals, timelines, and metrics that inform dynamic mesocycle guidance and assess progress spanning multiple mesocycles.
-- A macrocycle contains an ordered series of mesocycles working toward its goal.
+- The broad phase lasting **months to years** in which the user defines a single long-term goal: **hypertrophy, strength, cut, or maintain**.
+- Created through an **engine** (fig 2.3): from goal + duration (3/6/12 mo) + preferred block length (4/5/6 wk) + profile, it computes the number of evenly-spaced mesocycles that fit, proposes suggested phases (accumulate → intensify → peak), and a **realistic target range** with a per-month rate (e.g. `+8–11 lb lean mass`, `≈ +1.1–1.6 lb / month`).
+- A macrocycle contains an ordered series of mesocycles working toward its goal; mesos are created **unplanned** and the user plans each as they reach it. The **Macrocycle Overview** (fig 2.2) shows the target, the mesocycle timeline, and rolled-up macro stats (no body-weight progress tracking — the app tracks only the workout data it collects).
 
 ### Mesocycle
 - A **3–6 week planned block** of workouts geared toward the macrocycle goal. The heart of where users plan and track training.
@@ -33,16 +33,18 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 - Profile: age, gender, experience/fitness level, preferred exercise types (machines, free weights, etc.), units (kg/lb).
 
 ### F2 — Cycle management
-- Create/edit/archive macrocycles with goal type, target metrics, and timeline.
-- Create mesocycles inside a macrocycle: choose weeks (3–6), days/week, deload toggle, start from a template or from scratch.
+- Create/edit/archive macrocycles via the create engine (goal, duration, block length → computed mesos + realistic target); Macrocycle Overview with timeline + macro stats.
+- `+ NEW` chooser (fig 2.1b): a **macrocycle** or a **standalone mesocycle** (not tied to a macro). Mesos inside a macro are created from that macro's `+ PLAN` rows.
+- Plan a mesocycle (fig 2.4) via four paths: **copy a meso · start with a template · meso builder (from muscle-group priorities) · from scratch**. Choose weeks, days/week, deload toggle.
+- The **planner board (fig 2.5)** is the single view/edit surface for a meso, with a `PLAN | STATS` toggle and a partial-completion lock (logged/active weeks read-only; edits apply forward only).
 - Microcycles generated automatically from meso length, each with its target RIR.
-- Cycle dashboard: current position in macro → meso → micro → day.
+- Cycle dashboard (fig 2.1): macrocycles expand to reveal their mesocycles; current position in macro → meso → micro → day.
 
 ### F3 — Workout logging
 - Today's planned workout with prescribed exercises, target weight × reps × sets, and target RIR.
 - Log actual weight/reps per set; add/remove/swap sets and exercises; notes per set/exercise/workout.
 - **Per-exercise feedback** (fig 1.4): joint pain during the exercise, plus muscle-group pump and workload sliders.
-- **Workout feedback**: session summary, autoregulation summary, and free-text workout notes on completion.
+- **Workout complete** (fig 1.5): counts (exercises / sets / skipped) + free-text workout notes + `NEXT WORKOUT →`. Autoregulation recomputes silently in the background — no panel, no stats link (09 2026-06-13 §2).
 - Every logged entry is stamped with macro/meso/micro/day context and date.
 - Logging requires connectivity (decision, 08 §3 era): the app is online-only; no offline queue/sync.
 
@@ -53,16 +55,18 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 
 ### F5 — Exercise library
 - **Stock exercises** visible to all users; **custom exercises** visible only to their author.
-- Exercise attributes: muscle group(s), author, equipment type (dumbbell, barbell, machine, cable, smith machine, bodyweight, etc.).
+- Exercise attributes: muscle group(s), author, equipment type (dumbbell, barbell, machine, cable, smith machine, bodyweight, etc.), and a **per-set tracking type** (`weight × reps` / `reps` / `time`, fig 3.1c).
+- Browse the Exercises tab (fig 3.1) with **two filter axes — muscle group and equipment** (combine with AND, live count, clear-all). Each exercise has a full **Exercise page** (figs 3.1a/3.1b): Overview (last performed, all-time bests, est. 1RM by meso, lifetime totals) and History.
 - Sharing: users can share custom exercises directly, or implicitly by sharing templates/mesos that include them (shared copies resolve cleanly — see data model §Sharing).
 
 ### F6 — Templates
 - Reusable groups of workouts/exercises with filterable criteria: emphasis (arms, legs, upper, lower, full body…), author, intended gender, days per week.
 - Start a mesocycle from a template; save a meso as a template; share templates.
 
-### F7 — Meso stats & history (not a tab — see 08 §2)
-- Meso stats behind `MESO STATS` on meso detail: volume (sets per muscle group per week, logged + autoregulated plan), balance (push/pull/legs, per-muscle bars), performance (top set by week, e1RM across the macro, PRs).
-- Per-exercise history (weight × reps by session, e1RM) in the exercise library and picker.
+### F7 — Stats & history (not a tab — see 08 §2)
+- **Meso stats** via the planner board's `STATS` toggle (fig 2.5), opening on **Balance** (fig 4.1: push/pull/legs split, planned sets/week per muscle, balance check) with a **Performance** tab (fig 4.2: top set by week, e1RM across the macro, PRs this meso). The Volume tab was removed (09 2026-06-14 §4).
+- **Macrocycle stats** on the Macrocycle Overview (fig 2.2): est. strength on key lifts, total volume, sessions logged, adherence.
+- Per-exercise history + Overview aggregates on the Exercise page (figs 3.1a/3.1b) and the history sheet (3.2), shared with the library and picker.
 
 ### F8 — MCP connector
 - An MCP server exposing the user's training data and planning tools to their LLM of choice: analysis of macro/meso/micro performance, mesocycle planning/creation, template creation, goal editing, and personalized recommendations. See [05-mcp-connector.md](05-mcp-connector.md).

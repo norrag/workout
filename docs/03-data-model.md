@@ -7,11 +7,12 @@ The structures below are designed for three consumers: the UI, the internal prog
 ## Entity relationship overview
 
 ```
-profiles ─┬─< macrocycles ─< macro_slots ─< mesocycles ─< microcycles ─< workouts ─< workout_exercises ─< logged_sets
-          │   (mesos may also be standalone) │                              │              │
-          │                                  └─ meso_days ─< meso_day_groups─< meso_exercises (slot fills)
-          │                                                                 │              └─ exercise_feedback
-          │                                                                 └─ workout_feedback
+profiles ─┬─< macrocycles ─< mesocycles ─< microcycles ─< workouts ─< workout_exercises ─< logged_sets
+          │   (goal layer)  │ (positioned;                  │              │
+          │                 │  may be standalone)           │              │
+          │                 └─ meso_days ─< meso_day_groups ─< meso_exercises (slot fills)
+          │                                                  │              └─ exercise_feedback
+          │                                                  └─ workout_feedback
           ├─< exercises (custom; stock have user_id null)
           ├─< excluded_exercises / exercise_notes
           ├─< templates ─< template_days ─< template_day_groups ─< template_exercises
@@ -19,6 +20,13 @@ profiles ─┬─< macrocycles ─< macro_slots ─< mesocycles ─< microcycle
 exercises ─< exercise_muscle_groups >─ muscle_groups
 engine_params / engine_decisions / mcp_write_audit (tuning — operated via MCP, see 08 §3)
 ```
+
+> **Macrocycle restructure (June 2026, 09 2026-06-13 §3–5).** The `macro_slots` "goal arc" is
+> **retired**: a macrocycle now carries a single goal and a computed plan, and mesocycles
+> themselves carry `position` + suggested `phase` within the macro. Unplanned positions are
+> mesocycle rows in `unplanned` status (the Overview's `+ PLAN` rows). The migration delta is
+> noted on the `macrocycles` / `mesocycles` / `macro_slots` entries below; this is a documented
+> target shape for a future implementation session, not yet migrated.
 
 ## Tables
 
@@ -46,6 +54,9 @@ Seeded reference table: chest, back, quads, hamstrings, glutes, biceps, triceps,
 ### `exercises`
 - `user_id uuid null` — **null ⇒ stock exercise** (visible to all); set ⇒ custom (visible to author + grantees)
 - `name text`, `equipment_type text` — dumbbell / barbell / machine / cable / smith / bodyweight / bands / kettlebell / other
+- `tracking_type text default 'weight_reps'` — **how each set is logged** (fig 3.1c TRACK PER
+  SET): `weight_reps` (default), `reps` (reps only, e.g. bodyweight), `time` (duration, e.g.
+  planks / carries). Drives set-row inputs and history rendering. **Migration delta:** new column.
 - `description text`, `notes text`, `video_url text null`
 - `source_exercise_id uuid null` — provenance when copied via sharing
 
@@ -53,28 +64,48 @@ Seeded reference table: chest, back, quads, hamstrings, glutes, biceps, triceps,
 - `exercise_id`, `muscle_group_id`, `role text` — primary / secondary
 
 ### `macrocycles`
+The **goal layer** (figs 2.1/2.2/2.3). One long-term goal organizing several positioned mesos.
 - `user_id`, `name`
-- `goal_type text` — cut / gain / maintain
-- `goal_notes text`, `target_metrics jsonb` — e.g. `{ "bodyweight_delta_kg": 4, "key_lifts": {...} }`
+- `goal_type text` — **hypertrophy / strength / cut / maintain** (June 2026 vocabulary; replaces
+  the old cut/gain/maintain — `gain` → `hypertrophy`, `strength` added; migrate existing rows)
+- `duration_months int` — from the create engine (3 / 6 / 12 / custom)
+- `meso_length_weeks int` — the user's preferred block length incl. deload (4 / 5 / 6); drives
+  how many evenly-spaced mesos fit
+- **Realistic target (derived, cached for display):** `target_low numeric`, `target_high numeric`,
+  `target_unit text` (e.g. `lb_lean_mass`, `pct_strength`, `lb_loss`), computed from
+  goal + duration + profile (training age, bodyweight, experience). The **per-month rate** shown
+  in orange is `target range ÷ duration_months` — derived, not stored. No body-weight/lean-mass
+  progress is tracked (09 2026-06-14 §3); the target is a planning framework only.
+- `goal_notes text`
 - `start_date date`, `target_end_date date null`
 - `status text` — active / completed / archived
+- **Migration delta:** add `duration_months`, `meso_length_weeks`, target columns; migrate
+  `goal_type` vocabulary. The old free-form `target_metrics jsonb` is superseded by the derived
+  target columns (keep for migration if any data exists, otherwise drop).
 
-### `macro_slots`
-The macro's **goal arc** ("CUT → BULK → BULK II → PEAK", figs 2.1/2.7): an ordered series of slots that mesos fill.
-- `macrocycle_id`, `user_id`, `slot_number int`
-- `goal_type text` — cut / gain / maintain / peak
-- `label text null` — display label, e.g. "Bulk II"; unfilled slots render as "+ PLAN"
+### `macro_slots` — **retired**
+Superseded by mesocycle `position` + `phase` (below). The macro's progression is now an ordered
+series of **mesocycles** (some `unplanned` placeholders), not a separate slot table. Existing
+rows migrate into the host mesos' `position`/`phase`; the table is dropped once migrated.
 
 ### `mesocycles`
 - `macrocycle_id uuid null` — **null ⇒ standalone meso** (fig 2.1 has a standalone section)
-- `macro_slot_id uuid null` — placement in the goal arc
+- `position int null` — `M1…Mn` placement within the macro (null for standalone); replaces
+  `macro_slot_id`
+- `phase text null` — suggested/assigned phase: **accumulation / intensification / peak**
+  (deload is a per-week flag, not a meso phase). Set by the create engine; editable when planning.
 - `user_id` (denormalized for RLS + query speed)
 - `name`, `weeks int check (3..8)` (picker offers 4–8 incl. deload), `days_per_week int`
 - `includes_deload bool`
 - `rir_start int default 3`, `rir_end int default 0` — the planned RIR ramp
-- `status text` — planned / active / completed / abandoned
+- `status text` — **unplanned** / planned / active / completed / abandoned. `unplanned` is the
+  macro placeholder (Overview/list `+ PLAN` rows, `Mesocycle n` + `SUGGESTED <phase> · NOT
+  PLANNED`); planning it fills the board and moves it to `planned`.
 - `template_id uuid null` — provenance
 - `start_date date null`
+- **Migration delta:** add `position`, `phase`; add `unplanned` to the status check; drop
+  `macro_slot_id`. Macro creation pre-creates the computed number of `unplanned` mesos with
+  `position` + suggested `phase` (09 2026-06-13 §3–4).
 
 ### Groups-first plan: `meso_days` → `meso_day_groups` → `meso_exercises`
 The planner board (figs 2.4/2.5): days are columns of muscle-group blocks; each block has N exercise slots filled from the pre-filtered picker.
@@ -108,7 +139,8 @@ Skipped-set counts on the complete sheet derive from `prescribed_sets` minus log
 The atomic history record. **This is the primary input to the engine and MCP analysis** — each row is fully stamped with cycle context for efficient time-series queries.
 - `workout_exercise_id`
 - denormalized stamps: `user_id`, `exercise_id`, `macrocycle_id` (null for standalone mesos), `mesocycle_id`, `microcycle_id`, `workout_id`, `performed_at timestamptz`
-- `set_number int`, `weight numeric`, `unit text` (lb/kg — the unit in effect when logged), `reps int`
+- `set_number int`, `weight numeric null`, `unit text` (lb/kg — the unit in effect when logged), `reps int null`, `duration_seconds int null`
+  - which columns are populated follows the exercise's `tracking_type`: `weight_reps` ⇒ weight + reps; `reps` ⇒ reps only (weight null); `time` ⇒ duration_seconds (weight/reps null). **Migration delta:** make `weight`/`reps` nullable, add `duration_seconds`.
 - `set_type text` — straight / drop
 - `rir_reported int null` — user's own RIR estimate, when given
 - `is_warmup bool default false`
@@ -169,6 +201,10 @@ Unified grant table for custom content:
 
 - `logged_sets (user_id, exercise_id, performed_at desc)` — recent-performance lookups (the engine's hottest query).
 - `logged_sets (user_id, mesocycle_id)` and `(user_id, microcycle_id)` — cycle rollups.
+- `exercises (equipment_type)` — the Exercises tab's **EQUIP** filter axis (fig 3.1); combines (AND) with the muscle-group join for the **MUSCLE** axis and the live `n OF N` count. **Index delta.**
+- **Week → day completion** for the Day View navigator (09 2026-06-13 §2) and the planner-board lock (09 2026-06-13 §5): per week in the active meso, the programmed days with each day's completion state (completed / active / planned) and `setsLogged ÷ setsPlanned` counts — from `microcycles` (week status) → `workouts` (day status) → `logged_sets` vs `workout_exercises.prescribed_sets`. Add `v_meso_week_days` if a single query is cleaner; the planner lock keys off `microcycles.status` (edits apply only to `pending` weeks).
 - Muscle-group volume: view `v_muscle_group_volume` joining `logged_sets → exercises → exercise_muscle_groups`, aggregated per user/week.
-- Meso stats (figs 4.1–4.3): `v_meso_week_sets` — planned vs logged sets per muscle group per meso week (future weeks carry the autoregulated plan); `v_exercise_prs` — all-time bests per exercise for PR badges and the performance tab.
-- Shared views for MCP/stats: `v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs` — so MCP tools and the stats screens share one definition of "progress."
+- Meso stats — **Balance (4.1) / Performance (4.2)** (Volume tab removed, 09 2026-06-14 §4): `v_meso_week_sets` — planned vs logged sets per muscle group per meso week (future weeks carry the autoregulated plan), now consumed by the Balance "avg sets/week — planned" bars + push/pull/legs split; `v_exercise_prs` — all-time bests per exercise for PR badges and the performance tab.
+- **Exercise page (3.1a/3.1b):** `v_exercise_overview` — lifetime aggregates per user/exercise: last performed (date + W·D), all-time bests (weight PR, est. 1RM, volume PR, best session volume), est. 1RM by meso across the current macro, times trained, total volume, first logged. History tab groups `v_exercise_history` rows by meso.
+- **Macrocycle stats (2.2):** `v_macro_summary` — rolled up across the macro's mesos: est. strength on key lifts (% vs macro start), total volume, sessions logged, adherence. The Overview's `FULL ›` link expands the same rollup.
+- Shared views for MCP/stats: `v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs`, `v_exercise_overview`, `v_macro_summary` — so MCP tools and the stats screens share one definition of "progress."

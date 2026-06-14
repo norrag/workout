@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; background: #C9C6BE; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; background: #C9C6BE; font-family: 'Archivo', sans-serif; color: #17140F; padding: 56px 56px 96px;">
+
+  <!-- intro -->
+  <div style="max-width: 980px; margin-bottom: 8px;">
+    <div style="font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(23,20,15,0.55); margin-bottom: 14px;">workout — interactive prototype · one theme each</div>
+    <h1 style="font-size: 42px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.04;">The app shell, made real</h1>
+    <p style="font-size: 14px; line-height: 1.65; margin: 0; max-width: 720px; color: rgba(23,20,15,0.78);">A working build of the five-tab shell — <strong>Workout · Cycles · Templates · Exercises · More</strong>. Tap to navigate. The logging flow runs end to end: step weight &amp; reps, log sets, watch the progress bar fill, finish into the session-feedback sheet, then advance to the next workout. Everything you do <strong>persists across reloads</strong>. The same component is shown in both directions the design has explored — the <strong>paper ledger</strong> on the left, the <strong>dark-mode system</strong> on the right — so they can be judged against each other.</p>
+  </div>
+
+  <!-- legend -->
+  <div style="display: flex; gap: 24px; flex-wrap: wrap; margin: 26px 0 40px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; color: rgba(23,20,15,0.7);">
+    <div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; background: #C14B2A; display: inline-block;"></span>Tap weight / reps to step · tap the box to log</div>
+    <div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border: 1.5px solid #17140F; display: inline-block;"></span>Bottom tabs &amp; “+ NEW” are live</div>
+    <div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; background: #17140F; display: inline-block;"></span>Reload-safe — independent state per device</div>
+  </div>
+
+  <!-- devices -->
+  <div style="display: flex; gap: 64px; align-items: flex-start; flex-wrap: nowrap; width: max-content;">
+
+    <!-- PAPER -->
+    <div style="display: flex; flex-direction: column; gap: 18px;" data-screen-label="Paper theme — interactive">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800; letter-spacing: 0.04em;">PAPER LEDGER</div>
+        <div style="font-size: 11px; font-weight: 500; color: rgba(23,20,15,0.55); letter-spacing: 0.02em;">warm, hard-edged, ink on cream</div>
+      </div>
+      <div style="width: 412px; height: 822px; background: #0a0a0a; border-radius: 56px; padding: 11px; box-shadow: 0 50px 90px -20px rgba(23,20,15,0.45), 0 0 0 1px rgba(0,0,0,0.4);">
+        <div style="position: relative; width: 100%; height: 100%; border-radius: 46px; overflow: hidden; background: #F4F0E6;">
+          <div style="position: absolute; top: 13px; left: 50%; transform: translateX(-50%); width: 116px; height: 33px; background: #000; border-radius: 22px; z-index: 50;"></div>
+          <dc-import name="WorkoutApp" theme="paper" instance="paper" hint-size="100%,100%" style="width: 100%; height: 100%;"></dc-import>
+          <div style="position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); width: 132px; height: 5px; border-radius: 100px; background: rgba(23,20,15,0.32); z-index: 60; pointer-events: none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DARK -->
+    <div style="display: flex; flex-direction: column; gap: 18px;" data-screen-label="Dark theme — interactive">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800; letter-spacing: 0.04em;">DARK SYSTEM</div>
+        <div style="font-size: 11px; font-weight: 500; color: rgba(23,20,15,0.55); letter-spacing: 0.02em;">charcoal, soft radius, signal orange</div>
+      </div>
+      <div style="width: 412px; height: 822px; background: #050505; border-radius: 56px; padding: 11px; box-shadow: 0 50px 90px -20px rgba(23,20,15,0.5), 0 0 0 1px rgba(0,0,0,0.6);">
+        <div style="position: relative; width: 100%; height: 100%; border-radius: 46px; overflow: hidden; background: #0B0B0C;">
+          <div style="position: absolute; top: 13px; left: 50%; transform: translateX(-50%); width: 116px; height: 33px; background: #000; border-radius: 22px; z-index: 50;"></div>
+          <dc-import name="WorkoutApp" theme="dark" instance="dark" hint-size="100%,100%" style="width: 100%; height: 100%;"></dc-import>
+          <div style="position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); width: 132px; height: 5px; border-radius: 100px; background: rgba(242,242,240,0.7); z-index: 60; pointer-events: none;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
