@@ -2,7 +2,62 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-14 (latest) — Metrics & engine-params research lock-down (no code)
+## 2026-06-14 (latest) — Macrocycle planning engine + e1RM metric (Design v2 backlog, ENGINE)
+
+First code landing of the **Design v2 reconciliation backlog**: the pure engine foundation the new
+macrocycle goal layer (Create Macrocycle 2.3 / Overview 2.2) sits on, plus the §1 e1RM definition.
+Pure, fully tested, no UI yet — the screens consume these in the next slice.
+
+### Done
+
+- **`planMacrocycle()`** (`src/lib/engine/macro.ts`, pure & parameterized per 04 §Macrocycle
+  planning, defaults from 10 §5): ingests the full profile (sex, age, bodyweight+unit, height,
+  experience level, training years) and a goal (hypertrophy / strength / cut / maintain), returns
+  `{ target, perMonthRate, recommendedDurationMonths, durationMonths, mesoCount, phases, estimate }`.
+  - **Hypertrophy** — %BW/month rate band × duration × **sex factor** (0.5 female absolute) ×
+    **age taper**, capped by a **career-potential** ceiling that decays with training age
+    (`1 − e^(−years/τ)` × `career_cap_lb`).
+  - **Strength** — monthly-compounding % on key lifts, capped per experience.
+  - **Cut** — %BW/week scaled by **leanness via BMI proxy** (high-bf / average / lean bands),
+    presented as a loss.
+  - **Maintain** — no weight target (recomposition framing).
+  - **Recommended timeframe** — months to reach a meaningful target at the profile's rate, clamped;
+    backstops an omitted duration. `mesoCount = floor(months × 4.33 / mesoLength)`; **phases** spread
+    accumulate → intensify → peak (`spreadPhases`, parameterized by `phase_plan`).
+  - Every target carries an `estimate: true` flag + an "(estimate, …)" rationale (10 §9 honesty
+    guardrail — no progress bar, conservative end).
+- **e1RM** (`src/lib/engine/e1rm.ts`, 10 §1): `estimateE1rm(weight, reps, rir, params)` →
+  effective-reps (`reps + rir·offset`), **averaged Epley/Brzycki** (Epley-only fallback past
+  Brzycki's valid range), and a **confidence band** (high / moderate / low) that degrades with
+  effective reps / RIR and is `low` whenever RIR is unreported.
+- **Params v3** (`engine_params`): new `e1rm`, `macro_target`, `phase_plan`, `key_lifts` blocks added
+  to `engineParamsSchema` with `.default()` (so the active v2 row still parsed) and seeded as an
+  explicit, admin-tunable **version 3** via append-only migration `20260614000001_engine_params_v3.sql`
+  (v2 deactivated, kept for replay). Mirrored in `params.ts` defaults + `seed.sql`; **applied to the
+  hosted project** (v3 active, parses). RLS test updated to expect active version 3.
+- Tests: **80 passing** (+18) — 12 golden/property macro plans (per-goal goldens, monotonic-in-
+  duration, ~½ female absolute, experience scaling, perMonthRate×duration≈target, `spreadPhases`) +
+  6 e1RM (Epley/Brzycki average, confidence bands, Brzycki fallback, null-RIR, non-working input).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (80/80), `npm run build` green. Migration applied
+to the hosted project via the Supabase MCP and re-read (v3 active, `macro_target`/`phase_plan`
+present and well-formed). RLS suite needs a running stack (unchanged from prior sessions); the
+version assertion was updated to 3.
+
+### Not done yet / next
+
+- The **DATA macrocycle restructure** (retire `macro_slots`; `macrocycles.goal_type` /
+  `duration_months` / `meso_length_weeks` / derived targets; `mesocycles.position` / `phase` /
+  `unplanned`) — the migration that the Cycles UI net-new screens depend on. `planMacrocycle` is
+  ready to feed it.
+- **Cycles UI net-new** (2.1 retrofit, 2.1b chooser, 2.2 Overview, 2.3 Create Macrocycle engine):
+  wire `planMacrocycle` into the create flow + Overview target card (live recompute on goal/duration).
+- **Metric-defaults remainder**: wire e1RM into the stats views/exercise page; seed volume landmarks
+  / autoreg bands / adherence with per-metric golden tests.
+
+## 2026-06-14 — Metrics & engine-params research lock-down (no code)
 
 Research + documentation pass turning every mockup metric into a precise, research-backed
 definition with default `engine_params`. Ran a multi-source sports-science review (e1RM accuracy,

@@ -147,17 +147,22 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       `goal_type` (hypertrophy/strength/cut/maintain), `duration_months`, `meso_length_weeks`,
       derived target columns; `mesocycles` gain `position`, `phase`, and an `unplanned` status.
       Migration + RLS + tests (03-data-model deltas).
-- [ ] `ENGINE` `planMacrocycle()` pure function (04 §Macrocycle planning; defaults in 10 §5):
+- [x] `ENGINE` `planMacrocycle()` pure function (04 §Macrocycle planning; defaults in 10 §5):
       **profile-personalized** target range + per-month rate (sex/age/experience/training-age
       scaling) **and a recommended timeframe** for the goal; meso count + suggested phases; golden +
-      property tests; params `macro_target.*` / `phase_plan`.
-- [ ] `ENGINE` `DATA` **Metric defaults** ([10-metrics-spec.md](10-metrics-spec.md)): seed the
+      property tests; params `macro_target.*` / `phase_plan`. *(2026-06-14: `src/lib/engine/macro.ts`
+      + 12 golden/property tests; `engine_params.macro_target`/`phase_plan` seeded as v3.)*
+- [~] `ENGINE` `DATA` **Metric defaults** ([10-metrics-spec.md](10-metrics-spec.md)): seed the
       `engine_params` block (§8) — e1RM (effective-reps + Epley/Brzycki avg + confidence weighting),
       fractional volume counting + MEV/MAV/MRV landmarks, the workload/pump/pain autoregulation
       mapping, RIR ramp, increments/regression, deload, key-lifts = by frequency, adherence window;
       golden tests per metric. Apply the §9 honesty guardrails in copy (no overclaimed e1RM, targets
       labeled estimates, pump/soreness secondary, push:pull advisory-only, deload framed as fatigue
-      management).
+      management). *(2026-06-14: e1RM (`src/lib/engine/e1rm.ts`, averaged + confidence bands) and the
+      `macro_target`/`phase_plan`/`key_lifts` blocks seeded as engine_params v3 (migration
+      `20260614000001`) + schema defaults in `params.ts`; the planMacrocycle target carries an
+      `estimate` honesty flag. **Remaining:** wire e1RM into the stats views/UI, and seed the
+      volume-landmark / autoreg-band / adherence keys with per-metric golden tests.)*
 - [ ] **Cycles list (2.1)** retrofit: macro rows `GOAL <goal> · N MESOCYCLES` + `OVERVIEW ›`,
       name→Overview, chevron expand/collapse; meso rows drop "slot" language → `MESO n · <PHASE>`,
       unplanned rows `SUGGESTED <phase> · NOT PLANNED` + `+ PLAN`; remove per-row orange status tags.
