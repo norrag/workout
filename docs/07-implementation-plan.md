@@ -72,7 +72,7 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 - [x] Workout tab resting logic (08 §2): latest uncompleted workout shown; resting state shows the last completed meso's full 4.1 volume view with a link to all stats
 - [x] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
 - [x] Exercise menu (fig 1.2): history sheet, new/replace pinned note, replace exercise (group-filtered picker, blocked once sets are logged), move down, add set, skip remaining, remove (blocked once sets are logged)
-- [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets; prescription rationale surfaced in the exercise menu. No deletes of logged sets by design (append-only history)
+- [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets, **delete set** — all allowed while the workout is `in_progress`; prescription rationale surfaced in the exercise menu. Logged history becomes immutable only **on workout completion** (the session locks; it feeds the engine chain) — see the reconciliation backlog
 - [x] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
 - [x] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary is engine-derived (Phase 4 wiring landed)
 - [x] Deload logging = standard day view + `DELOAD` badge (engine-reduced prescriptions arrive with the Phase 4 week-generation job)
@@ -173,6 +173,11 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       denser set rows (06 addendum). `DATA` per-week programmed-days + set counts.
 - [ ] **Exercise menu (1.2)**: `History ›` → **`View exercise ›`** → Exercise page Overview (3.1a).
 - [ ] **Workout Complete (1.5)**: drop the autoregulation panel + stats link; `NEXT WORKOUT →`.
+- [ ] `DATA` **Set delete + completion lock (1.3)**: allow amend/delete of sets while the workout
+      is `in_progress`; **lock the workout on completion** (sets/feedback immutable) since completion
+      runs the engine's next-week generation. RLS: gate `logged_sets`/`exercise_feedback`
+      `update`/`delete` on the parent workout being `in_progress`; refines hard rule #5
+      (append-only *after* completion). The planner lock already keeps edit-meso off completed weeks.
 
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable

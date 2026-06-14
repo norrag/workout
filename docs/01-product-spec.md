@@ -42,7 +42,7 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 
 ### F3 — Workout logging
 - Today's planned workout with prescribed exercises, target weight × reps × sets, and target RIR.
-- Log actual weight/reps per set; add/remove/swap sets and exercises; notes per set/exercise/workout.
+- Log actual weight/reps per set; add/remove/**delete**/swap sets and exercises; notes per set/exercise/workout — editable while the session is in progress. **Completing a workout locks it** (its data feeds next-week generation; no later edits).
 - **Per-exercise feedback** (fig 1.4): joint pain during the exercise, plus muscle-group pump and workload sliders.
 - **Workout complete** (fig 1.5): counts (exercises / sets / skipped) + free-text workout notes + `NEXT WORKOUT →`. Autoregulation recomputes silently in the background — no panel, no stats link (09 2026-06-13 §2).
 - Every logged entry is stamped with macro/meso/micro/day context and date.

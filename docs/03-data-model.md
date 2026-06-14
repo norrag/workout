@@ -125,6 +125,13 @@ Generated when a meso starts/created.
 - `status text` — planned / in_progress / completed / skipped
 - `notes text`
 
+**Completion lock.** A `completed` workout is **immutable** — its `logged_sets`, feedback, and
+exercise rows can no longer be added, edited, or deleted. Completion is what feeds the engine's
+next-week generation (it writes `engine_decisions` and seeds the following week), so locking the
+session avoids having to recompute the downstream chain. All set editing/deleting happens **while
+the workout is `in_progress`** (the day view, fig 1.3 set menu); the meso planner's edits likewise
+never touch a completed workout (the partial-completion lock, 09 2026-06-13 §5).
+
 ### `workout_exercises`
 An exercise instance within a session, carrying the **prescription** the engine produced and ordering.
 - `workout_id`, `exercise_id`, `position int`
@@ -145,6 +152,13 @@ The atomic history record. **This is the primary input to the engine and MCP ana
 - `rir_reported int null` — user's own RIR estimate, when given
 - `is_warmup bool default false`
 - `notes text`
+
+**Editable only within the active session.** Sets can be amended **and deleted** from the day-view
+set menu (fig 1.3 `Delete set`) **while the parent workout is `in_progress`**. Once the workout is
+`completed` the rows are locked (see `workouts` §Completion lock) — no client `update`/`delete`.
+This refines hard rule #5: logged history is append-only/immutable *after completion*, not during
+the live workout. (RLS: `delete`/`update` policies on `logged_sets` are gated on the parent
+workout's status being `in_progress`.)
 
 ### `exercise_feedback`
 The post-exercise prompt (fig 1.4) — one row per `workout_exercise`, scoped to a muscle group ("GLUTES — AFTER DEADLIFT").
@@ -191,7 +205,8 @@ Unified grant table for custom content:
 | Table group | Policy sketch |
 |---|---|
 | profiles | owner read/write own row |
-| cycles (incl. macro_slots, meso_days/groups), workouts, sets, feedback, exclusions, exercise_notes | `user_id = auth.uid()` (directly or via parent) for all ops |
+| cycles (incl. meso_days/groups), workouts, exclusions, exercise_notes | `user_id = auth.uid()` (directly or via parent) for all ops |
+| logged_sets, exercise_feedback | `user_id = auth.uid()` for select/insert; **`update`/`delete` only while the parent workout is `in_progress`** — a `completed` workout is locked (no delete/update policy match) |
 | exercises, templates (incl. day groups) | read: `user_id is null or user_id = auth.uid()`; write: owner only; stock rows written only via service role/seed |
 | shares | owner manages; grantee can select rows addressed to them |
 | engine_params | read: all authenticated; write: admin role (via MCP tuning tools) |

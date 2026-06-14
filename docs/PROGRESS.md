@@ -45,9 +45,14 @@ code changed** — the implementation lands in future sessions per the new recon
 - Everything in the **07 reconciliation backlog** — the actual migrations, engine functions, and
   screen retrofits. Execute in future sessions, hard rules in force (append-only migration + RLS +
   tests per PR; engine changes need fixtures; pixel fidelity to the mockup, checking 09 first).
-- Open question for implementation: the set menu (1.3) shows **`Delete set`** — restrict to
-  **unlogged** sets only (hard rule #5 keeps logged history append-only); confirm against the
-  mockup when building.
+- **Resolved (2026-06-14):** the set menu (1.3) `Delete set` is allowed for **any set while the
+  workout is `in_progress`** (not just unlogged). **Completing a workout locks it** — sets/feedback
+  become immutable — since completion runs the engine's next-week generation and we don't want to
+  recompute the chain. RLS gates `logged_sets`/`exercise_feedback` `update`/`delete` on the parent
+  workout being `in_progress`; this refines hard rule #5 (append-only *after* completion). Edit-meso
+  already can't touch completed weeks (planner lock). Captured in 03/07/08.
+- Note: the interactive prototype is a **functional-testing** artifact and is not pixel-perfect —
+  the **mockup is the source of truth** for every detail (already enforced in CLAUDE.md / 09).
 
 ## 2026-06-13 — Phase 5: meso stats, library, templates & sharing
 
