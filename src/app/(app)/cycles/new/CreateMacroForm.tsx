@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   planMacrocycle,
+  suggestMesoLength,
   type EngineParams,
   type MacroGoal,
   type MacroPlan,
@@ -66,9 +67,16 @@ export function CreateMacroForm({
   const [goal, setGoal] = useState<MacroGoal>("hypertrophy");
   const [duration, setDuration] = useState<number | "custom">(6);
   const [customMonths, setCustomMonths] = useState(8);
-  const [mesoLength, setMesoLength] = useState(5);
+  // auto-suggest the block length that divides the macro most evenly, until
+  // the user overrides it (then their choice sticks).
+  const [mesoLength, setMesoLength] = useState(() => suggestMesoLength(6));
+  const [mesoTouched, setMesoTouched] = useState(false);
 
   const durationMonths = duration === "custom" ? customMonths : duration;
+
+  useEffect(() => {
+    if (!mesoTouched) setMesoLength(suggestMesoLength(durationMonths));
+  }, [durationMonths, mesoTouched]);
 
   const plan: MacroPlan = useMemo(
     () =>
@@ -183,7 +191,7 @@ export function CreateMacroForm({
           MESOCYCLE LENGTH
         </div>
         <div className="text-[9px] font-medium tracking-[0.06em] text-ink/50">
-          incl. deload
+          {mesoTouched ? "incl. deload" : "SUGGESTED · incl. deload"}
         </div>
       </div>
       <div className="mt-[7px] flex gap-1.5">
@@ -191,7 +199,10 @@ export function CreateMacroForm({
           <button
             key={w}
             type="button"
-            onClick={() => setMesoLength(w)}
+            onClick={() => {
+              setMesoTouched(true);
+              setMesoLength(w);
+            }}
             className={`flex h-10 flex-1 items-center justify-center text-[11px] ${
               mesoLength === w
                 ? "bg-ink font-bold text-bg-base"

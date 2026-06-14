@@ -177,16 +177,25 @@ genetic-potential advanced lifter to a modest hypertrophy target over a longer b
 All rate models are **[HEURISTIC / model-based]** — present the **conservative end** and label as
 estimates. Scale by experience/training age (front-loaded, halving) and sex.
 
-**Hypertrophy — lean-mass gain (Aragon %BW/month, cross-checked vs Lyle's absolute cap):**
-| Experience (training yrs) | %BW / month (male) |
-|---|---|
-| Beginner (<1) | 1.0–1.5% |
-| Intermediate (1–4) | 0.5–1.0% |
-| Advanced (4+) | 0.25–0.5% |
-`targetLb = bodyweight × rate × months × sexFactor`; `sexFactor = 0.5` female (absolute), else 1.0;
-taper as cumulative career muscle approaches Lyle's cap (~40 lb male / ~20 lb female). Also taper by
-**age** (older → lower end). *(Aragon model; Lyle McDonald model; sex: Roberts 2020 / Refalo 2025 —
+**Hypertrophy — lean-mass gain (continuous training-age decay; Aragon %BW/month bands as anchors):**
+The monthly rate **decays continuously with training age** rather than stepping through discrete
+buckets: `rate(T)% = base × e^(−T / tau)` per month, with `base = {low 1.0, high 1.5}` %BW and
+`tau = 5` yr (`hypertrophy_base_pct_bw_month`, `hypertrophy_decay_tau_years`). Then
+`targetLb = bodyweight × rate(T) × months × sexFactor × ageMultiplier`. This reproduces the Aragon
+bands at their anchor ages (beginner ≈1.0–1.5%/mo, intermediate ≈0.5–1.0%/mo, advanced ≈0.25–0.5%/mo)
+while staying **monotonic in duration** at every training age and tapering smoothly toward genetic
+potential as `T` grows — e.g. a 13-yr trainee gets ≈0.1–0.2%/mo (~2–3 lb lean mass per year), not a
+flat per-macro number. `sexFactor = 0.5` female (absolute), else 1.0; training years lead, experience
+level backstops a missing `training_since`. Also tapered by **age** (older → lower).
+*(Aragon model; Lyle McDonald model — front-loaded, decelerating; sex: Roberts 2020 / Refalo 2025 —
 absolute ~½ for women, relative equal.)*
+
+> **Superseded (v3 → v4).** v3 used discrete experience buckets × duration with a hard absolute
+> **career-cap clamp** (`min(target, career_cap × remaining-potential)`). Because the clamp bounded
+> the *per-macro total*, lifters near potential (high training age) saw an **identical target for
+> every duration** — a 3-month and a 12-month macro both returned the same ~0.5 lb. The continuous
+> decay above replaces it; `career_cap_lb` / `career_tau_years` are retained in params only for
+> back-compat and are unused.
 
 **Strength — % on key lifts:** monthly compounding, decelerating by training status: beginner
 ~4–8%/mo (neural/linear phase), intermediate ~1.5–3%/mo, advanced ~0.5–1.5%/mo; cap long horizons
@@ -199,10 +208,12 @@ absolute ~½ for women, relative equal.)*
 | Higher body fat | 1.0–1.5%+ |
 | Average | 0.5–1.0% |
 | Lean | 0.25–0.5% |
-`fatLossLb = bodyweight × weeklyRate × (months × 4.33)`. **[EVIDENCED — best of the three]**
-*(Helms/Aragon/Fitschen 2014: 0.5–1%/wk; Garthe 2011: 0.7%/wk preserved & built lean mass, 1.4%
-did not; Lyle ~31 kcal/lb-fat ceiling → leaner = slower.)* Heavier/over-fat users can be guided
-faster and safely; lean users slower.
+`fatLossLb = bodyweight × (1 − (1 − weeklyRate)^weeks)` — the weekly rate **compounds on the shrinking
+bodyweight** so long cuts decelerate instead of extrapolating linearly to absurd totals, then the
+total is **capped at `cut_cap_pct_bw` (25% of bodyweight)** since the profile carries no body-fat
+floor. **[EVIDENCED — best of the three]** *(Helms/Aragon/Fitschen 2014: 0.5–1%/wk; Garthe 2011:
+0.7%/wk preserved & built lean mass, 1.4% did not; Lyle ~31 kcal/lb-fat ceiling → leaner = slower.)*
+Heavier/over-fat users can be guided faster and safely; lean users slower.
 
 **Maintain:** target ≈ 0 (recomposition framing); no weight target.
 

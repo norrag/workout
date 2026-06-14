@@ -154,6 +154,32 @@ export function spreadPhases(
   ];
 }
 
+/**
+ * Suggest the mesocycle length (weeks) that divides a macro duration most
+ * evenly — the block size whose whole-number count leaves the least leftover.
+ * Ties break toward the canonical 5-week block, then the shorter block.
+ * (fig 2.3 — the create engine pre-selects this; the user can still override.)
+ */
+export function suggestMesoLength(
+  durationMonths: number,
+  options: readonly number[] = [4, 5, 6],
+): number {
+  const weeks = durationMonths * WEEKS_PER_MONTH;
+  let best = options[0];
+  let bestScore = Infinity;
+  for (const len of options) {
+    const count = Math.max(1, Math.round(weeks / len));
+    const leftover = Math.abs(weeks - count * len);
+    // small tie-breakers: prefer closeness to a 5-week block, then shorter
+    const score = leftover + Math.abs(len - 5) * 0.05 + len * 0.001;
+    if (score < bestScore) {
+      bestScore = score;
+      best = len;
+    }
+  }
+  return best;
+}
+
 interface Computed {
   target: MacroRange;
   perMonthRate: MacroRange;
@@ -249,8 +275,13 @@ function computeTarget(
     const band = leannessBand(profile, mt);
     const rate = mt.cut_pct_bw_week[band];
     const weeks = months * WEEKS_PER_MONTH;
-    const low = bw * (rate[0] / 100) * weeks;
-    const high = bw * (rate[1] / 100) * weeks;
+    // compound on the shrinking bodyweight so long cuts decelerate, then cap
+    // total loss at a realistic fraction of bodyweight (no fat floor in profile)
+    const lossFor = (pctWeek: number) =>
+      bw * (1 - Math.pow(1 - pctWeek / 100, weeks));
+    const cap = bw * mt.cut_cap_pct_bw;
+    const high = Math.min(lossFor(rate[1]), cap);
+    const low = Math.min(lossFor(rate[0]), high);
     return {
       target: { low: round1(low), high: round1(high), unit, direction: "loss" },
       perMonthRate: {
@@ -263,20 +294,14 @@ function computeTarget(
     };
   }
 
-  // hypertrophy
-  const rate = mt.hypertrophy_pct_bw_month[bucket];
+  // hypertrophy — rate decays continuously with training age (front-loaded),
+  // so the target scales with duration AND tapers as the lifter approaches
+  // genetic potential, without a flat per-macro ceiling.
+  const rate = hypertrophyRate(profile, bucket, mt);
   const sf = sexFactor(profile, mt);
   const am = ageMultiplier(profile.age, mt);
-  let low = bw * (rate[0] / 100) * months * sf * am;
-  let high = bw * (rate[1] / 100) * months * sf * am;
-
-  // career cap: remaining lean-mass potential decays with training age
-  const capLb = profile.sex === "female" ? mt.career_cap_lb.female : mt.career_cap_lb.male;
-  const years = profile.trainingYears ?? assumedYears(bucket);
-  const gainedFraction = 1 - Math.exp(-years / mt.career_tau_years);
-  const remaining = lbToUnit(capLb, unit) * (1 - gainedFraction);
-  high = Math.min(high, remaining);
-  low = Math.min(low, high);
+  const low = bw * (rate.low / 100) * months * sf * am;
+  const high = bw * (rate.high / 100) * months * sf * am;
 
   return {
     target: { low: round1(low), high: round1(high), unit, direction: "gain" },
@@ -287,6 +312,23 @@ function computeTarget(
       direction: "gain",
     },
     recommendedDurationMonths: months,
+  };
+}
+
+/**
+ * Hypertrophy %BW/month band at a given training age: `base × e^(−T/tau)`.
+ * Training years lead; experience level backstops a missing `training_since`.
+ */
+function hypertrophyRate(
+  profile: MacroProfile,
+  bucket: ExperienceBucket,
+  mt: EngineParams["macro_target"],
+): { low: number; high: number } {
+  const years = profile.trainingYears ?? assumedYears(bucket);
+  const decay = Math.exp(-years / mt.hypertrophy_decay_tau_years);
+  return {
+    low: mt.hypertrophy_base_pct_bw_month.low * decay,
+    high: mt.hypertrophy_base_pct_bw_month.high * decay,
   };
 }
 
@@ -333,10 +375,10 @@ function recommendDuration(
   }
 
   // hypertrophy: months to reach the recommended absolute gain at the mid rate
-  const rate = mt.hypertrophy_pct_bw_month[bucket];
+  const rate = hypertrophyRate(profile, bucket, mt);
   const sf = sexFactor(profile, mt);
   const am = ageMultiplier(profile.age, mt);
-  const monthlyMid = bw * ((rate[0] + rate[1]) / 2 / 100) * sf * am;
+  const monthlyMid = bw * ((rate.low + rate.high) / 2 / 100) * sf * am;
   if (monthlyMid <= 0) return clamp(6, lo, hi);
   const targetLb = profile.sex === "female" ? mt.recommend_target_lb.female : mt.recommend_target_lb.male;
   const target = lbToUnit(targetLb, unitOf(profile));

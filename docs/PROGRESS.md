@@ -2,7 +2,44 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-14 (latest) — Macrocycle restructure: goal layer + Create engine + Overview + Cycles retrofit (Design v2 backlog, DATA)
+## 2026-06-14 (latest) — Macro-target engine fix: continuous training-age decay + capped cut + auto block-length (ENGINE)
+
+Fixes the realistic-target outputs flagged on-device: for a high-training-age profile the target was
+**static across durations** (3-month and 12-month macros both showed ≈+0.6 lb) and implausibly low.
+Root cause: the hypertrophy model clamped the per-macro total to a hard **career-cap** (remaining
+lifetime potential), which collapses to a fixed tiny number for near-potential lifters regardless of
+duration. Reviewed via a matrix harness across 7 profiles × 4 goals × 3 durations and retuned.
+
+### Done
+
+- **Hypertrophy → continuous training-age decay** (`rate(T) = base × e^(−T/tau)`, `base {1.0,1.5}%BW`,
+  `tau 5 yr`). The target now scales with duration **and** tapers smoothly with training age; the hard
+  career-cap clamp is gone (`career_cap_lb`/`career_tau_years` kept in params only for back-compat).
+  Reproduces the Aragon bands at their anchor ages; a 13-yr lifter now reads **+0.4–0.7 / +0.9–1.3 /
+  +1.8–2.6 lb** for 3/6/12 mo (was a flat +0.6 lb) — ~2–3 lb lean mass/yr, research-appropriate.
+- **Cut → compounding + cap.** Was linearly extrapolating %BW/week (−93 lb over 12 mo). Now compounds
+  on the shrinking bodyweight (decelerates) and is capped at `cut_cap_pct_bw` (25% BW). Strength and
+  maintain unchanged.
+- **`suggestMesoLength(months)`** (pure) — picks the block length (4/5/6 wk) that divides the macro
+  most evenly (12 mo → 4 wk = 52/4 exact; 6 mo → 5 wk). The Create-Macrocycle form **auto-selects** it
+  and re-suggests as duration changes, until the user overrides (then their pick sticks); a `SUGGESTED`
+  hint shows until then.
+- **`engine_params` v4** (migration `20260614000003`, **applied to hosted** + re-read/parsed): new
+  `hypertrophy_base_pct_bw_month`, `hypertrophy_decay_tau_years`, `cut_cap_pct_bw`; v3 deactivated.
+  Schema fields added with `.default()` so older rows still parse; seed + `DEFAULT_ENGINE_PARAMS`
+  mirror it; RLS active-version assertion bumped to 4.
+- Tests: **91 passing** (+5) — reworked macro goldens to the new model; a **monotonic-in-duration**
+  property across training ages 1/4/7/13 (would have caught the static bug), a 13-yr decay-but-positive
+  case, a cut-cap bound, and `suggestMesoLength` correctness. `scripts/macro-engine-matrix.ts` is the
+  (dev-only) review harness. Docs: 10-spec §5 rewritten (model + superseded note); cut formula updated.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (91/91), `npm run build` green. v4 migration applied
+to hosted; the exact migration JSON re-parsed through `engineParamsSchema` and the 13-yr case confirmed
+duration-sensitive. Corrected output matrix reviewed across beginner→elite, both sexes, older lifter.
+
+## 2026-06-14 — Macrocycle restructure: goal layer + Create engine + Overview + Cycles retrofit (Design v2 backlog, DATA)
 
 Lands the largest reconciliation block: the **macrocycle becomes the single-goal layer** (09
 2026-06-13 §3–5 / 2026-06-14). `macro_slots` retired; the create-macrocycle engine (2.3),
