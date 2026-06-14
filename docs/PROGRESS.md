@@ -2,7 +2,43 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-14 (latest) — Design v2 handoff: docs integration (no code)
+## 2026-06-14 (latest) — Metrics & engine-params research lock-down (no code)
+
+Research + documentation pass turning every mockup metric into a precise, research-backed
+definition with default `engine_params`. Ran a multi-source sports-science review (e1RM accuracy,
+rate-of-gain models, volume landmarks, subjective-feedback validity, progression/deload, push/pull
+balance) with primary citations. **No code changed.**
+
+### Done
+
+- **New [10-metrics-spec.md](10-metrics-spec.md)** — authoritative metric/param doc: e1RM
+  (effective-reps = reps+RIR, avg Epley/Brzycki, confidence weighting), fractional volume counting
+  (1.0/0.5), MEV/MAV/MRV landmarks, workload/pump/joint-pain → set-count autoregulation, RIR ramp,
+  increments/regression/deload, the profile-personalized macrocycle target + recommended-timeframe
+  engine, key-lifts-by-frequency, stats rollups (total volume, adherence, progress score, advisory
+  push:pull), consolidated default `engine_params`, and §9 honesty guardrails.
+- **Decisions locked (user, 2026-06-14):** (1) macrocycle target personalized from the full profile
+  + engine recommends timeframe; shown as an estimate, no progress bar; (2) **session feedback
+  sliders restored** to a redesigned Workout Complete sheet (mockup dropped them in error); (3)
+  fractional 1.0/0.5 volume counting; (4) key lifts = most-logged (by frequency). Defaults: female
+  absolute-target ×0.5 (relative %s equal); pump = secondary nudge only.
+- Threaded through 01 (F2/F3), 03 (`workout_feedback` kept + redesigned sheet; macro recommended
+  duration; fractional counting), 04 (`planMacrocycle` profile inputs + recommend-timeframe; metric
+  pointers), 05, 07 (backlog: Complete redesign, profile-driven target, params seeding), 08
+  (decisions log), 09 (new 2026-06-14 session-4 entry), CLAUDE.md (10 in read-first list).
+
+### Recorded deviation
+
+- **Workout Complete (1.5) re-adds session sliders** — authorized deviation from the mockup, which
+  dropped overall fatigue / effort / performance. Sheet = counts + the three session sliders (1.4
+  slider UI) + paragraph notes + `NEXT WORKOUT →`; autoregulation panel stays removed.
+
+### Not done yet / next
+
+- Implement the metrics/params per 10 (engine + migrations + the Complete-sheet redesign), in the
+  07 reconciliation backlog. Hard rules in force; engine changes need golden fixtures.
+
+## 2026-06-14 — Design v2 handoff: docs integration (no code)
 
 Documentation-only pass folding the **2026-06-13/14 design sessions** into the spec docs ahead of
 implementation. New design assets imported and every doc reconciled; **no schema, engine, or UI

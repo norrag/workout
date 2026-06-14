@@ -68,7 +68,8 @@ The **goal layer** (figs 2.1/2.2/2.3). One long-term goal organizing several pos
 - `user_id`, `name`
 - `goal_type text` — **hypertrophy / strength / cut / maintain** (June 2026 vocabulary; replaces
   the old cut/gain/maintain — `gain` → `hypertrophy`, `strength` added; migrate existing rows)
-- `duration_months int` — from the create engine (3 / 6 / 12 / custom)
+- `duration_months int` — chosen on the create engine (3 / 6 / 12 / custom), or the engine's
+  **recommended timeframe** for the goal + profile (`planMacrocycle`, 04 / 10 §5)
 - `meso_length_weeks int` — the user's preferred block length incl. deload (4 / 5 / 6); drives
   how many evenly-spaced mesos fit
 - **Realistic target (derived, cached for display):** `target_low numeric`, `target_high numeric`,
@@ -169,11 +170,14 @@ The post-exercise prompt (fig 1.4) — one row per `workout_exercise`, scoped to
 - `notes text`
 
 ### `workout_feedback`
-After completing a session.
+After completing a session — **retained** and captured on the **redesigned Workout Complete sheet**
+(1.5), which re-adds these sliders (same UI as the per-exercise prompt) alongside the notes field
+(decision 2026-06-14; the mockup had dropped them — see 09 / PROGRESS). Used as a session-level
+dampener by the engine (see [10-metrics-spec.md](10-metrics-spec.md) §3).
 - `workout_id`, `user_id`
 - `overall_fatigue int` (0–4) — how tired/fatigued today
 - `effort_rating int` (0–4), `performance_rating int` (0–4)
-- `notes text`
+- `notes text` (paragraph notes; also mirrored to `workouts.notes`)
 
 ### `templates`
 - `user_id null` — null ⇒ stock template
@@ -218,7 +222,7 @@ Unified grant table for custom content:
 - `logged_sets (user_id, mesocycle_id)` and `(user_id, microcycle_id)` — cycle rollups.
 - `exercises (equipment_type)` — the Exercises tab's **EQUIP** filter axis (fig 3.1); combines (AND) with the muscle-group join for the **MUSCLE** axis and the live `n OF N` count. **Index delta.**
 - **Week → day completion** for the Day View navigator (09 2026-06-13 §2) and the planner-board lock (09 2026-06-13 §5): per week in the active meso, the programmed days with each day's completion state (completed / active / planned) and `setsLogged ÷ setsPlanned` counts — from `microcycles` (week status) → `workouts` (day status) → `logged_sets` vs `workout_exercises.prescribed_sets`. Add `v_meso_week_days` if a single query is cleaner; the planner lock keys off `microcycles.status` (edits apply only to `pending` weeks).
-- Muscle-group volume: view `v_muscle_group_volume` joining `logged_sets → exercises → exercise_muscle_groups`, aggregated per user/week.
+- Muscle-group volume: view `v_muscle_group_volume` joining `logged_sets → exercises → exercise_muscle_groups`, aggregated per user/week. **Fractional set counting** (primary `role` = 1.0, secondary = 0.5; working sets only) is the default convention for all "sets per muscle" metrics and the volume-autoregulation engine — see [10-metrics-spec.md](10-metrics-spec.md) §2.
 - Meso stats — **Balance (4.1) / Performance (4.2)** (Volume tab removed, 09 2026-06-14 §4): `v_meso_week_sets` — planned vs logged sets per muscle group per meso week (future weeks carry the autoregulated plan), now consumed by the Balance "avg sets/week — planned" bars + push/pull/legs split; `v_exercise_prs` — all-time bests per exercise for PR badges and the performance tab.
 - **Exercise page (3.1a/3.1b):** `v_exercise_overview` — lifetime aggregates per user/exercise: last performed (date + W·D), all-time bests (weight PR, est. 1RM, volume PR, best session volume), est. 1RM by meso across the current macro, times trained, total volume, first logged. History tab groups `v_exercise_history` rows by meso.
 - **Macrocycle stats (2.2):** `v_macro_summary` — rolled up across the macro's mesos: est. strength on key lifts (% vs macro start), total volume, sessions logged, adherence. The Overview's `FULL ›` link expands the same rollup.

@@ -42,6 +42,40 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-06-14 (session 4) — Metrics lock-down (engineering/product) + Workout Complete redesign
+
+Session scope: a research pass defining every displayed metric and engine parameter
+([10-metrics-spec.md](../10-metrics-spec.md), the new authoritative metric/params doc), plus one
+design correction to the Workout Complete sheet. Driven by engineering/product, not a designer
+mockup pass — so the mockup is amended here.
+
+### 1. Workout Complete (1.5) — session feedback sliders restored — `RETROFIT`
+- **Change.** The session feedback sliders (overall **fatigue / effort / performance**, 0–4) are
+  **re-added** to the complete sheet, using the same slider UI as the per-exercise prompt (1.4),
+  alongside the paragraph notes and `NEXT WORKOUT →`. The sheet now reads: counts + the three
+  session sliders + notes + next. The **autoregulation panel stays removed** (08 §3 / 2026-06-13 §2
+  unchanged on that point).
+- **Rationale.** The sliders were dropped from the mockup inadvertently; the engine uses
+  session-level fatigue/performance as a dampener on that session's progression (10 §3). This
+  supersedes the "counts + notes only" wording of the 2026-06-13 §2 entry for the slider question.
+- **Affected figures.** 1.5.
+- **Impact.** `RETROFIT`, `DATA`. Keep `workout_feedback` (overall_fatigue/effort/performance);
+  build the redesigned sheet; wire the session dampener.
+
+### 2. Metric & engine-parameter definitions locked — `NET-NEW` (doc), `DATA`/`ENGINE`
+- **Change.** New [10-metrics-spec.md](../10-metrics-spec.md) gives research-backed definitions and
+  default `engine_params` for: e1RM (effective-reps + Epley/Brzycki avg + confidence weighting),
+  **fractional volume counting (1.0/0.5)**, MEV/MAV/MRV landmarks, the workload/pump/joint-pain
+  set-count autoregulation, RIR ramp, increments/regression, deload, the **profile-personalized
+  macrocycle target + recommended timeframe**, **key lifts = most-logged (by frequency)**, and
+  stats rollups. Includes honesty guardrails (don't overclaim e1RM, targets are estimates, pump/
+  soreness secondary, push:pull advisory-only, deloads = fatigue management).
+- **Rationale.** Replace the mockups' illustrative numbers with grounded, citable definitions so the
+  engine helps real progress rather than showing pretty-but-unfounded figures.
+- **Affected figures.** 2.2, 2.3, 3.1a/b, 4.1, 4.2 (read-outs); 1.4 (signals).
+- **Impact.** `DATA`/`ENGINE` — implement per 10; no UI layout change beyond softening the Balance
+  Check copy (push:pull is advisory, not an injury/posture claim).
+
 ## 2026-06-14 (session 3) — Interactive prototype build; library, macrocycle & meso-stats refinements
 
 Session scope: stood up a **fully interactive, reload-persistent prototype** of the whole

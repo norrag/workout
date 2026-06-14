@@ -10,7 +10,8 @@ WORKOUT is a PWA-first workout tracker built on periodized training cycles (macr
 - `docs/06-design-system.md` — attitude, motion, copy voice (color system/nav superseded by 08)
 - `docs/07-implementation-plan.md` — phase order; implement phases in sequence
 - `docs/08-design-decisions.md` — **authoritative design baseline** (June 2026 pivot): light ledger system, canon tab bar, decisions log, figure index; mockups + screenshots in `docs/design/`
-- `docs/09-design-changelog.md` — **authoritative for the dated deltas** amending 08 (2026-06-13/14 sessions: macrocycle goal layer + Overview + create engine, planner board as the single meso surface, Day View header + progress bar, simplified Workout Complete, Exercise page, two-axis exercise filter, Volume stats tab removed, per-set tracking type). **Where 09 conflicts with 08/06, 09 wins.** Check it before building any screen.
+- `docs/09-design-changelog.md` — **authoritative for the dated deltas** amending 08 (2026-06-13/14 sessions: macrocycle goal layer + Overview + create engine, planner board as the single meso surface, Day View header + progress bar, Workout Complete redesign, Exercise page, two-axis exercise filter, Volume stats tab removed, per-set tracking type). **Where 09 conflicts with 08/06, 09 wins.** Check it before building any screen.
+- `docs/10-metrics-spec.md` — **authoritative for metric definitions and default engine parameters** (research-backed): e1RM, fractional volume counting, MEV/MAV/MRV, the workload/pump/pain autoregulation, RIR ramp, increments/deload, the profile-personalized macrocycle target engine, key lifts, stats rollups, and the honesty guardrails. Read before building any metric or engine behavior.
 
 ## Stack
 

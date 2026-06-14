@@ -53,38 +53,53 @@ Per exercise, when generating week *N+1* from week *N*:
 6. **Deload week.** If `is_deload`: prescribe `params.deload.load_pct` (≈ 50–60%) of week-peak load and `params.deload.set_pct` of sets, target RIR 4+.
 7. **Meso seeding.** First week of a new meso starts from prior meso peak adjusted down to the new 3 RIR start (`params.meso_seed_backoff_pct`), or from `initial_*` values / template defaults when no history exists.
 
-All numbered behaviors read from `engine_params.params` — nothing hardcoded.
+All numbered behaviors read from `engine_params.params` — nothing hardcoded. **The concrete,
+research-backed definitions and default values** for every threshold above — the
+`workload`→set-count mapping (step 4), the pump/pain rules, RIR ramp, increments, regression,
+deload, volume counting (fractional 1.0/0.5), and e1RM — live in
+[10-metrics-spec.md](10-metrics-spec.md). Session-level feedback (overall fatigue / effort /
+performance) is **retained** and used as a session dampener (10 §3); it is captured on the
+redesigned Workout Complete sheet (1.5).
 
 ### Progress scoring
 A per-exercise and per-muscle-group score computed from e1RM trend, volume trend, and feedback quality, rolled up to meso and macro level. Stored/queried via the shared views so the UI and MCP report identical numbers.
 
 ## Macrocycle planning (the "engine", figs 2.2/2.3)
 
-A second pure function powers the Create-Macrocycle engine and the Overview's target card:
+A second pure function powers the Create-Macrocycle engine and the Overview's target card.
+**Concrete rate tables, sex/age/experience scaling, and all defaults live in
+[10-metrics-spec.md](10-metrics-spec.md) §5** (research-backed); the shape:
 
 ```
 planMacrocycle(
-  { goal, durationMonths, mesoLengthWeeks, profile: { trainingAgeYears, bodyweight, experienceLevel, units } },
+  { goal,
+    profile: { sex, age, bodyweight, heightCm, experienceLevel, trainingYears },
+    durationMonths?,            // optional — engine recommends one if absent
+    mesoLengthWeeks },
   params
 ) → {
-  mesoCount,                  // evenly-spaced mesos that fit the duration at the chosen block length
-  phases: Phase[],            // suggested phase per position: accumulate → intensify → peak
-  target: { low, high, unit },// realistic range, e.g. { low: 8, high: 11, unit: 'lb_lean_mass' }
-  perMonthRate: { low, high } // target ÷ durationMonths, shown in orange (≈ +1.1–1.6 lb / month)
+  target: { low, high, unit },     // realistic range, personalized to the profile
+  perMonthRate: { low, high },     // target ÷ duration (orange), derived
+  recommendedDurationMonths,       // engine's suggested timeframe for this goal + profile
+  mesoCount,                       // evenly-spaced mesos that fit the (chosen or recommended) duration
+  phases: Phase[]                  // accumulate → intensify → peak
 }
 ```
 
+- **Personalized + scientifically sound (decision, 10 §Decisions).** The engine ingests the
+  **full profile** — sex, age, bodyweight, experience level, and training age (years since
+  `training_since`, a proxy for proximity to genetic potential) — and outputs both a
+  realistic target range **and a recommended macrocycle timeframe** for the chosen goal. A
+  near-potential advanced lifter gets a modest hypertrophy target; an older or female user a
+  lower absolute gain; a heavier user can be guided to a faster (still safe) cut, a lean user a
+  slower one. Rate models are heuristics — present the **conservative end**, labeled as estimates
+  (10 §9).
 - **Pure and parameterized like `prescribe`.** No I/O, no `Date.now()`; all rates/coefficients
-  come from `engine_params` (`params.macro_target.<goal>`, `params.phase_plan`). Same inputs +
-  params ⇒ same plan, replayable.
-- **Realistic target** is goal-specific and scaled by **training age, bodyweight, and experience
-  level** (a 4-yr intermediate at 198 lb gains lean mass slower than a novice): hypertrophy ⇒
-  `lb_lean_mass`, strength ⇒ `pct_strength` on key lifts, cut ⇒ `lb_loss`, maintain ⇒ ~0. The
-  output is what 03's `macrocycles.target_*` columns cache for display; the per-month rate is
-  derived, never stored.
-- **Meso count + phases:** `mesoCount = floor(durationMonths × ~4.33 / mesoLengthWeeks)`
-  (deload included in the block); phases are spread accumulate → intensify → peak across the
-  positions per `params.phase_plan`. The engine creates them as `unplanned` placeholders (03).
+  come from `engine_params` (`params.macro_target.*`, `params.phase_plan`). Same inputs + params
+  ⇒ same plan, replayable.
+- **Meso count + phases:** `mesoCount = floor(durationMonths × ~4.33 / mesoLengthWeeks)`; phases
+  spread accumulate → intensify → peak across positions. The engine creates them as `unplanned`
+  placeholders (03).
 - Recomputes live as the user changes goal / duration / block length on 2.3, and re-renders on
   the Overview (2.2).
 

@@ -147,10 +147,17 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       `goal_type` (hypertrophy/strength/cut/maintain), `duration_months`, `meso_length_weeks`,
       derived target columns; `mesocycles` gain `position`, `phase`, and an `unplanned` status.
       Migration + RLS + tests (03-data-model deltas).
-- [ ] `ENGINE` `planMacrocycle()` pure function (04 §Macrocycle planning): meso count, suggested
-      phases, realistic target range + per-month rate from goal/duration/block-length/profile;
-      golden + property tests; params `macro_target` / `phase_plan` / `goal_bias` (hypertrophy/
-      strength) / `phase_bias`.
+- [ ] `ENGINE` `planMacrocycle()` pure function (04 §Macrocycle planning; defaults in 10 §5):
+      **profile-personalized** target range + per-month rate (sex/age/experience/training-age
+      scaling) **and a recommended timeframe** for the goal; meso count + suggested phases; golden +
+      property tests; params `macro_target.*` / `phase_plan`.
+- [ ] `ENGINE` `DATA` **Metric defaults** ([10-metrics-spec.md](10-metrics-spec.md)): seed the
+      `engine_params` block (§8) — e1RM (effective-reps + Epley/Brzycki avg + confidence weighting),
+      fractional volume counting + MEV/MAV/MRV landmarks, the workload/pump/pain autoregulation
+      mapping, RIR ramp, increments/regression, deload, key-lifts = by frequency, adherence window;
+      golden tests per metric. Apply the §9 honesty guardrails in copy (no overclaimed e1RM, targets
+      labeled estimates, pump/soreness secondary, push:pull advisory-only, deload framed as fatigue
+      management).
 - [ ] **Cycles list (2.1)** retrofit: macro rows `GOAL <goal> · N MESOCYCLES` + `OVERVIEW ›`,
       name→Overview, chevron expand/collapse; meso rows drop "slot" language → `MESO n · <PHASE>`,
       unplanned rows `SUGGESTED <phase> · NOT PLANNED` + `+ PLAN`; remove per-row orange status tags.
@@ -172,7 +179,11 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       setsPlanned`); Target RIR moved next to `W·D`; `MESO n/N` removed from the navigator;
       denser set rows (06 addendum). `DATA` per-week programmed-days + set counts.
 - [ ] **Exercise menu (1.2)**: `History ›` → **`View exercise ›`** → Exercise page Overview (3.1a).
-- [ ] **Workout Complete (1.5)**: drop the autoregulation panel + stats link; `NEXT WORKOUT →`.
+- [ ] **Workout Complete (1.5) — redesign**: drop the autoregulation panel + stats link; keep
+      counts + `NEXT WORKOUT →`; **re-add the session feedback sliders** (overall fatigue / effort /
+      performance, same UI as the 1.4 prompt) + paragraph notes. Authorized deviation from the
+      mockup (it dropped the sliders in error) — `DATA` keeps `workout_feedback`; engine uses it as
+      a session dampener (10 §3).
 - [ ] `DATA` **Set delete + completion lock (1.3)**: allow amend/delete of sets while the workout
       is `in_progress`; **lock the workout on completion** (sets/feedback immutable) since completion
       runs the engine's next-week generation. RLS: gate `logged_sets`/`exercise_feedback`

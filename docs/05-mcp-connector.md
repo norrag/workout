@@ -32,7 +32,7 @@ The MCP connector lets users plug their training data into the LLM of their choi
 ### Write / planning (always explicit, never destructive-by-default)
 | Tool | Purpose |
 |---|---|
-| `create_macrocycle` | draft a macrocycle from `goal` (hypertrophy/strength/cut/maintain) + `duration_months` + `meso_length_weeks`; the **engine** (`planMacrocycle`) computes the meso count, suggested phases, and realistic target — the LLM never invents the numbers. Creates the macro + its `unplanned` meso placeholders |
+| `create_macrocycle` | draft a macrocycle from `goal` (hypertrophy/strength/cut/maintain) + `meso_length_weeks` (+ optional `duration_months`); the **engine** (`planMacrocycle`) computes the profile-personalized target, a **recommended timeframe**, the meso count, and suggested phases — the LLM never invents the numbers (defaults in 10). Creates the macro + its `unplanned` meso placeholders |
 | `create_mesocycle` | draft/plan a meso in the groups-first shape (weeks, days with weekday + label, muscle-group blocks, slot fills, RIR ramp); attaches at a macro `position` or as standalone — created in `planned` status for in-app review before activation |
 | `create_template` | build a reusable template from a spec or from an existing meso |
 | `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, **tracking type**, description) |

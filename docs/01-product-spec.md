@@ -10,7 +10,7 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 
 ### Macrocycle
 - The broad phase lasting **months to years** in which the user defines a single long-term goal: **hypertrophy, strength, cut, or maintain**.
-- Created through an **engine** (fig 2.3): from goal + duration (3/6/12 mo) + preferred block length (4/5/6 wk) + profile, it computes the number of evenly-spaced mesocycles that fit, proposes suggested phases (accumulate → intensify → peak), and a **realistic target range** with a per-month rate (e.g. `+8–11 lb lean mass`, `≈ +1.1–1.6 lb / month`).
+- Created through an **engine** (fig 2.3): from goal + preferred block length (4/5/6 wk) + the **full profile** (sex, age, bodyweight, experience, training age), it computes a **personalized realistic target range** with a per-month rate (e.g. `+8–11 lb lean mass`, `≈ +1.1–1.6 lb / month`), **recommends an appropriate timeframe** for the goal (or validates the user's chosen duration), and lays out the evenly-spaced mesocycles with suggested phases (accumulate → intensify → peak). Targets are research-backed estimates — see [10-metrics-spec.md](10-metrics-spec.md).
 - A macrocycle contains an ordered series of mesocycles working toward its goal; mesos are created **unplanned** and the user plans each as they reach it. The **Macrocycle Overview** (fig 2.2) shows the target, the mesocycle timeline, and rolled-up macro stats (no body-weight progress tracking — the app tracks only the workout data it collects).
 
 ### Mesocycle
@@ -44,7 +44,7 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 - Today's planned workout with prescribed exercises, target weight × reps × sets, and target RIR.
 - Log actual weight/reps per set; add/remove/**delete**/swap sets and exercises; notes per set/exercise/workout — editable while the session is in progress. **Completing a workout locks it** (its data feeds next-week generation; no later edits).
 - **Per-exercise feedback** (fig 1.4): joint pain during the exercise, plus muscle-group pump and workload sliders.
-- **Workout complete** (fig 1.5): counts (exercises / sets / skipped) + free-text workout notes + `NEXT WORKOUT →`. Autoregulation recomputes silently in the background — no panel, no stats link (09 2026-06-13 §2).
+- **Workout complete** (fig 1.5, redesigned): counts (exercises / sets / skipped) + **session feedback sliders (overall fatigue / effort / performance)** + free-text notes + `NEXT WORKOUT →`. Autoregulation recomputes silently — no panel, no stats link (09 2026-06-13 §2); the session sliders return (they were dropped from the mockup in error).
 - Every logged entry is stamped with macro/meso/micro/day context and date.
 - Logging requires connectivity (decision, 08 §3 era): the app is online-only; no offline queue/sync.
 
