@@ -56,7 +56,7 @@ beforeAll(async () => {
     .insert({
       user_id: aliceId,
       name: "Alice macro",
-      goal_type: "gain",
+      goal_type: "hypertrophy",
       start_date: "2026-06-01",
     })
     .select()
@@ -103,7 +103,7 @@ describe("cycles", () => {
     const { error } = await bob.from("macrocycles").insert({
       user_id: aliceId,
       name: "spoof",
-      goal_type: "gain",
+      goal_type: "hypertrophy",
       start_date: "2026-06-01",
     });
     expect(error).not.toBeNull();
@@ -280,24 +280,29 @@ describe("design-pivot tables (0002)", () => {
     expect(error).not.toBeNull();
   });
 
-  it("macro slots and groups-first plan rows are gated through their parents", async () => {
-    const { data: slot, error: slotError } = await alice
-      .from("macro_slots")
+  it("positioned macro mesos and groups-first plan rows are gated through their parents", async () => {
+    // an unplanned, phased placeholder inside alice's macro (replaces slots)
+    const { data: placeholder, error: phError } = await alice
+      .from("mesocycles")
       .insert({
         macrocycle_id: aliceMacroId,
         user_id: aliceId,
-        slot_number: 1,
-        goal_type: "gain",
-        label: "Bulk",
+        position: 1,
+        phase: "accumulation",
+        name: "Mesocycle 1",
+        weeks: 5,
+        days_per_week: 1,
+        status: "unplanned",
       })
       .select()
       .single();
-    expect(slotError).toBeNull();
-    const { data: bobSlots } = await bob
-      .from("macro_slots")
+    expect(phError).toBeNull();
+    expect(placeholder!.status).toBe("unplanned");
+    const { data: bobView } = await bob
+      .from("mesocycles")
       .select("*")
-      .eq("id", slot!.id);
-    expect(bobSlots).toEqual([]);
+      .eq("id", placeholder!.id);
+    expect(bobView).toEqual([]);
 
     // standalone meso (no macro) + groups-first day/group chain
     const { data: meso, error: mesoError } = await alice

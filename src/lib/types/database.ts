@@ -16,8 +16,10 @@ type Table<R> = {
   Relationships: [];
 };
 
-export type GoalType = "cut" | "gain" | "maintain";
-export type SlotGoalType = "cut" | "gain" | "maintain" | "peak";
+/** June 2026 macrocycle goal vocabulary (replaces the old cut/gain/maintain). */
+export type MacroGoalType = "hypertrophy" | "strength" | "cut" | "maintain";
+/** suggested/assigned mesocycle phase within a macro (deload is a per-week flag). */
+export type MesoPhase = "accumulation" | "intensification" | "peak";
 export type EquipmentType =
   | "dumbbell"
   | "barbell"
@@ -103,9 +105,19 @@ export type MacrocycleRow = {
   id: string;
   user_id: string;
   name: string;
-  goal_type: GoalType;
+  goal_type: MacroGoalType;
   goal_notes: string | null;
   target_metrics: Record<string, unknown>;
+  duration_months: number | null;
+  meso_length_weeks: number;
+  recommended_duration_months: number | null;
+  /** cached planMacrocycle target snapshot (display only; recomputed when null) */
+  target_low: number | null;
+  target_high: number | null;
+  target_unit: string | null;
+  target_direction: "gain" | "loss" | "none" | null;
+  rate_low: number | null;
+  rate_high: number | null;
   start_date: string;
   target_end_date: string | null;
   status: "active" | "completed" | "archived";
@@ -113,21 +125,13 @@ export type MacrocycleRow = {
   updated_at: string;
 }
 
-export type MacroSlotRow = {
-  id: string;
-  macrocycle_id: string;
-  user_id: string;
-  slot_number: number;
-  goal_type: SlotGoalType;
-  label: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export type MesocycleRow = {
   id: string;
   macrocycle_id: string | null;
-  macro_slot_id: string | null;
+  /** M1…Mn placement within the macro (null for standalone) */
+  position: number | null;
+  /** suggested/assigned phase, set by the create engine; editable when planning */
+  phase: MesoPhase | null;
   user_id: string;
   name: string;
   weeks: number;
@@ -135,7 +139,7 @@ export type MesocycleRow = {
   includes_deload: boolean;
   rir_start: number;
   rir_end: number;
-  status: "planned" | "active" | "completed" | "abandoned";
+  status: "unplanned" | "planned" | "active" | "completed" | "abandoned";
   template_id: string | null;
   start_date: string | null;
   created_at: string;
@@ -424,6 +428,17 @@ export type VMesoSummaryRow = {
   avg_performance: number | null;
 }
 
+export type VMacroSummaryRow = {
+  user_id: string;
+  macrocycle_id: string;
+  meso_count: number;
+  sessions_logged: number;
+  workouts_total: number;
+  working_sets: number;
+  total_volume: number;
+  first_week_start: string | null;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -434,7 +449,6 @@ export type Database = {
       excluded_exercises: Table<ExcludedExerciseRow>;
       exercise_notes: Table<ExerciseNoteRow>;
       macrocycles: Table<MacrocycleRow>;
-      macro_slots: Table<MacroSlotRow>;
       mesocycles: Table<MesocycleRow>;
       meso_days: Table<MesoDayRow>;
       meso_day_groups: Table<MesoDayGroupRow>;
@@ -460,6 +474,7 @@ export type Database = {
       v_meso_summary: { Row: VMesoSummaryRow; Relationships: [] };
       v_meso_week_sets: { Row: VMesoWeekSetsRow; Relationships: [] };
       v_exercise_prs: { Row: VExercisePrsRow; Relationships: [] };
+      v_macro_summary: { Row: VMacroSummaryRow; Relationships: [] };
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };

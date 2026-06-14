@@ -493,7 +493,6 @@ export async function getMesoStats(
   if (meso.macrocycle_id) {
     const [
       { data: macro, error: macroError },
-      { data: slots, error: slotError },
       { data: macroMesos, error: macroMesoError },
     ] = await Promise.all([
       supabase
@@ -502,58 +501,46 @@ export async function getMesoStats(
         .eq("id", meso.macrocycle_id)
         .maybeSingle(),
       supabase
-        .from("macro_slots")
-        .select("*")
-        .eq("macrocycle_id", meso.macrocycle_id)
-        .order("slot_number"),
-      supabase
         .from("mesocycles")
         .select("*")
-        .eq("macrocycle_id", meso.macrocycle_id),
+        .eq("macrocycle_id", meso.macrocycle_id)
+        .order("position", { ascending: true, nullsFirst: false })
+        .order("created_at"),
     ]);
     if (macroError) throw macroError;
-    if (slotError) throw slotError;
     if (macroMesoError) throw macroMesoError;
     macroName = macro?.name ?? null;
 
     const lead = keyLifts[0] ?? null;
-    if (lead && (slots ?? []).length > 0) {
+    const orderedMesos = macroMesos ?? [];
+    if (lead && orderedMesos.length > 0) {
       macroLiftName = lead.name;
-      const mesoBySlot = new Map(
-        (macroMesos ?? [])
-          .filter((m) => m.macro_slot_id)
-          .map((m) => [m.macro_slot_id!, m]),
-      );
-      const slotMesoIds = (slots ?? [])
-        .map((s) => mesoBySlot.get(s.id)?.id)
-        .filter((id): id is string => !!id);
+      const mesoIds = orderedMesos.map((m) => m.id);
       let liftHistory: { mesocycle_id: string; e1rm: number | null }[] = [];
-      if (slotMesoIds.length > 0) {
+      if (mesoIds.length > 0) {
         const { data, error } = await supabase
           .from("v_exercise_history")
           .select("mesocycle_id, e1rm")
           .eq("user_id", userId)
           .eq("exercise_id", lead.exercise_id)
-          .in("mesocycle_id", slotMesoIds);
+          .in("mesocycle_id", mesoIds);
         if (error) throw error;
         liftHistory = data ?? [];
       }
-      macroChart = (slots ?? []).map((slot, i) => {
-        const slotMeso = mesoBySlot.get(slot.id);
-        if (slotMeso?.id === meso.id) mesoPosition = `MESO ${i + 1} OF ${(slots ?? []).length}`;
-        const best = slotMeso
-          ? liftHistory
-              .filter((h) => h.mesocycle_id === slotMeso.id && h.e1rm != null)
-              .reduce<number | null>(
-                (max, h) => (max == null || h.e1rm! > max ? h.e1rm : max),
-                null,
-              )
-          : null;
+      macroChart = orderedMesos.map((macroMeso, i) => {
+        if (macroMeso.id === meso.id)
+          mesoPosition = `MESO ${i + 1} OF ${orderedMesos.length}`;
+        const best = liftHistory
+          .filter((h) => h.mesocycle_id === macroMeso.id && h.e1rm != null)
+          .reduce<number | null>(
+            (max, h) => (max == null || h.e1rm! > max ? h.e1rm : max),
+            null,
+          );
         return {
           label: `M${i + 1}`,
           e1rm: best != null ? Math.round(best) : null,
           state:
-            slotMeso?.id === meso.id
+            macroMeso.id === meso.id
               ? ("current" as const)
               : best != null
                 ? ("past" as const)

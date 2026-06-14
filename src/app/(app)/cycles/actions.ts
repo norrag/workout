@@ -8,7 +8,6 @@ import {
   addDayGroup,
   addMesoDay,
   clearSlot,
-  createMacrocycle,
   createMesocycle,
   fillSlot,
   removeDayGroup,
@@ -16,7 +15,11 @@ import {
   updateDayGroup,
   updateMesoDay,
 } from "@/lib/queries/cycles";
-import { startMeso } from "@/lib/queries/generation";
+import {
+  createMacrocycleWithMesos,
+  planUnplannedMeso,
+} from "@/lib/queries/macro";
+import { getActiveEngineParams, startMeso } from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
 import {
   applyTemplateToMeso,
@@ -37,68 +40,62 @@ export interface FormState {
 }
 
 // ---------------------------------------------------------------------------
-// macro creation — name, date range, ordered goal-arc slots (fig 2.1)
+// macrocycle creation — the engine (fig 2.3): goal + duration + block length →
+// realistic target + the right number of unplanned, phased mesocycles
 // ---------------------------------------------------------------------------
 
 const macroSchema = z.object({
   name: z.string().min(1, "Name is required").max(80),
+  goal_type: z.enum(["hypertrophy", "strength", "cut", "maintain"]),
+  // null ⇒ use the engine's recommended timeframe
+  duration_months: z.coerce.number().int().min(1).max(60).nullable(),
+  meso_length_weeks: z.coerce.number().int().min(4).max(6),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  target_end_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable(),
-  slots: z
-    .array(
-      z.object({
-        goal_type: z.enum(["cut", "gain", "maintain", "peak"]),
-        label: z.string().max(40).nullable(),
-      }),
-    )
-    .min(1, "Add at least one goal slot")
-    .max(12),
+  goal_notes: z.string().max(280).nullable(),
 });
 
 export async function createMacrocycleAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  let slots: unknown;
-  try {
-    slots = JSON.parse(String(formData.get("slots") ?? "[]"));
-  } catch {
-    return { error: "Invalid goal arc." };
-  }
+  const rawDuration = formData.get("duration_months");
   const parsed = macroSchema.safeParse({
     name: formData.get("name"),
+    goal_type: formData.get("goal_type"),
+    duration_months: rawDuration ? rawDuration : null,
+    meso_length_weeks: formData.get("meso_length_weeks"),
     start_date: formData.get("start_date"),
-    target_end_date: formData.get("target_end_date") || null,
-    slots,
+    goal_notes: formData.get("goal_notes") || null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
   const { supabase, user } = await requireUser();
-  // macro-level goal_type keeps the 0001 shape: first slot leads the arc
-  const lead = parsed.data.slots[0].goal_type;
-  await createMacrocycle(supabase, user.id, {
-    name: parsed.data.name,
-    goal_type: lead === "peak" ? "maintain" : lead,
-    start_date: parsed.data.start_date,
-    target_end_date: parsed.data.target_end_date,
-    slots: parsed.data.slots,
-  });
+  const profile = await getProfile(supabase, user.id);
+  if (!profile) redirect("/onboarding");
+  const { params } = await getActiveEngineParams(supabase);
+
+  await createMacrocycleWithMesos(supabase, user.id, parsed.data, profile, params);
   revalidatePath("/cycles");
   redirect("/cycles");
 }
 
+/** `+ PLAN` on an unplanned placeholder (figs 2.1/2.2) → planner board. */
+export async function planMesoAction(formData: FormData): Promise<void> {
+  const mesoId = z.string().uuid().parse(formData.get("meso_id"));
+  const { supabase } = await requireUser();
+  await planUnplannedMeso(supabase, mesoId);
+  revalidatePath("/cycles");
+  redirect(`/cycles/meso/${mesoId}/plan`);
+}
+
 // ---------------------------------------------------------------------------
-// meso creation (fig 2.7) — name, placement slot, weeks, RIR ramp
+// standalone meso creation (fig 2.4 from-scratch / template) — weeks, RIR ramp
 // ---------------------------------------------------------------------------
 
 const mesoSchema = z.object({
   name: z.string().min(1, "Name is required").max(80),
-  macro_slot_id: z.string().uuid().nullable(),
   weeks: z.coerce.number().int().min(3).max(8),
   includes_deload: z.boolean(),
   rir_start: z.coerce.number().int().min(0).max(5),
@@ -112,7 +109,6 @@ export async function createMesocycleAction(
 ): Promise<FormState> {
   const parsed = mesoSchema.safeParse({
     name: formData.get("name"),
-    macro_slot_id: formData.get("macro_slot_id") || null,
     weeks: formData.get("weeks"),
     includes_deload: formData.get("includes_deload") === "true",
     rir_start: formData.get("rir_start"),

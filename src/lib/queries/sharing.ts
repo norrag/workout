@@ -339,7 +339,8 @@ async function copyMesocycle(
     .insert({
       user_id: granteeId,
       macrocycle_id: null,
-      macro_slot_id: null,
+      position: null,
+      phase: null,
       name: source.name,
       weeks: source.weeks,
       days_per_week: source.days_per_week,

@@ -2,7 +2,96 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-14 (latest) — Macrocycle planning engine + e1RM metric (Design v2 backlog, ENGINE)
+## 2026-06-14 (latest) — Macrocycle restructure: goal layer + Create engine + Overview + Cycles retrofit (Design v2 backlog, DATA)
+
+Lands the largest reconciliation block: the **macrocycle becomes the single-goal layer** (09
+2026-06-13 §3–5 / 2026-06-14). `macro_slots` retired; the create-macrocycle engine (2.3),
+Macrocycle Overview (2.2), `+ NEW` chooser (2.1b), and the Cycles list retrofit (2.1) are live,
+all feeding off the already-built-and-tested `planMacrocycle`. Vertical slice; `main` deployable.
+
+### Done
+
+- **`DATA` migration `20260614000002_macrocycle_restructure.sql`** (append-only; **applied to the
+  hosted project** via Supabase MCP, schema re-read to confirm):
+  - `macrocycles` — goal vocabulary migrated (`gain → hypertrophy`, `strength` added; check swapped
+    to `hypertrophy/strength/cut/maintain`); new `duration_months`, `meso_length_weeks`,
+    `recommended_duration_months`, and the cached planMacrocycle snapshot (`target_low/high`,
+    `target_unit`, `target_direction`, `rate_low/high`).
+  - `mesocycles` — `position` + `phase` (accumulation/intensification/peak); `unplanned` added to the
+    status check; `macro_slot_id` dropped; `(macrocycle_id, position)` index. Any prior slot ordering
+    is carried onto the host meso before the table goes.
+  - `macro_slots` **dropped** (policy/index/trigger cascade).
+  - New **`v_macro_summary`** (security_invoker) — per-macro rollup (meso count, sessions, total
+    volume, working sets, first-week start). Security advisor clean (no new lints; view isn't flagged).
+- **Engine wiring (no engine change).** `src/lib/queries/macro.ts`: `profileToMacroProfile`
+  (training-age from `training_since`), `planForMacro` (live recompute), `createMacrocycleWithMesos`
+  (creates the macro + N **unplanned, phased** placeholders), `planUnplannedMeso` (`+ PLAN` flips to
+  planned), `getMacroOverview` (+ `buildMacroStats`: est-strength e1RM trend on key lifts by
+  frequency, over the shared `v_exercise_history`). `engineGoal` simplified to map the macro goal →
+  progression goal (hypertrophy/strength → gain; cut/maintain pass through); slot lookup removed from
+  the week N→N+1 job and the meso-stats macro chart.
+- **Screens (pixel pass off the v2 mockup, figs 2.1/2.1b/2.2/2.3):**
+  - **Create Macrocycle (2.3)** `/cycles/new` — the engine: name, goal (4), duration (3/6/12/custom),
+    block length (4/5/6 wk), with a **live target card** (range + per-month rate + meso strip +
+    phase legend) recomputed client-side via the pure `planMacrocycle`. Creates `active` macro +
+    unplanned mesos, lands on Cycles.
+  - **Macrocycle Overview (2.2)** `/cycles/macro/[macroId]` — realistic-target card (range + orange
+    `≈ rate / month` + profile chips), mesocycle timeline (phase + status + `+ PLAN` on placeholders),
+    macro-stats 2×2 (est strength / total volume / sessions / adherence). No progress-vs-projection
+    bar (09 §3).
+  - **`+ NEW` chooser (2.1b)** — bottom-sheet picker (Macrocycle → 2.3 · Standalone meso → 2.4) with
+    the in-macro `+ PLAN` note.
+  - **Cycles list (2.1) retrofit** — macro rows `GOAL <goal> · N MESOCYCLES` + `OVERVIEW ›`, name →
+    Overview, chevron expand; meso rows `MESO n · <PHASE> · …`, unplanned `SUGGESTED <phase> · NOT
+    PLANNED` + `+ PLAN`; standalone section unchanged. Slot language gone.
+  - Standalone meso create (2.4 from-scratch/template) simplified to standalone-only; planner board
+    macro-context strip rebuilt from `position`/`phase`.
+- Types (`database.ts`): `MacroGoalType`/`MesoPhase`, macrocycle target columns, meso `position`/
+  `phase`/`unplanned`, `MacroSlotRow`/`macro_slots` removed, `VMacroSummaryRow` added.
+- Tests: **86 passing** (+6) — `macro.test.ts` (profile→engine mapping incl. training-age math,
+  phase labels, plan snapshot/recommended-duration fallback); `engineGoal` test reworked to the new
+  goal mapping. RLS test updated (goal vocab; slot block → positioned-unplanned-meso gating).
+
+### Recorded deviations
+
+- **Per-month rate cached** in `macrocycles.rate_low/high` — 03 says the rate is "derived, not
+  stored". Cached anyway because strength's compounding band is **not** derivable from the total
+  range ÷ duration; the Overview still **recomputes the whole plan live** from the profile, so the
+  cache is a snapshot/fallback only.
+- **Est. strength** (macro stats) is computed in the **query layer** over `v_exercise_history` (the
+  e1RM trend is engine-side), not inside `v_macro_summary` SQL — same pattern as Phase 4 progress
+  scoring; still one shared view for the raw history.
+- **Timeline progress bar** is status-based (done = filled, active = accent, planned = faint), not
+  set-precise — exact `setsLogged ÷ planned` per meso would need extra queries; deferred.
+- **Overview `FULL ›`** link and a real **EDIT MACROCYCLE** screen are out of this slice — the stats
+  card has no detail page yet, and edit shows `SOON`. (Per-meso STATS is the existing 4.x screen.)
+- **`v_exercise_overview`** (Exercise page 3.1a) is **not** built here — it belongs to the
+  library/stats slice; the shared-views list in CLAUDE notes it as pending.
+- Legacy pre-restructure meso (1 row on hosted) has null `position` — the Overview/list fall back to
+  row index so it renders cleanly.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (86/86), `npm run build` green. Migration applied
+to the hosted project and the schema re-read (new macro columns, meso `position`/`phase`, `macro_slots`
+gone, `v_macro_summary` present, legacy `gain` row migrated to `hypertrophy`); security advisors show
+no new lints. RLS suite needs a running stack (unchanged); its assertions were updated to the new
+shape. No hosted integration smoke this slice (avoided polluting the existing account) — the create/
+overview I/O is exercised only through typecheck + the schema check; pure helpers are unit-tested.
+
+### Not done yet / next
+
+- **Plan a mesocycle (2.4) four paths** — copy / template / **meso builder (group priorities)** /
+  scratch (copy + builder still stubs).
+- **Planner board (2.5) as the single meso surface** — `PLAN | STATS` toggle, partial-completion
+  lock, `SAVE CHANGES`; retire the old meso-detail (2.2-old) page.
+- **Logging retrofit (1.1/1.2/1.5/1.3)** — Day View sticky header + orange progress bar, Workout
+  Complete redesign (re-add session sliders), set delete + completion lock RLS.
+- **Library & stats** — `exercises.tracking_type` + per-type set rows, two-axis filter, **Exercise
+  page (3.1a/b)** + `v_exercise_overview`, Meso Stats drop the Volume tab.
+- **MCP `create_macrocycle` / `get_macro_summary`** (05) once the connector phase lands.
+
+## 2026-06-14 — Macrocycle planning engine + e1RM metric (Design v2 backlog, ENGINE)
 
 First code landing of the **Design v2 reconciliation backlog**: the pure engine foundation the new
 macrocycle goal layer (Create Macrocycle 2.3 / Overview 2.2) sits on, plus the §1 e1RM definition.

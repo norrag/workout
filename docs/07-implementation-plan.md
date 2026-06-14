@@ -143,10 +143,12 @@ shipped** screens (retrofit). Schema/engine items carry a `DATA`/`ENGINE` tag an
 hard rules (append-only migration + RLS + tests in the same PR; engine changes need fixtures).
 
 ### Cycles & macrocycles (against Phase 2) — largest block, mostly net-new
-- [ ] `DATA` Macrocycle restructure: retire `macro_slots`; `macrocycles` gain
+- [x] `DATA` Macrocycle restructure: retire `macro_slots`; `macrocycles` gain
       `goal_type` (hypertrophy/strength/cut/maintain), `duration_months`, `meso_length_weeks`,
       derived target columns; `mesocycles` gain `position`, `phase`, and an `unplanned` status.
-      Migration + RLS + tests (03-data-model deltas).
+      Migration + RLS + tests (03-data-model deltas). *(2026-06-14: migration
+      `20260614000002_macrocycle_restructure.sql`, applied to hosted; `v_macro_summary` added;
+      types + queries + RLS test updated. Per-month rate cached too — see PROGRESS deviation.)*
 - [x] `ENGINE` `planMacrocycle()` pure function (04 §Macrocycle planning; defaults in 10 §5):
       **profile-personalized** target range + per-month rate (sex/age/experience/training-age
       scaling) **and a recommended timeframe** for the goal; meso count + suggested phases; golden +
@@ -163,15 +165,19 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       `20260614000001`) + schema defaults in `params.ts`; the planMacrocycle target carries an
       `estimate` honesty flag. **Remaining:** wire e1RM into the stats views/UI, and seed the
       volume-landmark / autoreg-band / adherence keys with per-metric golden tests.)*
-- [ ] **Cycles list (2.1)** retrofit: macro rows `GOAL <goal> · N MESOCYCLES` + `OVERVIEW ›`,
+- [x] **Cycles list (2.1)** retrofit: macro rows `GOAL <goal> · N MESOCYCLES` + `OVERVIEW ›`,
       name→Overview, chevron expand/collapse; meso rows drop "slot" language → `MESO n · <PHASE>`,
       unplanned rows `SUGGESTED <phase> · NOT PLANNED` + `+ PLAN`; remove per-row orange status tags.
-- [ ] **`+ NEW` chooser (2.1b)** net-new: Macrocycle vs Standalone mesocycle.
-- [ ] **Macrocycle Overview (2.2)** net-new: realistic target card (range + per-month rate +
+      *(2026-06-14.)*
+- [x] **`+ NEW` chooser (2.1b)** net-new: Macrocycle vs Standalone mesocycle. *(2026-06-14:
+      `NewCycleButton` bottom sheet.)*
+- [x] **Macrocycle Overview (2.2)** net-new: realistic target card (range + per-month rate +
       training-age/bodyweight/experience chips), mesocycle timeline (phase + status), macro stats
-      (`v_macro_summary`) with `FULL ›`. **No progress-vs-projection / body-weight bar.**
-- [ ] **Create Macrocycle engine (2.3)** net-new: goal / duration / block-length inputs, live
+      (`v_macro_summary`). **No progress-vs-projection / body-weight bar.** *(2026-06-14:
+      `/cycles/macro/[macroId]`; `FULL ›` + an edit screen deferred — see PROGRESS.)*
+- [x] **Create Macrocycle engine (2.3)** net-new: goal / duration / block-length inputs, live
       target + meso-count + phase preview (`planMacrocycle`), creates `unplanned` mesos.
+      *(2026-06-14: `/cycles/new` `CreateMacroForm`, live client recompute.)*
 - [ ] **Plan a mesocycle (2.4)** four paths: copy · template · **meso builder (muscle-group
       priorities — emphasize/grow/maintain)** · from scratch (builder + copy were "soon" stubs).
 - [ ] **Planner board (2.5)** becomes the **single meso view/edit surface** (old 2.2 meso-detail

@@ -38,44 +38,36 @@ export default async function MesoPlanPage({
     groupIdsByExercise.set(link.exercise_id, cur);
   }
 
-  // macro context strip (fig 2.4)
+  // macro context strip (fig 2.5) — positioned mesos, no more slots
   let macroContext: MacroContext | null = null;
   if (plan.meso.macrocycle_id) {
-    const [{ data: macro, error: macroError }, { data: slots, error: slotError }, { data: mesos, error: mesoError }] =
+    const [{ data: macro, error: macroError }, { data: mesos, error: mesoError }] =
       await Promise.all([
         supabase
           .from("macrocycles")
-          .select("id, name")
+          .select("id, name, goal_type")
           .eq("id", plan.meso.macrocycle_id)
           .single(),
         supabase
-          .from("macro_slots")
-          .select("id, slot_number, goal_type, label")
-          .eq("macrocycle_id", plan.meso.macrocycle_id)
-          .order("slot_number"),
-        supabase
           .from("mesocycles")
-          .select("id, macro_slot_id")
-          .eq("macrocycle_id", plan.meso.macrocycle_id),
+          .select("id, position, phase, status")
+          .eq("macrocycle_id", plan.meso.macrocycle_id)
+          .order("position", { ascending: true, nullsFirst: false }),
       ]);
     if (macroError) throw macroError;
-    if (slotError) throw slotError;
     if (mesoError) throw mesoError;
-    const filled = new Set(
-      (mesos ?? []).map((m) => m.macro_slot_id).filter(Boolean),
-    );
-    const thisSlot = (slots ?? []).find((s) => s.id === plan.meso.macro_slot_id);
+    const ordered = mesos ?? [];
+    const thisPos = ordered.findIndex((m) => m.id === mesoId) + 1;
+    const phase = plan.meso.phase ? ` · ${plan.meso.phase.toUpperCase()}` : "";
     macroContext = {
-      label: thisSlot
-        ? `MACRO ${macro.name.toUpperCase()} — SLOT ${thisSlot.slot_number} OF ${(slots ?? []).length} · ${(thisSlot.label ?? thisSlot.goal_type).toUpperCase()}`
-        : `MACRO ${macro.name.toUpperCase()}`,
-      slots: (slots ?? []).map((s) => ({
+      label: `MACRO ${macro.name.toUpperCase()} — MESO ${thisPos || "?"} OF ${ordered.length}${phase}`,
+      slots: ordered.map((m) => ({
         state:
-          s.id === plan.meso.macro_slot_id
+          m.id === mesoId
             ? ("this" as const)
-            : filled.has(s.id)
-              ? ("filled" as const)
-              : ("open" as const),
+            : m.status === "unplanned"
+              ? ("open" as const)
+              : ("filled" as const),
       })),
     };
   }
