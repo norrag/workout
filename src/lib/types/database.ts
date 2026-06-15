@@ -42,6 +42,8 @@ export type ProfileRow = {
   height_cm: number | null;
   bodyweight: number | null;
   bodyweight_updated_at: string | null;
+  /** estimated body-fat % (optional) — feeds the FFMI proximity target model */
+  body_fat_pct: number | null;
   training_since: string | null;
   experience_level: ExperienceLevel | null;
   preferred_equipment: string[];

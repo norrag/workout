@@ -28,6 +28,7 @@ export async function updateProfile(
       | "height_cm"
       | "bodyweight"
       | "bodyweight_updated_at"
+      | "body_fat_pct"
       | "training_since"
       | "experience_level"
       | "preferred_equipment"

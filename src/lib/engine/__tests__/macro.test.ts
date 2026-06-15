@@ -21,6 +21,7 @@ const intermediateMale: MacroProfile = {
   heightCm: 180,
   experienceLevel: "intermediate",
   trainingYears: 3,
+  bodyFatPct: null,
 };
 
 describe("planMacrocycle — golden plans", () => {
@@ -211,6 +212,7 @@ describe("planMacrocycle — properties", () => {
       heightCm: 175,
       experienceLevel: "intermediate",
       trainingYears: 3,
+      bodyFatPct: null,
     };
     const plan = planMacrocycle(
       { goal: "cut", profile, durationMonths: 12, mesoLengthWeeks: 5 },
@@ -222,7 +224,7 @@ describe("planMacrocycle — properties", () => {
     );
   });
 
-  it("female absolute hypertrophy target is ~half the male one", () => {
+  it("female absolute hypertrophy target scales by the sex factor (research-corrected 0.7, not 0.5)", () => {
     const base: MacroProfile = {
       ...intermediateMale,
       bodyweight: 150,
@@ -237,7 +239,12 @@ describe("planMacrocycle — properties", () => {
       { goal: "hypertrophy", profile: { ...base, sex: "female" }, durationMonths: 4, mesoLengthWeeks: 5 },
       params,
     );
-    expect(female.target.high * 2).toBeCloseTo(male.target.high, 1);
+    // relative gains are ~equal between sexes; the absolute factor (0.7) reflects
+    // women's lower lean-mass fraction, not a halved adaptive response
+    expect(female.target.high).toBeCloseTo(
+      male.target.high * params.macro_target.sex_factor_female,
+      1,
+    );
   });
 
   it("hypertrophy target scales down with training experience", () => {
@@ -305,6 +312,103 @@ describe("spreadPhases", () => {
     for (let n = 3; n <= 8; n++) {
       expect(spreadPhases(n, plan).at(-1)).toBe("peak");
     }
+  });
+});
+
+describe("hypertrophy — FFMI proximity model (when body fat is known)", () => {
+  // 6'1" 159 lb 36yo ~16.5% bf, "trained since 2013" but undermuscled (FFMI ~17,
+  // below untrained baseline). Calendar training age says elite; body comp says
+  // beginner. The proximity model must give him beginner-class gains.
+  const undermuscled: MacroProfile = {
+    sex: "male",
+    age: 36,
+    bodyweight: 159,
+    bodyweightUnit: "lb",
+    heightCm: 185.4,
+    experienceLevel: "intermediate",
+    trainingYears: 13,
+    bodyFatPct: 16.5,
+  };
+
+  it("gives an undermuscled long-time trainee beginner-class gains, not elite", () => {
+    const proximity = planMacrocycle(
+      { goal: "hypertrophy", profile: undermuscled, durationMonths: 12 },
+      params,
+    ).target;
+    // beginner-class: well above the ~2 lb/yr the training-age model gave
+    expect(proximity.high).toBeGreaterThan(20);
+    // and far above what the same calendar-age profile gets with body fat unknown
+    const trainingAge = planMacrocycle(
+      { goal: "hypertrophy", profile: { ...undermuscled, bodyFatPct: null }, durationMonths: 12 },
+      params,
+    ).target;
+    expect(trainingAge.high).toBeLessThan(4); // 13yr decay → elite
+    expect(proximity.high).toBeGreaterThan(trainingAge.high * 4);
+  });
+
+  it("a lifter near the FFMI ceiling gets minimal gains regardless of training age", () => {
+    const jacked: MacroProfile = {
+      sex: "male",
+      age: 30,
+      bodyweight: 200,
+      bodyweightUnit: "lb",
+      heightCm: 178,
+      experienceLevel: "advanced",
+      trainingYears: 13,
+      bodyFatPct: 10, // FFMI ~25, at the ceiling
+    };
+    const plan = planMacrocycle(
+      { goal: "hypertrophy", profile: jacked, durationMonths: 12 },
+      params,
+    );
+    expect(plan.target.high).toBeLessThan(2);
+  });
+
+  it("leaner/more-muscular at equal bodyweight ⇒ slower gains (reads muscle, not weight)", () => {
+    const at = (bf: number) =>
+      planMacrocycle(
+        {
+          goal: "hypertrophy",
+          profile: {
+            sex: "male",
+            age: 30,
+            bodyweight: 180,
+            bodyweightUnit: "lb",
+            heightCm: 178,
+            experienceLevel: "intermediate",
+            trainingYears: 5,
+            bodyFatPct: bf,
+          },
+          durationMonths: 12,
+        },
+        params,
+      ).target.high;
+    // higher body fat at same weight = less muscle = more room = faster
+    expect(at(28)).toBeGreaterThan(at(20));
+    expect(at(20)).toBeGreaterThan(at(10));
+  });
+
+  it("cut leanness band uses body fat % when present", () => {
+    const cut = (bf: number) =>
+      planMacrocycle(
+        {
+          goal: "cut",
+          profile: {
+            sex: "male",
+            age: 30,
+            bodyweight: 200,
+            bodyweightUnit: "lb",
+            heightCm: 178,
+            experienceLevel: "intermediate",
+            trainingYears: 3,
+            bodyFatPct: bf,
+          },
+          durationMonths: 2,
+        },
+        params,
+      ).perMonthRate.high;
+    // higher-BF band cuts faster than the lean band
+    expect(cut(28)).toBeGreaterThan(cut(10));
   });
 });
 

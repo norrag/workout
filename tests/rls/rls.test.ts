@@ -394,7 +394,7 @@ describe("engine tables", () => {
       .eq("is_active", true)
       .single();
     expect(error).toBeNull();
-    expect(data!.version).toBe(4);
+    expect(data!.version).toBe(5);
   });
 
   it("non-admins cannot write engine params", async () => {

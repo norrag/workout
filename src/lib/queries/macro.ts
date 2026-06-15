@@ -41,6 +41,7 @@ export function profileToMacroProfile(
     heightCm: profile.height_cm,
     experienceLevel: profile.experience_level,
     trainingYears,
+    bodyFatPct: profile.body_fat_pct,
   };
 }
 

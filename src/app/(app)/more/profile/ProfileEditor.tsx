@@ -6,6 +6,7 @@ import type { ProfileRow } from "@/lib/types/database";
 import type { ExclusionWithExercise } from "@/lib/queries/exercises";
 import {
   addExclusionAction,
+  clearBodyFatAction,
   removeExclusionAction,
   setEquipment,
   setExperience,
@@ -35,6 +36,17 @@ const FIELD_META: Record<
   bodyweight: { label: "BODYWEIGHT", type: "number" },
   training_since: { label: "TRAINING SINCE", type: "date" },
 };
+
+// body-fat estimate bands (store the midpoint %); a visual/text picker keeps
+// it accessible — feeds the FFMI proximity target model (10-spec §5).
+const BODY_FAT_BANDS = [
+  { mid: 10, label: "~10%" },
+  { mid: 14, label: "~14%" },
+  { mid: 18, label: "~18%" },
+  { mid: 23, label: "~23%" },
+  { mid: 29, label: "~29%" },
+  { mid: 35, label: "35%+" },
+] as const;
 
 function formatHeight(heightCm: number | null, units: string): string {
   if (heightCm == null) return "—";
@@ -72,6 +84,9 @@ export function ProfileEditor({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("");
+  const [bodyFat, setBodyFatLocal] = useState<number | null>(
+    profile.body_fat_pct,
+  );
 
   const units = profile.units;
 
@@ -179,6 +194,51 @@ export function ProfileEditor({
       </div>
       <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
         Drives starting volumes and how aggressively autoregulation ramps.
+      </p>
+
+      {/* body fat estimate (optional) */}
+      <div className="mt-5 flex items-baseline justify-between">
+        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          BODY FAT — ESTIMATE
+        </div>
+        <div className="text-[9px] font-medium tracking-[0.1em] text-ink/45">
+          OPTIONAL
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-6 gap-1.5">
+        {BODY_FAT_BANDS.map(({ mid, label }) => {
+          const on = bodyFat != null && Math.abs(bodyFat - mid) < 2.5;
+          return (
+            <button
+              key={mid}
+              type="button"
+              aria-pressed={on}
+              onClick={() => {
+                const next = on ? null : mid;
+                setBodyFatLocal(next);
+                startTransition(() =>
+                  next == null
+                    ? clearBodyFatAction()
+                    : updateProfileField("body_fat_pct", String(next)).then(
+                        () => undefined,
+                      ),
+                );
+              }}
+              className={`py-2 text-center text-[10px] tracking-[0.04em] ${
+                on
+                  ? "bg-ink font-bold text-bg-base"
+                  : "border border-ink/35 font-medium text-ink/55"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
+        Pick the closest. With your height and weight this estimates how much
+        muscle you carry vs. your potential — the single biggest input to a
+        realistic macrocycle target. Skip it and we fall back to training age.
       </p>
 
       {/* equipment access */}

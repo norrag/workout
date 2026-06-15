@@ -2,6 +2,48 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-15 (latest) — FFMI proximity target model + body-fat input (research-driven, ENGINE/DATA)
+
+Multi-source literature review (deep-research harness, 7 agents) on real muscle/strength/fat-loss
+rates exposed the core flaw: the engine keyed hypertrophy off **calendar training age**, which
+overstates adaptation for someone who trained for years without growing. Per the research the right
+state variable is **proximity to genetic potential**, observable from body composition (FFMI).
+
+### Done
+
+- **FFMI proximity model (primary driver)** in `src/lib/engine/macro.ts`: `rate = floor + (base −
+  floor)·(1 − developedFraction)`, where `developedFraction` comes from normalized FFMI vs ceiling
+  (`{male 25, female 21.5}`) / untrained baseline (`{18.5, 14.5}`); target capped at 0.6 × remaining
+  potential. **Falls back to the v4 training-age decay** when body fat is unknown (existing users
+  unaffected). Cut leanness band now uses **body-fat %** when present (BMI proxy fallback). Sex factor
+  **0.5 → 0.7** (research: relative gains equal between sexes; 0.5 over-penalized).
+- **`body_fat_pct`** added to `profiles` (migration `20260615000001`, **applied to hosted**;
+  nullable, 2–70 check) with a **skippable visual band picker** in the Profile editor (6 bands → stored
+  midpoint; `clearBodyFatAction`). Onboarding stays 4 steps; absent BF → graceful training-age fallback.
+- **`engine_params` v5** (same migration, applied to hosted + re-parsed through the schema): new
+  `hypertrophy_floor_pct_bw_month`, `ffmi_ceiling`, `ffmi_untrained`, `proximity_macro_cap_frac`,
+  `cut_bf_thresholds`; v4 deactivated. New fields carry `.default()` so older rows still parse.
+- **Validated the headline case:** 6′1″ 159 lb ~16% bf "trained since 2013" (FFMI ≈ 17, below
+  untrained) now reads **+19–29 lb/12mo** (beginner-class) instead of elite ~2 lb/yr; a jacked FFMI-25
+  veteran of the same age correctly reads ~0; leaner-at-equal-weight ⇒ slower (reads muscle, not scale).
+- Tests: **95 passing** (+4) — proximity goldens (undermuscled-long-timer, near-ceiling, leanness
+  gradient, BF-based cut band); sex-factor test corrected to 0.7. RLS active-version assertion → 5.
+- Docs: 10-spec §5 rewritten (proximity primary, training-age fallback, v3→v4→v5 evolution + the Hubal
+  individual-variation caveat). `scripts/macro-engine-matrix.ts` retained as the dev review harness.
+
+### Notes / honesty
+
+- The target is explicitly **not the heart of the app** (periodization for results is) — implemented
+  proportionately, behind tunable `engine_params`, and always shown as an estimate band.
+- FFMI ceiling (25/21.5 normalized) and the band-midpoint body-fat estimate carry real individual
+  variation; the model is a planning prior, not a prediction.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. v5 migration applied
+to hosted; the exact migration JSON re-parsed through `engineParamsSchema`; user case confirmed
+duration-sensitive and beginner-class. RLS suite needs a running stack (unchanged); assertion bumped.
+
 ## 2026-06-14 (latest) — Macro-target engine fix: continuous training-age decay + capped cut + auto block-length (ENGINE)
 
 Fixes the realistic-target outputs flagged on-device: for a high-training-age profile the target was

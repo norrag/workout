@@ -84,6 +84,7 @@ const fieldSchemas = {
   height_cm: z.coerce.number().min(90).max(250),
   bodyweight: z.coerce.number().positive().max(1000),
   training_since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  body_fat_pct: z.coerce.number().min(2).max(70),
 } as const;
 
 export async function updateProfileField(
@@ -104,6 +105,12 @@ export async function updateProfileField(
   });
   revalidate();
   return { error: null };
+}
+
+export async function clearBodyFatAction(): Promise<void> {
+  const { supabase, user } = await requireUser();
+  await updateProfile(supabase, user.id, { body_fat_pct: null });
+  revalidate();
 }
 
 export async function setExperience(level: string): Promise<void> {
