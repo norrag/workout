@@ -10,18 +10,17 @@ import {
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { HistorySheet } from "@/components/HistorySheet";
-import { getExerciseHistoryAction } from "@/app/(app)/log/actions";
-import type { HistoryEntry } from "@/lib/queries/history";
 import type { MesoPlan, PlannedDay, PlannedGroup } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
+import { groupByRegion } from "@/lib/planner/groups";
 import {
   addDayAction,
-  addGroupAction,
+  addGroupsAction,
   clearSlotAction,
-  fillSlotAction,
   finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
+  setGroupExercisesAction,
   updateDayAction,
   updateGroupAction,
   type FormState,
@@ -52,7 +51,7 @@ export interface PickerExerciseLite {
   muscle_group_ids: string[];
 }
 
-type PickerTarget = { group: PlannedGroup; slotNumber: number; day: PlannedDay };
+type PickerTarget = { group: PlannedGroup; day: PlannedDay };
 type Commit = (fn: () => Promise<void>) => void;
 
 function badge(name: string): string {
@@ -96,6 +95,7 @@ export function PlannerBoard({
     days[0]?.id ?? null,
   );
   const [daySetupId, setDaySetupId] = useState<string | null>(null);
+  const [addGroupsDayId, setAddGroupsDayId] = useState<string | null>(null);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   const [, startTransition] = useTransition();
@@ -255,9 +255,7 @@ export function PlannerBoard({
                       <button
                         type="button"
                         className="flex-1 text-left"
-                        onClick={() =>
-                          setPicker({ group, slotNumber, day: activeDay })
-                        }
+                        onClick={() => setPicker({ group, day: activeDay })}
                       >
                         <div className="text-[15px] font-semibold">
                           {fill.exercise_name}
@@ -289,9 +287,7 @@ export function PlannerBoard({
                     <button
                       key={slotNumber}
                       type="button"
-                      onClick={() =>
-                        setPicker({ group, slotNumber, day: activeDay })
-                      }
+                      onClick={() => setPicker({ group, day: activeDay })}
                       className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5 text-left"
                     >
                       <div className="flex-1">
@@ -311,7 +307,7 @@ export function PlannerBoard({
 
             <button
               type="button"
-              onClick={() => setDaySetupId(activeDay.id)}
+              onClick={() => setAddGroupsDayId(activeDay.id)}
               className="mt-3.5 w-full border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
             >
               + ADD MUSCLE GROUP
@@ -370,8 +366,23 @@ export function PlannerBoard({
             key={setupDay.id}
             day={setupDay}
             mesoId={meso.id}
-            muscleGroups={muscleGroups}
+            onAddGroups={() => setAddGroupsDayId(setupDay.id)}
             onClose={() => setDaySetupId(null)}
+            commit={commit}
+          />
+        ) : null;
+      })()}
+      {(() => {
+        const addDay = addGroupsDayId
+          ? (days.find((d) => d.id === addGroupsDayId) ?? null)
+          : null;
+        return addDay ? (
+          <AddGroupsSheet
+            key={addDay.id}
+            day={addDay}
+            mesoId={meso.id}
+            muscleGroups={muscleGroups}
+            onClose={() => setAddGroupsDayId(null)}
             commit={commit}
           />
         ) : null;
@@ -511,22 +522,18 @@ function FinalizeSheet({
 function DaySetupSheet({
   day,
   mesoId,
-  muscleGroups,
+  onAddGroups,
   onClose,
   commit,
 }: {
   day: PlannedDay;
   mesoId: string;
-  muscleGroups: MuscleGroupRow[];
+  onAddGroups: () => void;
   onClose: () => void;
   commit: Commit;
 }) {
   const [label, setLabel] = useState(day.label ?? "");
   const [weekday, setWeekday] = useState<number | null>(day.weekday ?? null);
-  const [addingGroup, setAddingGroup] = useState(false);
-
-  const taken = new Set(day.groups.map((g) => g.muscle_group_id));
-  const available = muscleGroups.filter((g) => !taken.has(g.id));
 
   const save = () => {
     commit(() =>
@@ -666,43 +673,13 @@ function DaySetupSheet({
             </div>
           ))}
 
-          {addingGroup ? (
-            <div className="mt-3 grid grid-cols-2 gap-1.5">
-              {available.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => {
-                    commit(() =>
-                      addGroupAction({
-                        day_id: day.id,
-                        meso_id: mesoId,
-                        muscle_group_id: g.id,
-                        exercise_slots: 1,
-                      }),
-                    );
-                    setAddingGroup(false);
-                  }}
-                  className="border border-ink/40 px-2 py-2.5 text-[10px] font-semibold tracking-[0.1em]"
-                >
-                  {g.name.toUpperCase()}
-                </button>
-              ))}
-              {available.length === 0 && (
-                <p className="col-span-2 text-sm text-ink/45">
-                  Every muscle group is already on this day.
-                </p>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAddingGroup(true)}
-              className="mt-3 w-full border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
-            >
-              + ADD MUSCLE GROUP
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onAddGroups}
+            className="mt-3 w-full border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
+          >
+            + ADD MUSCLE GROUP
+          </button>
           <p className="mt-3 text-[11px] leading-normal text-ink/60">
             Slots are created for each group — you&apos;ll pick the exact
             exercises on the board next.
@@ -730,7 +707,142 @@ function DaySetupSheet({
 }
 
 // ---------------------------------------------------------------------------
-// exercise picker (fig 2.6): pre-filtered, select then add
+// add muscle groups (fig 2.6b): region-grouped, multi-select. Groups already
+// on the day show "IN DAY" and can't be re-added.
+// ---------------------------------------------------------------------------
+
+function AddGroupsSheet({
+  day,
+  mesoId,
+  muscleGroups,
+  onClose,
+  commit,
+}: {
+  day: PlannedDay;
+  mesoId: string;
+  muscleGroups: MuscleGroupRow[];
+  onClose: () => void;
+  commit: Commit;
+}) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const taken = useMemo(
+    () => new Set(day.groups.map((g) => g.muscle_group_id)),
+    [day.groups],
+  );
+  const sections = useMemo(() => groupByRegion(muscleGroups), [muscleGroups]);
+  const q = search.trim().toLowerCase();
+  const dayName = `${dayTabLabel(day)}${day.label ? ` — ${day.label.toUpperCase()}` : ""}`;
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const add = () => {
+    if (selected.size === 0) return;
+    commit(() =>
+      addGroupsAction({
+        day_id: day.id,
+        meso_id: mesoId,
+        muscle_group_ids: [...selected],
+      }),
+    );
+    onClose();
+  };
+
+  return (
+    <BottomSheet
+      open
+      onClose={onClose}
+      title="Add groups"
+      subtitle={`${dayName} · ${taken.size} ALREADY IN DAY`}
+    >
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search groups"
+        className="h-[42px] w-full border-[1.5px] border-ink bg-paper px-3 text-[13px] text-ink placeholder:text-ink/45 focus:outline-none"
+      />
+
+      <div className="mt-3.5 max-h-[44dvh] overflow-y-auto">
+        {sections.map((section) => {
+          const rows = section.groups.filter(
+            (g) => !q || g.name.toLowerCase().includes(q),
+          );
+          if (rows.length === 0) return null;
+          return (
+            <div key={section.region} className="mt-4 first:mt-0">
+              <div className="border-b-[1.5px] border-ink pb-1.5 text-[9px] font-bold tracking-[0.16em] text-ink/50">
+                {section.region}
+              </div>
+              {rows.map((g) => {
+                const inDay = taken.has(g.id);
+                const sel = selected.has(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    disabled={inDay}
+                    onClick={() => toggle(g.id)}
+                    className="flex w-full items-center gap-3 border-b border-ink/15 py-2 text-left disabled:cursor-default"
+                  >
+                    <div
+                      className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-[12px] ${
+                        inDay
+                          ? "bg-ink/25 text-bg-base"
+                          : sel
+                            ? "bg-ink text-bg-base"
+                            : "border-[1.5px] border-ink/40"
+                      }`}
+                    >
+                      {inDay || sel ? "✓" : ""}
+                    </div>
+                    <div
+                      className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] text-[9px] font-extrabold ${
+                        inDay ? "border-ink/35 text-ink/40" : "border-ink"
+                      }`}
+                    >
+                      {badge(g.name)}
+                    </div>
+                    <div
+                      className={`flex-1 text-sm font-bold ${inDay ? "text-ink/40" : ""}`}
+                    >
+                      {g.name}
+                    </div>
+                    {inDay && (
+                      <div className="text-[8.5px] font-bold tracking-[0.12em] text-ink/45">
+                        IN DAY
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        disabled={selected.size === 0}
+        onClick={add}
+        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+      >
+        ADD {selected.size} {selected.size === 1 ? "GROUP" : "GROUPS"}
+      </button>
+    </BottomSheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// exercise picker (fig 2.7): pre-filtered to the group's muscle, multi-select,
+// with an equipment filter; the selected exercises become the group's slots.
 // ---------------------------------------------------------------------------
 
 function ExercisePicker({
@@ -747,47 +859,85 @@ function ExercisePicker({
   commit: Commit;
 }) {
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [lastSession, setLastSession] = useState<HistoryEntry | null>(null);
+  const [equip, setEquip] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [historyFor, setHistoryFor] = useState<PickerExerciseLite | null>(null);
 
-  const candidates = useMemo(() => {
-    if (!target) return [];
-    const q = search.trim().toLowerCase();
-    return exercises
-      .filter((e) => e.muscle_group_ids.includes(target.group.muscle_group_id))
-      .filter((e) => !q || e.name.toLowerCase().includes(q));
-  }, [exercises, target, search]);
+  const groupId = target?.group.id ?? null;
 
-  // last-session line for the selected card (fig 2.6)
+  // (re)seed the selection from the group's current fills each time the picker
+  // opens on a (new) group
   useEffect(() => {
-    setLastSession(null);
-    if (!selectedId) return;
-    let stale = false;
-    getExerciseHistoryAction(selectedId).then((entries) => {
-      if (!stale) setLastSession(entries[0] ?? null);
-    });
-    return () => {
-      stale = true;
-    };
-  }, [selectedId]);
+    if (!target) return;
+    setSelected(new Set(target.group.fills.map((f) => f.exercise_id)));
+    setSearch("");
+    setEquip(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
+
+  // muscle-group-filtered candidates (before search/equip) — drives the
+  // equipment chips and the stable add order
+  const groupCandidates = useMemo(() => {
+    if (!target) return [];
+    return exercises.filter((e) =>
+      e.muscle_group_ids.includes(target.group.muscle_group_id),
+    );
+  }, [exercises, target]);
+
+  const equipTypes = useMemo(
+    () => [...new Set(groupCandidates.map((e) => e.equipment_type))].sort(),
+    [groupCandidates],
+  );
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return groupCandidates
+      .filter((e) => !equip || e.equipment_type === equip)
+      .filter((e) => !q || e.name.toLowerCase().includes(q));
+  }, [groupCandidates, equip, search]);
 
   if (!target) return null;
-  const selected = candidates.find((e) => e.id === selectedId) ?? null;
   const dayName = `${dayTabLabel(target.day)}${target.day.label ? ` — ${target.day.label.toUpperCase()}` : ""}`;
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const close = () => {
     setSearch("");
-    setSelectedId(null);
+    setEquip(null);
     onClose();
   };
+
+  const save = () => {
+    // keep the muscle-group order stable regardless of search/equip filtering
+    const orderedIds = groupCandidates
+      .filter((e) => selected.has(e.id))
+      .map((e) => e.id);
+    commit(() =>
+      setGroupExercisesAction({
+        meso_id: mesoId,
+        group_id: target.group.id,
+        exercise_ids: orderedIds,
+      }),
+    );
+    close();
+  };
+
+  const chip =
+    "flex h-8 flex-shrink-0 items-center px-3 text-[10px] font-bold tracking-[0.1em]";
 
   return (
     <BottomSheet
       open
       onClose={close}
       title="Pick exercise"
-      subtitle={`${target.group.muscle_group.toUpperCase()} — SLOT ${target.slotNumber} · ${dayName}`}
+      subtitle={`${target.group.muscle_group.toUpperCase()} · ${dayName}`}
     >
       <div className="flex items-center gap-2">
         <input
@@ -801,54 +951,52 @@ function ExercisePicker({
         </div>
       </div>
 
-      <div className="mt-3.5 max-h-[42dvh] overflow-y-auto">
-        {selected && (
-          <div className="border-2 border-accent px-3.5 py-3">
-            <div className="flex items-center justify-between">
-              <div className="text-base font-bold">{selected.name}</div>
-              <div className="text-[9px] font-bold tracking-[0.12em] text-accent">
-                SELECTED
-              </div>
-            </div>
-            <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink/55">
-              {selected.equipment_type.toUpperCase()}
-              {selected.last_performed_at
-                ? ` · LAST PERFORMED ${shortDate(selected.last_performed_at)}`
-                : " · NEVER PERFORMED"}
-            </div>
-            {lastSession && (
-              <div className="mt-2.5 flex items-baseline justify-between border-t border-ink/[0.18] pt-2">
-                <div className="numeral text-[13px] font-bold">
-                  {lastSession.top_weight} lb{" "}
-                  <span className="font-normal text-ink/50">×</span>{" "}
-                  {lastSession.reps}
-                </div>
-                <div className="text-[9px] font-semibold tracking-[0.1em] text-ink/55">
-                  {lastSession.meso_name.toUpperCase()} — {lastSession.coordinate}
-                </div>
-              </div>
-            )}
-            {selected.last_performed_at && (
+      {/* equipment / machine-type filter */}
+      {equipTypes.length > 1 && (
+        <div className="mt-2.5 flex gap-1.5 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setEquip(null)}
+            className={`${chip} ${equip === null ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
+          >
+            ALL
+          </button>
+          {equipTypes.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setEquip(equip === t ? null : t)}
+              className={`${chip} ${equip === t ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 max-h-[42dvh] overflow-y-auto">
+        {visible.map((e) => {
+          const sel = selected.has(e.id);
+          return (
+            <div
+              key={e.id}
+              className="flex items-center gap-3 border-b border-ink/[0.18] py-[11px] last:border-b-0"
+            >
               <button
                 type="button"
-                onClick={() => setHistoryFor(selected)}
-                className="mt-2 text-[10px] font-bold tracking-[0.1em] underline underline-offset-2"
+                aria-label={`${sel ? "deselect" : "select"} ${e.name}`}
+                onClick={() => toggle(e.id)}
+                className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-[12px] ${
+                  sel ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/40"
+                }`}
               >
-                FULL HISTORY ›
+                {sel ? "✓" : ""}
               </button>
-            )}
-          </div>
-        )}
-        {candidates
-          .filter((e) => e.id !== selectedId)
-          .map((e) => (
-            <button
-              key={e.id}
-              type="button"
-              onClick={() => setSelectedId(e.id)}
-              className="flex w-full items-center justify-between border-b border-ink/[0.18] px-0.5 py-[13px] text-left"
-            >
-              <div>
+              <button
+                type="button"
+                onClick={() => toggle(e.id)}
+                className="flex-1 text-left"
+              >
                 <div className="text-[15px] font-bold">{e.name}</div>
                 <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
                   {e.equipment_type.toUpperCase()} ·{" "}
@@ -856,32 +1004,29 @@ function ExercisePicker({
                     ? `LAST ${shortDate(e.last_performed_at)}`
                     : "NEVER PERFORMED"}
                 </div>
-              </div>
-              <div className="text-[15px] text-ink/40">›</div>
-            </button>
-          ))}
-        {candidates.length === 0 && (
+              </button>
+              {e.last_performed_at && (
+                <button
+                  type="button"
+                  aria-label={`${e.name} history`}
+                  onClick={() => setHistoryFor(e)}
+                  className="px-1 text-[15px] text-ink/40"
+                >
+                  ›
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {visible.length === 0 && (
           <p className="py-4 text-sm text-ink/45">No matches.</p>
         )}
       </div>
 
       <button
         type="button"
-        disabled={!selected}
-        onClick={() => {
-          if (!selected) return;
-          commit(() =>
-            fillSlotAction({
-              meso_id: mesoId,
-              group_id: target.group.id,
-              slot_number: target.slotNumber,
-              exercise_id: selected.id,
-              initial_sets: 3,
-            }),
-          );
-          close();
-        }}
-        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+        onClick={save}
+        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base"
       >
         ADD TO {dayName}
       </button>

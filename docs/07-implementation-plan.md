@@ -61,7 +61,13 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
       add-day + day-setup combined into one `Day N` sheet reading live data — fixes the ± steppers /
       group-✕ / add-group "doesn't update" bugs; weekday auto-fills Monday-first; "week starts on this
       day" removed, weeks assumed to start Monday — per on-device feedback.)*
-- [x] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-session data, FULL HISTORY sheet; exclusions never appear
+- [x] Add muscle groups (fig 2.6b): region-grouped (`LEGS · PUSH · PULL · CORE`) **multi-select**
+      picker with search, `IN DAY` states for groups already on the day, `ADD N GROUPS`. *(2026-06-15:
+      `AddGroupsSheet`; replaced the inline 2-col grid that shipped during the design handoff.)*
+- [x] Exercise picker (fig 2.7): pre-filtered to the group's muscle, search + **equipment/machine-type
+      filter**, last-performed data, history via the per-row `›`; exclusions never appear.
+      *(2026-06-15: rebuilt as a **group-centric multi-select** — checkboxes + `ADD TO <DAY>` set the
+      group's exercises and resize its slot count; supersedes the per-slot single-select.)*
 - [x] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
 - [~] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `GO TO W#·D#`, edit-plan entry; `MESO STATS` stubbed until Phase 5
 - [x] Microcycle + week-1 workout generation on meso start (engine `seedMeso` / `rirRamp`; ramp widened to 3–8 weeks with tests)

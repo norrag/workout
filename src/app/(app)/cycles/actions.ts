@@ -5,16 +5,16 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
-  addDayGroup,
+  addDayGroups,
   addMesoDay,
   clearSlot,
   copyMesoStructure,
   createDraftMeso,
   deleteMesocycle,
-  fillSlot,
   finalizeDraftMeso,
   removeDayGroup,
   removeMesoDay,
+  setGroupExercises,
   updateDayGroup,
   updateMesoDay,
 } from "@/lib/queries/cycles";
@@ -251,27 +251,43 @@ export async function removeDayAction(input: {
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
-const groupAddSchema = z.object({
+const groupsAddSchema = z.object({
   day_id: z.string().uuid(),
   meso_id: z.string().uuid(),
-  muscle_group_id: z.string().uuid(),
-  exercise_slots: z.coerce.number().int().min(1).max(10),
+  muscle_group_ids: z.array(z.string().uuid()).min(1).max(20),
 });
 
-export async function addGroupAction(input: {
+/** Add several muscle groups to a day at once (fig 2.6b "ADD N GROUPS"). */
+export async function addGroupsAction(input: {
   day_id: string;
   meso_id: string;
-  muscle_group_id: string;
-  exercise_slots: number;
+  muscle_group_ids: string[];
 }): Promise<void> {
-  const parsed = groupAddSchema.parse(input);
+  const parsed = groupsAddSchema.parse(input);
   const { supabase } = await requireUser();
-  await addDayGroup(
-    supabase,
-    parsed.day_id,
-    parsed.muscle_group_id,
-    parsed.exercise_slots,
-  );
+  await addDayGroups(supabase, parsed.day_id, parsed.muscle_group_ids);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
+const setGroupExercisesSchema = z.object({
+  meso_id: z.string().uuid(),
+  group_id: z.string().uuid(),
+  exercise_ids: z.array(z.string().uuid()).max(20),
+});
+
+/** Set a group's exercises from the fig 2.7 multi-select picker. */
+export async function setGroupExercisesAction(input: {
+  meso_id: string;
+  group_id: string;
+  exercise_ids: string[];
+}): Promise<void> {
+  const parsed = setGroupExercisesSchema.parse(input);
+  const { supabase } = await requireUser();
+  await setGroupExercises(supabase, {
+    mesocycle_id: parsed.meso_id,
+    meso_day_group_id: parsed.group_id,
+    exercise_ids: parsed.exercise_ids,
+  });
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
@@ -303,33 +319,6 @@ export async function removeGroupAction(input: {
     .parse(input);
   const { supabase } = await requireUser();
   await removeDayGroup(supabase, parsed.group_id);
-  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
-}
-
-const fillSchema = z.object({
-  meso_id: z.string().uuid(),
-  group_id: z.string().uuid(),
-  slot_number: z.coerce.number().int().min(1).max(10),
-  exercise_id: z.string().uuid(),
-  initial_sets: z.coerce.number().int().min(1).max(10),
-});
-
-export async function fillSlotAction(input: {
-  meso_id: string;
-  group_id: string;
-  slot_number: number;
-  exercise_id: string;
-  initial_sets: number;
-}): Promise<void> {
-  const parsed = fillSchema.parse(input);
-  const { supabase } = await requireUser();
-  await fillSlot(supabase, {
-    mesocycle_id: parsed.meso_id,
-    meso_day_group_id: parsed.group_id,
-    slot_number: parsed.slot_number,
-    exercise_id: parsed.exercise_id,
-    initial_sets: parsed.initial_sets,
-  });
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 

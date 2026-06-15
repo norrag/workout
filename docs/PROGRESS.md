@@ -2,7 +2,55 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Cycles/meso navigation fixes + day-1 planner data repair (on-device feedback)
+## 2026-06-15 (latest) — Planner pickers retrofit: Add groups (2.6b) + multi-select Exercise picker (2.7) with equipment filter
+
+The 2.6b "Add groups" and 2.7 "Pick exercise" mockups never made it into the build during the
+design handoff — the planner shipped a plain inline 2-column add-group grid and a **single-select**
+picker filling one slot at a time. This slice transcribes both figures 1:1 and adds the
+equipment/machine-type filter the user asked for. No schema change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Add groups (fig 2.6b)** — new `AddGroupsSheet` replacing the inline grid. Region-grouped
+  (`LEGS · PUSH · PULL · CORE`, OTHER fallback), **multi-select** with a search box; groups already on
+  the day show a greyed ✓ + **`IN DAY`** and aren't re-selectable; the action button reads
+  **`ADD N GROUPS`** (live count) and adds all selected in one write (`addDayGroups` batch insert,
+  each with one open slot). Opened from both the board's **`+ ADD MUSCLE GROUP`** and the day-setup
+  sheet's button (the day-setup sheet no longer carries its own add-group UI).
+- **Exercise picker (fig 2.7)** — rebuilt `ExercisePicker` as a **group-centric multi-select**: it
+  pre-checks the group's current fills, lists muscle-group-filtered candidates with checkboxes +
+  `EQUIPMENT · LAST <date>`, and **`ADD TO <DAY>`** sets the group's exercises to exactly the selected
+  set (`setGroupExercises` → `planGroupExercises` lays them into slots 1..n, **retaining each kept
+  exercise's `initial_sets`**, defaulting new ones to 3, and **resizing the group's slot count** to
+  match). The board's slot rows (filled or empty) all open this one group picker.
+- **Equipment / machine-type filter** (user request) — a chip row (`ALL` + the distinct equipment
+  types present among the group's candidates) that ANDs with the search; mirrors the library 3.1
+  EQUIP axis. Shown only when the group spans more than one equipment type.
+- **Pure helpers** `src/lib/planner/groups.ts` — `groupByRegion` (region order + alphabetised,
+  empty regions omitted, OTHER last) and `planGroupExercises` (multi-select → slot layout, sets
+  retention, dedupe, empty). **+8 unit tests** (114 total).
+- **Dead code removed** — the per-slot `fillSlotAction`/`fillSlot` and single-group
+  `addGroupAction`/`addDayGroup` paths (superseded) are deleted.
+
+### Recorded deviations
+
+- **Picker is multi-select per group, not per slot.** Fig 2.7 shows checkboxes + `ADD TO <DAY>`, so
+  the picker now sets the whole group's exercises at once (and the group's slot count follows the
+  number picked). This supersedes the original per-slot single-select (07 Phase 2, fig "2.6") and the
+  inline last-session "SELECTED" card; the **`›` on each row still opens the full history sheet**.
+- **Regions are mapped client-side by muscle-group name** (`muscle_groups` has no region column) —
+  documented constant in `planner/groups.ts`; unknown names fall to `OTHER` so nothing is dropped.
+- **Picker subtitle uses `MUSCLE · DAY`** (drops the `SLOT n` now that it's group-level), and the
+  day-setup sheet keeps the per-group set-count steppers (the picker can override the count on add).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (114/114), `npm run build` green. Pure helpers
+unit-tested; the two new query writes (`addDayGroups`, `setGroupExercises`) are user-scoped through the
+existing `mesocycles`/`meso_*` RLS (planning rows only — no logged history touched). In-browser pixel
+QA of the two sheets still pending (as for other screens).
+
+## 2026-06-15 — Cycles/meso navigation fixes + day-1 planner data repair (on-device feedback)
 
 Three on-device follow-ups on the Cycles/meso surface. The meso detail page is **kept** (the 09
 "nix the meso page" decision is reversed per the user).

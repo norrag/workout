@@ -9,6 +9,7 @@ import type {
   MicrocycleRow,
   WorkoutRow,
 } from "@/lib/types/database";
+import { planGroupExercises } from "@/lib/planner/groups";
 
 type Client = SupabaseClient<Database>;
 
@@ -523,12 +524,15 @@ async function syncDaysPerWeek(supabase: Client, mesoId: string): Promise<void> 
   if (updateError) throw updateError;
 }
 
-export async function addDayGroup(
+/** Add several muscle groups to a day at once (fig 2.6b multi-select),
+ *  appending them after any existing groups, each with one open slot. */
+export async function addDayGroups(
   supabase: Client,
   dayId: string,
-  muscleGroupId: string,
-  exerciseSlots: number,
-): Promise<MesoDayGroupRow> {
+  muscleGroupIds: string[],
+  exerciseSlots = 1,
+): Promise<void> {
+  if (muscleGroupIds.length === 0) return;
   const { data: existing, error: existingError } = await supabase
     .from("meso_day_groups")
     .select("position")
@@ -537,18 +541,73 @@ export async function addDayGroup(
     .limit(1);
   if (existingError) throw existingError;
 
-  const { data, error } = await supabase
-    .from("meso_day_groups")
-    .insert({
-      meso_day_id: dayId,
-      muscle_group_id: muscleGroupId,
-      position: (existing?.[0]?.position ?? 0) + 1,
-      exercise_slots: exerciseSlots,
-    })
-    .select()
-    .single();
+  let position = existing?.[0]?.position ?? 0;
+  const rows = muscleGroupIds.map((muscle_group_id) => ({
+    meso_day_id: dayId,
+    muscle_group_id,
+    position: ++position,
+    exercise_slots: exerciseSlots,
+  }));
+  const { error } = await supabase.from("meso_day_groups").insert(rows);
   if (error) throw error;
-  return data;
+}
+
+/**
+ * Set a muscle-group's exercises from the fig 2.7 multi-select: the selected
+ * exercises become the group's slots (1..n), retained exercises keep their
+ * `initial_sets`, and the group's slot count is resized to match. Replaces the
+ * group's fills wholesale (planning-only data — no logged history here).
+ */
+export async function setGroupExercises(
+  supabase: Client,
+  input: {
+    mesocycle_id: string;
+    meso_day_group_id: string;
+    exercise_ids: string[];
+    default_sets?: number;
+  },
+): Promise<void> {
+  const { data: current, error: curError } = await supabase
+    .from("meso_exercises")
+    .select("exercise_id, initial_sets")
+    .eq("meso_day_group_id", input.meso_day_group_id)
+    .order("slot_number");
+  if (curError) throw curError;
+
+  const layout = planGroupExercises(
+    current ?? [],
+    input.exercise_ids,
+    input.default_sets ?? 3,
+  );
+
+  const { error: delError } = await supabase
+    .from("meso_exercises")
+    .delete()
+    .eq("meso_day_group_id", input.meso_day_group_id);
+  if (delError) throw delError;
+
+  if (layout.length > 0) {
+    const { error: insError } = await supabase.from("meso_exercises").insert(
+      layout.map((l) => ({
+        mesocycle_id: input.mesocycle_id,
+        day_of_week: null,
+        meso_day_group_id: input.meso_day_group_id,
+        slot_number: l.slot_number,
+        position: l.slot_number,
+        exercise_id: l.exercise_id,
+        initial_weight: null,
+        initial_reps: null,
+        initial_sets: l.initial_sets,
+      })),
+    );
+    if (insError) throw insError;
+  }
+
+  const { error: updError } = await supabase
+    .from("meso_day_groups")
+    .update({ exercise_slots: Math.max(layout.length, 1) })
+    .eq("id", input.meso_day_group_id);
+  if (updError) throw updError;
 }
 
 export async function updateDayGroup(
@@ -572,44 +631,6 @@ export async function removeDayGroup(
     .delete()
     .eq("id", groupId);
   if (error) throw error;
-}
-
-/** Fill an exercise slot on the planner board (fig 2.6 picker result). */
-export async function fillSlot(
-  supabase: Client,
-  input: {
-    mesocycle_id: string;
-    meso_day_group_id: string;
-    slot_number: number;
-    exercise_id: string;
-    initial_sets: number;
-  },
-): Promise<MesoExerciseRow> {
-  // replace whatever held the slot before
-  const { error: clearError } = await supabase
-    .from("meso_exercises")
-    .delete()
-    .eq("meso_day_group_id", input.meso_day_group_id)
-    .eq("slot_number", input.slot_number);
-  if (clearError) throw clearError;
-
-  const { data, error } = await supabase
-    .from("meso_exercises")
-    .insert({
-      mesocycle_id: input.mesocycle_id,
-      day_of_week: null,
-      meso_day_group_id: input.meso_day_group_id,
-      slot_number: input.slot_number,
-      position: input.slot_number,
-      exercise_id: input.exercise_id,
-      initial_weight: null,
-      initial_reps: null,
-      initial_sets: input.initial_sets,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
 }
 
 export async function clearSlot(
