@@ -2,7 +2,66 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Plan-a-meso: copy-a-mesocycle path (fig 2.4 option 01, Phase 2 / Design v2 backlog)
+## 2026-06-15 (latest) — Planner workflow fixes: combined day sheet, live-data bugs, delete mesocycle (Phase 2 on-device feedback)
+
+On-device review of the planner board surfaced several broken interactions and workflow friction.
+This slice fixes them. No schema change; `main` deployable. **The larger "draft model" reorder
+(create-mesocycle as the *final* stage, one draft at a time) is teed up as the next slice — see
+"Not done yet" below.**
+
+### Done
+
+- **Stale-sheet bug fixed — the root cause of three reported "doesn't work" bugs.** The day-setup
+  sheet captured a **snapshot** of the day when it opened, so the per-group **± set steppers**, the
+  group **✕ remove**, and the **add-muscle-group** picker all wrote to the DB but the sheet (and its
+  derived `taken`/`available` lists) never reflected the change. The sheet now reads the **live**
+  `day` from the board's `days` prop (looked up by id, re-passed on every revalidation), so all three
+  update immediately. The board already re-derived `activeDay` from live data; only the sheet was stale.
+- **Add-day and day-setup combined into one view (`Day N`).** Previously you added a day (label +
+  weekday) in one tray, then reopened a near-identical "day setup" tray to add muscle groups. Now
+  tapping **`+`** creates the day (auto weekday) and **opens the single combined sheet** titled
+  `Day 1` / `Day 2` … with weekday + label + muscle groups + per-group set counts all in one place.
+  `addDayAction` returns the new day so the client can open it directly; the old `"new"` sheet mode
+  is gone. Empty state shows a full-width **`+ ADD TRAINING DAY`** button.
+- **Weekday auto-fills (Monday-first).** Adding a day assigns the next unused weekday starting Monday
+  (`nextWeekday`), so days are never null/unordered on creation; the user can still change it in the
+  sheet. Days sort Monday-first (already the case in `getMesoPlan`).
+- **"Week starts on this day" removed.** Weeks are assumed to start Monday; the checkbox and the
+  `profiles.week_starts_on` write are gone (`updateDayAction` no longer takes `week_starts_here`).
+  The column remains (defaults to 1) — nothing reads it for ordering.
+- **Delete a mesocycle (with warnings).** New `DELETE MESOCYCLE` on the meso detail page opens a
+  confirm sheet. `getMesoDeletionImpact` counts the meso's `logged_sets`; when there's history the
+  copy is stronger (`… N logged sets, every workout, and the week structure …`) **and an
+  acknowledgement checkbox gates the delete**. `deleteMesocycle` is user-scoped; FK cascades remove
+  microcycles/workouts/logged_sets/planner rows (RLS `mesocycles_all_own` is `for all`; the child
+  cascade bypasses RLS by design — verified against the schema).
+
+### Recorded deviations
+
+- **Combined day sheet + removed week-starts** deviate from fig 2.5 (which shows separate add/setup
+  and a week-start toggle) — done per direct user request (2026-06-15 on-device review). Square-corner
+  ledger styling preserved.
+- **Delete button isn't in the stock mockup** — built in the house style (accent destructive row +
+  confirm sheet), consistent with other unmocked controls (share/redeem).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green. No schema change.
+The fixes are interaction logic in `PlannerBoard.tsx` (live-data derivation) + a delete query/action
+covered by the existing RLS model; in-browser pixel/interaction QA of the combined sheet and delete
+flow still pending (as for other screens).
+
+### Not done yet / next — draft model (the headline workflow ask)
+
+- **`create mesocycle` becomes the *final* stage, not the first.** From-scratch/template/copy should
+  drop you straight onto the planner **as a draft**, with the name/weeks/RIR form as the last step.
+  Needs a `draft` status (`DATA` migration extending the `mesocycles_status_check`), draft creation
+  on each entry path, the create-form moved to a board "finish" action (draft → planned), and a
+  cycles-list **`DRAFT — CONTINUE EDITING ›`** entry.
+- **One draft at a time.** Starting a new draft when one exists prompts **keep editing** vs **replace**
+  (replace deletes the existing draft). Query-layer enforced (no draft-management UI).
+
+## 2026-06-15 — Plan-a-meso: copy-a-mesocycle path (fig 2.4 option 01, Phase 2 / Design v2 backlog)
 
 Lands the **copy-a-mesocycle** path — the most-cited remaining Phase 2 gap (option 01 of the
 plan-a-meso flow, previously a dashed "soon" stub). No schema change: copy clones the planner

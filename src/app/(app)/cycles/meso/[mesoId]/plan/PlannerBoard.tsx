@@ -57,6 +57,13 @@ function dayTabLabel(day: PlannedDay): string {
     : `DAY ${day.day_number}`;
 }
 
+/** First unused weekday, Monday-first (weeks start Monday). Falls back to Mon. */
+function nextWeekday(used: (number | null)[]): number {
+  const taken = new Set(used.filter((w): w is number => w != null));
+  for (let d = 1; d <= 7; d++) if (!taken.has(d)) return d;
+  return 1;
+}
+
 function shortDate(iso: string): string {
   const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
@@ -80,12 +87,25 @@ export function PlannerBoard({
   const [activeDayId, setActiveDayId] = useState<string | null>(
     days[0]?.id ?? null,
   );
-  const [daySetup, setDaySetup] = useState<PlannedDay | "new" | null>(
-    days.length === 0 ? "new" : null,
-  );
+  const [daySetupId, setDaySetupId] = useState<string | null>(null);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [, startTransition] = useTransition();
   const commit: Commit = (fn) => startTransition(fn);
+
+  // add a day: auto-assign the next weekday, then open its setup sheet (a day
+  // and its setup are one view now — see DaySetupSheet)
+  const addDay = () => {
+    const weekday = nextWeekday(days.map((d) => d.weekday));
+    commit(async () => {
+      const created = await addDayAction({
+        meso_id: meso.id,
+        label: null,
+        weekday,
+      });
+      setActiveDayId(created.id);
+      setDaySetupId(created.id);
+    });
+  };
 
   useEffect(() => {
     if (!days.some((d) => d.id === activeDayId)) {
@@ -133,33 +153,43 @@ export function PlannerBoard({
       )}
 
       {/* day tabs */}
-      <div className="mt-4 flex border-[1.5px] border-ink">
-        {days.map((day, i) => {
-          const active = day.id === activeDayId;
-          return (
-            <button
-              key={day.id}
-              type="button"
-              onClick={() => setActiveDayId(day.id)}
-              className={`flex-1 py-[11px] text-center text-[11px] tracking-[0.08em] ${
-                active
-                  ? "bg-ink font-bold text-bg-base"
-                  : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
-              }`}
-            >
-              {dayTabLabel(day)}
-            </button>
-          );
-        })}
+      {days.length > 0 ? (
+        <div className="mt-4 flex border-[1.5px] border-ink">
+          {days.map((day, i) => {
+            const active = day.id === activeDayId;
+            return (
+              <button
+                key={day.id}
+                type="button"
+                onClick={() => setActiveDayId(day.id)}
+                className={`flex-1 py-[11px] text-center text-[11px] tracking-[0.08em] ${
+                  active
+                    ? "bg-ink font-bold text-bg-base"
+                    : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                }`}
+              >
+                {dayTabLabel(day)}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            aria-label="add day"
+            onClick={addDay}
+            className="flex-[0_0_40px] border-l border-ink/25 py-[9px] text-center text-sm font-semibold text-ink/60"
+          >
+            +
+          </button>
+        </div>
+      ) : (
         <button
           type="button"
-          aria-label="add day"
-          onClick={() => setDaySetup("new")}
-          className={`flex-[0_0_40px] py-[9px] text-center text-sm font-semibold text-ink/60 ${days.length > 0 ? "border-l border-ink/25" : ""}`}
+          onClick={addDay}
+          className="mt-4 w-full border-[1.5px] border-dashed border-ink/45 py-[14px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
         >
-          +
+          + ADD TRAINING DAY
         </button>
-      </div>
+      )}
 
       {activeDay && (
         <>
@@ -173,10 +203,10 @@ export function PlannerBoard({
             </span>
             <button
               type="button"
-              onClick={() => setDaySetup(activeDay)}
+              onClick={() => setDaySetupId(activeDay.id)}
               className="font-bold text-ink underline underline-offset-2"
             >
-              ✎ DAY SETUP
+              ✎ EDIT DAY
             </button>
           </div>
 
@@ -272,7 +302,7 @@ export function PlannerBoard({
 
             <button
               type="button"
-              onClick={() => setDaySetup(activeDay)}
+              onClick={() => setDaySetupId(activeDay.id)}
               className="mt-3.5 w-full border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
             >
               + ADD MUSCLE GROUP
@@ -282,8 +312,8 @@ export function PlannerBoard({
       )}
 
       {!activeDay && days.length === 0 && (
-        <p className="mt-5 text-sm text-ink/60">
-          Add a training day to start planning.
+        <p className="mt-4 text-sm text-ink/60">
+          Add a training day to start planning the week.
         </p>
       )}
 
@@ -295,15 +325,21 @@ export function PlannerBoard({
         {meso.status === "planned" ? "DONE — REVIEW MESO" : "DONE"}
       </button>
 
-      <DaySetupSheet
-        key={daySetup === "new" ? "new" : (daySetup?.id ?? "closed")}
-        target={daySetup}
-        days={days}
-        mesoId={meso.id}
-        muscleGroups={muscleGroups}
-        onClose={() => setDaySetup(null)}
-        commit={commit}
-      />
+      {(() => {
+        const setupDay = daySetupId
+          ? (days.find((d) => d.id === daySetupId) ?? null)
+          : null;
+        return setupDay ? (
+          <DaySetupSheet
+            key={setupDay.id}
+            day={setupDay}
+            mesoId={meso.id}
+            muscleGroups={muscleGroups}
+            onClose={() => setDaySetupId(null)}
+            commit={commit}
+          />
+        ) : null;
+      })()}
       <ExercisePicker
         target={picker}
         mesoId={meso.id}
@@ -316,50 +352,40 @@ export function PlannerBoard({
 }
 
 // ---------------------------------------------------------------------------
-// day setup sheet (fig 2.5): label, weekday, week start, groups & counts
+// day sheet (fig 2.5): the single combined view — weekday + label + muscle
+// groups & counts for one day. Reads the live `day` (props) so set steppers,
+// group add, and group removal reflect immediately.
 // ---------------------------------------------------------------------------
 
 function DaySetupSheet({
-  target,
-  days,
+  day,
   mesoId,
   muscleGroups,
   onClose,
   commit,
 }: {
-  target: PlannedDay | "new" | null;
-  days: PlannedDay[];
+  day: PlannedDay;
   mesoId: string;
   muscleGroups: MuscleGroupRow[];
   onClose: () => void;
   commit: Commit;
 }) {
-  const isNew = target === "new";
-  const day = isNew || target === null ? null : target;
-  const [label, setLabel] = useState(day?.label ?? "");
-  const [weekday, setWeekday] = useState<number | null>(day?.weekday ?? null);
-  const [weekStartsHere, setWeekStartsHere] = useState(false);
+  const [label, setLabel] = useState(day.label ?? "");
+  const [weekday, setWeekday] = useState<number | null>(day.weekday ?? null);
   const [addingGroup, setAddingGroup] = useState(false);
 
-  if (target === null) return null;
-
-  const taken = new Set(day?.groups.map((g) => g.muscle_group_id) ?? []);
+  const taken = new Set(day.groups.map((g) => g.muscle_group_id));
   const available = muscleGroups.filter((g) => !taken.has(g.id));
 
   const save = () => {
-    const value = { label: label.trim() || null, weekday };
-    commit(async () => {
-      if (isNew) {
-        await addDayAction({ meso_id: mesoId, ...value });
-      } else if (day) {
-        await updateDayAction({
-          day_id: day.id,
-          meso_id: mesoId,
-          ...value,
-          week_starts_here: weekStartsHere,
-        });
-      }
-    });
+    commit(() =>
+      updateDayAction({
+        day_id: day.id,
+        meso_id: mesoId,
+        label: label.trim() || null,
+        weekday,
+      }),
+    );
     onClose();
   };
 
@@ -370,12 +396,8 @@ function DaySetupSheet({
     <BottomSheet
       open
       onClose={onClose}
-      title={isNew ? "Add day" : "Day setup"}
-      subtitle={
-        isNew
-          ? `DAY ${days.length + 1} OF ${days.length + 1}`
-          : `${day?.weekday ? (WEEKDAYS.find((w) => w.value === day.weekday)?.label ?? "") : ""} — DAY ${day?.day_number} OF ${days.length}`
-      }
+      title={`Day ${day.day_number}`}
+      subtitle={`${weekday ? (WEEKDAYS.find((w) => w.value === weekday)?.label ?? "") + " · " : ""}${day.groups.length} ${day.groups.length === 1 ? "GROUP" : "GROUPS"}`}
     >
       <div className="flex gap-2.5">
         <div className="flex-1">
@@ -411,42 +433,20 @@ function DaySetupSheet({
         </div>
       </div>
 
-      <div className="mt-3.5 flex items-center justify-between">
+      <div className="mt-3.5 flex justify-end">
         <button
           type="button"
-          onClick={() => setWeekStartsHere((v) => !v)}
-          disabled={weekday === null}
-          className="flex items-center gap-2 disabled:opacity-40"
+          onClick={() => {
+            commit(() => removeDayAction({ day_id: day.id, meso_id: mesoId }));
+            onClose();
+          }}
+          className="text-[11px] font-bold text-accent"
         >
-          <div
-            className={`flex h-[18px] w-[18px] items-center justify-center text-[11px] ${
-              weekStartsHere
-                ? "bg-ink text-bg-base"
-                : "border-[1.5px] border-ink/40"
-            }`}
-          >
-            {weekStartsHere ? "✓" : ""}
-          </div>
-          <span className="text-xs font-semibold">Week starts on this day</span>
+          Remove day
         </button>
-        {!isNew && day && (
-          <button
-            type="button"
-            onClick={() => {
-              commit(() =>
-                removeDayAction({ day_id: day.id, meso_id: mesoId }),
-              );
-              onClose();
-            }}
-            className="text-[11px] font-bold text-accent"
-          >
-            Remove day
-          </button>
-        )}
       </div>
 
-      {!isNew && day && (
-        <>
+      <>
           <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
             MUSCLE GROUPS — EXERCISES PER GROUP
           </div>
@@ -556,8 +556,7 @@ function DaySetupSheet({
             Slots are created for each group — you&apos;ll pick the exact
             exercises on the board next.
           </p>
-        </>
-      )}
+      </>
 
       <div className="mt-4 flex items-center justify-end gap-2.5">
         <button

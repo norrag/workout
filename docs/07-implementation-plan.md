@@ -57,7 +57,10 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 - [x] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
 - [~] Plan-a-meso entry (fig 2.3): from-scratch, template, and **copy** paths live; meso builder shown as a dashed "soon" card (later)
 - [x] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
-- [x] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
+- [x] Day sheet (fig 2.5): label, weekday, per-group exercise-count steppers, remove day. *(2026-06-15:
+      add-day + day-setup combined into one `Day N` sheet reading live data — fixes the ± steppers /
+      group-✕ / add-group "doesn't update" bugs; weekday auto-fills Monday-first; "week starts on this
+      day" removed, weeks assumed to start Monday — per on-device feedback.)*
 - [x] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-session data, FULL HISTORY sheet; exclusions never appear
 - [x] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
 - [~] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `GO TO W#·D#`, edit-plan entry; `MESO STATS` stubbed until Phase 5
@@ -188,6 +191,13 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       removed): `PLAN | STATS` toggle, partial-completion **lock** (edits apply to `pending` weeks
       only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
 - [ ] **Create mesocycle (2.8)** rebrand: `MACROCYCLE PLACEMENT` with `M1…Mn` positions + phase.
+- [ ] **Draft model (on-device feedback, 2026-06-15):** `create mesocycle` (name/weeks/RIR) moves to
+      the **final** stage — scratch/template/copy drop straight onto the planner as a **draft**;
+      **one draft at a time** (new draft prompts keep-vs-replace). `DATA` (`draft` status) + flow
+      reorder across the three entry paths + a cycles-list `DRAFT — CONTINUE EDITING` entry.
+- [x] **Delete a mesocycle** with warnings (stronger + acknowledgement when it has logged history).
+      *(2026-06-15: `DELETE MESOCYCLE` on meso detail; `deleteMesocycle` + `getMesoDeletionImpact`;
+      FK cascades remove logged history.)*
 
 ### Logging (against Phase 3) — retrofit *(2026-06-15: shipped)*
 - [x] **Day View header (1.1)**: sticky/locked region; **orange progress bar** (`setsLogged ÷

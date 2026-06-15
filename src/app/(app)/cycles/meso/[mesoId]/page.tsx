@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMesoPlan } from "@/lib/queries/cycles";
+import { getMesoDeletionImpact, getMesoPlan } from "@/lib/queries/cycles";
 import { saveMesoAsTemplateAction } from "../../actions";
 import { ShareRow } from "@/components/ShareRow";
 import { StartMesoForm } from "./StartMesoForm";
+import { DeleteMesoButton } from "./DeleteMesoButton";
 
 const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -24,6 +25,8 @@ export default async function MesoDetailPage({
   const plan = await getMesoPlan(supabase, mesoId);
   if (!plan) notFound();
   const { meso, days } = plan;
+
+  const deletion = await getMesoDeletionImpact(supabase, user.id, mesoId);
 
   const { data: micros, error: microError } = await supabase
     .from("microcycles")
@@ -265,6 +268,12 @@ export default async function MesoDetailPage({
       {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
         <ShareRow objectType="mesocycle" objectId={meso.id} />
       )}
+      <DeleteMesoButton
+        mesoId={meso.id}
+        mesoName={meso.name}
+        loggedSets={deletion.loggedSets}
+        hasHistory={deletion.hasHistory}
+      />
     </div>
   );
 }

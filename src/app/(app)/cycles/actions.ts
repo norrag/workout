@@ -10,12 +10,14 @@ import {
   clearSlot,
   copyMesoStructure,
   createMesocycle,
+  deleteMesocycle,
   fillSlot,
   removeDayGroup,
   removeMesoDay,
   updateDayGroup,
   updateMesoDay,
 } from "@/lib/queries/cycles";
+import type { MesoDayRow } from "@/lib/types/database";
 import {
   createMacrocycleWithMesos,
   planUnplannedMeso,
@@ -168,14 +170,15 @@ export async function addDayAction(input: {
   meso_id: string;
   label: string | null;
   weekday: number | null;
-}): Promise<void> {
+}): Promise<MesoDayRow> {
   const parsed = dayInputSchema.parse(input);
   const { supabase, user } = await requireUser();
-  await addMesoDay(supabase, user.id, parsed.meso_id, {
+  const day = await addMesoDay(supabase, user.id, parsed.meso_id, {
     label: parsed.label,
     weekday: parsed.weekday,
   });
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+  return day;
 }
 
 const dayPatchSchema = z.object({
@@ -183,7 +186,6 @@ const dayPatchSchema = z.object({
   meso_id: z.string().uuid(),
   label: z.string().max(40).nullable(),
   weekday: z.coerce.number().int().min(1).max(7).nullable(),
-  week_starts_here: z.boolean().optional(),
 });
 
 export async function updateDayAction(input: {
@@ -191,22 +193,13 @@ export async function updateDayAction(input: {
   meso_id: string;
   label: string | null;
   weekday: number | null;
-  week_starts_here?: boolean;
 }): Promise<void> {
   const parsed = dayPatchSchema.parse(input);
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   await updateMesoDay(supabase, parsed.day_id, {
     label: parsed.label,
     weekday: parsed.weekday,
   });
-  // "week starts on this day" (fig 2.5) writes the profile-level setting
-  if (parsed.week_starts_here && parsed.weekday) {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ week_starts_on: parsed.weekday })
-      .eq("id", user.id);
-    if (error) throw error;
-  }
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
@@ -334,4 +327,17 @@ export async function startMesoAction(
   revalidatePath("/cycles");
   revalidatePath(`/cycles/meso/${mesoId}`);
   redirect("/workout");
+}
+
+// ---------------------------------------------------------------------------
+// delete a mesocycle — destructive; cascades remove logged history. The UI
+// confirms (with a stronger warning when the meso has logged sets).
+// ---------------------------------------------------------------------------
+
+export async function deleteMesoAction(formData: FormData): Promise<void> {
+  const mesoId = z.string().uuid().parse(formData.get("meso_id"));
+  const { supabase, user } = await requireUser();
+  await deleteMesocycle(supabase, user.id, mesoId);
+  revalidatePath("/cycles");
+  redirect("/cycles");
 }

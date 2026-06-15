@@ -553,6 +553,46 @@ export async function clearSlot(
 }
 
 // ---------------------------------------------------------------------------
+// delete a mesocycle (user-initiated). FK cascades remove its microcycles,
+// workouts, logged_sets, planner days/groups/fills — so deleting an active or
+// completed meso destroys logged history; the UI warns accordingly. (RLS:
+// `mesocycles_all_own` is `for all`; the child cascade bypasses RLS by design.)
+// ---------------------------------------------------------------------------
+
+export interface MesoDeletionImpact {
+  loggedSets: number;
+  hasHistory: boolean;
+}
+
+export async function getMesoDeletionImpact(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<MesoDeletionImpact> {
+  const { count, error } = await supabase
+    .from("logged_sets")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("mesocycle_id", mesoId);
+  if (error) throw error;
+  const loggedSets = count ?? 0;
+  return { loggedSets, hasHistory: loggedSets > 0 };
+}
+
+export async function deleteMesocycle(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("mesocycles")
+    .delete()
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
 // current position — macro → meso → micro → next workout. Standalone mesos
 // (no macro) are first-class (08 §3).
 // ---------------------------------------------------------------------------
