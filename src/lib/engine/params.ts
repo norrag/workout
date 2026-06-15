@@ -12,6 +12,36 @@ export const equipmentTypes = [
   "other",
 ] as const;
 
+export type EquipmentType = (typeof equipmentTypes)[number];
+
+/**
+ * Normalize a stored `exercises.equipment_type` to the canonical step bucket the
+ * engine prices loads in. The exercise library stores equipment verbatim from the
+ * user's import (a wider vocabulary — e.g. "smith machine", "freemotion",
+ * "bodyweight loadable"), but the engine only knows the buckets in
+ * `equipmentTypes`. Each extra label maps to the bucket with the same loadable
+ * step, so progression math is unchanged; unknown values fall back to "other"
+ * (the engine's FALLBACK_STEP). Pure.
+ */
+export function toEngineEquipment(raw: string): EquipmentType {
+  if ((equipmentTypes as readonly string[]).includes(raw)) {
+    return raw as EquipmentType;
+  }
+  switch (raw) {
+    case "smith machine":
+      return "smith";
+    case "bodyweight only":
+    case "bodyweight loadable":
+      return "bodyweight";
+    case "machine assistance":
+      return "machine";
+    case "freemotion":
+      return "cable";
+    default:
+      return "other";
+  }
+}
+
 export const experienceLevels = [
   "beginner",
   "intermediate",

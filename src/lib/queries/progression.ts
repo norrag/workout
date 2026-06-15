@@ -3,6 +3,7 @@ import {
   composeAutoregulationSummary,
   composeMesoCompleteSummary,
   prescribe,
+  toEngineEquipment,
   type EngineInputs,
   type EngineParams,
   type Prescription,
@@ -77,7 +78,7 @@ export function buildEngineInputs(args: {
   const { we } = args;
   return {
     exercise: {
-      equipmentType: args.equipmentType as EngineInputs["exercise"]["equipmentType"],
+      equipmentType: toEngineEquipment(args.equipmentType),
     },
     user: {
       experienceLevel: args.profile.experience_level ?? "beginner",

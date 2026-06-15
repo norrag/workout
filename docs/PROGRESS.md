@@ -2,7 +2,47 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Planner edit surface (2.5): staged save/cancel, immutability warning, open-workout regen, read-only planned days (on-device feedback)
+## 2026-06-15 (latest) — Exercise library replaced with the user's 330-exercise import
+
+Wholesale replacement of the stock exercise library with the user's curated export
+(`docs/data/exercises_all_20260615.csv`, 330 rows). All prior macro/meso/workout/template
+rows were test data and are wiped by the import; `profiles`, `muscle_groups`, and
+`engine_params` are preserved. Generated, not hand-written — rerun
+`scripts/import-exercise-library.py` to regenerate the migration + `seed.sql` from the CSV.
+
+### Done
+
+- **Migration `20260615000006_replace_exercise_library.sql`** — adds `exercises.legacy_id`
+  (unique), widens the `equipment_type` check, `truncate … restart identity cascade` of the
+  test data, then loads 330 stock rows (`user_id null`) + their primary/secondary muscle links.
+- **`seed.sql` regenerated** — muscle_groups + the 330-library + engine_params kept; the stock
+  *templates* were **dropped** (they referenced old exercise names that no longer exist and would
+  fail a fresh `db reset`). Rebuild stock templates against the new library when desired.
+- **Engine boundary normalizer** `toEngineEquipment` (`engine/params.ts`) maps the wider stored
+  vocabulary to the canonical step buckets; wired into `buildEngineInputs` (progression) and both
+  `seedMeso` call sites (generation). Unit test `engine/__tests__/equipment.test.ts` asserts the
+  mapping is loss-free for load math. `EquipmentType` union + `ExerciseRow.legacy_id` added to
+  `types/database.ts`; `legacy_id` is insert-optional (`Defaulted`).
+
+### Decisions / deviations (per hard rule #8)
+
+- **Integer ids → `legacy_id`, not the PK.** The PK is a `uuid` (every FK targets it), so the CSV's
+  1–330 ids can't be the PK. They live in `exercises.legacy_id` (unique) so the later workout-history
+  import joins `old int → legacy_id → uuid`. No separate conversion list needed; a
+  `legacy_id ↔ uuid ↔ name` map is exported post-apply for convenience.
+- **Equipment stored verbatim from the CSV** (per the user). The check now also allows
+  `smith machine`, `bodyweight only`, `bodyweight loadable`, `machine assistance`, `freemotion`
+  alongside the canonical engine buckets (the latter still used by user-created customs). Wrinkle to
+  reconcile later: both `smith`/`smith machine` and `bodyweight`/`bodyweight only|loadable` are now
+  valid; the create-exercise form still offers only the canonical set.
+- **Secondaries faithful to the CSV.** A conservative, opt-in enrichment proposal (125 high-confidence
+  compound synergists for rows lacking a secondary) is generated to
+  `scripts/exercise-secondary-enrichment.sql` (NOT applied by the import) for review.
+- **Known near-duplicates kept verbatim** (ids link to history, so nothing merged/renamed): two
+  `Hack Squat` (236 quads/machine, 228 glutes/smith), `Back Raise (45 Degree)` (6) vs
+  `(45 degree)` (5), `StIff Leg Deadlift` (145), `Triceps cable push-down Bar` (147).
+
+## 2026-06-15 — Planner edit surface (2.5): staged save/cancel, immutability warning, open-workout regen, read-only planned days (on-device feedback)
 
 On-device review of editing an existing meso surfaced four issues. This slice lands the
 **Planner board (2.5) edit surface** backlog item plus the read-only future-day view. Vertical

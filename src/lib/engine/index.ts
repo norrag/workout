@@ -16,7 +16,7 @@ import { rirRamp, type WeekPlan } from "./rules/rir";
 import { incrementFor, roundToStep } from "./rules/rounding";
 
 export { rirRamp, type WeekPlan };
-export { engineParamsSchema, DEFAULT_ENGINE_PARAMS } from "./params";
+export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
 export { macroGoalTypes, phaseNames } from "./params";
 export { engineInputsSchema } from "./types";
 export {

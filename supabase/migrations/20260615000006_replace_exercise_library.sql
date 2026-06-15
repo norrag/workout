@@ -1,22 +1,38 @@
--- Seed: muscle groups, stock exercises, default engine params.
--- Stock rows have user_id null and are written only here (service context).
--- The stock exercise library is generated from the user-provided export
--- (docs/data/exercises_all_20260615.csv) by scripts/import-exercise-library.py;
--- regenerate both this file and the import migration with that script.
+-- 20260615000006 — replace exercise library
+-- Loads the user-provided library export (docs/data/exercises_all_20260615.csv,
+-- 330 exercises). All prior macro/meso/workout/template rows are test data
+-- and are wiped; profiles, muscle_groups, and engine_params are preserved.
+--
+-- ID preservation: the table PK is a uuid (every FK in the app points at it), so
+-- the CSV's integer ids cannot BE the PK. They are stored in exercises.legacy_id
+-- (unique) so the later workout-history import can map old int -> new uuid.
+--
+-- Equipment is stored verbatim from the CSV (wider vocabulary than the engine's
+-- canonical buckets); the engine normalizes at its input boundary
+-- (src/lib/engine/params.ts: toEngineEquipment) so prescription math is unchanged.
 
--- ---------------------------------------------------------------------------
--- muscle groups
--- ---------------------------------------------------------------------------
+-- 1. schema: legacy id + widened equipment vocabulary ------------------------
+alter table public.exercises add column if not exists legacy_id integer;
+create unique index if not exists exercises_legacy_id_key
+  on public.exercises (legacy_id);
 
-insert into public.muscle_groups (name) values
-  ('chest'), ('back'), ('quads'), ('hamstrings'), ('glutes'), ('biceps'),
-  ('triceps'), ('shoulders'), ('calves'), ('abs'), ('forearms'), ('traps')
-on conflict (name) do nothing;
+alter table public.exercises drop constraint if exists exercises_equipment_type_check;
+alter table public.exercises
+  add constraint exercises_equipment_type_check
+  check (equipment_type in ('dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bodyweight', 'bands', 'kettlebell', 'other', 'bodyweight loadable', 'bodyweight only', 'freemotion', 'machine assistance', 'smith machine'));
 
--- ---------------------------------------------------------------------------
--- stock exercises (user-provided library; ids preserved in legacy_id)
--- ---------------------------------------------------------------------------
+-- 2. wipe test data + the prior stock library --------------------------------
+truncate
+  public.macrocycles, public.mesocycles, public.microcycles,
+  public.meso_days, public.meso_day_groups, public.meso_exercises,
+  public.workouts, public.workout_exercises, public.workout_feedback,
+  public.logged_sets, public.exercise_feedback, public.engine_decisions,
+  public.templates, public.template_days, public.template_day_groups,
+  public.template_exercises, public.excluded_exercises, public.exercise_notes,
+  public.shares, public.exercise_muscle_groups, public.exercises
+  restart identity cascade;
 
+-- 3. load the library (stock rows: user_id null) -----------------------------
 with ex (legacy_id, name, equipment_type, primary_mg, secondary_mg) as (
   values
     (39, 'Calf Machine', 'machine', 'calves', null),
@@ -368,285 +384,3 @@ cross join lateral (
 join public.muscle_groups mg on mg.name = r.mg_name
 where r.mg_name is not null
 on conflict (exercise_id, muscle_group_id) do nothing;
-
--- ---------------------------------------------------------------------------
--- default engine params (version 2) — mirrors src/lib/engine/params.ts
--- (version 1 is historical; migration 20260613000001 owns the v2 row on
--- existing databases, so this insert is guarded)
--- ---------------------------------------------------------------------------
-
-insert into public.engine_params (version, params, is_active, notes)
-select 2, '{
-  "increment": {
-    "barbell": { "kg": 2.5, "lb": 5 },
-    "smith": { "kg": 2.5, "lb": 5 },
-    "dumbbell": { "kg": 2.0, "lb": 5 },
-    "machine": { "kg": 2.5, "lb": 5 },
-    "cable": { "kg": 2.5, "lb": 5 },
-    "bodyweight": { "kg": 2.5, "lb": 5 },
-    "bands": { "kg": 5.0, "lb": 10 },
-    "kettlebell": { "kg": 4.0, "lb": 9 },
-    "other": { "kg": 2.5, "lb": 5 }
-  },
-  "experience_increment_scale": {
-    "beginner": 1.5,
-    "intermediate": 1.0,
-    "advanced": 0.5
-  },
-  "progression_style": {
-    "gain": "load_first",
-    "cut": "hold",
-    "maintain": "hold"
-  },
-  "small_miss_reps": 2,
-  "regression_pct": 0.9,
-  "pain_gate": 2,
-  "workload_high": 8,
-  "workload_low": 3,
-  "set_add_pump_min": 6,
-  "pump_low": 2,
-  "min_sets": 2,
-  "max_sets_per_exercise": 6,
-  "mg_set_ceiling": 20,
-  "session_fatigue_dampen_threshold": 3,
-  "session_performance_dampen_threshold": 1,
-  "deload": { "load_pct": 0.55, "set_pct": 0.5, "target_rir": 4 },
-  "meso_seed_backoff_pct": 0.925,
-  "rounding": {
-    "barbell": { "kg": 2.5, "lb": 5 },
-    "smith": { "kg": 2.5, "lb": 5 },
-    "dumbbell": { "kg": 2.0, "lb": 5 },
-    "machine": { "kg": 2.5, "lb": 5 },
-    "cable": { "kg": 2.5, "lb": 5 },
-    "bodyweight": { "kg": 2.5, "lb": 5 },
-    "bands": { "kg": 5.0, "lb": 10 },
-    "kettlebell": { "kg": 4.0, "lb": 9 },
-    "other": { "kg": 2.5, "lb": 5 }
-  }
-}'::jsonb, false, 'v2 — pivot feedback re-alignment (pump/workload 0-10), per-equipment per-unit increments incl. bands/kettlebell'
-where not exists (select 1 from public.engine_params where version = 2);
-
--- ---------------------------------------------------------------------------
--- default engine params (version 3, active) — adds the metric blocks
--- (e1rm, macro_target, phase_plan, key_lifts; 10-metrics-spec.md §8).
--- Migration 20260614000001 owns the v3 row on existing databases; this guarded
--- insert covers a fresh seed. Mirrors src/lib/engine/params.ts defaults.
--- ---------------------------------------------------------------------------
-
-update public.engine_params set is_active = false where version < 3 and is_active;
-
-insert into public.engine_params (version, params, is_active, notes)
-select 3, '{
-  "increment": {
-    "barbell": { "kg": 2.5, "lb": 5 },
-    "smith": { "kg": 2.5, "lb": 5 },
-    "dumbbell": { "kg": 2.0, "lb": 5 },
-    "machine": { "kg": 2.5, "lb": 5 },
-    "cable": { "kg": 2.5, "lb": 5 },
-    "bodyweight": { "kg": 2.5, "lb": 5 },
-    "bands": { "kg": 5.0, "lb": 10 },
-    "kettlebell": { "kg": 4.0, "lb": 9 },
-    "other": { "kg": 2.5, "lb": 5 }
-  },
-  "experience_increment_scale": {
-    "beginner": 1.5,
-    "intermediate": 1.0,
-    "advanced": 0.5
-  },
-  "progression_style": {
-    "gain": "load_first",
-    "cut": "hold",
-    "maintain": "hold"
-  },
-  "small_miss_reps": 2,
-  "regression_pct": 0.9,
-  "pain_gate": 2,
-  "workload_high": 8,
-  "workload_low": 3,
-  "set_add_pump_min": 6,
-  "pump_low": 2,
-  "min_sets": 2,
-  "max_sets_per_exercise": 6,
-  "mg_set_ceiling": 20,
-  "session_fatigue_dampen_threshold": 3,
-  "session_performance_dampen_threshold": 1,
-  "deload": { "load_pct": 0.55, "set_pct": 0.5, "target_rir": 4 },
-  "meso_seed_backoff_pct": 0.925,
-  "rounding": {
-    "barbell": { "kg": 2.5, "lb": 5 },
-    "smith": { "kg": 2.5, "lb": 5 },
-    "dumbbell": { "kg": 2.0, "lb": 5 },
-    "machine": { "kg": 2.5, "lb": 5 },
-    "cable": { "kg": 2.5, "lb": 5 },
-    "bodyweight": { "kg": 2.5, "lb": 5 },
-    "bands": { "kg": 5.0, "lb": 10 },
-    "kettlebell": { "kg": 4.0, "lb": 9 },
-    "other": { "kg": 2.5, "lb": 5 }
-  },
-  "e1rm": {
-    "rir_offset": 1.0,
-    "high_max_eff_reps": 8,
-    "mod_max_eff_reps": 12,
-    "high_max_rir": 2,
-    "mod_max_rir": 3
-  },
-  "macro_target": {
-    "sex_factor_female": 0.5,
-    "career_cap_lb": { "male": 40, "female": 20 },
-    "career_tau_years": 3,
-    "hypertrophy_pct_bw_month": { "beginner": [1.0, 1.5], "intermediate": [0.5, 1.0], "advanced": [0.25, 0.5] },
-    "strength_pct_month": { "beginner": [4, 8], "intermediate": [1.5, 3], "advanced": [0.5, 1.5] },
-    "strength_cap_total_pct": { "beginner": 60, "intermediate": 30, "advanced": 15 },
-    "cut_pct_bw_week": { "high_bf": [1.0, 1.5], "average": [0.5, 1.0], "lean": [0.25, 0.5] },
-    "cut_bmi_high": 27,
-    "cut_bmi_lean": 22,
-    "age_taper": true,
-    "age_taper_start": 40,
-    "age_taper_per_year": 0.02,
-    "age_taper_floor": 0.6,
-    "recommend_target_lb": { "male": 8, "female": 4 },
-    "recommend_strength_total_pct": 10,
-    "recommend_cut_bw_pct": 8,
-    "recommend_min_months": 2,
-    "recommend_max_months": 12,
-    "present": "conservative_end"
-  },
-  "phase_plan": { "order": ["accumulation", "intensification", "peak"], "accumulation_fraction": 0.6 },
-  "key_lifts": { "n": 5, "selection": "frequency" }
-}'::jsonb, false, 'v3 — metric defaults: e1RM, macro_target (planMacrocycle), phase_plan, key_lifts (10-metrics-spec.md)'
-where not exists (select 1 from public.engine_params where version = 3);
-
--- ---------------------------------------------------------------------------
--- default engine params (version 4, active) — macrocycle-target fix
--- (10-metrics-spec.md §5): hypertrophy rate decays continuously with training
--- age (replaces the discrete buckets + hard career-cap clamp that flattened
--- the per-macro target across durations); cut compounds + is %BW-capped.
--- Migration 20260614000003 owns the v4 row on existing databases.
--- ---------------------------------------------------------------------------
-
-update public.engine_params set is_active = false where version < 4 and is_active;
-
-insert into public.engine_params (version, params, is_active, notes)
-select 4, '{
-  "increment": {
-    "barbell": { "kg": 2.5, "lb": 5 },
-    "smith": { "kg": 2.5, "lb": 5 },
-    "dumbbell": { "kg": 2.0, "lb": 5 },
-    "machine": { "kg": 2.5, "lb": 5 },
-    "cable": { "kg": 2.5, "lb": 5 },
-    "bodyweight": { "kg": 2.5, "lb": 5 },
-    "bands": { "kg": 5.0, "lb": 10 },
-    "kettlebell": { "kg": 4.0, "lb": 9 },
-    "other": { "kg": 2.5, "lb": 5 }
-  },
-  "experience_increment_scale": {
-    "beginner": 1.5,
-    "intermediate": 1.0,
-    "advanced": 0.5
-  },
-  "progression_style": {
-    "gain": "load_first",
-    "cut": "hold",
-    "maintain": "hold"
-  },
-  "small_miss_reps": 2,
-  "regression_pct": 0.9,
-  "pain_gate": 2,
-  "workload_high": 8,
-  "workload_low": 3,
-  "set_add_pump_min": 6,
-  "pump_low": 2,
-  "min_sets": 2,
-  "max_sets_per_exercise": 6,
-  "mg_set_ceiling": 20,
-  "session_fatigue_dampen_threshold": 3,
-  "session_performance_dampen_threshold": 1,
-  "deload": { "load_pct": 0.55, "set_pct": 0.5, "target_rir": 4 },
-  "meso_seed_backoff_pct": 0.925,
-  "rounding": {
-    "barbell": { "kg": 2.5, "lb": 5 },
-    "smith": { "kg": 2.5, "lb": 5 },
-    "dumbbell": { "kg": 2.0, "lb": 5 },
-    "machine": { "kg": 2.5, "lb": 5 },
-    "cable": { "kg": 2.5, "lb": 5 },
-    "bodyweight": { "kg": 2.5, "lb": 5 },
-    "bands": { "kg": 5.0, "lb": 10 },
-    "kettlebell": { "kg": 4.0, "lb": 9 },
-    "other": { "kg": 2.5, "lb": 5 }
-  },
-  "e1rm": {
-    "rir_offset": 1.0,
-    "high_max_eff_reps": 8,
-    "mod_max_eff_reps": 12,
-    "high_max_rir": 2,
-    "mod_max_rir": 3
-  },
-  "macro_target": {
-    "sex_factor_female": 0.5,
-    "hypertrophy_base_pct_bw_month": { "low": 1.0, "high": 1.5 },
-    "hypertrophy_decay_tau_years": 5,
-    "career_cap_lb": { "male": 40, "female": 20 },
-    "career_tau_years": 3,
-    "hypertrophy_pct_bw_month": { "beginner": [1.0, 1.5], "intermediate": [0.5, 1.0], "advanced": [0.25, 0.5] },
-    "strength_pct_month": { "beginner": [4, 8], "intermediate": [1.5, 3], "advanced": [0.5, 1.5] },
-    "strength_cap_total_pct": { "beginner": 60, "intermediate": 30, "advanced": 15 },
-    "cut_pct_bw_week": { "high_bf": [1.0, 1.5], "average": [0.5, 1.0], "lean": [0.25, 0.5] },
-    "cut_bmi_high": 27,
-    "cut_bmi_lean": 22,
-    "cut_cap_pct_bw": 0.25,
-    "age_taper": true,
-    "age_taper_start": 40,
-    "age_taper_per_year": 0.02,
-    "age_taper_floor": 0.6,
-    "recommend_target_lb": { "male": 8, "female": 4 },
-    "recommend_strength_total_pct": 10,
-    "recommend_cut_bw_pct": 8,
-    "recommend_min_months": 2,
-    "recommend_max_months": 12,
-    "present": "conservative_end"
-  },
-  "phase_plan": { "order": ["accumulation", "intensification", "peak"], "accumulation_fraction": 0.6 },
-  "key_lifts": { "n": 5, "selection": "frequency" }
-}'::jsonb, false, 'v4 — macro-target fix: continuous training-age hypertrophy decay + compounding/capped cut (10-metrics-spec.md §5)'
-where not exists (select 1 from public.engine_params where version = 4);
-
--- ---------------------------------------------------------------------------
--- default engine params (version 5, active) — FFMI proximity-to-potential
--- hypertrophy model + body-fat cut bands; sex factor 0.5->0.7 (10-spec §5).
--- Migration 20260615000001 owns the v5 row on existing databases.
--- ---------------------------------------------------------------------------
-
-update public.engine_params set is_active = false where version < 5 and is_active;
-
-insert into public.engine_params (version, params, is_active, notes)
-select 5, '{
-  "increment": { "barbell": { "kg": 2.5, "lb": 5 }, "smith": { "kg": 2.5, "lb": 5 }, "dumbbell": { "kg": 2.0, "lb": 5 }, "machine": { "kg": 2.5, "lb": 5 }, "cable": { "kg": 2.5, "lb": 5 }, "bodyweight": { "kg": 2.5, "lb": 5 }, "bands": { "kg": 5.0, "lb": 10 }, "kettlebell": { "kg": 4.0, "lb": 9 }, "other": { "kg": 2.5, "lb": 5 } },
-  "experience_increment_scale": { "beginner": 1.5, "intermediate": 1.0, "advanced": 0.5 },
-  "progression_style": { "gain": "load_first", "cut": "hold", "maintain": "hold" },
-  "small_miss_reps": 2, "regression_pct": 0.9, "pain_gate": 2, "workload_high": 8, "workload_low": 3, "set_add_pump_min": 6, "pump_low": 2, "min_sets": 2, "max_sets_per_exercise": 6, "mg_set_ceiling": 20, "session_fatigue_dampen_threshold": 3, "session_performance_dampen_threshold": 1,
-  "deload": { "load_pct": 0.55, "set_pct": 0.5, "target_rir": 4 }, "meso_seed_backoff_pct": 0.925,
-  "rounding": { "barbell": { "kg": 2.5, "lb": 5 }, "smith": { "kg": 2.5, "lb": 5 }, "dumbbell": { "kg": 2.0, "lb": 5 }, "machine": { "kg": 2.5, "lb": 5 }, "cable": { "kg": 2.5, "lb": 5 }, "bodyweight": { "kg": 2.5, "lb": 5 }, "bands": { "kg": 5.0, "lb": 10 }, "kettlebell": { "kg": 4.0, "lb": 9 }, "other": { "kg": 2.5, "lb": 5 } },
-  "e1rm": { "rir_offset": 1.0, "high_max_eff_reps": 8, "mod_max_eff_reps": 12, "high_max_rir": 2, "mod_max_rir": 3 },
-  "macro_target": {
-    "sex_factor_female": 0.7,
-    "hypertrophy_base_pct_bw_month": { "low": 1.0, "high": 1.5 },
-    "hypertrophy_decay_tau_years": 5,
-    "hypertrophy_floor_pct_bw_month": { "low": 0.04, "high": 0.09 },
-    "ffmi_ceiling": { "male": 25, "female": 21.5 },
-    "ffmi_untrained": { "male": 18.5, "female": 14.5 },
-    "proximity_macro_cap_frac": 0.6,
-    "cut_bf_thresholds": { "male": { "high": 20, "lean": 12 }, "female": { "high": 30, "lean": 22 } },
-    "career_cap_lb": { "male": 40, "female": 20 },
-    "career_tau_years": 3,
-    "hypertrophy_pct_bw_month": { "beginner": [1.0, 1.5], "intermediate": [0.5, 1.0], "advanced": [0.25, 0.5] },
-    "strength_pct_month": { "beginner": [4, 8], "intermediate": [1.5, 3], "advanced": [0.5, 1.5] },
-    "strength_cap_total_pct": { "beginner": 60, "intermediate": 30, "advanced": 15 },
-    "cut_pct_bw_week": { "high_bf": [1.0, 1.5], "average": [0.5, 1.0], "lean": [0.25, 0.5] },
-    "cut_bmi_high": 27, "cut_bmi_lean": 22, "cut_cap_pct_bw": 0.25,
-    "age_taper": true, "age_taper_start": 40, "age_taper_per_year": 0.02, "age_taper_floor": 0.6,
-    "recommend_target_lb": { "male": 8, "female": 4 }, "recommend_strength_total_pct": 10, "recommend_cut_bw_pct": 8, "recommend_min_months": 2, "recommend_max_months": 12, "present": "conservative_end"
-  },
-  "phase_plan": { "order": ["accumulation", "intensification", "peak"], "accumulation_fraction": 0.6 },
-  "key_lifts": { "n": 5, "selection": "frequency" }
-}'::jsonb, true, 'v5 — FFMI proximity-to-potential hypertrophy + body-fat cut bands; sex factor 0.7 (10-metrics-spec.md §5)'
-where not exists (select 1 from public.engine_params where version = 5);
