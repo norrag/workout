@@ -2,7 +2,110 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Cycles/meso navigation fixes + day-1 planner data repair (on-device feedback)
+## 2026-06-15 (latest) — Planner edit surface (2.5): staged save/cancel, immutability warning, open-workout regen, read-only planned days (on-device feedback)
+
+On-device review of editing an existing meso surfaced four issues. This slice lands the
+**Planner board (2.5) edit surface** backlog item plus the read-only future-day view. Vertical
+slice; `main` deployable; no schema change.
+
+### Done
+
+- **Staged editing for non-draft mesos.** Editing a `planned`/`active` meso (EDIT PLAN / EDIT WEEKS)
+  now works on a **local working copy** — add/remove day, add muscle groups, set exercises, set
+  counts, and removals all mutate client state only; **nothing is written until `SAVE CHANGES`**. A
+  sticky bottom **CANCEL · SAVE CHANGES** bar appears; CANCEL discards (confirm sheet when dirty),
+  SAVE opens a confirm with the warning. **Drafts keep the live build-then-`CREATE MESOCYCLE` flow.**
+  The three sheets (day setup, add-groups, picker) were made callback-driven so the board chooses
+  staged-vs-live per state. *(This also resolves the reported "add-day panel won't dismiss" bug — the
+  sheets now close on local state, with no server-action/revalidation timing in the loop.)*
+- **Immutability warning on save.** The save-confirm sheet states plainly that completed/in-progress
+  workouts and every logged set are protected and that edits only affect not-yet-started days
+  (this week's remaining days + future weeks). The stronger copy shows when the meso has logged
+  history (`getMesoDeletionImpact.hasHistory`, threaded into the board).
+- **Open-workout regeneration (active mesos).** On save, `regenerateOpenWorkouts` does a **structural
+  merge** on the open (not-yet-started) workouts of non-completed weeks: removed days' `planned`
+  workouts are deleted, added days get fresh seeded planned workouts, and within an existing
+  `planned` workout exercises are added/removed to match the plan while **surviving exercises keep
+  their engine-progressed prescription**. Completed / in-progress / skipped workouts and all logged
+  sets are never touched. Future weeks (not yet generated) pick up the new plan when their generation
+  job runs. `saveMesoPlan` reconciles the planner tables (wholesale replace, day_numbers preserved so
+  generated workouts still line up — nothing outside the planner tables references their ids).
+- **Read-only planned-day view (issue 4).** New `/cycles/meso/[mesoId]/planned/[week]/[day]` shows a
+  not-yet-generated day's **basic planned exercises** (groups → exercise · planned sets · target RIR
+  from the ramp/microcycle) behind a clear **`NOT PLANNED YET`** banner explaining loads arrive once
+  the prior week is logged. Wired from the Day View navigator chips (future days were dead `<div>`s)
+  and the meso-detail ramp matrix's empty/future cells (previously un-clickable) — fixing the "can't
+  view unplanned days / workout view gets weird after edits" report.
+
+### Recorded deviations
+
+- **Staged save replaces the planner tables wholesale** on commit (vs. a fine-grained diff) — simplest
+  safe reconcile since the planner tables hold no logged data and `day_number` is preserved for
+  retained days so generated workouts still match. Regeneration of generated workouts is the careful,
+  history-protecting part.
+- **Edits during a deload week** reseed newly-added exercises at the microcycle's `target_rir`
+  (deload RIR) rather than recomputing the full RP deload reduction; retained exercises are untouched.
+  Editing mid-deload is an edge case; the next week's generation recomputes normally.
+- **The planned-day view shows structure + target RIR only** (no projected loads) — loads genuinely
+  aren't known until the prior week is logged, which the banner states (10 §9 honesty guardrail).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (114/114), `npm run build` green. No schema change.
+The staged-edit interactions are client state; the new IO (`saveMesoPlan`, `regenerateOpenWorkouts`)
+is user-scoped through existing RLS and reuses the smoke-tested `seedMeso` path; the merge protects
+started/completed work and logged sets by status guards. In-browser QA of the edit/save/regeneration
+flow on a real active meso still pending (as for other screens).
+
+## 2026-06-15 — Planner pickers retrofit: Add groups (2.6b) + multi-select Exercise picker (2.7) with equipment filter
+
+The 2.6b "Add groups" and 2.7 "Pick exercise" mockups never made it into the build during the
+design handoff — the planner shipped a plain inline 2-column add-group grid and a **single-select**
+picker filling one slot at a time. This slice transcribes both figures 1:1 and adds the
+equipment/machine-type filter the user asked for. No schema change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Add groups (fig 2.6b)** — new `AddGroupsSheet` replacing the inline grid. Region-grouped
+  (`LEGS · PUSH · PULL · CORE`, OTHER fallback), **multi-select** with a search box; groups already on
+  the day show a greyed ✓ + **`IN DAY`** and aren't re-selectable; the action button reads
+  **`ADD N GROUPS`** (live count) and adds all selected in one write (`addDayGroups` batch insert,
+  each with one open slot). Opened from both the board's **`+ ADD MUSCLE GROUP`** and the day-setup
+  sheet's button (the day-setup sheet no longer carries its own add-group UI).
+- **Exercise picker (fig 2.7)** — rebuilt `ExercisePicker` as a **group-centric multi-select**: it
+  pre-checks the group's current fills, lists muscle-group-filtered candidates with checkboxes +
+  `EQUIPMENT · LAST <date>`, and **`ADD TO <DAY>`** sets the group's exercises to exactly the selected
+  set (`setGroupExercises` → `planGroupExercises` lays them into slots 1..n, **retaining each kept
+  exercise's `initial_sets`**, defaulting new ones to 3, and **resizing the group's slot count** to
+  match). The board's slot rows (filled or empty) all open this one group picker.
+- **Equipment / machine-type filter** (user request) — a chip row (`ALL` + the distinct equipment
+  types present among the group's candidates) that ANDs with the search; mirrors the library 3.1
+  EQUIP axis. Shown only when the group spans more than one equipment type.
+- **Pure helpers** `src/lib/planner/groups.ts` — `groupByRegion` (region order + alphabetised,
+  empty regions omitted, OTHER last) and `planGroupExercises` (multi-select → slot layout, sets
+  retention, dedupe, empty). **+8 unit tests** (114 total).
+- **Dead code removed** — the per-slot `fillSlotAction`/`fillSlot` and single-group
+  `addGroupAction`/`addDayGroup` paths (superseded) are deleted.
+
+### Recorded deviations
+
+- **Picker is multi-select per group, not per slot.** Fig 2.7 shows checkboxes + `ADD TO <DAY>`, so
+  the picker now sets the whole group's exercises at once (and the group's slot count follows the
+  number picked). This supersedes the original per-slot single-select (07 Phase 2, fig "2.6") and the
+  inline last-session "SELECTED" card; the **`›` on each row still opens the full history sheet**.
+- **Regions are mapped client-side by muscle-group name** (`muscle_groups` has no region column) —
+  documented constant in `planner/groups.ts`; unknown names fall to `OTHER` so nothing is dropped.
+- **Picker subtitle uses `MUSCLE · DAY`** (drops the `SLOT n` now that it's group-level), and the
+  day-setup sheet keeps the per-group set-count steppers (the picker can override the count on add).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (114/114), `npm run build` green. Pure helpers
+unit-tested; the two new query writes (`addDayGroups`, `setGroupExercises`) are user-scoped through the
+existing `mesocycles`/`meso_*` RLS (planning rows only — no logged history touched). In-browser pixel
+QA of the two sheets still pending (as for other screens).
+
+## 2026-06-15 — Cycles/meso navigation fixes + day-1 planner data repair (on-device feedback)
 
 Three on-device follow-ups on the Cycles/meso surface. The meso detail page is **kept** (the 09
 "nix the meso page" decision is reversed per the user).

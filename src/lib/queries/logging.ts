@@ -223,12 +223,14 @@ export async function getWorkoutDetail(
     const weekWorkouts = (mesoWorkouts ?? []).filter(
       (w) => w.microcycle_id === m.id,
     );
-    // generated days drive the chips; before generation, fall back to the
-    // planner's programmed day numbers as plain placeholders
-    const dayNumbers =
-      weekWorkouts.length > 0
-        ? weekWorkouts.map((w) => w.day_number).sort((a, b) => a - b)
-        : plannedDayNumbers;
+    // every programmed day shows for every week — generated days carry their
+    // workout id + status; not-yet-generated days are plain placeholders (the
+    // progression job builds next week one day at a time, so a partially
+    // generated future week must still list its full planned day set). The
+    // union also tolerates a plan edit that added/removed a day mid-meso.
+    const dayNumbers = [
+      ...new Set([...plannedDayNumbers, ...weekWorkouts.map((w) => w.day_number)]),
+    ].sort((a, b) => a - b);
     const days: NavDay[] = dayNumbers.map((dayNumber) => {
       const w = weekWorkouts.find((x) => x.day_number === dayNumber);
       let status: NavDay["status"] = "planned";

@@ -207,11 +207,18 @@ export default async function MesoDetailPage({
                       D{day?.day_number}
                     </Link>
                   );
-                return (
-                  <div
-                    key={day?.id ?? di}
-                    className={`h-[38px] ${week.isDeload || week.status === "unbuilt" ? "border border-dashed border-ink/35" : "border border-ink/[0.22]"}`}
-                  />
+                const cellClass = `flex h-[38px] items-center justify-center text-[9px] font-medium tracking-[0.06em] text-ink/40 ${week.isDeload || week.status === "unbuilt" ? "border border-dashed border-ink/35" : "border border-ink/[0.22]"}`;
+                // empty/future cell → read-only planned day (basic exercises)
+                return day ? (
+                  <Link
+                    key={day.id}
+                    href={`/cycles/meso/${meso.id}/planned/${week.weekNumber}/${day.day_number}`}
+                    className={cellClass}
+                  >
+                    D{day.day_number}
+                  </Link>
+                ) : (
+                  <div key={di} className={cellClass} />
                 );
               })}
             </div>

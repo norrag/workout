@@ -115,6 +115,7 @@ export function DayView({
   return (
     <div>
       <DayHeader
+        mesoId={mesocycle.id}
         mesoName={mesocycle.name}
         weekNumber={microcycle.week_number}
         dayNumber={workout.day_number}
@@ -218,6 +219,7 @@ export function DayView({
 // ---------------------------------------------------------------------------
 
 function DayHeader({
+  mesoId,
   mesoName,
   weekNumber,
   dayNumber,
@@ -228,6 +230,7 @@ function DayHeader({
   totalSets,
   navWeeks,
 }: {
+  mesoId: string;
   mesoName: string;
   weekNumber: number;
   dayNumber: number;
@@ -364,18 +367,22 @@ function DayHeader({
                     </>
                   );
                   const chipClass = `relative flex h-[30px] flex-1 items-center justify-center text-[10.5px] tracking-[0.04em] ${cls}`;
-                  return d.workoutId && !viewing ? (
-                    <Link
-                      key={d.dayNumber}
-                      href={`/log/${d.workoutId}`}
-                      className={chipClass}
-                    >
+                  if (viewing) {
+                    return (
+                      <div key={d.dayNumber} className={chipClass}>
+                        {content}
+                      </div>
+                    );
+                  }
+                  // generated day → log view; not-yet-generated day → the
+                  // read-only planned view (basic exercises, no projections yet)
+                  const href = d.workoutId
+                    ? `/log/${d.workoutId}`
+                    : `/cycles/meso/${mesoId}/planned/${selWeek?.weekNumber ?? selectedWeek}/${d.dayNumber}`;
+                  return (
+                    <Link key={d.dayNumber} href={href} className={chipClass}>
                       {content}
                     </Link>
-                  ) : (
-                    <div key={d.dayNumber} className={chipClass}>
-                      {content}
-                    </div>
                   );
                 })}
               </div>

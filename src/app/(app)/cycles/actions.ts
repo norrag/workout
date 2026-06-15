@@ -5,16 +5,17 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
-  addDayGroup,
+  addDayGroups,
   addMesoDay,
   clearSlot,
   copyMesoStructure,
   createDraftMeso,
   deleteMesocycle,
-  fillSlot,
   finalizeDraftMeso,
   removeDayGroup,
   removeMesoDay,
+  saveMesoPlan,
+  setGroupExercises,
   updateDayGroup,
   updateMesoDay,
 } from "@/lib/queries/cycles";
@@ -23,7 +24,11 @@ import {
   createMacrocycleWithMesos,
   planUnplannedMeso,
 } from "@/lib/queries/macro";
-import { getActiveEngineParams, startMeso } from "@/lib/queries/generation";
+import {
+  getActiveEngineParams,
+  regenerateOpenWorkouts,
+  startMeso,
+} from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
 import {
   applyTemplateToMeso,
@@ -251,27 +256,43 @@ export async function removeDayAction(input: {
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
-const groupAddSchema = z.object({
+const groupsAddSchema = z.object({
   day_id: z.string().uuid(),
   meso_id: z.string().uuid(),
-  muscle_group_id: z.string().uuid(),
-  exercise_slots: z.coerce.number().int().min(1).max(10),
+  muscle_group_ids: z.array(z.string().uuid()).min(1).max(20),
 });
 
-export async function addGroupAction(input: {
+/** Add several muscle groups to a day at once (fig 2.6b "ADD N GROUPS"). */
+export async function addGroupsAction(input: {
   day_id: string;
   meso_id: string;
-  muscle_group_id: string;
-  exercise_slots: number;
+  muscle_group_ids: string[];
 }): Promise<void> {
-  const parsed = groupAddSchema.parse(input);
+  const parsed = groupsAddSchema.parse(input);
   const { supabase } = await requireUser();
-  await addDayGroup(
-    supabase,
-    parsed.day_id,
-    parsed.muscle_group_id,
-    parsed.exercise_slots,
-  );
+  await addDayGroups(supabase, parsed.day_id, parsed.muscle_group_ids);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
+const setGroupExercisesSchema = z.object({
+  meso_id: z.string().uuid(),
+  group_id: z.string().uuid(),
+  exercise_ids: z.array(z.string().uuid()).max(20),
+});
+
+/** Set a group's exercises from the fig 2.7 multi-select picker. */
+export async function setGroupExercisesAction(input: {
+  meso_id: string;
+  group_id: string;
+  exercise_ids: string[];
+}): Promise<void> {
+  const parsed = setGroupExercisesSchema.parse(input);
+  const { supabase } = await requireUser();
+  await setGroupExercises(supabase, {
+    mesocycle_id: parsed.meso_id,
+    meso_day_group_id: parsed.group_id,
+    exercise_ids: parsed.exercise_ids,
+  });
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
@@ -306,31 +327,74 @@ export async function removeGroupAction(input: {
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
-const fillSchema = z.object({
+// ---------------------------------------------------------------------------
+// staged plan save (fig 2.5): editing a non-draft meso stages changes locally;
+// SAVE CHANGES commits the whole plan in one write. For an active meso, open
+// (not-yet-started) workouts are regenerated to match — logged history and
+// started/completed workouts are never touched.
+// ---------------------------------------------------------------------------
+
+const planSaveSchema = z.object({
   meso_id: z.string().uuid(),
-  group_id: z.string().uuid(),
-  slot_number: z.coerce.number().int().min(1).max(10),
-  exercise_id: z.string().uuid(),
-  initial_sets: z.coerce.number().int().min(1).max(10),
+  days: z
+    .array(
+      z.object({
+        day_number: z.number().int().min(1).max(14),
+        label: z.string().max(40).nullable(),
+        weekday: z.number().int().min(1).max(7).nullable(),
+        groups: z.array(
+          z.object({
+            muscle_group_id: z.string().uuid(),
+            exercise_slots: z.number().int().min(1).max(10),
+            fills: z.array(
+              z.object({
+                slot_number: z.number().int().min(1).max(10),
+                exercise_id: z.string().uuid(),
+                initial_sets: z.number().int().min(1).max(10),
+              }),
+            ),
+          }),
+        ),
+      }),
+    )
+    .max(14),
 });
 
-export async function fillSlotAction(input: {
+export async function saveMesoPlanAction(input: {
   meso_id: string;
-  group_id: string;
-  slot_number: number;
-  exercise_id: string;
-  initial_sets: number;
+  days: {
+    day_number: number;
+    label: string | null;
+    weekday: number | null;
+    groups: {
+      muscle_group_id: string;
+      exercise_slots: number;
+      fills: { slot_number: number; exercise_id: string; initial_sets: number }[];
+    }[];
+  }[];
 }): Promise<void> {
-  const parsed = fillSchema.parse(input);
-  const { supabase } = await requireUser();
-  await fillSlot(supabase, {
-    mesocycle_id: parsed.meso_id,
-    meso_day_group_id: parsed.group_id,
-    slot_number: parsed.slot_number,
-    exercise_id: parsed.exercise_id,
-    initial_sets: parsed.initial_sets,
-  });
+  const parsed = planSaveSchema.parse(input);
+  const { supabase, user } = await requireUser();
+
+  await saveMesoPlan(supabase, user.id, parsed.meso_id, parsed.days);
+
+  const { data: meso } = await supabase
+    .from("mesocycles")
+    .select("status")
+    .eq("id", parsed.meso_id)
+    .single();
+  if (meso?.status === "active") {
+    const profile = await getProfile(supabase, user.id);
+    if (profile) {
+      await regenerateOpenWorkouts(supabase, user.id, parsed.meso_id, profile);
+    }
+  }
+
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/meso/${parsed.meso_id}`);
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+  revalidatePath("/workout");
+  redirect(`/cycles/meso/${parsed.meso_id}`);
 }
 
 export async function clearSlotAction(input: {
