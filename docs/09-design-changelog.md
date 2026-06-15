@@ -42,6 +42,114 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-06-15 (session 5) — Logging-flow review on device (product)
+
+First hands-on review of the deployed logging flow. Several interaction fixes plus two net-new
+features. The interaction fixes (1–7) shipped in the same session; the two larger features
+(notes model, workout/meso options menu) are specced here and below for dedicated next slices.
+
+### 1. Day View navigator — stays open across day selection — `RETROFIT`
+- **Change.** Selecting a day from the expanded navigator must **not** auto-close it; it stays
+  open until the user closes it (chevron). Supersedes the 2026-06-13 note that the navigator
+  "defaults closed on each entry."
+- **Rationale.** Selecting consecutive days is common; collapsing on every pick is hostile.
+- **Affected figures.** 1.1.
+- **Impact.** `RETROFIT`. *(Shipped 2026-06-15: open state persisted in `sessionStorage` so it
+  survives the day-chip navigation.)*
+
+### 2. Set rows — capture the denser sizing — `RETROFIT`
+- **Change.** The logging set rows were still at the **old** dimensions; rebuild to the denser
+  spec (2026-06-13 §5: box 32px, value 14px, log box 21px, padding 4px, columns 20/44).
+- **Affected figures.** 1.1/1.2/1.3.
+- **Impact.** `RETROFIT`. *(Shipped 2026-06-15.)*
+
+### 3. Sets are uncheckable — `RETROFIT`
+- **Change.** Tapping a logged set's ✓ **un-marks** it (re-opens the slot for re-entry). Allowed
+  only on an active (in_progress) workout; completed workouts are locked.
+- **Rationale.** Mis-taps and corrections need a one-tap undo, not a menu detour.
+- **Affected figures.** 1.1.
+- **Impact.** `RETROFIT`, `DATA` (delete-the-logged-row while in_progress; keep the prescription).
+  *(Shipped 2026-06-15: `unlogSet`.)*
+
+### 4. Row menus must flip to stay on-screen — `RETROFIT`
+- **Change.** When a row's `⋮` menu would overflow the bottom of the screen, it opens **above**
+  the button instead of below; below when there's room.
+- **Affected figures.** 1.2/1.3.
+- **Impact.** `RETROFIT`. *(Shipped 2026-06-15: `AnchoredMenu` — viewport-fixed, measures and flips.)*
+
+### 5. Skip set = grey, don't remove; reversible — `RETROFIT`, `DATA`
+- **Change.** "Skip set" **greys the set in place** and makes it non-interactable (it is **not**
+  removed). It is reversible via the same menu ("Unskip set"). Distinct from "Delete set", which
+  drops a planned slot.
+- **Affected figures.** 1.3.
+- **Impact.** `RETROFIT`, `DATA`. *(Shipped 2026-06-15: per-set skip stored as
+  `workout_exercises.skipped_set_numbers int[]`, migration `20260615000003`; reversible while
+  in_progress.)*
+
+### 6. Skip remaining sets = per-set, not whole-exercise — `RETROFIT`
+- **Change.** "Skip remaining sets" greys **only the uncompleted sets** of the exercise; logged
+  sets and the exercise itself stay displayed and interactive, and the exercise's own menu is
+  unaffected (the prior bug greyed/!backgrounded the whole exercise and its reopened menu).
+  Reversible per set.
+- **Affected figures.** 1.2.
+- **Impact.** `RETROFIT`. *(Shipped 2026-06-15: uses the same per-set skip mechanism; the
+  exercise no longer flips to `status = skipped` during an active workout.)*
+
+### 7. Complete-workout gating — `RETROFIT`
+- **Change.** The "Complete workout" button appears **only when every set is logged or skipped**
+  (not merely "after any set is logged").
+- **Affected figures.** 1.1/1.5.
+- **Impact.** `RETROFIT`. *(Shipped 2026-06-15.)*
+
+### 8. Notes model — pinned note vs session log note — `NET-NEW`, `DATA` *(next slice)*
+- **Change.** Two distinct kinds of exercise note:
+  - **Pinned note** — an **attribute of the exercise record**, shown on that exercise in *every*
+    workout until edited/unpinned. Editable from the Day View (an **edit (pencil) icon** on the
+    pinned-note bar) or the Exercise page. Pinning is **optional**.
+  - **Session log note** — a note **saved with that workout's exercise log** (per-session). Shown
+    in exercise history (quick-view and the Exercise page) as a small **note icon** on the row;
+    tapping the row reveals the note. **Editable only in the live, active workout** — never from
+    history or after the workout completes.
+- **Rationale.** Today there is only one notion (the pinned note via "New/Replace note"), so a
+  per-session observation has nowhere to live and the pinned note's cross-workout semantics are
+  implicit.
+- **Affected figures.** 1.1, 1.2, 3.1a/3.2.
+- **Impact.** `NET-NEW`, `DATA`. Pinned note already exists (`exercise_notes`, `is_pinned`); add
+  a **per-(workout_exercise) session note** (likely `workout_exercises.log_note` or reuse
+  `exercise_feedback.notes`), a note-icon affordance on history rows, and a pinned-note inline
+  **edit icon**. Editing gated to the active workout (RLS like the completion lock). See
+  [03-data-model.md](03-data-model.md).
+
+### 9. Workout / mesocycle options menu — `NET-NEW`, `DATA` *(next slice)*
+- **Change.** A new overflow (`⋮`) control on the Day View header, placed **to the right of the
+  date / Target-RIR column** and sized vertically to match the height of those two rows. It opens
+  a menu with two clearly separated groups:
+  - **Mesocycle** — Mesocycle notes · Edit mesocycle (→ planner board) · Mesocycle stats
+    (→ stats) · **End mesocycle** (skips all remaining sets on all remaining days and completes
+    the mesocycle — **strong destructive warning** describing exactly what it does).
+  - **Workout** — New/Edit workout note · Edit day (→ planner board, current day selected) · Add
+    exercise · **End workout** (skips all remaining sets and completes the workout — warn it can't
+    be undone).
+- **Rationale.** There was no entry point for whole-workout / whole-meso actions from the logging
+  screen; several were unreachable (end early, jump to edit, add an exercise mid-session).
+- **Affected figures.** 1.1 (new control), → 2.5 (planner board), 4.1/4.2 (stats).
+- **Impact.** `NET-NEW`, `DATA`. New header control + grouped menu. Navigation items reuse
+  existing routes. **End workout** = skip-remaining-all + complete (the existing completion +
+  per-set-skip paths). **End mesocycle** = skip/complete every remaining workout of the meso, then
+  mark the meso complete — needs a new audited query + a confirm step. **Add exercise** opens the
+  group-aware picker against the live workout. Mesocycle/workout notes depend on the §8 notes model.
+
+### Round-2 refinements (same-day, all `RETROFIT`, shipped)
+- **Navigator animation** only plays on an explicit chevron toggle — hydrating the open state on a
+  day-chip navigation snaps (no re-run of the reveal). Refines §1.
+- **Active-day dot** always shows on the resume week/day, even when it is the selected/viewed chip,
+  so the live day is always findable. Refines §1/1.1.
+- **Bottom-sheet motion:** all bottom sheets slide up on open / down on close (~280ms, scrim fade)
+  via a shared `useSheetTransition`; applies to the per-exercise feedback sheet (1.4) and the
+  Workout Complete sheet (1.5).
+- **Unskip all:** the exercise menu (1.2) offers "Unskip all sets" when any set is skipped
+  (alongside per-set unskip). Refines §6.
+
 ## 2026-06-14 (session 4) — Metrics lock-down (engineering/product) + Workout Complete redesign
 
 Session scope: a research pass defining every displayed metric and engine parameter

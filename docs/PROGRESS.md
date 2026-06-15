@@ -2,7 +2,137 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — FFMI proximity target model + body-fat input (research-driven, ENGINE/DATA)
+## 2026-06-15 (latest) — Logging-flow review, round 2: animation polish + skip/dot refinements
+
+Follow-up to the on-device review (09 session-5, second batch).
+
+### Done
+
+- **Navigator no longer re-animates on day load.** The reveal transition is now gated to an
+  explicit chevron toggle (`animate` flag); hydrating the open state after a day-chip navigation
+  snaps instead of replaying the 0fr→1fr animation. Week selection was already smooth (client state).
+- **Active-day dot always shown.** The orange dot marks the meso's resume week/day **regardless of
+  selection** (dropped the `!viewing`/`!isSel` guards; the current week is derived from the nav
+  grid, not the viewed week), so the user can always spot and return to the live day.
+- **Bottom sheets slide up/down.** `BottomSheet` gained a reusable `useSheetTransition`
+  (mount + `translate-y-full`↔`translate-y-0` + scrim fade, ~280ms ease-out); the per-exercise
+  feedback sheet (1.4) now animates in, and the Workout Complete sheet (1.5, a custom container)
+  uses the same hook for enter **and** exit.
+- **Unskip all.** The exercise menu (1.2) shows **"Unskip all sets"** whenever the exercise has any
+  skipped sets (`clearSkippedSets`), alongside per-set unskip.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. No schema change
+this batch (reuses `skipped_set_numbers` from `20260615000003`).
+
+## 2026-06-15 — Logging-flow on-device review: interaction fixes + per-set skip (DATA)
+
+First hands-on review of the deployed logging flow (09 session-5). Seven interaction fixes
+shipped; two larger features (notes model, workout/meso options menu) specced for next slices.
+Vertical slice; `main` deployable.
+
+### Done
+
+- **Navigator stays open** across day selection — open state persisted in `sessionStorage`, so
+  picking consecutive days no longer collapses it (supersedes the "defaults closed each entry" note).
+- **Denser set rows captured** (09 §5, which the code had never picked up): box `42→32px`, value
+  `17→14px`, log box `26→21px`, row padding `7→4px`, grip/log columns `22/50→20/44`; the LOG control
+  keeps a ≥44px-wide tap target around the 21px box.
+- **Sets are uncheckable** — tapping a logged ✓ on an active workout un-marks it and re-opens the
+  slot (`unlogSet`; keeps the prescription, no renumber). Completed workouts stay locked.
+- **Row menus flip on-screen** — new `AnchoredMenu` (viewport-`fixed`, measures the trigger and its
+  own height) opens below when there's room, otherwise above; replaces the absolutely-positioned
+  cards that ran off the bottom edge. Used by both the exercise (1.2) and set (1.3) menus.
+- **Per-set skip** (`DATA`, migration `20260615000003_per_set_skip.sql`, **applied to hosted**):
+  `workout_exercises.skipped_set_numbers int[]`. "Skip set" greys a set **in place** and is
+  reversible ("Unskip set"); "Skip remaining sets" fills every uncompleted slot and **no longer
+  flips the whole exercise to skipped** (fixing the bug where the exercise + its reopened menu were
+  greyed/backgrounded). Skipped sets are never logged, so the engine and views are unaffected; the
+  type's `Defaulted` union gained the column so inserts stay optional.
+- **Delete vs skip split** — "Delete set" drops a planned slot (unlogged) or deletes the logged row
+  (`deleteSet`, renumber); "Skip set" toggles the greyed state. Both gated to in_progress.
+- **Complete-workout gating** — the button now appears only once **every set is logged or skipped**
+  (was "after any set is logged"); the helper `exerciseDone`/`plannedSetCount` account for skips.
+
+### Deferred to next slices (specced in 09 session-5 §8/§9, 07 backlog, 03)
+
+- **Notes model** — split the cross-workout **pinned note** (exercise attribute, inline edit icon,
+  optional) from a per-session **log note** (saved with the workout's exercise log; note-icon on
+  history rows; editable only live). `DATA`.
+- **Workout / mesocycle options menu** on the Day View header — Mesocycle (notes · edit → planner ·
+  stats · End mesocycle) + Workout (note · edit day · add exercise · End workout). New audited
+  `endMesocycle`/`endWorkout` queries + confirm steps. `DATA`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. Per-set-skip
+migration applied to hosted. No new unit tests this slice (the new functions are I/O against
+Supabase; pure helpers live in the component); the engine paths are unchanged and remain golden-tested.
+
+## 2026-06-15 — Logging retrofit: Day View header, Workout Complete redesign, completion lock (Design v2 backlog, DATA)
+
+Lands the **Logging (against Phase 3) reconciliation block** from 09 (2026-06-13 §1–2 / 2026-06-14
+§1): the Day View header rework (1.1), the redesigned Workout Complete sheet (1.5), the set
+delete + completion lock (1.3), and the 1.2 menu relabel. Vertical slice; `main` deployable.
+
+### Done
+
+- **Day View header (1.1)** — rebuilt as a **sticky/locked region** with a **collapsible week/day
+  navigator**: `workout` logotype + disclosure chevron, a bordered card with the week selector
+  (`W1…DL`, current-week orange dot) and a **nested day-chip drawer** for the selected week
+  (completed = tint + ✓, current = orange dot, viewing = filled ink). Day chips **navigate** to that
+  day's `/log/[workoutId]`. The coordinate keeps `W·D` + date and moves **Target RIR** beside it (in
+  orange; `DELOAD WEEK` on deload); the old `MESO n/N` meta line and the `N OF M SETS LOGGED` text
+  are replaced by an **orange progress bar** (`setsLogged ÷ setsPlanned`) over the marked divider.
+  `DATA`: `getWorkoutDetail` now returns `navWeeks` (per-week programmed days with completion state +
+  workout ids), built from the meso's microcycles/workouts/`meso_days` (future weeks fall back to the
+  planner's day list).
+- **Workout Complete (1.5) — redesigned.** Removed the boxed `AUTOREGULATION` panel and the
+  `View meso stats` link (recalculation runs silently). The sheet is now **counts + the three
+  session sliders** (overall fatigue / effort / performance, 0–4, same `SnapSlider` UI as the 1.4
+  prompt) **+ notes + a single `NEXT WORKOUT →`** that completes, advances, and navigates in one
+  action. `DATA`: `saveWorkoutFeedback` writes `workout_feedback` **before** completion flips the
+  status, so the **already-wired** session dampener (10 §3 / `feedback.ts` `sessionDampened`) finally
+  has data — previously the engine accepted `workoutFeedback` but the UI never captured it.
+- **Set delete + completion lock (1.3)** — `DATA` migration `20260615000002_completion_lock.sql`
+  (**applied to hosted**, policies + advisors re-checked): replaces the user-only `logged_sets`
+  update policy and adds a delete policy, both gated on the **parent workout being `in_progress`**;
+  splits `exercise_feedback`'s blanket `for all` into select/insert (own) + update/delete (own **and**
+  parent workout `in_progress`). Inserts stay open (the first set is written while the workout is
+  still `planned`); the service-role week-N→N+1 job is unaffected. UI: the set menu's **Delete set**
+  now really deletes a logged set while in-progress (`deleteLoggedSet` renumbers survivors + trims a
+  prescribed slot); a completed workout shows `Logged — session locked`. Refines hard rule #5
+  (append-only **after** completion).
+- **Exercise menu (1.2)** — `History ›` → **`View exercise ›`**, repointed to the exercise detail
+  page (the full 3.1a Overview tab arrives with the library slice).
+- Tests: RLS suite reworked — the old "append-only (no delete policy)" case is now a
+  **completion-lock** pair: owner can amend+delete while `in_progress`; a **completed** workout
+  rejects both amend and delete (and stays invisible to other users). 95 unit/engine tests
+  unchanged (engine dampener already had golden coverage).
+
+### Recorded deviations
+
+- **Single-action complete** (vs the prior two-phase confirm→recalculated sheet): the redesigned
+  sheet completes + advances + navigates on the one `NEXT WORKOUT →` tap, matching the mockup. The
+  engine summary is no longer surfaced (panel removed by design); it still writes `engine_decisions`.
+- **`workout_feedback` not RLS-locked on completion.** The spec calls out gating
+  `logged_sets`/`exercise_feedback`; `workout_feedback` stays own-scoped because it is written once,
+  transactionally, just before completion (gating its insert on `in_progress` would be order-fragile).
+- **"View exercise" lands on the existing exercise detail page**, not the not-yet-built 3.1a/b
+  Overview/History tabs (library slice). Functionally equivalent for now (description, bests, history).
+- **Sticky header fidelity:** implemented as `position: sticky` within the scrolling page (the app
+  isn't a fixed-height device frame); in-browser pixel QA still pending, as for the other screens.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. Migration applied
+to the hosted project; policies confirmed present with the `in_progress` gate and security advisors
+show no new lints. RLS assertions for the lock are written (need a running stack to execute, as for
+the rest of the RLS suite). No hosted integration smoke this slice (avoided polluting the account) —
+the new query/IO paths are covered by typecheck + build; the engine dampener path is unit-tested.
+
+## 2026-06-15 — FFMI proximity target model + body-fat input (research-driven, ENGINE/DATA)
 
 Multi-source literature review (deep-research harness, 7 agents) on real muscle/strength/fat-loss
 rates exposed the core flaw: the engine keyed hypertrophy off **calendar training age**, which

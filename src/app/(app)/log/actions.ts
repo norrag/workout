@@ -8,13 +8,18 @@ import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
+  clearSkippedSets,
   completeWorkout,
+  deleteLoggedSet,
   logSet,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
-  setExerciseStatus,
+  saveWorkoutFeedback,
+  setSetSkipped,
+  skipRemainingSets,
+  unlogSet,
 } from "@/lib/queries/logging";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
 import { getProfile } from "@/lib/queries/profiles";
@@ -110,7 +115,8 @@ export async function addSetAction(input: {
   revalidatePath("/workout");
 }
 
-export async function skipSetAction(input: {
+/** "Delete set" on an unlogged slot (fig 1.3) — drops one planned slot. */
+export async function removeSetAction(input: {
   workout_id: string;
   workout_exercise_id: string;
 }): Promise<void> {
@@ -121,13 +127,86 @@ export async function skipSetAction(input: {
   revalidatePath("/workout");
 }
 
+const toggleSkipSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  set_number: z.coerce.number().int().min(1).max(30),
+  skipped: z.boolean(),
+});
+
+/** Skip / unskip a single set (fig 1.3) — greyed but kept; reversible. */
+export async function toggleSkipSetAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  set_number: number;
+  skipped: boolean;
+}): Promise<void> {
+  const parsed = toggleSkipSchema.parse(input);
+  const { supabase } = await requireUser();
+  await setSetSkipped(
+    supabase,
+    parsed.workout_exercise_id,
+    parsed.set_number,
+    parsed.skipped,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const unlogSchema = z.object({
+  workout_id: z.string().uuid(),
+  set_id: z.string().uuid(),
+});
+
+/** Uncheck a logged set (fig 1.1) — re-opens the slot; keeps the prescription. */
+export async function unlogSetAction(input: {
+  workout_id: string;
+  set_id: string;
+}): Promise<void> {
+  const parsed = unlogSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await unlogSet(supabase, user.id, parsed.set_id);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const deleteSetSchema = z.object({
+  workout_id: z.string().uuid(),
+  set_id: z.string().uuid(),
+});
+
+/** Delete a logged set (fig 1.3) — allowed only while in_progress (RLS). */
+export async function deleteSetAction(input: {
+  workout_id: string;
+  set_id: string;
+}): Promise<void> {
+  const parsed = deleteSetSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await deleteLoggedSet(supabase, user.id, parsed.set_id);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+/** Skip all uncompleted sets of an exercise (fig 1.2) — per-set, reversible. */
 export async function skipRemainingAction(input: {
   workout_id: string;
   workout_exercise_id: string;
 }): Promise<void> {
   const parsed = weTargetSchema.parse(input);
   const { supabase } = await requireUser();
-  await setExerciseStatus(supabase, parsed.workout_exercise_id, "skipped");
+  await skipRemainingSets(supabase, parsed.workout_exercise_id);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+/** Unskip every skipped set of an exercise at once (fig 1.2). */
+export async function unskipAllAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  const { supabase } = await requireUser();
+  await clearSkippedSets(supabase, parsed.workout_exercise_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }
@@ -285,14 +364,31 @@ export async function moveExerciseDownAction(input: {
 const completeSchema = z.object({
   workout_id: z.string().uuid(),
   notes: z.string().max(2000).nullable(),
+  overall_fatigue: z.coerce.number().int().min(0).max(4).nullable(),
+  effort_rating: z.coerce.number().int().min(0).max(4).nullable(),
+  performance_rating: z.coerce.number().int().min(0).max(4).nullable(),
 });
 
 export async function completeWorkoutAction(input: {
   workout_id: string;
   notes: string | null;
+  overall_fatigue: number | null;
+  effort_rating: number | null;
+  performance_rating: number | null;
 }): Promise<AdvanceResult> {
   const parsed = completeSchema.parse(input);
   const { supabase, user } = await requireUser();
+
+  // session feedback must land before completion flips the status — the
+  // next-week job reads it as a dampener (10 §3), and RLS will lock writes
+  // once the workout is no longer in_progress.
+  await saveWorkoutFeedback(supabase, user.id, {
+    workout_id: parsed.workout_id,
+    overall_fatigue: parsed.overall_fatigue,
+    effort_rating: parsed.effort_rating,
+    performance_rating: parsed.performance_rating,
+  });
+
   await completeWorkout(
     supabase,
     user.id,

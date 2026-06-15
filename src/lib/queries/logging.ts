@@ -27,6 +27,24 @@ export interface LoggedExercise extends WorkoutExerciseRow {
   feedback: ExerciseFeedbackRow | null;
 }
 
+/** A programmed day in the navigator (fig 1.1 expanded header). */
+export interface NavDay {
+  dayNumber: number;
+  label: string | null;
+  /** the generated workout, or null for not-yet-generated future days */
+  workoutId: string | null;
+  status: "completed" | "active" | "current" | "skipped" | "planned";
+}
+
+/** A week in the navigator: the week selector + its nested day chips. */
+export interface NavWeek {
+  weekNumber: number;
+  isDeload: boolean;
+  targetRir: number;
+  status: MicrocycleRow["status"];
+  days: NavDay[];
+}
+
 export interface WorkoutDetail {
   workout: WorkoutRow;
   microcycle: MicrocycleRow;
@@ -38,6 +56,8 @@ export interface WorkoutDetail {
   contextLabel: string;
   /** all workouts of this week, for the 1.5 next-workout button */
   siblingWorkouts: WorkoutRow[];
+  /** the week→day navigator grid (fig 1.1 expanded header) */
+  navWeeks: NavWeek[];
   exercises: LoggedExercise[];
 }
 
@@ -159,6 +179,79 @@ export async function getWorkoutDetail(
     (feedback ?? []).map((f) => [f.workout_exercise_id, f]),
   );
 
+  // navigator grid (fig 1.1 expanded header): every week of the meso with its
+  // programmed days. Generated days carry their workout id (for navigation)
+  // and completion state; future weeks fall back to the planned day list.
+  const microById = new Map((microcycles ?? []).map((m) => [m.id, m]));
+  const microIds = (microcycles ?? []).map((m) => m.id);
+  const [
+    { data: mesoWorkouts, error: mwError },
+    { data: mesoDays, error: mdError },
+  ] = await Promise.all([
+    microIds.length > 0
+      ? supabase
+          .from("workouts")
+          .select("id, microcycle_id, day_number, status")
+          .in("microcycle_id", microIds)
+          .order("day_number")
+      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("meso_days")
+      .select("day_number, label")
+      .eq("mesocycle_id", microcycle.mesocycle_id)
+      .order("day_number"),
+  ]);
+  if (mwError) throw mwError;
+  if (mdError) throw mdError;
+
+  const dayLabelByNumber = new Map(
+    (mesoDays ?? []).map((d) => [d.day_number, d.label]),
+  );
+  const plannedDayNumbers = (mesoDays ?? []).map((d) => d.day_number);
+
+  // the meso's resume point: earliest (week, day) workout still open
+  const ordered = [...(mesoWorkouts ?? [])].sort((a, b) => {
+    const wa = microById.get(a.microcycle_id)?.week_number ?? 0;
+    const wb = microById.get(b.microcycle_id)?.week_number ?? 0;
+    return wa - wb || a.day_number - b.day_number;
+  });
+  const currentWorkoutId =
+    ordered.find((w) => w.status === "planned" || w.status === "in_progress")
+      ?.id ?? null;
+
+  const navWeeks: NavWeek[] = (microcycles ?? []).map((m) => {
+    const weekWorkouts = (mesoWorkouts ?? []).filter(
+      (w) => w.microcycle_id === m.id,
+    );
+    // generated days drive the chips; before generation, fall back to the
+    // planner's programmed day numbers as plain placeholders
+    const dayNumbers =
+      weekWorkouts.length > 0
+        ? weekWorkouts.map((w) => w.day_number).sort((a, b) => a - b)
+        : plannedDayNumbers;
+    const days: NavDay[] = dayNumbers.map((dayNumber) => {
+      const w = weekWorkouts.find((x) => x.day_number === dayNumber);
+      let status: NavDay["status"] = "planned";
+      if (w?.status === "completed") status = "completed";
+      else if (w?.status === "skipped") status = "skipped";
+      else if (w && w.id === currentWorkoutId) status = "current";
+      else if (w?.status === "in_progress") status = "active";
+      return {
+        dayNumber,
+        label: dayLabelByNumber.get(dayNumber) ?? null,
+        workoutId: w?.id ?? null,
+        status,
+      };
+    });
+    return {
+      weekNumber: m.week_number,
+      isDeload: m.is_deload,
+      targetRir: m.target_rir,
+      status: m.status,
+      days,
+    };
+  });
+
   // macro context caption (fig 1.1)
   let contextLabel = "STANDALONE MESO";
   if (mesocycle.macrocycle_id) {
@@ -191,6 +284,7 @@ export async function getWorkoutDetail(
     dayLabel: day?.label ?? null,
     contextLabel,
     siblingWorkouts: siblings ?? [],
+    navWeeks,
     exercises: wes.map((we) => ({
       ...we,
       exercise_name: exerciseById.get(we.exercise_id)?.name ?? "",
@@ -280,6 +374,151 @@ export async function logSet(
     .eq("status", "planned");
 
   return data;
+}
+
+/**
+ * Delete a logged set while the workout is `in_progress` (fig 1.3). Allowed
+ * because completion locks the session (RLS gates the delete on the parent
+ * workout's status). Renumbers the surviving sets to stay contiguous and
+ * trims one prescribed slot so the row leaves the grid.
+ */
+export async function deleteLoggedSet(
+  supabase: Client,
+  userId: string,
+  setId: string,
+): Promise<void> {
+  const { data: target, error: targetError } = await supabase
+    .from("logged_sets")
+    .select("id, set_number, workout_exercise_id")
+    .eq("id", setId)
+    .eq("user_id", userId)
+    .single();
+  if (targetError) throw targetError;
+
+  const { error: delError } = await supabase
+    .from("logged_sets")
+    .delete()
+    .eq("id", setId)
+    .eq("user_id", userId);
+  if (delError) throw delError;
+
+  // pull later sets of this exercise down by one to close the gap
+  const { data: remaining, error: remError } = await supabase
+    .from("logged_sets")
+    .select("id, set_number")
+    .eq("workout_exercise_id", target.workout_exercise_id)
+    .gt("set_number", target.set_number)
+    .order("set_number");
+  if (remError) throw remError;
+  for (const s of remaining ?? []) {
+    const { error } = await supabase
+      .from("logged_sets")
+      .update({ set_number: s.set_number - 1 })
+      .eq("id", s.id);
+    if (error) throw error;
+  }
+
+  // shrink the planned count so the freed slot doesn't reappear as "next"
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("prescribed_sets")
+    .eq("id", target.workout_exercise_id)
+    .single();
+  if (weError) throw weError;
+  const { error: updError } = await supabase
+    .from("workout_exercises")
+    .update({ prescribed_sets: Math.max(1, (we.prescribed_sets ?? 1) - 1) })
+    .eq("id", target.workout_exercise_id);
+  if (updError) throw updError;
+}
+
+/**
+ * Uncheck a logged set (fig 1.1) — remove the logged row but keep its planned
+ * slot, so it re-opens as the next editable set. Unlike `deleteLoggedSet` this
+ * does not renumber or shrink the prescription. Allowed only while the workout
+ * is `in_progress` (RLS-enforced).
+ */
+export async function unlogSet(
+  supabase: Client,
+  userId: string,
+  setId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("logged_sets")
+    .delete()
+    .eq("id", setId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+/** Toggle an individual set's skipped state (fig 1.3) — greyed but kept. */
+export async function setSetSkipped(
+  supabase: Client,
+  workoutExerciseId: string,
+  setNumber: number,
+  skipped: boolean,
+): Promise<void> {
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("skipped_set_numbers")
+    .eq("id", workoutExerciseId)
+    .single();
+  if (weError) throw weError;
+  const current = new Set(we.skipped_set_numbers ?? []);
+  if (skipped) current.add(setNumber);
+  else current.delete(setNumber);
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ skipped_set_numbers: [...current].sort((a, b) => a - b) })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
+/**
+ * Skip every still-uncompleted set of an exercise (fig 1.2 menu). Leaves the
+ * logged sets and the exercise itself untouched — only the unlogged planned
+ * slots are greyed. Reversible per-set via {@link setSetSkipped}.
+ */
+export async function skipRemainingSets(
+  supabase: Client,
+  workoutExerciseId: string,
+): Promise<void> {
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("prescribed_sets, skipped_set_numbers")
+    .eq("id", workoutExerciseId)
+    .single();
+  if (weError) throw weError;
+  const { data: sets, error: setsError } = await supabase
+    .from("logged_sets")
+    .select("set_number")
+    .eq("workout_exercise_id", workoutExerciseId);
+  if (setsError) throw setsError;
+
+  const logged = new Set((sets ?? []).map((s) => s.set_number));
+  const maxLogged = logged.size > 0 ? Math.max(...logged) : 0;
+  const planned = Math.max(we.prescribed_sets ?? 1, maxLogged);
+  const skipped = new Set(we.skipped_set_numbers ?? []);
+  for (let n = 1; n <= planned; n += 1) {
+    if (!logged.has(n)) skipped.add(n);
+  }
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ skipped_set_numbers: [...skipped].sort((a, b) => a - b) })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
+/** Clear every skipped set on an exercise (fig 1.2 "Unskip all sets"). */
+export async function clearSkippedSets(
+  supabase: Client,
+  workoutExerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ skipped_set_numbers: [] })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
 }
 
 /** Amend a logged set (history is append-only; corrections are updates). */
@@ -469,6 +708,59 @@ export async function saveExerciseFeedback(
 // ---------------------------------------------------------------------------
 // workout completion (fig 1.5)
 // ---------------------------------------------------------------------------
+
+/**
+ * Session feedback (fig 1.5, redesigned per 09 2026-06-14 §1): overall
+ * fatigue / effort / performance 0–4. The engine uses it as a session-level
+ * dampener (10 §3). Saved while the workout is still `in_progress`, before
+ * completion flips the status, so the next-week job can read it.
+ */
+export async function saveWorkoutFeedback(
+  supabase: Client,
+  userId: string,
+  input: {
+    workout_id: string;
+    overall_fatigue: number | null;
+    effort_rating: number | null;
+    performance_rating: number | null;
+  },
+): Promise<void> {
+  if (
+    input.overall_fatigue == null &&
+    input.effort_rating == null &&
+    input.performance_rating == null
+  ) {
+    return;
+  }
+  const { data: existing, error: existingError } = await supabase
+    .from("workout_feedback")
+    .select("id")
+    .eq("workout_id", input.workout_id)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing) {
+    const { error } = await supabase
+      .from("workout_feedback")
+      .update({
+        overall_fatigue: input.overall_fatigue,
+        effort_rating: input.effort_rating,
+        performance_rating: input.performance_rating,
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("workout_feedback").insert({
+      workout_id: input.workout_id,
+      user_id: userId,
+      overall_fatigue: input.overall_fatigue,
+      effort_rating: input.effort_rating,
+      performance_rating: input.performance_rating,
+      notes: null,
+    });
+    if (error) throw error;
+  }
+}
 
 export async function completeWorkout(
   supabase: Client,

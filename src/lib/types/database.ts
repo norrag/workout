@@ -6,7 +6,12 @@
  * generated output replaces this file — keep shapes in sync via migrations).
  */
 
-type Defaulted = "id" | "created_at" | "updated_at";
+type Defaulted =
+  | "id"
+  | "created_at"
+  | "updated_at"
+  // has a DB default ('{}'); only workout_exercises carries this key
+  | "skipped_set_numbers";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -221,6 +226,8 @@ export type WorkoutExerciseRow = {
   prescribed_sets: number | null;
   target_rir: number | null;
   status: "pending" | "completed" | "skipped";
+  /** set numbers skipped individually (greyed, reversible) — fig 1.3 */
+  skipped_set_numbers: number[];
   notes: string | null;
   created_at: string;
   updated_at: string;

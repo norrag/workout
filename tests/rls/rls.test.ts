@@ -154,12 +154,13 @@ describe("exercises and templates", () => {
   });
 });
 
-describe("logged history", () => {
-  it("clients cannot delete logged_sets (append-only)", async () => {
-    // service role sets up a full chain for alice
-    const service = createClient(URL, SERVICE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+describe("logged history (completion lock)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  /** Build a full meso→workout chain for alice and log one set (service role). */
+  async function buildLoggedSet(workoutStatus: "in_progress" | "completed") {
     const { data: meso } = await service
       .from("mesocycles")
       .insert({
@@ -183,7 +184,12 @@ describe("logged history", () => {
       .single();
     const { data: workout } = await service
       .from("workouts")
-      .insert({ microcycle_id: micro!.id, user_id: aliceId, day_number: 1 })
+      .insert({
+        microcycle_id: micro!.id,
+        user_id: aliceId,
+        day_number: 1,
+        status: workoutStatus,
+      })
       .select()
       .single();
     const { data: stock } = await service
@@ -197,8 +203,9 @@ describe("logged history", () => {
       .insert({ workout_id: workout!.id, exercise_id: stock!.id, position: 1 })
       .select()
       .single();
-
-    const { data: set, error: insertError } = await alice
+    // the set itself is always inserted by the service role so the test is
+    // independent of the insert path (which flips planned → in_progress)
+    const { data: set } = await service
       .from("logged_sets")
       .insert({
         workout_exercise_id: we!.id,
@@ -214,21 +221,46 @@ describe("logged history", () => {
       })
       .select()
       .single();
-    expect(insertError).toBeNull();
+    return set!;
+  }
 
-    // delete is silently blocked by the absence of a delete policy
-    await alice.from("logged_sets").delete().eq("id", set!.id);
-    const { data: stillThere } = await alice
+  it("owner can amend and delete a set while the workout is in_progress", async () => {
+    const set = await buildLoggedSet("in_progress");
+
+    const { error: amendError } = await alice
+      .from("logged_sets")
+      .update({ weight: 105 })
+      .eq("id", set.id);
+    expect(amendError).toBeNull();
+
+    await alice.from("logged_sets").delete().eq("id", set.id);
+    const { data: gone } = await alice
       .from("logged_sets")
       .select("id")
-      .eq("id", set!.id);
-    expect(stillThere).toHaveLength(1);
+      .eq("id", set.id);
+    expect(gone).toEqual([]);
+  });
 
-    // and bob can't read it
+  it("a completed workout locks its sets — no amend, no delete", async () => {
+    const set = await buildLoggedSet("completed");
+
+    // update is rejected by the with-check (row stays at weight 100)
+    await alice.from("logged_sets").update({ weight: 999 }).eq("id", set.id);
+    // delete is blocked
+    await alice.from("logged_sets").delete().eq("id", set.id);
+
+    const { data: stillThere } = await alice
+      .from("logged_sets")
+      .select("id, weight")
+      .eq("id", set.id)
+      .single();
+    expect(stillThere?.weight).toBe(100);
+
+    // and bob still can't read it
     const { data: bobView } = await bob
       .from("logged_sets")
       .select("id")
-      .eq("id", set!.id);
+      .eq("id", set.id);
     expect(bobView).toEqual([]);
   });
 });
