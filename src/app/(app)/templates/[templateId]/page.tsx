@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTemplateDetail } from "@/lib/queries/templates";
 import { ShareRow } from "@/components/ShareRow";
+import { startTemplateDraftAction } from "../../cycles/actions";
 
 /**
  * Template detail (08 §4, described not mocked): the template's days, groups
@@ -88,12 +89,15 @@ export default async function TemplateDetailPage({
         </div>
       ))}
 
-      <Link
-        href={`/cycles/plan/new?template=${template.id}`}
-        className="mt-6 block w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
-      >
-        START A MESO FROM THIS
-      </Link>
+      <form action={startTemplateDraftAction}>
+        <input type="hidden" name="template_id" value={template.id} />
+        <button
+          type="submit"
+          className="mt-6 block w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
+        >
+          START A MESO FROM THIS
+        </button>
+      </form>
       <p className="mt-2.5 text-[11px] leading-normal text-ink/60">
         Opens the planner board prefilled — excluded movements never carry
         over.

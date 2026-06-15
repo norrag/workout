@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCyclesOverview } from "@/lib/queries/cycles";
+import { getCyclesOverview, getDraftMeso } from "@/lib/queries/cycles";
 import { phaseLabel } from "@/lib/queries/macro";
 import type { MesocycleRow } from "@/lib/types/database";
 import { NewCycleButton } from "./NewCycleButton";
@@ -85,7 +85,7 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
   }
   return (
     <Link
-      href={`/cycles/meso/${meso.id}${meso.status === "planned" ? "/plan" : ""}`}
+      href={`/cycles/meso/${meso.id}`}
       className="block border-b border-ink/[0.18] py-[11px] last:border-b-0"
     >
       <div className="flex items-center justify-between">
@@ -103,7 +103,7 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
 function StandaloneRow({ meso }: { meso: MesocycleRow }) {
   return (
     <Link
-      href={`/cycles/meso/${meso.id}${meso.status === "planned" ? "/plan" : ""}`}
+      href={`/cycles/meso/${meso.id}`}
       className="flex items-center justify-between border-b border-ink/[0.15] py-[11px] last:border-b-0"
     >
       <div>
@@ -125,7 +125,10 @@ export default async function CyclesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { macros, standaloneMesos } = await getCyclesOverview(supabase, user.id);
+  const [{ macros, standaloneMesos }, draft] = await Promise.all([
+    getCyclesOverview(supabase, user.id),
+    getDraftMeso(supabase, user.id),
+  ]);
   const empty = macros.length === 0 && standaloneMesos.length === 0;
 
   return (
@@ -134,6 +137,25 @@ export default async function CyclesPage() {
         <h1 className="title-display text-[32px]">cycles</h1>
         <NewCycleButton />
       </div>
+
+      {draft && (
+        <Link
+          href={`/cycles/meso/${draft.id}/plan`}
+          className="mt-4 flex items-center justify-between border-[1.5px] border-dashed border-accent/60 px-3.5 py-3"
+        >
+          <div>
+            <div className="text-[9px] font-bold tracking-[0.14em] text-accent">
+              DRAFT IN PROGRESS
+            </div>
+            <div className="mt-1 text-[15px] font-bold">
+              {draft.name.trim() || "Untitled draft"}
+            </div>
+          </div>
+          <div className="text-[10px] font-bold tracking-[0.1em] text-accent">
+            CONTINUE EDITING ›
+          </div>
+        </Link>
+      )}
 
       {empty && (
         <div className="mt-6">

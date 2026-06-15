@@ -52,6 +52,7 @@ export async function getCyclesOverview(
         .from("mesocycles")
         .select("*")
         .eq("user_id", userId)
+        .neq("status", "draft")
         .order("created_at"),
     ]);
   if (macroError) throw macroError;
@@ -95,6 +96,7 @@ export async function createMesocycle(
     rir_start: number;
     rir_end: number;
     template_id?: string | null;
+    status?: MesocycleRow["status"];
   },
 ): Promise<MesocycleRow> {
   const { data, error } = await supabase
@@ -110,7 +112,7 @@ export async function createMesocycle(
       includes_deload: input.includes_deload,
       rir_start: input.rir_start,
       rir_end: input.rir_end,
-      status: "planned",
+      status: input.status ?? "planned",
       template_id: input.template_id ?? null,
       start_date: null,
     })
@@ -118,6 +120,75 @@ export async function createMesocycle(
     .single();
   if (error) throw error;
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// draft mesocycles (2026-06-15) — "create mesocycle" is the *final* stage.
+// Scratch/template/copy create a `draft`, plan it on the board, then finalize
+// (name + weeks) → `planned`. One draft at a time: creating one clears any
+// existing draft (the entry UI offers "continue editing" before that point).
+// ---------------------------------------------------------------------------
+
+/** The user's single in-progress draft, if any. */
+export async function getDraftMeso(
+  supabase: Client,
+  userId: string,
+): Promise<MesocycleRow | null> {
+  const { data, error } = await supabase
+    .from("mesocycles")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Start a fresh draft, clearing any existing draft first (one at a time). */
+export async function createDraftMeso(
+  supabase: Client,
+  userId: string,
+  opts: {
+    name?: string;
+    weeks?: number;
+    includes_deload?: boolean;
+    rir_start?: number;
+    rir_end?: number;
+  } = {},
+): Promise<MesocycleRow> {
+  const { error: clearError } = await supabase
+    .from("mesocycles")
+    .delete()
+    .eq("user_id", userId)
+    .eq("status", "draft");
+  if (clearError) throw clearError;
+
+  return createMesocycle(supabase, userId, {
+    name: opts.name ?? "",
+    weeks: opts.weeks ?? 5,
+    includes_deload: opts.includes_deload ?? true,
+    rir_start: opts.rir_start ?? 3,
+    rir_end: opts.rir_end ?? 0,
+    status: "draft",
+  });
+}
+
+/** Finalize a draft into a planned meso (the create-mesocycle final stage). */
+export async function finalizeDraftMeso(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+  input: { name: string; weeks: number },
+): Promise<void> {
+  const { error } = await supabase
+    .from("mesocycles")
+    .update({ name: input.name, weeks: input.weeks, status: "planned" })
+    .eq("id", mesoId)
+    .eq("user_id", userId)
+    .eq("status", "draft");
+  if (error) throw error;
 }
 
 export interface SlotFill extends MesoExerciseRow {
@@ -219,6 +290,171 @@ export async function getMesoPlan(
         })),
     })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// copy a mesocycle (fig 2.4 option 01) — carry the planner structure forward.
+// The loads are NOT copied: `startMeso` reseeds every slot from the user's
+// all-time best (v_exercise_prs), so a copy literally "starts from where you
+// left off" without dragging stale numbers along.
+// ---------------------------------------------------------------------------
+
+/** Mesos that can be copied: planned/active/completed (drafts & placeholders excluded). */
+export async function listCopyableMesos(
+  supabase: Client,
+  userId: string,
+): Promise<MesocycleRow[]> {
+  const { data, error } = await supabase
+    .from("mesocycles")
+    .select("*")
+    .eq("user_id", userId)
+    .in("status", ["planned", "active", "completed"])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+interface CopySourceFill {
+  slot_number: number | null;
+  exercise_id: string;
+  initial_sets: number;
+}
+interface CopySourceGroup {
+  muscle_group_id: string;
+  position: number;
+  exercise_slots: number;
+  fills: CopySourceFill[];
+}
+interface CopySourceDay {
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  groups: CopySourceGroup[];
+}
+
+export interface CopyFillPlan {
+  slot_number: number;
+  exercise_id: string;
+  initial_sets: number;
+}
+export interface CopyGroupPlan {
+  muscle_group_id: string;
+  position: number;
+  exercise_slots: number;
+  fills: CopyFillPlan[];
+}
+export interface CopyDayPlan {
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  groups: CopyGroupPlan[];
+}
+
+/**
+ * Pure: map a source meso's planner structure into copy-insert rows, dropping
+ * excluded exercises. A dropped fill leaves its slot open (the group's slot
+ * count is preserved) so the picker can replace it. Slot numbers fall back to
+ * their position when the source left them unset.
+ */
+export function planMesoCopy(
+  days: CopySourceDay[],
+  excluded: Set<string>,
+): CopyDayPlan[] {
+  return days.map((day) => ({
+    day_number: day.day_number,
+    label: day.label,
+    weekday: day.weekday,
+    groups: day.groups.map((group) => ({
+      muscle_group_id: group.muscle_group_id,
+      position: group.position,
+      exercise_slots: Math.max(group.exercise_slots, group.fills.length),
+      fills: group.fills
+        .filter((f) => !excluded.has(f.exercise_id))
+        .map((f, i) => ({
+          slot_number: f.slot_number ?? i + 1,
+          exercise_id: f.exercise_id,
+          initial_sets: f.initial_sets,
+        })),
+    })),
+  }));
+}
+
+/**
+ * Clone a source meso's planner board (days → groups → slot fills) onto a
+ * freshly created target meso. Mirrors `applyTemplateToMeso`; honors the user's
+ * exclusion list. No-op if the source has no plan (or isn't visible via RLS).
+ */
+export async function copyMesoStructure(
+  supabase: Client,
+  userId: string,
+  sourceMesoId: string,
+  targetMesoId: string,
+): Promise<void> {
+  const source = await getMesoPlan(supabase, sourceMesoId);
+  if (!source || source.days.length === 0) return;
+
+  const { data: exclusions, error: exclError } = await supabase
+    .from("excluded_exercises")
+    .select("exercise_id")
+    .eq("user_id", userId);
+  if (exclError) throw exclError;
+  const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
+
+  const dayPlans = planMesoCopy(source.days, excluded);
+
+  for (const day of dayPlans) {
+    const { data: mesoDay, error: dayError } = await supabase
+      .from("meso_days")
+      .insert({
+        mesocycle_id: targetMesoId,
+        user_id: userId,
+        day_number: day.day_number,
+        label: day.label,
+        weekday: day.weekday,
+      })
+      .select()
+      .single();
+    if (dayError) throw dayError;
+
+    for (const group of day.groups) {
+      const { data: mesoGroup, error: groupError } = await supabase
+        .from("meso_day_groups")
+        .insert({
+          meso_day_id: mesoDay.id,
+          muscle_group_id: group.muscle_group_id,
+          position: group.position,
+          exercise_slots: group.exercise_slots,
+        })
+        .select()
+        .single();
+      if (groupError) throw groupError;
+
+      if (group.fills.length > 0) {
+        const { error: fillError } = await supabase
+          .from("meso_exercises")
+          .insert(
+            group.fills.map((f) => ({
+              mesocycle_id: targetMesoId,
+              day_of_week: null,
+              meso_day_group_id: mesoGroup.id,
+              slot_number: f.slot_number,
+              position: f.slot_number,
+              exercise_id: f.exercise_id,
+              initial_weight: null,
+              initial_reps: null,
+              initial_sets: f.initial_sets,
+            })),
+          );
+        if (fillError) throw fillError;
+      }
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("mesocycles")
+    .update({ days_per_week: Math.max(1, dayPlans.length) })
+    .eq("id", targetMesoId);
+  if (updateError) throw updateError;
 }
 
 export async function addMesoDay(
@@ -384,6 +620,46 @@ export async function clearSlot(
     .from("meso_exercises")
     .delete()
     .eq("id", mesoExerciseId);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// delete a mesocycle (user-initiated). FK cascades remove its microcycles,
+// workouts, logged_sets, planner days/groups/fills — so deleting an active or
+// completed meso destroys logged history; the UI warns accordingly. (RLS:
+// `mesocycles_all_own` is `for all`; the child cascade bypasses RLS by design.)
+// ---------------------------------------------------------------------------
+
+export interface MesoDeletionImpact {
+  loggedSets: number;
+  hasHistory: boolean;
+}
+
+export async function getMesoDeletionImpact(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<MesoDeletionImpact> {
+  const { count, error } = await supabase
+    .from("logged_sets")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("mesocycle_id", mesoId);
+  if (error) throw error;
+  const loggedSets = count ?? 0;
+  return { loggedSets, hasHistory: loggedSets > 0 };
+}
+
+export async function deleteMesocycle(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("mesocycles")
+    .delete()
+    .eq("id", mesoId)
+    .eq("user_id", userId);
   if (error) throw error;
 }
 

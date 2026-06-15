@@ -146,7 +146,13 @@ export type MesocycleRow = {
   includes_deload: boolean;
   rir_start: number;
   rir_end: number;
-  status: "unplanned" | "planned" | "active" | "completed" | "abandoned";
+  status:
+    | "draft"
+    | "unplanned"
+    | "planned"
+    | "active"
+    | "completed"
+    | "abandoned";
   template_id: string | null;
   start_date: string | null;
   created_at: string;

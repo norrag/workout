@@ -2,7 +2,177 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Library & stats reconciliation: Exercise page (3.1a/b) + two-axis filter + Volume tab removed (Design v2 backlog, DATA)
+## 2026-06-15 (latest) — Cycles/meso navigation fixes + day-1 planner data repair (on-device feedback)
+
+Three on-device follow-ups on the Cycles/meso surface. The meso detail page is **kept** (the 09
+"nix the meso page" decision is reversed per the user).
+
+### Done
+
+- **All meso rows open the meso detail page** (was: `planned` mesos jumped straight to the planner
+  board, so only the active meso reached the page with its delete/stats/start controls). Cycles list
+  (`MacroMesoRow`/`StandaloneRow`) and the Macrocycle Overview meso rows now link to
+  `/cycles/meso/<id>` regardless of status; `EDIT PLAN` on that page still opens the planner.
+- **Completed days are clickable in the ramp matrix** → open the workout in the log view
+  (read-only). The `✓` cell on the meso detail calendar is now a `Link` to `/log/<workoutId>`.
+- **Day-1 "empty planner" repaired (data).** Diagnosis: on the user's active PPL meso, day 1's
+  `meso_day_groups` (and their cascaded `meso_exercises`) had been **deleted** — almost certainly via
+  the old ✕-with-stale-UI bug (the remove worked but the sheet didn't refresh, so it got clicked).
+  The logged workout was intact (5 exercises, 15 sets). Reconstructed day 1's groups + slot fills
+  from the surviving week-1 day-1 `workout_exercises` (chest ×2 · shoulders ×2 · triceps ×1);
+  day 1 now matches the other days (3 groups / 5 fills). The **root cause is already fixed** in this
+  PR's stale-sheet work, so it shouldn't recur. Idempotent repair (guarded on day 1 having 0 groups);
+  no schema change.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green. Data repair run
+against hosted and re-queried (all 6 days now 3–4 groups / 5 fills). Read-only diagnosis of the
+account before the targeted, reversible insert.
+
+## 2026-06-15 — Draft model: create-mesocycle is the final stage; one draft at a time (Phase 2 on-device feedback, DATA)
+
+Reorders meso creation per on-device feedback: you now build the plan **first** (on the planner
+board, as a draft) and **name + size it last**. One draft at a time, no draft management.
+Vertical slice; `main` deployable.
+
+### Done
+
+- **`DATA` migration `20260615000005_meso_draft_status.sql`** (append-only; **applied to hosted**,
+  constraint re-read, advisors show no new lints) — widens `mesocycles_status_check` to admit
+  **`draft`**. RLS unchanged (`mesocycles_all_own` already covers every status for the owner).
+  `database.ts` mesocycle status union updated to include `draft`.
+- **All three plan-a-meso paths create a draft** and drop you straight onto the planner board:
+  `startScratchDraftAction` (blank), `startTemplateDraftAction` (prefilled from a template),
+  `startCopyDraftAction` (prefilled from a source meso + its weeks/RIR/deload). The old
+  create-**first** form (`/cycles/plan/new` + `NewMesoForm` + `createMesocycleAction`) is removed.
+- **Create-mesocycle is the final stage.** A draft's planner board shows **`CREATE MESOCYCLE`**
+  (gated until at least one exercise is filled) → a **finalize sheet** (name + weeks + RIR caption,
+  fig 2.8) → `finalizeMesoAction` flips `draft → planned` and lands on meso detail. Non-draft boards
+  keep the existing `DONE — REVIEW MESO`.
+- **One draft at a time.** `createDraftMeso` **clears any existing draft** before creating the new
+  one (query-layer enforced — no draft-management UI). Before that point the entry surfaces the
+  existing draft so you can **keep editing** instead: a `DRAFT IN PROGRESS — <name> · CONTINUE
+  EDITING ›` banner on **/cycles/plan** (with "starting a new plan replaces this draft") and a
+  matching dashed banner on the **Cycles** tab. Drafts are excluded from the normal cycles lists
+  (`getCyclesOverview` filters `status != 'draft'`; `listCopyableMesos` is now planned/active/completed).
+- The template-detail **START A MESO FROM THIS** and both pickers (template/copy) post to the new
+  draft actions (forms, not links).
+
+### Recorded deviations
+
+- **Create-last / draft flow** deviates from the mockup's create-first 2.8 sheet — done per direct
+  user request (2026-06-15). Draft banners are built in the house style (not separately mocked).
+- **Finalize requires ≥1 filled exercise** (not in the mockup) — avoids creating an empty planned meso.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green. Migration applied
+to hosted; `mesocycles_status_check` re-read (now includes `draft`); security advisors show no new
+lints (no tables/policies/functions added). No hosted integration smoke this slice (avoided polluting
+the account); the draft create/finalize/one-at-a-time logic is query-layer IO exercised via
+typecheck + build. In-browser flow QA still pending.
+
+## 2026-06-15 — Planner workflow fixes: combined day sheet, live-data bugs, delete mesocycle (Phase 2 on-device feedback)
+
+On-device review of the planner board surfaced several broken interactions and workflow friction.
+This slice fixes them. No schema change; `main` deployable. **The larger "draft model" reorder
+(create-mesocycle as the *final* stage, one draft at a time) is teed up as the next slice — see
+"Not done yet" below.**
+
+### Done
+
+- **Stale-sheet bug fixed — the root cause of three reported "doesn't work" bugs.** The day-setup
+  sheet captured a **snapshot** of the day when it opened, so the per-group **± set steppers**, the
+  group **✕ remove**, and the **add-muscle-group** picker all wrote to the DB but the sheet (and its
+  derived `taken`/`available` lists) never reflected the change. The sheet now reads the **live**
+  `day` from the board's `days` prop (looked up by id, re-passed on every revalidation), so all three
+  update immediately. The board already re-derived `activeDay` from live data; only the sheet was stale.
+- **Add-day and day-setup combined into one view (`Day N`).** Previously you added a day (label +
+  weekday) in one tray, then reopened a near-identical "day setup" tray to add muscle groups. Now
+  tapping **`+`** creates the day (auto weekday) and **opens the single combined sheet** titled
+  `Day 1` / `Day 2` … with weekday + label + muscle groups + per-group set counts all in one place.
+  `addDayAction` returns the new day so the client can open it directly; the old `"new"` sheet mode
+  is gone. Empty state shows a full-width **`+ ADD TRAINING DAY`** button.
+- **Weekday auto-fills (Monday-first).** Adding a day assigns the next unused weekday starting Monday
+  (`nextWeekday`), so days are never null/unordered on creation; the user can still change it in the
+  sheet. Days sort Monday-first (already the case in `getMesoPlan`).
+- **"Week starts on this day" removed.** Weeks are assumed to start Monday; the checkbox and the
+  `profiles.week_starts_on` write are gone (`updateDayAction` no longer takes `week_starts_here`).
+  The column remains (defaults to 1) — nothing reads it for ordering.
+- **Delete a mesocycle (with warnings).** New `DELETE MESOCYCLE` on the meso detail page opens a
+  confirm sheet. `getMesoDeletionImpact` counts the meso's `logged_sets`; when there's history the
+  copy is stronger (`… N logged sets, every workout, and the week structure …`) **and an
+  acknowledgement checkbox gates the delete**. `deleteMesocycle` is user-scoped; FK cascades remove
+  microcycles/workouts/logged_sets/planner rows (RLS `mesocycles_all_own` is `for all`; the child
+  cascade bypasses RLS by design — verified against the schema).
+
+### Recorded deviations
+
+- **Combined day sheet + removed week-starts** deviate from fig 2.5 (which shows separate add/setup
+  and a week-start toggle) — done per direct user request (2026-06-15 on-device review). Square-corner
+  ledger styling preserved.
+- **Delete button isn't in the stock mockup** — built in the house style (accent destructive row +
+  confirm sheet), consistent with other unmocked controls (share/redeem).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green. No schema change.
+The fixes are interaction logic in `PlannerBoard.tsx` (live-data derivation) + a delete query/action
+covered by the existing RLS model; in-browser pixel/interaction QA of the combined sheet and delete
+flow still pending (as for other screens).
+
+### Follow-up — draft model (the headline workflow ask)
+
+Shipped in the **2026-06-15 (latest)** entry above: `create mesocycle` moved to the final stage,
+all three paths create a draft, one draft at a time with continue-editing banners.
+
+## 2026-06-15 — Plan-a-meso: copy-a-mesocycle path (fig 2.4 option 01, Phase 2 / Design v2 backlog)
+
+Lands the **copy-a-mesocycle** path — the most-cited remaining Phase 2 gap (option 01 of the
+plan-a-meso flow, previously a dashed "soon" stub). No schema change: copy clones the planner
+structure and lets `startMeso` reseed loads from the user's all-time bests, so it literally
+"starts from where you left off." Vertical slice; `main` deployable.
+
+### Done
+
+- **`copyMesoStructure` + `planMesoCopy`** (`src/lib/queries/cycles.ts`) — `copyMesoStructure`
+  reads the source meso's plan (`getMesoPlan`) and clones its `meso_days → meso_day_groups →
+  meso_exercises` onto a freshly created target meso, mirroring `applyTemplateToMeso`. The pure
+  **`planMesoCopy`** helper maps source days→groups→fills into insert rows: it **honors the user's
+  exclusion list** (an excluded exercise's fill is dropped but its **slot stays open** — slot count
+  preserved so the picker can replace it), widens a group's slot count to fit if the source had more
+  fills than declared slots, and falls back slot numbers to position when unset. Loads are **not**
+  copied — `startMeso` reseeds every slot from `v_exercise_prs`.
+- **`listCopyableMesos`** — the user's planned/active/completed mesos (placeholders excluded),
+  newest first, for the source picker.
+- **Source picker** `/cycles/plan/copy` (house style, bordered rows like the template picker) —
+  `STATUS · PHASE`, name, `N WK` / `N D/WK` chips; tapping routes to the create form with `?copy=`.
+- **Create-meso form (fig 2.4) reused for copy** — `/cycles/plan/new?copy=<id>` loads the source,
+  subtitles `COPIED FROM — NAME`, and prefills name (`<source> II`), weeks, RIR ramp, and deload
+  from the source. The form gained `copyMesoId`/`defaultWeeks`/`defaultDeload`/`defaultRir*` props;
+  `createMesocycleAction` parses an optional `copy_meso_id` and runs `copyMesoStructure` after create
+  (template path unchanged). Plan-a-meso option 01 is now an enabled link.
+- Tests: **106 passing** (+4) — `planMesoCopy` (full clone with weekday/label/sets carry, excluded
+  exercise dropped + slot preserved, slot-count widening, empty plan).
+
+### Recorded deviations
+
+- **Copy picker UI not in the stock mockup** — built in the established house style (bordered rows),
+  same as the template picker and share/redeem rows (a prior recorded deviation). Square-corner
+  ledger styling preserved.
+- **RIR ramp / deload carry from the source** even though the create form doesn't expose RIR edits;
+  the copy intent is "do this meso again," so the source's ramp is the right default.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green (`/cycles/plan/copy`
+and the updated `/cycles/plan/new` both compile). No schema/RLS change — copy creates rows the user
+owns through existing policies; the source is read via RLS (a meso not visible to the user copies as a
+no-op). No hosted writes this slice; pure helper unit-tested, the DB walk mirrors the smoke-tested
+`applyTemplateToMeso` pattern. In-browser pixel QA of the picker still pending (as for other screens).
+
+## 2026-06-15 — Library & stats reconciliation: Exercise page (3.1a/b) + two-axis filter + Volume tab removed (Design v2 backlog, DATA)
 
 Lands the bulk of the **Library & stats (against Phase 5)** reconciliation block from 09 (2026-06-14
 session-3 §1/§2/§4): the net-new Exercise page (Overview/History tabs), the two-axis library filter,

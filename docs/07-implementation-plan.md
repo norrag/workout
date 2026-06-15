@@ -55,9 +55,12 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 - [x] Cycles tab (fig 2.1): expandable macro blocks with goal arc + slot states (filled / current / `+ PLAN`), standalone-meso section
 - [x] Macro creation: name, date range, ordered goal-arc slots (`macro_slots`)
-- [~] Plan-a-meso entry (fig 2.3): from-scratch and template paths live; copy / builder shown as dashed "soon" cards (later)
+- [~] Plan-a-meso entry (fig 2.3): from-scratch, template, and **copy** paths live; meso builder shown as a dashed "soon" card (later)
 - [x] Planner board (fig 2.4): day tabs auto-sorted by weekday, muscle-group blocks with set counts, dashed unfilled slots, add muscle group, add day
-- [x] Day setup sheet (fig 2.5): label, weekday, "week starts on this day", per-group exercise-count steppers, remove day
+- [x] Day sheet (fig 2.5): label, weekday, per-group exercise-count steppers, remove day. *(2026-06-15:
+      add-day + day-setup combined into one `Day N` sheet reading live data — fixes the ± steppers /
+      group-✕ / add-group "doesn't update" bugs; weekday auto-fills Monday-first; "week starts on this
+      day" removed, weeks assumed to start Monday — per on-device feedback.)*
 - [x] Exercise picker (fig 2.6): pre-filtered to the slot's muscle group, search, last-performed + last-session data, FULL HISTORY sheet; exclusions never appear
 - [x] Create-mesocycle sheet (fig 2.7): name, macro placement slot, weeks 4–8 incl. deload, RIR-ramp preview
 - [~] Meso detail (fig 2.2): RIR ramp matrix with day-completion states, `GO TO W#·D#`, edit-plan entry; `MESO STATS` stubbed until Phase 5
@@ -178,12 +181,27 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
 - [x] **Create Macrocycle engine (2.3)** net-new: goal / duration / block-length inputs, live
       target + meso-count + phase preview (`planMacrocycle`), creates `unplanned` mesos.
       *(2026-06-14: `/cycles/new` `CreateMacroForm`, live client recompute.)*
-- [ ] **Plan a mesocycle (2.4)** four paths: copy · template · **meso builder (muscle-group
-      priorities — emphasize/grow/maintain)** · from scratch (builder + copy were "soon" stubs).
-- [ ] **Planner board (2.5)** becomes the **single meso view/edit surface** (old 2.2 meso-detail
-      removed): `PLAN | STATS` toggle, partial-completion **lock** (edits apply to `pending` weeks
-      only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
+- [~] **Plan a mesocycle (2.4)** four paths: **copy** · template · **meso builder (muscle-group
+      priorities — emphasize/grow/maintain)** · from scratch. Copy/template/scratch live;
+      **meso builder** is the remaining path. *(2026-06-15: copy-a-meso — source picker
+      `/cycles/plan/copy` → create form prefilled (`COPIED FROM —`, source weeks/RIR/deload) →
+      `copyMesoStructure` clones days/groups/slot fills onto the new meso, honoring exclusions;
+      loads reseed from `v_exercise_prs` at start. Pure `planMesoCopy` helper + 4 unit tests.)*
+- [~] **Planner board (2.5)** edit surface: partial-completion **lock** (edits apply to `pending`
+      weeks only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
+      **The meso detail page (2.2) is KEPT** — user reversed the 09 "nix the meso page" decision
+      (2026-06-15); the planner is reached via `EDIT PLAN`, not as the sole surface. The
+      `PLAN | STATS` toggle / `‹ PLAN` back-nav are therefore dropped.
 - [ ] **Create mesocycle (2.8)** rebrand: `MACROCYCLE PLACEMENT` with `M1…Mn` positions + phase.
+- [x] **Draft model (on-device feedback, 2026-06-15):** `create mesocycle` (name/weeks) moved to
+      the **final** stage — scratch/template/copy drop straight onto the planner as a **draft**;
+      **one draft at a time** (creating clears the prior draft; `CONTINUE EDITING` banners on
+      /cycles + /cycles/plan let you keep it instead). *(migration `20260615000005`, applied to
+      hosted; `createDraftMeso`/`finalizeDraftMeso`; finalize sheet on the board; create-first
+      `/cycles/plan/new` removed.)*
+- [x] **Delete a mesocycle** with warnings (stronger + acknowledgement when it has logged history).
+      *(2026-06-15: `DELETE MESOCYCLE` on meso detail; `deleteMesocycle` + `getMesoDeletionImpact`;
+      FK cascades remove logged history.)*
 
 ### Logging (against Phase 3) — retrofit *(2026-06-15: shipped)*
 - [x] **Day View header (1.1)**: sticky/locked region; **orange progress bar** (`setsLogged ÷
