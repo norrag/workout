@@ -9,11 +9,13 @@ import {
   adjustPrescribedSets,
   amendSet,
   completeWorkout,
+  deleteLoggedSet,
   logSet,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
+  saveWorkoutFeedback,
   setExerciseStatus,
 } from "@/lib/queries/logging";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
@@ -117,6 +119,23 @@ export async function skipSetAction(input: {
   const parsed = weTargetSchema.parse(input);
   const { supabase } = await requireUser();
   await adjustPrescribedSets(supabase, parsed.workout_exercise_id, -1);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const deleteSetSchema = z.object({
+  workout_id: z.string().uuid(),
+  set_id: z.string().uuid(),
+});
+
+/** Delete a logged set (fig 1.3) — allowed only while in_progress (RLS). */
+export async function deleteSetAction(input: {
+  workout_id: string;
+  set_id: string;
+}): Promise<void> {
+  const parsed = deleteSetSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await deleteLoggedSet(supabase, user.id, parsed.set_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }
@@ -285,14 +304,31 @@ export async function moveExerciseDownAction(input: {
 const completeSchema = z.object({
   workout_id: z.string().uuid(),
   notes: z.string().max(2000).nullable(),
+  overall_fatigue: z.coerce.number().int().min(0).max(4).nullable(),
+  effort_rating: z.coerce.number().int().min(0).max(4).nullable(),
+  performance_rating: z.coerce.number().int().min(0).max(4).nullable(),
 });
 
 export async function completeWorkoutAction(input: {
   workout_id: string;
   notes: string | null;
+  overall_fatigue: number | null;
+  effort_rating: number | null;
+  performance_rating: number | null;
 }): Promise<AdvanceResult> {
   const parsed = completeSchema.parse(input);
   const { supabase, user } = await requireUser();
+
+  // session feedback must land before completion flips the status — the
+  // next-week job reads it as a dampener (10 §3), and RLS will lock writes
+  // once the workout is no longer in_progress.
+  await saveWorkoutFeedback(supabase, user.id, {
+    workout_id: parsed.workout_id,
+    overall_fatigue: parsed.overall_fatigue,
+    effort_rating: parsed.effort_rating,
+    performance_rating: parsed.performance_rating,
+  });
+
   await completeWorkout(
     supabase,
     user.id,

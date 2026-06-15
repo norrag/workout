@@ -2,7 +2,69 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — FFMI proximity target model + body-fat input (research-driven, ENGINE/DATA)
+## 2026-06-15 (latest) — Logging retrofit: Day View header, Workout Complete redesign, completion lock (Design v2 backlog, DATA)
+
+Lands the **Logging (against Phase 3) reconciliation block** from 09 (2026-06-13 §1–2 / 2026-06-14
+§1): the Day View header rework (1.1), the redesigned Workout Complete sheet (1.5), the set
+delete + completion lock (1.3), and the 1.2 menu relabel. Vertical slice; `main` deployable.
+
+### Done
+
+- **Day View header (1.1)** — rebuilt as a **sticky/locked region** with a **collapsible week/day
+  navigator**: `workout` logotype + disclosure chevron, a bordered card with the week selector
+  (`W1…DL`, current-week orange dot) and a **nested day-chip drawer** for the selected week
+  (completed = tint + ✓, current = orange dot, viewing = filled ink). Day chips **navigate** to that
+  day's `/log/[workoutId]`. The coordinate keeps `W·D` + date and moves **Target RIR** beside it (in
+  orange; `DELOAD WEEK` on deload); the old `MESO n/N` meta line and the `N OF M SETS LOGGED` text
+  are replaced by an **orange progress bar** (`setsLogged ÷ setsPlanned`) over the marked divider.
+  `DATA`: `getWorkoutDetail` now returns `navWeeks` (per-week programmed days with completion state +
+  workout ids), built from the meso's microcycles/workouts/`meso_days` (future weeks fall back to the
+  planner's day list).
+- **Workout Complete (1.5) — redesigned.** Removed the boxed `AUTOREGULATION` panel and the
+  `View meso stats` link (recalculation runs silently). The sheet is now **counts + the three
+  session sliders** (overall fatigue / effort / performance, 0–4, same `SnapSlider` UI as the 1.4
+  prompt) **+ notes + a single `NEXT WORKOUT →`** that completes, advances, and navigates in one
+  action. `DATA`: `saveWorkoutFeedback` writes `workout_feedback` **before** completion flips the
+  status, so the **already-wired** session dampener (10 §3 / `feedback.ts` `sessionDampened`) finally
+  has data — previously the engine accepted `workoutFeedback` but the UI never captured it.
+- **Set delete + completion lock (1.3)** — `DATA` migration `20260615000002_completion_lock.sql`
+  (**applied to hosted**, policies + advisors re-checked): replaces the user-only `logged_sets`
+  update policy and adds a delete policy, both gated on the **parent workout being `in_progress`**;
+  splits `exercise_feedback`'s blanket `for all` into select/insert (own) + update/delete (own **and**
+  parent workout `in_progress`). Inserts stay open (the first set is written while the workout is
+  still `planned`); the service-role week-N→N+1 job is unaffected. UI: the set menu's **Delete set**
+  now really deletes a logged set while in-progress (`deleteLoggedSet` renumbers survivors + trims a
+  prescribed slot); a completed workout shows `Logged — session locked`. Refines hard rule #5
+  (append-only **after** completion).
+- **Exercise menu (1.2)** — `History ›` → **`View exercise ›`**, repointed to the exercise detail
+  page (the full 3.1a Overview tab arrives with the library slice).
+- Tests: RLS suite reworked — the old "append-only (no delete policy)" case is now a
+  **completion-lock** pair: owner can amend+delete while `in_progress`; a **completed** workout
+  rejects both amend and delete (and stays invisible to other users). 95 unit/engine tests
+  unchanged (engine dampener already had golden coverage).
+
+### Recorded deviations
+
+- **Single-action complete** (vs the prior two-phase confirm→recalculated sheet): the redesigned
+  sheet completes + advances + navigates on the one `NEXT WORKOUT →` tap, matching the mockup. The
+  engine summary is no longer surfaced (panel removed by design); it still writes `engine_decisions`.
+- **`workout_feedback` not RLS-locked on completion.** The spec calls out gating
+  `logged_sets`/`exercise_feedback`; `workout_feedback` stays own-scoped because it is written once,
+  transactionally, just before completion (gating its insert on `in_progress` would be order-fragile).
+- **"View exercise" lands on the existing exercise detail page**, not the not-yet-built 3.1a/b
+  Overview/History tabs (library slice). Functionally equivalent for now (description, bests, history).
+- **Sticky header fidelity:** implemented as `position: sticky` within the scrolling page (the app
+  isn't a fixed-height device frame); in-browser pixel QA still pending, as for the other screens.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. Migration applied
+to the hosted project; policies confirmed present with the `in_progress` gate and security advisors
+show no new lints. RLS assertions for the lock are written (need a running stack to execute, as for
+the rest of the RLS suite). No hosted integration smoke this slice (avoided polluting the account) —
+the new query/IO paths are covered by typecheck + build; the engine dampener path is unit-tested.
+
+## 2026-06-15 — FFMI proximity target model + body-fat input (research-driven, ENGINE/DATA)
 
 Multi-source literature review (deep-research harness, 7 agents) on real muscle/strength/fat-loss
 rates exposed the core flaw: the engine keyed hypertrophy off **calendar training age**, which

@@ -72,9 +72,9 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 - [x] Workout tab resting logic (08 §2): latest uncompleted workout shown; resting state shows the last completed meso's full 4.1 volume view with a link to all stats
 - [x] Day view (fig 1.1): meso week track, day coordinate, grouped exercise blocks with pinned notes, set rows with logged/next/unstarted states, one-thumb logging
 - [x] Exercise menu (fig 1.2): history sheet, new/replace pinned note, replace exercise (group-filtered picker, blocked once sets are logged), move down, add set, skip remaining, remove (blocked once sets are logged)
-- [~] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets, **delete set** — all allowed while the workout is `in_progress`; prescription rationale surfaced in the exercise menu. Logged history becomes immutable only **on workout completion** (the session locks; it feeds the engine chain) — see the reconciliation backlog
+- [x] Set menu (fig 1.3): drop-set toggle on the live set, skip last set, add set, tap-to-amend logged sets, **delete set** — all allowed while the workout is `in_progress`; prescription rationale surfaced in the exercise menu. Logged history becomes immutable **on workout completion** (the session locks; it feeds the engine chain) — completion lock shipped 2026-06-15 (migration `20260615000002`, RLS-enforced)
 - [x] Per-exercise feedback prompt (fig 1.4): joint pain (none/low/moderate/high) per exercise + pump and workload snap-sliders (0–10) per muscle group, with explainers
-- [x] Workout complete sheet (fig 1.5): summary rows (sets + top set), workout notes saved with the session; autoregulation summary is engine-derived (Phase 4 wiring landed)
+- [x] Workout complete sheet (fig 1.5): redesigned 2026-06-15 — counts + session feedback sliders (fatigue/effort/performance) + notes + `NEXT WORKOUT →`; the autoregulation panel was removed (recalculation runs silently). Session feedback feeds the engine dampener (10 §3)
 - [x] Deload logging = standard day view + `DELOAD` badge (engine-reduced prescriptions arrive with the Phase 4 week-generation job)
 - [ ] Playwright e2e: log a full workout including feedback and completion
 
@@ -185,21 +185,24 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
 - [ ] **Create mesocycle (2.8)** rebrand: `MACROCYCLE PLACEMENT` with `M1…Mn` positions + phase.
 
-### Logging (against Phase 3) — retrofit
-- [ ] **Day View header (1.1)**: sticky/locked region; **orange progress bar** (`setsLogged ÷
-      setsPlanned`); Target RIR moved next to `W·D`; `MESO n/N` removed from the navigator;
-      denser set rows (06 addendum). `DATA` per-week programmed-days + set counts.
-- [ ] **Exercise menu (1.2)**: `History ›` → **`View exercise ›`** → Exercise page Overview (3.1a).
-- [ ] **Workout Complete (1.5) — redesign**: drop the autoregulation panel + stats link; keep
-      counts + `NEXT WORKOUT →`; **re-add the session feedback sliders** (overall fatigue / effort /
-      performance, same UI as the 1.4 prompt) + paragraph notes. Authorized deviation from the
-      mockup (it dropped the sliders in error) — `DATA` keeps `workout_feedback`; engine uses it as
-      a session dampener (10 §3).
-- [ ] `DATA` **Set delete + completion lock (1.3)**: allow amend/delete of sets while the workout
-      is `in_progress`; **lock the workout on completion** (sets/feedback immutable) since completion
-      runs the engine's next-week generation. RLS: gate `logged_sets`/`exercise_feedback`
-      `update`/`delete` on the parent workout being `in_progress`; refines hard rule #5
-      (append-only *after* completion). The planner lock already keeps edit-meso off completed weeks.
+### Logging (against Phase 3) — retrofit *(2026-06-15: shipped)*
+- [x] **Day View header (1.1)**: sticky/locked region; **orange progress bar** (`setsLogged ÷
+      setsPlanned`); Target RIR moved next to `W·D`; `MESO n/N` removed; collapsible week/day
+      navigator (week selector + nested day chips, day-chip navigation). `DATA` per-week
+      programmed-days exposed via `getWorkoutDetail.navWeeks`. *(Denser set rows already shipped in
+      the 2026-06-12 fidelity pass.)*
+- [x] **Exercise menu (1.2)**: `History ›` → **`View exercise ›`** → repointed to the exercise
+      detail page. *(Lands on the existing detail page until the 3.1a Overview tab ships with the
+      library slice.)*
+- [x] **Workout Complete (1.5) — redesign**: dropped the autoregulation panel + stats link; counts
+      + **session feedback sliders** (overall fatigue / effort / performance, 1.4 slider UI, 0–4) +
+      notes + single `NEXT WORKOUT →`. `DATA` writes `workout_feedback` **before** completion so the
+      already-wired session dampener (10 §3) reads it.
+- [x] `DATA` **Set delete + completion lock (1.3)**: amend/delete of sets allowed while the workout
+      is `in_progress`; **locked on completion** (sets/feedback immutable). Migration
+      `20260615000002_completion_lock.sql` gates `logged_sets`/`exercise_feedback` `update`/`delete`
+      on the parent workout being `in_progress` (+ a `logged_sets` delete policy); refines hard rule
+      #5 (append-only *after* completion). RLS tests + applied to hosted.
 
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable
