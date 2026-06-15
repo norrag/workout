@@ -2,7 +2,39 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Exercise library replaced with the user's 330-exercise import
+## 2026-06-15 (latest) — Full training history imported (27 mesos, 6,745 sets)
+
+Imported Garron's complete logged history (`docs/data/master_exercise_history_garron.csv`,
+2,925 rows) into the live account `3183ce71…`. Built the whole hierarchy server-side from a
+staging table so no generated uuids transit anywhere; joined exercises on `legacy_id` (the
+column added by the library import). Verified end to end.
+
+### Done
+
+- **Decoded the export** (100% of rows): `Set 1` = working weight (== Weight), `Set 2…N` = reps
+  per set ⇒ working sets = `Sets − 1`. Bodyweight `(155 − 40)`-style notes use the net `Weight`.
+- **Loaded** via REST into `public.import_hist` (anon insert, RLS off, dropped after), then ran
+  `scripts/history-build.sql` (single session, idempotency-guarded) to derive:
+  **5 macrocycles** (contiguous bulk/cut runs — goal = cut if name~`cut` else hypertrophy; the
+  15-meso bulk run stays under the 24-position cap), **27 mesocycles**, **130 microcycles**
+  (target-RIR 3→0 ramp; deload week = 4, since RIR wasn't tracked → `logged_sets.rir_reported`
+  null), **108 meso_days / 503 groups / 754 meso_exercises** (per-day plan rebuilt groups-first
+  from what was logged, `initial_*` from the first week), **463 workouts**, **2,925
+  workout_exercises**, **6,745 logged_sets** — all `completed`.
+- **Verified:** logged-set count == expected, 0 missing macro links, all 27 mesos + 5 macros +
+  111 exercises surface in `v_meso_summary` / `v_macro_summary` / `v_exercise_prs`; e.g. Bench
+  Press (Medium Grip) shows 114 sessions, e1RM 154→180 lb. Lifetime volume ≈ 6.07M lb,
+  2023-11-07 → 2026-06-15.
+- Reproducible via `scripts/import-history.py` (CSV → JSON batches) + `scripts/history-build.sql`.
+
+### Notes / deviations
+
+- All cycles imported as **completed** (even the in-progress June 2026 bulk) — clean for a history
+  load; the latest meso/macro can be flipped to `active` to resume.
+- Meso **names kept verbatim** from the export (some labels' years are off, e.g. "Cut Dec '25"
+  actually ran Dec 2025–Jan 2026); macro names use the real date ranges.
+
+## 2026-06-15 — Exercise library replaced with the user's 330-exercise import
 
 Wholesale replacement of the stock exercise library with the user's curated export
 (`docs/data/exercises_all_20260615.csv`, 330 rows). All prior macro/meso/workout/template
