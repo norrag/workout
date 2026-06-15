@@ -139,6 +139,17 @@ features. The interaction fixes (1–7) shipped in the same session; the two lar
   mark the meso complete — needs a new audited query + a confirm step. **Add exercise** opens the
   group-aware picker against the live workout. Mesocycle/workout notes depend on the §8 notes model.
 
+### Round-2 refinements (same-day, all `RETROFIT`, shipped)
+- **Navigator animation** only plays on an explicit chevron toggle — hydrating the open state on a
+  day-chip navigation snaps (no re-run of the reveal). Refines §1.
+- **Active-day dot** always shows on the resume week/day, even when it is the selected/viewed chip,
+  so the live day is always findable. Refines §1/1.1.
+- **Bottom-sheet motion:** all bottom sheets slide up on open / down on close (~280ms, scrim fade)
+  via a shared `useSheetTransition`; applies to the per-exercise feedback sheet (1.4) and the
+  Workout Complete sheet (1.5).
+- **Unskip all:** the exercise menu (1.2) offers "Unskip all sets" when any set is skipped
+  (alongside per-set unskip). Refines §6.
+
 ## 2026-06-14 (session 4) — Metrics lock-down (engineering/product) + Workout Complete redesign
 
 Session scope: a research pass defining every displayed metric and engine parameter

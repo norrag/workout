@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BottomSheet } from "@/components/ui/BottomSheet";
+import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
@@ -28,6 +28,7 @@ import {
   skipRemainingAction,
   toggleSkipSetAction,
   unlogSetAction,
+  unskipAllAction,
   type ReplacementCandidate,
 } from "../actions";
 
@@ -237,18 +238,23 @@ function DayHeader({
   totalSets: number;
   navWeeks: NavWeek[];
 }) {
-  // the navigator stays open across day navigation until the user closes it
+  // the navigator stays open across day navigation until the user closes it.
+  // `animate` is enabled only by an explicit toggle, so hydrating the open
+  // state on load (after navigation) snaps rather than re-running the reveal.
   const [open, setOpen] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(weekNumber);
   useEffect(() => {
     setOpen(sessionStorage.getItem("dayNavOpen") === "1");
   }, []);
-  const toggleOpen = () =>
+  const toggleOpen = () => {
+    setAnimate(true);
     setOpen((v) => {
       const next = !v;
       sessionStorage.setItem("dayNavOpen", next ? "1" : "0");
       return next;
     });
+  };
 
   const pct = totalSets > 0 ? Math.round((loggedSets / totalSets) * 100) : 0;
   const rirLabel = isDeload ? "DELOAD WEEK" : `TARGET ${targetRir} RIR`;
@@ -256,6 +262,10 @@ function DayHeader({
     navWeeks.find((w) => w.weekNumber === selectedWeek) ??
     navWeeks.find((w) => w.weekNumber === weekNumber);
   const lastIdx = navWeeks.length - 1;
+  // week containing the meso's resume point — its dot always shows (#2)
+  const currentWeekNumber = navWeeks.find((w) =>
+    w.days.some((d) => d.status === "current"),
+  )?.weekNumber;
 
   return (
     <div className="sticky top-0 z-20 -mx-4 bg-bg-base px-4 pb-3 pt-2 shadow-[0_8px_16px_-12px_rgba(23,20,15,0.55)]">
@@ -293,7 +303,7 @@ function DayHeader({
 
       {/* collapsible navigator: week selector + nested day chips */}
       <div
-        className="grid transition-all duration-300"
+        className={`grid ${animate ? "transition-all duration-300" : ""}`}
         style={{
           gridTemplateRows: open ? "1fr" : "0fr",
           opacity: open ? 1 : 0,
@@ -305,7 +315,6 @@ function DayHeader({
             <div className="flex">
               {navWeeks.map((w, i) => {
                 const isSel = w.weekNumber === selectedWeek;
-                const isCurrentWeek = w.weekNumber === weekNumber;
                 const label = w.isDeload ? "DL" : `W${w.weekNumber}`;
                 return (
                   <button
@@ -324,7 +333,8 @@ function DayHeader({
                     }`}
                   >
                     {label}
-                    {isCurrentWeek && !isSel && (
+                    {/* the active week's dot always shows, so the user can find it */}
+                    {w.weekNumber === currentWeekNumber && (
                       <span className="absolute right-[5px] top-[5px] h-[5px] w-[5px] rounded-full bg-accent" />
                     )}
                   </button>
@@ -347,7 +357,8 @@ function DayHeader({
                       {d.status === "completed" && !viewing && (
                         <span className="ml-[3px] text-[8px] opacity-60">✓</span>
                       )}
-                      {d.status === "current" && !viewing && (
+                      {/* active-day dot always shows, even when it's selected */}
+                      {d.status === "current" && (
                         <span className="absolute right-1 top-1 h-[5px] w-[5px] rounded-full bg-accent" />
                       )}
                     </>
@@ -620,6 +631,20 @@ function ExerciseBlock({
                 onClick={() => {
                   commit(() =>
                     skipRemainingAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
+                  onCloseMenu();
+                }}
+              />
+            )}
+            {we.skipped_set_numbers.length > 0 && (
+              <MenuRow
+                label="Unskip all sets"
+                onClick={() => {
+                  commit(() =>
+                    unskipAllAction({
                       workout_id: we.workout_id,
                       workout_exercise_id: we.id,
                     }),
@@ -1435,9 +1460,10 @@ function CompleteSheet({
   const [effort, setEffort] = useState(2);
   const [performance, setPerformance] = useState(2);
   const [completing, startCompleting] = useTransition();
+  const { render, shown } = useSheetTransition(open);
   const sliderValue = { fatigue, effort, performance };
   const setSlider = { fatigue: setFatigue, effort: setEffort, performance: setPerformance };
-  if (!open) return null;
+  if (!render) return null;
 
   const { workout, microcycle, exercises } = detail;
   const loggedExercises = exercises.filter((we) => we.sets.length > 0);
@@ -1463,8 +1489,14 @@ function CompleteSheet({
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-ink/45" onClick={onClose} aria-hidden />
-      <div className="absolute inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-6">
+      <div
+        className={`absolute inset-0 bg-ink/45 transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-6 transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
+      >
         <div className="flex items-baseline justify-between">
           <div className="text-[30px] font-extrabold tracking-[-0.02em]">
             W{microcycle.week_number}·D{workout.day_number} complete.

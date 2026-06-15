@@ -2,7 +2,31 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Logging-flow on-device review: interaction fixes + per-set skip (DATA)
+## 2026-06-15 (latest) — Logging-flow review, round 2: animation polish + skip/dot refinements
+
+Follow-up to the on-device review (09 session-5, second batch).
+
+### Done
+
+- **Navigator no longer re-animates on day load.** The reveal transition is now gated to an
+  explicit chevron toggle (`animate` flag); hydrating the open state after a day-chip navigation
+  snaps instead of replaying the 0fr→1fr animation. Week selection was already smooth (client state).
+- **Active-day dot always shown.** The orange dot marks the meso's resume week/day **regardless of
+  selection** (dropped the `!viewing`/`!isSel` guards; the current week is derived from the nav
+  grid, not the viewed week), so the user can always spot and return to the live day.
+- **Bottom sheets slide up/down.** `BottomSheet` gained a reusable `useSheetTransition`
+  (mount + `translate-y-full`↔`translate-y-0` + scrim fade, ~280ms ease-out); the per-exercise
+  feedback sheet (1.4) now animates in, and the Workout Complete sheet (1.5, a custom container)
+  uses the same hook for enter **and** exit.
+- **Unskip all.** The exercise menu (1.2) shows **"Unskip all sets"** whenever the exercise has any
+  skipped sets (`clearSkippedSets`), alongside per-set unskip.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. No schema change
+this batch (reuses `skipped_set_numbers` from `20260615000003`).
+
+## 2026-06-15 — Logging-flow on-device review: interaction fixes + per-set skip (DATA)
 
 First hands-on review of the deployed logging flow (09 session-5). Seven interaction fixes
 shipped; two larger features (notes model, workout/meso options menu) specced for next slices.

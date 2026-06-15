@@ -8,6 +8,7 @@ import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
+  clearSkippedSets,
   completeWorkout,
   deleteLoggedSet,
   logSet,
@@ -194,6 +195,18 @@ export async function skipRemainingAction(input: {
   const parsed = weTargetSchema.parse(input);
   const { supabase } = await requireUser();
   await skipRemainingSets(supabase, parsed.workout_exercise_id);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+/** Unskip every skipped set of an exercise at once (fig 1.2). */
+export async function unskipAllAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  const { supabase } = await requireUser();
+  await clearSkippedSets(supabase, parsed.workout_exercise_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }

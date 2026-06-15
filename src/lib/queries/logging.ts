@@ -509,6 +509,18 @@ export async function skipRemainingSets(
   if (error) throw error;
 }
 
+/** Clear every skipped set on an exercise (fig 1.2 "Unskip all sets"). */
+export async function clearSkippedSets(
+  supabase: Client,
+  workoutExerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ skipped_set_numbers: [] })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
 /** Amend a logged set (history is append-only; corrections are updates). */
 export async function amendSet(
   supabase: Client,
