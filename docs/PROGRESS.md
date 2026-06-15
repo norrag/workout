@@ -2,7 +2,50 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Planner workflow fixes: combined day sheet, live-data bugs, delete mesocycle (Phase 2 on-device feedback)
+## 2026-06-15 (latest) — Draft model: create-mesocycle is the final stage; one draft at a time (Phase 2 on-device feedback, DATA)
+
+Reorders meso creation per on-device feedback: you now build the plan **first** (on the planner
+board, as a draft) and **name + size it last**. One draft at a time, no draft management.
+Vertical slice; `main` deployable.
+
+### Done
+
+- **`DATA` migration `20260615000005_meso_draft_status.sql`** (append-only; **applied to hosted**,
+  constraint re-read, advisors show no new lints) — widens `mesocycles_status_check` to admit
+  **`draft`**. RLS unchanged (`mesocycles_all_own` already covers every status for the owner).
+  `database.ts` mesocycle status union updated to include `draft`.
+- **All three plan-a-meso paths create a draft** and drop you straight onto the planner board:
+  `startScratchDraftAction` (blank), `startTemplateDraftAction` (prefilled from a template),
+  `startCopyDraftAction` (prefilled from a source meso + its weeks/RIR/deload). The old
+  create-**first** form (`/cycles/plan/new` + `NewMesoForm` + `createMesocycleAction`) is removed.
+- **Create-mesocycle is the final stage.** A draft's planner board shows **`CREATE MESOCYCLE`**
+  (gated until at least one exercise is filled) → a **finalize sheet** (name + weeks + RIR caption,
+  fig 2.8) → `finalizeMesoAction` flips `draft → planned` and lands on meso detail. Non-draft boards
+  keep the existing `DONE — REVIEW MESO`.
+- **One draft at a time.** `createDraftMeso` **clears any existing draft** before creating the new
+  one (query-layer enforced — no draft-management UI). Before that point the entry surfaces the
+  existing draft so you can **keep editing** instead: a `DRAFT IN PROGRESS — <name> · CONTINUE
+  EDITING ›` banner on **/cycles/plan** (with "starting a new plan replaces this draft") and a
+  matching dashed banner on the **Cycles** tab. Drafts are excluded from the normal cycles lists
+  (`getCyclesOverview` filters `status != 'draft'`; `listCopyableMesos` is now planned/active/completed).
+- The template-detail **START A MESO FROM THIS** and both pickers (template/copy) post to the new
+  draft actions (forms, not links).
+
+### Recorded deviations
+
+- **Create-last / draft flow** deviates from the mockup's create-first 2.8 sheet — done per direct
+  user request (2026-06-15). Draft banners are built in the house style (not separately mocked).
+- **Finalize requires ≥1 filled exercise** (not in the mockup) — avoids creating an empty planned meso.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green. Migration applied
+to hosted; `mesocycles_status_check` re-read (now includes `draft`); security advisors show no new
+lints (no tables/policies/functions added). No hosted integration smoke this slice (avoided polluting
+the account); the draft create/finalize/one-at-a-time logic is query-layer IO exercised via
+typecheck + build. In-browser flow QA still pending.
+
+## 2026-06-15 — Planner workflow fixes: combined day sheet, live-data bugs, delete mesocycle (Phase 2 on-device feedback)
 
 On-device review of the planner board surfaced several broken interactions and workflow friction.
 This slice fixes them. No schema change; `main` deployable. **The larger "draft model" reorder
@@ -51,15 +94,10 @@ The fixes are interaction logic in `PlannerBoard.tsx` (live-data derivation) + a
 covered by the existing RLS model; in-browser pixel/interaction QA of the combined sheet and delete
 flow still pending (as for other screens).
 
-### Not done yet / next — draft model (the headline workflow ask)
+### Follow-up — draft model (the headline workflow ask)
 
-- **`create mesocycle` becomes the *final* stage, not the first.** From-scratch/template/copy should
-  drop you straight onto the planner **as a draft**, with the name/weeks/RIR form as the last step.
-  Needs a `draft` status (`DATA` migration extending the `mesocycles_status_check`), draft creation
-  on each entry path, the create-form moved to a board "finish" action (draft → planned), and a
-  cycles-list **`DRAFT — CONTINUE EDITING ›`** entry.
-- **One draft at a time.** Starting a new draft when one exists prompts **keep editing** vs **replace**
-  (replace deletes the existing draft). Query-layer enforced (no draft-management UI).
+Shipped in the **2026-06-15 (latest)** entry above: `create mesocycle` moved to the final stage,
+all three paths create a draft, one draft at a time with continue-editing banners.
 
 ## 2026-06-15 — Plan-a-meso: copy-a-mesocycle path (fig 2.4 option 01, Phase 2 / Design v2 backlog)
 

@@ -1,26 +1,31 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getDraftMeso } from "@/lib/queries/cycles";
+import { startScratchDraftAction } from "../actions";
 
-/** Plan-a-meso entry (fig 2.3). Copy/template/builder land in later phases. */
-export default async function PlanMesoPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ slot?: string }>;
-}) {
-  const { slot } = await searchParams;
-  const slotQuery = slot ? `?slot=${slot}` : "";
+/** Plan-a-meso entry (fig 2.4). Every path opens the planner as a draft. */
+export default async function PlanMesoPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  const draft = await getDraftMeso(supabase, user.id);
 
   const options = [
     {
       n: "01",
       title: "Copy a mesocycle",
       detail: "Carry progressive overload forward — start from where you left off.",
-      href: `/cycles/plan/copy${slotQuery}`,
+      href: "/cycles/plan/copy",
     },
     {
       n: "02",
       title: "Start with a template",
       detail: "Pick a saved split and adjust from there.",
-      href: `/cycles/plan/template${slotQuery}`,
+      href: "/cycles/plan/template",
     },
     {
       n: "03",
@@ -31,8 +36,9 @@ export default async function PlanMesoPage({
     {
       n: "04",
       title: "From scratch",
-      detail: "Blank board. You know what you're doing.",
-      href: `/cycles/plan/new${slotQuery}`,
+      detail: "Blank board. You name it and set the weeks at the end.",
+      href: null,
+      scratch: true,
     },
   ];
 
@@ -46,6 +52,28 @@ export default async function PlanMesoPage({
       </Link>
       <h1 className="title-display mt-3 text-[32px]">plan a meso</h1>
 
+      {draft && (
+        <div className="mt-4 border-[1.5px] border-ink bg-paper px-3.5 py-3">
+          <div className="text-[9px] font-bold tracking-[0.14em] text-accent">
+            DRAFT IN PROGRESS
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <div className="text-[15px] font-bold">
+              {draft.name.trim() || "Untitled draft"}
+            </div>
+            <Link
+              href={`/cycles/meso/${draft.id}/plan`}
+              className="shrink-0 bg-ink px-3.5 py-2 text-[10px] font-bold tracking-[0.1em] text-bg-base"
+            >
+              CONTINUE EDITING ›
+            </Link>
+          </div>
+          <p className="mt-2 text-[11px] leading-normal text-ink/60">
+            Starting a new plan below replaces this draft.
+          </p>
+        </div>
+      )}
+
       <div className="mt-5 border-t-[1.5px] border-ink">
         {options.map((opt) => {
           const inner = (
@@ -55,33 +83,37 @@ export default async function PlanMesoPage({
               </div>
               <div className="flex-1">
                 <div
-                  className={`text-lg font-bold ${opt.href ? "" : "text-ink/45"}`}
+                  className={`text-lg font-bold ${opt.href || opt.scratch ? "" : "text-ink/45"}`}
                 >
                   {opt.title}
                 </div>
                 <div
-                  className={`mt-1 text-[12.5px] leading-[1.45] ${opt.href ? "text-ink/60" : "text-ink/35"}`}
+                  className={`mt-1 text-[12.5px] leading-[1.45] ${opt.href || opt.scratch ? "text-ink/60" : "text-ink/35"}`}
                 >
                   {opt.detail}
-                  {!opt.href && " (soon)"}
+                  {!opt.href && !opt.scratch && " (soon)"}
                 </div>
               </div>
               <div className="text-base text-ink/40">›</div>
             </>
           );
+          const rowClass =
+            "flex w-full items-baseline gap-3.5 border-b border-ink/[0.18] py-[18px] text-left";
+          if (opt.scratch) {
+            return (
+              <form key={opt.n} action={startScratchDraftAction}>
+                <button type="submit" className={rowClass}>
+                  {inner}
+                </button>
+              </form>
+            );
+          }
           return opt.href ? (
-            <Link
-              key={opt.n}
-              href={opt.href}
-              className="flex items-baseline gap-3.5 border-b border-ink/[0.18] py-[18px]"
-            >
+            <Link key={opt.n} href={opt.href} className={rowClass}>
               {inner}
             </Link>
           ) : (
-            <div
-              key={opt.n}
-              className="flex items-baseline gap-3.5 border-b border-ink/[0.18] py-[18px]"
-            >
+            <div key={opt.n} className={rowClass}>
               {inner}
             </div>
           );

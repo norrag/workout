@@ -52,6 +52,7 @@ export async function getCyclesOverview(
         .from("mesocycles")
         .select("*")
         .eq("user_id", userId)
+        .neq("status", "draft")
         .order("created_at"),
     ]);
   if (macroError) throw macroError;
@@ -95,6 +96,7 @@ export async function createMesocycle(
     rir_start: number;
     rir_end: number;
     template_id?: string | null;
+    status?: MesocycleRow["status"];
   },
 ): Promise<MesocycleRow> {
   const { data, error } = await supabase
@@ -110,7 +112,7 @@ export async function createMesocycle(
       includes_deload: input.includes_deload,
       rir_start: input.rir_start,
       rir_end: input.rir_end,
-      status: "planned",
+      status: input.status ?? "planned",
       template_id: input.template_id ?? null,
       start_date: null,
     })
@@ -118,6 +120,75 @@ export async function createMesocycle(
     .single();
   if (error) throw error;
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// draft mesocycles (2026-06-15) — "create mesocycle" is the *final* stage.
+// Scratch/template/copy create a `draft`, plan it on the board, then finalize
+// (name + weeks) → `planned`. One draft at a time: creating one clears any
+// existing draft (the entry UI offers "continue editing" before that point).
+// ---------------------------------------------------------------------------
+
+/** The user's single in-progress draft, if any. */
+export async function getDraftMeso(
+  supabase: Client,
+  userId: string,
+): Promise<MesocycleRow | null> {
+  const { data, error } = await supabase
+    .from("mesocycles")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Start a fresh draft, clearing any existing draft first (one at a time). */
+export async function createDraftMeso(
+  supabase: Client,
+  userId: string,
+  opts: {
+    name?: string;
+    weeks?: number;
+    includes_deload?: boolean;
+    rir_start?: number;
+    rir_end?: number;
+  } = {},
+): Promise<MesocycleRow> {
+  const { error: clearError } = await supabase
+    .from("mesocycles")
+    .delete()
+    .eq("user_id", userId)
+    .eq("status", "draft");
+  if (clearError) throw clearError;
+
+  return createMesocycle(supabase, userId, {
+    name: opts.name ?? "",
+    weeks: opts.weeks ?? 5,
+    includes_deload: opts.includes_deload ?? true,
+    rir_start: opts.rir_start ?? 3,
+    rir_end: opts.rir_end ?? 0,
+    status: "draft",
+  });
+}
+
+/** Finalize a draft into a planned meso (the create-mesocycle final stage). */
+export async function finalizeDraftMeso(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+  input: { name: string; weeks: number },
+): Promise<void> {
+  const { error } = await supabase
+    .from("mesocycles")
+    .update({ name: input.name, weeks: input.weeks, status: "planned" })
+    .eq("id", mesoId)
+    .eq("user_id", userId)
+    .eq("status", "draft");
+  if (error) throw error;
 }
 
 export interface SlotFill extends MesoExerciseRow {
@@ -228,7 +299,7 @@ export async function getMesoPlan(
 // left off" without dragging stale numbers along.
 // ---------------------------------------------------------------------------
 
-/** Mesos that can be copied: anything that's been planned (placeholders excluded). */
+/** Mesos that can be copied: planned/active/completed (drafts & placeholders excluded). */
 export async function listCopyableMesos(
   supabase: Client,
   userId: string,
@@ -237,7 +308,7 @@ export async function listCopyableMesos(
     .from("mesocycles")
     .select("*")
     .eq("user_id", userId)
-    .neq("status", "unplanned")
+    .in("status", ["planned", "active", "completed"])
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];

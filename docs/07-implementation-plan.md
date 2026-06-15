@@ -191,10 +191,12 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       removed): `PLAN | STATS` toggle, partial-completion **lock** (edits apply to `pending` weeks
       only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
 - [ ] **Create mesocycle (2.8)** rebrand: `MACROCYCLE PLACEMENT` with `M1…Mn` positions + phase.
-- [ ] **Draft model (on-device feedback, 2026-06-15):** `create mesocycle` (name/weeks/RIR) moves to
+- [x] **Draft model (on-device feedback, 2026-06-15):** `create mesocycle` (name/weeks) moved to
       the **final** stage — scratch/template/copy drop straight onto the planner as a **draft**;
-      **one draft at a time** (new draft prompts keep-vs-replace). `DATA` (`draft` status) + flow
-      reorder across the three entry paths + a cycles-list `DRAFT — CONTINUE EDITING` entry.
+      **one draft at a time** (creating clears the prior draft; `CONTINUE EDITING` banners on
+      /cycles + /cycles/plan let you keep it instead). *(migration `20260615000005`, applied to
+      hosted; `createDraftMeso`/`finalizeDraftMeso`; finalize sheet on the board; create-first
+      `/cycles/plan/new` removed.)*
 - [x] **Delete a mesocycle** with warnings (stronger + acknowledgement when it has logged history).
       *(2026-06-15: `DELETE MESOCYCLE` on meso detail; `deleteMesocycle` + `getMesoDeletionImpact`;
       FK cascades remove logged history.)*

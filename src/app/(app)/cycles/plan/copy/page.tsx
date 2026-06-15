@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listCopyableMesos } from "@/lib/queries/cycles";
+import { startCopyDraftAction } from "../../actions";
 
 /** Source picker for the copy-a-meso path (fig 2.4 option 01). */
 export default async function CopyMesoPage() {
@@ -33,28 +34,30 @@ export default async function CopyMesoPage() {
           </p>
         )}
         {mesos.map((meso) => (
-          <Link
-            key={meso.id}
-            href={`/cycles/plan/new?copy=${meso.id}`}
-            className="flex items-center justify-between border-b border-ink/[0.18] py-[15px]"
-          >
-            <div>
-              <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink/50">
-                {meso.status.toUpperCase()}
-                {meso.phase ? ` · ${meso.phase.toUpperCase()}` : ""}
+          <form key={meso.id} action={startCopyDraftAction}>
+            <input type="hidden" name="source_meso_id" value={meso.id} />
+            <button
+              type="submit"
+              className="flex w-full items-center justify-between border-b border-ink/[0.18] py-[15px] text-left"
+            >
+              <div>
+                <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink/50">
+                  {meso.status.toUpperCase()}
+                  {meso.phase ? ` · ${meso.phase.toUpperCase()}` : ""}
+                </div>
+                <div className="mt-[3px] text-[17px] font-bold">{meso.name}</div>
+                <div className="mt-[7px] flex gap-1.5">
+                  <span className="border border-ink/40 px-[7px] py-[3px] text-[9px] font-semibold tracking-[0.08em]">
+                    {meso.weeks} WK
+                  </span>
+                  <span className="border border-ink/40 px-[7px] py-[3px] text-[9px] font-semibold tracking-[0.08em]">
+                    {meso.days_per_week} D/WK
+                  </span>
+                </div>
               </div>
-              <div className="mt-[3px] text-[17px] font-bold">{meso.name}</div>
-              <div className="mt-[7px] flex gap-1.5">
-                <span className="border border-ink/40 px-[7px] py-[3px] text-[9px] font-semibold tracking-[0.08em]">
-                  {meso.weeks} WK
-                </span>
-                <span className="border border-ink/40 px-[7px] py-[3px] text-[9px] font-semibold tracking-[0.08em]">
-                  {meso.days_per_week} D/WK
-                </span>
-              </div>
-            </div>
-            <div className="text-base text-ink/40">›</div>
-          </Link>
+              <div className="text-base text-ink/40">›</div>
+            </button>
+          </form>
         ))}
       </div>
     </div>

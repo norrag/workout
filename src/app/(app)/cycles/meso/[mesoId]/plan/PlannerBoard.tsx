@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { HistorySheet } from "@/components/HistorySheet";
@@ -13,10 +19,12 @@ import {
   addGroupAction,
   clearSlotAction,
   fillSlotAction,
+  finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
   updateDayAction,
   updateGroupAction,
+  type FormState,
 } from "../../../actions";
 
 const WEEKDAYS = [
@@ -89,6 +97,7 @@ export function PlannerBoard({
   );
   const [daySetupId, setDaySetupId] = useState<string | null>(null);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
+  const [finalizing, setFinalizing] = useState(false);
   const [, startTransition] = useTransition();
   const commit: Commit = (fn) => startTransition(fn);
 
@@ -317,13 +326,40 @@ export function PlannerBoard({
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => router.push(`/cycles/meso/${meso.id}`)}
-        className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
-      >
-        {meso.status === "planned" ? "DONE — REVIEW MESO" : "DONE"}
-      </button>
+      {meso.status === "draft" ? (
+        <>
+          {(() => {
+            const hasExercise = days.some((d) =>
+              d.groups.some((g) => g.fills.length > 0),
+            );
+            return (
+              <>
+                <button
+                  type="button"
+                  disabled={!hasExercise}
+                  onClick={() => setFinalizing(true)}
+                  className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base disabled:opacity-40"
+                >
+                  CREATE MESOCYCLE
+                </button>
+                {!hasExercise && (
+                  <p className="mt-2 text-center text-[11px] text-ink/55">
+                    Add at least one exercise to finish.
+                  </p>
+                )}
+              </>
+            );
+          })()}
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => router.push(`/cycles/meso/${meso.id}`)}
+          className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
+        >
+          {meso.status === "planned" ? "DONE — REVIEW MESO" : "DONE"}
+        </button>
+      )}
 
       {(() => {
         const setupDay = daySetupId
@@ -347,7 +383,122 @@ export function PlannerBoard({
         onClose={() => setPicker(null)}
         commit={commit}
       />
+      <FinalizeSheet
+        open={finalizing}
+        onClose={() => setFinalizing(false)}
+        mesoId={meso.id}
+        defaultName={meso.name}
+        defaultWeeks={meso.weeks}
+        rirStart={meso.rir_start}
+        rirEnd={meso.rir_end}
+        includesDeload={meso.includes_deload}
+      />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// create-mesocycle final stage (fig 2.8) — name + weeks; flips draft → planned
+// ---------------------------------------------------------------------------
+
+const FINALIZE_INITIAL: FormState = { error: null };
+
+function FinalizeSheet({
+  open,
+  onClose,
+  mesoId,
+  defaultName,
+  defaultWeeks,
+  rirStart,
+  rirEnd,
+  includesDeload,
+}: {
+  open: boolean;
+  onClose: () => void;
+  mesoId: string;
+  defaultName: string;
+  defaultWeeks: number;
+  rirStart: number;
+  rirEnd: number;
+  includesDeload: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(
+    finalizeMesoAction,
+    FINALIZE_INITIAL,
+  );
+  const [weeks, setWeeks] = useState(
+    defaultWeeks >= 4 && defaultWeeks <= 8 ? defaultWeeks : 5,
+  );
+
+  if (!open) return null;
+
+  return (
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title="Create mesocycle"
+      subtitle="NAME IT AND CONFIRM THE LENGTH"
+    >
+      <form action={formAction}>
+        <input type="hidden" name="meso_id" value={mesoId} />
+        <input type="hidden" name="weeks" value={weeks} />
+
+        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          NAME
+        </div>
+        <input
+          name="name"
+          required
+          maxLength={80}
+          defaultValue={defaultName}
+          placeholder="e.g. Jul '26 — Bulk II"
+          className="mt-2 h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink placeholder:text-ink/40 focus:outline-none"
+        />
+
+        <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          WEEKS — INCLUDING DELOAD
+        </div>
+        <div className="mt-2 flex border-[1.5px] border-ink">
+          {[4, 5, 6, 7, 8].map((w, i) => (
+            <button
+              key={w}
+              type="button"
+              onClick={() => setWeeks(w)}
+              className={`numeral flex-1 py-[13px] text-center text-[15px] ${
+                weeks === w
+                  ? "bg-ink font-bold text-bg-base"
+                  : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+              }`}
+            >
+              {w}
+            </button>
+          ))}
+        </div>
+        <div className="mt-[7px] text-[10px] font-medium tracking-[0.08em] text-ink/50">
+          RIR RAMP: {rirStart} → {rirEnd}
+          {includesDeload ? ` · W${weeks} DELOAD AT 4 RIR` : ""}
+        </div>
+
+        {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}
+
+        <div className="mt-6 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={pending}
+            className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
+          >
+            {pending ? "CREATING" : "CREATE MESOCYCLE"}
+          </button>
+        </div>
+      </form>
+    </BottomSheet>
   );
 }
 

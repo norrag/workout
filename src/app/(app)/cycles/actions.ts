@@ -9,9 +9,10 @@ import {
   addMesoDay,
   clearSlot,
   copyMesoStructure,
-  createMesocycle,
+  createDraftMeso,
   deleteMesocycle,
   fillSlot,
+  finalizeDraftMeso,
   removeDayGroup,
   removeMesoDay,
   updateDayGroup,
@@ -94,49 +95,84 @@ export async function planMesoAction(formData: FormData): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// standalone meso creation (fig 2.4 from-scratch / template) — weeks, RIR ramp
+// plan-a-meso (fig 2.4) — every path creates a DRAFT and drops the user onto
+// the planner board; "create mesocycle" (name + weeks) is the final stage
+// (finalizeMesoAction). One draft at a time: createDraftMeso clears any
+// existing draft first (the entry UI surfaces "continue editing" beforehand).
 // ---------------------------------------------------------------------------
 
-const mesoSchema = z.object({
+/** From scratch → a blank draft. */
+export async function startScratchDraftAction(): Promise<void> {
+  const { supabase, user } = await requireUser();
+  const meso = await createDraftMeso(supabase, user.id);
+  revalidatePath("/cycles");
+  redirect(`/cycles/meso/${meso.id}/plan`);
+}
+
+/** From a template → a draft prefilled with the template's structure. */
+export async function startTemplateDraftAction(formData: FormData): Promise<void> {
+  const templateId = z.string().uuid().parse(formData.get("template_id"));
+  const { supabase, user } = await requireUser();
+  const { data: template } = await supabase
+    .from("templates")
+    .select("name")
+    .eq("id", templateId)
+    .maybeSingle();
+  const meso = await createDraftMeso(supabase, user.id, {
+    name: template?.name ?? "",
+  });
+  await applyTemplateToMeso(supabase, user.id, meso.id, templateId);
+  revalidatePath("/cycles");
+  redirect(`/cycles/meso/${meso.id}/plan`);
+}
+
+/** Copy a meso → a draft prefilled from a source meso's structure + settings. */
+export async function startCopyDraftAction(formData: FormData): Promise<void> {
+  const sourceId = z.string().uuid().parse(formData.get("source_meso_id"));
+  const { supabase, user } = await requireUser();
+  const { data: source } = await supabase
+    .from("mesocycles")
+    .select("name, weeks, includes_deload, rir_start, rir_end")
+    .eq("id", sourceId)
+    .maybeSingle();
+  const meso = await createDraftMeso(supabase, user.id, {
+    name: source ? `${source.name} II` : "",
+    weeks: source?.weeks,
+    includes_deload: source?.includes_deload,
+    rir_start: source?.rir_start,
+    rir_end: source?.rir_end,
+  });
+  await copyMesoStructure(supabase, user.id, sourceId, meso.id);
+  revalidatePath("/cycles");
+  redirect(`/cycles/meso/${meso.id}/plan`);
+}
+
+const finalizeSchema = z.object({
+  meso_id: z.string().uuid(),
   name: z.string().min(1, "Name is required").max(80),
   weeks: z.coerce.number().int().min(3).max(8),
-  includes_deload: z.boolean(),
-  rir_start: z.coerce.number().int().min(0).max(5),
-  rir_end: z.coerce.number().int().min(0).max(5),
-  template_id: z.string().uuid().nullable(),
-  copy_meso_id: z.string().uuid().nullable(),
 });
 
-export async function createMesocycleAction(
+/** Create-mesocycle final stage — name the draft + confirm weeks → planned. */
+export async function finalizeMesoAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const parsed = mesoSchema.safeParse({
+  const parsed = finalizeSchema.safeParse({
+    meso_id: formData.get("meso_id"),
     name: formData.get("name"),
     weeks: formData.get("weeks"),
-    includes_deload: formData.get("includes_deload") === "true",
-    rir_start: formData.get("rir_start"),
-    rir_end: formData.get("rir_end"),
-    template_id: formData.get("template_id") || null,
-    copy_meso_id: formData.get("copy_meso_id") || null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
-  if (parsed.data.rir_end > parsed.data.rir_start) {
-    return { error: "RIR must ramp downward." };
-  }
-
   const { supabase, user } = await requireUser();
-  const { copy_meso_id, ...mesoInput } = parsed.data;
-  const meso = await createMesocycle(supabase, user.id, mesoInput);
-  if (mesoInput.template_id) {
-    await applyTemplateToMeso(supabase, user.id, meso.id, mesoInput.template_id);
-  } else if (copy_meso_id) {
-    await copyMesoStructure(supabase, user.id, copy_meso_id, meso.id);
-  }
+  await finalizeDraftMeso(supabase, user.id, parsed.data.meso_id, {
+    name: parsed.data.name,
+    weeks: parsed.data.weeks,
+  });
   revalidatePath("/cycles");
-  redirect(`/cycles/meso/${meso.id}/plan`);
+  redirect(`/cycles/meso/${parsed.data.meso_id}`);
 }
 
 // ---------------------------------------------------------------------------
