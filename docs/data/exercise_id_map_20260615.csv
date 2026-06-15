@@ -1,0 +1,331 @@
+legacy_id,uuid,name,equipment_type
+1,b0f9c141-c9b2-4825-8cf2-ad0f47389674,"Arnold Press",dumbbell
+2,b7d44f11-4ee5-45e2-9748-57ec3d9ae3cf,"Assisted Dip",machine assistance
+3,7a41db44-d443-4838-b0e6-f8c5dffecf06,"Assisted Pullup (Normal Grip)",machine assistance
+4,94dbca1c-b892-41c4-b2ba-472621797d79,"Assisted Pullup (Parallel Grip)",machine assistance
+5,bca1ac79-7ed6-42be-811a-f795f9dcea1e,"Back Raise (45 degree)",bodyweight only
+6,f67f7c97-d32d-4379-a074-68027eaad784,"Back Raise (45 Degree)",bodyweight loadable
+7,02ae7ec5-d089-4154-a618-a8a59467cc33,"Barbell Hip Thrust",barbell
+8,ba74baeb-ddf6-4a55-b637-513579e79964,"Barbell Overhead Triceps Extension (Seated)",barbell
+9,fc8ed3df-4300-43da-9ac3-1108e625a20d,"Barbell Skullcrusher",barbell
+10,3da81ce9-40d5-4ae8-9323-a4ba2128c2c4,"Barbell Split Squat",barbell
+11,76f47a8b-b1d9-4b14-8bf7-0b6f3bdf7d6a,"Barbell Squat (Close Stance, Feet Forward)",barbell
+12,c690e814-00bd-4f23-aefa-3bbde9295699,"Barbell Squat (Heel Elevated)",barbell
+13,cc689dc3-debf-4719-a298-3492de494eb8,"Barbell Squat (High Bar)",barbell
+14,22cde125-9577-4519-80b5-8ca26427116f,"Barbell Squat (Narrow Stance)",barbell
+15,c8772879-26a5-4ab5-85d5-98b424ddeb3f,"Barbell Squat (Sumo Stance)",barbell
+16,1646ac40-9633-4372-aff1-ff856c5a3cc8,"Belt Squat",machine
+17,14d5cd36-b7cf-40ae-934b-5292341f1c21,"Belt Squat (Wide Stance)",machine
+18,a68a3a23-f7f3-4a39-8905-63067db12af1,"Bench Press (Incline, Medium Grip)",barbell
+19,334fab56-db2b-4581-ac61-1e35b9900853,"Bench Press (Medium Grip)",barbell
+20,37bdc1be-ae22-4cd0-8d43-52ab4f8e6149,"Booty Builder Hip Thrust",machine
+21,10ba5830-d8aa-4f75-9454-be8de3a347be,"Cable Curl",cable
+22,6e664417-322c-4d10-b66b-8222747f11cd,"Cable Flye",cable
+23,d765b867-9362-472b-8d51-12053648ac1f,"Cable Flye (Bent Over)",cable
+24,ed34542c-d8b9-474d-8319-8e71aff3f093,"Cable Flye (High)",cable
+25,58f42a71-88db-4acb-a662-6ead63749e40,"Cable Front Raise (Underhand)",cable
+26,1a142a6a-128e-427e-a350-e49722919163,"Cable Hammer Curl (Rope)",cable
+27,01338fc9-f29f-4874-8d5b-831431859a61,"Cable Lateral Raise (Single-Arm)",cable
+28,fb37c4f8-0fba-4ffb-a556-f363d744811d,"Cable Leaning Lateral Raise",cable
+29,228a646b-844b-4830-8264-db46b8af5983,"Cable Overhead Triceps Extension",cable
+30,cad996b3-3339-4984-a0a1-29566d9ed76a,"Cable Overhead Triceps Extension (Rope)",cable
+31,db4283ff-10f1-48b5-a24c-54d48cdc4867,"Cable Rope Facepull",cable
+32,2358e04f-a242-407f-9ee9-c1542bbddd41,"Cable Rope Twist Curl",cable
+33,cb46df9d-c536-4aa1-806e-4f8e696a5425,"Cable Rotator Cuff Rotation (Internal)",cable
+34,aa1ad528-619b-4aec-bf5f-739ae6a920d6,"Cable Tricep Kickback",cable
+35,ecd0a41b-b253-4e7b-80b2-81a218a87589,"Cable Triceps Pushdown (Bar)",cable
+36,2d9ed30d-1915-4c05-89cf-257b03972dbb,"Cable Triceps Pushdown (Rope)",cable
+37,5af67dcc-ea94-469e-8963-06efdbea349e,"Cable Triceps Pushdown (Single-Arm)",cable
+38,700d1261-be0d-40d9-bbf7-f5403f1c0028,"Cable Upright Row",cable
+39,e799578d-dce7-4017-ae21-86971e68c690,"Calf Machine",machine
+40,23077157-95aa-4dc5-a10c-beec6428ac88,"Calf Raise - Seated",machine
+41,d6c96b31-80d1-46e0-8518-017870ca30e2,"Chest Supported Row",machine
+42,830fca1b-05f2-430b-9322-879e38d299bc,"Barbell Bent Over Shrug",barbell
+43,53491c89-d323-45e3-8c2d-5184d2a0bf3e,"Deadlift (Deficit)",barbell
+44,c14dfa3c-8ce3-480c-93ab-4f569c143c75,"Dip (Triceps-Focused)",bodyweight only
+45,29f0f848-0a33-44c0-a113-ab79ba8af0ec,"Dip (Weighted, Triceps-Focused)",bodyweight loadable
+46,4ded147b-84bc-472e-a073-7065ea6f6015,"Dumbbell Bent Lateral Raise",dumbbell
+47,22c73c4a-3c3b-4992-9670-4b4dfda612c5,"Dumbbell Curl (2-Arm)",dumbbell
+48,f6642507-3475-41b6-b642-cedadd813876,"Dumbbell Curl (Alternating)",dumbbell
+49,9ca82a1b-483c-434e-b4b3-e6562c0d3a0e,"Dumbbell Curl (Incline)",dumbbell
+50,81687766-7269-400a-9fb8-5897d9b553f5,"Dumbbell Flye (Flat)",dumbbell
+51,466252b8-397c-4168-885e-72ba99dc9904,"Dumbbell Flye (Incline)",dumbbell
+52,13a6ce2a-481b-4d9b-ae19-593615dc47ae,"Dumbbell Front Raise",dumbbell
+53,eb2ed5e9-9d6a-48b9-90cf-fc5833183cb6,"Dumbbell Lateral Raise",dumbbell
+54,4cd414fb-8970-498b-8d1b-7301d4b716f7,"Dumbbell Lateral Raise (Incline)",dumbbell
+55,b217ee33-af8f-4710-87e9-9359b1d84542,"Dumbbell Lateral Raise (Super ROM)",dumbbell
+56,940f5f89-6e69-4be2-9bfa-cbf2f98dda75,"Dumbbell Overhead Extension",dumbbell
+57,297092b4-a5db-46ba-8077-713c428b3fba,"Dumbbell Overhead Extension (Single-Arm)",dumbbell
+58,7d4fc360-5bf8-4b89-abb5-5ebb0237f577,"Dumbbell Press (Flat)",dumbbell
+59,05bf2658-eb11-4e56-9da7-7bfea06a6082,"Barbell Shrug",barbell
+60,b949770d-e87c-4fc4-9bbb-a7a9b7ff5393,"Dumbbell Press (Low Incline)",dumbbell
+61,7e2162c1-272f-42d2-a797-b3be798ea34d,"Dumbbell Press (Medium Incline)",dumbbell
+62,66aa70fd-eaed-448e-a340-a8008ace64fe,"Dumbbell Press Flye (Incline)",dumbbell
+63,5d855db4-6ee6-42ee-8d32-f551b5f0343c,"Dumbbell Rotator Cuff Rotation (External)",dumbbell
+64,055b0bf8-8e40-4528-b8b0-7be33b164477,"Dumbbell Row (2-Arm)",dumbbell
+65,9552fe95-cacc-42ef-b8b1-adc4cb0c88db,"Dumbbell Row (2-Arm, Incline)",dumbbell
+66,d725412f-01de-4e9e-867b-e45973d1e1ca,"Dumbbell Row (Single-Arm, Supported)",dumbbell
+67,50362bd5-1995-4057-925d-9689b9bb07f8,"Dumbbell Row to Hips",dumbbell
+68,0082cf22-4a16-4adc-b7b4-97b30c2714a1,"Dumbbell Shoulder Press (Seated)",dumbbell
+69,a7af8918-c963-4572-bf69-8aa922a88ebb,"Dumbbell Shrug (Seated)",dumbbell
+70,cdce2e2c-7217-4ff3-b202-bf8c65dc0357,"Dumbbell Skullcrusher",dumbbell
+71,7c4f4fa8-325a-4637-8756-d313d0a18f90,"Dumbbell Split Squat",dumbbell
+72,3bc7fec6-3524-4df7-a711-5bff93cc5aa8,"Dumbbell Stiff Legged Deadlift",dumbbell
+73,c6974742-5642-4846-a939-f8a627493608,"Dumbbell Upright Row",dumbbell
+74,a3ec5797-c2fa-465f-9a94-02f0beac7c43,"Dumbbell Y-Raise",dumbbell
+75,836bf4cd-b6b2-4335-9a1a-099cd158c223,"Dumbbell Y-Raise (seated)",dumbbell
+76,2a87796c-a99e-4e29-9143-293df41e5303,"EZ Bar Curl (Narrow Grip)",barbell
+77,b79ede74-c10c-44d1-a9b6-d38019d0f384,"EZ Bar Overhead Triceps Extension",barbell
+78,99fb0e97-4e7e-48fd-8c9d-2caac299353c,"EZ Bar Overhead Triceps Extension (Seated)",barbell
+79,ad9946cd-ba55-41f3-a833-59c264b5c1a7,"EZ Bar Preacher Curl",barbell
+80,2c5cb9e5-8597-492b-a9e4-ce2dacd2668b,"GluteBuilder Hip Thrust",machine
+81,7828d69a-ac2d-441a-9df8-da6243a2bf06,"Cable Bent Over Shrug",cable
+82,15259943-52bd-47f2-ad68-33c9e5ad5f23,"Hammer Curl",dumbbell
+83,2b88045c-55a9-4f1f-8123-b0e80848efc4,"Hammer Machine Chest Press (Flat)",machine
+84,2c247910-a61e-47bc-b565-43b949a9edaf,"Hammer Machine Row (High)",machine
+85,6ae7418d-69fd-4707-866d-69057ad2e3e4,"Hammer Machine Row (Low)",machine
+86,190a666e-149a-434d-bcf4-2e720f717153,"Kneeling Hamstring Curl",machine
+87,9c256464-7b58-43ce-930d-643f8b2ea05d,"Leg Extension",machine
+88,73924103-296a-469f-8d99-f7ded1699ac1,"Leg Press",machine
+89,85e1bee0-791d-48f5-b84a-9d30399769b4,"Leg Press (Watson Split Leg Press)",machine
+90,8aa6afae-bf6e-4007-9b5a-ac235da29f4a,"Leg Press Calves",machine
+91,53e7d488-1af0-48e7-a085-9c1835db226b,"Lying Biceps Dumbbell Curl",dumbbell
+92,b865580a-59af-4d3f-90cf-96b09010d174,"Lying Leg Curl",machine
+93,f0521df5-44e6-49fe-a813-d936364417cd,"Machine Bent Over Lateral Raise (MaxPump)",machine
+94,a436700c-e0ba-4177-8946-9eb045801771,"Machine Chest Press",machine
+95,dfd6fefa-24a1-4b73-aa0b-f576adf08046,"Machine Chest Press (Incline)",machine
+96,357f2e59-1484-4b88-a377-f87cc146b4f7,"Machine Chest Supported Row",machine
+97,65ac6a27-fc16-4b8b-b7e4-c0616a8e6b94,"Machine Crunch",machine
+98,4531fc6a-bb35-4986-93dd-48903ae4012d,"Machine Flye",machine
+99,3ddb8351-7e67-4743-a757-dc187b7c50c6,"Machine Glute Kickback",machine
+100,3341a578-d76a-4b39-976c-e2cda273a362,"Machine Lateral Raise",machine
+101,5bb7c74a-7f64-4905-8445-5ac42080e03e,"Machine Lateral Raise (MaxPump)",machine
+102,e5a5c421-eb03-4e2e-875f-56ba1a484e6f,"Machine Leg Extension (MaxPump)",machine
+103,3ccee8a0-8cd3-4d42-a5d8-33a0e49c1ded,"Machine Low Row",machine
+104,efbd21e4-e60d-4642-ab5c-17cca4071058,"Machine Mid Row",machine
+105,6bba6105-e3b5-4839-9a99-fea74d3da7ca,"Machine Preacher Curl",machine
+106,05afd4a2-6385-4fce-82dc-515402020a0a,"Machine Preacher Curl (MaxPump)",machine
+107,7c383cef-4f68-40e3-9d81-734c3db94773,"Machine Pulldown",machine
+108,96406ffa-c2f4-418b-aa8f-fae92548e800,"Machine Pullover",machine
+109,7ce929ec-52b5-4886-b656-1c91b1ce7380,"Machine Reverse Flye",machine
+110,1a4d2c30-6d7a-4a84-ac97-1bd97c03024a,"Machine Shoulder Press",machine
+111,b33fb0d3-fcea-464e-89b7-ff226a9645a3,"Machine Tricep Overhead Extension (MaxPump)",machine
+112,c29a63f5-7dab-4ba8-aa20-737b8d361e5e,"Machine Triceps Extension",machine
+113,54f9ff2c-72f3-4ebe-9a29-8c8f2f4bb84b,"Machine Triceps Pushdown",machine
+114,c08d8ef6-99be-43d5-a078-1d2dbc0e1837,"MaxPump Hip Press (Single Leg)",machine
+115,c1c0b2e0-a8e1-42d6-a7f6-5a8bc2649aca,"MaxPump Incline Press",machine
+116,e485f495-7dce-4bc9-9d3a-be3abe290578,"MaxPump Seated Multi High Row (Single Arm)",machine
+117,61b545ee-a2f3-48bb-abb6-462fdd033d58,"Pendulum Calves",machine
+118,2385809d-e996-4ee3-896d-29ffb0cf813c,"Pendulum Squat",machine
+119,d93ca0e1-3030-431c-ba3b-a36c62c77ace,"Power Squat",machine
+120,d96793f9-a58e-4c24-ab51-a019e2c936ec,"Pull Down (Mag Grip)",cable
+121,5fd34edf-f884-4ec2-8358-ef9698d2c83d,"Pulldown (Normal Grip)",cable
+122,f78d0d33-de46-41d6-a62b-2b9529f4432b,"Pulldown (Parallel Grip)",cable
+123,c40759e0-dbfb-4348-9922-f4adc1bcba48,"Pulldown (Straight Arm)",cable
+124,9b173474-eb5a-45bd-bf63-d252f98d4e00,"Pulldown (Wide Grip)",cable
+125,5ff5fe08-6bbe-4bbe-9c54-26102a4ce33e,"Pullup (Weighted, Normal Grip)",bodyweight loadable
+126,cb49f637-eca8-4e97-8ea3-a045a63ec259,"Pushup",bodyweight only
+127,21841330-1244-4f8d-b1af-c5d6c579aad6,"Rear Delt Fly",machine
+128,bb33eb35-3270-47d3-a4ba-2f04390042e9,"Reverse Lunge (Barbell)",barbell
+129,b1aa7aa2-bb3e-4772-91c0-126101cffdf1,"Scapular Retraction - MegaMass Row",machine
+130,36e11ee9-fc37-404f-a124-5df3b0888136,"Seated Cable Row",cable
+131,6e5e90d9-d84a-4bce-b475-c5375047bd90,"Seated Leg Curl",machine
+132,a7c6f6ce-b091-4f61-a7b3-a4ee240f0e52,"Single Leg Extension",machine
+133,f2126314-82fe-4e7a-b92a-1d9ece941015,"Single-Leg Leg Curl",machine
+134,1a778326-f737-4a83-a57f-ce381daef5f8,"Slant Board Sit-Up (Weighted)",bodyweight loadable
+135,56d097ed-f1df-4f79-a361-62e0f86b1f73,"Slope squat",machine
+136,fcac5df4-c921-4d78-9fe1-a8a80bc82e16,"Smith Machine Bench Press (Medium Grip)",smith machine
+137,8e265883-bde9-49e3-ac39-181836e565a2,"Smith Machine Calves",smith machine
+138,36443a70-3bb3-4d19-8954-c974fc7df96e,"Smith Machine Good Morning",smith machine
+139,72b20da8-dd30-4c96-b586-364afd4ceddf,"Smith Machine Shoulder Press (Seated)",smith machine
+140,f554f5eb-be83-4a18-a6b1-f854b730d380,"Cable Shrug",cable
+141,1846bc2f-d4e7-456c-a497-369055b88b42,"Smith Machine Squat (Feet Forward)",smith machine
+142,5ee7996a-c107-4c32-88b5-33016f2f2af4,"Stair Calves",bodyweight only
+143,ce23a016-ecb5-4f46-bc51-58b1a7154d41,"Stair Calves (Single Leg)",bodyweight only
+144,5006e259-29fb-40c6-8912-d8f4f286502a,"Standing Shoulder Press (Machine)",machine
+145,1b327d89-7fd2-47cc-952d-1680ab2cc7a9,"StIff Leg Deadlift",dumbbell
+146,5b37ab85-7175-4d77-a4b6-78eec966b336,"Stiff-Legged Deadlift",barbell
+147,3c998ff1-d05f-4dc1-adbf-628276c21417,"Triceps cable push-down Bar",cable
+148,08d04ffb-d3a4-42a2-8d6c-9e1d054636d5,"Walking Lunges (Glute-Focused, Barbell)",barbell
+149,8badc342-e42f-4d91-93b2-266cd2ca4d98,"Walking Lunges (Glute-Focused, Bodyweight)",bodyweight only
+150,754ae9f5-53f2-412c-b862-cde7c44fe797,"Walking Lunges (Quad-Focused, Bodyweight)",bodyweight only
+151,53578da7-35cd-412e-91a4-e92e441ce7da,"Ab Wheel",bodyweight only
+152,528c3493-c460-4529-acdf-e5dfc1074ed4,"Assisted Pullup (Underhand Grip)",machine assistance
+153,a3959598-60db-4600-8a25-45804556a8e6,"Assisted Pullup (Wide Grip)",machine assistance
+154,0c4ff392-ce21-499c-b369-b5369d328011,"Back Extension",bodyweight loadable
+155,fedad9fa-8570-4654-b9bc-9dcb0834ed37,"Back Extension (Flexion)",bodyweight loadable
+156,12c3934f-debb-4e45-b5f8-4a751cae153a,"Back Raise (Glute Ham Deck)",bodyweight only
+157,33fc1c49-07ed-493a-b0df-33794dc67343,"Barbell Bent Over Row",barbell
+158,f24cc9a1-be7e-472b-81df-e1de36fb60f8,"Cable Side Shrug",cable
+159,83303dc2-0a1b-4a83-9f5b-b79e72307f9f,"Barbell Curl (Narrow Grip)",barbell
+160,fddd2bb4-28c5-4eb9-977d-12994ec83910,"Barbell Curl (Normal Grip)",barbell
+161,e7f68a7f-0ea7-4c7c-a845-082b0c49f92c,"Barbell Facepull",barbell
+162,74fd94d8-76ad-44a8-993d-5334d053f955,"Barbell Flexion Row",barbell
+163,e88474ae-150e-4151-8b6b-c867d7402857,"Barbell Front Raise",barbell
+164,17dd4931-f532-4080-bc49-6d5c8790cf9f,"Barbell Front Raise (EZ Bar, Underhand)",barbell
+165,d124583b-4000-46ac-b614-aea53b455578,"Barbell Front Raise (Overhand)",barbell
+166,c844b8b5-043a-4fca-b506-1a2ecea027de,"Barbell Good Morning (Cambered Bar)",barbell
+167,9603d452-e851-49c3-bbfc-54d0d1a9080c,"Barbell Good Morning (High Bar)",barbell
+168,9f397d4b-a953-4181-ba5e-16982af9455b,"Barbell Good Morning (Low Bar)",barbell
+169,eabd04e9-2772-4dcb-8497-1c16ccf2aab4,"Barbell Good Morning (Safety Bar)",barbell
+170,4bf4e6fe-050b-4962-aae4-f3fcdfb4239e,"Barbell Overhead Triceps Extension",barbell
+171,a505fba1-13a0-4555-b3d2-5721b2d54067,"Barbell Pullover",barbell
+172,abb0259b-9fd8-4784-b868-b9e1d2ef98de,"Barbell Row to Chest",barbell
+173,a5c36200-8cbc-4a09-89b0-4b4d358a43f5,"Barbell Shoulder Press (Seated)",barbell
+174,ea20fe81-71a7-4742-a9df-13ba007e20c2,"Barbell Shoulder Press (Standing)",barbell
+175,781e362c-c8ff-4ea5-b413-f23c6a710dc2,"Cable Single Arm Side Shrug",cable
+176,d7935248-9a3c-41a0-8051-2e3d4ce5a9fc,"Barbell Squat (Cambered Bar)",barbell
+177,a2ff7c6d-fe28-4ca2-9af4-8af8da279845,"Barbell Squat (Safety Bar)",barbell
+178,39d06503-3fea-4ee3-8d9c-689f70e8bb9c,"Barbell Standing Wrist Curl",barbell
+179,1eba9687-9646-4f07-8811-516878355d85,"Barbell Upright Row",barbell
+180,d7d91cb1-6e89-40ff-a655-6cd21cd491a7,"Bayesian Curl",cable
+181,ba982730-8711-406e-82af-5204205972f8,"Belt Squat Calves",machine
+182,2f9ecd44-8401-43aa-8edf-1d1d94a02f13,"Bench Press (Cambered Bar)",barbell
+183,1322d8e1-b5e5-4dce-8572-1c8c6f8111da,"Bench Press (Close Grip)",barbell
+184,299c1c82-41d6-4795-a122-e83f5da84d40,"Bench Press (Decline)",barbell
+185,39820bd4-8244-4908-b1cd-7015d2e81fc5,"Bench Press (Incline, Narrow Grip)",barbell
+186,535397b9-684b-4b79-b225-16e6ac914fd0,"Bench Press (Incline, Wide Grip)",barbell
+187,93e7be71-4389-4581-9f73-bff83eeee563,"Bench Press (Narrow Grip)",barbell
+188,225ed65e-b82b-4761-b8db-a12205e3769a,"Bench Press (Wide Grip)",barbell
+189,713d5e18-36b5-430b-b143-f55624890834,"Bodyweight Squat (2/3)",bodyweight only
+190,3b891c01-54aa-42e3-84c5-5c607fca8674,"Bulgarian Split Squat (Glute-Focused)",dumbbell
+191,fc9330f1-8644-499c-b57d-394bbc158a47,"Bulgarian Split Squat (Quad-Focused)",dumbbell
+192,6ab7f9f2-2e47-471b-aa7d-b7def6d81f13,"Deadlift",barbell
+193,db255274-9968-48a1-a861-3b70cbe6497a,"Cable Chest Press",cable
+194,075ddfb6-ce9e-41de-a397-19f029177a58,"Cable Cross Body Bent Lateral Raise",cable
+195,3099c67f-d1ce-4f1a-b0f8-b7b91c87033f,"Cable Cross Body Lateral Raise",cable
+196,cda5bdef-0410-49c7-9c98-ecbc9b6a4dbb,"Cable Curl (EZ Bar)",cable
+197,9f2b70cf-c291-4eb2-80dd-6bf2c189200c,"Cable Curl (EZ Bar, Wide Grip)",cable
+198,00952cdf-82a6-4196-a671-ae4e551c72a0,"Cable Curl (Single-Arm)",cable
+199,e98430b8-91d0-4103-91d4-c78dc56b616e,"Cable Flexion Row",cable
+200,0ade3c19-cee8-4c3d-99f5-caff0d38490c,"Cable Flye (Seated)",cable
+201,9c23d15d-97a6-4f06-91fc-4e4b9d541e2d,"Cable Flye (Underhand)",cable
+202,ff261665-f510-4ebc-b2cb-c194e04291ab,"Cable Front Raise (Overhand)",cable
+203,987317ff-9524-4ea3-8ec4-ae9d8ddb0a48,"Cable Kickback",cable
+204,6a751c65-d6df-4397-a28d-1da5f2102b23,"Cable Pull Through",cable
+205,c72e8ff3-5073-43ef-beaf-e0518a9b522e,"Cable Pullover",cable
+206,e0bef929-2653-43b9-bc7b-7339eb14bafe,"Cable Rope Crunch",cable
+207,029ee677-a67d-472c-ac18-59a9b84bb82b,"Cable Rope Facepull (Kneeling)",cable
+208,6ccb17ca-c7e5-41df-9c27-8d3e3c10d4b4,"Dumbbell Bent Over Shrug",dumbbell
+209,d54c87a2-0a13-49aa-86a8-3bc72972159a,"Dumbbell Leaning Shrug",dumbbell
+210,382a9f85-e88f-4a02-9f36-1db279210dd2,"Cable Single Arm Rear Delt Raise",cable
+211,6005c58c-7cd9-4918-a136-89c2c68647b5,"Dumbbell Press (High Incline)",dumbbell
+212,19cdf9df-3cd6-4564-8178-0128ad6e498d,"Cable Wrist Curl",cable
+213,c1349b9f-c3ed-441e-bcc6-a927471e5b24,"Cambered Bar Row",barbell
+214,17b8f3c3-05bb-49d0-b7db-628f2365d163,"Concentration Curl",dumbbell
+215,b616d1b2-9811-44e1-8403-8aa53e6e3ed3,"Dumbbell Shrug",dumbbell
+216,5c415d83-6015-4e7d-9b16-e21f5b1ff240,"Deadlift (Deficit 25's)",barbell
+217,c9664cb4-0388-44c9-af59-5697054f12c8,"Deadlift (Flexion)",barbell
+218,5ff9551a-50d9-40ca-ade9-4dd9e65fc8ce,"Deadlift (Sumo Stance)",barbell
+219,a323d085-aa0e-435a-afaf-9c56b7dbcded,"Deadlift (Sumo Stance, Deficit)",barbell
+220,b8a20dae-c59d-4c4e-ae1b-1ce71bebc49d,"Decline Dumbbell Curl",dumbbell
+221,523e5ec8-ce95-4ed0-abeb-6c347cb7e39d,"Dip (Chest-Focused)",bodyweight only
+222,249105fc-6c59-4792-918c-d46ecbf2b468,"Dip (Weighted, Chest-Focused)",bodyweight loadable
+223,e459ff3b-9931-4603-a2cd-cdb16c6a184c,"Dip Machine",machine
+224,d47d5996-8f14-4aa8-a5c0-03017d296913,"Donkey Calf Raise",machine
+225,7a9e2fe8-4355-42d7-a63b-5d8f86875a06,"Dual Cable Pullover",cable
+226,40777788-0302-478e-b613-8bd1659b12ba,"Dumbbbell Flexion Row",dumbbell
+227,e13d35c1-2775-4386-9201-b96c576a72cd,"Dumbbell Bench Wrist Curl",dumbbell
+228,c5cdcaf5-2500-4f89-940a-ca78aafcb30b,"Hack Squat",smith machine
+229,f20a0344-777d-4eb7-a398-87ece6b62c71,"Dumbbell Facepull",dumbbell
+230,0ce5ab76-ddf4-4461-a47c-a5f73f2073b3,"Dumbbell Facepull (Incline)",dumbbell
+231,3d2044cb-a67b-4c10-899b-572467d81c07,"Dumbbell Front Squat",dumbbell
+232,3a7ecbbe-024f-4faf-99bd-38f7688f2539,"Dumbbell Hip Thrust (Single Leg)",dumbbell
+233,dd071daf-3d17-4b82-bc83-f3cb1c77adc0,"Dumbbell Lateral Raise (Seated)",dumbbell
+234,61c084d0-df83-4b52-bdb1-07f244a3574b,"Dumbbell Lateral Raise (Thumbs Down)",dumbbell
+235,dad2d2a5-d55e-4d73-b222-8c167509c812,"Dumbbell Lateral Raise (Top Hold)",dumbbell
+236,f7c3cbea-4b37-45c0-8486-9806f631d624,"Hack Squat",machine
+237,5b3fb2f8-f221-423c-94fa-131ac0fc8037,"Machine Hip Thrust",machine
+238,9eb7c448-6303-46e7-a46e-3755fadf9624,"Dumbbell Preacher Curl (Single-Arm)",dumbbell
+239,57c1af8b-e599-494f-842d-2cd39babef7a,"Dumbbell Press Flye (Flat)",dumbbell
+240,41d0e09a-a329-4650-afea-93627fee0a4f,"Dumbbell Pullover",dumbbell
+241,0feccec6-6b73-41b6-b9e4-deb699bf25a5,"Dumbbell Shoulder Press (Standing)",dumbbell
+242,c6731824-9910-4593-9cba-eaaf8f86c20b,"Smith Machine Split Squat",smith machine
+243,7f8dd1c4-932c-468b-83c1-0db32a9b106f,"Dumbbell Spider Curl",dumbbell
+244,60681c74-6648-4e24-ae8e-c5842086a604,"Dumbbell Standing Wrist Curl",dumbbell
+245,6caa2d60-a968-4d6d-b3fb-df3d2dc8415b,"Dumbbell Twist Curl",dumbbell
+246,df8385b2-6b9d-437c-beac-ab4098a9bec7,"EZ Bar Curl (Normal Grip)",barbell
+247,963dcde4-9493-4d86-91f4-ec67fe86e987,"EZ Bar Curl (Wide Grip)",barbell
+248,82ca0842-1301-409d-91bb-7003fed73c6b,"EZ Bar Row (Underhand)",barbell
+249,38023594-cf53-4074-8597-4ceca74e61f2,"EZ Bar Skullcrusher",barbell
+250,e7f91f15-9fe2-498f-8e6b-1d079e3a4aca,"EZ Bar Spider Curl",barbell
+251,de080b43-0da3-4ce7-8333-8f2b5e34a6cd,"Freemotion Curl (Facing Away)",freemotion
+252,3da3a468-9da1-43d9-a4ad-67983920a60c,"Freemotion Curl (Facing Machine)",freemotion
+253,0ead788e-ccef-4df3-821f-2f9f4c7f5de6,"Freemotion Curl (Single-Arm)",freemotion
+254,9598fd55-8f07-4d14-ad85-06076d34df60,"Freemotion Rear Delt Flyes",freemotion
+255,f15b79d8-75e4-4398-9cdc-11719687700b,"Freemotion Rear Delt Flyes (Paused)",freemotion
+256,fa4e9310-5aec-4c3c-999f-5e4560b6d16e,"Freemotion Y-Raises",freemotion
+257,64ee7dfa-d3a9-4221-9ff8-fd712066b013,"Freemotion Y-Raises (Paused)",freemotion
+258,c12cbacc-e1bc-44cd-bed1-9308bc930650,"Front Foot Elevated Smith Lunge",smith machine
+259,ad6180f1-431a-4049-9a42-c62631eca05c,"Front Squat",barbell
+260,c89434cf-22a8-4266-a773-65a9da66375b,"Front Squat (Cross Grip)",barbell
+261,268638d7-3bdc-4d25-b37d-28ca9033f71e,"Goblet Squat",dumbbell
+262,200ea359-bd44-469c-a71f-8e543a1c4f38,"Grip Roller",machine
+263,0706b408-6cb1-44a1-867d-7e75f29aa3c6,"Hammer Machine Chest Press (Incline)",machine
+264,612573e5-757a-4bcb-a5d9-6c3f55a64536,"Hammer Preacher Curl",dumbbell
+265,5ce4a20d-9f0c-48f6-9990-bef23eb393ef,"Hanging Knee Raise",bodyweight only
+266,73ed5444-2326-4ceb-84f6-9ada8060d8eb,"Hanging Straight Leg Raise",bodyweight only
+267,14b84dc6-7afc-4c88-80b4-d2ddbd46fa7e,"Hip Abduction Machine",machine
+268,6866df1e-2310-4e89-b844-696f7ed7b6ca,"Hip Adduction",machine
+269,57ad7a8b-7d34-4b29-9d68-f898bb1172f2,"Inverted Row",bodyweight only
+270,59380279-eaa8-4c5a-8796-4df2bd7db051,"Inverted Skullcrusher",bodyweight only
+271,6a446a9b-805f-4bf0-b547-1cc9d12603d6,"JM Press",barbell
+272,e6b78329-8b02-4fae-9f72-ef62058d3c32,"Landmine Row",barbell
+273,d9ddfda8-8e3d-4c35-9f15-7e9e347d124b,"Lying Cable Curl",cable
+274,d1280390-a094-47b7-bfa7-63349fcf7e66,"Lying Dumbbell Curl",dumbbell
+275,6f9e40b9-1bf8-4aa8-b56d-4f856f01b658,"Machine Shrug",machine
+276,0f83bea1-976d-4d16-b014-6d77a034e52b,"Meadows Row",barbell
+277,09ee2a29-cd13-4a3d-8485-fb6708004f04,"Modified Candlestick",bodyweight only
+278,d749edb6-fdaf-4131-92f2-c2e983f5c49d,"Nordic Curl",bodyweight only
+279,862ac671-76cc-4a15-8cda-98f7cbedfa89,"Pec Dec Flye",machine
+280,d4bf8d5b-0261-44b2-86ca-cff9905a9c69,"Pulldown (Narrow Grip)",cable
+281,6938bba8-58fd-4271-b2e0-e76f5221820d,"Pulldown (Single-Arm)",cable
+282,85f4af9f-b7b6-415a-b2cb-f98704ddefba,"Pulldown (Underhand Grip)",cable
+283,0101255c-9401-4d8b-acf7-b18201d7cdb2,"Pulldown (Upright Torso to Abs)",cable
+284,ed7d7dbe-7722-411f-a0c7-f33d551c6537,"Pullup (Normal Grip)",bodyweight only
+285,4580a609-144a-4746-acfd-f6076387f7e2,"Pullup (Parallel Grip)",bodyweight only
+286,15cc332f-6e62-465b-8e9d-c5855dc79988,"Pullup (Underhand Grip)",bodyweight only
+287,8180bb7c-e217-4cf4-8901-479720c2a2c8,"Pullup (Weighted, Parallel Grip)",bodyweight loadable
+288,e28d7c97-ad0b-49b2-8dce-1c9b7b1e72b6,"Pullup (Weighted, Underhand Grip)",bodyweight loadable
+289,6a92394e-f4d2-40d3-8dbc-9fa8f0af4326,"Pullup (Weighted, Wide Grip)",bodyweight loadable
+290,c5b5982d-c22f-48b8-bf32-6388d34b3f59,"Pullup (Wide Grip)",bodyweight only
+291,f9fec483-d9b2-4a94-a35a-e136e405ec29,"Pushup (Deficit)",bodyweight only
+292,925b0592-ae6e-4115-bb67-757b8b68dbc8,"Pushup (Narrow Grip)",bodyweight only
+293,0cd9ba35-51a7-4b31-bdd1-9946159bcd71,"Pushup (Weighted, Narrow Grip)",bodyweight loadable
+294,d46444f5-0e91-4fb3-8ce1-b85b5f758cd3,"Pushup (Weighted, Normal Grip)",bodyweight loadable
+295,e87f59d3-8e8e-4bfc-a859-349bcc3ecde9,"Reaching Sit-Up",bodyweight only
+296,f9f8c399-cc9c-4849-8968-08f50aa8c813,"Reverse Curl",barbell
+297,1c8fbc73-ed2c-4585-b662-d9dfd9a59cdd,"Reverse Hyper",machine
+298,51d537b6-9276-4d53-b706-18b4941cfd66,"Reverse Lunge (Dumbbell)",dumbbell
+299,ce662bb8-e84a-49bf-893a-41657ec11df9,"Rogers Good Morning",machine
+300,9ff5e617-538b-41d5-9701-a9669fc1269d,"Rogers Reverse Lunge",machine
+301,24dbed66-b440-4055-acb0-b772ccce58ac,"Rogers Squat",machine
+302,8f8e628f-eef6-46b0-b404-39b6bff46cfc,"Seal Row",barbell
+303,70acc692-06ff-4704-a1be-d07fdd752754,"Seated Cable Row (Single-Arm)",cable
+304,47e804c0-c688-44d0-aab1-61233557390f,"Single Leg Press",machine
+305,561d981c-24d5-4133-93fd-9903f25161cb,"Single Leg Romanian Deadlift",dumbbell
+306,bf547c24-3457-4fe6-8424-962246a61e6a,"Sissy Squat (Machine)",bodyweight only
+307,c9ebdafe-ee13-45aa-a8b6-4e958a4f7304,"Sissy Squat (No Machine)",bodyweight only
+308,cd12cd43-eae8-40f2-86d2-aff86d2e85af,"Smith Machine Bench Press (Narrow Grip)",smith machine
+309,3f8ffcb1-4457-48e5-934d-a1d437301508,"Smith Machine Bench Press (Wide Grip)",smith machine
+310,2fe7ec80-9869-4813-8e78-07612540361f,"Smith Machine JM Press",smith machine
+311,6a7b08a5-3ca9-45f5-b979-c8fbb5307bfd,"Smith Machine Press (High Incline, Medium Grip)",smith machine
+312,0f170248-7fa2-444f-aee6-1e923f292a81,"Smith Machine Press (High Incline, Narrow Grip)",smith machine
+313,6e9f904e-b231-4d51-9eb6-a1d61ddd68d9,"Smith Machine Press (High Incline, Wide Grip)",smith machine
+314,fc64e3fd-5c5f-43bd-b031-81cf263792a5,"Smith Machine Press (Incline, Medium Grip)",smith machine
+315,fa0f3910-aff3-43cd-8f9e-9faf79f4a5df,"Smith Machine Press (Incline, Wide Grip)",smith machine
+316,6518fde3-6989-45e7-9eb5-c4a09fe03c47,"Smith Machine Press (Low Incline, Medium Grip)",smith machine
+317,189611ae-5aff-4d40-b05f-e80aa8ef52e6,"Smith Machine Press (Low Incline, Narrow Grip)",smith machine
+318,98a2a55f-a306-4ea7-9ab5-d9d977407d78,"Smith Machine Press (Low Incline, Wide Grip)",smith machine
+319,ac7c1b14-d2f9-440f-8ca0-c36fd1f8abba,"Smith Machine Press (Medium Incline, Narrow Grip)",smith machine
+320,b1b4ff72-de3b-438b-94d9-8b5c388fb233,"Smith Machine Row",smith machine
+321,50a023b7-09f0-44af-93a5-94ba7bb95bd1,"Smith Machine Shrug",smith machine
+322,da4f1b60-5ddd-4535-8ab8-dcbd3f224f97,"Smith Machine Skullcrusher",smith machine
+323,d02df79c-8663-4a0a-a1e5-a84beebd5fc8,"Standing Calf Raise",machine
+324,e3b7ed14-21de-4528-9a2c-6a8ff0f0871f,"Smith Machine Upright Row",smith machine
+325,62ffa784-52d4-45eb-9388-87bad98cee24,"T-Bar Row",machine
+326,ebe1c280-7e4e-470a-91b3-434eea5a5a00,"Trap Bar Deadlift",barbell
+327,522a084a-4bfc-4b37-a45b-4052cc1dd81d,"V-Up (Weighted)",bodyweight loadable
+328,ff1c69ce-fe7b-484a-8d77-83ca7c49f79c,"Walking Lunges (Glute-Focused, Dumbbell)",dumbbell
+329,a7bf0ea6-803c-4aa6-8ed7-f52aecd4b7db,"Walking Lunges (Quad-Focused, Barbell)",barbell
+330,404e2733-4b6e-4154-9aa1-1f28a4162818,"Walking Lunges (Quad-Focused, Dumbbell)",dumbbell
