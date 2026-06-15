@@ -610,6 +610,99 @@ export async function setGroupExercises(
   if (updError) throw updError;
 }
 
+// ---------------------------------------------------------------------------
+// staged plan save (fig 2.5 edit surface): the planner board edits a local
+// working copy when editing a non-draft meso; SAVE CHANGES commits the whole
+// plan at once. The planner tables hold no logged data, so the safe + simple
+// reconcile is a wholesale replace — day_numbers are preserved by the caller
+// so generated workouts (matched by day_number) still line up. Regeneration
+// of open workouts for an active meso is handled separately (generation.ts).
+// ---------------------------------------------------------------------------
+
+export interface PlanGroupInput {
+  muscle_group_id: string;
+  exercise_slots: number;
+  fills: { slot_number: number; exercise_id: string; initial_sets: number }[];
+}
+
+export interface PlanDayInput {
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  groups: PlanGroupInput[];
+}
+
+export async function saveMesoPlan(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+  days: PlanDayInput[],
+): Promise<void> {
+  // wholesale replace: dropping the days cascades groups + exercises (RLS
+  // scopes the meso to the owner). Nothing outside the planner tables
+  // references their ids — generated workouts key off day_number + values.
+  const { error: delError } = await supabase
+    .from("meso_days")
+    .delete()
+    .eq("mesocycle_id", mesoId);
+  if (delError) throw delError;
+
+  for (const day of days) {
+    const { data: dayRow, error: dayError } = await supabase
+      .from("meso_days")
+      .insert({
+        mesocycle_id: mesoId,
+        user_id: userId,
+        day_number: day.day_number,
+        label: day.label,
+        weekday: day.weekday,
+      })
+      .select()
+      .single();
+    if (dayError) throw dayError;
+
+    let position = 1;
+    for (const group of day.groups) {
+      const { data: groupRow, error: groupError } = await supabase
+        .from("meso_day_groups")
+        .insert({
+          meso_day_id: dayRow.id,
+          muscle_group_id: group.muscle_group_id,
+          position: position++,
+          exercise_slots: Math.max(group.exercise_slots, 1),
+        })
+        .select()
+        .single();
+      if (groupError) throw groupError;
+
+      if (group.fills.length > 0) {
+        const { error: fillError } = await supabase
+          .from("meso_exercises")
+          .insert(
+            group.fills.map((f) => ({
+              mesocycle_id: mesoId,
+              meso_day_group_id: groupRow.id,
+              day_of_week: null,
+              slot_number: f.slot_number,
+              position: f.slot_number,
+              exercise_id: f.exercise_id,
+              initial_weight: null,
+              initial_reps: null,
+              initial_sets: f.initial_sets,
+            })),
+          );
+        if (fillError) throw fillError;
+      }
+    }
+  }
+
+  const { error: dpwError } = await supabase
+    .from("mesocycles")
+    .update({ days_per_week: Math.max(1, days.length) })
+    .eq("id", mesoId);
+  if (dpwError) throw dpwError;
+}
+
 export async function updateDayGroup(
   supabase: Client,
   groupId: string,

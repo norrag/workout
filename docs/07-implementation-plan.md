@@ -193,11 +193,18 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       `/cycles/plan/copy` → create form prefilled (`COPIED FROM —`, source weeks/RIR/deload) →
       `copyMesoStructure` clones days/groups/slot fills onto the new meso, honoring exclusions;
       loads reseed from `v_exercise_prs` at start. Pure `planMesoCopy` helper + 4 unit tests.)*
-- [~] **Planner board (2.5)** edit surface: partial-completion **lock** (edits apply to `pending`
-      weeks only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
-      **The meso detail page (2.2) is KEPT** — user reversed the 09 "nix the meso page" decision
-      (2026-06-15); the planner is reached via `EDIT PLAN`, not as the sole surface. The
-      `PLAN | STATS` toggle / `‹ PLAN` back-nav are therefore dropped.
+- [x] **Planner board (2.5)** edit surface: editing a non-draft meso stages changes in a **local
+      working copy** with a sticky `CANCEL · SAVE CHANGES` bar (nothing written until save); a save
+      confirm states logged history is protected and edits only touch not-yet-started days. On save,
+      `regenerateOpenWorkouts` structurally merges the active meso's open workouts (completed/
+      in-progress/skipped + logged sets never touched; future weeks regenerate from the new plan when
+      reached). **Drafts keep the live build-then-`CREATE MESOCYCLE` flow.** **The meso detail page
+      (2.2) is KEPT** — user reversed the 09 "nix the meso page" decision (2026-06-15); reached via
+      `EDIT PLAN`. The `PLAN | STATS` toggle / `‹ PLAN` back-nav are dropped. *(2026-06-15.)*
+- [x] **Read-only planned-day view**: `/cycles/meso/[id]/planned/[week]/[day]` shows a not-yet-
+      generated day's basic planned exercises (groups · sets · target RIR) behind a `NOT PLANNED YET`
+      banner; wired from the Day View navigator chips and the meso-detail matrix's future cells, so
+      future days are viewable instead of dead. *(2026-06-15.)*
 - [ ] **Create mesocycle (2.8)** rebrand: `MACROCYCLE PLACEMENT` with `M1…Mn` positions + phase.
 - [x] **Draft model (on-device feedback, 2026-06-15):** `create mesocycle` (name/weeks) moved to
       the **final** stage — scratch/template/copy drop straight onto the planner as a **draft**;

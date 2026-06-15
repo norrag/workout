@@ -1,18 +1,12 @@
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useMemo,
-  useState,
-  useTransition,
-} from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { HistorySheet } from "@/components/HistorySheet";
-import type { MesoPlan, PlannedDay, PlannedGroup } from "@/lib/queries/cycles";
+import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
-import { groupByRegion } from "@/lib/planner/groups";
+import { groupByRegion, planGroupExercises } from "@/lib/planner/groups";
 import {
   addDayAction,
   addGroupsAction,
@@ -20,6 +14,7 @@ import {
   finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
+  saveMesoPlanAction,
   setGroupExercisesAction,
   updateDayAction,
   updateGroupAction,
@@ -51,14 +46,65 @@ export interface PickerExerciseLite {
   muscle_group_ids: string[];
 }
 
-type PickerTarget = { group: PlannedGroup; day: PlannedDay };
+// View types the board renders from. `PlannedDay` (props) is structurally a
+// superset, so live data flows straight in; the staged working copy uses the
+// same shape with synthetic ids for not-yet-saved days/groups/fills.
+interface ViewFill {
+  id: string;
+  exercise_id: string;
+  exercise_name: string;
+  initial_sets: number;
+  slot_number: number;
+}
+interface ViewGroup {
+  id: string;
+  muscle_group: string;
+  muscle_group_id: string;
+  exercise_slots: number;
+  fills: ViewFill[];
+}
+interface ViewDay {
+  id: string;
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  groups: ViewGroup[];
+}
+
+type PickerTarget = { group: ViewGroup; day: ViewDay };
 type Commit = (fn: () => Promise<void>) => void;
+
+function tmpId(): string {
+  return `tmp-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+}
+
+function toWorkDays(days: PlannedDay[]): ViewDay[] {
+  return days.map((d) => ({
+    id: d.id,
+    day_number: d.day_number,
+    label: d.label,
+    weekday: d.weekday,
+    groups: d.groups.map((g) => ({
+      id: g.id,
+      muscle_group: g.muscle_group,
+      muscle_group_id: g.muscle_group_id,
+      exercise_slots: g.exercise_slots,
+      fills: g.fills.map((f, i) => ({
+        id: f.id,
+        exercise_id: f.exercise_id,
+        exercise_name: f.exercise_name,
+        initial_sets: f.initial_sets,
+        slot_number: f.slot_number ?? i + 1,
+      })),
+    })),
+  }));
+}
 
 function badge(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function dayTabLabel(day: PlannedDay): string {
+function dayTabLabel(day: ViewDay): string {
   return day.weekday
     ? (WEEKDAYS.find((w) => w.value === day.weekday)?.label ?? `D${day.day_number}`)
     : `DAY ${day.day_number}`;
@@ -77,20 +123,35 @@ function shortDate(iso: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
 }
 
-/** Planner board (figs 2.4/2.5/2.6). */
+/** Planner board (figs 2.4/2.5/2.6b/2.7).
+ *
+ * Drafts edit **live** (build then CREATE MESOCYCLE). Editing a non-draft meso
+ * (planned/active) stages changes in a local working copy — nothing is written
+ * until SAVE CHANGES; CANCEL discards. */
 export function PlannerBoard({
   plan,
   macroContext,
   muscleGroups,
   exercises,
+  hasHistory = false,
 }: {
   plan: MesoPlan;
   macroContext: MacroContext | null;
   muscleGroups: MuscleGroupRow[];
   exercises: PickerExerciseLite[];
+  hasHistory?: boolean;
 }) {
-  const { meso, days } = plan;
+  const { meso } = plan;
+  const editing = meso.status !== "draft";
   const router = useRouter();
+
+  // staged working copy (editing mode). Initialised once from props; in editing
+  // mode no server action runs mid-edit, so props won't change underneath it.
+  const [workDays, setWorkDays] = useState<ViewDay[]>(() => toWorkDays(plan.days));
+  const [dirty, setDirty] = useState(false);
+
+  const days: ViewDay[] = editing ? workDays : toWorkDays(plan.days);
+
   const [activeDayId, setActiveDayId] = useState<string | null>(
     days[0]?.id ?? null,
   );
@@ -98,22 +159,185 @@ export function PlannerBoard({
   const [addGroupsDayId, setAddGroupsDayId] = useState<string | null>(null);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [finalizing, setFinalizing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [, startTransition] = useTransition();
   const commit: Commit = (fn) => startTransition(fn);
 
-  // add a day: auto-assign the next weekday, then open its setup sheet (a day
-  // and its setup are one view now — see DaySetupSheet)
+  // ----- mutators -----------------------------------------------------------
   const addDay = () => {
+    if (editing) {
+      const id = tmpId();
+      setWorkDays((ds) => [
+        ...ds,
+        {
+          id,
+          day_number: Math.max(0, ...ds.map((d) => d.day_number)) + 1,
+          label: null,
+          weekday: nextWeekday(ds.map((d) => d.weekday)),
+          groups: [],
+        },
+      ]);
+      setActiveDayId(id);
+      setDaySetupId(id);
+      setDirty(true);
+      return;
+    }
     const weekday = nextWeekday(days.map((d) => d.weekday));
     commit(async () => {
-      const created = await addDayAction({
-        meso_id: meso.id,
-        label: null,
-        weekday,
-      });
+      const created = await addDayAction({ meso_id: meso.id, label: null, weekday });
       setActiveDayId(created.id);
       setDaySetupId(created.id);
     });
+  };
+
+  const saveDay = (dayId: string, label: string | null, weekday: number | null) => {
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => (d.id === dayId ? { ...d, label, weekday } : d)),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() => updateDayAction({ day_id: dayId, meso_id: meso.id, label, weekday }));
+  };
+
+  const removeDay = (dayId: string) => {
+    if (editing) {
+      setWorkDays((ds) => ds.filter((d) => d.id !== dayId));
+      setDirty(true);
+      return;
+    }
+    commit(() => removeDayAction({ day_id: dayId, meso_id: meso.id }));
+  };
+
+  const addGroups = (dayId: string, ids: string[]) => {
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => {
+          if (d.id !== dayId) return d;
+          const fresh = ids
+            .filter((id) => !d.groups.some((g) => g.muscle_group_id === id))
+            .map((id) => ({
+              id: tmpId(),
+              muscle_group: muscleGroups.find((m) => m.id === id)?.name ?? "",
+              muscle_group_id: id,
+              exercise_slots: 1,
+              fills: [],
+            }));
+          return { ...d, groups: [...d.groups, ...fresh] };
+        }),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      addGroupsAction({ day_id: dayId, meso_id: meso.id, muscle_group_ids: ids }),
+    );
+  };
+
+  const updateGroupSlots = (groupId: string, slots: number) => {
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) =>
+            g.id === groupId ? { ...g, exercise_slots: slots } : g,
+          ),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      updateGroupAction({ group_id: groupId, meso_id: meso.id, exercise_slots: slots }),
+    );
+  };
+
+  const removeGroup = (groupId: string) => {
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({ ...d, groups: d.groups.filter((g) => g.id !== groupId) })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() => removeGroupAction({ group_id: groupId, meso_id: meso.id }));
+  };
+
+  const setGroupExercises = (groupId: string, exerciseIds: string[]) => {
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) => {
+            if (g.id !== groupId) return g;
+            const layout = planGroupExercises(
+              g.fills.map((f) => ({
+                exercise_id: f.exercise_id,
+                initial_sets: f.initial_sets,
+              })),
+              exerciseIds,
+              3,
+            );
+            return {
+              ...g,
+              exercise_slots: Math.max(layout.length, 1),
+              fills: layout.map((l) => ({
+                id: tmpId(),
+                exercise_id: l.exercise_id,
+                exercise_name: exercises.find((e) => e.id === l.exercise_id)?.name ?? "",
+                initial_sets: l.initial_sets,
+                slot_number: l.slot_number,
+              })),
+            };
+          }),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      setGroupExercisesAction({ meso_id: meso.id, group_id: groupId, exercise_ids: exerciseIds }),
+    );
+  };
+
+  const clearFill = (groupId: string, fill: ViewFill) => {
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, fills: g.fills.filter((f) => f.id !== fill.id) }
+              : g,
+          ),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      clearSlotAction({ meso_id: meso.id, meso_exercise_id: fill.id }),
+    );
+  };
+
+  const doSave = () => {
+    const payload = days.map((d) => ({
+      day_number: d.day_number,
+      label: d.label,
+      weekday: d.weekday,
+      groups: d.groups.map((g) => ({
+        muscle_group_id: g.muscle_group_id,
+        exercise_slots: g.exercise_slots,
+        fills: g.fills.map((f) => ({
+          slot_number: f.slot_number,
+          exercise_id: f.exercise_id,
+          initial_sets: f.initial_sets,
+        })),
+      })),
+    }));
+    commit(() => saveMesoPlanAction({ meso_id: meso.id, days: payload }));
   };
 
   useEffect(() => {
@@ -136,8 +360,10 @@ export function PlannerBoard({
       )
     : 0;
 
+  const hasExercise = days.some((d) => d.groups.some((g) => g.fills.length > 0));
+
   return (
-    <div>
+    <div className={editing ? "pb-24" : undefined}>
       {/* macro context strip */}
       {macroContext && (
         <div className="mt-3 flex items-center justify-between border border-ink/35 px-3 py-2">
@@ -241,17 +467,13 @@ export function PlannerBoard({
                 </div>
                 {Array.from({ length: group.exercise_slots }, (_, i) => {
                   const slotNumber = i + 1;
-                  const fill = group.fills.find(
-                    (f) => f.slot_number === slotNumber,
-                  );
+                  const fill = group.fills.find((f) => f.slot_number === slotNumber);
                   return fill ? (
                     <div
                       key={slotNumber}
                       className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-1.5 last:border-b-0"
                     >
-                      <div className="text-[13px] tracking-[-1px] text-ink/35">
-                        ⋮⋮
-                      </div>
+                      <div className="text-[13px] tracking-[-1px] text-ink/35">⋮⋮</div>
                       <button
                         type="button"
                         className="flex-1 text-left"
@@ -270,14 +492,7 @@ export function PlannerBoard({
                       <button
                         type="button"
                         aria-label={`remove ${fill.exercise_name}`}
-                        onClick={() =>
-                          commit(() =>
-                            clearSlotAction({
-                              meso_id: meso.id,
-                              meso_exercise_id: fill.id,
-                            }),
-                          )
-                        }
+                        onClick={() => clearFill(group.id, fill)}
                         className="px-1 text-[13px] text-ink/40"
                       >
                         ✕
@@ -322,39 +537,44 @@ export function PlannerBoard({
         </p>
       )}
 
+      {/* bottom action */}
       {meso.status === "draft" ? (
         <>
-          {(() => {
-            const hasExercise = days.some((d) =>
-              d.groups.some((g) => g.fills.length > 0),
-            );
-            return (
-              <>
-                <button
-                  type="button"
-                  disabled={!hasExercise}
-                  onClick={() => setFinalizing(true)}
-                  className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base disabled:opacity-40"
-                >
-                  CREATE MESOCYCLE
-                </button>
-                {!hasExercise && (
-                  <p className="mt-2 text-center text-[11px] text-ink/55">
-                    Add at least one exercise to finish.
-                  </p>
-                )}
-              </>
-            );
-          })()}
+          <button
+            type="button"
+            disabled={!hasExercise}
+            onClick={() => setFinalizing(true)}
+            className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base disabled:opacity-40"
+          >
+            CREATE MESOCYCLE
+          </button>
+          {!hasExercise && (
+            <p className="mt-2 text-center text-[11px] text-ink/55">
+              Add at least one exercise to finish.
+            </p>
+          )}
         </>
       ) : (
-        <button
-          type="button"
-          onClick={() => router.push(`/cycles/meso/${meso.id}`)}
-          className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
-        >
-          {meso.status === "planned" ? "DONE — REVIEW MESO" : "DONE"}
-        </button>
+        // staged edit bar (fig 2.5): nothing is written until SAVE CHANGES
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t-[1.5px] border-ink bg-bg-base px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+          <div className="mx-auto flex max-w-md items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => (dirty ? setDiscarding(true) : router.push(`/cycles/meso/${meso.id}`))}
+              className="flex-[0_0_auto] border-[1.5px] border-ink px-5 py-3.5 text-[12px] font-bold tracking-[0.1em]"
+            >
+              CANCEL
+            </button>
+            <button
+              type="button"
+              disabled={!dirty}
+              onClick={() => setSaving(true)}
+              className="flex-1 bg-ink py-3.5 text-center text-[12px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+            >
+              {dirty ? "SAVE CHANGES" : "NO CHANGES"}
+            </button>
+          </div>
+        </div>
       )}
 
       {(() => {
@@ -365,34 +585,34 @@ export function PlannerBoard({
           <DaySetupSheet
             key={setupDay.id}
             day={setupDay}
-            mesoId={meso.id}
+            onSaveDay={(label, weekday) => saveDay(setupDay.id, label, weekday)}
+            onRemoveDay={() => removeDay(setupDay.id)}
+            onUpdateGroupSlots={updateGroupSlots}
+            onRemoveGroup={removeGroup}
             onAddGroups={() => setAddGroupsDayId(setupDay.id)}
             onClose={() => setDaySetupId(null)}
-            commit={commit}
           />
         ) : null;
       })()}
       {(() => {
-        const addDay = addGroupsDayId
+        const target = addGroupsDayId
           ? (days.find((d) => d.id === addGroupsDayId) ?? null)
           : null;
-        return addDay ? (
+        return target ? (
           <AddGroupsSheet
-            key={addDay.id}
-            day={addDay}
-            mesoId={meso.id}
+            key={target.id}
+            day={target}
             muscleGroups={muscleGroups}
+            onAdd={(ids) => addGroups(target.id, ids)}
             onClose={() => setAddGroupsDayId(null)}
-            commit={commit}
           />
         ) : null;
       })()}
       <ExercisePicker
         target={picker}
-        mesoId={meso.id}
         exercises={exercises}
+        onSubmit={(ids) => picker && setGroupExercises(picker.group.id, ids)}
         onClose={() => setPicker(null)}
-        commit={commit}
       />
       <FinalizeSheet
         open={finalizing}
@@ -404,6 +624,82 @@ export function PlannerBoard({
         rirEnd={meso.rir_end}
         includesDeload={meso.includes_deload}
       />
+
+      {/* save-changes confirm + immutability warning */}
+      {saving && (
+        <BottomSheet
+          open
+          onClose={() => setSaving(false)}
+          title="Save changes"
+          subtitle={`${meso.name.toUpperCase()} — ${meso.status.toUpperCase()}`}
+        >
+          {hasHistory ? (
+            <div className="border-[1.5px] border-ink bg-paper px-3.5 py-3">
+              <div className="text-[9px] font-bold tracking-[0.14em] text-accent">
+                LOGGED HISTORY IS PROTECTED
+              </div>
+              <p className="mt-1.5 text-[12.5px] leading-[1.5] text-ink/75">
+                Completed and in-progress workouts — and every set you&apos;ve
+                already logged — won&apos;t change. These edits only affect days
+                and sets that haven&apos;t been started yet (this week&apos;s
+                remaining days and future weeks).
+              </p>
+            </div>
+          ) : (
+            <p className="text-[12.5px] leading-[1.5] text-ink/75">
+              These edits apply to the planned, not-yet-started workouts. Future
+              weeks pick them up when they&apos;re generated.
+            </p>
+          )}
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSaving(false)}
+              className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+            >
+              Keep editing
+            </button>
+            <button
+              type="button"
+              onClick={doSave}
+              className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+            >
+              SAVE CHANGES
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* discard confirm */}
+      {discarding && (
+        <BottomSheet
+          open
+          onClose={() => setDiscarding(false)}
+          title="Discard changes?"
+          subtitle="UNSAVED EDITS WILL BE LOST"
+        >
+          <p className="text-[12.5px] leading-[1.5] text-ink/75">
+            Your changes to this plan haven&apos;t been saved. Discard them and
+            go back?
+          </p>
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setDiscarding(false)}
+              className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+            >
+              Keep editing
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/cycles/meso/${meso.id}`)}
+              className="border-[1.5px] border-accent px-8 py-3 text-[13px] font-bold tracking-[0.08em] text-accent"
+            >
+              DISCARD
+            </button>
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }
@@ -515,35 +811,32 @@ function FinalizeSheet({
 
 // ---------------------------------------------------------------------------
 // day sheet (fig 2.5): the single combined view — weekday + label + muscle
-// groups & counts for one day. Reads the live `day` (props) so set steppers,
-// group add, and group removal reflect immediately.
+// groups & counts for one day. All edits go through callbacks so the board
+// decides whether they're staged (editing) or written live (draft).
 // ---------------------------------------------------------------------------
 
 function DaySetupSheet({
   day,
-  mesoId,
+  onSaveDay,
+  onRemoveDay,
+  onUpdateGroupSlots,
+  onRemoveGroup,
   onAddGroups,
   onClose,
-  commit,
 }: {
-  day: PlannedDay;
-  mesoId: string;
+  day: ViewDay;
+  onSaveDay: (label: string | null, weekday: number | null) => void;
+  onRemoveDay: () => void;
+  onUpdateGroupSlots: (groupId: string, slots: number) => void;
+  onRemoveGroup: (groupId: string) => void;
   onAddGroups: () => void;
   onClose: () => void;
-  commit: Commit;
 }) {
   const [label, setLabel] = useState(day.label ?? "");
   const [weekday, setWeekday] = useState<number | null>(day.weekday ?? null);
 
   const save = () => {
-    commit(() =>
-      updateDayAction({
-        day_id: day.id,
-        meso_id: mesoId,
-        label: label.trim() || null,
-        weekday,
-      }),
-    );
+    onSaveDay(label.trim() || null, weekday);
     onClose();
   };
 
@@ -576,9 +869,7 @@ function DaySetupSheet({
           </div>
           <select
             value={weekday ?? ""}
-            onChange={(e) =>
-              setWeekday(e.target.value ? Number(e.target.value) : null)
-            }
+            onChange={(e) => setWeekday(e.target.value ? Number(e.target.value) : null)}
             className="mt-[7px] h-11 w-full appearance-none border-[1.5px] border-ink bg-bg-base px-3 text-sm font-bold text-ink focus:outline-none"
           >
             <option value="">—</option>
@@ -595,7 +886,7 @@ function DaySetupSheet({
         <button
           type="button"
           onClick={() => {
-            commit(() => removeDayAction({ day_id: day.id, meso_id: mesoId }));
+            onRemoveDay();
             onClose();
           }}
           className="text-[11px] font-bold text-accent"
@@ -604,87 +895,67 @@ function DaySetupSheet({
         </button>
       </div>
 
-      <>
-          <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-            MUSCLE GROUPS — EXERCISES PER GROUP
+      <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+        MUSCLE GROUPS — EXERCISES PER GROUP
+      </div>
+      {day.groups.map((group) => (
+        <div
+          key={group.id}
+          className="flex items-center gap-2.5 border-b border-ink/15 py-2"
+        >
+          <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
+            {badge(group.muscle_group)}
           </div>
-          {day.groups.map((group) => (
-            <div
-              key={group.id}
-              className="flex items-center gap-2.5 border-b border-ink/15 py-2"
+          <div className="flex-1 text-sm font-bold">{group.muscle_group}</div>
+          <div className="flex items-center">
+            <button
+              type="button"
+              aria-label={`fewer ${group.muscle_group} exercises`}
+              className={stepBtn}
+              onClick={() =>
+                group.exercise_slots > 1 &&
+                onUpdateGroupSlots(group.id, group.exercise_slots - 1)
+              }
             >
-              <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
-                {badge(group.muscle_group)}
-              </div>
-              <div className="flex-1 text-sm font-bold">
-                {group.muscle_group}
-              </div>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  aria-label={`fewer ${group.muscle_group} exercises`}
-                  className={stepBtn}
-                  onClick={() =>
-                    group.exercise_slots > 1 &&
-                    commit(() =>
-                      updateGroupAction({
-                        group_id: group.id,
-                        meso_id: mesoId,
-                        exercise_slots: group.exercise_slots - 1,
-                      }),
-                    )
-                  }
-                >
-                  −
-                </button>
-                <div className="numeral flex h-9 w-[38px] items-center justify-center border-y-[1.5px] border-ink text-[15px] font-extrabold">
-                  {group.exercise_slots}
-                </div>
-                <button
-                  type="button"
-                  aria-label={`more ${group.muscle_group} exercises`}
-                  className={stepBtn}
-                  onClick={() =>
-                    group.exercise_slots < 10 &&
-                    commit(() =>
-                      updateGroupAction({
-                        group_id: group.id,
-                        meso_id: mesoId,
-                        exercise_slots: group.exercise_slots + 1,
-                      }),
-                    )
-                  }
-                >
-                  +
-                </button>
-              </div>
-              <button
-                type="button"
-                aria-label={`remove ${group.muscle_group}`}
-                onClick={() =>
-                  commit(() =>
-                    removeGroupAction({ group_id: group.id, meso_id: mesoId }),
-                  )
-                }
-                className="px-1 text-xs text-ink/40"
-              >
-                ✕
-              </button>
+              −
+            </button>
+            <div className="numeral flex h-9 w-[38px] items-center justify-center border-y-[1.5px] border-ink text-[15px] font-extrabold">
+              {group.exercise_slots}
             </div>
-          ))}
-
+            <button
+              type="button"
+              aria-label={`more ${group.muscle_group} exercises`}
+              className={stepBtn}
+              onClick={() =>
+                group.exercise_slots < 10 &&
+                onUpdateGroupSlots(group.id, group.exercise_slots + 1)
+              }
+            >
+              +
+            </button>
+          </div>
           <button
             type="button"
-            onClick={onAddGroups}
-            className="mt-3 w-full border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
+            aria-label={`remove ${group.muscle_group}`}
+            onClick={() => onRemoveGroup(group.id)}
+            className="px-1 text-xs text-ink/40"
           >
-            + ADD MUSCLE GROUP
+            ✕
           </button>
-          <p className="mt-3 text-[11px] leading-normal text-ink/60">
-            Slots are created for each group — you&apos;ll pick the exact
-            exercises on the board next.
-          </p>
-      </>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={onAddGroups}
+        className="mt-3 w-full border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
+      >
+        + ADD MUSCLE GROUP
+      </button>
+      <p className="mt-3 text-[11px] leading-normal text-ink/60">
+        Slots are created for each group — you&apos;ll pick the exact exercises
+        on the board next.
+      </p>
 
       <div className="mt-4 flex items-center justify-end gap-2.5">
         <button
@@ -713,16 +984,14 @@ function DaySetupSheet({
 
 function AddGroupsSheet({
   day,
-  mesoId,
   muscleGroups,
+  onAdd,
   onClose,
-  commit,
 }: {
-  day: PlannedDay;
-  mesoId: string;
+  day: ViewDay;
   muscleGroups: MuscleGroupRow[];
+  onAdd: (ids: string[]) => void;
   onClose: () => void;
-  commit: Commit;
 }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -746,13 +1015,7 @@ function AddGroupsSheet({
 
   const add = () => {
     if (selected.size === 0) return;
-    commit(() =>
-      addGroupsAction({
-        day_id: day.id,
-        meso_id: mesoId,
-        muscle_group_ids: [...selected],
-      }),
-    );
+    onAdd([...selected]);
     onClose();
   };
 
@@ -847,16 +1110,14 @@ function AddGroupsSheet({
 
 function ExercisePicker({
   target,
-  mesoId,
   exercises,
+  onSubmit,
   onClose,
-  commit,
 }: {
   target: PickerTarget | null;
-  mesoId: string;
   exercises: PickerExerciseLite[];
+  onSubmit: (exerciseIds: string[]) => void;
   onClose: () => void;
-  commit: Commit;
 }) {
   const [search, setSearch] = useState("");
   const [equip, setEquip] = useState<string | null>(null);
@@ -865,8 +1126,6 @@ function ExercisePicker({
 
   const groupId = target?.group.id ?? null;
 
-  // (re)seed the selection from the group's current fills each time the picker
-  // opens on a (new) group
   useEffect(() => {
     if (!target) return;
     setSelected(new Set(target.group.fills.map((f) => f.exercise_id)));
@@ -875,8 +1134,6 @@ function ExercisePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
-  // muscle-group-filtered candidates (before search/equip) — drives the
-  // equipment chips and the stable add order
   const groupCandidates = useMemo(() => {
     if (!target) return [];
     return exercises.filter((e) =>
@@ -915,17 +1172,10 @@ function ExercisePicker({
   };
 
   const save = () => {
-    // keep the muscle-group order stable regardless of search/equip filtering
     const orderedIds = groupCandidates
       .filter((e) => selected.has(e.id))
       .map((e) => e.id);
-    commit(() =>
-      setGroupExercisesAction({
-        meso_id: mesoId,
-        group_id: target.group.id,
-        exercise_ids: orderedIds,
-      }),
-    );
+    onSubmit(orderedIds);
     close();
   };
 

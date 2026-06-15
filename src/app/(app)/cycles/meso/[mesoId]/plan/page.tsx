@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMesoPlan } from "@/lib/queries/cycles";
+import { getMesoDeletionImpact, getMesoPlan } from "@/lib/queries/cycles";
 import {
   listMuscleGroups,
   listPickerExercises,
@@ -30,6 +30,9 @@ export default async function MesoPlanPage({
     ]);
   if (linkError) throw linkError;
   if (!plan) notFound();
+
+  // logged-history flag → drives the immutability warning on SAVE CHANGES
+  const { hasHistory } = await getMesoDeletionImpact(supabase, user.id, mesoId);
 
   const groupIdsByExercise = new Map<string, string[]>();
   for (const link of links ?? []) {
@@ -99,6 +102,7 @@ export default async function MesoPlanPage({
       <PlannerBoard
         plan={plan}
         macroContext={macroContext}
+        hasHistory={hasHistory}
         muscleGroups={muscleGroups}
         exercises={exercises.map((e) => ({
           id: e.id,
