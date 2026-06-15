@@ -221,6 +221,171 @@ export async function getMesoPlan(
   };
 }
 
+// ---------------------------------------------------------------------------
+// copy a mesocycle (fig 2.4 option 01) — carry the planner structure forward.
+// The loads are NOT copied: `startMeso` reseeds every slot from the user's
+// all-time best (v_exercise_prs), so a copy literally "starts from where you
+// left off" without dragging stale numbers along.
+// ---------------------------------------------------------------------------
+
+/** Mesos that can be copied: anything that's been planned (placeholders excluded). */
+export async function listCopyableMesos(
+  supabase: Client,
+  userId: string,
+): Promise<MesocycleRow[]> {
+  const { data, error } = await supabase
+    .from("mesocycles")
+    .select("*")
+    .eq("user_id", userId)
+    .neq("status", "unplanned")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+interface CopySourceFill {
+  slot_number: number | null;
+  exercise_id: string;
+  initial_sets: number;
+}
+interface CopySourceGroup {
+  muscle_group_id: string;
+  position: number;
+  exercise_slots: number;
+  fills: CopySourceFill[];
+}
+interface CopySourceDay {
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  groups: CopySourceGroup[];
+}
+
+export interface CopyFillPlan {
+  slot_number: number;
+  exercise_id: string;
+  initial_sets: number;
+}
+export interface CopyGroupPlan {
+  muscle_group_id: string;
+  position: number;
+  exercise_slots: number;
+  fills: CopyFillPlan[];
+}
+export interface CopyDayPlan {
+  day_number: number;
+  label: string | null;
+  weekday: number | null;
+  groups: CopyGroupPlan[];
+}
+
+/**
+ * Pure: map a source meso's planner structure into copy-insert rows, dropping
+ * excluded exercises. A dropped fill leaves its slot open (the group's slot
+ * count is preserved) so the picker can replace it. Slot numbers fall back to
+ * their position when the source left them unset.
+ */
+export function planMesoCopy(
+  days: CopySourceDay[],
+  excluded: Set<string>,
+): CopyDayPlan[] {
+  return days.map((day) => ({
+    day_number: day.day_number,
+    label: day.label,
+    weekday: day.weekday,
+    groups: day.groups.map((group) => ({
+      muscle_group_id: group.muscle_group_id,
+      position: group.position,
+      exercise_slots: Math.max(group.exercise_slots, group.fills.length),
+      fills: group.fills
+        .filter((f) => !excluded.has(f.exercise_id))
+        .map((f, i) => ({
+          slot_number: f.slot_number ?? i + 1,
+          exercise_id: f.exercise_id,
+          initial_sets: f.initial_sets,
+        })),
+    })),
+  }));
+}
+
+/**
+ * Clone a source meso's planner board (days → groups → slot fills) onto a
+ * freshly created target meso. Mirrors `applyTemplateToMeso`; honors the user's
+ * exclusion list. No-op if the source has no plan (or isn't visible via RLS).
+ */
+export async function copyMesoStructure(
+  supabase: Client,
+  userId: string,
+  sourceMesoId: string,
+  targetMesoId: string,
+): Promise<void> {
+  const source = await getMesoPlan(supabase, sourceMesoId);
+  if (!source || source.days.length === 0) return;
+
+  const { data: exclusions, error: exclError } = await supabase
+    .from("excluded_exercises")
+    .select("exercise_id")
+    .eq("user_id", userId);
+  if (exclError) throw exclError;
+  const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
+
+  const dayPlans = planMesoCopy(source.days, excluded);
+
+  for (const day of dayPlans) {
+    const { data: mesoDay, error: dayError } = await supabase
+      .from("meso_days")
+      .insert({
+        mesocycle_id: targetMesoId,
+        user_id: userId,
+        day_number: day.day_number,
+        label: day.label,
+        weekday: day.weekday,
+      })
+      .select()
+      .single();
+    if (dayError) throw dayError;
+
+    for (const group of day.groups) {
+      const { data: mesoGroup, error: groupError } = await supabase
+        .from("meso_day_groups")
+        .insert({
+          meso_day_id: mesoDay.id,
+          muscle_group_id: group.muscle_group_id,
+          position: group.position,
+          exercise_slots: group.exercise_slots,
+        })
+        .select()
+        .single();
+      if (groupError) throw groupError;
+
+      if (group.fills.length > 0) {
+        const { error: fillError } = await supabase
+          .from("meso_exercises")
+          .insert(
+            group.fills.map((f) => ({
+              mesocycle_id: targetMesoId,
+              day_of_week: null,
+              meso_day_group_id: mesoGroup.id,
+              slot_number: f.slot_number,
+              position: f.slot_number,
+              exercise_id: f.exercise_id,
+              initial_weight: null,
+              initial_reps: null,
+              initial_sets: f.initial_sets,
+            })),
+          );
+        if (fillError) throw fillError;
+      }
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("mesocycles")
+    .update({ days_per_week: Math.max(1, dayPlans.length) })
+    .eq("id", targetMesoId);
+  if (updateError) throw updateError;
+}
+
 export async function addMesoDay(
   supabase: Client,
   userId: string,

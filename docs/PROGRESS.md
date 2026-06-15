@@ -2,7 +2,52 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Library & stats reconciliation: Exercise page (3.1a/b) + two-axis filter + Volume tab removed (Design v2 backlog, DATA)
+## 2026-06-15 (latest) — Plan-a-meso: copy-a-mesocycle path (fig 2.4 option 01, Phase 2 / Design v2 backlog)
+
+Lands the **copy-a-mesocycle** path — the most-cited remaining Phase 2 gap (option 01 of the
+plan-a-meso flow, previously a dashed "soon" stub). No schema change: copy clones the planner
+structure and lets `startMeso` reseed loads from the user's all-time bests, so it literally
+"starts from where you left off." Vertical slice; `main` deployable.
+
+### Done
+
+- **`copyMesoStructure` + `planMesoCopy`** (`src/lib/queries/cycles.ts`) — `copyMesoStructure`
+  reads the source meso's plan (`getMesoPlan`) and clones its `meso_days → meso_day_groups →
+  meso_exercises` onto a freshly created target meso, mirroring `applyTemplateToMeso`. The pure
+  **`planMesoCopy`** helper maps source days→groups→fills into insert rows: it **honors the user's
+  exclusion list** (an excluded exercise's fill is dropped but its **slot stays open** — slot count
+  preserved so the picker can replace it), widens a group's slot count to fit if the source had more
+  fills than declared slots, and falls back slot numbers to position when unset. Loads are **not**
+  copied — `startMeso` reseeds every slot from `v_exercise_prs`.
+- **`listCopyableMesos`** — the user's planned/active/completed mesos (placeholders excluded),
+  newest first, for the source picker.
+- **Source picker** `/cycles/plan/copy` (house style, bordered rows like the template picker) —
+  `STATUS · PHASE`, name, `N WK` / `N D/WK` chips; tapping routes to the create form with `?copy=`.
+- **Create-meso form (fig 2.4) reused for copy** — `/cycles/plan/new?copy=<id>` loads the source,
+  subtitles `COPIED FROM — NAME`, and prefills name (`<source> II`), weeks, RIR ramp, and deload
+  from the source. The form gained `copyMesoId`/`defaultWeeks`/`defaultDeload`/`defaultRir*` props;
+  `createMesocycleAction` parses an optional `copy_meso_id` and runs `copyMesoStructure` after create
+  (template path unchanged). Plan-a-meso option 01 is now an enabled link.
+- Tests: **106 passing** (+4) — `planMesoCopy` (full clone with weekday/label/sets carry, excluded
+  exercise dropped + slot preserved, slot-count widening, empty plan).
+
+### Recorded deviations
+
+- **Copy picker UI not in the stock mockup** — built in the established house style (bordered rows),
+  same as the template picker and share/redeem rows (a prior recorded deviation). Square-corner
+  ledger styling preserved.
+- **RIR ramp / deload carry from the source** even though the create form doesn't expose RIR edits;
+  the copy intent is "do this meso again," so the source's ramp is the right default.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green (`/cycles/plan/copy`
+and the updated `/cycles/plan/new` both compile). No schema/RLS change — copy creates rows the user
+owns through existing policies; the source is read via RLS (a meso not visible to the user copies as a
+no-op). No hosted writes this slice; pure helper unit-tested, the DB walk mirrors the smoke-tested
+`applyTemplateToMeso` pattern. In-browser pixel QA of the picker still pending (as for other screens).
+
+## 2026-06-15 — Library & stats reconciliation: Exercise page (3.1a/b) + two-axis filter + Volume tab removed (Design v2 backlog, DATA)
 
 Lands the bulk of the **Library & stats (against Phase 5)** reconciliation block from 09 (2026-06-14
 session-3 §1/§2/§4): the net-new Exercise page (Overview/History tabs), the two-axis library filter,

@@ -6,31 +6,39 @@ import { createMesocycleAction, type FormState } from "../../actions";
 
 const initialState: FormState = { error: null };
 
-const RIR_START = 3;
-const RIR_END = 0;
-
-/** Create a standalone mesocycle (fig 2.4 from-scratch / template path). */
+/** Create a standalone mesocycle (fig 2.4 from-scratch / template / copy path). */
 export function NewMesoForm({
   templateId = null,
+  copyMesoId = null,
   defaultName = "",
+  defaultWeeks = 5,
+  defaultDeload = true,
+  defaultRirStart = 3,
+  defaultRirEnd = 0,
 }: {
   templateId?: string | null;
+  copyMesoId?: string | null;
   defaultName?: string;
+  defaultWeeks?: number;
+  defaultDeload?: boolean;
+  defaultRirStart?: number;
+  defaultRirEnd?: number;
 }) {
   const [state, formAction, pending] = useActionState(
     createMesocycleAction,
     initialState,
   );
   const router = useRouter();
-  const [weeks, setWeeks] = useState(5);
+  const [weeks, setWeeks] = useState(defaultWeeks);
 
   return (
     <form action={formAction}>
       <input type="hidden" name="weeks" value={weeks} />
-      <input type="hidden" name="includes_deload" value="true" />
-      <input type="hidden" name="rir_start" value={RIR_START} />
-      <input type="hidden" name="rir_end" value={RIR_END} />
+      <input type="hidden" name="includes_deload" value={String(defaultDeload)} />
+      <input type="hidden" name="rir_start" value={defaultRirStart} />
+      <input type="hidden" name="rir_end" value={defaultRirEnd} />
       {templateId && <input type="hidden" name="template_id" value={templateId} />}
+      {copyMesoId && <input type="hidden" name="copy_meso_id" value={copyMesoId} />}
 
       <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
         NAME
@@ -64,7 +72,8 @@ export function NewMesoForm({
         ))}
       </div>
       <div className="mt-[7px] text-[10px] font-medium tracking-[0.08em] text-ink/50">
-        RIR RAMP: {RIR_START} → {RIR_END} · W{weeks} DELOAD AT 4 RIR
+        RIR RAMP: {defaultRirStart} → {defaultRirEnd}
+        {defaultDeload ? ` · W${weeks} DELOAD AT 4 RIR` : ""}
       </div>
 
       {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}

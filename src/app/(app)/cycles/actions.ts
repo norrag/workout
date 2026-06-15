@@ -8,6 +8,7 @@ import {
   addDayGroup,
   addMesoDay,
   clearSlot,
+  copyMesoStructure,
   createMesocycle,
   fillSlot,
   removeDayGroup,
@@ -101,6 +102,7 @@ const mesoSchema = z.object({
   rir_start: z.coerce.number().int().min(0).max(5),
   rir_end: z.coerce.number().int().min(0).max(5),
   template_id: z.string().uuid().nullable(),
+  copy_meso_id: z.string().uuid().nullable(),
 });
 
 export async function createMesocycleAction(
@@ -114,6 +116,7 @@ export async function createMesocycleAction(
     rir_start: formData.get("rir_start"),
     rir_end: formData.get("rir_end"),
     template_id: formData.get("template_id") || null,
+    copy_meso_id: formData.get("copy_meso_id") || null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -123,9 +126,12 @@ export async function createMesocycleAction(
   }
 
   const { supabase, user } = await requireUser();
-  const meso = await createMesocycle(supabase, user.id, parsed.data);
-  if (parsed.data.template_id) {
-    await applyTemplateToMeso(supabase, user.id, meso.id, parsed.data.template_id);
+  const { copy_meso_id, ...mesoInput } = parsed.data;
+  const meso = await createMesocycle(supabase, user.id, mesoInput);
+  if (mesoInput.template_id) {
+    await applyTemplateToMeso(supabase, user.id, meso.id, mesoInput.template_id);
+  } else if (copy_meso_id) {
+    await copyMesoStructure(supabase, user.id, copy_meso_id, meso.id);
   }
   revalidatePath("/cycles");
   redirect(`/cycles/meso/${meso.id}/plan`);

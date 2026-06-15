@@ -14,7 +14,7 @@ export default async function PlanMesoPage({
       n: "01",
       title: "Copy a mesocycle",
       detail: "Carry progressive overload forward — start from where you left off.",
-      href: null,
+      href: `/cycles/plan/copy${slotQuery}`,
     },
     {
       n: "02",
