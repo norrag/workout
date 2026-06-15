@@ -2,7 +2,35 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Draft model: create-mesocycle is the final stage; one draft at a time (Phase 2 on-device feedback, DATA)
+## 2026-06-15 (latest) — Cycles/meso navigation fixes + day-1 planner data repair (on-device feedback)
+
+Three on-device follow-ups on the Cycles/meso surface. The meso detail page is **kept** (the 09
+"nix the meso page" decision is reversed per the user).
+
+### Done
+
+- **All meso rows open the meso detail page** (was: `planned` mesos jumped straight to the planner
+  board, so only the active meso reached the page with its delete/stats/start controls). Cycles list
+  (`MacroMesoRow`/`StandaloneRow`) and the Macrocycle Overview meso rows now link to
+  `/cycles/meso/<id>` regardless of status; `EDIT PLAN` on that page still opens the planner.
+- **Completed days are clickable in the ramp matrix** → open the workout in the log view
+  (read-only). The `✓` cell on the meso detail calendar is now a `Link` to `/log/<workoutId>`.
+- **Day-1 "empty planner" repaired (data).** Diagnosis: on the user's active PPL meso, day 1's
+  `meso_day_groups` (and their cascaded `meso_exercises`) had been **deleted** — almost certainly via
+  the old ✕-with-stale-UI bug (the remove worked but the sheet didn't refresh, so it got clicked).
+  The logged workout was intact (5 exercises, 15 sets). Reconstructed day 1's groups + slot fills
+  from the surviving week-1 day-1 `workout_exercises` (chest ×2 · shoulders ×2 · triceps ×1);
+  day 1 now matches the other days (3 groups / 5 fills). The **root cause is already fixed** in this
+  PR's stale-sheet work, so it shouldn't recur. Idempotent repair (guarded on day 1 having 0 groups);
+  no schema change.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (106/106), `npm run build` green. Data repair run
+against hosted and re-queried (all 6 days now 3–4 groups / 5 fills). Read-only diagnosis of the
+account before the targeted, reversible insert.
+
+## 2026-06-15 — Draft model: create-mesocycle is the final stage; one draft at a time (Phase 2 on-device feedback, DATA)
 
 Reorders meso creation per on-device feedback: you now build the plan **first** (on the planner
 board, as a draft) and **name + size it last**. One draft at a time, no draft management.

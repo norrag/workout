@@ -187,9 +187,11 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       `/cycles/plan/copy` → create form prefilled (`COPIED FROM —`, source weeks/RIR/deload) →
       `copyMesoStructure` clones days/groups/slot fills onto the new meso, honoring exclusions;
       loads reseed from `v_exercise_prs` at start. Pure `planMesoCopy` helper + 4 unit tests.)*
-- [ ] **Planner board (2.5)** becomes the **single meso view/edit surface** (old 2.2 meso-detail
-      removed): `PLAN | STATS` toggle, partial-completion **lock** (edits apply to `pending` weeks
-      only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
+- [~] **Planner board (2.5)** edit surface: partial-completion **lock** (edits apply to `pending`
+      weeks only), `SAVE CHANGES`, rebranded macro context strip. `DATA` week→day completion exposure.
+      **The meso detail page (2.2) is KEPT** — user reversed the 09 "nix the meso page" decision
+      (2026-06-15); the planner is reached via `EDIT PLAN`, not as the sole surface. The
+      `PLAN | STATS` toggle / `‹ PLAN` back-nav are therefore dropped.
 - [ ] **Create mesocycle (2.8)** rebrand: `MACROCYCLE PLACEMENT` with `M1…Mn` positions + phase.
 - [x] **Draft model (on-device feedback, 2026-06-15):** `create mesocycle` (name/weeks) moved to
       the **final** stage — scratch/template/copy drop straight onto the planner as a **draft**;

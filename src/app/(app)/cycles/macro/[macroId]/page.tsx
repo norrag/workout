@@ -249,7 +249,7 @@ export default async function MacroOverviewPage({
             return (
               <Link
                 key={meso.id}
-                href={`/cycles/meso/${meso.id}${meso.status === "planned" ? "/plan" : ""}`}
+                href={`/cycles/meso/${meso.id}`}
                 className="flex items-center gap-[11px]"
               >
                 {inner}

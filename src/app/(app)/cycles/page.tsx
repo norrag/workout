@@ -85,7 +85,7 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
   }
   return (
     <Link
-      href={`/cycles/meso/${meso.id}${meso.status === "planned" ? "/plan" : ""}`}
+      href={`/cycles/meso/${meso.id}`}
       className="block border-b border-ink/[0.18] py-[11px] last:border-b-0"
     >
       <div className="flex items-center justify-between">
@@ -103,7 +103,7 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
 function StandaloneRow({ meso }: { meso: MesocycleRow }) {
   return (
     <Link
-      href={`/cycles/meso/${meso.id}${meso.status === "planned" ? "/plan" : ""}`}
+      href={`/cycles/meso/${meso.id}`}
       className="flex items-center justify-between border-b border-ink/[0.15] py-[11px] last:border-b-0"
     >
       <div>

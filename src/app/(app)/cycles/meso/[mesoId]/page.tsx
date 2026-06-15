@@ -179,12 +179,13 @@ export default async function MesoDetailPage({
                   isCurrent && workout && nextWorkout?.id === workout.id;
                 if (done)
                   return (
-                    <div
+                    <Link
                       key={day?.id ?? di}
+                      href={`/log/${workout!.id}`}
                       className="flex h-[38px] items-center justify-center bg-ink text-xs text-bg-base"
                     >
                       ✓
-                    </div>
+                    </Link>
                   );
                 if (isNextCell)
                   return (
