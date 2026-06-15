@@ -224,12 +224,15 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable
       + `duration_seconds`; set-row + history render per type. **New exercise (3.1c)** TRACK PER SET.
-- [ ] **Exercises tab (3.1)** two-axis filter (MUSCLE + EQUIP, AND, count, CLEAR ALL); index
-      `exercises(equipment_type)`.
-- [ ] **Exercise page (3.1a/3.1b)** net-new: Overview (`v_exercise_overview` aggregates) + History
-      tabs; replaces the simple exercise-detail page.
-- [ ] **Meso stats**: drop the **Volume** tab; two tabs **Balance (4.1) · Performance (4.2)**,
-      default Balance; reached via the planner `STATS` toggle (back-nav `‹ PLAN`).
+      *(Deferred — touches the logging core; separate slice.)*
+- [x] **Exercises tab (3.1)** two-axis filter (MUSCLE + EQUIP, AND, count, CLEAR ALL); index
+      `exercises(equipment_type)`. *(2026-06-15: migration `20260615000004`.)*
+- [x] **Exercise page (3.1a/3.1b)** net-new: Overview (`v_exercise_overview` aggregates) + History
+      tabs; replaces the simple exercise-detail page. *(2026-06-15: `v_exercise_overview` +
+      `getExerciseOverview`; across-macro e1RM bars computed in the query layer like meso stats.)*
+- [x] **Meso stats**: drop the **Volume** tab; two tabs **Balance (4.1) · Performance (4.2)**,
+      default Balance. *(2026-06-15. Reaching it via the planner `STATS` toggle / `‹ PLAN` back-nav
+      waits on the 2.5 single-surface planner; entry stays the meso-detail `MESO STATS` row for now.)*
 
 ### Consistency
 - [ ] Profile bodyweight reconciled to **198 LB** across Overview / More (4.4) / Profile (4.5).

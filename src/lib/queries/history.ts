@@ -4,12 +4,39 @@ import type { Database } from "@/lib/types/database";
 type Client = SupabaseClient<Database>;
 
 export interface HistoryEntry {
+  mesocycle_id: string;
   meso_name: string;
   coordinate: string;
   performed_on: string;
   top_weight: number | null;
   reps: string;
   is_deload: boolean;
+}
+
+export interface HistoryMesoGroup {
+  mesocycle_id: string;
+  meso_name: string;
+  entries: HistoryEntry[];
+}
+
+/**
+ * Group session entries by mesocycle for the Exercise page History tab (3.1b),
+ * preserving the newest-first order. Sessions within a meso are time-contiguous,
+ * so consecutive grouping keeps each meso's block together.
+ */
+export function groupHistoryByMeso(entries: HistoryEntry[]): HistoryMesoGroup[] {
+  const groups: HistoryMesoGroup[] = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.mesocycle_id === e.mesocycle_id) last.entries.push(e);
+    else
+      groups.push({
+        mesocycle_id: e.mesocycle_id,
+        meso_name: e.meso_name,
+        entries: [e],
+      });
+  }
+  return groups;
 }
 
 /**
@@ -72,6 +99,7 @@ export async function getExerciseHistory(
     const micro = microById.get(group[0].microcycle_id);
     const workout = workoutById.get(workoutId);
     return {
+      mesocycle_id: group[0].mesocycle_id,
       meso_name: mesoById.get(group[0].mesocycle_id)?.name ?? "",
       coordinate: `W${micro?.week_number ?? "?"}·D${workout?.day_number ?? "?"}`,
       performed_on: group[0].performed_at.slice(0, 10),

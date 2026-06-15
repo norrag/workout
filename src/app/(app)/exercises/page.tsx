@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import {
-  listExercises,
-  listMuscleGroups,
-} from "@/lib/queries/exercises";
+import { listExercises, listMuscleGroups } from "@/lib/queries/exercises";
+import type { EquipmentType } from "@/lib/types/database";
 
 function shortDate(iso: string): string {
   const d = new Date(iso);
@@ -13,11 +11,11 @@ function shortDate(iso: string): string {
   return `${mm}/${dd}/${String(d.getFullYear()).slice(2)}`;
 }
 
-/** Exercise library (fig 3.1): search, muscle-group filter, last-logged. */
+/** Exercise library (fig 3.1): search + two-axis filter (MUSCLE × EQUIP, AND). */
 export default async function ExercisesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; mg?: string }>;
+  searchParams: Promise<{ q?: string; mg?: string; eq?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -25,7 +23,7 @@ export default async function ExercisesPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { q, mg } = await searchParams;
+  const { q, mg, eq } = await searchParams;
   const [exercises, muscleGroups, { data: prs, error: prError }] =
     await Promise.all([
       listExercises(supabase, { search: q }),
@@ -33,13 +31,39 @@ export default async function ExercisesPage({
       supabase.from("v_exercise_prs").select("*").eq("user_id", user.id),
     ]);
   if (prError) throw prError;
+
   const lastById = new Map(
     (prs ?? []).map((p) => [p.exercise_id, p.last_performed_at]),
   );
   const activeGroup = muscleGroups.find((g) => g.id === mg) ?? null;
-  const visible = activeGroup
-    ? exercises.filter((e) => e.muscles.some((m) => m.id === activeGroup.id))
-    : exercises;
+  const activeEquip = (eq ?? null) as EquipmentType | null;
+
+  // equipment axis: the distinct equipment types present in the (searched) library
+  const equipTypes = [...new Set(exercises.map((e) => e.equipment_type))].sort();
+
+  const visible = exercises.filter(
+    (e) =>
+      (!activeGroup || e.muscles.some((m) => m.id === activeGroup.id)) &&
+      (!activeEquip || e.equipment_type === activeEquip),
+  );
+  const filtering = !!activeGroup || !!activeEquip;
+
+  // build an href preserving the other query params
+  const href = (next: { mg?: string | null; eq?: string | null }) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    const m = next.mg === undefined ? mg : next.mg;
+    const e = next.eq === undefined ? eq : next.eq;
+    if (m) sp.set("mg", m);
+    if (e) sp.set("eq", e);
+    const s = sp.toString();
+    return `/exercises${s ? `?${s}` : ""}`;
+  };
+
+  const chipBase =
+    "px-2.5 py-1.5 text-[10.5px] tracking-[0.08em] whitespace-nowrap";
+  const chipOn = `bg-ink text-bg-base font-bold flex items-center gap-2 ${chipBase}`;
+  const chipOff = `border-[1.5px] border-ink/40 text-ink/55 font-medium ${chipBase}`;
 
   return (
     <div>
@@ -54,7 +78,8 @@ export default async function ExercisesPage({
       </div>
 
       <form method="get">
-        {activeGroup && <input type="hidden" name="mg" value={activeGroup.id} />}
+        {mg && <input type="hidden" name="mg" value={mg} />}
+        {eq && <input type="hidden" name="eq" value={eq} />}
         <input
           type="search"
           name="q"
@@ -64,29 +89,65 @@ export default async function ExercisesPage({
         />
       </form>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
-          FILTERS
+      {/* MUSCLE axis */}
+      <div className="mt-2.5 flex items-center gap-2">
+        <span className="w-[52px] flex-shrink-0 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+          MUSCLE
         </span>
-        {activeGroup ? (
-          <Link
-            href={`/exercises${q ? `?q=${encodeURIComponent(q)}` : ""}`}
-            className="flex items-center gap-2 bg-ink px-2.5 py-1.5 text-[10.5px] font-semibold tracking-[0.08em] text-bg-base"
-          >
-            {activeGroup.name.toUpperCase()} <span className="opacity-60">✕</span>
-          </Link>
-        ) : (
-          muscleGroups.map((g) => (
-            <Link
-              key={g.id}
-              href={`/exercises?mg=${g.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-              className="border border-ink/35 px-2.5 py-1.5 text-[10.5px] font-medium tracking-[0.08em] text-ink/55"
-            >
-              {g.name.toUpperCase()}
-            </Link>
-          ))
-        )}
+        <div className="flex gap-1.5 overflow-x-auto">
+          {muscleGroups.map((g) =>
+            activeGroup?.id === g.id ? (
+              <Link key={g.id} href={href({ mg: null })} className={chipOn}>
+                {g.name.toUpperCase()} <span className="opacity-60">✕</span>
+              </Link>
+            ) : (
+              <Link key={g.id} href={href({ mg: g.id })} className={chipOff}>
+                {g.name.toUpperCase()}
+              </Link>
+            ),
+          )}
+        </div>
       </div>
+
+      {/* EQUIP axis */}
+      <div className="mt-2 flex items-center gap-2">
+        <span className="w-[52px] flex-shrink-0 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+          EQUIP
+        </span>
+        <div className="flex gap-1.5 overflow-x-auto">
+          <Link
+            href={href({ eq: null })}
+            className={activeEquip ? chipOff : chipOn}
+          >
+            ALL
+          </Link>
+          {equipTypes.map((type) =>
+            activeEquip === type ? (
+              <Link key={type} href={href({ eq: null })} className={chipOn}>
+                {type.toUpperCase()} <span className="opacity-60">✕</span>
+              </Link>
+            ) : (
+              <Link key={type} href={href({ eq: type })} className={chipOff}>
+                {type.toUpperCase()}
+              </Link>
+            ),
+          )}
+        </div>
+      </div>
+
+      {filtering && (
+        <div className="mt-2.5 flex items-baseline justify-between">
+          <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/45">
+            {visible.length} OF {exercises.length} EXERCISES
+          </div>
+          <Link
+            href={href({ mg: null, eq: null })}
+            className="border-b-[1.5px] border-ink text-[9.5px] font-bold tracking-[0.1em] text-ink"
+          >
+            CLEAR ALL
+          </Link>
+        </div>
+      )}
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         {visible.length === 0 && (

@@ -6,13 +6,14 @@ import { getMesoStats } from "@/lib/queries/stats";
 import {
   BalanceView,
   PerformanceView,
-  VolumeView,
 } from "@/components/stats/MesoStatsViews";
 
-const VIEWS = ["volume", "balance", "performance"] as const;
+// 09 2026-06-14 §4: the Volume tab was removed; meso stats are Balance (4.1) ·
+// Performance (4.2) and default to Balance.
+const VIEWS = ["balance", "performance"] as const;
 type View = (typeof VIEWS)[number];
 
-/** Meso stats (figs 4.1–4.3): one screen, three views via the segmented control. */
+/** Meso stats (figs 4.1–4.2): two views (Balance · Performance) via the segmented control. */
 export default async function MesoStatsPage({
   params,
   searchParams,
@@ -24,7 +25,7 @@ export default async function MesoStatsPage({
   const { view: viewParam } = await searchParams;
   const view: View = VIEWS.includes(viewParam as View)
     ? (viewParam as View)
-    : "volume";
+    : "balance";
 
   const supabase = await createClient();
   const {
@@ -85,7 +86,6 @@ export default async function MesoStatsPage({
         })}
       </div>
 
-      {view === "volume" && <VolumeView stats={stats} />}
       {view === "balance" && <BalanceView stats={stats} />}
       {view === "performance" && <PerformanceView stats={stats} unit={unit} />}
     </div>
