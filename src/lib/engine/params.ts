@@ -121,12 +121,49 @@ export const engineParamsSchema = z.object({
   macro_target: z
     .object({
       sex_factor_female: z.number().min(0).max(1),
-      career_cap_lb: z.object({
-        male: z.number().positive(),
-        female: z.number().positive(),
+      // hypertrophy rate decays continuously with training age (front-loaded,
+      // research-grounded): rate(T) = base × e^(−T/tau). Replaces the old
+      // discrete buckets + hard career-cap clamp, which flattened the per-macro
+      // target across durations for near-cap lifters (the "static" bug).
+      hypertrophy_base_pct_bw_month: z
+        .object({ low: z.number().positive(), high: z.number().positive() })
+        .default({ low: 1.0, high: 1.5 }),
+      hypertrophy_decay_tau_years: z.number().positive().default(5),
+      // proximity-to-potential model (v5, primary when body fat is known): the
+      // rate is driven by how far the lifter is below their genetic ceiling
+      // (FFMI), not calendar training age — gains stay fast for an undermuscled
+      // lifter regardless of how long ago they started. rate = floor + (base −
+      // floor)·(1 − developedFraction). Falls back to the decay model above when
+      // body fat / height are missing.
+      hypertrophy_floor_pct_bw_month: z
+        .object({ low: z.number().min(0), high: z.number().min(0) })
+        .default({ low: 0.04, high: 0.09 }),
+      // normalized FFMI (height-adjusted to 1.83 m) ceiling + untrained baseline
+      ffmi_ceiling: z
+        .object({ male: z.number().positive(), female: z.number().positive() })
+        .default({ male: 25, female: 21.5 }),
+      ffmi_untrained: z
+        .object({ male: z.number().positive(), female: z.number().positive() })
+        .default({ male: 18.5, female: 14.5 }),
+      // a single macro can't claim more than this fraction of remaining potential
+      proximity_macro_cap_frac: z.number().positive().max(1).default(0.6),
+      // cut leanness bands by body-fat % (preferred over the BMI proxy)
+      cut_bf_thresholds: z
+        .object({
+          male: z.object({ high: z.number(), lean: z.number() }),
+          female: z.object({ high: z.number(), lean: z.number() }),
+        })
+        .default({ male: { high: 20, lean: 12 }, female: { high: 30, lean: 22 } }),
+      // deprecated (kept for back-compat parsing of older rows; unused since v4)
+      career_cap_lb: z
+        .object({ male: z.number().positive(), female: z.number().positive() })
+        .default({ male: 40, female: 20 }),
+      career_tau_years: z.number().positive().default(3),
+      hypertrophy_pct_bw_month: experienceRanges.default({
+        beginner: [1.0, 1.5],
+        intermediate: [0.5, 1.0],
+        advanced: [0.25, 0.5],
       }),
-      career_tau_years: z.number().positive(),
-      hypertrophy_pct_bw_month: experienceRanges,
       strength_pct_month: experienceRanges,
       strength_cap_total_pct: z.object({
         beginner: z.number().positive(),
@@ -140,6 +177,10 @@ export const engineParamsSchema = z.object({
       }),
       cut_bmi_high: z.number().positive(),
       cut_bmi_lean: z.number().positive(),
+      // realistic cap on total loss in one macro (fraction of bodyweight) — the
+      // weekly rate also compounds on the shrinking bodyweight so long cuts
+      // decelerate instead of extrapolating linearly to absurd totals.
+      cut_cap_pct_bw: z.number().positive().max(1).default(0.25),
       age_taper: z.boolean(),
       age_taper_start: z.number().positive(),
       age_taper_per_year: z.number().min(0),
@@ -155,7 +196,14 @@ export const engineParamsSchema = z.object({
       present: z.enum(["conservative_end", "range"]),
     })
     .default({
-      sex_factor_female: 0.5,
+      sex_factor_female: 0.7,
+      hypertrophy_base_pct_bw_month: { low: 1.0, high: 1.5 },
+      hypertrophy_decay_tau_years: 5,
+      hypertrophy_floor_pct_bw_month: { low: 0.04, high: 0.09 },
+      ffmi_ceiling: { male: 25, female: 21.5 },
+      ffmi_untrained: { male: 18.5, female: 14.5 },
+      proximity_macro_cap_frac: 0.6,
+      cut_bf_thresholds: { male: { high: 20, lean: 12 }, female: { high: 30, lean: 22 } },
       career_cap_lb: { male: 40, female: 20 },
       career_tau_years: 3,
       hypertrophy_pct_bw_month: {
@@ -176,6 +224,7 @@ export const engineParamsSchema = z.object({
       },
       cut_bmi_high: 27,
       cut_bmi_lean: 22,
+      cut_cap_pct_bw: 0.25,
       age_taper: true,
       age_taper_start: 40,
       age_taper_per_year: 0.02,

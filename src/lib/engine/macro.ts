@@ -37,8 +37,10 @@ export const macroProfileSchema = z.object({
   bodyweightUnit: z.enum(["kg", "lb"]).default("lb"),
   heightCm: z.number().positive().nullable().default(null),
   experienceLevel: z.enum(experienceLevels).nullable().default(null),
-  /** years since `training_since`; proxy for proximity to genetic potential */
+  /** years since `training_since`; weak fallback proxy when body comp is unknown */
   trainingYears: z.number().min(0).nullable().default(null),
+  /** estimated body-fat %; with height+weight gives FFMI (proximity to potential) */
+  bodyFatPct: z.number().min(2).max(70).nullable().default(null),
 });
 
 export const macroPlanInputSchema = z.object({
@@ -120,6 +122,49 @@ function lbToUnit(lb: number, unit: WeightUnit): number {
   return unit === "lb" ? lb : lb / LB_PER_KG;
 }
 
+function kgToUnit(kg: number, unit: WeightUnit): number {
+  return unit === "lb" ? kg * LB_PER_KG : kg;
+}
+
+type Sex = "male" | "female";
+function sexKey(profile: MacroProfile): Sex {
+  return profile.sex === "female" ? "female" : "male";
+}
+
+/**
+ * Muscular development from body composition: normalized FFMI vs the genetic
+ * ceiling. `fraction` is 0 at the untrained baseline → 1 at the ceiling;
+ * `remainingLb` is the muscle left to the ceiling in the user's unit. Returns
+ * null when body fat or height is unknown (caller falls back to training age).
+ */
+function muscularDevelopment(
+  profile: MacroProfile,
+  mt: EngineParams["macro_target"],
+): { fraction: number; remainingLb: number } | null {
+  if (
+    profile.bodyFatPct == null ||
+    profile.heightCm == null ||
+    profile.bodyweight == null
+  ) {
+    return null;
+  }
+  const hM = profile.heightCm / 100;
+  if (hM <= 0) return null;
+  const bwKg = toKg(profile.bodyweight, profile.bodyweightUnit);
+  const ffmKg = bwKg * (1 - profile.bodyFatPct / 100);
+  const ffmi = ffmKg / (hM * hM);
+  // normalize to 1.83 m so the ceiling/baseline are height-independent
+  const ffmiNorm = ffmi + 6.1 * (1.83 - hM);
+  const sex = sexKey(profile);
+  const ceiling = mt.ffmi_ceiling[sex];
+  const untrained = mt.ffmi_untrained[sex];
+  const fraction = clamp((ffmiNorm - untrained) / (ceiling - untrained), 0, 1);
+  // remaining FFM to the ceiling, de-normalized back to the user's actual height
+  const ceilingActual = ceiling - 6.1 * (1.83 - hM);
+  const remainingKg = Math.max(0, ceilingActual * hM * hM - ffmKg);
+  return { fraction, remainingLb: kgToUnit(remainingKg, profile.bodyweightUnit) };
+}
+
 function bmiOf(profile: MacroProfile): number | null {
   if (profile.bodyweight == null || profile.heightCm == null) return null;
   const kg = toKg(profile.bodyweight, profile.bodyweightUnit);
@@ -152,6 +197,32 @@ export function spreadPhases(
     ...Array<PhaseName>(Math.max(0, intN)).fill(intensify),
     ...Array<PhaseName>(peakN).fill(peak),
   ];
+}
+
+/**
+ * Suggest the mesocycle length (weeks) that divides a macro duration most
+ * evenly — the block size whose whole-number count leaves the least leftover.
+ * Ties break toward the canonical 5-week block, then the shorter block.
+ * (fig 2.3 — the create engine pre-selects this; the user can still override.)
+ */
+export function suggestMesoLength(
+  durationMonths: number,
+  options: readonly number[] = [4, 5, 6],
+): number {
+  const weeks = durationMonths * WEEKS_PER_MONTH;
+  let best = options[0];
+  let bestScore = Infinity;
+  for (const len of options) {
+    const count = Math.max(1, Math.round(weeks / len));
+    const leftover = Math.abs(weeks - count * len);
+    // small tie-breakers: prefer closeness to a 5-week block, then shorter
+    const score = leftover + Math.abs(len - 5) * 0.05 + len * 0.001;
+    if (score < bestScore) {
+      bestScore = score;
+      best = len;
+    }
+  }
+  return best;
 }
 
 interface Computed {
@@ -249,8 +320,13 @@ function computeTarget(
     const band = leannessBand(profile, mt);
     const rate = mt.cut_pct_bw_week[band];
     const weeks = months * WEEKS_PER_MONTH;
-    const low = bw * (rate[0] / 100) * weeks;
-    const high = bw * (rate[1] / 100) * weeks;
+    // compound on the shrinking bodyweight so long cuts decelerate, then cap
+    // total loss at a realistic fraction of bodyweight (no fat floor in profile)
+    const lossFor = (pctWeek: number) =>
+      bw * (1 - Math.pow(1 - pctWeek / 100, weeks));
+    const cap = bw * mt.cut_cap_pct_bw;
+    const high = Math.min(lossFor(rate[1]), cap);
+    const low = Math.min(lossFor(rate[0]), high);
     return {
       target: { low: round1(low), high: round1(high), unit, direction: "loss" },
       perMonthRate: {
@@ -263,20 +339,20 @@ function computeTarget(
     };
   }
 
-  // hypertrophy
-  const rate = mt.hypertrophy_pct_bw_month[bucket];
+  // hypertrophy — rate is driven by proximity to genetic potential (FFMI) when
+  // body comp is known, else by training-age decay. The target scales with
+  // duration and is capped at a fraction of remaining potential so long blocks
+  // (and very undermuscled lifters) stay realistic.
+  const rate = hypertrophyRate(profile, bucket, mt);
   const sf = sexFactor(profile, mt);
   const am = ageMultiplier(profile.age, mt);
-  let low = bw * (rate[0] / 100) * months * sf * am;
-  let high = bw * (rate[1] / 100) * months * sf * am;
-
-  // career cap: remaining lean-mass potential decays with training age
-  const capLb = profile.sex === "female" ? mt.career_cap_lb.female : mt.career_cap_lb.male;
-  const years = profile.trainingYears ?? assumedYears(bucket);
-  const gainedFraction = 1 - Math.exp(-years / mt.career_tau_years);
-  const remaining = lbToUnit(capLb, unit) * (1 - gainedFraction);
-  high = Math.min(high, remaining);
-  low = Math.min(low, high);
+  let low = bw * (rate.low / 100) * months * sf * am;
+  let high = bw * (rate.high / 100) * months * sf * am;
+  if (rate.remainingLb != null) {
+    const cap = mt.proximity_macro_cap_frac * rate.remainingLb;
+    high = Math.min(high, cap);
+    low = Math.min(low, high);
+  }
 
   return {
     target: { low: round1(low), high: round1(high), unit, direction: "gain" },
@@ -290,10 +366,49 @@ function computeTarget(
   };
 }
 
+/**
+ * Hypertrophy %BW/month band. Primary: proximity to potential (FFMI) — rate =
+ * floor + (base − floor)·(1 − developedFraction), so an undermuscled lifter
+ * gains fast regardless of calendar training age (the "trained since 2013 but
+ * never grew" case). Fallback when body comp is unknown: training-age decay
+ * `base × e^(−T/tau)`. `remainingLb` is non-null only in the proximity path.
+ */
+function hypertrophyRate(
+  profile: MacroProfile,
+  bucket: ExperienceBucket,
+  mt: EngineParams["macro_target"],
+): { low: number; high: number; remainingLb: number | null } {
+  const dev = muscularDevelopment(profile, mt);
+  if (dev) {
+    const base = mt.hypertrophy_base_pct_bw_month;
+    const floor = mt.hypertrophy_floor_pct_bw_month;
+    const headroom = 1 - dev.fraction;
+    return {
+      low: floor.low + (base.low - floor.low) * headroom,
+      high: floor.high + (base.high - floor.high) * headroom,
+      remainingLb: dev.remainingLb,
+    };
+  }
+  const years = profile.trainingYears ?? assumedYears(bucket);
+  const decay = Math.exp(-years / mt.hypertrophy_decay_tau_years);
+  return {
+    low: mt.hypertrophy_base_pct_bw_month.low * decay,
+    high: mt.hypertrophy_base_pct_bw_month.high * decay,
+    remainingLb: null,
+  };
+}
+
 function leannessBand(
   profile: MacroProfile,
   mt: EngineParams["macro_target"],
 ): "high_bf" | "average" | "lean" {
+  // prefer measured body-fat % when known; else fall back to the BMI proxy
+  if (profile.bodyFatPct != null) {
+    const t = mt.cut_bf_thresholds[sexKey(profile)];
+    if (profile.bodyFatPct >= t.high) return "high_bf";
+    if (profile.bodyFatPct < t.lean) return "lean";
+    return "average";
+  }
   const bmi = bmiOf(profile);
   if (bmi == null) return "average";
   if (bmi >= mt.cut_bmi_high) return "high_bf";
@@ -333,10 +448,10 @@ function recommendDuration(
   }
 
   // hypertrophy: months to reach the recommended absolute gain at the mid rate
-  const rate = mt.hypertrophy_pct_bw_month[bucket];
+  const rate = hypertrophyRate(profile, bucket, mt);
   const sf = sexFactor(profile, mt);
   const am = ageMultiplier(profile.age, mt);
-  const monthlyMid = bw * ((rate[0] + rate[1]) / 2 / 100) * sf * am;
+  const monthlyMid = bw * ((rate.low + rate.high) / 2 / 100) * sf * am;
   if (monthlyMid <= 0) return clamp(6, lo, hi);
   const targetLb = profile.sex === "female" ? mt.recommend_target_lb.female : mt.recommend_target_lb.male;
   const target = lbToUnit(targetLb, unitOf(profile));

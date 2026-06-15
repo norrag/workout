@@ -2,77 +2,66 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Database,
   MacrocycleRow,
-  MacroSlotRow,
   MesocycleRow,
   MesoDayGroupRow,
   MesoDayRow,
   MesoExerciseRow,
   MicrocycleRow,
-  SlotGoalType,
   WorkoutRow,
 } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
 
 // ---------------------------------------------------------------------------
-// cycles overview (fig 2.1) — macros with goal-arc slots and their mesos,
-// plus standalone mesos
+// cycles overview (fig 2.1) — macrocycles with their ordered mesocycles
+// (some `unplanned` placeholders) plus standalone mesos. "Slots" are retired
+// (09 2026-06-13 §4); a macro's progression is its positioned mesocycles.
 // ---------------------------------------------------------------------------
 
-export interface MacroWithSlots extends MacrocycleRow {
-  slots: (MacroSlotRow & { mesocycle: MesocycleRow | null })[];
-  /** mesos attached to the macro but not placed in a goal slot */
-  unslotted: MesocycleRow[];
+export interface MacroWithMesos extends MacrocycleRow {
+  /** ordered by position (placeholders included) */
+  mesos: MesocycleRow[];
 }
 
 export interface CyclesOverview {
-  macros: MacroWithSlots[];
+  macros: MacroWithMesos[];
   standaloneMesos: MesocycleRow[];
+}
+
+/** Mesos ordered by macro position; placeholders last, then by creation. */
+function orderMesos(mesos: MesocycleRow[]): MesocycleRow[] {
+  return [...mesos].sort(
+    (a, b) =>
+      (a.position ?? 99) - (b.position ?? 99) ||
+      a.created_at.localeCompare(b.created_at),
+  );
 }
 
 export async function getCyclesOverview(
   supabase: Client,
   userId: string,
 ): Promise<CyclesOverview> {
-  const [
-    { data: macros, error: macroError },
-    { data: slots, error: slotError },
-    { data: mesos, error: mesoError },
-  ] = await Promise.all([
-    supabase
-      .from("macrocycles")
-      .select("*")
-      .eq("user_id", userId)
-      .order("start_date", { ascending: false }),
-    supabase
-      .from("macro_slots")
-      .select("*")
-      .eq("user_id", userId)
-      .order("slot_number"),
-    supabase
-      .from("mesocycles")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at"),
-  ]);
+  const [{ data: macros, error: macroError }, { data: mesos, error: mesoError }] =
+    await Promise.all([
+      supabase
+        .from("macrocycles")
+        .select("*")
+        .eq("user_id", userId)
+        .order("start_date", { ascending: false }),
+      supabase
+        .from("mesocycles")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at"),
+    ]);
   if (macroError) throw macroError;
-  if (slotError) throw slotError;
   if (mesoError) throw mesoError;
-
-  const mesoBySlot = new Map(
-    (mesos ?? [])
-      .filter((m) => m.macro_slot_id)
-      .map((m) => [m.macro_slot_id!, m]),
-  );
 
   return {
     macros: (macros ?? []).map((macro) => ({
       ...macro,
-      slots: (slots ?? [])
-        .filter((s) => s.macrocycle_id === macro.id)
-        .map((s) => ({ ...s, mesocycle: mesoBySlot.get(s.id) ?? null })),
-      unslotted: (mesos ?? []).filter(
-        (m) => m.macrocycle_id === macro.id && !m.macro_slot_id,
+      mesos: orderMesos(
+        (mesos ?? []).filter((m) => m.macrocycle_id === macro.id),
       ),
     })),
     standaloneMesos: (mesos ?? []).filter((m) => !m.macrocycle_id),
@@ -90,47 +79,10 @@ export async function listMacrocycles(
   return data ?? [];
 }
 
-export async function createMacrocycle(
-  supabase: Client,
-  userId: string,
-  input: Pick<MacrocycleRow, "name" | "goal_type" | "start_date"> &
-    Partial<Pick<MacrocycleRow, "goal_notes" | "target_end_date">> & {
-      slots?: { goal_type: SlotGoalType; label: string | null }[];
-    },
-): Promise<MacrocycleRow> {
-  const { data, error } = await supabase
-    .from("macrocycles")
-    .insert({
-      user_id: userId,
-      name: input.name,
-      goal_type: input.goal_type,
-      goal_notes: input.goal_notes ?? null,
-      target_metrics: {},
-      start_date: input.start_date,
-      target_end_date: input.target_end_date ?? null,
-      status: "active",
-    })
-    .select()
-    .single();
-  if (error) throw error;
-
-  if (input.slots && input.slots.length > 0) {
-    const { error: slotError } = await supabase.from("macro_slots").insert(
-      input.slots.map((slot, i) => ({
-        macrocycle_id: data.id,
-        user_id: userId,
-        slot_number: i + 1,
-        goal_type: slot.goal_type,
-        label: slot.label,
-      })),
-    );
-    if (slotError) throw slotError;
-  }
-  return data;
-}
-
 // ---------------------------------------------------------------------------
-// mesocycles — creation (fig 2.7) and the groups-first plan (figs 2.4–2.6)
+// mesocycles — standalone creation (fig 2.4 from-scratch/template path) and
+// the groups-first plan (figs 2.5/2.6). In-macro mesos are created by the
+// macrocycle engine (see queries/macro.ts) and planned via `+ PLAN`.
 // ---------------------------------------------------------------------------
 
 export async function createMesocycle(
@@ -142,27 +94,16 @@ export async function createMesocycle(
     includes_deload: boolean;
     rir_start: number;
     rir_end: number;
-    macro_slot_id: string | null;
     template_id?: string | null;
   },
 ): Promise<MesocycleRow> {
-  let macrocycleId: string | null = null;
-  if (input.macro_slot_id) {
-    const { data: slot, error: slotError } = await supabase
-      .from("macro_slots")
-      .select("macrocycle_id")
-      .eq("id", input.macro_slot_id)
-      .single();
-    if (slotError) throw slotError;
-    macrocycleId = slot.macrocycle_id;
-  }
-
   const { data, error } = await supabase
     .from("mesocycles")
     .insert({
       user_id: userId,
-      macrocycle_id: macrocycleId,
-      macro_slot_id: input.macro_slot_id,
+      macrocycle_id: null,
+      position: null,
+      phase: null,
       name: input.name,
       weeks: input.weeks,
       days_per_week: 1, // updated as days are added on the planner board

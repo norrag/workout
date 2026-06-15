@@ -162,7 +162,7 @@ export async function getWorkoutDetail(
   // macro context caption (fig 1.1)
   let contextLabel = "STANDALONE MESO";
   if (mesocycle.macrocycle_id) {
-    const [{ data: macro, error: macroError }, { data: slots, error: slotError }] =
+    const [{ data: macro, error: macroError }, { data: siblings, error: sibError }] =
       await Promise.all([
         supabase
           .from("macrocycles")
@@ -170,16 +170,16 @@ export async function getWorkoutDetail(
           .eq("id", mesocycle.macrocycle_id)
           .single(),
         supabase
-          .from("macro_slots")
-          .select("id, slot_number")
+          .from("mesocycles")
+          .select("id, position")
           .eq("macrocycle_id", mesocycle.macrocycle_id)
-          .order("slot_number"),
+          .order("position", { ascending: true, nullsFirst: false }),
       ]);
     if (macroError) throw macroError;
-    if (slotError) throw slotError;
-    const slot = (slots ?? []).find((s) => s.id === mesocycle.macro_slot_id);
-    contextLabel = slot
-      ? `MESO ${slot.slot_number} OF ${(slots ?? []).length} · ${macro.name.toUpperCase()}`
+    if (sibError) throw sibError;
+    const total = (siblings ?? []).length;
+    contextLabel = mesocycle.position
+      ? `MESO ${mesocycle.position} OF ${total} · ${macro.name.toUpperCase()}`
       : `MACRO ${macro.name.toUpperCase()}`;
   }
 

@@ -177,16 +177,38 @@ genetic-potential advanced lifter to a modest hypertrophy target over a longer b
 All rate models are **[HEURISTIC / model-based]** — present the **conservative end** and label as
 estimates. Scale by experience/training age (front-loaded, halving) and sex.
 
-**Hypertrophy — lean-mass gain (Aragon %BW/month, cross-checked vs Lyle's absolute cap):**
-| Experience (training yrs) | %BW / month (male) |
-|---|---|
-| Beginner (<1) | 1.0–1.5% |
-| Intermediate (1–4) | 0.5–1.0% |
-| Advanced (4+) | 0.25–0.5% |
-`targetLb = bodyweight × rate × months × sexFactor`; `sexFactor = 0.5` female (absolute), else 1.0;
-taper as cumulative career muscle approaches Lyle's cap (~40 lb male / ~20 lb female). Also taper by
-**age** (older → lower end). *(Aragon model; Lyle McDonald model; sex: Roberts 2020 / Refalo 2025 —
-absolute ~½ for women, relative equal.)*
+**Hypertrophy — lean-mass gain. Primary driver = proximity to genetic potential (FFMI), not calendar
+training age.** The rate of muscle gain is governed by **how far below your genetic ceiling you are**,
+not how long ago you started (Barbell Medicine, SBS, Casey Butt all frame "advanced" as a
+distance-from-potential state, not calendar time). We estimate that distance from body composition:
+- `FFM = bodyweight × (1 − bodyFat%)`; `FFMI = FFM / height_m²`; normalize to 1.83 m
+  (`FFMI_norm = FFMI + 6.1 × (1.83 − height_m)`).
+- `developedFraction = clamp((FFMI_norm − untrained) / (ceiling − untrained), 0, 1)` with
+  `ceiling = {male 25, female 21.5}`, `untrained = {male 18.5, female 14.5}` normalized FFMI.
+- `rate%BW/mo = floor + (base − floor) × (1 − developedFraction)`, `base {1.0, 1.5}`,
+  `floor {0.04, 0.09}` (`hypertrophy_base_pct_bw_month`, `hypertrophy_floor_pct_bw_month`).
+- `targetLb = bodyweight × rate × months × sexFactor × ageMultiplier`, **capped at
+  `proximity_macro_cap_frac` (0.6) × remaining-potential lb** so one block can't claim everything.
+
+This fixes the headline failure case: a lifter who "trained since 2013" but is undermuscled (e.g.
+6′1″ 159 lb ~16% bf → FFMI ≈ 17, *below* the untrained baseline) is correctly modeled as having
+beginner-class headroom (~+19–29 lb/yr), **not** elite ~2 lb/yr. A genuinely jacked FFMI-25 lifter of
+the same calendar age correctly gets ~0. `sexFactor = 0.7` female (relative gains are equal between
+sexes — Roberts 2020 / Refalo 2025; the residual reflects women's lower lean-mass fraction, **not** a
+halved response, so the old 0.5 was too low), `1.0` male. Also tapered by **age** (older → lower).
+
+**Fallback (no body fat):** when `bodyFat%`/height are unknown we use the **training-age decay**
+`rate(T)% = base × e^(−T/tau)`, `tau = 5` yr — monotonic in duration, tapering toward potential with
+training age. *(Aragon %BW/month bands; Lyle McDonald front-loaded model; Casey Butt / Kouri FFMI
+ceiling ~25; sex: Roberts 2020 / Refalo 2025.)*
+
+> **Evolution.** v3 used experience buckets × duration with a hard **career-cap clamp**, which pinned
+> near-potential lifters to an *identical target for every duration* (the "static" bug). v4 replaced
+> it with continuous training-age decay. **v5** makes **FFMI proximity the primary driver** (training
+> age was a poor proxy — it overstates adaptation for someone who trained for years without growing)
+> and corrects the sex factor 0.5 → 0.7. `career_cap_lb` / `career_tau_years` remain in params for
+> back-compat only. **Individual variation dwarfs these means** (Hubal 2005: −2% to +59% size on one
+> program) — always a labeled estimate band, never a promise.
 
 **Strength — % on key lifts:** monthly compounding, decelerating by training status: beginner
 ~4–8%/mo (neural/linear phase), intermediate ~1.5–3%/mo, advanced ~0.5–1.5%/mo; cap long horizons
@@ -199,10 +221,12 @@ absolute ~½ for women, relative equal.)*
 | Higher body fat | 1.0–1.5%+ |
 | Average | 0.5–1.0% |
 | Lean | 0.25–0.5% |
-`fatLossLb = bodyweight × weeklyRate × (months × 4.33)`. **[EVIDENCED — best of the three]**
-*(Helms/Aragon/Fitschen 2014: 0.5–1%/wk; Garthe 2011: 0.7%/wk preserved & built lean mass, 1.4%
-did not; Lyle ~31 kcal/lb-fat ceiling → leaner = slower.)* Heavier/over-fat users can be guided
-faster and safely; lean users slower.
+`fatLossLb = bodyweight × (1 − (1 − weeklyRate)^weeks)` — the weekly rate **compounds on the shrinking
+bodyweight** so long cuts decelerate instead of extrapolating linearly to absurd totals, then the
+total is **capped at `cut_cap_pct_bw` (25% of bodyweight)** since the profile carries no body-fat
+floor. **[EVIDENCED — best of the three]** *(Helms/Aragon/Fitschen 2014: 0.5–1%/wk; Garthe 2011:
+0.7%/wk preserved & built lean mass, 1.4% did not; Lyle ~31 kcal/lb-fat ceiling → leaner = slower.)*
+Heavier/over-fat users can be guided faster and safely; lean users slower.
 
 **Maintain:** target ≈ 0 (recomposition framing); no weight target.
 

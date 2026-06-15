@@ -2,7 +2,175 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-14 (latest) — Macrocycle planning engine + e1RM metric (Design v2 backlog, ENGINE)
+## 2026-06-15 (latest) — FFMI proximity target model + body-fat input (research-driven, ENGINE/DATA)
+
+Multi-source literature review (deep-research harness, 7 agents) on real muscle/strength/fat-loss
+rates exposed the core flaw: the engine keyed hypertrophy off **calendar training age**, which
+overstates adaptation for someone who trained for years without growing. Per the research the right
+state variable is **proximity to genetic potential**, observable from body composition (FFMI).
+
+### Done
+
+- **FFMI proximity model (primary driver)** in `src/lib/engine/macro.ts`: `rate = floor + (base −
+  floor)·(1 − developedFraction)`, where `developedFraction` comes from normalized FFMI vs ceiling
+  (`{male 25, female 21.5}`) / untrained baseline (`{18.5, 14.5}`); target capped at 0.6 × remaining
+  potential. **Falls back to the v4 training-age decay** when body fat is unknown (existing users
+  unaffected). Cut leanness band now uses **body-fat %** when present (BMI proxy fallback). Sex factor
+  **0.5 → 0.7** (research: relative gains equal between sexes; 0.5 over-penalized).
+- **`body_fat_pct`** added to `profiles` (migration `20260615000001`, **applied to hosted**;
+  nullable, 2–70 check) with a **skippable visual band picker** in the Profile editor (6 bands → stored
+  midpoint; `clearBodyFatAction`). Onboarding stays 4 steps; absent BF → graceful training-age fallback.
+- **`engine_params` v5** (same migration, applied to hosted + re-parsed through the schema): new
+  `hypertrophy_floor_pct_bw_month`, `ffmi_ceiling`, `ffmi_untrained`, `proximity_macro_cap_frac`,
+  `cut_bf_thresholds`; v4 deactivated. New fields carry `.default()` so older rows still parse.
+- **Validated the headline case:** 6′1″ 159 lb ~16% bf "trained since 2013" (FFMI ≈ 17, below
+  untrained) now reads **+19–29 lb/12mo** (beginner-class) instead of elite ~2 lb/yr; a jacked FFMI-25
+  veteran of the same age correctly reads ~0; leaner-at-equal-weight ⇒ slower (reads muscle, not scale).
+- Tests: **95 passing** (+4) — proximity goldens (undermuscled-long-timer, near-ceiling, leanness
+  gradient, BF-based cut band); sex-factor test corrected to 0.7. RLS active-version assertion → 5.
+- Docs: 10-spec §5 rewritten (proximity primary, training-age fallback, v3→v4→v5 evolution + the Hubal
+  individual-variation caveat). `scripts/macro-engine-matrix.ts` retained as the dev review harness.
+
+### Notes / honesty
+
+- The target is explicitly **not the heart of the app** (periodization for results is) — implemented
+  proportionately, behind tunable `engine_params`, and always shown as an estimate band.
+- FFMI ceiling (25/21.5 normalized) and the band-midpoint body-fat estimate carry real individual
+  variation; the model is a planning prior, not a prediction.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. v5 migration applied
+to hosted; the exact migration JSON re-parsed through `engineParamsSchema`; user case confirmed
+duration-sensitive and beginner-class. RLS suite needs a running stack (unchanged); assertion bumped.
+
+## 2026-06-14 (latest) — Macro-target engine fix: continuous training-age decay + capped cut + auto block-length (ENGINE)
+
+Fixes the realistic-target outputs flagged on-device: for a high-training-age profile the target was
+**static across durations** (3-month and 12-month macros both showed ≈+0.6 lb) and implausibly low.
+Root cause: the hypertrophy model clamped the per-macro total to a hard **career-cap** (remaining
+lifetime potential), which collapses to a fixed tiny number for near-potential lifters regardless of
+duration. Reviewed via a matrix harness across 7 profiles × 4 goals × 3 durations and retuned.
+
+### Done
+
+- **Hypertrophy → continuous training-age decay** (`rate(T) = base × e^(−T/tau)`, `base {1.0,1.5}%BW`,
+  `tau 5 yr`). The target now scales with duration **and** tapers smoothly with training age; the hard
+  career-cap clamp is gone (`career_cap_lb`/`career_tau_years` kept in params only for back-compat).
+  Reproduces the Aragon bands at their anchor ages; a 13-yr lifter now reads **+0.4–0.7 / +0.9–1.3 /
+  +1.8–2.6 lb** for 3/6/12 mo (was a flat +0.6 lb) — ~2–3 lb lean mass/yr, research-appropriate.
+- **Cut → compounding + cap.** Was linearly extrapolating %BW/week (−93 lb over 12 mo). Now compounds
+  on the shrinking bodyweight (decelerates) and is capped at `cut_cap_pct_bw` (25% BW). Strength and
+  maintain unchanged.
+- **`suggestMesoLength(months)`** (pure) — picks the block length (4/5/6 wk) that divides the macro
+  most evenly (12 mo → 4 wk = 52/4 exact; 6 mo → 5 wk). The Create-Macrocycle form **auto-selects** it
+  and re-suggests as duration changes, until the user overrides (then their pick sticks); a `SUGGESTED`
+  hint shows until then.
+- **`engine_params` v4** (migration `20260614000003`, **applied to hosted** + re-read/parsed): new
+  `hypertrophy_base_pct_bw_month`, `hypertrophy_decay_tau_years`, `cut_cap_pct_bw`; v3 deactivated.
+  Schema fields added with `.default()` so older rows still parse; seed + `DEFAULT_ENGINE_PARAMS`
+  mirror it; RLS active-version assertion bumped to 4.
+- Tests: **91 passing** (+5) — reworked macro goldens to the new model; a **monotonic-in-duration**
+  property across training ages 1/4/7/13 (would have caught the static bug), a 13-yr decay-but-positive
+  case, a cut-cap bound, and `suggestMesoLength` correctness. `scripts/macro-engine-matrix.ts` is the
+  (dev-only) review harness. Docs: 10-spec §5 rewritten (model + superseded note); cut formula updated.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (91/91), `npm run build` green. v4 migration applied
+to hosted; the exact migration JSON re-parsed through `engineParamsSchema` and the 13-yr case confirmed
+duration-sensitive. Corrected output matrix reviewed across beginner→elite, both sexes, older lifter.
+
+## 2026-06-14 — Macrocycle restructure: goal layer + Create engine + Overview + Cycles retrofit (Design v2 backlog, DATA)
+
+Lands the largest reconciliation block: the **macrocycle becomes the single-goal layer** (09
+2026-06-13 §3–5 / 2026-06-14). `macro_slots` retired; the create-macrocycle engine (2.3),
+Macrocycle Overview (2.2), `+ NEW` chooser (2.1b), and the Cycles list retrofit (2.1) are live,
+all feeding off the already-built-and-tested `planMacrocycle`. Vertical slice; `main` deployable.
+
+### Done
+
+- **`DATA` migration `20260614000002_macrocycle_restructure.sql`** (append-only; **applied to the
+  hosted project** via Supabase MCP, schema re-read to confirm):
+  - `macrocycles` — goal vocabulary migrated (`gain → hypertrophy`, `strength` added; check swapped
+    to `hypertrophy/strength/cut/maintain`); new `duration_months`, `meso_length_weeks`,
+    `recommended_duration_months`, and the cached planMacrocycle snapshot (`target_low/high`,
+    `target_unit`, `target_direction`, `rate_low/high`).
+  - `mesocycles` — `position` + `phase` (accumulation/intensification/peak); `unplanned` added to the
+    status check; `macro_slot_id` dropped; `(macrocycle_id, position)` index. Any prior slot ordering
+    is carried onto the host meso before the table goes.
+  - `macro_slots` **dropped** (policy/index/trigger cascade).
+  - New **`v_macro_summary`** (security_invoker) — per-macro rollup (meso count, sessions, total
+    volume, working sets, first-week start). Security advisor clean (no new lints; view isn't flagged).
+- **Engine wiring (no engine change).** `src/lib/queries/macro.ts`: `profileToMacroProfile`
+  (training-age from `training_since`), `planForMacro` (live recompute), `createMacrocycleWithMesos`
+  (creates the macro + N **unplanned, phased** placeholders), `planUnplannedMeso` (`+ PLAN` flips to
+  planned), `getMacroOverview` (+ `buildMacroStats`: est-strength e1RM trend on key lifts by
+  frequency, over the shared `v_exercise_history`). `engineGoal` simplified to map the macro goal →
+  progression goal (hypertrophy/strength → gain; cut/maintain pass through); slot lookup removed from
+  the week N→N+1 job and the meso-stats macro chart.
+- **Screens (pixel pass off the v2 mockup, figs 2.1/2.1b/2.2/2.3):**
+  - **Create Macrocycle (2.3)** `/cycles/new` — the engine: name, goal (4), duration (3/6/12/custom),
+    block length (4/5/6 wk), with a **live target card** (range + per-month rate + meso strip +
+    phase legend) recomputed client-side via the pure `planMacrocycle`. Creates `active` macro +
+    unplanned mesos, lands on Cycles.
+  - **Macrocycle Overview (2.2)** `/cycles/macro/[macroId]` — realistic-target card (range + orange
+    `≈ rate / month` + profile chips), mesocycle timeline (phase + status + `+ PLAN` on placeholders),
+    macro-stats 2×2 (est strength / total volume / sessions / adherence). No progress-vs-projection
+    bar (09 §3).
+  - **`+ NEW` chooser (2.1b)** — bottom-sheet picker (Macrocycle → 2.3 · Standalone meso → 2.4) with
+    the in-macro `+ PLAN` note.
+  - **Cycles list (2.1) retrofit** — macro rows `GOAL <goal> · N MESOCYCLES` + `OVERVIEW ›`, name →
+    Overview, chevron expand; meso rows `MESO n · <PHASE> · …`, unplanned `SUGGESTED <phase> · NOT
+    PLANNED` + `+ PLAN`; standalone section unchanged. Slot language gone.
+  - Standalone meso create (2.4 from-scratch/template) simplified to standalone-only; planner board
+    macro-context strip rebuilt from `position`/`phase`.
+- Types (`database.ts`): `MacroGoalType`/`MesoPhase`, macrocycle target columns, meso `position`/
+  `phase`/`unplanned`, `MacroSlotRow`/`macro_slots` removed, `VMacroSummaryRow` added.
+- Tests: **86 passing** (+6) — `macro.test.ts` (profile→engine mapping incl. training-age math,
+  phase labels, plan snapshot/recommended-duration fallback); `engineGoal` test reworked to the new
+  goal mapping. RLS test updated (goal vocab; slot block → positioned-unplanned-meso gating).
+
+### Recorded deviations
+
+- **Per-month rate cached** in `macrocycles.rate_low/high` — 03 says the rate is "derived, not
+  stored". Cached anyway because strength's compounding band is **not** derivable from the total
+  range ÷ duration; the Overview still **recomputes the whole plan live** from the profile, so the
+  cache is a snapshot/fallback only.
+- **Est. strength** (macro stats) is computed in the **query layer** over `v_exercise_history` (the
+  e1RM trend is engine-side), not inside `v_macro_summary` SQL — same pattern as Phase 4 progress
+  scoring; still one shared view for the raw history.
+- **Timeline progress bar** is status-based (done = filled, active = accent, planned = faint), not
+  set-precise — exact `setsLogged ÷ planned` per meso would need extra queries; deferred.
+- **Overview `FULL ›`** link and a real **EDIT MACROCYCLE** screen are out of this slice — the stats
+  card has no detail page yet, and edit shows `SOON`. (Per-meso STATS is the existing 4.x screen.)
+- **`v_exercise_overview`** (Exercise page 3.1a) is **not** built here — it belongs to the
+  library/stats slice; the shared-views list in CLAUDE notes it as pending.
+- Legacy pre-restructure meso (1 row on hosted) has null `position` — the Overview/list fall back to
+  row index so it renders cleanly.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (86/86), `npm run build` green. Migration applied
+to the hosted project and the schema re-read (new macro columns, meso `position`/`phase`, `macro_slots`
+gone, `v_macro_summary` present, legacy `gain` row migrated to `hypertrophy`); security advisors show
+no new lints. RLS suite needs a running stack (unchanged); its assertions were updated to the new
+shape. No hosted integration smoke this slice (avoided polluting the existing account) — the create/
+overview I/O is exercised only through typecheck + the schema check; pure helpers are unit-tested.
+
+### Not done yet / next
+
+- **Plan a mesocycle (2.4) four paths** — copy / template / **meso builder (group priorities)** /
+  scratch (copy + builder still stubs).
+- **Planner board (2.5) as the single meso surface** — `PLAN | STATS` toggle, partial-completion
+  lock, `SAVE CHANGES`; retire the old meso-detail (2.2-old) page.
+- **Logging retrofit (1.1/1.2/1.5/1.3)** — Day View sticky header + orange progress bar, Workout
+  Complete redesign (re-add session sliders), set delete + completion lock RLS.
+- **Library & stats** — `exercises.tracking_type` + per-type set rows, two-axis filter, **Exercise
+  page (3.1a/b)** + `v_exercise_overview`, Meso Stats drop the Volume tab.
+- **MCP `create_macrocycle` / `get_macro_summary`** (05) once the connector phase lands.
+
+## 2026-06-14 — Macrocycle planning engine + e1RM metric (Design v2 backlog, ENGINE)
 
 First code landing of the **Design v2 reconciliation backlog**: the pure engine foundation the new
 macrocycle goal layer (Create Macrocycle 2.3 / Overview 2.2) sits on, plus the §1 e1RM definition.

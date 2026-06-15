@@ -79,15 +79,16 @@ function feedback(
 }
 
 describe("engineGoal", () => {
-  it("prefers the macro slot goal", () => {
-    expect(engineGoal("cut", "gain")).toBe("cut");
+  it("maps hypertrophy and strength to gain (progressive overload)", () => {
+    expect(engineGoal("hypertrophy")).toBe("gain");
+    expect(engineGoal("strength")).toBe("gain");
   });
-  it("maps peak slots to gain", () => {
-    expect(engineGoal("peak", "maintain")).toBe("gain");
+  it("passes cut and maintain through", () => {
+    expect(engineGoal("cut")).toBe("cut");
+    expect(engineGoal("maintain")).toBe("maintain");
   });
-  it("falls back to the macro goal, then gain for standalone mesos", () => {
-    expect(engineGoal(null, "maintain")).toBe("maintain");
-    expect(engineGoal(null, null)).toBe("gain");
+  it("defaults to gain for standalone mesos (no macro goal)", () => {
+    expect(engineGoal(null)).toBe("gain");
   });
 });
 

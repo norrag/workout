@@ -11,7 +11,7 @@ import {
 import type {
   Database,
   ExerciseFeedbackRow,
-  GoalType,
+  MacroGoalType,
   LoggedSetRow,
   MesocycleRow,
   MicrocycleRow,
@@ -39,18 +39,24 @@ export interface AdvanceResult {
   nextLabel: string | null;
 }
 
-const ENGINE_GOALS = ["cut", "gain", "maintain"] as const;
+type EngineGoal = "cut" | "gain" | "maintain";
 
-/** Map the cycle context onto an engine goal; `peak` slots train like gain. */
-export function engineGoal(
-  slotGoal: string | null,
-  macroGoal: GoalType | null,
-): (typeof ENGINE_GOALS)[number] {
-  if (slotGoal && (ENGINE_GOALS as readonly string[]).includes(slotGoal)) {
-    return slotGoal as (typeof ENGINE_GOALS)[number];
+/**
+ * Map the macrocycle goal onto a progression-engine goal: hypertrophy and
+ * strength both drive progressive overload (gain); cut/maintain pass through.
+ * Standalone mesos (no macro goal) default to gain.
+ */
+export function engineGoal(macroGoal: MacroGoalType | null): EngineGoal {
+  switch (macroGoal) {
+    case "cut":
+      return "cut";
+    case "maintain":
+      return "maintain";
+    case "strength":
+    case "hypertrophy":
+    default:
+      return "gain";
   }
-  if (slotGoal === "peak") return "gain";
-  return macroGoal ?? "gain";
 }
 
 /** Assemble pure engine inputs for one exercise from week-N rows. */
@@ -62,7 +68,7 @@ export function buildEngineInputs(args: {
   workoutFeedback: WorkoutFeedbackRow | null;
   microTargetRir: number;
   nextWeek: { targetRir: number; isDeload: boolean };
-  goal: (typeof ENGINE_GOALS)[number];
+  goal: EngineGoal;
   equipmentType: string;
   profile: Pick<ProfileRow, "experience_level" | "units">;
   muscleGroupWeeklySets: number | null;
@@ -155,7 +161,7 @@ interface WeekContext {
   meso: MesocycleRow;
   micro: MicrocycleRow;
   nextMicro: MicrocycleRow;
-  goal: (typeof ENGINE_GOALS)[number];
+  goal: EngineGoal;
   weekWes: WorkoutExerciseRow[];
   setsByWe: Map<string, LoggedSetRow[]>;
   feedbackByWe: Map<string, ExerciseFeedbackRow>;
@@ -476,18 +482,9 @@ export async function advanceWeekAfterWorkout(
       : { data: [], error: null };
   if (exError) throw exError;
 
-  // goal context: macro slot → macro → standalone default
-  let slotGoal: string | null = null;
-  let macroGoal: GoalType | null = null;
-  if (meso.macro_slot_id) {
-    const { data: slot, error } = await service
-      .from("macro_slots")
-      .select("goal_type")
-      .eq("id", meso.macro_slot_id)
-      .maybeSingle();
-    if (error) throw error;
-    slotGoal = slot?.goal_type ?? null;
-  }
+  // goal context: macrocycle goal → standalone default (09 2026-06-13 §4: no
+  // more slots; the macro's single goal drives progression)
+  let macroGoal: MacroGoalType | null = null;
   if (meso.macrocycle_id) {
     const { data: macro, error } = await service
       .from("macrocycles")
@@ -517,7 +514,7 @@ export async function advanceWeekAfterWorkout(
     meso,
     micro,
     nextMicro,
-    goal: engineGoal(slotGoal, macroGoal),
+    goal: engineGoal(macroGoal),
     weekWes,
     setsByWe,
     feedbackByWe: new Map(

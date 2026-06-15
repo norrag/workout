@@ -4,7 +4,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "../params";
-import { planMacrocycle, spreadPhases, type MacroProfile } from "../macro";
+import {
+  planMacrocycle,
+  spreadPhases,
+  suggestMesoLength,
+  type MacroProfile,
+} from "../macro";
 
 const params = DEFAULT_ENGINE_PARAMS;
 
@@ -16,6 +21,7 @@ const intermediateMale: MacroProfile = {
   heightCm: 180,
   experienceLevel: "intermediate",
   trainingYears: 3,
+  bodyFatPct: null,
 };
 
 describe("planMacrocycle — golden plans", () => {
@@ -29,19 +35,20 @@ describe("planMacrocycle — golden plans", () => {
       },
       params,
     );
+    // continuous training-age decay: rate(3yr) = base × e^(−3/5)
     expect(plan.target).toEqual({
-      low: 5.9,
-      high: 11.9,
+      low: 6.5,
+      high: 9.8,
       unit: "lb",
       direction: "gain",
     });
     expect(plan.perMonthRate).toEqual({
-      low: 1.0,
-      high: 2.0,
+      low: 1.1,
+      high: 1.6,
       unit: "lb",
       direction: "gain",
     });
-    expect(plan.recommendedDurationMonths).toBe(5);
+    expect(plan.recommendedDurationMonths).toBe(6);
     expect(plan.durationMonths).toBe(6);
     expect(plan.mesoCount).toBe(5);
     expect(plan.phases).toEqual([
@@ -99,9 +106,10 @@ describe("planMacrocycle — golden plans", () => {
       },
       params,
     );
+    // compounding weekly rate on the average (BMI) band over ~13 weeks
     expect(plan.target).toEqual({
-      low: 11.7,
-      high: 23.4,
+      low: 11.3,
+      high: 22,
       unit: "lb",
       direction: "loss",
     });
@@ -128,7 +136,7 @@ describe("planMacrocycle — golden plans", () => {
       params,
     );
     expect(plan.durationMonths).toBe(plan.recommendedDurationMonths);
-    expect(plan.durationMonths).toBe(5);
+    expect(plan.durationMonths).toBe(6);
   });
 });
 
@@ -154,25 +162,69 @@ describe("planMacrocycle — properties", () => {
     }
   });
 
-  it("hypertrophy target grows monotonically with duration (cap permitting)", () => {
-    const profile: MacroProfile = {
-      ...intermediateMale,
-      bodyweight: 170,
-      trainingYears: 1,
-      age: 25,
-    };
-    const highs = [3, 6, 9].map(
-      (m) =>
-        planMacrocycle(
-          { goal: "hypertrophy", profile, durationMonths: m, mesoLengthWeeks: 5 },
-          params,
-        ).target.high,
-    );
-    expect(highs[1]).toBeGreaterThan(highs[0]);
-    expect(highs[2]).toBeGreaterThan(highs[1]);
+  it("hypertrophy target grows monotonically with duration at every training age", () => {
+    // regression for the "static across durations" bug: the old career-cap
+    // clamp flattened the target for near-potential lifters (e.g. 13 training
+    // years), so 3/6/12-month macros all returned the same number.
+    for (const trainingYears of [1, 4, 7, 13]) {
+      const profile: MacroProfile = {
+        ...intermediateMale,
+        bodyweight: 198,
+        trainingYears,
+        age: 30,
+      };
+      const highs = [3, 6, 12].map(
+        (m) =>
+          planMacrocycle(
+            { goal: "hypertrophy", profile, durationMonths: m, mesoLengthWeeks: 5 },
+            params,
+          ).target.high,
+      );
+      expect(highs[1]).toBeGreaterThan(highs[0]);
+      expect(highs[2]).toBeGreaterThan(highs[1]);
+    }
   });
 
-  it("female absolute hypertrophy target is ~half the male one", () => {
+  it("hypertrophy decays with training age but stays positive for a 13-yr lifter", () => {
+    const plan = (trainingYears: number, months: number) =>
+      planMacrocycle(
+        {
+          goal: "hypertrophy",
+          profile: { ...intermediateMale, bodyweight: 198, age: 40, trainingYears },
+          durationMonths: months,
+          mesoLengthWeeks: 5,
+        },
+        params,
+      ).target.high;
+    // a 13-yr trainee gains far less than a 4-yr one over the same window
+    expect(plan(13, 12)).toBeLessThan(plan(4, 12));
+    // ...but a year still yields a small, non-zero, research-plausible target
+    expect(plan(13, 12)).toBeGreaterThan(1);
+    expect(plan(13, 12)).toBeLessThan(5);
+  });
+
+  it("cut total is bounded by the realistic %BW cap on long durations", () => {
+    const profile: MacroProfile = {
+      sex: "male",
+      age: 30,
+      bodyweight: 200,
+      bodyweightUnit: "lb",
+      heightCm: 175,
+      experienceLevel: "intermediate",
+      trainingYears: 3,
+      bodyFatPct: null,
+    };
+    const plan = planMacrocycle(
+      { goal: "cut", profile, durationMonths: 12, mesoLengthWeeks: 5 },
+      params,
+    );
+    // never project losing more than the capped fraction of bodyweight
+    expect(plan.target.high).toBeLessThanOrEqual(
+      200 * params.macro_target.cut_cap_pct_bw + 0.05,
+    );
+  });
+
+  it("female absolute hypertrophy target scales by the sex factor (research-corrected 0.7, not 0.5)", () => {
     const base: MacroProfile = {
       ...intermediateMale,
       bodyweight: 150,
@@ -187,7 +239,12 @@ describe("planMacrocycle — properties", () => {
       { goal: "hypertrophy", profile: { ...base, sex: "female" }, durationMonths: 4, mesoLengthWeeks: 5 },
       params,
     );
-    expect(female.target.high * 2).toBeCloseTo(male.target.high, 1);
+    // relative gains are ~equal between sexes; the absolute factor (0.7) reflects
+    // women's lower lean-mass fraction, not a halved adaptive response
+    expect(female.target.high).toBeCloseTo(
+      male.target.high * params.macro_target.sex_factor_female,
+      1,
+    );
   });
 
   it("hypertrophy target scales down with training experience", () => {
@@ -254,6 +311,129 @@ describe("spreadPhases", () => {
   it("the last meso peaks once there are three or more", () => {
     for (let n = 3; n <= 8; n++) {
       expect(spreadPhases(n, plan).at(-1)).toBe("peak");
+    }
+  });
+});
+
+describe("hypertrophy — FFMI proximity model (when body fat is known)", () => {
+  // 6'1" 159 lb 36yo ~16.5% bf, "trained since 2013" but undermuscled (FFMI ~17,
+  // below untrained baseline). Calendar training age says elite; body comp says
+  // beginner. The proximity model must give him beginner-class gains.
+  const undermuscled: MacroProfile = {
+    sex: "male",
+    age: 36,
+    bodyweight: 159,
+    bodyweightUnit: "lb",
+    heightCm: 185.4,
+    experienceLevel: "intermediate",
+    trainingYears: 13,
+    bodyFatPct: 16.5,
+  };
+
+  it("gives an undermuscled long-time trainee beginner-class gains, not elite", () => {
+    const proximity = planMacrocycle(
+      { goal: "hypertrophy", profile: undermuscled, durationMonths: 12 },
+      params,
+    ).target;
+    // beginner-class: well above the ~2 lb/yr the training-age model gave
+    expect(proximity.high).toBeGreaterThan(20);
+    // and far above what the same calendar-age profile gets with body fat unknown
+    const trainingAge = planMacrocycle(
+      { goal: "hypertrophy", profile: { ...undermuscled, bodyFatPct: null }, durationMonths: 12 },
+      params,
+    ).target;
+    expect(trainingAge.high).toBeLessThan(4); // 13yr decay → elite
+    expect(proximity.high).toBeGreaterThan(trainingAge.high * 4);
+  });
+
+  it("a lifter near the FFMI ceiling gets minimal gains regardless of training age", () => {
+    const jacked: MacroProfile = {
+      sex: "male",
+      age: 30,
+      bodyweight: 200,
+      bodyweightUnit: "lb",
+      heightCm: 178,
+      experienceLevel: "advanced",
+      trainingYears: 13,
+      bodyFatPct: 10, // FFMI ~25, at the ceiling
+    };
+    const plan = planMacrocycle(
+      { goal: "hypertrophy", profile: jacked, durationMonths: 12 },
+      params,
+    );
+    expect(plan.target.high).toBeLessThan(2);
+  });
+
+  it("leaner/more-muscular at equal bodyweight ⇒ slower gains (reads muscle, not weight)", () => {
+    const at = (bf: number) =>
+      planMacrocycle(
+        {
+          goal: "hypertrophy",
+          profile: {
+            sex: "male",
+            age: 30,
+            bodyweight: 180,
+            bodyweightUnit: "lb",
+            heightCm: 178,
+            experienceLevel: "intermediate",
+            trainingYears: 5,
+            bodyFatPct: bf,
+          },
+          durationMonths: 12,
+        },
+        params,
+      ).target.high;
+    // higher body fat at same weight = less muscle = more room = faster
+    expect(at(28)).toBeGreaterThan(at(20));
+    expect(at(20)).toBeGreaterThan(at(10));
+  });
+
+  it("cut leanness band uses body fat % when present", () => {
+    const cut = (bf: number) =>
+      planMacrocycle(
+        {
+          goal: "cut",
+          profile: {
+            sex: "male",
+            age: 30,
+            bodyweight: 200,
+            bodyweightUnit: "lb",
+            heightCm: 178,
+            experienceLevel: "intermediate",
+            trainingYears: 3,
+            bodyFatPct: bf,
+          },
+          durationMonths: 2,
+        },
+        params,
+      ).perMonthRate.high;
+    // higher-BF band cuts faster than the lean band
+    expect(cut(28)).toBeGreaterThan(cut(10));
+  });
+});
+
+describe("suggestMesoLength", () => {
+  it("picks the block length that divides the macro most evenly", () => {
+    expect(suggestMesoLength(6)).toBe(5); // 26 wk → 5×5 (leftover 1)
+    expect(suggestMesoLength(12)).toBe(4); // 52 wk → 13×4 (exact)
+    expect(suggestMesoLength(5)).toBe(5); // ~21.6 wk → 4×5 (leftover ~1.6)
+  });
+
+  it("always returns one of the offered block lengths", () => {
+    for (let m = 1; m <= 24; m++) {
+      expect([4, 5, 6]).toContain(suggestMesoLength(m));
+    }
+  });
+
+  it("the suggested length leaves no worse a remainder than any alternative", () => {
+    const weeks = (m: number) => m * 4.33;
+    const leftover = (w: number, len: number) =>
+      Math.abs(w - Math.max(1, Math.round(w / len)) * len);
+    for (const m of [3, 4, 6, 8, 9, 12]) {
+      const w = weeks(m);
+      const chosen = suggestMesoLength(m);
+      const best = Math.min(...[4, 5, 6].map((l) => leftover(w, l)));
+      expect(leftover(w, chosen)).toBeLessThanOrEqual(best + 1e-9);
     }
   });
 });

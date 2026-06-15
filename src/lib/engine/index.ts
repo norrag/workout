@@ -22,6 +22,7 @@ export { engineInputsSchema } from "./types";
 export {
   planMacrocycle,
   spreadPhases,
+  suggestMesoLength,
   macroPlanInputSchema,
   macroProfileSchema,
   type MacroPlan,
