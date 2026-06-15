@@ -5,6 +5,7 @@ import type {
   ExcludedExerciseRow,
   ExerciseNoteRow,
   ExerciseRow,
+  VExerciseOverviewRow,
 } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
@@ -98,6 +99,139 @@ export async function listMuscleGroups(supabase: Client) {
     .order("name");
   if (error) throw error;
   return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// exercise page overview (fig 3.1a) — lifetime aggregates from
+// v_exercise_overview + the est-1RM-across-the-current-macro bars (one
+// definition of progress, computed like the meso-stats macro chart)
+// ---------------------------------------------------------------------------
+
+export interface ExerciseMacroBar {
+  /** M1…Mn position in the macro */
+  label: string;
+  e1rm: number | null;
+  state: "past" | "current" | "future";
+}
+
+/**
+ * Bars of peak e1RM per meso across a macro: the meso the exercise was most
+ * recently trained in is `current`, mesos with logged work are `past`, and
+ * mesos with no logged work for this lift are `future` (dashed). Pure.
+ */
+export function buildExerciseMacroBars(
+  orderedMesoIds: string[],
+  currentMesoId: string | null,
+  e1rmByMeso: Map<string, number>,
+): ExerciseMacroBar[] {
+  const currentIdx = currentMesoId ? orderedMesoIds.indexOf(currentMesoId) : -1;
+  return orderedMesoIds.map((id, i) => {
+    const e1rm = e1rmByMeso.get(id) ?? null;
+    const state: ExerciseMacroBar["state"] =
+      i === currentIdx ? "current" : e1rm != null ? "past" : "future";
+    return { label: `M${i + 1}`, e1rm: e1rm != null ? Math.round(e1rm) : null, state };
+  });
+}
+
+export interface ExerciseOverview {
+  overview: VExerciseOverviewRow | null;
+  /** W·D of the most recent session, e.g. "W2·D2" */
+  lastCoordinate: string | null;
+  macroName: string | null;
+  /** e.g. "M2 TO DATE" — the exercise's current position in that macro */
+  macroPosition: string | null;
+  macroBars: ExerciseMacroBar[];
+}
+
+export async function getExerciseOverview(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseOverview> {
+  const [
+    { data: overview, error: ovError },
+    { data: hist, error: histError },
+  ] = await Promise.all([
+    supabase
+      .from("v_exercise_overview")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("exercise_id", exerciseId)
+      .maybeSingle(),
+    supabase
+      .from("v_exercise_history")
+      .select("mesocycle_id, microcycle_id, workout_id, performed_on, e1rm")
+      .eq("user_id", userId)
+      .eq("exercise_id", exerciseId)
+      .order("performed_on", { ascending: false }),
+  ]);
+  if (ovError) throw ovError;
+  if (histError) throw histError;
+
+  const result: ExerciseOverview = {
+    overview: overview ?? null,
+    lastCoordinate: null,
+    macroName: null,
+    macroPosition: null,
+    macroBars: [],
+  };
+  if (!hist || hist.length === 0) return result;
+
+  const latest = hist[0];
+  const [{ data: micro }, { data: workout }, { data: latestMeso }] =
+    await Promise.all([
+      supabase
+        .from("microcycles")
+        .select("week_number")
+        .eq("id", latest.microcycle_id)
+        .maybeSingle(),
+      supabase
+        .from("workouts")
+        .select("day_number")
+        .eq("id", latest.workout_id)
+        .maybeSingle(),
+      supabase
+        .from("mesocycles")
+        .select("id, macrocycle_id")
+        .eq("id", latest.mesocycle_id)
+        .maybeSingle(),
+    ]);
+  if (micro && workout)
+    result.lastCoordinate = `W${micro.week_number}·D${workout.day_number}`;
+
+  if (latestMeso?.macrocycle_id) {
+    const [{ data: macro }, { data: macroMesos }] = await Promise.all([
+      supabase
+        .from("macrocycles")
+        .select("name")
+        .eq("id", latestMeso.macrocycle_id)
+        .maybeSingle(),
+      supabase
+        .from("mesocycles")
+        .select("id")
+        .eq("macrocycle_id", latestMeso.macrocycle_id)
+        .order("position", { ascending: true, nullsFirst: false })
+        .order("created_at"),
+    ]);
+    result.macroName = macro?.name ?? null;
+    const orderedIds = (macroMesos ?? []).map((m) => m.id);
+    const e1rmByMeso = new Map<string, number>();
+    for (const row of hist) {
+      if (row.e1rm == null) continue;
+      const prev = e1rmByMeso.get(row.mesocycle_id);
+      if (prev == null || row.e1rm > prev)
+        e1rmByMeso.set(row.mesocycle_id, row.e1rm);
+    }
+    result.macroBars = buildExerciseMacroBars(
+      orderedIds,
+      latestMeso.id,
+      e1rmByMeso,
+    );
+    const curIdx = orderedIds.indexOf(latestMeso.id);
+    if (curIdx >= 0) result.macroPosition = `M${curIdx + 1} TO DATE`;
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------

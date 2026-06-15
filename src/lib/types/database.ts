@@ -448,6 +448,23 @@ export type VMacroSummaryRow = {
   first_week_start: string | null;
 }
 
+export type VExerciseOverviewRow = {
+  user_id: string;
+  exercise_id: string;
+  exercise_name: string;
+  times_trained: number;
+  total_volume: number | null;
+  first_logged_at: string | null;
+  last_performed_at: string | null;
+  weight_pr: number | null;
+  weight_pr_reps: number | null;
+  volume_pr: number | null;
+  volume_pr_weight: number | null;
+  volume_pr_reps: number | null;
+  best_e1rm: number | null;
+  best_session_volume: number | null;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -484,6 +501,7 @@ export type Database = {
       v_meso_week_sets: { Row: VMesoWeekSetsRow; Relationships: [] };
       v_exercise_prs: { Row: VExercisePrsRow; Relationships: [] };
       v_macro_summary: { Row: VMacroSummaryRow; Relationships: [] };
+      v_exercise_overview: { Row: VExerciseOverviewRow; Relationships: [] };
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };

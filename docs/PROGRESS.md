@@ -2,7 +2,63 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Logging-flow review, round 2: animation polish + skip/dot refinements
+## 2026-06-15 (latest) — Library & stats reconciliation: Exercise page (3.1a/b) + two-axis filter + Volume tab removed (Design v2 backlog, DATA)
+
+Lands the bulk of the **Library & stats (against Phase 5)** reconciliation block from 09 (2026-06-14
+session-3 §1/§2/§4): the net-new Exercise page (Overview/History tabs), the two-axis library filter,
+and the Meso Stats Volume-tab removal. This is what the logging "View exercise ›" link (shipped
+2026-06-15) was already pointing at. Vertical slice; `main` deployable.
+
+### Done
+
+- **`DATA` migration `20260615000004_exercise_overview.sql`** (append-only; **applied to hosted**,
+  schema + values re-checked, security advisors clean):
+  - **`v_exercise_overview`** (security_invoker) — per (user, exercise) lifetime aggregates backing
+    the 3.1a Overview and MCP read tools (one definition of progress): `times_trained`,
+    `total_volume`, `first_logged_at`, `last_performed_at`, `weight_pr` (+ reps at it), `volume_pr`
+    (+ the weight×reps that produced it), `best_e1rm`, `best_session_volume`. Argmax columns built
+    with `distinct on` CTEs over working sets; cross-checked against raw `logged_sets` on hosted
+    (Dumbbell Bench: 155×8 weight PR, 1240 volume PR, e1RM 196.3 = 155·(1+8/30) — exact).
+  - **`exercises(equipment_type)` index** for the new EQUIP filter axis (09 §1 `DATA`).
+- **Exercise page (3.1a/3.1b)** — rebuilt `/exercises/[exerciseId]` with an **OVERVIEW | HISTORY**
+  segmented toggle (`?tab=`). Overview = LAST PERFORMED (date · W·D) + the **ALL-TIME BESTS** 2×2 ink
+  grid (weight PR, est 1RM, volume PR, best session vol) + **EST. 1RM ACROSS `<macro>`** M1…Mn bars
+  (filled past / accent-framed current / dashed future) + TIMES TRAINED / TOTAL VOLUME / FIRST LOGGED
+  footer; description, pinned note, and the custom-exercise SHARE row retained below (deviation —
+  functionally needed, not in the stock mockup). History = `ExerciseHistoryList` (sessions grouped by
+  meso). `getExerciseOverview` reads the view, derives the last-session coordinate, and computes the
+  across-macro bars from `v_exercise_history` (same pattern as the meso-stats macro chart).
+- **Exercises tab (3.1) two-axis filter** — `MUSCLE` and `EQUIP` rows (chips scroll, selected = filled
+  ink + ✕ to clear, EQUIP has an `ALL` chip); the two combine **AND**; an `n OF N EXERCISES` count +
+  `CLEAR ALL` appear whenever a filter is active. Equipment chips are the distinct types present.
+- **Meso stats — Volume tab removed** (09 §4): the segmented control is now **Balance · Performance**
+  and defaults to **Balance**; the renumbering is 4.1 Balance / 4.2 Performance. `buildVolumeMatrix`
+  stays (it still feeds `buildBalance`, and the Workout-tab resting state still renders `VolumeView`
+  per 08 §2 — left unchanged, not in this backlog item).
+- Types: `VExerciseOverviewRow` + the `v_exercise_overview` view registered in `database.ts`.
+- Tests: **102 passing** (+7) — `buildExerciseMacroBars` (label/state/rounding, current-with-no-data,
+  no-current, empty) and `groupHistoryByMeso` (consecutive grouping, distinct same-named mesos, empty).
+
+### Recorded deviations
+
+- **Overview keeps description / pinned note / SHARE** below the stat blocks — the 3.1a mockup shows a
+  stock exercise without them, but they're functional (custom-exercise description + sharing, the
+  pinned note). Square-corner ledger styling preserved.
+- **Stats back-nav stays `‹ MESO`** and entry stays the meso-detail `MESO STATS` row — the planner-board
+  `PLAN | STATS` toggle + `‹ PLAN` back-nav belongs to the not-yet-built single-surface planner (2.5);
+  only the Volume-tab removal is in scope here.
+- **`tracking_type` (3.1c / per-set render) deferred** — it changes `logged_sets` (nullable weight/reps
+  + `duration_seconds`) and touches the whole logging core, so it's a separate slice (still `[ ]` in 07).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (102/102), `npm run build` green. Migration applied
+to hosted; `v_exercise_overview` shape + computed values validated against raw `logged_sets`; equipment
+index present; security advisors show no new lints (the view is security_invoker, no SECURITY DEFINER).
+Read-only validation against existing account data — nothing written or deleted. In-browser pixel QA of
+the new Exercise page / filter rows still pending (as for the other screens).
+
+## 2026-06-15 — Logging-flow review, round 2: animation polish + skip/dot refinements
 
 Follow-up to the on-device review (09 session-5, second batch).
 
