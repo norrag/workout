@@ -2,7 +2,51 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Logging retrofit: Day View header, Workout Complete redesign, completion lock (Design v2 backlog, DATA)
+## 2026-06-15 (latest) — Logging-flow on-device review: interaction fixes + per-set skip (DATA)
+
+First hands-on review of the deployed logging flow (09 session-5). Seven interaction fixes
+shipped; two larger features (notes model, workout/meso options menu) specced for next slices.
+Vertical slice; `main` deployable.
+
+### Done
+
+- **Navigator stays open** across day selection — open state persisted in `sessionStorage`, so
+  picking consecutive days no longer collapses it (supersedes the "defaults closed each entry" note).
+- **Denser set rows captured** (09 §5, which the code had never picked up): box `42→32px`, value
+  `17→14px`, log box `26→21px`, row padding `7→4px`, grip/log columns `22/50→20/44`; the LOG control
+  keeps a ≥44px-wide tap target around the 21px box.
+- **Sets are uncheckable** — tapping a logged ✓ on an active workout un-marks it and re-opens the
+  slot (`unlogSet`; keeps the prescription, no renumber). Completed workouts stay locked.
+- **Row menus flip on-screen** — new `AnchoredMenu` (viewport-`fixed`, measures the trigger and its
+  own height) opens below when there's room, otherwise above; replaces the absolutely-positioned
+  cards that ran off the bottom edge. Used by both the exercise (1.2) and set (1.3) menus.
+- **Per-set skip** (`DATA`, migration `20260615000003_per_set_skip.sql`, **applied to hosted**):
+  `workout_exercises.skipped_set_numbers int[]`. "Skip set" greys a set **in place** and is
+  reversible ("Unskip set"); "Skip remaining sets" fills every uncompleted slot and **no longer
+  flips the whole exercise to skipped** (fixing the bug where the exercise + its reopened menu were
+  greyed/backgrounded). Skipped sets are never logged, so the engine and views are unaffected; the
+  type's `Defaulted` union gained the column so inserts stay optional.
+- **Delete vs skip split** — "Delete set" drops a planned slot (unlogged) or deletes the logged row
+  (`deleteSet`, renumber); "Skip set" toggles the greyed state. Both gated to in_progress.
+- **Complete-workout gating** — the button now appears only once **every set is logged or skipped**
+  (was "after any set is logged"); the helper `exerciseDone`/`plannedSetCount` account for skips.
+
+### Deferred to next slices (specced in 09 session-5 §8/§9, 07 backlog, 03)
+
+- **Notes model** — split the cross-workout **pinned note** (exercise attribute, inline edit icon,
+  optional) from a per-session **log note** (saved with the workout's exercise log; note-icon on
+  history rows; editable only live). `DATA`.
+- **Workout / mesocycle options menu** on the Day View header — Mesocycle (notes · edit → planner ·
+  stats · End mesocycle) + Workout (note · edit day · add exercise · End workout). New audited
+  `endMesocycle`/`endWorkout` queries + confirm steps. `DATA`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (95/95), `npm run build` green. Per-set-skip
+migration applied to hosted. No new unit tests this slice (the new functions are I/O against
+Supabase; pure helpers live in the component); the engine paths are unchanged and remain golden-tested.
+
+## 2026-06-15 — Logging retrofit: Day View header, Workout Complete redesign, completion lock (Design v2 backlog, DATA)
 
 Lands the **Logging (against Phase 3) reconciliation block** from 09 (2026-06-13 §1–2 / 2026-06-14
 §1): the Day View header rework (1.1), the redesigned Workout Complete sheet (1.5), the set

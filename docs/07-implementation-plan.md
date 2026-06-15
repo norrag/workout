@@ -204,6 +204,23 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       on the parent workout being `in_progress` (+ a `logged_sets` delete policy); refines hard rule
       #5 (append-only *after* completion). RLS tests + applied to hosted.
 
+#### Logging review — session 5 (2026-06-15, 09 entry) — on-device feedback
+- [x] **Navigator stays open** across day selection (`sessionStorage`); **denser set rows**
+      captured (09 §5: 32/14/21/4, cols 20/44); **sets uncheckable** (`unlogSet`, in_progress only);
+      **row menus flip** above/below to stay on-screen (`AnchoredMenu`); **per-set skip**
+      (`workout_exercises.skipped_set_numbers`, migration `20260615000003`) — skip greys in place &
+      reversible, **skip-remaining is per-set** (no longer whole-exercise); **complete button gated**
+      on every set being logged or skipped. *(2026-06-15.)*
+- [ ] `DATA` **Notes model (1.1/1.2/3.x)** — split the **pinned note** (exercise-record attribute,
+      cross-workout, inline edit icon, optional) from a **session log note** (saved with the
+      workout's exercise log; note-icon on history rows; editable only in the live workout). 09
+      session-5 §8.
+- [ ] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
+      Mesocycle (notes · edit → planner · stats · **End mesocycle** = skip+complete all remaining,
+      strong warning) + Workout (note · edit day → planner · add exercise · **End workout** =
+      skip-remaining + complete). New audited `endMesocycle`/`endWorkout` queries + confirm steps;
+      notes items depend on the notes model. 09 session-5 §9.
+
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable
       + `duration_seconds`; set-row + history render per type. **New exercise (3.1c)** TRACK PER SET.

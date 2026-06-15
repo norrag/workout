@@ -138,10 +138,12 @@ An exercise instance within a session, carrying the **prescription** the engine 
 - `workout_id`, `exercise_id`, `position int`
 - `muscle_group_id uuid null` — the planner group this slot came from; drives the day view's "01 — QUADS" headers and the feedback prompt's scope
 - `prescribed_weight numeric null`, `prescribed_reps int null`, `prescribed_sets int null`, `target_rir int null`
-- `status text` — pending / completed / skipped ("skip remaining sets")
-- `notes text`
+- `status text` — pending / completed / skipped (a *whole* exercise skipped; set on completion for an exercise with no logged sets)
+- `skipped_set_numbers int[]` (default `'{}'`) — **individually skipped sets** (fig 1.3): greyed in place, non-interactable, reversible while the workout is `in_progress`. "Skip remaining sets" fills this with every uncompleted slot (it no longer flips the exercise to `status = skipped`). Skipped sets are never logged, so the engine/views ignore them. **Migration delta:** `20260615000003_per_set_skip.sql` (shipped).
+- `notes text` — the engine prescription rationale (read-only context in the 1.2 menu)
+- **Notes model delta (planned, 09 session-5 §8):** add a **session log note** for the exercise-in-this-workout — `log_note text` here (or reuse `exercise_feedback.notes`) — distinct from the cross-workout **pinned note** (`exercise_notes.is_pinned`). The session note shows as a note-icon on history rows and is editable only on the live workout; the pinned note gets an inline edit affordance on the Day View.
 
-Skipped-set counts on the complete sheet derive from `prescribed_sets` minus logged rows; individual skipped sets are simply never logged.
+The complete sheet's progress/denominator counts `prescribed_sets` minus `skipped_set_numbers`; "done" = every planned slot logged or skipped.
 
 ### `logged_sets`
 The atomic history record. **This is the primary input to the engine and MCP analysis** — each row is fully stamped with cycle context for efficient time-series queries.

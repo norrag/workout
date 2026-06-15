@@ -16,7 +16,9 @@ import {
   saveExerciseFeedback,
   savePinnedNote,
   saveWorkoutFeedback,
-  setExerciseStatus,
+  setSetSkipped,
+  skipRemainingSets,
+  unlogSet,
 } from "@/lib/queries/logging";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
 import { getProfile } from "@/lib/queries/profiles";
@@ -112,13 +114,57 @@ export async function addSetAction(input: {
   revalidatePath("/workout");
 }
 
-export async function skipSetAction(input: {
+/** "Delete set" on an unlogged slot (fig 1.3) — drops one planned slot. */
+export async function removeSetAction(input: {
   workout_id: string;
   workout_exercise_id: string;
 }): Promise<void> {
   const parsed = weTargetSchema.parse(input);
   const { supabase } = await requireUser();
   await adjustPrescribedSets(supabase, parsed.workout_exercise_id, -1);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const toggleSkipSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  set_number: z.coerce.number().int().min(1).max(30),
+  skipped: z.boolean(),
+});
+
+/** Skip / unskip a single set (fig 1.3) — greyed but kept; reversible. */
+export async function toggleSkipSetAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  set_number: number;
+  skipped: boolean;
+}): Promise<void> {
+  const parsed = toggleSkipSchema.parse(input);
+  const { supabase } = await requireUser();
+  await setSetSkipped(
+    supabase,
+    parsed.workout_exercise_id,
+    parsed.set_number,
+    parsed.skipped,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const unlogSchema = z.object({
+  workout_id: z.string().uuid(),
+  set_id: z.string().uuid(),
+});
+
+/** Uncheck a logged set (fig 1.1) — re-opens the slot; keeps the prescription. */
+export async function unlogSetAction(input: {
+  workout_id: string;
+  set_id: string;
+}): Promise<void> {
+  const parsed = unlogSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await unlogSet(supabase, user.id, parsed.set_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }
@@ -140,13 +186,14 @@ export async function deleteSetAction(input: {
   revalidatePath("/workout");
 }
 
+/** Skip all uncompleted sets of an exercise (fig 1.2) — per-set, reversible. */
 export async function skipRemainingAction(input: {
   workout_id: string;
   workout_exercise_id: string;
 }): Promise<void> {
   const parsed = weTargetSchema.parse(input);
   const { supabase } = await requireUser();
-  await setExerciseStatus(supabase, parsed.workout_exercise_id, "skipped");
+  await skipRemainingSets(supabase, parsed.workout_exercise_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }

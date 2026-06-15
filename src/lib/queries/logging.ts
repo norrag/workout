@@ -432,6 +432,83 @@ export async function deleteLoggedSet(
   if (updError) throw updError;
 }
 
+/**
+ * Uncheck a logged set (fig 1.1) — remove the logged row but keep its planned
+ * slot, so it re-opens as the next editable set. Unlike `deleteLoggedSet` this
+ * does not renumber or shrink the prescription. Allowed only while the workout
+ * is `in_progress` (RLS-enforced).
+ */
+export async function unlogSet(
+  supabase: Client,
+  userId: string,
+  setId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("logged_sets")
+    .delete()
+    .eq("id", setId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+/** Toggle an individual set's skipped state (fig 1.3) — greyed but kept. */
+export async function setSetSkipped(
+  supabase: Client,
+  workoutExerciseId: string,
+  setNumber: number,
+  skipped: boolean,
+): Promise<void> {
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("skipped_set_numbers")
+    .eq("id", workoutExerciseId)
+    .single();
+  if (weError) throw weError;
+  const current = new Set(we.skipped_set_numbers ?? []);
+  if (skipped) current.add(setNumber);
+  else current.delete(setNumber);
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ skipped_set_numbers: [...current].sort((a, b) => a - b) })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
+/**
+ * Skip every still-uncompleted set of an exercise (fig 1.2 menu). Leaves the
+ * logged sets and the exercise itself untouched — only the unlogged planned
+ * slots are greyed. Reversible per-set via {@link setSetSkipped}.
+ */
+export async function skipRemainingSets(
+  supabase: Client,
+  workoutExerciseId: string,
+): Promise<void> {
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("prescribed_sets, skipped_set_numbers")
+    .eq("id", workoutExerciseId)
+    .single();
+  if (weError) throw weError;
+  const { data: sets, error: setsError } = await supabase
+    .from("logged_sets")
+    .select("set_number")
+    .eq("workout_exercise_id", workoutExerciseId);
+  if (setsError) throw setsError;
+
+  const logged = new Set((sets ?? []).map((s) => s.set_number));
+  const maxLogged = logged.size > 0 ? Math.max(...logged) : 0;
+  const planned = Math.max(we.prescribed_sets ?? 1, maxLogged);
+  const skipped = new Set(we.skipped_set_numbers ?? []);
+  for (let n = 1; n <= planned; n += 1) {
+    if (!logged.has(n)) skipped.add(n);
+  }
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ skipped_set_numbers: [...skipped].sort((a, b) => a - b) })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
 /** Amend a logged set (history is append-only; corrections are updates). */
 export async function amendSet(
   supabase: Client,

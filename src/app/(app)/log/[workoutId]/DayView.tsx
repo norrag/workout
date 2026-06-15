@@ -21,11 +21,13 @@ import {
   logSetAction,
   moveExerciseDownAction,
   removeExerciseAction,
+  removeSetAction,
   replaceExerciseAction,
   saveFeedbackAction,
   savePinnedNoteAction,
   skipRemainingAction,
-  skipSetAction,
+  toggleSkipSetAction,
+  unlogSetAction,
   type ReplacementCandidate,
 } from "../actions";
 
@@ -38,6 +40,29 @@ function shortDate(iso: string | null): string {
 }
 
 type Commit = (fn: () => Promise<void>) => void;
+
+/** Planned slot count, widened to cover any logged/skipped beyond it. */
+function plannedSetCount(we: LoggedExercise): number {
+  const maxLogged = we.sets.length
+    ? Math.max(...we.sets.map((s) => s.set_number))
+    : 0;
+  const maxSkipped = we.skipped_set_numbers.length
+    ? Math.max(...we.skipped_set_numbers)
+    : 0;
+  return Math.max(we.prescribed_sets ?? 1, maxLogged, maxSkipped);
+}
+
+/** Every planned slot resolved (logged or skipped), or the whole exercise skipped. */
+function exerciseDone(we: LoggedExercise): boolean {
+  if (we.status === "skipped") return true;
+  const planned = plannedSetCount(we);
+  const logged = new Set(we.sets.map((s) => s.set_number));
+  const skipped = new Set(we.skipped_set_numbers);
+  for (let n = 1; n <= planned; n += 1) {
+    if (!logged.has(n) && !skipped.has(n)) return false;
+  }
+  return true;
+}
 
 /**
  * Day view (fig 1.1) — the Workout tab itself. Brand row, meso track,
@@ -68,13 +93,17 @@ export function DayView({
 
   const commit: Commit = (fn) => startTransition(fn);
 
+  // progress bar denominator excludes skipped slots; an exercise is "done"
+  // when every planned slot is either logged or skipped (fig 1.1/1.3)
+  const loggedSets = exercises.reduce((n, we) => n + we.sets.length, 0);
   const totalSets = exercises
     .filter((we) => we.status !== "skipped")
-    .reduce((n, we) => n + Math.max(we.prescribed_sets ?? 1, we.sets.length), 0);
-  const loggedSets = exercises.reduce((n, we) => n + we.sets.length, 0);
+    .reduce((n, we) => {
+      const planned = plannedSetCount(we);
+      const skipped = we.skipped_set_numbers.filter((s) => s <= planned).length;
+      return n + Math.max(0, planned - skipped);
+    }, 0);
 
-  const exerciseDone = (we: LoggedExercise) =>
-    we.status === "skipped" || we.sets.length >= (we.prescribed_sets ?? 1);
   const allDone = exercises.length > 0 && exercises.every(exerciseDone);
 
   const isLastOfGroup = (we: LoggedExercise) =>
@@ -131,15 +160,12 @@ export function DayView({
         />
       ))}
 
-      {!readOnly && loggedSets > 0 && (
+      {/* complete is offered only once every set is logged or skipped (1.5) */}
+      {!readOnly && allDone && (
         <button
           type="button"
           onClick={() => setCompleteOpen(true)}
-          className={`mt-6 w-full py-4 text-center text-[13px] font-bold tracking-[0.12em] ${
-            allDone
-              ? "bg-ink text-bg-base"
-              : "border-[1.5px] border-ink text-ink"
-          }`}
+          className="mt-6 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
         >
           COMPLETE WORKOUT
         </button>
@@ -211,8 +237,18 @@ function DayHeader({
   totalSets: number;
   navWeeks: NavWeek[];
 }) {
+  // the navigator stays open across day navigation until the user closes it
   const [open, setOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(weekNumber);
+  useEffect(() => {
+    setOpen(sessionStorage.getItem("dayNavOpen") === "1");
+  }, []);
+  const toggleOpen = () =>
+    setOpen((v) => {
+      const next = !v;
+      sessionStorage.setItem("dayNavOpen", next ? "1" : "0");
+      return next;
+    });
 
   const pct = totalSets > 0 ? Math.round((loggedSets / totalSets) * 100) : 0;
   const rirLabel = isDeload ? "DELOAD WEEK" : `TARGET ${targetRir} RIR`;
@@ -227,7 +263,7 @@ function DayHeader({
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggleOpen}
           className="flex items-center gap-[7px]"
           aria-expanded={open}
           aria-label="week and day navigator"
@@ -404,10 +440,19 @@ function ExerciseBlock({
   commit: Commit;
 }) {
   const skipped = we.status === "skipped";
-  const plannedSets = Math.max(we.prescribed_sets ?? 1, we.sets.length);
-  const nextSetNumber = we.sets.length + 1;
+  const plannedSets = plannedSetCount(we);
+  const loggedNums = new Set(we.sets.map((s) => s.set_number));
+  const skippedNums = new Set(we.skipped_set_numbers);
+  let nextSetNumber = 0;
+  for (let n = 1; n <= plannedSets; n += 1) {
+    if (!loggedNums.has(n) && !skippedNums.has(n)) {
+      nextSetNumber = n;
+      break;
+    }
+  }
   const [removeError, setRemoveError] = useState<string | null>(null);
   const router = useRouter();
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   const iconBtn =
     "flex h-7 w-7 items-center justify-center border border-ink/35";
@@ -430,6 +475,7 @@ function ExerciseBlock({
           </button>
           <button
             type="button"
+            ref={menuBtnRef}
             aria-label={`${we.exercise_name} menu`}
             onClick={onOpenMenu}
             className={`${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`}
@@ -454,8 +500,8 @@ function ExerciseBlock({
 
       {!skipped && (
         <>
-          {/* grid header */}
-          <div className="mt-2.5 grid grid-cols-[22px_1fr_1fr_50px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink/50">
+          {/* grid header (denser rows, 09 §5) */}
+          <div className="mt-2.5 grid grid-cols-[20px_1fr_1fr_44px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink/50">
             <div />
             <div className="text-center">{units.toUpperCase()}</div>
             <div className="text-center">REPS</div>
@@ -464,11 +510,13 @@ function ExerciseBlock({
           {Array.from({ length: plannedSets }, (_, i) => {
             const setNumber = i + 1;
             const logged = we.sets.find((s) => s.set_number === setNumber);
-            const state: "logged" | "next" | "future" = logged
+            const state: "logged" | "skipped" | "next" | "future" = logged
               ? "logged"
-              : setNumber === nextSetNumber && !readOnly
-                ? "next"
-                : "future";
+              : skippedNums.has(setNumber)
+                ? "skipped"
+                : setNumber === nextSetNumber && !readOnly
+                  ? "next"
+                  : "future";
             return (
               <SetRow
                 key={`${setNumber}-${logged?.id ?? "open"}`}
@@ -496,109 +544,188 @@ function ExerciseBlock({
       )}
 
       {/* exercise menu (fig 1.2) */}
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-ink/35"
-            onClick={onCloseMenu}
-            aria-hidden
+      <AnchoredMenu
+        open={menuOpen}
+        triggerRef={menuBtnRef}
+        align="right"
+        label={`${we.exercise_name} menu`}
+        onClose={onCloseMenu}
+      >
+        <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
+          EXERCISE — {we.exercise_name.toUpperCase()}
+        </div>
+        {we.notes && (
+          <div className="border-b border-ink/10 px-4 py-2 text-[11px] leading-[1.45] text-ink/60">
+            {we.notes}
+          </div>
+        )}
+        <MenuRow
+          label="View exercise"
+          trailing="›"
+          onClick={() => {
+            onCloseMenu();
+            router.push(`/exercises/${we.exercise_id}`);
+          }}
+        />
+        <MenuRow
+          label={we.pinned_note ? "Edit pinned note" : "New note"}
+          onClick={() => {
+            onCloseMenu();
+            onNote();
+          }}
+        />
+        {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
+          <MenuRow
+            label="Replace exercise"
+            trailing="›"
+            onClick={() => {
+              onCloseMenu();
+              onReplace();
+            }}
           />
-          <div className="absolute right-0 top-8 z-50 w-[248px] border-[1.5px] border-ink bg-bg-base shadow-menu">
-            <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
-              EXERCISE — {we.exercise_name.toUpperCase()}
-            </div>
-            {we.notes && (
-              <div className="border-b border-ink/10 px-4 py-2 text-[11px] leading-[1.45] text-ink/60">
-                {we.notes}
-              </div>
-            )}
-            <MenuRow
-              label="View exercise"
-              trailing="›"
-              onClick={() => {
-                onCloseMenu();
-                router.push(`/exercises/${we.exercise_id}`);
-              }}
-            />
-            <MenuRow
-              label={we.pinned_note ? "Replace note" : "New note"}
-              onClick={() => {
-                onCloseMenu();
-                onNote();
-              }}
-            />
-            {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
+        ) : (
+          <MenuRow label="Replace exercise" trailing="LOGGED" disabled />
+        )}
+        {!readOnly && (
+          <>
+            {!isLast && (
               <MenuRow
-                label="Replace exercise"
-                trailing="›"
+                label="Move down"
                 onClick={() => {
+                  commit(() =>
+                    moveExerciseDownAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
                   onCloseMenu();
-                  onReplace();
                 }}
               />
-            ) : (
-              <MenuRow label="Replace exercise" trailing="LOGGED" disabled />
             )}
-            {!readOnly && (
-              <>
-                {!isLast && (
-                  <MenuRow
-                    label="Move down"
-                    onClick={() => {
-                      commit(() =>
-                        moveExerciseDownAction({
-                          workout_id: we.workout_id,
-                          workout_exercise_id: we.id,
-                        }),
-                      );
-                      onCloseMenu();
-                    }}
-                  />
-                )}
-                <MenuRow
-                  label="Add set"
-                  onClick={() => {
-                    commit(() =>
-                      addSetAction({
-                        workout_id: we.workout_id,
-                        workout_exercise_id: we.id,
-                      }),
-                    );
-                    onCloseMenu();
-                  }}
-                />
-                <MenuRow
-                  label="Skip remaining sets"
-                  onClick={() => {
-                    commit(() =>
-                      skipRemainingAction({
-                        workout_id: we.workout_id,
-                        workout_exercise_id: we.id,
-                      }),
-                    );
-                    onCloseMenu();
-                  }}
-                />
-                <MenuRow
-                  label="Remove exercise"
-                  destructive
-                  onClick={() => {
-                    commit(async () => {
-                      const result = await removeExerciseAction({
-                        workout_id: we.workout_id,
-                        workout_exercise_id: we.id,
-                      });
-                      setRemoveError(result.error);
-                    });
-                    onCloseMenu();
-                  }}
-                />
-              </>
+            <MenuRow
+              label="Add set"
+              onClick={() => {
+                commit(() =>
+                  addSetAction({
+                    workout_id: we.workout_id,
+                    workout_exercise_id: we.id,
+                  }),
+                );
+                onCloseMenu();
+              }}
+            />
+            {nextSetNumber !== 0 && (
+              <MenuRow
+                label="Skip remaining sets"
+                onClick={() => {
+                  commit(() =>
+                    skipRemainingAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
+                  onCloseMenu();
+                }}
+              />
             )}
-          </div>
-        </>
-      )}
+            <MenuRow
+              label="Remove exercise"
+              destructive
+              onClick={() => {
+                commit(async () => {
+                  const result = await removeExerciseAction({
+                    workout_id: we.workout_id,
+                    workout_exercise_id: we.id,
+                  });
+                  setRemoveError(result.error);
+                });
+                onCloseMenu();
+              }}
+            />
+          </>
+        )}
+      </AnchoredMenu>
     </div>
+  );
+}
+
+/**
+ * Menu card anchored to a trigger button, fixed to the viewport so it never
+ * runs off-screen: opens below the trigger when there's room, otherwise flips
+ * above it (fig 1.2/1.3). Carries the offset hard shadow + ink scrim.
+ */
+function AnchoredMenu({
+  open,
+  triggerRef,
+  align = "right",
+  width = 248,
+  label,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  align?: "left" | "right";
+  width?: number;
+  label: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const place = () => {
+      const trigger = triggerRef.current;
+      const card = cardRef.current;
+      if (!trigger || !card) return;
+      const t = trigger.getBoundingClientRect();
+      const h = card.offsetHeight;
+      const margin = 8;
+      const belowTop = t.bottom + 4;
+      const fitsBelow = belowTop + h <= window.innerHeight - margin;
+      const top = fitsBelow
+        ? belowTop
+        : Math.max(margin, t.top - 4 - h);
+      let left = align === "right" ? t.right - width : t.left;
+      left = Math.min(
+        Math.max(margin, left),
+        window.innerWidth - width - margin,
+      );
+      setPos({ top, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, triggerRef, align, width]);
+
+  if (!open) return null;
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-ink/35"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        ref={cardRef}
+        role="menu"
+        aria-label={label}
+        style={{
+          top: pos?.top ?? 0,
+          left: pos?.left ?? 0,
+          width,
+          visibility: pos ? "visible" : "hidden",
+        }}
+        className="fixed z-50 border-[1.5px] border-ink bg-bg-base shadow-menu"
+      >
+        {children}
+      </div>
+    </>
   );
 }
 
@@ -659,7 +786,7 @@ function SetRow({
 }: {
   we: LoggedExercise;
   setNumber: number;
-  state: "logged" | "next" | "future";
+  state: "logged" | "skipped" | "next" | "future";
   readOnly: boolean;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
   isLastRow: boolean;
@@ -681,6 +808,7 @@ function SetRow({
   const [reps, setReps] = useState(String(initialReps));
   const edited = useRef(false);
   const router = useRouter();
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   // re-sync when the server state for this row changes
   useEffect(() => {
@@ -690,14 +818,17 @@ function SetRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged?.id, logged?.weight, logged?.reps]);
 
+  // denser rows (09 §5): 32px box, 14px value, 21px log box
   const cellBase =
-    "h-[42px] w-full text-center text-[17px] focus:outline-none numeral";
+    "h-[32px] w-full text-center text-[14px] focus:outline-none numeral";
   const cell =
     state === "logged"
       ? `${cellBase} border border-ink/30 bg-ink/5 font-semibold`
       : state === "next"
         ? `${cellBase} border-[1.5px] border-ink bg-paper font-semibold`
-        : `${cellBase} border border-ink/25 font-medium text-ink/45`;
+        : state === "skipped"
+          ? `${cellBase} border border-ink/15 font-medium text-ink/30 line-through`
+          : `${cellBase} border border-ink/25 font-medium text-ink/45`;
 
   const save = () => {
     const w = Number(weight);
@@ -732,21 +863,24 @@ function SetRow({
     }
   };
 
+  const staticCells = state === "future" || state === "skipped";
+
   return (
     <div
-      className={`relative grid grid-cols-[22px_1fr_1fr_50px] items-center gap-2.5 py-[7px] ${
+      className={`relative grid grid-cols-[20px_1fr_1fr_44px] items-center gap-2.5 py-[4px] ${
         isLastRow ? "" : "border-b border-ink/15"
       }`}
     >
       <button
         type="button"
+        ref={menuBtnRef}
         aria-label={`set ${setNumber} menu`}
         onClick={onOpenMenu}
         className={`text-center text-base leading-[0.5] ${menuOpen ? "font-bold text-ink" : "text-ink/40"}`}
       >
         ⋮
       </button>
-      {state === "future" ? (
+      {staticCells ? (
         <>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
             {prescribedWeight ?? "—"}
@@ -783,20 +917,44 @@ function SetRow({
           />
         </>
       )}
-      <div className="flex justify-center">
+      {/* LOG column — ≥44px-wide tap target around the 21px visual box */}
+      <div className="flex h-8 items-center justify-center">
         {state === "logged" ? (
-          <div className="flex h-[26px] w-[26px] items-center justify-center bg-ink text-sm text-bg-base">
-            ✓
-          </div>
+          readOnly ? (
+            <div className="flex h-[21px] w-[21px] items-center justify-center bg-ink text-[12px] text-bg-base">
+              ✓
+            </div>
+          ) : (
+            <button
+              type="button"
+              aria-label={`uncheck set ${setNumber}`}
+              onClick={() => {
+                if (logged)
+                  commit(() =>
+                    unlogSetAction({
+                      workout_id: we.workout_id,
+                      set_id: logged.id,
+                    }),
+                  );
+              }}
+              className="flex h-[21px] w-[21px] items-center justify-center bg-ink text-[12px] text-bg-base"
+            >
+              ✓
+            </button>
+          )
         ) : state === "next" ? (
           <button
             type="button"
             aria-label={`log set ${setNumber}`}
             onClick={save}
-            className="h-[26px] w-[26px] border-2 border-ink"
+            className="h-[21px] w-[21px] border-2 border-ink"
           />
+        ) : state === "skipped" ? (
+          <span className="text-[8px] font-bold tracking-[0.08em] text-ink/40">
+            SKIP
+          </span>
         ) : (
-          <div className="h-[26px] w-[26px] border-[1.5px] border-ink/35" />
+          <div className="h-[21px] w-[21px] border-[1.5px] border-ink/35" />
         )}
       </div>
       {(state === "next" && dropPending) || logged?.set_type === "drop" ? (
@@ -806,23 +964,58 @@ function SetRow({
       ) : null}
 
       {/* set menu (fig 1.3) */}
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-ink/35"
-            onClick={onCloseMenu}
-            aria-hidden
+      <AnchoredMenu
+        open={menuOpen}
+        triggerRef={menuBtnRef}
+        align="left"
+        label={`set ${setNumber} menu`}
+        onClose={onCloseMenu}
+      >
+        <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
+          SET <span className="numeral">{setNumber}</span> —{" "}
+          {we.exercise_name.toUpperCase()}
+        </div>
+        {!readOnly && (
+          <MenuRow
+            label="Add set below"
+            onClick={() => {
+              commit(() =>
+                addSetAction({
+                  workout_id: we.workout_id,
+                  workout_exercise_id: we.id,
+                }),
+              );
+              onCloseMenu();
+            }}
           />
-          <div className="absolute left-0 top-12 z-50 w-[248px] border-[1.5px] border-ink bg-bg-base shadow-menu">
-            <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
-              SET <span className="numeral">{setNumber}</span> —{" "}
-              {we.exercise_name.toUpperCase()}
-            </div>
+        )}
+        {!readOnly && (state === "next" || state === "future") && (
+          <>
             <MenuRow
-              label="Add set below"
+              label="Set type"
+              trailing={`${dropPending ? "DROP" : "STRAIGHT"} ›`}
+              onClick={onToggleDrop}
+            />
+            <MenuRow
+              label="Skip set"
               onClick={() => {
                 commit(() =>
-                  addSetAction({
+                  toggleSkipSetAction({
+                    workout_id: we.workout_id,
+                    workout_exercise_id: we.id,
+                    set_number: setNumber,
+                    skipped: true,
+                  }),
+                );
+                onCloseMenu();
+              }}
+            />
+            <MenuRow
+              label="Delete set"
+              destructive
+              onClick={() => {
+                commit(() =>
+                  removeSetAction({
                     workout_id: we.workout_id,
                     workout_exercise_id: we.id,
                   }),
@@ -830,64 +1023,47 @@ function SetRow({
                 onCloseMenu();
               }}
             />
-            {state !== "logged" && (
-              <MenuRow
-                label="Set type"
-                trailing={`${dropPending ? "DROP" : "STRAIGHT"} ›`}
-                onClick={onToggleDrop}
-              />
-            )}
-            {state !== "logged" && (
-              <MenuRow
-                label="Skip set"
-                onClick={() => {
+          </>
+        )}
+        {!readOnly && state === "skipped" && (
+          <MenuRow
+            label="Unskip set"
+            onClick={() => {
+              commit(() =>
+                toggleSkipSetAction({
+                  workout_id: we.workout_id,
+                  workout_exercise_id: we.id,
+                  set_number: setNumber,
+                  skipped: false,
+                }),
+              );
+              onCloseMenu();
+            }}
+          />
+        )}
+        {state === "logged" &&
+          (readOnly ? (
+            <MenuRow label="Logged — session locked" disabled />
+          ) : (
+            <MenuRow
+              label="Delete set"
+              destructive
+              onClick={() => {
+                if (logged)
                   commit(() =>
-                    skipSetAction({
+                    deleteSetAction({
                       workout_id: we.workout_id,
-                      workout_exercise_id: we.id,
+                      set_id: logged.id,
                     }),
                   );
-                  onCloseMenu();
-                }}
-              />
-            )}
-            {state !== "logged" ? (
-              <MenuRow
-                label="Delete set"
-                destructive
-                onClick={() => {
-                  commit(() =>
-                    skipSetAction({
-                      workout_id: we.workout_id,
-                      workout_exercise_id: we.id,
-                    }),
-                  );
-                  onCloseMenu();
-                }}
-              />
-            ) : readOnly ? (
-              // completed workouts are locked — sets are immutable (fig 1.3)
-              <MenuRow label="Logged — session locked" disabled />
-            ) : (
-              // editable while in_progress; completion locks it (RLS-enforced)
-              <MenuRow
-                label="Delete set"
-                destructive
-                onClick={() => {
-                  if (logged)
-                    commit(() =>
-                      deleteSetAction({
-                        workout_id: we.workout_id,
-                        set_id: logged.id,
-                      }),
-                    );
-                  onCloseMenu();
-                }}
-              />
-            )}
-          </div>
-        </>
-      )}
+                onCloseMenu();
+              }}
+            />
+          ))}
+        {readOnly && state !== "logged" && (
+          <MenuRow label="Session locked" disabled />
+        )}
+      </AnchoredMenu>
     </div>
   );
 }
