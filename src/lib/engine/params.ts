@@ -138,6 +138,11 @@ export const engineParamsSchema = z.object({
       mod_max_eff_reps: z.number().int().positive(),
       high_max_rir: z.number().int().min(0),
       mod_max_rir: z.number().int().min(0),
+      // recency-weighted strength anchor (doc 11): each historical set's e1RM is
+      // weighted by 0.5^(ageDays / halflife) × confidence, so the live reps
+      // predictor tracks current form and legitimately drops when performance
+      // dips (e.g. on a cut). Tunable like everything else.
+      recency_halflife_days: z.number().positive().default(30),
     })
     .default({
       rir_offset: 1.0,
@@ -145,6 +150,7 @@ export const engineParamsSchema = z.object({
       mod_max_eff_reps: 12,
       high_max_rir: 2,
       mod_max_rir: 3,
+      recency_halflife_days: 30,
     }),
 
   // §5 profile-personalized macrocycle target + recommended-timeframe engine

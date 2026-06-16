@@ -88,6 +88,25 @@ describe("profiles", () => {
       .select();
     expect(data).toEqual([]);
   });
+
+  it("owners can toggle their own auto-match-weights setting", async () => {
+    const { data } = await alice
+      .from("profiles")
+      .update({ auto_match_weights: true })
+      .eq("id", aliceId)
+      .select("auto_match_weights")
+      .maybeSingle();
+    expect(data?.auto_match_weights).toBe(true);
+  });
+
+  it("other users cannot change someone else's settings", async () => {
+    const { data } = await bob
+      .from("profiles")
+      .update({ auto_match_weights: true })
+      .eq("id", aliceId)
+      .select();
+    expect(data).toEqual([]);
+  });
 });
 
 describe("cycles", () => {

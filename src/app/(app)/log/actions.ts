@@ -15,6 +15,7 @@ import {
   endMesocycle,
   endWorkout,
   logSet,
+  setPlannedSetWeight,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
@@ -73,6 +74,17 @@ export async function logSetAction(input: {
     set_type: parsed.set_type,
     unit: profile?.units ?? "lb",
   });
+  // auto-match (doc 11): carry the logged weight onto the remaining unlogged
+  // sets. Done here (after the insert excludes this set) to avoid a client race.
+  if (profile?.auto_match_weights) {
+    await setPlannedSetWeight(
+      supabase,
+      parsed.workout_exercise_id,
+      parsed.set_number,
+      parsed.weight,
+      true,
+    );
+  }
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }
@@ -107,6 +119,38 @@ const weTargetSchema = z.object({
   workout_id: z.string().uuid(),
   workout_exercise_id: z.string().uuid(),
 });
+
+const setWeightSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  set_number: z.coerce.number().int().min(1).max(30),
+  weight: z.coerce.number().min(0).max(2000),
+});
+
+/**
+ * Persist an edited planned weight for an upcoming (unlogged) set (doc 11). The
+ * weight always sticks; the user's `auto_match_weights` setting decides whether
+ * it lands on just this set or every still-unlogged set of the exercise.
+ */
+export async function updateSetWeightAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  set_number: number;
+  weight: number;
+}): Promise<void> {
+  const parsed = setWeightSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  const profile = await getProfile(supabase, user.id);
+  await setPlannedSetWeight(
+    supabase,
+    parsed.workout_exercise_id,
+    parsed.set_number,
+    parsed.weight,
+    profile?.auto_match_weights ?? false,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
 
 export async function addSetAction(input: {
   workout_id: string;

@@ -44,6 +44,41 @@ Docs-only change: `05-mcp-connector.md` (auth approach + coaching/analysis tool 
 `get_exercise_affinity`), `07-implementation-plan.md` (Phase 6 reorganized into slices), this log.
 
 ## 2026-06-16 — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
+## 2026-06-16 (latest) — Live reps⇄weight⇄RIR predictor + auto-match-weights setting
+
+Implements [11-workout-engine-explainer.md](11-workout-engine-explainer.md) §6
+after design review. Vertical slice; `main` deployable.
+
+### Done
+
+- **Live reps prediction (request #1).** New pure engine module
+  `src/lib/engine/reps.ts` — `predictRepsAtWeight` / `impliedRirAtReps` (invert
+  the averaged Epley/Brzycki e1RM curve by bisection) + `recencyWeightedE1rm`
+  (the strength anchor: each sample's e1RM weighted by
+  `0.5^(ageDays/recency_halflife_days) × confidence`, pure — caller supplies
+  ageDays). On the Day View, changing a set's weight now re-estimates the reps
+  that hit the row's **target RIR** from the user's recent history, until the
+  user types their own reps; future rows display the predicted reps at the
+  planned weight. New param `e1rm.recency_halflife_days` (default 30 d, engine
+  params **v6**). 13 golden/property tests.
+- **RIR premise (decision).** No separate per-set RIR capture: the prescribed
+  target RIR is the assumed RIR for all e1RM math (the app prescribes RIR and
+  trusts the honest log). Anchor recency-weighted so it tracks current form
+  (e.g. drops on a cut). Predicted reps = single integer.
+- **Auto-match weights (request #3).** New `profiles.auto_match_weights`
+  (migration `20260616000002`, off by default), More-tab ON/OFF toggle, and
+  propagation of a just-entered weight onto the exercise's **unlogged** sets
+  (via `prescribed_weight`; logged history untouched — hard rule #5). Rides the
+  existing owner-only profiles RLS; new RLS tests added.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (141/141), `npm run build`
+green. No mockup figure exists for these (live predictor is a behavior change,
+not a layout change; the toggle mirrors the existing Units control) — the reps
+field updates in place with no new chrome, so no pixel deviation to record.
+RLS unchanged except the additive column (covered by existing policies).
+## 2026-06-16 (latest) — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
 
 On-device feedback on the notes-model slice: the pinned vs session note should be
 **one** entry with a pin toggle, not two menu items. This unifies the UI, adds the
