@@ -157,12 +157,15 @@ export function PlannerBoard({
   muscleGroups,
   exercises,
   hasHistory = false,
+  initialDayNumber = null,
 }: {
   plan: MesoPlan;
   macroContext: MacroContext | null;
   muscleGroups: MuscleGroupRow[];
   exercises: PickerExerciseLite[];
   hasHistory?: boolean;
+  /** deep-link a specific day (e.g. from the Day View "Edit day") */
+  initialDayNumber?: number | null;
 }) {
   const { meso } = plan;
   const editing = meso.status !== "draft";
@@ -180,7 +183,11 @@ export function PlannerBoard({
     : withPending(toWorkDays(plan.days), pendingDay);
 
   const [activeDayId, setActiveDayId] = useState<string | null>(
-    days[0]?.id ?? null,
+    (initialDayNumber != null
+      ? days.find((d) => d.day_number === initialDayNumber)?.id
+      : null) ??
+      days[0]?.id ??
+      null,
   );
   const [daySetupId, setDaySetupId] = useState<string | null>(null);
   // a just-added day not yet confirmed via DONE — cancelling the sheet rolls it

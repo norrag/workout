@@ -11,10 +11,14 @@ import { PlannerBoard, type MacroContext } from "./PlannerBoard";
 /** Planner board (fig 2.4): days as columns of muscle-group slots. */
 export default async function MesoPlanPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ mesoId: string }>;
+  searchParams: Promise<{ day?: string }>;
 }) {
   const { mesoId } = await params;
+  const { day } = await searchParams;
+  const initialDayNumber = day ? Number(day) : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -103,6 +107,11 @@ export default async function MesoPlanPage({
         plan={plan}
         macroContext={macroContext}
         hasHistory={hasHistory}
+        initialDayNumber={
+          initialDayNumber && !Number.isNaN(initialDayNumber)
+            ? initialDayNumber
+            : null
+        }
         muscleGroups={muscleGroups}
         exercises={exercises.map((e) => ({
           id: e.id,

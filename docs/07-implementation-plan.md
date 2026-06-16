@@ -244,15 +244,23 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       (`workout_exercises.skipped_set_numbers`, migration `20260615000003`) — skip greys in place &
       reversible, **skip-remaining is per-set** (no longer whole-exercise); **complete button gated**
       on every set being logged or skipped. *(2026-06-15.)*
-- [ ] `DATA` **Notes model (1.1/1.2/3.x)** — split the **pinned note** (exercise-record attribute,
+- [x] `DATA` **Notes model (1.1/1.2/3.x)** — split the **pinned note** (exercise-record attribute,
       cross-workout, inline edit icon, optional) from a **session log note** (saved with the
       workout's exercise log; note-icon on history rows; editable only in the live workout). 09
-      session-5 §8.
-- [ ] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
+      session-5 §8. *(2026-06-16: session note reuses `exercise_feedback.notes` (one row per
+      workout_exercise) — **no migration**: the completion-lock RLS already gates its edits to the
+      active workout. Day View gains an inline pencil on the pinned-note bar + a NOTE bar / sheet for
+      the session note; `getExerciseHistory` carries `session_note`, surfaced as a tap-to-reveal note
+      icon in `ExerciseHistoryList` (sheet + Exercise page). Exercise-page pinned-note inline edit
+      deferred — minor.)*
+- [~] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
       Mesocycle (notes · edit → planner · stats · **End mesocycle** = skip+complete all remaining,
       strong warning) + Workout (note · edit day → planner · add exercise · **End workout** =
       skip-remaining + complete). New audited `endMesocycle`/`endWorkout` queries + confirm steps;
-      notes items depend on the notes model. 09 session-5 §9.
+      notes items depend on the notes model. 09 session-5 §9. *(2026-06-16: `⋮` menu +
+      `endWorkout`/`endMesocycle` (skip-remaining → complete, logged history untouched) + confirm
+      sheets + pure `src/lib/logging/end.ts` helpers (8 tests). **Notes items and Add exercise
+      deferred** — notes rows depend on the §8 notes-model slice; Add exercise is its own piece.)*
 
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable

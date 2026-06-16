@@ -54,6 +54,7 @@ describe("groupHistoryByMeso", () => {
     top_weight: 200,
     reps: "10, 10",
     is_deload: false,
+    session_note: null,
   });
 
   it("groups consecutive sessions of the same meso, preserving order", () => {

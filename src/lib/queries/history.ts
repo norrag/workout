@@ -11,6 +11,8 @@ export interface HistoryEntry {
   top_weight: number | null;
   reps: string;
   is_deload: boolean;
+  /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
+  session_note: string | null;
 }
 
 export interface HistoryMesoGroup {
@@ -63,10 +65,12 @@ export async function getExerciseHistory(
   const mesoIds = [...new Set(sets.map((s) => s.mesocycle_id))];
   const microIds = [...new Set(sets.map((s) => s.microcycle_id))];
   const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
+  const weIds = [...new Set(sets.map((s) => s.workout_exercise_id))];
   const [
     { data: mesos, error: mesoError },
     { data: micros, error: microError },
     { data: workouts, error: workoutError },
+    { data: feedback, error: feedbackError },
   ] = await Promise.all([
     supabase.from("mesocycles").select("id, name").in("id", mesoIds),
     supabase
@@ -74,13 +78,23 @@ export async function getExerciseHistory(
       .select("id, week_number, is_deload")
       .in("id", microIds),
     supabase.from("workouts").select("id, day_number").in("id", workoutIds),
+    supabase
+      .from("exercise_feedback")
+      .select("workout_exercise_id, notes")
+      .in("workout_exercise_id", weIds),
   ]);
   if (mesoError) throw mesoError;
   if (microError) throw microError;
   if (workoutError) throw workoutError;
+  if (feedbackError) throw feedbackError;
   const mesoById = new Map((mesos ?? []).map((m) => [m.id, m]));
   const microById = new Map((micros ?? []).map((m) => [m.id, m]));
   const workoutById = new Map((workouts ?? []).map((w) => [w.id, w]));
+  const noteByWe = new Map(
+    (feedback ?? [])
+      .filter((f) => f.notes)
+      .map((f) => [f.workout_exercise_id, f.notes]),
+  );
 
   // one entry per workout: top weight and its reps across the session
   const byWorkout = new Map<string, typeof sets>();
@@ -106,6 +120,7 @@ export async function getExerciseHistory(
       top_weight: top,
       reps,
       is_deload: micro?.is_deload ?? false,
+      session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };
   });
 }

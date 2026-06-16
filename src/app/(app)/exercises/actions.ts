@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createCustomExercise } from "@/lib/queries/exercises";
+import { clearPinnedNote, savePinnedNote } from "@/lib/queries/logging";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -17,6 +18,25 @@ async function requireUser() {
 
 export interface FormState {
   error: string | null;
+}
+
+const pinnedNoteSchema = z.object({
+  exercise_id: z.string().uuid(),
+  body: z.string().max(500).nullable(),
+});
+
+/** Edit the exercise's pinned note from the Exercise page (09 §8 parity with
+ * the Day View pencil). An empty body unpins it. */
+export async function setPinnedNoteAction(input: {
+  exercise_id: string;
+  body: string | null;
+}): Promise<void> {
+  const parsed = pinnedNoteSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  const body = parsed.body?.trim() || null;
+  if (body) await savePinnedNote(supabase, user.id, parsed.exercise_id, body);
+  else await clearPinnedNote(supabase, user.id, parsed.exercise_id);
+  revalidatePath(`/exercises/${parsed.exercise_id}`);
 }
 
 const customExerciseSchema = z.object({

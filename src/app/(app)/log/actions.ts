@@ -8,14 +8,18 @@ import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
+  clearPinnedNote,
   clearSkippedSets,
   completeWorkout,
   deleteLoggedSet,
+  endMesocycle,
+  endWorkout,
   logSet,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
+  saveSessionNote,
   saveWorkoutFeedback,
   setSetSkipped,
   skipRemainingSets,
@@ -244,6 +248,49 @@ export async function savePinnedNoteAction(input: {
   revalidatePath("/workout");
 }
 
+const clearPinnedSchema = z.object({
+  workout_id: z.string().uuid(),
+  exercise_id: z.string().uuid(),
+});
+
+/** Unpin the exercise's pinned note (used when a note is unpinned/cleared or
+ * moved to session-only from the unified note sheet). */
+export async function clearPinnedNoteAction(input: {
+  workout_id: string;
+  exercise_id: string;
+}): Promise<void> {
+  const parsed = clearPinnedSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await clearPinnedNote(supabase, user.id, parsed.exercise_id);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const sessionNoteSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  note: z.string().max(500).nullable(),
+});
+
+/** Session log note (09 §8) — saved with the workout's exercise log; the
+ * completion lock keeps it editable only while the workout is in_progress. */
+export async function saveSessionNoteAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  note: string | null;
+}): Promise<void> {
+  const parsed = sessionNoteSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await saveSessionNote(
+    supabase,
+    user.id,
+    parsed.workout_exercise_id,
+    parsed.note,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
 const feedbackSchema = z.object({
   workout_id: z.string().uuid(),
   workout_exercise_id: z.string().uuid(),
@@ -443,4 +490,60 @@ export async function completeWorkoutAction(input: {
   revalidatePath("/workout");
   revalidatePath(`/log/${parsed.workout_id}`);
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// end early (fig 1.1 options menu, 09 session-5 §9)
+// ---------------------------------------------------------------------------
+
+const endWorkoutSchema = z.object({ workout_id: z.string().uuid() });
+
+/** End workout = skip every remaining set + complete + advance the week. */
+export async function endWorkoutAction(input: {
+  workout_id: string;
+}): Promise<AdvanceResult> {
+  const parsed = endWorkoutSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await endWorkout(supabase, user.id, parsed.workout_id);
+
+  // same week N → N+1 generation as a normal completion; a failure must not
+  // lose the early-end (the workout tab re-runs the job on next open).
+  let result: AdvanceResult;
+  try {
+    result = await advanceWeekAfterWorkout(
+      createServiceClient(),
+      user.id,
+      parsed.workout_id,
+    );
+  } catch (error) {
+    console.error("week generation failed after ending workout", error);
+    result = {
+      summary:
+        "Workout ended. Next week's targets recalculate when you next open the app.",
+      nextWorkoutId: null,
+      nextLabel: null,
+    };
+  }
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  return result;
+}
+
+const endMesoSchema = z.object({
+  workout_id: z.string().uuid(),
+  meso_id: z.string().uuid(),
+});
+
+/** End mesocycle = skip/close every remaining workout, then complete the meso. */
+export async function endMesocycleAction(input: {
+  workout_id: string;
+  meso_id: string;
+}): Promise<void> {
+  const parsed = endMesoSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await endMesocycle(supabase, user.id, parsed.meso_id);
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}`);
+  revalidatePath("/cycles");
 }
