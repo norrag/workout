@@ -1031,17 +1031,23 @@ function SetRow({
             aria-label={`set ${setNumber} weight`}
             value={weight}
             onChange={(e) => {
-              const v = e.target.value;
-              setWeight(v);
+              setWeight(e.target.value);
               edited.current = true;
-              // re-estimate reps for the new weight unless the user set their own
-              const w = Number(v);
-              if (!repsManual.current && v !== "" && !Number.isNaN(w)) {
-                const predicted = predictReps(w);
-                if (predicted != null) setReps(String(predicted));
+            }}
+            onBlur={() => {
+              // re-estimate reps for the entered weight once the user is done
+              // typing (not live), unless they set their own reps. Only on
+              // unlogged rows — a logged row's reps are recorded actuals.
+              if (state === "next" && !repsManual.current) {
+                const w = Number(weight);
+                if (weight !== "" && !Number.isNaN(w)) {
+                  const predicted = predictReps(w);
+                  if (predicted != null) setReps(String(predicted));
+                }
+              } else if (state === "logged") {
+                save();
               }
             }}
-            onBlur={() => state === "logged" && save()}
             className={cell}
           />
           <input
