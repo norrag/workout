@@ -37,7 +37,6 @@ export default async function LogWorkoutPage({
       <DayView
         detail={detail}
         units={profile?.units ?? "lb"}
-        autoMatch={profile?.auto_match_weights ?? false}
         params={engineParams}
       />
     </div>

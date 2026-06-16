@@ -648,20 +648,47 @@ export async function adjustPrescribedSets(
 }
 
 /**
- * Auto-match weights (doc 11): set the exercise's prescribed weight so the
- * still-unlogged sets (future display rows + the next slot's default) follow a
- * weight the user just entered. Logged history is untouched — only the
- * prescription moves. Gated on the user's `auto_match_weights` setting by the
- * caller.
+ * Persist a planned weight for an upcoming (unlogged) set (doc 11). With
+ * `matchAll` (the auto-match setting), the weight is written to *every*
+ * still-unlogged set of the exercise; otherwise only to `setNumber`. Logged
+ * sets are never touched — actuals live in `logged_sets`; this only seeds the
+ * weight shown before a set is logged. Stored as a `set_number → weight` map in
+ * `workout_exercises.set_weights`.
  */
-export async function matchWeightAcrossSets(
+export async function setPlannedSetWeight(
   supabase: Client,
   workoutExerciseId: string,
+  setNumber: number,
   weight: number,
+  matchAll: boolean,
 ): Promise<void> {
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("prescribed_sets, set_weights")
+    .eq("id", workoutExerciseId)
+    .single();
+  if (weError) throw weError;
+
+  const next: Record<string, number> = { ...(we.set_weights ?? {}) };
+
+  if (matchAll) {
+    const { data: sets, error: setsError } = await supabase
+      .from("logged_sets")
+      .select("set_number")
+      .eq("workout_exercise_id", workoutExerciseId);
+    if (setsError) throw setsError;
+    const logged = new Set((sets ?? []).map((s) => s.set_number));
+    const planned = Math.max(we.prescribed_sets ?? 1, setNumber);
+    for (let n = 1; n <= planned; n += 1) {
+      if (!logged.has(n)) next[String(n)] = weight;
+    }
+  } else {
+    next[String(setNumber)] = weight;
+  }
+
   const { error } = await supabase
     .from("workout_exercises")
-    .update({ prescribed_weight: weight })
+    .update({ set_weights: next })
     .eq("id", workoutExerciseId);
   if (error) throw error;
 }

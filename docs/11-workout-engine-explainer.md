@@ -396,9 +396,16 @@ profile flag; optionally optimistic propagation in `DayView` for snappiness.
 - `profiles.auto_match_weights` column (migration `20260616000002`), off by
   default; rides the existing owner-only profiles RLS (new RLS tests added).
 - More-tab toggle (`more/AutoMatchToggle.tsx` + `setAutoMatchWeights` action).
-- `matchWeightAction` / `matchWeightAcrossSets()` propagate a just-entered
-  weight onto the exercise's **unlogged** sets via `prescribed_weight`; logged
-  history is never rewritten. Triggered from `SetRow.save()` on log/amend when
-  the setting is on (composes with the predictor: shared weight, per-row reps).
+- **Per-set planned weight overrides** (`workout_exercises.set_weights` jsonb,
+  migration `20260616000003`): the plan stores a single `prescribed_weight` per
+  exercise, so an edited upcoming weight had nowhere to persist. `set_weights`
+  maps `set_number → weight` for **unlogged** sets; display falls back to
+  `prescribed_weight`. Editing a set's weight (on blur) persists its override
+  so it survives navigation; `setPlannedSetWeight(matchAll)` writes either just
+  that set or **every still-unlogged set** per the user's setting. Logging a set
+  with the setting on carries the logged weight onto the remaining unlogged sets
+  (server-side, in `logSetAction`, after the insert excludes the logged set).
+  Logged history (`logged_sets`) is never rewritten — composes with the
+  predictor: shared weight, per-row predicted reps.
 </content>
 </invoke>

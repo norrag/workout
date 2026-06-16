@@ -10,8 +10,9 @@ type Defaulted =
   | "id"
   | "created_at"
   | "updated_at"
-  // has a DB default ('{}'); only workout_exercises carries this key
+  // has a DB default ('{}'); only workout_exercises carries these keys
   | "skipped_set_numbers"
+  | "set_weights"
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
@@ -247,6 +248,8 @@ export type WorkoutExerciseRow = {
   status: "pending" | "completed" | "skipped";
   /** set numbers skipped individually (greyed, reversible) — fig 1.3 */
   skipped_set_numbers: number[];
+  /** per-set planned weight overrides for unlogged sets (set_number → weight), doc 11 */
+  set_weights: Record<string, number>;
   notes: string | null;
   created_at: string;
   updated_at: string;

@@ -55,7 +55,6 @@ export default async function WorkoutPage() {
         <DayView
           detail={detail}
           units={profile?.units ?? "lb"}
-          autoMatch={profile?.auto_match_weights ?? false}
           params={engineParams}
         />
       );
