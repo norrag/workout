@@ -14,6 +14,18 @@ The MCP connector lets users plug their training data into the LLM of their choi
 - Data access uses an RLS-scoped client where possible; where service-role is required, queries are explicitly filtered by the session's `user_id`.
 - Tokens are revocable from More → AI connector (fig 4.4).
 
+> **Implementation approach (2026-06-16 planning).** Use Supabase's native **OAuth 2.1
+> Server** as the authorization server: it provides authorization-code + PKCE, **dynamic
+> client registration** for MCP clients, JWKS/OIDC discovery, and revocation, and issues
+> standard Supabase JWTs carrying `user_id` / `role` / `client_id`. `/api/mcp` is therefore a
+> pure **resource server** — it validates the bearer JWT against JWKS (`mcp-handler`'s
+> `withMcpAuth`) and exposes `/.well-known/oauth-protected-resource` pointing at the Supabase
+> AS. Because **RLS applies automatically to OAuth-issued tokens**, tools use a token-bound
+> RLS client for reads/writes; service-role stays reserved for the few spots RLS can't cover
+> (writing `mcp_write_audit`, admin cross-scope reads). No custom token table is needed; the
+> connector row revokes the Supabase grant. Confirm the feature is enabled on the hosted
+> project before the first slice.
+
 ## Tools
 
 ### Read / analysis
@@ -28,6 +40,29 @@ The MCP connector lets users plug their training data into the LLM of their choi
 | `get_macro_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
 | `search_exercises` / `search_templates` | library queries with the same filters the UI uses |
 | `explain_prescription` | surface the engine's `engine_decisions` rationale for a given prescription |
+
+### Coaching & analysis (read-only; added 2026-06-16 — "deep access" expansion)
+
+The connector's largest purpose is acting as a grounded personal trainer. These tools give the
+model a coach's-eye view of the whole training picture without adding any write surface — built
+entirely on the shared views + the pure engine. All honor exclusions and the §9 honesty
+guardrails (estimates labeled, pump/soreness secondary, balance advisory-only).
+
+| Tool | Purpose |
+|---|---|
+| `get_training_overview` | one-call grounding snapshot: profile + active macro→meso→next workout + recent adherence + key-lift e1RM trend |
+| `get_recent_sessions` | reverse-chron feed of completed workouts with session feedback (fatigue/effort/performance) and session notes — recovery & adherence signal |
+| `analyze_exercise_progress` | e1RM trend, PRs, and **stall/plateau detection** for an exercise (over `v_exercise_overview` / `v_exercise_prs`) |
+| `compare_mesocycles` | side-by-side rollups of two or more mesos (volume, progression, adherence, progress score) |
+| `get_muscle_balance` | weekly sets per muscle group vs MEV/MAV/MRV landmarks + push/pull/legs split with weak-point flags — **advisory only** (10 §9) |
+| `get_exercise_affinity` | **exercise-selection profile** per muscle group / equipment type: which movements the user actually trains (frequency, recency, recent loads & volume), each joined with its **pinned note** and **aggregated session feedback** (mean joint pain, workload, pump). Surfaces what the user relies on and tolerates well vs. what their notes/feedback flag — so recommendations and planning favor proven, well-received movements and steer clear of injury-sensitive or poorly-tolerated ones. Read over `logged_sets` × `exercise_muscle_groups` × `exercise_notes` × `exercise_feedback`; respects exclusions |
+| `get_exercise_notes` / `get_exclusions` | durable context: pinned notes across the library and the user's excluded movements with reasons |
+
+**Why selection history matters.** Prior exercise selection is itself a strong prior: an exercise
+the user has chosen repeatedly, loaded well, and left no pain/"felt off" notes on is a safe
+recommendation; one they tried once and flagged, or never pick for a muscle they train hard, is a
+signal to avoid or revisit. `get_exercise_affinity` makes that prior explicit so advice and drafted
+plans stay grounded in the user's real movement preferences rather than a generic library default.
 
 ### Write / planning (always explicit, never destructive-by-default)
 | Tool | Purpose |
