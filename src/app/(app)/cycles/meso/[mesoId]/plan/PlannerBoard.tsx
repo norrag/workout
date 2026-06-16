@@ -342,10 +342,16 @@ export function PlannerBoard({
   };
 
   useEffect(() => {
+    // Don't snap the active day back to day-1 while a setup / add-groups sheet
+    // is open for a day that the freshly-revalidated `days` hasn't caught up to
+    // yet (live draft path) — that left the sheet pointing at a vanished day and
+    // wedged it shut until a manual refresh.
+    const pendingSheet = daySetupId ?? addGroupsDayId;
+    if (pendingSheet && !days.some((d) => d.id === pendingSheet)) return;
     if (!days.some((d) => d.id === activeDayId)) {
       setActiveDayId(days[0]?.id ?? null);
     }
-  }, [days, activeDayId]);
+  }, [days, activeDayId, daySetupId, addGroupsDayId]);
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
   const totalSlots = activeDay
