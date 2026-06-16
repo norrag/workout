@@ -2,7 +2,46 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Planner reorder (groups + exercises) + draft add-day sheet fix
+## 2026-06-16 (latest) — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
+
+On-device review of the planner board surfaced three concrete, reproducible
+bugs (the prior optimistic-bridge fix didn't cover them). No schema change;
+`main` deployable.
+
+### Fixed
+
+- **Stacked day-sheet + group-picker ("two edit-day windows / non-responsive
+  window").** Opening **+ ADD MUSCLE GROUP** from the EDIT DAY sheet left the
+  day sheet mounted **behind** the picker, so the picker (which looks like the
+  day sheet) appeared to "slide up over another window," and on close the stale
+  day sheet underneath read as non-responsive. Now it's **single-sheet at a
+  time**: opening the picker from the day sheet **closes** the day sheet (after
+  persisting its label/weekday) and **reopens** it when the picker closes — but
+  only when the picker was opened from the day sheet (a `returnToDaySheet` flag;
+  the board's own + ADD MUSCLE GROUP returns to the board).
+- **Day-tab `+` then Cancel still added the day.** In editing (staged) mode the
+  `+` committed the day to the working copy immediately, so Cancel/✕ didn't undo
+  it. The day sheet now distinguishes **DONE** (`onDone` — commit) from
+  **Cancel/✕/scrim** (`onCancel`); a just-added, never-confirmed day is tracked
+  (`pendingNewDayId`) and **rolled back on cancel** (in both staged and live
+  modes; the optimistic draft ghost is cleared too). The button reads **ADD
+  DAY** for a new day, **DONE** for an existing one.
+- **"Application error" past 7 days.** A week is 7 days — the DB checks
+  (`meso_days.day_number ≤ 7`, `mesocycles.days_per_week ≤ 7`) threw once a
+  user added an 8th. The day-tab `+` is now **hidden at 7 days** (`atDayLimit`),
+  and day numbering picks the **smallest unused 1..7** (`nextDayNumber`) instead
+  of `max+1` — so removing then re-adding a day no longer pushes `day_number`
+  past 7 (the live `addMesoDay` query got the same fix). `saveMesoPlan` schema
+  tightened from `max(14)` to `max(7)` to match the DB.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (128/128), `npm run build`
+green. The fixes are planner interaction state + a day-numbering correction
+(client + the `addMesoDay` query); RLS unchanged. In-browser re-test of the
+three flows on a device recommended to confirm.
+
+## 2026-06-16 — Planner reorder (groups + exercises) + draft add-day sheet fix
 
 Closes the remaining two open items from the 2026-06-16 notes batch ("Not done
 yet"): **planner reorder** and the **add-day sheet dismissal** bug. No schema

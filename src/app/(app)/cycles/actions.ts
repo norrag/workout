@@ -421,7 +421,8 @@ const planSaveSchema = z.object({
   days: z
     .array(
       z.object({
-        day_number: z.number().int().min(1).max(14),
+        // a week is 7 days (DB checks: day_number ≤ 7, days_per_week ≤ 7)
+        day_number: z.number().int().min(1).max(7),
         label: z.string().max(40).nullable(),
         weekday: z.number().int().min(1).max(7).nullable(),
         groups: z.array(
@@ -439,7 +440,7 @@ const planSaveSchema = z.object({
         ),
       }),
     )
-    .max(14),
+    .max(7),
 });
 
 export async function saveMesoPlanAction(input: {
