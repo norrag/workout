@@ -5,6 +5,7 @@ import { getExerciseHistory } from "@/lib/queries/history";
 import { getExerciseOverview } from "@/lib/queries/exercises";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
+import { ExercisePinnedNote } from "./ExercisePinnedNote";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -266,12 +267,10 @@ export default async function ExerciseDetailPage({
               {exercise.description}
             </p>
           )}
-          {pinned && (
-            <div className="mt-4 border-l-2 border-ink py-1.5 pl-2.5 text-[11.5px] leading-normal text-ink/75">
-              <span className="font-bold tracking-[0.08em]">PINNED — </span>
-              {pinned.body}
-            </div>
-          )}
+          <ExercisePinnedNote
+            exerciseId={exercise.id}
+            initial={pinned?.body ?? null}
+          />
 
           {exercise.user_id === user.id && (
             <ShareRow objectType="exercise" objectId={exercise.id} />

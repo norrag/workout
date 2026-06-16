@@ -8,6 +8,7 @@ import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
+  clearPinnedNote,
   clearSkippedSets,
   completeWorkout,
   deleteLoggedSet,
@@ -243,6 +244,24 @@ export async function savePinnedNoteAction(input: {
   const parsed = noteSchema.parse(input);
   const { supabase, user } = await requireUser();
   await savePinnedNote(supabase, user.id, parsed.exercise_id, parsed.body);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const clearPinnedSchema = z.object({
+  workout_id: z.string().uuid(),
+  exercise_id: z.string().uuid(),
+});
+
+/** Unpin the exercise's pinned note (used when a note is unpinned/cleared or
+ * moved to session-only from the unified note sheet). */
+export async function clearPinnedNoteAction(input: {
+  workout_id: string;
+  exercise_id: string;
+}): Promise<void> {
+  const parsed = clearPinnedSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await clearPinnedNote(supabase, user.id, parsed.exercise_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }

@@ -2,7 +2,55 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Notes-model split (09 §8) + options-menu polish (subtle ⋮ · Edit day deep-link)
+## 2026-06-16 (latest) — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
+
+On-device feedback on the notes-model slice: the pinned vs session note should be
+**one** entry with a pin toggle, not two menu items. This unifies the UI, adds the
+Exercise-page pencil, and records the two-note contract for the MCP. No schema change.
+
+### Done
+
+- **One note, one sheet, a pin checkbox.** The exercise `⋮` menu now has a single
+  **Note / Notes** row (was two: pinned + session). It opens a unified sheet with a
+  textarea + a **"Pin to this exercise"** checkbox whose helper line states the
+  difference plainly: checked → *"Stays on this exercise in every workout."*,
+  unchecked → *"Saved with just this session — a note on how it went today."* The
+  checkbox decides where the note lands (pinned `exercise_notes` vs session
+  `exercise_feedback.notes`).
+- **Move between buckets.** Flipping the pin on an existing note **moves** it rather
+  than duplicating: pinning a session note clears the session copy; unpinning the
+  pinned note demotes it to a session note (new `clearPinnedNote` query +
+  `clearPinnedNoteAction`). Empty text clears the note in its bucket. Both display
+  bars (PINNED — / NOTE —) keep their inline pencils, which open the same sheet
+  pre-targeted to that bucket; the menu row defaults to the session note.
+- **Exercise-page pinned-note pencil (parity).** New `ExercisePinnedNote` client
+  component on the Exercise page (3.1a): the pinned note shows with an inline pencil
+  to edit/clear, and an empty state offers **+ PIN A NOTE**. Saves via a new
+  `setPinnedNoteAction` (exercise-scoped; empty unpins). No workout context needed —
+  it's the exercise-wide note.
+- **MCP notes contract (`docs/05-mcp-connector.md`).** Recorded that the connector
+  exposes **both** note kinds and why: the pinned note is durable/general (conditions
+  interpretation of the whole history), the session notes are day-to-day signal
+  (trend, recovery, adherence). `get_exercise_history` carries both; `log_note` writes
+  either kind (drafts/active session only, never completed history). This is the
+  understanding the MCP uses to be a stronger partner.
+
+### Recorded deviations
+
+- **Pin defaults off** for a note opened from the menu — a mid-workout note is most
+  often a session observation; the checkbox + copy make pinning a deliberate one-tap.
+- **Both notes can still coexist** on an exercise (a durable pinned caveat + today's
+  observation); the two display bars and pencils manage each independently, while the
+  single sheet handles one note at a time per its pin state.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+Still no schema change (session note rides `exercise_feedback`; the pinned note rides
+`exercise_notes`); the move/clear paths are user-scoped through existing RLS and the
+completion lock. In-browser QA of the unified sheet + Exercise-page pencil pending.
+
+## 2026-06-16 — Notes-model split (09 §8) + options-menu polish (subtle ⋮ · Edit day deep-link)
 
 Follow-up to the options-menu slice (on-device notes). Lands the **notes-model
 split** (09 session-5 §8) and two interaction fixes. No schema change — the

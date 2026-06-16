@@ -660,6 +660,22 @@ export async function savePinnedNote(
   if (error) throw error;
 }
 
+/** Unpin the exercise's pinned note (used when a note moves to session-only,
+ * or is cleared). The row is kept but no longer surfaces as the pinned note. */
+export async function clearPinnedNote(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("exercise_notes")
+    .update({ is_pinned: false })
+    .eq("user_id", userId)
+    .eq("exercise_id", exerciseId)
+    .eq("is_pinned", true);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // feedback (fig 1.4): joint pain per exercise; pump/workload 0–10 scoped
 // to the exercise's muscle group, stored on that exercise's feedback row
