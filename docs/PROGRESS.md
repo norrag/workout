@@ -2,6 +2,48 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-16 (latest) — Phase 6 (MCP connector) plan locked
+
+Planning session for the MCP connector ahead of implementation in a separate session.
+No code yet — this commit records the build decisions in the specs so the next session
+launches straight from the docs. `main` unaffected.
+
+### Decisions
+
+- **Auth = Supabase's native OAuth 2.1 Server** as the authorization server (authorization-code
+  + PKCE, **dynamic client registration**, JWKS/OIDC discovery, revocation; issues Supabase JWTs
+  with `user_id`/`role`/`client_id`). `/api/mcp` becomes a pure **resource server** validating the
+  bearer JWT via `mcp-handler`'s `withMcpAuth`, with **RLS doing per-user scoping**; service-role
+  reserved for `mcp_write_audit` + admin cross-scope reads. No custom token table. This collapses
+  the riskiest slice from "build an OAuth AS" to "verify a JWT + expose protected-resource
+  metadata." (05 §Auth.) Requires enabling the OAuth server on the hosted project.
+- **Vertical slices** (each deployable): (1) transport+auth+`get_current_state`+test harness,
+  (2) full read/analysis + coaching suite, (3) write/planning drafts (audited), (4) admin/tuning +
+  replay. (07 Phase 6.)
+- **Tool surface expanded for coaching** beyond the original spec list: `get_training_overview`,
+  `get_recent_sessions`, `analyze_exercise_progress` (stall/plateau detection), `compare_mesocycles`,
+  `get_muscle_balance`, `get_exercise_notes`/`get_exclusions`, and **`get_exercise_affinity`** — an
+  exercise-selection profile per muscle group / equipment type combining prior selection (frequency,
+  recency, loads/volume) with pinned notes and aggregated session feedback, so advice/planning favor
+  proven, well-tolerated movements and avoid flagged ones. All read-only on existing views + the
+  pure engine. (05 §Coaching & analysis.)
+
+### Codebase readiness (surveyed)
+
+- `src/lib/mcp/` and `src/app/api/mcp/` do **not** exist yet — Phase 6 is greenfield on top of a
+  built app.
+- The `src/lib/queries/` layer (~90 fns, all `(client, userId, …)`-shaped) already covers nearly
+  every read/write a tool needs; the pure engine (`prescribe`/`seedMeso`/`planMacrocycle`/
+  `estimateE1rm`) is fully exported; `mcp_write_audit`/`engine_params`/`engine_decisions` and the
+  shared `v_*` views all exist. **Missing data paths:** an `engine_decisions` reader, a param-version
+  lister, and the affinity rollup — plus likely one index migration on `engine_decisions`.
+
+### Verified
+
+Docs-only change: `05-mcp-connector.md` (auth approach + coaching/analysis tool tables incl.
+`get_exercise_affinity`), `07-implementation-plan.md` (Phase 6 reorganized into slices), this log.
+
+## 2026-06-16 — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
 ## 2026-06-16 (latest) — Live reps⇄weight⇄RIR predictor + auto-match-weights setting
 
 Implements [11-workout-engine-explainer.md](11-workout-engine-explainer.md) §6
