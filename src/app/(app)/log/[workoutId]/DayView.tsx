@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
@@ -20,6 +21,7 @@ import {
   listReplacementCandidatesAction,
   logSetAction,
   moveExerciseDownAction,
+  moveExerciseUpAction,
   removeExerciseAction,
   removeSetAction,
   replaceExerciseAction,
@@ -152,6 +154,7 @@ export function DayView({
           onHistory={() => setHistoryFor(we)}
           onReplace={() => setReplaceFor(we)}
           onNote={() => setNoteFor(we)}
+          onFeedback={() => setFeedbackFor(we)}
           onToggleDrop={() =>
             setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
           }
@@ -197,6 +200,7 @@ export function DayView({
         onClose={() => setHistoryFor(null)}
       />
       <FeedbackSheet
+        key={feedbackFor?.id ?? "none"}
         we={feedbackFor}
         workoutId={workout.id}
         weekNumber={microcycle.week_number}
@@ -434,6 +438,7 @@ function ExerciseBlock({
   onHistory,
   onReplace,
   onNote,
+  onFeedback,
   onToggleDrop,
   onLogged,
   commit,
@@ -453,6 +458,7 @@ function ExerciseBlock({
   onHistory: () => void;
   onReplace: () => void;
   onNote: () => void;
+  onFeedback: () => void;
   onToggleDrop: () => void;
   onLogged: (wasLastPlannedSet: boolean) => void;
   commit: Commit;
@@ -606,6 +612,20 @@ function ExerciseBlock({
         )}
         {!readOnly && (
           <>
+            {index > 0 && (
+              <MenuRow
+                label="Move up"
+                onClick={() => {
+                  commit(() =>
+                    moveExerciseUpAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
+                  onCloseMenu();
+                }}
+              />
+            )}
             {!isLast && (
               <MenuRow
                 label="Move down"
@@ -630,6 +650,13 @@ function ExerciseBlock({
                   }),
                 );
                 onCloseMenu();
+              }}
+            />
+            <MenuRow
+              label={we.feedback ? "Edit feedback" : "Add feedback"}
+              onClick={() => {
+                onCloseMenu();
+                onFeedback();
               }}
             />
             {nextSetNumber !== 0 && (
@@ -734,6 +761,8 @@ function AnchoredMenu({
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
   }, [open, triggerRef, align, width]);
+
+  useScrollLock(open);
 
   if (!open) return null;
   return (
@@ -1275,9 +1304,12 @@ function FeedbackSheet({
   onClose: () => void;
   commit: Commit;
 }) {
-  const [pain, setPain] = useState<number | null>(null);
-  const [pump, setPump] = useState(5);
-  const [workload, setWorkload] = useState(5);
+  // prefill from any existing feedback (editing) — the sheet is keyed per
+  // exercise so these initial values are correct on each open
+  const existing = we?.feedback ?? null;
+  const [pain, setPain] = useState<number | null>(existing?.joint_pain ?? null);
+  const [pump, setPump] = useState(existing?.pump ?? 5);
+  const [workload, setWorkload] = useState(existing?.workload ?? 5);
   const [workloadInfo, setWorkloadInfo] = useState(true);
   const [pumpInfo, setPumpInfo] = useState(false);
 
@@ -1470,6 +1502,7 @@ function CompleteSheet({
   const { render, shown } = useSheetTransition(open);
   const sliderValue = { fatigue, effort, performance };
   const setSlider = { fatigue: setFatigue, effort: setEffort, performance: setPerformance };
+  useScrollLock(render);
   if (!render) return null;
 
   const { workout, microcycle, exercises } = detail;

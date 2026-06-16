@@ -3,7 +3,7 @@ import type { HistoryEntry } from "@/lib/queries/history";
 function shortDate(iso: string): string {
   const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   const d = new Date(`${iso}T12:00:00`);
-  return `${d.getDate()} ${months[d.getMonth()]}`;
+  return `${d.getDate()} ${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
 }
 
 /**

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 
 /**
  * Drives a mount + slide-up/down transition for a bottom sheet controlled by
@@ -42,6 +43,7 @@ export function BottomSheet({
   children: ReactNode;
 }) {
   const { render, shown } = useSheetTransition(open);
+  useScrollLock(render);
   if (!render) return null;
   return (
     <div className="fixed inset-0 z-50">
