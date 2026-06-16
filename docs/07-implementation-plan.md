@@ -248,11 +248,14 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       cross-workout, inline edit icon, optional) from a **session log note** (saved with the
       workout's exercise log; note-icon on history rows; editable only in the live workout). 09
       session-5 §8.
-- [ ] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
+- [~] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
       Mesocycle (notes · edit → planner · stats · **End mesocycle** = skip+complete all remaining,
       strong warning) + Workout (note · edit day → planner · add exercise · **End workout** =
       skip-remaining + complete). New audited `endMesocycle`/`endWorkout` queries + confirm steps;
-      notes items depend on the notes model. 09 session-5 §9.
+      notes items depend on the notes model. 09 session-5 §9. *(2026-06-16: `⋮` menu +
+      `endWorkout`/`endMesocycle` (skip-remaining → complete, logged history untouched) + confirm
+      sheets + pure `src/lib/logging/end.ts` helpers (8 tests). **Notes items and Add exercise
+      deferred** — notes rows depend on the §8 notes-model slice; Add exercise is its own piece.)*
 
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable

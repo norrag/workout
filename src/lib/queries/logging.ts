@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { endWorkoutStatus, isRemainingWorkout } from "@/lib/logging/end";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -831,4 +832,118 @@ export async function completeWorkout(
       .eq("id", workout.microcycle_id);
     if (error) throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// end early (fig 1.1 options menu, 09 session-5 §9) — skip what's left, then
+// close. Logged history is never modified; only still-open planned slots are
+// skipped and statuses advance.
+// ---------------------------------------------------------------------------
+
+/**
+ * End the current workout early: skip every still-open set on every exercise,
+ * then run the standard completion path (exercise statuses, microcycle close).
+ * Reuses {@link skipRemainingSets} + {@link completeWorkout}; allowed while the
+ * workout is planned/in_progress.
+ */
+export async function endWorkout(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+): Promise<void> {
+  const { data: wes, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("id")
+    .eq("workout_id", workoutId);
+  if (weError) throw weError;
+  for (const we of wes ?? []) {
+    await skipRemainingSets(supabase, we.id);
+  }
+  await completeWorkout(supabase, userId, workoutId, null);
+}
+
+/**
+ * End a mesocycle early: for every not-yet-finished workout, skip all open
+ * sets and close it (completed if anything was logged on it, else skipped),
+ * then close every microcycle and mark the mesocycle completed. Logged sets
+ * are never touched. No week generation runs — the meso is over.
+ */
+export async function endMesocycle(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<void> {
+  const { data: micros, error: microError } = await supabase
+    .from("microcycles")
+    .select("id")
+    .eq("mesocycle_id", mesoId)
+    .eq("user_id", userId);
+  if (microError) throw microError;
+  const microIds = (micros ?? []).map((m) => m.id);
+
+  if (microIds.length > 0) {
+    const { data: workouts, error: wError } = await supabase
+      .from("workouts")
+      .select("id, status")
+      .in("microcycle_id", microIds);
+    if (wError) throw wError;
+
+    for (const w of workouts ?? []) {
+      if (!isRemainingWorkout(w.status)) continue;
+
+      const { data: wes, error: weError } = await supabase
+        .from("workout_exercises")
+        .select("id")
+        .eq("workout_id", w.id);
+      if (weError) throw weError;
+      const weIds = (wes ?? []).map((x) => x.id);
+
+      // skip the open slots while the workout is still in_progress, before the
+      // status flip (logged_sets/feedback lock on completion, not these)
+      for (const id of weIds) {
+        await skipRemainingSets(supabase, id);
+      }
+
+      let loggedWeIds = new Set<string>();
+      if (weIds.length > 0) {
+        const { data: sets, error: setsError } = await supabase
+          .from("logged_sets")
+          .select("workout_exercise_id")
+          .in("workout_exercise_id", weIds);
+        if (setsError) throw setsError;
+        loggedWeIds = new Set((sets ?? []).map((s) => s.workout_exercise_id));
+      }
+      for (const id of weIds) {
+        const { error } = await supabase
+          .from("workout_exercises")
+          .update({ status: loggedWeIds.has(id) ? "completed" : "skipped" })
+          .eq("id", id);
+        if (error) throw error;
+      }
+
+      const { error: wUpdError } = await supabase
+        .from("workouts")
+        .update({
+          status: endWorkoutStatus(loggedWeIds.size > 0),
+          performed_at: new Date().toISOString(),
+        })
+        .eq("id", w.id)
+        .eq("user_id", userId);
+      if (wUpdError) throw wUpdError;
+    }
+
+    const { error: microUpdError } = await supabase
+      .from("microcycles")
+      .update({ status: "completed" })
+      .in("id", microIds)
+      .neq("status", "completed");
+    if (microUpdError) throw microUpdError;
+  }
+
+  const { error: mesoUpdError } = await supabase
+    .from("mesocycles")
+    .update({ status: "completed" })
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (mesoUpdError) throw mesoUpdError;
 }

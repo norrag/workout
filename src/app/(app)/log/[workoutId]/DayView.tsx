@@ -18,6 +18,8 @@ import {
   amendSetAction,
   completeWorkoutAction,
   deleteSetAction,
+  endMesocycleAction,
+  endWorkoutAction,
   listReplacementCandidatesAction,
   logSetAction,
   moveExerciseDownAction,
@@ -125,6 +127,11 @@ export function DayView({
       <DayHeader
         mesoId={mesocycle.id}
         mesoName={mesocycle.name}
+        workoutId={workout.id}
+        workoutActive={
+          workout.status === "planned" || workout.status === "in_progress"
+        }
+        mesoActive={mesocycle.status === "active"}
         weekNumber={microcycle.week_number}
         dayNumber={workout.day_number}
         isDeload={microcycle.is_deload}
@@ -239,6 +246,9 @@ export function DayView({
 function DayHeader({
   mesoId,
   mesoName,
+  workoutId,
+  workoutActive,
+  mesoActive,
   weekNumber,
   dayNumber,
   isDeload,
@@ -250,6 +260,9 @@ function DayHeader({
 }: {
   mesoId: string;
   mesoName: string;
+  workoutId: string;
+  workoutActive: boolean;
+  mesoActive: boolean;
   weekNumber: number;
   dayNumber: number;
   isDeload: boolean;
@@ -415,10 +428,18 @@ function DayHeader({
           <div className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em]">
             W{weekNumber}·D{dayNumber}
           </div>
-          <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
-            {dateLabel}
-            <br />
-            <span className="font-bold text-accent">{rirLabel}</span>
+          <div className="flex items-stretch gap-2.5">
+            <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
+              {dateLabel}
+              <br />
+              <span className="font-bold text-accent">{rirLabel}</span>
+            </div>
+            <WorkoutOptionsMenu
+              mesoId={mesoId}
+              workoutId={workoutId}
+              workoutActive={workoutActive}
+              mesoActive={mesoActive}
+            />
           </div>
         </div>
         <div className="relative h-[3px] bg-ink">
@@ -429,6 +450,172 @@ function DayHeader({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// workout / mesocycle options menu (fig 1.1 header ⋮, 09 session-5 §9)
+// ---------------------------------------------------------------------------
+
+function WorkoutOptionsMenu({
+  mesoId,
+  workoutId,
+  workoutActive,
+  mesoActive,
+}: {
+  mesoId: string;
+  workoutId: string;
+  workoutActive: boolean;
+  mesoActive: boolean;
+}) {
+  const router = useRouter();
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
+  const [, startEnding] = useTransition();
+
+  const go = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
+
+  const endWorkout = () =>
+    startEnding(async () => {
+      const res = await endWorkoutAction({ workout_id: workoutId });
+      setConfirm(null);
+      router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+    });
+
+  const endMeso = () =>
+    startEnding(async () => {
+      await endMesocycleAction({ workout_id: workoutId, meso_id: mesoId });
+      setConfirm(null);
+      router.push(`/cycles/meso/${mesoId}`);
+    });
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={btnRef}
+        aria-label="workout and mesocycle options"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-7 items-center justify-center self-stretch border border-ink/30 pb-1 text-[15px] tracking-[1px] ${
+          open ? "border-ink bg-ink text-bg-base" : "text-ink/70"
+        }`}
+      >
+        ⋮
+      </button>
+
+      <AnchoredMenu
+        open={open}
+        triggerRef={btnRef}
+        align="right"
+        label="workout and mesocycle options"
+        onClose={() => setOpen(false)}
+      >
+        <div className="border-b border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+          MESOCYCLE
+        </div>
+        <MenuRow
+          label="Edit mesocycle"
+          trailing="PLANNER"
+          onClick={() => go(`/cycles/meso/${mesoId}/plan`)}
+        />
+        <MenuRow
+          label="Mesocycle stats"
+          trailing="STATS"
+          onClick={() => go(`/cycles/meso/${mesoId}/stats`)}
+        />
+        {mesoActive && (
+          <MenuRow
+            label="End mesocycle"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("meso");
+            }}
+          />
+        )}
+
+        <div className="border-y border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+          WORKOUT
+        </div>
+        <MenuRow
+          label="Edit day"
+          trailing="PLANNER"
+          onClick={() => go(`/cycles/meso/${mesoId}/plan`)}
+        />
+        {workoutActive && (
+          <MenuRow
+            label="End workout"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("workout");
+            }}
+          />
+        )}
+      </AnchoredMenu>
+
+      <BottomSheet
+        open={confirm === "workout"}
+        onClose={() => setConfirm(null)}
+        title="End workout"
+        subtitle="SKIP REMAINING · COMPLETE"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This skips every set you haven&apos;t logged and completes the
+          workout now. Anything already logged is kept. This can&apos;t be
+          undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={endWorkout}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            END WORKOUT
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={confirm === "meso"}
+        onClose={() => setConfirm(null)}
+        title="End mesocycle"
+        subtitle="SKIP REMAINING DAYS · COMPLETE"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This skips all remaining sets on every remaining day of the
+          mesocycle and marks the whole mesocycle complete. Logged history is
+          kept; nothing further is generated. This can&apos;t be undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={endMeso}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            END MESOCYCLE
+          </button>
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 

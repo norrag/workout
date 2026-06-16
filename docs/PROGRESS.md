@@ -2,7 +2,69 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
+## 2026-06-16 (latest) — Workout / mesocycle options menu: End workout · End mesocycle (09 session-5 §9)
+
+Lands the **Workout / mesocycle options menu** — the open reconciliation-backlog
+item from the 2026-06-15 logging review (09 session-5 §9): a header `⋮` control on
+the Day View opening a grouped menu, with the two net-new audited end-early actions.
+No schema change; reuses the existing completion + per-set-skip machinery; the pure
+engine is untouched. Vertical slice; `main` deployable.
+
+### Done
+
+- **Header `⋮` options menu (fig 1.1).** New `WorkoutOptionsMenu` to the right of the
+  date / Target-RIR column, sized to the height of those two rows (per the spec). Opens
+  the shared viewport-flipping `AnchoredMenu` with two labelled groups:
+  - **MESOCYCLE** — Edit mesocycle (→ planner board `/cycles/meso/[id]/plan`) ·
+    Mesocycle stats (→ `/cycles/meso/[id]/stats`) · **End mesocycle** (destructive,
+    shown only while the meso is `active`).
+  - **WORKOUT** — Edit day (→ planner board) · **End workout** (destructive, shown only
+    while the workout is `planned`/`in_progress`).
+  Each end action opens a strong-warning confirm `BottomSheet` before running.
+- **End workout** (`endWorkout` + `endWorkoutAction`) — skips every still-open set on
+  every exercise (reuses `skipRemainingSets`), runs the standard `completeWorkout`
+  (exercise statuses, microcycle close), then the same week N→N+1 generation as a normal
+  completion (service-role, scoped to the user; a generation failure can't lose the
+  early-end). Routes to the next workout if one was generated, else the Workout tab —
+  mirroring the Complete sheet.
+- **End mesocycle** (`endMesocycle` + `endMesocycleAction`) — for every not-yet-finished
+  workout of the meso: skip all open sets, then close it (**completed** if anything was
+  logged on it, **skipped** if untouched); then mark every microcycle and the mesocycle
+  `completed`. **Logged sets are never modified** — only open planned slots are skipped
+  and statuses advance; no week generation runs (the meso is over). Routes to the meso
+  detail page.
+- **Pure helpers** `src/lib/logging/end.ts` — `isRemainingWorkout(status)`,
+  `endWorkoutStatus(hasLoggedSets)`, and `remainingSetNumbers(prescribed, logged,
+  skipped)` (the open-slot computation). **+8 unit tests** (136 total).
+
+### Recorded deviations
+
+- **Notes items deferred.** The §9 menu also specs *Mesocycle notes* and *New/Edit
+  workout note* rows — both depend on the §8 **notes-model** split (pinned vs session
+  note), which is its own backlog slice. Those rows are omitted here rather than stubbed;
+  the menu ships with the navigation + end-early items that don't need the notes model.
+- **"Add exercise" deferred.** The §9 *Add exercise* row (group-aware picker against the
+  live workout) is its own piece of work; not built this slice. Edit day routes to the
+  planner board (the planner does not yet deep-link the current day pre-selected —
+  acceptable, the day is one tap on the board).
+- **No separate in-app audit row.** The spec calls these "audited" queries; like the
+  existing `completeWorkout`/`deleteMesocycle`, the end actions are deliberate,
+  RLS-scoped, confirm-gated server actions rather than rows in `mcp_write_audit` (that
+  table is the MCP write boundary, not in-app actions). Built in the house ledger style
+  (the `⋮` control + grouped menu aren't separately mocked).
+- **End mesocycle from the Day View** acts on the meso behind the viewed workout; it's
+  offered only while that meso is `active`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+The end helpers are unit-tested; the IO (`endWorkout`/`endMesocycle`) reuses the
+smoke-tested `skipRemainingSets`/`completeWorkout` paths and is user-scoped through the
+existing `workouts`/`workout_exercises`/`microcycles`/`mesocycles` RLS — logged_sets are
+never written, so the completion-lock policy is unaffected. In-browser interaction QA of
+the menu + the two confirm flows on a device still pending (as for other screens).
+
+## 2026-06-16 — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
 
 On-device review of the planner board surfaced three concrete, reproducible
 bugs (the prior optimistic-bridge fix didn't cover them). No schema change;

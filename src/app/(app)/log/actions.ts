@@ -11,6 +11,8 @@ import {
   clearSkippedSets,
   completeWorkout,
   deleteLoggedSet,
+  endMesocycle,
+  endWorkout,
   logSet,
   removeWorkoutExercise,
   replaceWorkoutExercise,
@@ -443,4 +445,60 @@ export async function completeWorkoutAction(input: {
   revalidatePath("/workout");
   revalidatePath(`/log/${parsed.workout_id}`);
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// end early (fig 1.1 options menu, 09 session-5 §9)
+// ---------------------------------------------------------------------------
+
+const endWorkoutSchema = z.object({ workout_id: z.string().uuid() });
+
+/** End workout = skip every remaining set + complete + advance the week. */
+export async function endWorkoutAction(input: {
+  workout_id: string;
+}): Promise<AdvanceResult> {
+  const parsed = endWorkoutSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await endWorkout(supabase, user.id, parsed.workout_id);
+
+  // same week N → N+1 generation as a normal completion; a failure must not
+  // lose the early-end (the workout tab re-runs the job on next open).
+  let result: AdvanceResult;
+  try {
+    result = await advanceWeekAfterWorkout(
+      createServiceClient(),
+      user.id,
+      parsed.workout_id,
+    );
+  } catch (error) {
+    console.error("week generation failed after ending workout", error);
+    result = {
+      summary:
+        "Workout ended. Next week's targets recalculate when you next open the app.",
+      nextWorkoutId: null,
+      nextLabel: null,
+    };
+  }
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  return result;
+}
+
+const endMesoSchema = z.object({
+  workout_id: z.string().uuid(),
+  meso_id: z.string().uuid(),
+});
+
+/** End mesocycle = skip/close every remaining workout, then complete the meso. */
+export async function endMesocycleAction(input: {
+  workout_id: string;
+  meso_id: string;
+}): Promise<void> {
+  const parsed = endMesoSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await endMesocycle(supabase, user.id, parsed.meso_id);
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}`);
+  revalidatePath("/cycles");
 }
