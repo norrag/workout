@@ -296,7 +296,7 @@ function DayHeader({
             <path
               d="M2.5 4.5 L6 8 L9.5 4.5"
               fill="none"
-              stroke="#17140F"
+              stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -493,8 +493,8 @@ function ExerciseBlock({
         <div className="flex gap-2">
           <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={onHistory}>
             <svg width="14" height="14" viewBox="0 0 14 14">
-              <circle cx="7" cy="7" r="5.5" fill="none" stroke="#17140F" strokeWidth="1.3" />
-              <path d="M7 4v3l2 1.5" fill="none" stroke="#17140F" strokeWidth="1.3" />
+              <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
             </svg>
           </button>
           <button
