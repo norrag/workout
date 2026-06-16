@@ -1,7 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth", "/manifest.webmanifest", "/icons", "/sw.js"];
+const PUBLIC_PATHS = [
+  "/sign-in",
+  "/sign-up",
+  "/auth",
+  "/manifest.webmanifest",
+  "/icons",
+  "/sw.js",
+  // MCP resource server + its discovery metadata authenticate via bearer token,
+  // not the app's auth cookie — never redirect them to /sign-in (05 §Auth).
+  "/api/mcp",
+  "/.well-known/oauth-protected-resource",
+];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

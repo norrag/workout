@@ -132,13 +132,18 @@ meso comparison, muscle-balance, and `get_exercise_affinity` (exercise-selection
 prior selection × pinned notes × aggregated feedback). Ship in **vertical slices**, each
 deployable:
 
-- [ ] **Slice 1 — transport + auth + smoke.** Add deps (`mcp-handler`, `@modelcontextprotocol/sdk`,
+- [x] **Slice 1 — transport + auth + smoke.** Add deps (`mcp-handler`, `@modelcontextprotocol/sdk`,
       `jose`); `/api/mcp` Streamable-HTTP route behind `withMcpAuth`; `/.well-known/oauth-protected-resource`
       metadata; token-bound RLS client factory; server instructions string; **one** read tool
       (`get_current_state`) + one resource; tool-handler test harness against a seeded fixture user;
       enable the Supabase OAuth server on the hosted project; wire the More → AI connector row +
       revocation. Module layout per 05 §Module layout (`src/lib/mcp/{server,auth,resources}.ts`,
-      `tools/`, `__tests__/`).
+      `tools/`, `__tests__/`). *(2026-06-16: shipped. Resource server validates Supabase ES256 JWTs
+      via JWKS; RFC 9728 discovery; `resolveSession` → token-bound RLS client; `get_current_state` +
+      `workout://current-cycle`; 11 tests + capture-server harness; `/more/connector` page. Verified
+      end-to-end against hosted (401 discovery + real-token `tools/call`). **External dep still open:**
+      enabling Supabase's native **OAuth 2.1 Server** (AS metadata 404s today) — a dashboard toggle,
+      not code; the resource-server side is complete and the connect flow works once it's on.)*
 - [ ] **Slice 2 — read/analysis + coaching suite.** Spec read tools (profile, cycles, exercise
       history with both note kinds, muscle-group volume, meso/macro summaries, PRs, search,
       `explain_prescription`) + coaching tools (`get_training_overview`, `get_recent_sessions`,

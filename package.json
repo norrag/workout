@@ -16,9 +16,12 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@serwist/next": "^9.0.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.49.0",
+    "jose": "^6.2.3",
+    "mcp-handler": "^1.1.0",
     "next": "^15.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
