@@ -72,6 +72,8 @@ function feedback(
     joint_pain: 1,
     pump: 7,
     workload: 5,
+    soreness: null,
+    soreness_days: null,
     notes: null,
     created_at: "",
     updated_at: "",

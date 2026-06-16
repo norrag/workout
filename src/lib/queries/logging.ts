@@ -673,6 +673,8 @@ export async function saveExerciseFeedback(
     muscle_group_id: string | null;
     pump: number | null;
     workload: number | null;
+    soreness: number | null;
+    soreness_days: number | null;
   },
 ): Promise<void> {
   const { data: existing, error: existingError } = await supabase
@@ -690,6 +692,8 @@ export async function saveExerciseFeedback(
         muscle_group_id: input.muscle_group_id,
         pump: input.pump,
         workload: input.workload,
+        soreness: input.soreness,
+        soreness_days: input.soreness_days,
       })
       .eq("id", existing.id);
     if (error) throw error;
@@ -701,6 +705,8 @@ export async function saveExerciseFeedback(
       muscle_group_id: input.muscle_group_id,
       pump: input.pump,
       workload: input.workload,
+      soreness: input.soreness,
+      soreness_days: input.soreness_days,
       notes: null,
     });
     if (error) throw error;

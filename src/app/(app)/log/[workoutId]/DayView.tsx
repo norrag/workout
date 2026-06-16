@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
@@ -20,6 +21,7 @@ import {
   listReplacementCandidatesAction,
   logSetAction,
   moveExerciseDownAction,
+  moveExerciseUpAction,
   removeExerciseAction,
   removeSetAction,
   replaceExerciseAction,
@@ -107,10 +109,16 @@ export function DayView({
 
   const allDone = exercises.length > 0 && exercises.every(exerciseDone);
 
+  const groupSiblings = (we: LoggedExercise) =>
+    exercises.filter(
+      (x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id,
+    );
+  // first to be completed in its group → recovery/soreness prompt
+  const isFirstOfGroup = (we: LoggedExercise) =>
+    groupSiblings(we).every((x) => !exerciseDone(x));
+  // group fully done (this exercise closed it) → joint pain + pump + workload
   const isLastOfGroup = (we: LoggedExercise) =>
-    exercises
-      .filter((x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id)
-      .every(exerciseDone);
+    groupSiblings(we).every(exerciseDone);
 
   return (
     <div>
@@ -152,11 +160,19 @@ export function DayView({
           onHistory={() => setHistoryFor(we)}
           onReplace={() => setReplaceFor(we)}
           onNote={() => setNoteFor(we)}
+          onFeedback={() => setFeedbackFor(we)}
           onToggleDrop={() =>
             setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
           }
           onLogged={(wasLast) => {
-            if (wasLast && !we.feedback) setFeedbackFor(we);
+            // only prompt on the first (soreness) and group-closing (joint
+            // pain + pump + workload) exercises — middle ones don't auto-ask
+            if (
+              wasLast &&
+              !we.feedback &&
+              (isFirstOfGroup(we) || isLastOfGroup(we))
+            )
+              setFeedbackFor(we);
           }}
           commit={commit}
         />
@@ -197,9 +213,11 @@ export function DayView({
         onClose={() => setHistoryFor(null)}
       />
       <FeedbackSheet
+        key={feedbackFor?.id ?? "none"}
         we={feedbackFor}
         workoutId={workout.id}
         weekNumber={microcycle.week_number}
+        withSoreness={feedbackFor ? isFirstOfGroup(feedbackFor) : false}
         withGroupScope={feedbackFor ? isLastOfGroup(feedbackFor) : false}
         onClose={() => setFeedbackFor(null)}
         commit={commit}
@@ -292,7 +310,7 @@ function DayHeader({
             <path
               d="M2.5 4.5 L6 8 L9.5 4.5"
               fill="none"
-              stroke="#17140F"
+              stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -434,6 +452,7 @@ function ExerciseBlock({
   onHistory,
   onReplace,
   onNote,
+  onFeedback,
   onToggleDrop,
   onLogged,
   commit,
@@ -453,6 +472,7 @@ function ExerciseBlock({
   onHistory: () => void;
   onReplace: () => void;
   onNote: () => void;
+  onFeedback: () => void;
   onToggleDrop: () => void;
   onLogged: (wasLastPlannedSet: boolean) => void;
   commit: Commit;
@@ -487,8 +507,8 @@ function ExerciseBlock({
         <div className="flex gap-2">
           <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={onHistory}>
             <svg width="14" height="14" viewBox="0 0 14 14">
-              <circle cx="7" cy="7" r="5.5" fill="none" stroke="#17140F" strokeWidth="1.3" />
-              <path d="M7 4v3l2 1.5" fill="none" stroke="#17140F" strokeWidth="1.3" />
+              <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
             </svg>
           </button>
           <button
@@ -606,6 +626,20 @@ function ExerciseBlock({
         )}
         {!readOnly && (
           <>
+            {index > 0 && (
+              <MenuRow
+                label="Move up"
+                onClick={() => {
+                  commit(() =>
+                    moveExerciseUpAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
+                  onCloseMenu();
+                }}
+              />
+            )}
             {!isLast && (
               <MenuRow
                 label="Move down"
@@ -630,6 +664,13 @@ function ExerciseBlock({
                   }),
                 );
                 onCloseMenu();
+              }}
+            />
+            <MenuRow
+              label={we.feedback ? "Edit feedback" : "Add feedback"}
+              onClick={() => {
+                onCloseMenu();
+                onFeedback();
               }}
             />
             {nextSetNumber !== 0 && (
@@ -734,6 +775,8 @@ function AnchoredMenu({
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
   }, [open, triggerRef, align, width]);
+
+  useScrollLock(open);
 
   if (!open) return null;
   return (
@@ -1260,10 +1303,20 @@ function ReplaceSheet({
 
 const PAIN_OPTIONS = ["None", "Low", "Moderate", "High"];
 
+/**
+ * Feedback prompt (fig 1.4), revised 2026-06-16:
+ * - After the FIRST exercise of a muscle group → recovery: how sore the user
+ *   was from the LAST time they trained that group (0–10) + how many days they
+ *   stayed sore (0–5). No joint-pain question here (was redundant).
+ * - When the group is COMPLETE (last exercise) → joint pain + pump + workload.
+ * - A single-exercise group is both, so it shows everything at once.
+ * Editing via the menu re-opens with whatever the row already holds.
+ */
 function FeedbackSheet({
   we,
   workoutId,
   weekNumber,
+  withSoreness,
   withGroupScope,
   onClose,
   commit,
@@ -1271,53 +1324,117 @@ function FeedbackSheet({
   we: LoggedExercise | null;
   workoutId: string;
   weekNumber: number;
+  withSoreness: boolean;
   withGroupScope: boolean;
   onClose: () => void;
   commit: Commit;
 }) {
-  const [pain, setPain] = useState<number | null>(null);
-  const [pump, setPump] = useState(5);
-  const [workload, setWorkload] = useState(5);
+  // prefill from any existing feedback (editing) — the sheet is keyed per
+  // exercise so these initial values are correct on each open
+  const existing = we?.feedback ?? null;
+  const [pain, setPain] = useState<number | null>(existing?.joint_pain ?? null);
+  const [pump, setPump] = useState(existing?.pump ?? 5);
+  const [workload, setWorkload] = useState(existing?.workload ?? 5);
+  const [soreness, setSoreness] = useState(existing?.soreness ?? 3);
+  const [sorenessDays, setSorenessDays] = useState<number | null>(
+    existing?.soreness_days ?? null,
+  );
   const [workloadInfo, setWorkloadInfo] = useState(true);
   const [pumpInfo, setPumpInfo] = useState(false);
 
   if (!we) return null;
   const mg = we.muscle_group || "Session";
 
+  // show a section when its role applies OR the row already carries that data
+  const showSoreness = withSoreness || existing?.soreness != null;
+  const showGroup =
+    withGroupScope ||
+    existing?.joint_pain != null ||
+    existing?.pump != null ||
+    existing?.workload != null;
+
+  const disabled =
+    (showGroup && pain === null) || (showSoreness && sorenessDays === null);
+
   return (
     <BottomSheet
       open
       onClose={onClose}
       title="Feedback"
-      subtitle={`${mg.toUpperCase()} — AFTER ${we.exercise_name.toUpperCase()} · FEEDS W${weekNumber + 1} TARGETS`}
+      subtitle={`${mg.toUpperCase()} — ${showSoreness && !showGroup ? "RECOVERY CHECK" : `AFTER ${we.exercise_name.toUpperCase()}`} · FEEDS W${weekNumber + 1} TARGETS`}
     >
-      <div>
-        <div className="text-[13px] font-bold">
-          Joint pain{" "}
-          <span className="text-xs font-normal text-ink/55">
-            — during {we.exercise_name.toLowerCase()}
-          </span>
+      {showSoreness && (
+        <div className={showGroup ? "mb-1" : ""}>
+          <div className="text-[13px] font-bold">
+            {mg} soreness{" "}
+            <span className="text-xs font-normal text-ink/55">
+              — from last {mg.toLowerCase()} session
+            </span>
+          </div>
+          <div className="mt-3">
+            <SnapSlider
+              label={`${mg} soreness last session`}
+              value={soreness}
+              onChange={setSoreness}
+              leftLabel="NONE"
+              rightLabel="VERY SORE"
+            />
+          </div>
+          <div className="mt-4 text-[13px] font-bold">
+            Days sore{" "}
+            <span className="text-xs font-normal text-ink/55">
+              — after that session
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-6 gap-[6px]">
+            {[0, 1, 2, 3, 4, 5].map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={sorenessDays === d}
+                onClick={() => setSorenessDays(d)}
+                className={`numeral h-[44px] text-sm ${
+                  sorenessDays === d
+                    ? "bg-accent font-bold text-bg-base"
+                    : "border border-ink/40 font-medium text-ink"
+                }`}
+              >
+                {d === 5 ? "5+" : d}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-2 grid grid-cols-4 gap-[7px]">
-          {PAIN_OPTIONS.map((opt, i) => (
-            <button
-              key={opt}
-              type="button"
-              aria-pressed={pain === i}
-              onClick={() => setPain(i)}
-              className={`h-[46px] text-xs ${
-                pain === i
-                  ? "bg-accent font-bold text-bg-base"
-                  : "border border-ink/40 font-medium text-ink"
-              }`}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
-      {withGroupScope && (
+      {showGroup && (
+        <div className={showSoreness ? "mt-5" : ""}>
+          <div className="text-[13px] font-bold">
+            Joint pain{" "}
+            <span className="text-xs font-normal text-ink/55">
+              — during {we.exercise_name.toLowerCase()}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-[7px]">
+            {PAIN_OPTIONS.map((opt, i) => (
+              <button
+                key={opt}
+                type="button"
+                aria-pressed={pain === i}
+                onClick={() => setPain(i)}
+                className={`h-[46px] text-xs ${
+                  pain === i
+                    ? "bg-accent font-bold text-bg-base"
+                    : "border border-ink/40 font-medium text-ink"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showGroup && (
         <>
           <div className="mt-5">
             <div className="flex items-center gap-2">
@@ -1407,16 +1524,19 @@ function FeedbackSheet({
         </button>
         <button
           type="button"
-          disabled={pain === null}
+          disabled={disabled}
           onClick={() => {
             commit(() =>
               saveFeedbackAction({
                 workout_id: workoutId,
                 workout_exercise_id: we.id,
-                joint_pain: pain,
-                muscle_group_id: withGroupScope ? we.muscle_group_id : null,
-                pump: withGroupScope ? pump : null,
-                workload: withGroupScope ? workload : null,
+                joint_pain: showGroup ? pain : null,
+                muscle_group_id:
+                  showGroup || showSoreness ? we.muscle_group_id : null,
+                pump: showGroup ? pump : null,
+                workload: showGroup ? workload : null,
+                soreness: showSoreness ? soreness : null,
+                soreness_days: showSoreness ? sorenessDays : null,
               }),
             );
             onClose();
@@ -1470,6 +1590,7 @@ function CompleteSheet({
   const { render, shown } = useSheetTransition(open);
   const sliderValue = { fatigue, effort, performance };
   const setSlider = { fatigue: setFatigue, effort: setEffort, performance: setPerformance };
+  useScrollLock(render);
   if (!render) return null;
 
   const { workout, microcycle, exercises } = detail;

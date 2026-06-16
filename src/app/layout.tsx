@@ -28,18 +28,28 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F4F0E6",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F4F0E6" },
+    { media: "(prefers-color-scheme: dark)", color: "#14110C" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
 };
 
+// Applies the saved theme to <html> before first paint so there's no flash of
+// the wrong palette. Default is "system" (follows the OS preference).
+const themeInit = `(function(){try{var t=localStorage.getItem("theme")||"system";document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme="system";}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={archivo.variable}>
+    <html lang="en" className={archivo.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
       <body className="min-h-dvh bg-bg-base text-ink">{children}</body>
     </html>
   );

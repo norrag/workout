@@ -2,6 +2,103 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-16 (latest) — Notes batch: scroll-lock, gender, dark mode, feedback-flow revision, planner polish
+
+Worked the 2026-06-16 notes batch. Most items shipped this slice; the larger
+ones (full drag-and-drop reorder, edit-macrocycle, and one bug that needs
+in-app reproduction) are teed up below as planned work. Vertical slice; `main`
+deployable. One `DATA` migration (applied to hosted).
+
+### Done
+
+- **Overlay scroll-lock.** New ref-counted `useScrollLock` hook wired into
+  `BottomSheet`, the day-view `AnchoredMenu` (exercise/set menus), and the
+  Workout Complete sheet — the page behind any tray/menu/overlay no longer
+  scrolls (and the scrollbar gap is compensated so the layout doesn't jump).
+- **Exercise history shows the year.** `ExerciseHistoryList` date now reads
+  `D MON 'YY` (was day/month only), so older sessions are unambiguous.
+- **Move exercise up (day view).** The 1.2 exercise menu gained **Move up**
+  alongside **Move down**; the position swap is factored into one
+  `moveExercise(delta)` helper + `moveExerciseUpAction`.
+- **Edit feedback (active workouts).** The 1.2 menu gained **Edit/Add
+  feedback**; the feedback sheet prefills from any saved row and is keyed per
+  exercise.
+- **Gender captured.** Onboarding step 1 and the profile editor now set
+  `profiles.gender` (the column already existed and the macro target engine
+  already read it — this was a pure UI gap). 4-way: female / male / other /
+  prefer-not.
+- **Full-screen exercise picker (planner).** `BottomSheet` gained a
+  `fullHeight` mode (pinned header + footer, scrollable middle); the meso
+  planner's exercise picker now rises to nearly the whole screen.
+- **Discard a draft.** New `discardDraftAction` (guarded to `draft` status, so
+  it can never touch a planned/active cycle or logged history) surfaced as
+  **DISCARD DRAFT** on both the plan-a-meso entry banner and the draft board.
+- **Dark mode (light / dark / system).** A dark ledger palette as
+  CSS-custom-property overrides (ink ⇄ cream on warm near-black, lifted accent,
+  light menu shadow) under `[data-theme=dark]` / `(prefers-color-scheme:
+  dark)[data-theme=system]`; every ink/cream utility adapts with no markup
+  changes. Applied to `<html data-theme>` before paint via an inline script
+  (default `system`, no flash); `ThemeToggle` in More settings persists to
+  `localStorage`. The three hardcoded ink SVG strokes in the day view switched
+  to `currentColor`.
+- **Feedback-flow revision (DATA).** Migration `20260616000001` adds nullable
+  `exercise_feedback.soreness` (0–10) and `soreness_days` (0–5) — applied to
+  hosted, no new advisor lints, RLS unchanged. The **first** exercise logged
+  for a muscle group now prompts a *recovery check* (soreness from the last
+  session of that group + how many days sore) instead of joint pain; **joint
+  pain is asked once**, with the group-complete prompt (pump/workload).
+  Middle-of-group exercises no longer auto-prompt; a one-exercise group shows
+  everything. Soreness rows carry `muscle_group_id` but null pump/workload, so
+  the engine's group-feedback guard (pump/workload non-null) ignores them — **no
+  engine behavior change** (engine consumption of soreness is a future slice).
+- **Planner active-day guard.** The board's "snap active day back to day 1"
+  effect no longer fires while a setup/add-groups sheet references a day the
+  just-revalidated `days` hasn't caught up to (a latent wedge in the live draft
+  path).
+
+### Recorded deviations
+
+- **Gender / theme / discard / soreness controls** are built in the house
+  ledger style — none are in the stock mockups (the mockups predate these asks).
+- **Joint pain is now group-level** (stored on the closing exercise) rather than
+  per-exercise, per the user's explicit "remove the redundancy" request. The
+  engine still reads `joint_pain` per exercise; in practice it's now populated on
+  the group's last exercise.
+- **Theme is a device setting** (localStorage), not a `profiles` column — instant,
+  no migration, and the natural home for a per-device preference.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (118/118), `npm run build`
+green. Soreness migration applied to hosted and columns re-queried; security
+advisors show no new lints. In-browser pixel/interaction QA of the new
+surfaces (dark palette, full-screen picker, soreness prompt) still pending, as
+for the other screens.
+
+### Not done yet — planned work (from the same notes batch)
+
+- **Planner drag-and-drop reorder (muscle groups + exercises).** The ask is to
+  reorder muscle groups within a day and exercises within a group, ideally via
+  drag-and-drop. This needs (a) a stable ordering for groups — `meso_day_groups`
+  has no `position` column today, so a `DATA` migration + ordered reads; (b)
+  reorder mutators that work in **both** persistence modes (live draft via new
+  swap actions, staged edit via local `workDays`); and (c) a pointer/touch DnD
+  surface (or up/down arrows as the accessible fallback). Deferred as its own
+  vertical slice so it isn't shipped half-working across the two modes.
+- **Edit macrocycle.** Create-macro exists; the edit surface (rename, adjust
+  goal/duration/notes, re-plan/re-phase the meso slots) is unbuilt. Needs a
+  macro edit form + queries mirroring `createMacrocycleWithMesos`, with the same
+  history-protection rules as meso edits (completed/active mesos immutable).
+- **Add-day sheet won't dismiss (BUG, needs in-app repro).** Still reported on
+  the **draft** board. The 2026-06-15 staged-edit fix only covered the *editing*
+  (non-draft) path; **drafts still build via the live `addDay…` → `revalidate`
+  flow**, which is the class of bug that fix addressed. The active-day guard
+  above removes one latent wedge, but the dismissal symptom needs to be
+  reproduced in-browser to confirm the cause (likely revalidation timing vs.
+  client state, or an exit-animation scrim). Candidate proper fix: give the
+  draft board the same local working-copy model as editing, mapping each live
+  insert's returned id back into local state (tmp→real), so no revalidation sits
+  in the interaction loop.
 ## 2026-06-16 (latest) — App icon design handoff wired in (S4 wordmark + slider)
 
 Replaced the placeholder barbell icons with the final **S4** mark from the design

@@ -251,6 +251,8 @@ const feedbackSchema = z.object({
   muscle_group_id: z.string().uuid().nullable(),
   pump: z.coerce.number().int().min(0).max(10).nullable(),
   workload: z.coerce.number().int().min(0).max(10).nullable(),
+  soreness: z.coerce.number().int().min(0).max(10).nullable(),
+  soreness_days: z.coerce.number().int().min(0).max(5).nullable(),
 });
 
 export async function saveFeedbackAction(input: {
@@ -260,6 +262,8 @@ export async function saveFeedbackAction(input: {
   muscle_group_id: string | null;
   pump: number | null;
   workload: number | null;
+  soreness: number | null;
+  soreness_days: number | null;
 }): Promise<void> {
   const parsed = feedbackSchema.parse(input);
   const { supabase, user } = await requireUser();
@@ -269,6 +273,8 @@ export async function saveFeedbackAction(input: {
     muscle_group_id: parsed.muscle_group_id,
     pump: parsed.pump,
     workload: parsed.workload,
+    soreness: parsed.soreness,
+    soreness_days: parsed.soreness_days,
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
@@ -331,22 +337,25 @@ export async function listReplacementCandidatesAction(
   }));
 }
 
-export async function moveExerciseDownAction(input: {
-  workout_id: string;
-  workout_exercise_id: string;
-}): Promise<void> {
-  const parsed = weTargetSchema.parse(input);
+/** Swap an exercise with its neighbour (delta -1 = up, +1 = down). */
+async function moveExercise(
+  workoutId: string,
+  workoutExerciseId: string,
+  delta: -1 | 1,
+): Promise<void> {
   const { supabase } = await requireUser();
   const { data: wes, error } = await supabase
     .from("workout_exercises")
     .select("id, position")
-    .eq("workout_id", parsed.workout_id)
+    .eq("workout_id", workoutId)
     .order("position");
   if (error) throw error;
-  const idx = (wes ?? []).findIndex((w) => w.id === parsed.workout_exercise_id);
-  if (idx < 0 || idx >= (wes ?? []).length - 1) return;
-  const a = wes![idx];
-  const b = wes![idx + 1];
+  const list = wes ?? [];
+  const idx = list.findIndex((w) => w.id === workoutExerciseId);
+  const target = idx + delta;
+  if (idx < 0 || target < 0 || target >= list.length) return;
+  const a = list[idx];
+  const b = list[target];
   const { error: e1 } = await supabase
     .from("workout_exercises")
     .update({ position: b.position })
@@ -357,8 +366,24 @@ export async function moveExerciseDownAction(input: {
     .update({ position: a.position })
     .eq("id", b.id);
   if (e2) throw e2;
-  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath(`/log/${workoutId}`);
   revalidatePath("/workout");
+}
+
+export async function moveExerciseDownAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  await moveExercise(parsed.workout_id, parsed.workout_exercise_id, 1);
+}
+
+export async function moveExerciseUpAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  await moveExercise(parsed.workout_id, parsed.workout_exercise_id, -1);
 }
 
 const completeSchema = z.object({

@@ -120,6 +120,15 @@ export async function setExperience(level: string): Promise<void> {
   revalidate();
 }
 
+const genderSchema = z.enum(["female", "male", "other", "undisclosed"]);
+
+export async function setGender(value: string): Promise<void> {
+  const parsed = genderSchema.parse(value);
+  const { supabase, user } = await requireUser();
+  await updateProfile(supabase, user.id, { gender: parsed });
+  revalidate();
+}
+
 export async function setEquipment(values: string[]): Promise<void> {
   const parsed = equipmentSchema.parse(values);
   const { supabase, user } = await requireUser();
