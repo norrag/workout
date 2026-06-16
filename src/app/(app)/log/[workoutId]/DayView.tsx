@@ -17,8 +17,11 @@ import { predictRepsAtWeight, type EngineParams } from "@/lib/engine";
 import {
   addSetAction,
   amendSetAction,
+  clearPinnedNoteAction,
   completeWorkoutAction,
   deleteSetAction,
+  endMesocycleAction,
+  endWorkoutAction,
   listReplacementCandidatesAction,
   logSetAction,
   updateSetWeightAction,
@@ -29,6 +32,7 @@ import {
   replaceExerciseAction,
   saveFeedbackAction,
   savePinnedNoteAction,
+  saveSessionNoteAction,
   skipRemainingAction,
   toggleSkipSetAction,
   unlogSetAction,
@@ -45,6 +49,10 @@ function shortDate(iso: string | null): string {
 }
 
 type Commit = (fn: () => Promise<void>) => void;
+
+/** Which note bucket the unified note sheet (09 §8) opened from. "menu" defaults
+ * to the session note; "pinned"/"session" edit that specific existing note. */
+type NoteOrigin = "menu" | "pinned" | "session";
 
 /** Planned slot count, widened to cover any logged/skipped beyond it. */
 function plannedSetCount(we: LoggedExercise): number {
@@ -93,7 +101,10 @@ export function DayView({
   } | null>(null);
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
-  const [noteFor, setNoteFor] = useState<LoggedExercise | null>(null);
+  const [noteSheet, setNoteSheet] = useState<{
+    we: LoggedExercise;
+    origin: NoteOrigin;
+  } | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<LoggedExercise | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [dropPending, setDropPending] = useState<Record<string, boolean>>({});
@@ -129,6 +140,11 @@ export function DayView({
       <DayHeader
         mesoId={mesocycle.id}
         mesoName={mesocycle.name}
+        workoutId={workout.id}
+        workoutActive={
+          workout.status === "planned" || workout.status === "in_progress"
+        }
+        mesoActive={mesocycle.status === "active"}
         weekNumber={microcycle.week_number}
         dayNumber={workout.day_number}
         isDeload={microcycle.is_deload}
@@ -165,7 +181,7 @@ export function DayView({
           onCloseSetMenu={() => setSetMenu(null)}
           onHistory={() => setHistoryFor(we)}
           onReplace={() => setReplaceFor(we)}
-          onNote={() => setNoteFor(we)}
+          onNote={(origin) => setNoteSheet({ we, origin })}
           onFeedback={() => setFeedbackFor(we)}
           onToggleDrop={() =>
             setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
@@ -196,9 +212,10 @@ export function DayView({
       )}
 
       <NoteSheet
-        we={noteFor}
+        key={noteSheet ? `${noteSheet.we.id}-${noteSheet.origin}` : "none"}
+        sheet={noteSheet}
         workoutId={workout.id}
-        onClose={() => setNoteFor(null)}
+        onClose={() => setNoteSheet(null)}
         commit={commit}
       />
       <ReplaceSheet
@@ -245,6 +262,9 @@ export function DayView({
 function DayHeader({
   mesoId,
   mesoName,
+  workoutId,
+  workoutActive,
+  mesoActive,
   weekNumber,
   dayNumber,
   isDeload,
@@ -256,6 +276,9 @@ function DayHeader({
 }: {
   mesoId: string;
   mesoName: string;
+  workoutId: string;
+  workoutActive: boolean;
+  mesoActive: boolean;
   weekNumber: number;
   dayNumber: number;
   isDeload: boolean;
@@ -421,10 +444,19 @@ function DayHeader({
           <div className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em]">
             W{weekNumber}·D{dayNumber}
           </div>
-          <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
-            {dateLabel}
-            <br />
-            <span className="font-bold text-accent">{rirLabel}</span>
+          <div className="flex items-stretch gap-2.5">
+            <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
+              {dateLabel}
+              <br />
+              <span className="font-bold text-accent">{rirLabel}</span>
+            </div>
+            <WorkoutOptionsMenu
+              mesoId={mesoId}
+              workoutId={workoutId}
+              dayNumber={dayNumber}
+              workoutActive={workoutActive}
+              mesoActive={mesoActive}
+            />
           </div>
         </div>
         <div className="relative h-[3px] bg-ink">
@@ -435,6 +467,174 @@ function DayHeader({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// workout / mesocycle options menu (fig 1.1 header ⋮, 09 session-5 §9)
+// ---------------------------------------------------------------------------
+
+function WorkoutOptionsMenu({
+  mesoId,
+  workoutId,
+  dayNumber,
+  workoutActive,
+  mesoActive,
+}: {
+  mesoId: string;
+  workoutId: string;
+  dayNumber: number;
+  workoutActive: boolean;
+  mesoActive: boolean;
+}) {
+  const router = useRouter();
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
+  const [, startEnding] = useTransition();
+
+  const go = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
+
+  const endWorkout = () =>
+    startEnding(async () => {
+      const res = await endWorkoutAction({ workout_id: workoutId });
+      setConfirm(null);
+      router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+    });
+
+  const endMeso = () =>
+    startEnding(async () => {
+      await endMesocycleAction({ workout_id: workoutId, meso_id: mesoId });
+      setConfirm(null);
+      router.push(`/cycles/meso/${mesoId}`);
+    });
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={btnRef}
+        aria-label="workout and mesocycle options"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-6 items-center justify-center self-stretch pb-1 text-[18px] leading-none tracking-[1px] ${
+          open ? "text-ink" : "text-ink/45"
+        }`}
+      >
+        ⋮
+      </button>
+
+      <AnchoredMenu
+        open={open}
+        triggerRef={btnRef}
+        align="right"
+        label="workout and mesocycle options"
+        onClose={() => setOpen(false)}
+      >
+        <div className="border-b border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+          MESOCYCLE
+        </div>
+        <MenuRow
+          label="Edit mesocycle"
+          trailing="PLANNER"
+          onClick={() => go(`/cycles/meso/${mesoId}/plan`)}
+        />
+        <MenuRow
+          label="Mesocycle stats"
+          trailing="STATS"
+          onClick={() => go(`/cycles/meso/${mesoId}/stats`)}
+        />
+        {mesoActive && (
+          <MenuRow
+            label="End mesocycle"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("meso");
+            }}
+          />
+        )}
+
+        <div className="border-y border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+          WORKOUT
+        </div>
+        <MenuRow
+          label="Edit day"
+          trailing="PLANNER"
+          onClick={() => go(`/cycles/meso/${mesoId}/plan?day=${dayNumber}`)}
+        />
+        {workoutActive && (
+          <MenuRow
+            label="End workout"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("workout");
+            }}
+          />
+        )}
+      </AnchoredMenu>
+
+      <BottomSheet
+        open={confirm === "workout"}
+        onClose={() => setConfirm(null)}
+        title="End workout"
+        subtitle="SKIP REMAINING · COMPLETE"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This skips every set you haven&apos;t logged and completes the
+          workout now. Anything already logged is kept. This can&apos;t be
+          undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={endWorkout}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            END WORKOUT
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={confirm === "meso"}
+        onClose={() => setConfirm(null)}
+        title="End mesocycle"
+        subtitle="SKIP REMAINING DAYS · COMPLETE"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This skips all remaining sets on every remaining day of the
+          mesocycle and marks the whole mesocycle complete. Logged history is
+          kept; nothing further is generated. This can&apos;t be undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={endMeso}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            END MESOCYCLE
+          </button>
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 
@@ -481,7 +681,7 @@ function ExerciseBlock({
   onCloseSetMenu: () => void;
   onHistory: () => void;
   onReplace: () => void;
-  onNote: () => void;
+  onNote: (origin: NoteOrigin) => void;
   onFeedback: () => void;
   onToggleDrop: () => void;
   onLogged: (wasLastPlannedSet: boolean) => void;
@@ -541,9 +741,35 @@ function ExerciseBlock({
         </div>
       </div>
       {we.pinned_note && (
-        <div className="mt-[7px] border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
-          PINNED — {we.pinned_note.body}
+        <div className="mt-[7px] flex items-start justify-between gap-2 border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
+          <span>PINNED — {we.pinned_note.body}</span>
+          {!readOnly && (
+            <button
+              type="button"
+              aria-label="edit pinned note"
+              onClick={() => onNote("pinned")}
+              className="-my-1 shrink-0 px-1.5 py-1 text-[12px] text-ink/45"
+            >
+              ✎
+            </button>
+          )}
         </div>
+      )}
+      {we.feedback?.notes && (
+        <button
+          type="button"
+          disabled={readOnly}
+          aria-label="edit session note"
+          onClick={() => onNote("session")}
+          className="mt-[7px] flex w-full items-start justify-between gap-2 border-l-2 border-ink/35 py-[5px] pl-2.5 text-left text-[11px] font-medium text-ink/60 disabled:cursor-default"
+        >
+          <span>NOTE — {we.feedback.notes}</span>
+          {!readOnly && (
+            <span aria-hidden className="shrink-0 px-1.5 text-[12px] text-ink/40">
+              ✎
+            </span>
+          )}
+        </button>
       )}
 
       {!skipped && (
@@ -618,10 +844,11 @@ function ExerciseBlock({
           }}
         />
         <MenuRow
-          label={we.pinned_note ? "Edit pinned note" : "New note"}
+          label={we.pinned_note || we.feedback?.notes ? "Notes" : "Add note"}
+          trailing={we.pinned_note || we.feedback?.notes ? "›" : undefined}
           onClick={() => {
             onCloseMenu();
-            onNote();
+            onNote("menu");
           }}
         />
         {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
@@ -1222,28 +1449,95 @@ function SetRow({
 }
 
 // ---------------------------------------------------------------------------
-// note sheet (from the 1.2 menu)
+// note sheet (09 §8) — one sheet for both kinds of exercise note. A "Pin to
+// this exercise" checkbox decides where it lands: pinned = an attribute of the
+// exercise, shown in every workout; unpinned = a note saved with just this
+// session's log. Flipping the pin on an existing note moves it between buckets.
 // ---------------------------------------------------------------------------
 
 function NoteSheet({
-  we,
+  sheet,
   workoutId,
   onClose,
   commit,
 }: {
-  we: LoggedExercise | null;
+  sheet: { we: LoggedExercise; origin: NoteOrigin } | null;
   workoutId: string;
   onClose: () => void;
   commit: Commit;
 }) {
-  const [note, setNote] = useState("");
+  const we = sheet?.we ?? null;
+  const origin = sheet?.origin ?? "menu";
+  // "pinned" origin edits the pinned note; "menu"/"session" default to the
+  // session note (the common mid-workout "note about today" case).
+  const originBucket: "pinned" | "session" =
+    origin === "pinned" ? "pinned" : "session";
+  const originText =
+    originBucket === "pinned"
+      ? (we?.pinned_note?.body ?? "")
+      : (we?.feedback?.notes ?? "");
+
+  const [note, setNote] = useState(originText);
+  const [pinned, setPinned] = useState(originBucket === "pinned");
   if (!we) return null;
+
+  const body = note.trim();
+  const wid = workoutId;
+  // nothing to do only when the box is empty and there was no note here to clear
+  const noop = !body && originText.trim() === "";
+
+  const save = () => {
+    commit(async () => {
+      if (!body) {
+        if (originBucket === "pinned")
+          await clearPinnedNoteAction({
+            workout_id: wid,
+            exercise_id: we.exercise_id,
+          });
+        else
+          await saveSessionNoteAction({
+            workout_id: wid,
+            workout_exercise_id: we.id,
+            note: null,
+          });
+        return;
+      }
+      if (pinned) {
+        await savePinnedNoteAction({
+          workout_id: wid,
+          exercise_id: we.exercise_id,
+          body,
+        });
+        // moved up from a session note → clear the session copy
+        if (originBucket === "session" && we.feedback?.notes)
+          await saveSessionNoteAction({
+            workout_id: wid,
+            workout_exercise_id: we.id,
+            note: null,
+          });
+      } else {
+        await saveSessionNoteAction({
+          workout_id: wid,
+          workout_exercise_id: we.id,
+          note: body,
+        });
+        // moved down from the pinned note → unpin it
+        if (originBucket === "pinned")
+          await clearPinnedNoteAction({
+            workout_id: wid,
+            exercise_id: we.exercise_id,
+          });
+      }
+    });
+    onClose();
+  };
+
   return (
     <BottomSheet
       open
       onClose={onClose}
-      title="New note"
-      subtitle={`${we.exercise_name.toUpperCase()} — PINNED IN EVERY WORKOUT`}
+      title={originText ? "Edit note" : "Add note"}
+      subtitle={we.exercise_name.toUpperCase()}
     >
       <textarea
         value={note}
@@ -1252,8 +1546,32 @@ function NoteSheet({
         rows={3}
         autoFocus
         className="min-h-16 w-full border-[1.5px] border-ink bg-paper px-3 py-2.5 text-[13px] leading-normal text-ink placeholder:text-ink/40 focus:outline-none"
-        placeholder="e.g. handle grip, underhand, strict"
+        placeholder="e.g. cambered bar, strict form — or how it felt today"
       />
+
+      {/* pin toggle: decides exercise-wide vs this-session-only */}
+      <button
+        type="button"
+        onClick={() => setPinned((v) => !v)}
+        className="mt-3.5 flex w-full items-start gap-2.5 text-left"
+      >
+        <div
+          className={`mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[11px] ${
+            pinned ? "bg-accent text-bg-base" : "border-[1.5px] border-ink/40"
+          }`}
+        >
+          {pinned ? "✓" : ""}
+        </div>
+        <div>
+          <div className="text-[12.5px] font-semibold">Pin to this exercise</div>
+          <div className="mt-0.5 text-[11px] leading-[1.45] text-ink/55">
+            {pinned
+              ? "Stays on this exercise in every workout."
+              : "Saved with just this session — a note on how it went today."}
+          </div>
+        </div>
+      </button>
+
       <div className="mt-4 flex items-center justify-end gap-2.5">
         <button
           type="button"
@@ -1264,21 +1582,11 @@ function NoteSheet({
         </button>
         <button
           type="button"
-          disabled={!note.trim()}
-          onClick={() => {
-            commit(() =>
-              savePinnedNoteAction({
-                workout_id: workoutId,
-                exercise_id: we.exercise_id,
-                body: note.trim(),
-              }),
-            );
-            setNote("");
-            onClose();
-          }}
+          disabled={noop}
+          onClick={save}
           className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
         >
-          SAVE
+          {!body && originText ? "CLEAR" : "SAVE"}
         </button>
       </div>
     </BottomSheet>

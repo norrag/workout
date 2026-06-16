@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { HistoryEntry } from "@/lib/queries/history";
 
 function shortDate(iso: string): string {
@@ -9,9 +12,11 @@ function shortDate(iso: string): string {
 /**
  * The 3.2 history content: sessions grouped by meso — current meso in full
  * ink, earlier mesos dimmed. Shared by the history sheet and the exercise
- * detail page.
+ * detail page. Rows with a session log note (09 §8) carry a note icon and
+ * reveal the note when tapped.
  */
 export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
+  const [openNote, setOpenNote] = useState<string | null>(null);
   const groups: { meso: string; rows: HistoryEntry[] }[] = [];
   for (const e of entries) {
     const last = groups.at(-1);
@@ -31,26 +36,53 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
           >
             {group.meso.toUpperCase()}
           </div>
-          {group.rows.map((row, ri) => (
-            <div
-              key={ri}
-              className={`flex items-baseline justify-between border-b border-ink/15 py-3 ${gi > 0 ? "text-ink/55" : ""}`}
-            >
-              <div className="numeral text-base font-bold">
-                {row.top_weight} lb{" "}
-                <span className="text-[13px] font-normal text-ink/50">×</span>{" "}
-                {row.reps}
-                {row.is_deload && (
-                  <span className="ml-1.5 border border-ink/40 px-[5px] py-[2px] align-[2px] text-[8.5px] font-bold tracking-[0.1em]">
-                    DELOAD
-                  </span>
+          {group.rows.map((row, ri) => {
+            const rowKey = `${gi}-${ri}`;
+            const hasNote = !!row.session_note;
+            const noteOpen = openNote === rowKey;
+            return (
+              <div
+                key={ri}
+                className={`border-b border-ink/15 ${gi > 0 ? "text-ink/55" : ""}`}
+              >
+                <button
+                  type="button"
+                  disabled={!hasNote}
+                  onClick={() => setOpenNote(noteOpen ? null : rowKey)}
+                  className="flex w-full items-baseline justify-between py-3 text-left disabled:cursor-default"
+                >
+                  <div className="numeral text-base font-bold">
+                    {row.top_weight} lb{" "}
+                    <span className="text-[13px] font-normal text-ink/50">×</span>{" "}
+                    {row.reps}
+                    {row.is_deload && (
+                      <span className="ml-1.5 border border-ink/40 px-[5px] py-[2px] align-[2px] text-[8.5px] font-bold tracking-[0.1em]">
+                        DELOAD
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-1.5 text-right text-[10px] font-semibold tracking-[0.1em] text-ink/55">
+                    {hasNote && (
+                      <span
+                        aria-label="has a session note"
+                        className={`translate-y-[1px] text-[11px] ${noteOpen ? "text-accent" : "text-ink/45"}`}
+                      >
+                        ✎
+                      </span>
+                    )}
+                    <span>
+                      {row.coordinate} — {shortDate(row.performed_on)}
+                    </span>
+                  </div>
+                </button>
+                {hasNote && noteOpen && (
+                  <div className="border-l-2 border-ink/30 pb-3 pl-2.5 text-[11px] leading-[1.5] text-ink/65">
+                    {row.session_note}
+                  </div>
                 )}
               </div>
-              <div className="text-right text-[10px] font-semibold tracking-[0.1em] text-ink/55">
-                {row.coordinate} — {shortDate(row.performed_on)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ))}
     </>

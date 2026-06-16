@@ -36,6 +36,168 @@ green. No mockup figure exists for these (live predictor is a behavior change,
 not a layout change; the toggle mirrors the existing Units control) — the reps
 field updates in place with no new chrome, so no pixel deviation to record.
 RLS unchanged except the additive column (covered by existing policies).
+## 2026-06-16 (latest) — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
+
+On-device feedback on the notes-model slice: the pinned vs session note should be
+**one** entry with a pin toggle, not two menu items. This unifies the UI, adds the
+Exercise-page pencil, and records the two-note contract for the MCP. No schema change.
+
+### Done
+
+- **One note, one sheet, a pin checkbox.** The exercise `⋮` menu now has a single
+  **Note / Notes** row (was two: pinned + session). It opens a unified sheet with a
+  textarea + a **"Pin to this exercise"** checkbox whose helper line states the
+  difference plainly: checked → *"Stays on this exercise in every workout."*,
+  unchecked → *"Saved with just this session — a note on how it went today."* The
+  checkbox decides where the note lands (pinned `exercise_notes` vs session
+  `exercise_feedback.notes`).
+- **Move between buckets.** Flipping the pin on an existing note **moves** it rather
+  than duplicating: pinning a session note clears the session copy; unpinning the
+  pinned note demotes it to a session note (new `clearPinnedNote` query +
+  `clearPinnedNoteAction`). Empty text clears the note in its bucket. Both display
+  bars (PINNED — / NOTE —) keep their inline pencils, which open the same sheet
+  pre-targeted to that bucket; the menu row defaults to the session note.
+- **Exercise-page pinned-note pencil (parity).** New `ExercisePinnedNote` client
+  component on the Exercise page (3.1a): the pinned note shows with an inline pencil
+  to edit/clear, and an empty state offers **+ PIN A NOTE**. Saves via a new
+  `setPinnedNoteAction` (exercise-scoped; empty unpins). No workout context needed —
+  it's the exercise-wide note.
+- **MCP notes contract (`docs/05-mcp-connector.md`).** Recorded that the connector
+  exposes **both** note kinds and why: the pinned note is durable/general (conditions
+  interpretation of the whole history), the session notes are day-to-day signal
+  (trend, recovery, adherence). `get_exercise_history` carries both; `log_note` writes
+  either kind (drafts/active session only, never completed history). This is the
+  understanding the MCP uses to be a stronger partner.
+
+### Recorded deviations
+
+- **Pin defaults off** for a note opened from the menu — a mid-workout note is most
+  often a session observation; the checkbox + copy make pinning a deliberate one-tap.
+- **Both notes can still coexist** on an exercise (a durable pinned caveat + today's
+  observation); the two display bars and pencils manage each independently, while the
+  single sheet handles one note at a time per its pin state.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+Still no schema change (session note rides `exercise_feedback`; the pinned note rides
+`exercise_notes`); the move/clear paths are user-scoped through existing RLS and the
+completion lock. In-browser QA of the unified sheet + Exercise-page pencil pending.
+
+## 2026-06-16 — Notes-model split (09 §8) + options-menu polish (subtle ⋮ · Edit day deep-link)
+
+Follow-up to the options-menu slice (on-device notes). Lands the **notes-model
+split** (09 session-5 §8) and two interaction fixes. No schema change — the
+session note reuses an existing column; `main` deployable.
+
+### Done
+
+- **Options menu polish.** The Day View header `⋮` is now **borderless** (subtle
+  ink-tint, darkens when open) instead of a boxed control. **Edit day** deep-links
+  the planner to the **current day** (`/cycles/meso/[id]/plan?day=<n>`): the page
+  reads a `day` searchParam and `PlannerBoard` seeds `activeDayId` from the matching
+  day (falls back to day 1). Edit mesocycle still opens the board on day 1.
+- **Notes model split (09 §8).** Two distinct exercise notes, now cleanly separated:
+  - **Pinned note** (cross-workout, already existed via `exercise_notes`) gains an
+    **inline pencil** on the pinned-note bar (Day View) for direct editing, and the
+    edit sheet now **prefills** the current body; the menu row reads `New/Edit
+    pinned note`.
+  - **Session log note** (net-new) — a per-session note **saved with that workout's
+    exercise log**. Stored in **`exercise_feedback.notes`** (one row per
+    workout_exercise) — **no migration**: that table's completion-lock RLS already
+    gates update/delete to the active workout, so the note is editable **only in the
+    live session** and locks on completion, exactly per §8. New `saveSessionNote`
+    query + `saveSessionNoteAction`; a `NOTE —` bar + `SessionNoteSheet` on the Day
+    View (menu row `Add/Edit session note`; empty clears it).
+  - **History display** — `getExerciseHistory` now carries `session_note`;
+    `ExerciseHistoryList` (now a client component) shows a small **✎ note icon** on
+    rows that have one and **reveals the note on tap**. Shared by the 3.2 history
+    sheet and the Exercise page History tab.
+
+### Recorded deviations
+
+- **Session note reuses `exercise_feedback.notes`** rather than a new
+  `workout_exercises.log_note` column (09 §8 offered either). It's per-we, already
+  RLS-gated to the active workout (completion lock), and `workout_exercises.notes` is
+  already taken by the engine's prescription rationale — so reuse avoids a migration
+  and a second lock policy. Pump/workload/joint-pain on the row are preserved (only
+  `notes` is written); a feedback-less note inserts a notes-only row.
+- **Exercise-page pinned-note inline edit not added** — the §8 pencil affordance is
+  on the Day View bar; editing the pinned note from the Exercise page is a minor
+  follow-up.
+- **Notes rows now live in the exercise `⋮` menu** (not the header options menu) —
+  the per-exercise note is an exercise-scoped action; the header menu stays
+  whole-workout/meso. This also unblocks the header menu's deferred "notes" items
+  conceptually (per-exercise notes are covered; a whole-workout note is separate).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+No schema change; the session note rides the existing `exercise_feedback` table +
+completion-lock RLS (logged history untouched). In-browser QA of the pencil/sheet +
+history reveal on a device still pending (as for other screens).
+
+## 2026-06-16 — Workout / mesocycle options menu: End workout · End mesocycle (09 session-5 §9)
+
+Lands the **Workout / mesocycle options menu** — the open reconciliation-backlog
+item from the 2026-06-15 logging review (09 session-5 §9): a header `⋮` control on
+the Day View opening a grouped menu, with the two net-new audited end-early actions.
+No schema change; reuses the existing completion + per-set-skip machinery; the pure
+engine is untouched. Vertical slice; `main` deployable.
+
+### Done
+
+- **Header `⋮` options menu (fig 1.1).** New `WorkoutOptionsMenu` to the right of the
+  date / Target-RIR column, sized to the height of those two rows (per the spec). Opens
+  the shared viewport-flipping `AnchoredMenu` with two labelled groups:
+  - **MESOCYCLE** — Edit mesocycle (→ planner board `/cycles/meso/[id]/plan`) ·
+    Mesocycle stats (→ `/cycles/meso/[id]/stats`) · **End mesocycle** (destructive,
+    shown only while the meso is `active`).
+  - **WORKOUT** — Edit day (→ planner board) · **End workout** (destructive, shown only
+    while the workout is `planned`/`in_progress`).
+  Each end action opens a strong-warning confirm `BottomSheet` before running.
+- **End workout** (`endWorkout` + `endWorkoutAction`) — skips every still-open set on
+  every exercise (reuses `skipRemainingSets`), runs the standard `completeWorkout`
+  (exercise statuses, microcycle close), then the same week N→N+1 generation as a normal
+  completion (service-role, scoped to the user; a generation failure can't lose the
+  early-end). Routes to the next workout if one was generated, else the Workout tab —
+  mirroring the Complete sheet.
+- **End mesocycle** (`endMesocycle` + `endMesocycleAction`) — for every not-yet-finished
+  workout of the meso: skip all open sets, then close it (**completed** if anything was
+  logged on it, **skipped** if untouched); then mark every microcycle and the mesocycle
+  `completed`. **Logged sets are never modified** — only open planned slots are skipped
+  and statuses advance; no week generation runs (the meso is over). Routes to the meso
+  detail page.
+- **Pure helpers** `src/lib/logging/end.ts` — `isRemainingWorkout(status)`,
+  `endWorkoutStatus(hasLoggedSets)`, and `remainingSetNumbers(prescribed, logged,
+  skipped)` (the open-slot computation). **+8 unit tests** (136 total).
+
+### Recorded deviations
+
+- **Notes items deferred.** The §9 menu also specs *Mesocycle notes* and *New/Edit
+  workout note* rows — both depend on the §8 **notes-model** split (pinned vs session
+  note), which is its own backlog slice. Those rows are omitted here rather than stubbed;
+  the menu ships with the navigation + end-early items that don't need the notes model.
+- **"Add exercise" deferred.** The §9 *Add exercise* row (group-aware picker against the
+  live workout) is its own piece of work; not built this slice. Edit day routes to the
+  planner board (the planner does not yet deep-link the current day pre-selected —
+  acceptable, the day is one tap on the board).
+- **No separate in-app audit row.** The spec calls these "audited" queries; like the
+  existing `completeWorkout`/`deleteMesocycle`, the end actions are deliberate,
+  RLS-scoped, confirm-gated server actions rather than rows in `mcp_write_audit` (that
+  table is the MCP write boundary, not in-app actions). Built in the house ledger style
+  (the `⋮` control + grouped menu aren't separately mocked).
+- **End mesocycle from the Day View** acts on the meso behind the viewed workout; it's
+  offered only while that meso is `active`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+The end helpers are unit-tested; the IO (`endWorkout`/`endMesocycle`) reuses the
+smoke-tested `skipRemainingSets`/`completeWorkout` paths and is user-scoped through the
+existing `workouts`/`workout_exercises`/`microcycles`/`mesocycles` RLS — logged_sets are
+never written, so the completion-lock policy is unaffected. In-browser interaction QA of
+the menu + the two confirm flows on a device still pending (as for other screens).
 
 ## 2026-06-16 — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
 

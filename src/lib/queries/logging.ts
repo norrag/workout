@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { endWorkoutStatus, isRemainingWorkout } from "@/lib/logging/end";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -791,6 +792,22 @@ export async function savePinnedNote(
   if (error) throw error;
 }
 
+/** Unpin the exercise's pinned note (used when a note moves to session-only,
+ * or is cleared). The row is kept but no longer surfaces as the pinned note. */
+export async function clearPinnedNote(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("exercise_notes")
+    .update({ is_pinned: false })
+    .eq("user_id", userId)
+    .eq("exercise_id", exerciseId)
+    .eq("is_pinned", true);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // feedback (fig 1.4): joint pain per exercise; pump/workload 0–10 scoped
 // to the exercise's muscle group, stored on that exercise's feedback row
@@ -840,6 +857,51 @@ export async function saveExerciseFeedback(
       soreness: input.soreness,
       soreness_days: input.soreness_days,
       notes: null,
+    });
+    if (error) throw error;
+  }
+}
+
+/**
+ * Session log note (09 session-5 §8) — a per-(workout_exercise) note saved with
+ * that session's exercise log, distinct from the cross-workout pinned note. It
+ * reuses `exercise_feedback.notes` (one row per workout_exercise): the
+ * completion-lock RLS already gates update/delete to the active workout, so the
+ * note is editable only in the live session and locks on completion. An empty
+ * note clears the field (so the history note-icon disappears). Only the `notes`
+ * column is touched — pump/workload/joint-pain are preserved.
+ */
+export async function saveSessionNote(
+  supabase: Client,
+  userId: string,
+  workoutExerciseId: string,
+  note: string | null,
+): Promise<void> {
+  const body = note?.trim() ? note.trim() : null;
+  const { data: existing, error: existingError } = await supabase
+    .from("exercise_feedback")
+    .select("id")
+    .eq("workout_exercise_id", workoutExerciseId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing) {
+    const { error } = await supabase
+      .from("exercise_feedback")
+      .update({ notes: body })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("exercise_feedback").insert({
+      workout_exercise_id: workoutExerciseId,
+      user_id: userId,
+      joint_pain: null,
+      muscle_group_id: null,
+      pump: null,
+      workload: null,
+      soreness: null,
+      soreness_days: null,
+      notes: body,
     });
     if (error) throw error;
   }
@@ -963,4 +1025,118 @@ export async function completeWorkout(
       .eq("id", workout.microcycle_id);
     if (error) throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// end early (fig 1.1 options menu, 09 session-5 §9) — skip what's left, then
+// close. Logged history is never modified; only still-open planned slots are
+// skipped and statuses advance.
+// ---------------------------------------------------------------------------
+
+/**
+ * End the current workout early: skip every still-open set on every exercise,
+ * then run the standard completion path (exercise statuses, microcycle close).
+ * Reuses {@link skipRemainingSets} + {@link completeWorkout}; allowed while the
+ * workout is planned/in_progress.
+ */
+export async function endWorkout(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+): Promise<void> {
+  const { data: wes, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("id")
+    .eq("workout_id", workoutId);
+  if (weError) throw weError;
+  for (const we of wes ?? []) {
+    await skipRemainingSets(supabase, we.id);
+  }
+  await completeWorkout(supabase, userId, workoutId, null);
+}
+
+/**
+ * End a mesocycle early: for every not-yet-finished workout, skip all open
+ * sets and close it (completed if anything was logged on it, else skipped),
+ * then close every microcycle and mark the mesocycle completed. Logged sets
+ * are never touched. No week generation runs — the meso is over.
+ */
+export async function endMesocycle(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<void> {
+  const { data: micros, error: microError } = await supabase
+    .from("microcycles")
+    .select("id")
+    .eq("mesocycle_id", mesoId)
+    .eq("user_id", userId);
+  if (microError) throw microError;
+  const microIds = (micros ?? []).map((m) => m.id);
+
+  if (microIds.length > 0) {
+    const { data: workouts, error: wError } = await supabase
+      .from("workouts")
+      .select("id, status")
+      .in("microcycle_id", microIds);
+    if (wError) throw wError;
+
+    for (const w of workouts ?? []) {
+      if (!isRemainingWorkout(w.status)) continue;
+
+      const { data: wes, error: weError } = await supabase
+        .from("workout_exercises")
+        .select("id")
+        .eq("workout_id", w.id);
+      if (weError) throw weError;
+      const weIds = (wes ?? []).map((x) => x.id);
+
+      // skip the open slots while the workout is still in_progress, before the
+      // status flip (logged_sets/feedback lock on completion, not these)
+      for (const id of weIds) {
+        await skipRemainingSets(supabase, id);
+      }
+
+      let loggedWeIds = new Set<string>();
+      if (weIds.length > 0) {
+        const { data: sets, error: setsError } = await supabase
+          .from("logged_sets")
+          .select("workout_exercise_id")
+          .in("workout_exercise_id", weIds);
+        if (setsError) throw setsError;
+        loggedWeIds = new Set((sets ?? []).map((s) => s.workout_exercise_id));
+      }
+      for (const id of weIds) {
+        const { error } = await supabase
+          .from("workout_exercises")
+          .update({ status: loggedWeIds.has(id) ? "completed" : "skipped" })
+          .eq("id", id);
+        if (error) throw error;
+      }
+
+      const { error: wUpdError } = await supabase
+        .from("workouts")
+        .update({
+          status: endWorkoutStatus(loggedWeIds.size > 0),
+          performed_at: new Date().toISOString(),
+        })
+        .eq("id", w.id)
+        .eq("user_id", userId);
+      if (wUpdError) throw wUpdError;
+    }
+
+    const { error: microUpdError } = await supabase
+      .from("microcycles")
+      .update({ status: "completed" })
+      .in("id", microIds)
+      .neq("status", "completed");
+    if (microUpdError) throw microUpdError;
+  }
+
+  const { error: mesoUpdError } = await supabase
+    .from("mesocycles")
+    .update({ status: "completed" })
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (mesoUpdError) throw mesoUpdError;
 }
