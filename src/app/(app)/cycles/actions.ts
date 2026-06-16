@@ -441,3 +441,23 @@ export async function deleteMesoAction(formData: FormData): Promise<void> {
   revalidatePath("/cycles");
   redirect("/cycles");
 }
+
+/**
+ * Discard the in-progress draft (the one-at-a-time build). Only deletes a meso
+ * still in `draft` status, so it can never remove a planned/active cycle or any
+ * logged history. Lands back on the plan-a-meso entry.
+ */
+export async function discardDraftAction(formData: FormData): Promise<void> {
+  const mesoId = z.string().uuid().parse(formData.get("meso_id"));
+  const { supabase, user } = await requireUser();
+  const { data: meso } = await supabase
+    .from("mesocycles")
+    .select("status")
+    .eq("id", mesoId)
+    .maybeSingle();
+  if (meso?.status === "draft") {
+    await deleteMesocycle(supabase, user.id, mesoId);
+  }
+  revalidatePath("/cycles");
+  redirect("/cycles/plan");
+}

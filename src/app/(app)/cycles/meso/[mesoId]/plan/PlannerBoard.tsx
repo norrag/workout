@@ -11,6 +11,7 @@ import {
   addDayAction,
   addGroupsAction,
   clearSlotAction,
+  discardDraftAction,
   finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
@@ -553,6 +554,15 @@ export function PlannerBoard({
               Add at least one exercise to finish.
             </p>
           )}
+          <form action={discardDraftAction} className="mt-3 text-center">
+            <input type="hidden" name="meso_id" value={meso.id} />
+            <button
+              type="submit"
+              className="text-[10px] font-bold tracking-[0.12em] text-accent"
+            >
+              DISCARD DRAFT
+            </button>
+          </form>
         </>
       ) : (
         // staged edit bar (fig 2.5): nothing is written until SAVE CHANGES
@@ -1185,6 +1195,7 @@ function ExercisePicker({
   return (
     <BottomSheet
       open
+      fullHeight
       onClose={close}
       title="Pick exercise"
       subtitle={`${target.group.muscle_group.toUpperCase()} · ${dayName}`}
@@ -1224,7 +1235,7 @@ function ExercisePicker({
         </div>
       )}
 
-      <div className="mt-3 max-h-[42dvh] overflow-y-auto">
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
         {visible.map((e) => {
           const sel = selected.has(e.id);
           return (

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDraftMeso } from "@/lib/queries/cycles";
-import { startScratchDraftAction } from "../actions";
+import { discardDraftAction, startScratchDraftAction } from "../actions";
 
 /** Plan-a-meso entry (fig 2.4). Every path opens the planner as a draft. */
 export default async function PlanMesoPage() {
@@ -71,6 +71,15 @@ export default async function PlanMesoPage() {
           <p className="mt-2 text-[11px] leading-normal text-ink/60">
             Starting a new plan below replaces this draft.
           </p>
+          <form action={discardDraftAction} className="mt-2.5">
+            <input type="hidden" name="meso_id" value={draft.id} />
+            <button
+              type="submit"
+              className="text-[10px] font-bold tracking-[0.1em] text-accent"
+            >
+              DISCARD DRAFT
+            </button>
+          </form>
         </div>
       )}
 

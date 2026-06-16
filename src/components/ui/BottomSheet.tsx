@@ -34,17 +34,27 @@ export function BottomSheet({
   onClose,
   title,
   subtitle,
+  fullHeight = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
+  /**
+   * Rise to (nearly) the whole screen — a pinned header, a scrollable middle
+   * (children manage their own `flex-1 min-h-0` region), and a pinned footer.
+   * Used for the planner exercise picker (better visibility).
+   */
+  fullHeight?: boolean;
   children: ReactNode;
 }) {
   const { render, shown } = useSheetTransition(open);
   useScrollLock(render);
   if (!render) return null;
+  const panelClass = fullHeight
+    ? "absolute inset-x-0 bottom-0 top-[max(1rem,env(safe-area-inset-top))] flex flex-col border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6"
+    : "absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6";
   return (
     <div className="fixed inset-0 z-50">
       <div
@@ -56,7 +66,7 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6 transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
+        className={`${panelClass} transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
       >
         <div className="flex items-baseline justify-between">
           <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">
@@ -76,7 +86,9 @@ export function BottomSheet({
             {subtitle}
           </p>
         )}
-        <div className="mt-5">{children}</div>
+        <div className={fullHeight ? "mt-5 flex min-h-0 flex-1 flex-col" : "mt-5"}>
+          {children}
+        </div>
       </div>
     </div>
   );
