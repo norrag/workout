@@ -714,6 +714,51 @@ export async function saveExerciseFeedback(
   }
 }
 
+/**
+ * Session log note (09 session-5 §8) — a per-(workout_exercise) note saved with
+ * that session's exercise log, distinct from the cross-workout pinned note. It
+ * reuses `exercise_feedback.notes` (one row per workout_exercise): the
+ * completion-lock RLS already gates update/delete to the active workout, so the
+ * note is editable only in the live session and locks on completion. An empty
+ * note clears the field (so the history note-icon disappears). Only the `notes`
+ * column is touched — pump/workload/joint-pain are preserved.
+ */
+export async function saveSessionNote(
+  supabase: Client,
+  userId: string,
+  workoutExerciseId: string,
+  note: string | null,
+): Promise<void> {
+  const body = note?.trim() ? note.trim() : null;
+  const { data: existing, error: existingError } = await supabase
+    .from("exercise_feedback")
+    .select("id")
+    .eq("workout_exercise_id", workoutExerciseId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing) {
+    const { error } = await supabase
+      .from("exercise_feedback")
+      .update({ notes: body })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("exercise_feedback").insert({
+      workout_exercise_id: workoutExerciseId,
+      user_id: userId,
+      joint_pain: null,
+      muscle_group_id: null,
+      pump: null,
+      workload: null,
+      soreness: null,
+      soreness_days: null,
+      notes: body,
+    });
+    if (error) throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // workout completion (fig 1.5)
 // ---------------------------------------------------------------------------

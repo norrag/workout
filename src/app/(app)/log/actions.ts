@@ -18,6 +18,7 @@ import {
   replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
+  saveSessionNote,
   saveWorkoutFeedback,
   setSetSkipped,
   skipRemainingSets,
@@ -242,6 +243,31 @@ export async function savePinnedNoteAction(input: {
   const parsed = noteSchema.parse(input);
   const { supabase, user } = await requireUser();
   await savePinnedNote(supabase, user.id, parsed.exercise_id, parsed.body);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const sessionNoteSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  note: z.string().max(500).nullable(),
+});
+
+/** Session log note (09 §8) — saved with the workout's exercise log; the
+ * completion lock keeps it editable only while the workout is in_progress. */
+export async function saveSessionNoteAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  note: string | null;
+}): Promise<void> {
+  const parsed = sessionNoteSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await saveSessionNote(
+    supabase,
+    user.id,
+    parsed.workout_exercise_id,
+    parsed.note,
+  );
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }

@@ -29,6 +29,7 @@ import {
   replaceExerciseAction,
   saveFeedbackAction,
   savePinnedNoteAction,
+  saveSessionNoteAction,
   skipRemainingAction,
   toggleSkipSetAction,
   unlogSetAction,
@@ -92,6 +93,9 @@ export function DayView({
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
   const [noteFor, setNoteFor] = useState<LoggedExercise | null>(null);
+  const [sessionNoteFor, setSessionNoteFor] = useState<LoggedExercise | null>(
+    null,
+  );
   const [feedbackFor, setFeedbackFor] = useState<LoggedExercise | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [dropPending, setDropPending] = useState<Record<string, boolean>>({});
@@ -167,6 +171,7 @@ export function DayView({
           onHistory={() => setHistoryFor(we)}
           onReplace={() => setReplaceFor(we)}
           onNote={() => setNoteFor(we)}
+          onSessionNote={() => setSessionNoteFor(we)}
           onFeedback={() => setFeedbackFor(we)}
           onToggleDrop={() =>
             setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
@@ -200,6 +205,13 @@ export function DayView({
         we={noteFor}
         workoutId={workout.id}
         onClose={() => setNoteFor(null)}
+        commit={commit}
+      />
+      <SessionNoteSheet
+        key={sessionNoteFor?.id ?? "none"}
+        we={sessionNoteFor}
+        workoutId={workout.id}
+        onClose={() => setSessionNoteFor(null)}
         commit={commit}
       />
       <ReplaceSheet
@@ -437,6 +449,7 @@ function DayHeader({
             <WorkoutOptionsMenu
               mesoId={mesoId}
               workoutId={workoutId}
+              dayNumber={dayNumber}
               workoutActive={workoutActive}
               mesoActive={mesoActive}
             />
@@ -460,11 +473,13 @@ function DayHeader({
 function WorkoutOptionsMenu({
   mesoId,
   workoutId,
+  dayNumber,
   workoutActive,
   mesoActive,
 }: {
   mesoId: string;
   workoutId: string;
+  dayNumber: number;
   workoutActive: boolean;
   mesoActive: boolean;
 }) {
@@ -500,8 +515,8 @@ function WorkoutOptionsMenu({
         ref={btnRef}
         aria-label="workout and mesocycle options"
         onClick={() => setOpen((v) => !v)}
-        className={`flex w-7 items-center justify-center self-stretch border border-ink/30 pb-1 text-[15px] tracking-[1px] ${
-          open ? "border-ink bg-ink text-bg-base" : "text-ink/70"
+        className={`flex w-6 items-center justify-center self-stretch pb-1 text-[18px] leading-none tracking-[1px] ${
+          open ? "text-ink" : "text-ink/45"
         }`}
       >
         ⋮
@@ -544,7 +559,7 @@ function WorkoutOptionsMenu({
         <MenuRow
           label="Edit day"
           trailing="PLANNER"
-          onClick={() => go(`/cycles/meso/${mesoId}/plan`)}
+          onClick={() => go(`/cycles/meso/${mesoId}/plan?day=${dayNumber}`)}
         />
         {workoutActive && (
           <MenuRow
@@ -639,6 +654,7 @@ function ExerciseBlock({
   onHistory,
   onReplace,
   onNote,
+  onSessionNote,
   onFeedback,
   onToggleDrop,
   onLogged,
@@ -659,6 +675,7 @@ function ExerciseBlock({
   onHistory: () => void;
   onReplace: () => void;
   onNote: () => void;
+  onSessionNote: () => void;
   onFeedback: () => void;
   onToggleDrop: () => void;
   onLogged: (wasLastPlannedSet: boolean) => void;
@@ -718,9 +735,35 @@ function ExerciseBlock({
         </div>
       </div>
       {we.pinned_note && (
-        <div className="mt-[7px] border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
-          PINNED — {we.pinned_note.body}
+        <div className="mt-[7px] flex items-start justify-between gap-2 border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
+          <span>PINNED — {we.pinned_note.body}</span>
+          {!readOnly && (
+            <button
+              type="button"
+              aria-label="edit pinned note"
+              onClick={onNote}
+              className="-my-1 shrink-0 px-1.5 py-1 text-[12px] text-ink/45"
+            >
+              ✎
+            </button>
+          )}
         </div>
+      )}
+      {we.feedback?.notes && (
+        <button
+          type="button"
+          disabled={readOnly}
+          aria-label="edit session note"
+          onClick={onSessionNote}
+          className="mt-[7px] flex w-full items-start justify-between gap-2 border-l-2 border-ink/35 py-[5px] pl-2.5 text-left text-[11px] font-medium text-ink/60 disabled:cursor-default"
+        >
+          <span>NOTE — {we.feedback.notes}</span>
+          {!readOnly && (
+            <span aria-hidden className="shrink-0 px-1.5 text-[12px] text-ink/40">
+              ✎
+            </span>
+          )}
+        </button>
       )}
 
       {!skipped && (
@@ -793,12 +836,21 @@ function ExerciseBlock({
           }}
         />
         <MenuRow
-          label={we.pinned_note ? "Edit pinned note" : "New note"}
+          label={we.pinned_note ? "Edit pinned note" : "New pinned note"}
           onClick={() => {
             onCloseMenu();
             onNote();
           }}
         />
+        {!readOnly && (
+          <MenuRow
+            label={we.feedback?.notes ? "Edit session note" : "Add session note"}
+            onClick={() => {
+              onCloseMenu();
+              onSessionNote();
+            }}
+          />
+        )}
         {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
           <MenuRow
             label="Replace exercise"
@@ -1345,13 +1397,14 @@ function NoteSheet({
   onClose: () => void;
   commit: Commit;
 }) {
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(we?.pinned_note?.body ?? "");
   if (!we) return null;
+  const editing = !!we.pinned_note;
   return (
     <BottomSheet
       open
       onClose={onClose}
-      title="New note"
+      title={editing ? "Edit pinned note" : "New pinned note"}
       subtitle={`${we.exercise_name.toUpperCase()} — PINNED IN EVERY WORKOUT`}
     >
       <textarea
@@ -1382,12 +1435,76 @@ function NoteSheet({
                 body: note.trim(),
               }),
             );
-            setNote("");
             onClose();
           }}
           className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
         >
           SAVE
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// session log note (09 §8) — saved with this session's exercise log, editable
+// only in the live workout. Distinct from the cross-workout pinned note.
+// ---------------------------------------------------------------------------
+
+function SessionNoteSheet({
+  we,
+  workoutId,
+  onClose,
+  commit,
+}: {
+  we: LoggedExercise | null;
+  workoutId: string;
+  onClose: () => void;
+  commit: Commit;
+}) {
+  const [note, setNote] = useState(we?.feedback?.notes ?? "");
+  if (!we) return null;
+  const existing = we.feedback?.notes ?? "";
+  return (
+    <BottomSheet
+      open
+      onClose={onClose}
+      title={existing ? "Edit session note" : "Session note"}
+      subtitle={`${we.exercise_name.toUpperCase()} — SAVED WITH THIS SESSION`}
+    >
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        maxLength={500}
+        rows={3}
+        autoFocus
+        className="min-h-16 w-full border-[1.5px] border-ink bg-paper px-3 py-2.5 text-[13px] leading-normal text-ink placeholder:text-ink/40 focus:outline-none"
+        placeholder="e.g. left elbow cranky, dropped the last set"
+      />
+      <div className="mt-4 flex items-center justify-end gap-2.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={note.trim() === existing.trim()}
+          onClick={() => {
+            commit(() =>
+              saveSessionNoteAction({
+                workout_id: workoutId,
+                workout_exercise_id: we.id,
+                note: note.trim() || null,
+              }),
+            );
+            onClose();
+          }}
+          className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
+        >
+          {existing && !note.trim() ? "CLEAR" : "SAVE"}
         </button>
       </div>
     </BottomSheet>

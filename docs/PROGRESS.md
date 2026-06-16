@@ -2,7 +2,60 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Workout / mesocycle options menu: End workout · End mesocycle (09 session-5 §9)
+## 2026-06-16 (latest) — Notes-model split (09 §8) + options-menu polish (subtle ⋮ · Edit day deep-link)
+
+Follow-up to the options-menu slice (on-device notes). Lands the **notes-model
+split** (09 session-5 §8) and two interaction fixes. No schema change — the
+session note reuses an existing column; `main` deployable.
+
+### Done
+
+- **Options menu polish.** The Day View header `⋮` is now **borderless** (subtle
+  ink-tint, darkens when open) instead of a boxed control. **Edit day** deep-links
+  the planner to the **current day** (`/cycles/meso/[id]/plan?day=<n>`): the page
+  reads a `day` searchParam and `PlannerBoard` seeds `activeDayId` from the matching
+  day (falls back to day 1). Edit mesocycle still opens the board on day 1.
+- **Notes model split (09 §8).** Two distinct exercise notes, now cleanly separated:
+  - **Pinned note** (cross-workout, already existed via `exercise_notes`) gains an
+    **inline pencil** on the pinned-note bar (Day View) for direct editing, and the
+    edit sheet now **prefills** the current body; the menu row reads `New/Edit
+    pinned note`.
+  - **Session log note** (net-new) — a per-session note **saved with that workout's
+    exercise log**. Stored in **`exercise_feedback.notes`** (one row per
+    workout_exercise) — **no migration**: that table's completion-lock RLS already
+    gates update/delete to the active workout, so the note is editable **only in the
+    live session** and locks on completion, exactly per §8. New `saveSessionNote`
+    query + `saveSessionNoteAction`; a `NOTE —` bar + `SessionNoteSheet` on the Day
+    View (menu row `Add/Edit session note`; empty clears it).
+  - **History display** — `getExerciseHistory` now carries `session_note`;
+    `ExerciseHistoryList` (now a client component) shows a small **✎ note icon** on
+    rows that have one and **reveals the note on tap**. Shared by the 3.2 history
+    sheet and the Exercise page History tab.
+
+### Recorded deviations
+
+- **Session note reuses `exercise_feedback.notes`** rather than a new
+  `workout_exercises.log_note` column (09 §8 offered either). It's per-we, already
+  RLS-gated to the active workout (completion lock), and `workout_exercises.notes` is
+  already taken by the engine's prescription rationale — so reuse avoids a migration
+  and a second lock policy. Pump/workload/joint-pain on the row are preserved (only
+  `notes` is written); a feedback-less note inserts a notes-only row.
+- **Exercise-page pinned-note inline edit not added** — the §8 pencil affordance is
+  on the Day View bar; editing the pinned note from the Exercise page is a minor
+  follow-up.
+- **Notes rows now live in the exercise `⋮` menu** (not the header options menu) —
+  the per-exercise note is an exercise-scoped action; the header menu stays
+  whole-workout/meso. This also unblocks the header menu's deferred "notes" items
+  conceptually (per-exercise notes are covered; a whole-workout note is separate).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+No schema change; the session note rides the existing `exercise_feedback` table +
+completion-lock RLS (logged history untouched). In-browser QA of the pencil/sheet +
+history reveal on a device still pending (as for other screens).
+
+## 2026-06-16 — Workout / mesocycle options menu: End workout · End mesocycle (09 session-5 §9)
 
 Lands the **Workout / mesocycle options menu** — the open reconciliation-backlog
 item from the 2026-06-15 logging review (09 session-5 §9): a header `⋮` control on
