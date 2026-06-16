@@ -96,3 +96,26 @@ export function planGroupExercises(
   }
   return out;
 }
+
+/**
+ * Move the item identified by `id` by `delta` positions (−1 up / +1 down)
+ * within an ordered list of ids, returning the new id order. A move that would
+ * fall off either end is a no-op (returns the original order). Pure: drives
+ * both the staged (local) and live (server) reorder paths for muscle groups
+ * within a day and exercises within a group.
+ */
+export function moveInOrder(
+  ids: string[],
+  id: string,
+  delta: number,
+): string[] {
+  const from = ids.indexOf(id);
+  if (from === -1) return ids;
+  const to = from + delta;
+  if (to < 0 || to >= ids.length) return ids;
+  const next = [...ids];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+

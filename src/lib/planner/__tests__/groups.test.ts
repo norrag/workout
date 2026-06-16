@@ -3,7 +3,12 @@
  * the group-centric "Pick exercise" multi-select layout (fig 2.7).
  */
 import { describe, expect, it } from "vitest";
-import { groupByRegion, planGroupExercises, regionForMuscle } from "../groups";
+import {
+  groupByRegion,
+  moveInOrder,
+  planGroupExercises,
+  regionForMuscle,
+} from "../groups";
 
 describe("regionForMuscle", () => {
   it("maps the canonical groups", () => {
@@ -89,5 +94,32 @@ describe("planGroupExercises", () => {
     expect(planGroupExercises([{ exercise_id: "a", initial_sets: 3 }], [], 3)).toEqual(
       [],
     );
+  });
+});
+
+describe("moveInOrder", () => {
+  it("moves an item up", () => {
+    expect(moveInOrder(["a", "b", "c"], "b", -1)).toEqual(["b", "a", "c"]);
+  });
+
+  it("moves an item down", () => {
+    expect(moveInOrder(["a", "b", "c"], "b", 1)).toEqual(["a", "c", "b"]);
+  });
+
+  it("is a no-op (same reference) past either end", () => {
+    const ids = ["a", "b", "c"];
+    expect(moveInOrder(ids, "a", -1)).toBe(ids);
+    expect(moveInOrder(ids, "c", 1)).toBe(ids);
+  });
+
+  it("is a no-op (same reference) for an unknown id", () => {
+    const ids = ["a", "b"];
+    expect(moveInOrder(ids, "z", 1)).toBe(ids);
+  });
+
+  it("does not mutate the input", () => {
+    const ids = ["a", "b", "c"];
+    moveInOrder(ids, "a", 1);
+    expect(ids).toEqual(["a", "b", "c"]);
   });
 });

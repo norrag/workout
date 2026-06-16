@@ -726,6 +726,47 @@ export async function removeDayGroup(
   if (error) throw error;
 }
 
+/**
+ * Reorder a day's muscle groups: rewrite each group's `position` to its index
+ * in `orderedGroupIds` (1..n). Scoped to the day; `position` has no unique
+ * constraint, so a plain rewrite is safe (no temp-value swap dance). Used by
+ * the live (draft) reorder path — staged edits reorder the local copy instead.
+ */
+export async function reorderDayGroups(
+  supabase: Client,
+  dayId: string,
+  orderedGroupIds: string[],
+): Promise<void> {
+  for (let i = 0; i < orderedGroupIds.length; i++) {
+    const { error } = await supabase
+      .from("meso_day_groups")
+      .update({ position: i + 1 })
+      .eq("id", orderedGroupIds[i])
+      .eq("meso_day_id", dayId);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Reorder a group's exercises: rewrite each fill's `slot_number`/`position` to
+ * its index in `orderedFillIds` (1..n), packing fills to the top slots. Scoped
+ * to the group. Live (draft) reorder path; staged edits reorder locally.
+ */
+export async function reorderGroupExercises(
+  supabase: Client,
+  groupId: string,
+  orderedFillIds: string[],
+): Promise<void> {
+  for (let i = 0; i < orderedFillIds.length; i++) {
+    const { error } = await supabase
+      .from("meso_exercises")
+      .update({ slot_number: i + 1, position: i + 1 })
+      .eq("id", orderedFillIds[i])
+      .eq("meso_day_group_id", groupId);
+    if (error) throw error;
+  }
+}
+
 export async function clearSlot(
   supabase: Client,
   mesoExerciseId: string,

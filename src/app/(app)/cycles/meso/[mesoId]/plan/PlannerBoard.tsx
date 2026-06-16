@@ -6,7 +6,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { HistorySheet } from "@/components/HistorySheet";
 import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
-import { groupByRegion, planGroupExercises } from "@/lib/planner/groups";
+import { groupByRegion, moveInOrder, planGroupExercises } from "@/lib/planner/groups";
 import {
   addDayAction,
   addGroupsAction,
@@ -15,6 +15,8 @@ import {
   finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
+  reorderDayGroupsAction,
+  reorderGroupExercisesAction,
   saveMesoPlanAction,
   setGroupExercisesAction,
   updateDayAction,
@@ -77,6 +79,14 @@ type Commit = (fn: () => Promise<void>) => void;
 
 function tmpId(): string {
   return `tmp-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+}
+
+/** Append an optimistic, not-yet-revalidated day so a sheet opened right after
+ *  a live insert (draft path) has its backing day immediately — bridges the
+ *  addDay→revalidate gap that left the day-setup sheet without a day. */
+function withPending(base: ViewDay[], pending: ViewDay | null): ViewDay[] {
+  if (!pending || base.some((d) => d.id === pending.id)) return base;
+  return [...base, pending];
 }
 
 function toWorkDays(days: PlannedDay[]): ViewDay[] {
@@ -150,8 +160,12 @@ export function PlannerBoard({
   // mode no server action runs mid-edit, so props won't change underneath it.
   const [workDays, setWorkDays] = useState<ViewDay[]>(() => toWorkDays(plan.days));
   const [dirty, setDirty] = useState(false);
+  // optimistic bridge for the draft (live) path — see withPending
+  const [pendingDay, setPendingDay] = useState<ViewDay | null>(null);
 
-  const days: ViewDay[] = editing ? workDays : toWorkDays(plan.days);
+  const days: ViewDay[] = editing
+    ? workDays
+    : withPending(toWorkDays(plan.days), pendingDay);
 
   const [activeDayId, setActiveDayId] = useState<string | null>(
     days[0]?.id ?? null,
@@ -187,6 +201,15 @@ export function PlannerBoard({
     const weekday = nextWeekday(days.map((d) => d.weekday));
     commit(async () => {
       const created = await addDayAction({ meso_id: meso.id, label: null, weekday });
+      // render the day-setup sheet immediately from the returned row instead of
+      // waiting on revalidation (the documented add-day "won't dismiss" gap).
+      setPendingDay({
+        id: created.id,
+        day_number: created.day_number,
+        label: created.label,
+        weekday: created.weekday,
+        groups: [],
+      });
       setActiveDayId(created.id);
       setDaySetupId(created.id);
     });
@@ -303,6 +326,71 @@ export function PlannerBoard({
     );
   };
 
+  // reorder a muscle group within its day (−1 up / +1 down). Staged in editing
+  // mode; a live position rewrite on a draft.
+  const moveGroup = (dayId: string, groupId: string, delta: number) => {
+    const day = days.find((d) => d.id === dayId);
+    if (!day) return;
+    const ids = day.groups.map((g) => g.id);
+    const ordered = moveInOrder(ids, groupId, delta);
+    if (ordered === ids) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => {
+          if (d.id !== dayId) return d;
+          const byId = new Map(d.groups.map((g) => [g.id, g]));
+          return { ...d, groups: ordered.map((id) => byId.get(id)!) };
+        }),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      reorderDayGroupsAction({
+        meso_id: meso.id,
+        day_id: dayId,
+        ordered_group_ids: ordered,
+      }),
+    );
+  };
+
+  // reorder an exercise within its group, packing fills to the top slots.
+  const moveFill = (groupId: string, fillId: string, delta: number) => {
+    const group = days.flatMap((d) => d.groups).find((g) => g.id === groupId);
+    if (!group) return;
+    const sorted = [...group.fills].sort((a, b) => a.slot_number - b.slot_number);
+    const sortedIds = sorted.map((f) => f.id);
+    const ordered = moveInOrder(sortedIds, fillId, delta);
+    if (ordered === sortedIds) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) => {
+            if (g.id !== groupId) return g;
+            const byId = new Map(g.fills.map((f) => [f.id, f]));
+            return {
+              ...g,
+              fills: ordered.map((id, i) => ({
+                ...byId.get(id)!,
+                slot_number: i + 1,
+              })),
+            };
+          }),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      reorderGroupExercisesAction({
+        meso_id: meso.id,
+        group_id: groupId,
+        ordered_fill_ids: ordered,
+      }),
+    );
+  };
+
   const clearFill = (groupId: string, fill: ViewFill) => {
     if (editing) {
       setWorkDays((ds) =>
@@ -340,6 +428,13 @@ export function PlannerBoard({
     }));
     commit(() => saveMesoPlanAction({ meso_id: meso.id, days: payload }));
   };
+
+  useEffect(() => {
+    // drop the optimistic day once the revalidated props include it
+    if (pendingDay && plan.days.some((d) => d.id === pendingDay.id)) {
+      setPendingDay(null);
+    }
+  }, [plan.days, pendingDay]);
 
   useEffect(() => {
     // Don't snap the active day back to day-1 while a setup / add-groups sheet
@@ -472,15 +567,41 @@ export function PlannerBoard({
                     SETS
                   </div>
                 </div>
-                {Array.from({ length: group.exercise_slots }, (_, i) => {
+                {(() => {
+                  const sortedFills = [...group.fills].sort(
+                    (a, b) => a.slot_number - b.slot_number,
+                  );
+                  return Array.from({ length: group.exercise_slots }, (_, i) => {
                   const slotNumber = i + 1;
                   const fill = group.fills.find((f) => f.slot_number === slotNumber);
+                  const fillIndex = fill
+                    ? sortedFills.findIndex((f) => f.id === fill.id)
+                    : -1;
                   return fill ? (
                     <div
                       key={slotNumber}
                       className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-1.5 last:border-b-0"
                     >
-                      <div className="text-[13px] tracking-[-1px] text-ink/35">⋮⋮</div>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          aria-label={`move ${fill.exercise_name} up`}
+                          disabled={fillIndex <= 0}
+                          onClick={() => moveFill(group.id, fill.id, -1)}
+                          className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`move ${fill.exercise_name} down`}
+                          disabled={fillIndex >= sortedFills.length - 1}
+                          onClick={() => moveFill(group.id, fill.id, 1)}
+                          className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className="flex-1 text-left"
@@ -523,7 +644,8 @@ export function PlannerBoard({
                       <div className="text-[15px] font-bold">›</div>
                     </button>
                   );
-                })}
+                  });
+                })()}
               </div>
             ))}
 
@@ -604,6 +726,7 @@ export function PlannerBoard({
             onSaveDay={(label, weekday) => saveDay(setupDay.id, label, weekday)}
             onRemoveDay={() => removeDay(setupDay.id)}
             onUpdateGroupSlots={updateGroupSlots}
+            onMoveGroup={(groupId, delta) => moveGroup(setupDay.id, groupId, delta)}
             onRemoveGroup={removeGroup}
             onAddGroups={() => setAddGroupsDayId(setupDay.id)}
             onClose={() => setDaySetupId(null)}
@@ -836,6 +959,7 @@ function DaySetupSheet({
   onSaveDay,
   onRemoveDay,
   onUpdateGroupSlots,
+  onMoveGroup,
   onRemoveGroup,
   onAddGroups,
   onClose,
@@ -844,6 +968,7 @@ function DaySetupSheet({
   onSaveDay: (label: string | null, weekday: number | null) => void;
   onRemoveDay: () => void;
   onUpdateGroupSlots: (groupId: string, slots: number) => void;
+  onMoveGroup: (groupId: string, delta: number) => void;
   onRemoveGroup: (groupId: string) => void;
   onAddGroups: () => void;
   onClose: () => void;
@@ -914,11 +1039,31 @@ function DaySetupSheet({
       <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
         MUSCLE GROUPS — EXERCISES PER GROUP
       </div>
-      {day.groups.map((group) => (
+      {day.groups.map((group, gi) => (
         <div
           key={group.id}
           className="flex items-center gap-2.5 border-b border-ink/15 py-2"
         >
+          <div className="flex flex-col">
+            <button
+              type="button"
+              aria-label={`move ${group.muscle_group} up`}
+              disabled={gi === 0}
+              onClick={() => onMoveGroup(group.id, -1)}
+              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              aria-label={`move ${group.muscle_group} down`}
+              disabled={gi === day.groups.length - 1}
+              onClick={() => onMoveGroup(group.id, 1)}
+              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+            >
+              ▼
+            </button>
+          </div>
           <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
             {badge(group.muscle_group)}
           </div>
