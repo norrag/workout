@@ -3,6 +3,7 @@ import {
   engineParamsSchema,
   rirRamp,
   seedMeso,
+  toEngineEquipment,
   type EngineParams,
 } from "@/lib/engine";
 import type { Database, ExerciseRow, ProfileRow } from "@/lib/types/database";
@@ -25,7 +26,9 @@ function buildDayExerciseRows(workoutId: string, day: PlannedDay, ctx: SeedCtx) 
   let position = 1;
   return day.groups.flatMap((group) =>
     group.fills.map((fill) => {
-      const equipment = ctx.equipmentById.get(fill.exercise_id) ?? "other";
+      const equipment = toEngineEquipment(
+        ctx.equipmentById.get(fill.exercise_id) ?? "other",
+      );
       const pr = ctx.prById.get(fill.exercise_id);
       const seeded = seedMeso(
         pr?.best_weight != null
@@ -335,7 +338,9 @@ export async function regenerateOpenWorkouts(
         group.fills
           .filter((f) => !haveIds.has(f.exercise_id))
           .map((fill) => {
-            const equipment = equipmentById.get(fill.exercise_id) ?? "other";
+            const equipment = toEngineEquipment(
+              equipmentById.get(fill.exercise_id) ?? "other",
+            );
             const pr = prById.get(fill.exercise_id);
             const seeded = seedMeso(
               pr?.best_weight != null

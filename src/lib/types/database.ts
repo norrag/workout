@@ -11,7 +11,9 @@ type Defaulted =
   | "created_at"
   | "updated_at"
   // has a DB default ('{}'); only workout_exercises carries this key
-  | "skipped_set_numbers";
+  | "skipped_set_numbers"
+  // nullable; set only by the library seed/import, never by app inserts
+  | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -25,6 +27,9 @@ type Table<R> = {
 export type MacroGoalType = "hypertrophy" | "strength" | "cut" | "maintain";
 /** suggested/assigned mesocycle phase within a macro (deload is a per-week flag). */
 export type MesoPhase = "accumulation" | "intensification" | "peak";
+// canonical engine buckets (used by user-created customs) plus the wider
+// vocabulary the imported library stores verbatim. The engine normalizes the
+// extra labels to a canonical bucket via toEngineEquipment (engine/params.ts).
 export type EquipmentType =
   | "dumbbell"
   | "barbell"
@@ -34,7 +39,12 @@ export type EquipmentType =
   | "bodyweight"
   | "bands"
   | "kettlebell"
-  | "other";
+  | "other"
+  | "smith machine"
+  | "bodyweight only"
+  | "bodyweight loadable"
+  | "machine assistance"
+  | "freemotion";
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
 export type Units = "kg" | "lb";
 export type SetType = "straight" | "drop";
@@ -70,6 +80,7 @@ export type MuscleGroupRow = {
 export type ExerciseRow = {
   id: string;
   user_id: string | null;
+  legacy_id: number | null;
   name: string;
   equipment_type: EquipmentType;
   description: string | null;
