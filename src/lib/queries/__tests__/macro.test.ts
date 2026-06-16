@@ -6,8 +6,14 @@
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
-import { phaseLabel, planForMacro, profileToMacroProfile } from "../macro";
-import type { ProfileRow } from "@/lib/types/database";
+import {
+  macroEditImpact,
+  phaseLabel,
+  planForMacro,
+  profileToMacroProfile,
+  reconcileMacroSlots,
+} from "../macro";
+import type { MesocycleRow, ProfileRow } from "@/lib/types/database";
 
 function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
   return {
@@ -24,6 +30,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     preferred_equipment: [],
     units: "lb",
     week_starts_on: 1,
+    auto_match_weights: false,
     role: "user",
     onboarded_at: null,
     created_at: "2026-01-01T00:00:00Z",
@@ -93,5 +100,73 @@ describe("planForMacro", () => {
     );
     expect(plan.durationMonths).toBe(plan.recommendedDurationMonths);
     expect(plan.target.unit).toBe("%");
+  });
+});
+
+function meso(
+  id: string,
+  status: MesocycleRow["status"],
+): Pick<MesocycleRow, "id" | "status"> {
+  return { id, status };
+}
+
+describe("macroEditImpact", () => {
+  it("counts unplanned vs locked mesos", () => {
+    const impact = macroEditImpact([
+      meso("a", "completed"),
+      meso("b", "active"),
+      meso("c", "unplanned"),
+      meso("d", "unplanned"),
+    ] as MesocycleRow[]);
+    expect(impact).toEqual({ lockedCount: 2, unplannedCount: 2 });
+  });
+});
+
+describe("reconcileMacroSlots", () => {
+  it("adds unplanned placeholders when the plan grew", () => {
+    const mesos = [meso("a", "active"), meso("b", "unplanned")];
+    expect(reconcileMacroSlots(mesos, 4)).toEqual({
+      removeIds: [],
+      addCount: 2,
+    });
+  });
+
+  it("removes surplus unplanned from the tail when the plan shrank", () => {
+    const mesos = [
+      meso("a", "active"),
+      meso("b", "unplanned"),
+      meso("c", "unplanned"),
+      meso("d", "unplanned"),
+    ];
+    // target 2 ⇒ keep the locked + the earliest open slot, drop c & d
+    expect(reconcileMacroSlots(mesos, 2)).toEqual({
+      removeIds: ["c", "d"],
+      addCount: 0,
+    });
+  });
+
+  it("never drops below the locked count", () => {
+    const mesos = [
+      meso("a", "completed"),
+      meso("b", "active"),
+      meso("c", "unplanned"),
+    ];
+    // plan asks for 1 but 2 are locked ⇒ remove the lone unplanned, add none
+    expect(reconcileMacroSlots(mesos, 1)).toEqual({
+      removeIds: ["c"],
+      addCount: 0,
+    });
+  });
+
+  it("is a no-op when the plan already matches", () => {
+    const mesos = [
+      meso("a", "active"),
+      meso("b", "unplanned"),
+      meso("c", "unplanned"),
+    ];
+    expect(reconcileMacroSlots(mesos, 3)).toEqual({
+      removeIds: [],
+      addCount: 0,
+    });
   });
 });

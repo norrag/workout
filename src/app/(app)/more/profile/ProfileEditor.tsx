@@ -10,8 +10,16 @@ import {
   removeExclusionAction,
   setEquipment,
   setExperience,
+  setGender,
   updateProfileField,
 } from "./actions";
+
+const GENDERS = [
+  { value: "female", label: "FEMALE" },
+  { value: "male", label: "MALE" },
+  { value: "other", label: "OTHER" },
+  { value: "undisclosed", label: "PREFER NOT" },
+] as const;
 
 const EQUIPMENT = [
   "barbell",
@@ -87,6 +95,7 @@ export function ProfileEditor({
   const [bodyFat, setBodyFatLocal] = useState<number | null>(
     profile.body_fat_pct,
   );
+  const [gender, setGenderLocal] = useState(profile.gender ?? "undisclosed");
 
   const units = profile.units;
 
@@ -194,6 +203,34 @@ export function ProfileEditor({
       </div>
       <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
         Drives starting volumes and how aggressively autoregulation ramps.
+      </p>
+
+      {/* sex — calibrates the macrocycle muscle-gain target */}
+      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+        SEX
+      </div>
+      <div className="mt-2 flex border-[1.5px] border-ink">
+        {GENDERS.map((opt, i) => (
+          <button
+            key={opt.value}
+            type="button"
+            aria-pressed={gender === opt.value}
+            onClick={() => {
+              setGenderLocal(opt.value);
+              startTransition(() => setGender(opt.value));
+            }}
+            className={`flex-1 py-2.5 text-center text-[10px] tracking-[0.08em] ${
+              gender === opt.value
+                ? "bg-ink font-bold text-bg-base"
+                : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
+        Calibrates the realistic muscle-gain target on your macrocycles.
       </p>
 
       {/* body fat estimate (optional) */}

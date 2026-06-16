@@ -20,6 +20,36 @@
   color-scheme: light;
 }
 
+/*
+ * Dark ledger — an inversion of the light system (ink ⇄ cream) on a warm
+ * near-black, kept square/flat per 08 §1. The accent lifts slightly for
+ * legibility on dark; the single permitted menu shadow flips to a light cast.
+ * Tokens are overridden as CSS custom properties so every `bg-ink / text-ink /
+ * ink-opacity` utility adapts with no markup changes.
+ *
+ * `data-theme` is set on <html> before paint (see the inline script in the
+ * root layout): "light" / "dark" / "system" (follows the OS preference).
+ */
+[data-theme="dark"] {
+  --color-bg-base: #14110c; /* warm near-black app background */
+  --color-paper: #211c14; /* active input / sheet surfaces */
+  --color-ink: #f1ece0; /* text, rules, filled/active elements (cream) */
+  --color-accent: #d76040; /* current position + selected states ONLY */
+  --shadow-menu: 5px 5px 0 rgba(241, 236, 224, 0.16);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --color-bg-base: #14110c;
+    --color-paper: #211c14;
+    --color-ink: #f1ece0;
+    --color-accent: #d76040;
+    --shadow-menu: 5px 5px 0 rgba(241, 236, 224, 0.16);
+    color-scheme: dark;
+  }
+}
+
 html,
 body {
   background: var(--color-bg-base);

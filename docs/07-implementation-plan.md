@@ -120,14 +120,47 @@ Schema v1, RLS suite, auth, and onboarding shipped. The pivot delta:
 
 **Goal:** any MCP client can analyze, plan, and — for admins — tune the engine. This phase absorbs the old Phase 5 admin tooling.
 
-- [ ] `/api/mcp` server (Streamable HTTP) with OAuth bridge to Supabase Auth; connector row + token revocation in More
-- [ ] Read tools: profile, current state, cycles, exercise history, muscle-group volume/balance, meso summaries, PRs, explain_prescription, search
-- [ ] Write tools (drafts only, audited to `mcp_write_audit`): create_mesocycle (groups-first shape), create_template, create_custom_exercise, update_macrocycle_goals, manage_exclusions, log_note
-- [ ] **Admin tools (role-gated by `profiles.role`):** get_engine_params / list versions, propose_engine_params (new inactive version), activate_engine_params (explicit confirm step), get_engine_decisions (filterable inspector), replay_decisions (re-run historical decisions/mesos against a candidate version, return diffs)
-- [ ] Replay functions + synthetic scenario fixtures shared with the test suite
-- [ ] Resources + server instructions; tool-handler tests against a seeded fixture user; manual verification from Claude
+**Build decisions (2026-06-16 planning session).** Auth uses Supabase's native **OAuth 2.1
+Server** as the authorization server (DCR + PKCE + JWKS); `/api/mcp` is a **resource server**
+validating the bearer JWT via `mcp-handler`'s `withMcpAuth`, leaning on **RLS for per-user
+scoping** (service-role only for `mcp_write_audit` + admin cross-scope reads) — see
+[05-mcp-connector.md](05-mcp-connector.md) §Auth. Tools are thin, zod-validated wrappers over the
+existing `src/lib/queries/` layer (all `(client, userId, …)`-shaped) and the pure engine; nearly
+all data paths already exist. The tool surface is **expanded for coaching** (05 §Coaching &
+analysis): consolidated overview, recent-sessions feed, exercise-progress/stall analysis,
+meso comparison, muscle-balance, and `get_exercise_affinity` (exercise-selection profile from
+prior selection × pinned notes × aggregated feedback). Ship in **vertical slices**, each
+deployable:
 
-**Accept:** from Claude, a user gets a grounded meso summary and a drafted next meso appearing in-app as planned; an admin changes a progression increment, replays a real meso against it, sees the diff, and activates — all via MCP, no deploy, no admin UI.
+- [ ] **Slice 1 — transport + auth + smoke.** Add deps (`mcp-handler`, `@modelcontextprotocol/sdk`,
+      `jose`); `/api/mcp` Streamable-HTTP route behind `withMcpAuth`; `/.well-known/oauth-protected-resource`
+      metadata; token-bound RLS client factory; server instructions string; **one** read tool
+      (`get_current_state`) + one resource; tool-handler test harness against a seeded fixture user;
+      enable the Supabase OAuth server on the hosted project; wire the More → AI connector row +
+      revocation. Module layout per 05 §Module layout (`src/lib/mcp/{server,auth,resources}.ts`,
+      `tools/`, `__tests__/`).
+- [ ] **Slice 2 — read/analysis + coaching suite.** Spec read tools (profile, cycles, exercise
+      history with both note kinds, muscle-group volume, meso/macro summaries, PRs, search,
+      `explain_prescription`) + coaching tools (`get_training_overview`, `get_recent_sessions`,
+      `analyze_exercise_progress`, `compare_mesocycles`, `get_muscle_balance`,
+      `get_exercise_affinity`, `get_exercise_notes`/`get_exclusions`) + remaining resources. New
+      query-layer readers for `engine_decisions` and the affinity rollup.
+- [ ] **Slice 3 — write/planning (drafts, audited).** create_macrocycle, create_mesocycle
+      (groups-first, `planned`), create_template, create_custom_exercise, update_macrocycle_goals,
+      manage_exclusions, log_note — all written to `mcp_write_audit`; verify a drafted meso surfaces
+      in-app as `planned`. Engine fills every prescribed number; the LLM only proposes structure.
+- [ ] **Slice 4 — admin/tuning + replay (role-gated by `profiles.role`).** list/get/diff
+      `engine_params`, propose_engine_params (inactive, zod-gated), activate_engine_params (explicit
+      version-echo confirm), get_engine_decisions (filterable inspector), replay_decisions (re-run
+      historical decisions/mesos against a candidate version via `buildEngineInputs` +
+      `prescribe`/`seedMeso`, return diffs). Synthetic scenario fixtures shared with the test suite.
+- [ ] Likely **one migration**: index `engine_decisions (user_id, exercise_id, created_at,
+      params_version)` for the inspector/replay filters (+ RLS confirm). Rate-limiting + payload
+      caps/pagination + the security pass fold into Phase 7.
+
+**Accept:** from Claude, a user gets a grounded meso summary and exercise-selection-aware advice,
+and a drafted next meso appears in-app as planned; an admin changes a progression increment,
+replays a real meso against it, sees the diff, and activates — all via MCP, no deploy, no admin UI.
 
 ## Phase 7 — Production hardening & launch
 
@@ -183,7 +216,9 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
 - [x] **Macrocycle Overview (2.2)** net-new: realistic target card (range + per-month rate +
       training-age/bodyweight/experience chips), mesocycle timeline (phase + status), macro stats
       (`v_macro_summary`). **No progress-vs-projection / body-weight bar.** *(2026-06-14:
-      `/cycles/macro/[macroId]`; `FULL ›` + an edit screen deferred — see PROGRESS.)*
+      `/cycles/macro/[macroId]`; `FULL ›` deferred. **Edit macrocycle shipped 2026-06-16:**
+      `/cycles/macro/[macroId]/edit` + `updateMacrocycle` — rename/goal/duration/block-length/notes
+      + safe re-plan of unplanned slots only, locked mesos + logged history immutable.)*
 - [x] **Create Macrocycle engine (2.3)** net-new: goal / duration / block-length inputs, live
       target + meso-count + phase preview (`planMacrocycle`), creates `unplanned` mesos.
       *(2026-06-14: `/cycles/new` `CreateMacroForm`, live client recompute.)*
@@ -242,15 +277,23 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
       (`workout_exercises.skipped_set_numbers`, migration `20260615000003`) — skip greys in place &
       reversible, **skip-remaining is per-set** (no longer whole-exercise); **complete button gated**
       on every set being logged or skipped. *(2026-06-15.)*
-- [ ] `DATA` **Notes model (1.1/1.2/3.x)** — split the **pinned note** (exercise-record attribute,
+- [x] `DATA` **Notes model (1.1/1.2/3.x)** — split the **pinned note** (exercise-record attribute,
       cross-workout, inline edit icon, optional) from a **session log note** (saved with the
       workout's exercise log; note-icon on history rows; editable only in the live workout). 09
-      session-5 §8.
-- [ ] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
+      session-5 §8. *(2026-06-16: session note reuses `exercise_feedback.notes` (one row per
+      workout_exercise) — **no migration**: the completion-lock RLS already gates its edits to the
+      active workout. Day View gains an inline pencil on the pinned-note bar + a NOTE bar / sheet for
+      the session note; `getExerciseHistory` carries `session_note`, surfaced as a tap-to-reveal note
+      icon in `ExerciseHistoryList` (sheet + Exercise page). Exercise-page pinned-note inline edit
+      deferred — minor.)*
+- [~] `DATA` **Workout / mesocycle options menu (1.1)** — header `⋮` right of the date/RIR column:
       Mesocycle (notes · edit → planner · stats · **End mesocycle** = skip+complete all remaining,
       strong warning) + Workout (note · edit day → planner · add exercise · **End workout** =
       skip-remaining + complete). New audited `endMesocycle`/`endWorkout` queries + confirm steps;
-      notes items depend on the notes model. 09 session-5 §9.
+      notes items depend on the notes model. 09 session-5 §9. *(2026-06-16: `⋮` menu +
+      `endWorkout`/`endMesocycle` (skip-remaining → complete, logged history untouched) + confirm
+      sheets + pure `src/lib/logging/end.ts` helpers (8 tests). **Notes items and Add exercise
+      deferred** — notes rows depend on the §8 notes-model slice; Add exercise is its own piece.)*
 
 ### Library & stats (against Phase 5) — retrofit
 - [ ] `DATA` `exercises.tracking_type` (weight_reps/reps/time); `logged_sets` weight/reps nullable

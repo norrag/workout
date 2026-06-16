@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { endWorkoutStatus, isRemainingWorkout } from "@/lib/logging/end";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -11,8 +12,82 @@ import type {
   WorkoutExerciseRow,
   WorkoutRow,
 } from "@/lib/types/database";
+import {
+  recencyWeightedE1rm,
+  type EngineParams,
+  type E1rmSample,
+} from "@/lib/engine";
+import { getActiveEngineParams } from "./generation";
 
 type Client = SupabaseClient<Database>;
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+/**
+ * Recency-weighted strength anchor (e1RM) per exercise (doc 11), powering the
+ * live reps predictor. Reads the user's recent working sets, assumes each was
+ * performed at its prescribed target RIR (the app's RIR premise — no separate
+ * per-set RIR capture), and folds them through the pure `recencyWeightedE1rm`.
+ * `ageDays` is computed here (query land); the engine stays clock-free.
+ */
+export async function getExerciseE1rmAnchors(
+  supabase: Client,
+  userId: string,
+  exerciseIds: string[],
+  params: EngineParams,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (exerciseIds.length === 0) return out;
+
+  const { data: sets, error } = await supabase
+    .from("logged_sets")
+    .select(
+      "exercise_id, workout_exercise_id, weight, reps, rir_reported, performed_at",
+    )
+    .eq("user_id", userId)
+    .in("exercise_id", exerciseIds)
+    .eq("is_warmup", false)
+    .gt("weight", 0)
+    .gt("reps", 0)
+    .order("performed_at", { ascending: false })
+    .limit(600);
+  if (error) throw error;
+  if (!sets || sets.length === 0) return out;
+
+  // assumed RIR = the parent prescription's target RIR (RIR premise, doc 11),
+  // unless the set carried an explicit reported RIR
+  const weIds = [...new Set(sets.map((s) => s.workout_exercise_id))];
+  const { data: wes, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("id, target_rir")
+    .in("id", weIds);
+  if (weError) throw weError;
+  const targetRirByWe = new Map((wes ?? []).map((w) => [w.id, w.target_rir]));
+
+  const now = Date.now();
+  const byExercise = new Map<string, E1rmSample[]>();
+  for (const s of sets) {
+    const ageDays = Math.max(
+      0,
+      (now - new Date(s.performed_at).getTime()) / DAY_MS,
+    );
+    const sample: E1rmSample = {
+      weight: s.weight,
+      reps: s.reps,
+      targetRir: s.rir_reported ?? targetRirByWe.get(s.workout_exercise_id) ?? null,
+      ageDays,
+    };
+    const cur = byExercise.get(s.exercise_id) ?? [];
+    cur.push(sample);
+    byExercise.set(s.exercise_id, cur);
+  }
+
+  for (const [exerciseId, samples] of byExercise) {
+    const anchor = recencyWeightedE1rm(samples, params);
+    if (anchor) out.set(exerciseId, anchor.value);
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // day view detail (fig 1.1) — everything the logger needs in one shape
@@ -25,6 +100,8 @@ export interface LoggedExercise extends WorkoutExerciseRow {
   sets: LoggedSetRow[];
   pinned_note: ExerciseNoteRow | null;
   feedback: ExerciseFeedbackRow | null;
+  /** recency-weighted strength anchor for the live reps predictor (doc 11) */
+  e1rm_anchor: number | null;
 }
 
 /** A programmed day in the navigator (fig 1.1 expanded header). */
@@ -254,6 +331,15 @@ export async function getWorkoutDetail(
     };
   });
 
+  // recency-weighted strength anchors for the live reps predictor (doc 11)
+  const { params } = await getActiveEngineParams(supabase);
+  const e1rmAnchors = await getExerciseE1rmAnchors(
+    supabase,
+    userId,
+    exerciseIds,
+    params,
+  );
+
   // macro context caption (fig 1.1)
   let contextLabel = "STANDALONE MESO";
   if (mesocycle.macrocycle_id) {
@@ -297,6 +383,7 @@ export async function getWorkoutDetail(
       sets: (sets ?? []).filter((s) => s.workout_exercise_id === we.id),
       pinned_note: noteByExercise.get(we.exercise_id) ?? null,
       feedback: feedbackByWe.get(we.id) ?? null,
+      e1rm_anchor: e1rmAnchors.get(we.exercise_id) ?? null,
     })),
   };
 }
@@ -561,6 +648,52 @@ export async function adjustPrescribedSets(
   if (error) throw error;
 }
 
+/**
+ * Persist a planned weight for an upcoming (unlogged) set (doc 11). With
+ * `matchAll` (the auto-match setting), the weight is written to *every*
+ * still-unlogged set of the exercise; otherwise only to `setNumber`. Logged
+ * sets are never touched — actuals live in `logged_sets`; this only seeds the
+ * weight shown before a set is logged. Stored as a `set_number → weight` map in
+ * `workout_exercises.set_weights`.
+ */
+export async function setPlannedSetWeight(
+  supabase: Client,
+  workoutExerciseId: string,
+  setNumber: number,
+  weight: number,
+  matchAll: boolean,
+): Promise<void> {
+  const { data: we, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("prescribed_sets, set_weights")
+    .eq("id", workoutExerciseId)
+    .single();
+  if (weError) throw weError;
+
+  const next: Record<string, number> = { ...(we.set_weights ?? {}) };
+
+  if (matchAll) {
+    const { data: sets, error: setsError } = await supabase
+      .from("logged_sets")
+      .select("set_number")
+      .eq("workout_exercise_id", workoutExerciseId);
+    if (setsError) throw setsError;
+    const logged = new Set((sets ?? []).map((s) => s.set_number));
+    const planned = Math.max(we.prescribed_sets ?? 1, setNumber);
+    for (let n = 1; n <= planned; n += 1) {
+      if (!logged.has(n)) next[String(n)] = weight;
+    }
+  } else {
+    next[String(setNumber)] = weight;
+  }
+
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ set_weights: next })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
 export async function setExerciseStatus(
   supabase: Client,
   workoutExerciseId: string,
@@ -659,6 +792,22 @@ export async function savePinnedNote(
   if (error) throw error;
 }
 
+/** Unpin the exercise's pinned note (used when a note moves to session-only,
+ * or is cleared). The row is kept but no longer surfaces as the pinned note. */
+export async function clearPinnedNote(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("exercise_notes")
+    .update({ is_pinned: false })
+    .eq("user_id", userId)
+    .eq("exercise_id", exerciseId)
+    .eq("is_pinned", true);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // feedback (fig 1.4): joint pain per exercise; pump/workload 0–10 scoped
 // to the exercise's muscle group, stored on that exercise's feedback row
@@ -673,6 +822,8 @@ export async function saveExerciseFeedback(
     muscle_group_id: string | null;
     pump: number | null;
     workload: number | null;
+    soreness: number | null;
+    soreness_days: number | null;
   },
 ): Promise<void> {
   const { data: existing, error: existingError } = await supabase
@@ -690,6 +841,8 @@ export async function saveExerciseFeedback(
         muscle_group_id: input.muscle_group_id,
         pump: input.pump,
         workload: input.workload,
+        soreness: input.soreness,
+        soreness_days: input.soreness_days,
       })
       .eq("id", existing.id);
     if (error) throw error;
@@ -701,7 +854,54 @@ export async function saveExerciseFeedback(
       muscle_group_id: input.muscle_group_id,
       pump: input.pump,
       workload: input.workload,
+      soreness: input.soreness,
+      soreness_days: input.soreness_days,
       notes: null,
+    });
+    if (error) throw error;
+  }
+}
+
+/**
+ * Session log note (09 session-5 §8) — a per-(workout_exercise) note saved with
+ * that session's exercise log, distinct from the cross-workout pinned note. It
+ * reuses `exercise_feedback.notes` (one row per workout_exercise): the
+ * completion-lock RLS already gates update/delete to the active workout, so the
+ * note is editable only in the live session and locks on completion. An empty
+ * note clears the field (so the history note-icon disappears). Only the `notes`
+ * column is touched — pump/workload/joint-pain are preserved.
+ */
+export async function saveSessionNote(
+  supabase: Client,
+  userId: string,
+  workoutExerciseId: string,
+  note: string | null,
+): Promise<void> {
+  const body = note?.trim() ? note.trim() : null;
+  const { data: existing, error: existingError } = await supabase
+    .from("exercise_feedback")
+    .select("id")
+    .eq("workout_exercise_id", workoutExerciseId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing) {
+    const { error } = await supabase
+      .from("exercise_feedback")
+      .update({ notes: body })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("exercise_feedback").insert({
+      workout_exercise_id: workoutExerciseId,
+      user_id: userId,
+      joint_pain: null,
+      muscle_group_id: null,
+      pump: null,
+      workload: null,
+      soreness: null,
+      soreness_days: null,
+      notes: body,
     });
     if (error) throw error;
   }
@@ -825,4 +1025,118 @@ export async function completeWorkout(
       .eq("id", workout.microcycle_id);
     if (error) throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// end early (fig 1.1 options menu, 09 session-5 §9) — skip what's left, then
+// close. Logged history is never modified; only still-open planned slots are
+// skipped and statuses advance.
+// ---------------------------------------------------------------------------
+
+/**
+ * End the current workout early: skip every still-open set on every exercise,
+ * then run the standard completion path (exercise statuses, microcycle close).
+ * Reuses {@link skipRemainingSets} + {@link completeWorkout}; allowed while the
+ * workout is planned/in_progress.
+ */
+export async function endWorkout(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+): Promise<void> {
+  const { data: wes, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("id")
+    .eq("workout_id", workoutId);
+  if (weError) throw weError;
+  for (const we of wes ?? []) {
+    await skipRemainingSets(supabase, we.id);
+  }
+  await completeWorkout(supabase, userId, workoutId, null);
+}
+
+/**
+ * End a mesocycle early: for every not-yet-finished workout, skip all open
+ * sets and close it (completed if anything was logged on it, else skipped),
+ * then close every microcycle and mark the mesocycle completed. Logged sets
+ * are never touched. No week generation runs — the meso is over.
+ */
+export async function endMesocycle(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<void> {
+  const { data: micros, error: microError } = await supabase
+    .from("microcycles")
+    .select("id")
+    .eq("mesocycle_id", mesoId)
+    .eq("user_id", userId);
+  if (microError) throw microError;
+  const microIds = (micros ?? []).map((m) => m.id);
+
+  if (microIds.length > 0) {
+    const { data: workouts, error: wError } = await supabase
+      .from("workouts")
+      .select("id, status")
+      .in("microcycle_id", microIds);
+    if (wError) throw wError;
+
+    for (const w of workouts ?? []) {
+      if (!isRemainingWorkout(w.status)) continue;
+
+      const { data: wes, error: weError } = await supabase
+        .from("workout_exercises")
+        .select("id")
+        .eq("workout_id", w.id);
+      if (weError) throw weError;
+      const weIds = (wes ?? []).map((x) => x.id);
+
+      // skip the open slots while the workout is still in_progress, before the
+      // status flip (logged_sets/feedback lock on completion, not these)
+      for (const id of weIds) {
+        await skipRemainingSets(supabase, id);
+      }
+
+      let loggedWeIds = new Set<string>();
+      if (weIds.length > 0) {
+        const { data: sets, error: setsError } = await supabase
+          .from("logged_sets")
+          .select("workout_exercise_id")
+          .in("workout_exercise_id", weIds);
+        if (setsError) throw setsError;
+        loggedWeIds = new Set((sets ?? []).map((s) => s.workout_exercise_id));
+      }
+      for (const id of weIds) {
+        const { error } = await supabase
+          .from("workout_exercises")
+          .update({ status: loggedWeIds.has(id) ? "completed" : "skipped" })
+          .eq("id", id);
+        if (error) throw error;
+      }
+
+      const { error: wUpdError } = await supabase
+        .from("workouts")
+        .update({
+          status: endWorkoutStatus(loggedWeIds.size > 0),
+          performed_at: new Date().toISOString(),
+        })
+        .eq("id", w.id)
+        .eq("user_id", userId);
+      if (wUpdError) throw wUpdError;
+    }
+
+    const { error: microUpdError } = await supabase
+      .from("microcycles")
+      .update({ status: "completed" })
+      .in("id", microIds)
+      .neq("status", "completed");
+    if (microUpdError) throw microUpdError;
+  }
+
+  const { error: mesoUpdError } = await supabase
+    .from("mesocycles")
+    .update({ status: "completed" })
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (mesoUpdError) throw mesoUpdError;
 }

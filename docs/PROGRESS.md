@@ -28,6 +28,499 @@ intentional, not a miss). Views recompute live, so stats update immediately.
 - Both build scripts now do this as their final step (`history-build.sql`,
   `history-build-standalone.sql`); applied to the live data for both accounts.
 - Garron's completed macros now read 92–96% (was 100%); Madeline's mesos likewise.
+## 2026-06-16 — Phase 6 (MCP connector) plan locked
+
+Planning session for the MCP connector ahead of implementation in a separate session.
+No code yet — this commit records the build decisions in the specs so the next session
+launches straight from the docs. `main` unaffected.
+
+### Decisions
+
+- **Auth = Supabase's native OAuth 2.1 Server** as the authorization server (authorization-code
+  + PKCE, **dynamic client registration**, JWKS/OIDC discovery, revocation; issues Supabase JWTs
+  with `user_id`/`role`/`client_id`). `/api/mcp` becomes a pure **resource server** validating the
+  bearer JWT via `mcp-handler`'s `withMcpAuth`, with **RLS doing per-user scoping**; service-role
+  reserved for `mcp_write_audit` + admin cross-scope reads. No custom token table. This collapses
+  the riskiest slice from "build an OAuth AS" to "verify a JWT + expose protected-resource
+  metadata." (05 §Auth.) Requires enabling the OAuth server on the hosted project.
+- **Vertical slices** (each deployable): (1) transport+auth+`get_current_state`+test harness,
+  (2) full read/analysis + coaching suite, (3) write/planning drafts (audited), (4) admin/tuning +
+  replay. (07 Phase 6.)
+- **Tool surface expanded for coaching** beyond the original spec list: `get_training_overview`,
+  `get_recent_sessions`, `analyze_exercise_progress` (stall/plateau detection), `compare_mesocycles`,
+  `get_muscle_balance`, `get_exercise_notes`/`get_exclusions`, and **`get_exercise_affinity`** — an
+  exercise-selection profile per muscle group / equipment type combining prior selection (frequency,
+  recency, loads/volume) with pinned notes and aggregated session feedback, so advice/planning favor
+  proven, well-tolerated movements and avoid flagged ones. All read-only on existing views + the
+  pure engine. (05 §Coaching & analysis.)
+
+### Codebase readiness (surveyed)
+
+- `src/lib/mcp/` and `src/app/api/mcp/` do **not** exist yet — Phase 6 is greenfield on top of a
+  built app.
+- The `src/lib/queries/` layer (~90 fns, all `(client, userId, …)`-shaped) already covers nearly
+  every read/write a tool needs; the pure engine (`prescribe`/`seedMeso`/`planMacrocycle`/
+  `estimateE1rm`) is fully exported; `mcp_write_audit`/`engine_params`/`engine_decisions` and the
+  shared `v_*` views all exist. **Missing data paths:** an `engine_decisions` reader, a param-version
+  lister, and the affinity rollup — plus likely one index migration on `engine_decisions`.
+
+### Verified
+
+Docs-only change: `05-mcp-connector.md` (auth approach + coaching/analysis tool tables incl.
+`get_exercise_affinity`), `07-implementation-plan.md` (Phase 6 reorganized into slices), this log.
+
+## 2026-06-16 — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
+## 2026-06-16 (latest) — Live reps⇄weight⇄RIR predictor + auto-match-weights setting
+
+Implements [11-workout-engine-explainer.md](11-workout-engine-explainer.md) §6
+after design review. Vertical slice; `main` deployable.
+
+### Done
+
+- **Live reps prediction (request #1).** New pure engine module
+  `src/lib/engine/reps.ts` — `predictRepsAtWeight` / `impliedRirAtReps` (invert
+  the averaged Epley/Brzycki e1RM curve by bisection) + `recencyWeightedE1rm`
+  (the strength anchor: each sample's e1RM weighted by
+  `0.5^(ageDays/recency_halflife_days) × confidence`, pure — caller supplies
+  ageDays). On the Day View, changing a set's weight now re-estimates the reps
+  that hit the row's **target RIR** from the user's recent history, until the
+  user types their own reps; future rows display the predicted reps at the
+  planned weight. New param `e1rm.recency_halflife_days` (default 30 d, engine
+  params **v6**). 13 golden/property tests.
+- **RIR premise (decision).** No separate per-set RIR capture: the prescribed
+  target RIR is the assumed RIR for all e1RM math (the app prescribes RIR and
+  trusts the honest log). Anchor recency-weighted so it tracks current form
+  (e.g. drops on a cut). Predicted reps = single integer.
+- **Auto-match weights (request #3).** New `profiles.auto_match_weights`
+  (migration `20260616000002`, off by default), More-tab ON/OFF toggle, and
+  propagation of a just-entered weight onto the exercise's **unlogged** sets
+  (via `prescribed_weight`; logged history untouched — hard rule #5). Rides the
+  existing owner-only profiles RLS; new RLS tests added.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (141/141), `npm run build`
+green. No mockup figure exists for these (live predictor is a behavior change,
+not a layout change; the toggle mirrors the existing Units control) — the reps
+field updates in place with no new chrome, so no pixel deviation to record.
+RLS unchanged except the additive column (covered by existing policies).
+## 2026-06-16 (latest) — Unified note sheet (pin checkbox) + Exercise-page pinned-note pencil + MCP notes contract
+
+On-device feedback on the notes-model slice: the pinned vs session note should be
+**one** entry with a pin toggle, not two menu items. This unifies the UI, adds the
+Exercise-page pencil, and records the two-note contract for the MCP. No schema change.
+
+### Done
+
+- **One note, one sheet, a pin checkbox.** The exercise `⋮` menu now has a single
+  **Note / Notes** row (was two: pinned + session). It opens a unified sheet with a
+  textarea + a **"Pin to this exercise"** checkbox whose helper line states the
+  difference plainly: checked → *"Stays on this exercise in every workout."*,
+  unchecked → *"Saved with just this session — a note on how it went today."* The
+  checkbox decides where the note lands (pinned `exercise_notes` vs session
+  `exercise_feedback.notes`).
+- **Move between buckets.** Flipping the pin on an existing note **moves** it rather
+  than duplicating: pinning a session note clears the session copy; unpinning the
+  pinned note demotes it to a session note (new `clearPinnedNote` query +
+  `clearPinnedNoteAction`). Empty text clears the note in its bucket. Both display
+  bars (PINNED — / NOTE —) keep their inline pencils, which open the same sheet
+  pre-targeted to that bucket; the menu row defaults to the session note.
+- **Exercise-page pinned-note pencil (parity).** New `ExercisePinnedNote` client
+  component on the Exercise page (3.1a): the pinned note shows with an inline pencil
+  to edit/clear, and an empty state offers **+ PIN A NOTE**. Saves via a new
+  `setPinnedNoteAction` (exercise-scoped; empty unpins). No workout context needed —
+  it's the exercise-wide note.
+- **MCP notes contract (`docs/05-mcp-connector.md`).** Recorded that the connector
+  exposes **both** note kinds and why: the pinned note is durable/general (conditions
+  interpretation of the whole history), the session notes are day-to-day signal
+  (trend, recovery, adherence). `get_exercise_history` carries both; `log_note` writes
+  either kind (drafts/active session only, never completed history). This is the
+  understanding the MCP uses to be a stronger partner.
+
+### Recorded deviations
+
+- **Pin defaults off** for a note opened from the menu — a mid-workout note is most
+  often a session observation; the checkbox + copy make pinning a deliberate one-tap.
+- **Both notes can still coexist** on an exercise (a durable pinned caveat + today's
+  observation); the two display bars and pencils manage each independently, while the
+  single sheet handles one note at a time per its pin state.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+Still no schema change (session note rides `exercise_feedback`; the pinned note rides
+`exercise_notes`); the move/clear paths are user-scoped through existing RLS and the
+completion lock. In-browser QA of the unified sheet + Exercise-page pencil pending.
+
+## 2026-06-16 — Notes-model split (09 §8) + options-menu polish (subtle ⋮ · Edit day deep-link)
+
+Follow-up to the options-menu slice (on-device notes). Lands the **notes-model
+split** (09 session-5 §8) and two interaction fixes. No schema change — the
+session note reuses an existing column; `main` deployable.
+
+### Done
+
+- **Options menu polish.** The Day View header `⋮` is now **borderless** (subtle
+  ink-tint, darkens when open) instead of a boxed control. **Edit day** deep-links
+  the planner to the **current day** (`/cycles/meso/[id]/plan?day=<n>`): the page
+  reads a `day` searchParam and `PlannerBoard` seeds `activeDayId` from the matching
+  day (falls back to day 1). Edit mesocycle still opens the board on day 1.
+- **Notes model split (09 §8).** Two distinct exercise notes, now cleanly separated:
+  - **Pinned note** (cross-workout, already existed via `exercise_notes`) gains an
+    **inline pencil** on the pinned-note bar (Day View) for direct editing, and the
+    edit sheet now **prefills** the current body; the menu row reads `New/Edit
+    pinned note`.
+  - **Session log note** (net-new) — a per-session note **saved with that workout's
+    exercise log**. Stored in **`exercise_feedback.notes`** (one row per
+    workout_exercise) — **no migration**: that table's completion-lock RLS already
+    gates update/delete to the active workout, so the note is editable **only in the
+    live session** and locks on completion, exactly per §8. New `saveSessionNote`
+    query + `saveSessionNoteAction`; a `NOTE —` bar + `SessionNoteSheet` on the Day
+    View (menu row `Add/Edit session note`; empty clears it).
+  - **History display** — `getExerciseHistory` now carries `session_note`;
+    `ExerciseHistoryList` (now a client component) shows a small **✎ note icon** on
+    rows that have one and **reveals the note on tap**. Shared by the 3.2 history
+    sheet and the Exercise page History tab.
+
+### Recorded deviations
+
+- **Session note reuses `exercise_feedback.notes`** rather than a new
+  `workout_exercises.log_note` column (09 §8 offered either). It's per-we, already
+  RLS-gated to the active workout (completion lock), and `workout_exercises.notes` is
+  already taken by the engine's prescription rationale — so reuse avoids a migration
+  and a second lock policy. Pump/workload/joint-pain on the row are preserved (only
+  `notes` is written); a feedback-less note inserts a notes-only row.
+- **Exercise-page pinned-note inline edit not added** — the §8 pencil affordance is
+  on the Day View bar; editing the pinned note from the Exercise page is a minor
+  follow-up.
+- **Notes rows now live in the exercise `⋮` menu** (not the header options menu) —
+  the per-exercise note is an exercise-scoped action; the header menu stays
+  whole-workout/meso. This also unblocks the header menu's deferred "notes" items
+  conceptually (per-exercise notes are covered; a whole-workout note is separate).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+No schema change; the session note rides the existing `exercise_feedback` table +
+completion-lock RLS (logged history untouched). In-browser QA of the pencil/sheet +
+history reveal on a device still pending (as for other screens).
+
+## 2026-06-16 — Workout / mesocycle options menu: End workout · End mesocycle (09 session-5 §9)
+
+Lands the **Workout / mesocycle options menu** — the open reconciliation-backlog
+item from the 2026-06-15 logging review (09 session-5 §9): a header `⋮` control on
+the Day View opening a grouped menu, with the two net-new audited end-early actions.
+No schema change; reuses the existing completion + per-set-skip machinery; the pure
+engine is untouched. Vertical slice; `main` deployable.
+
+### Done
+
+- **Header `⋮` options menu (fig 1.1).** New `WorkoutOptionsMenu` to the right of the
+  date / Target-RIR column, sized to the height of those two rows (per the spec). Opens
+  the shared viewport-flipping `AnchoredMenu` with two labelled groups:
+  - **MESOCYCLE** — Edit mesocycle (→ planner board `/cycles/meso/[id]/plan`) ·
+    Mesocycle stats (→ `/cycles/meso/[id]/stats`) · **End mesocycle** (destructive,
+    shown only while the meso is `active`).
+  - **WORKOUT** — Edit day (→ planner board) · **End workout** (destructive, shown only
+    while the workout is `planned`/`in_progress`).
+  Each end action opens a strong-warning confirm `BottomSheet` before running.
+- **End workout** (`endWorkout` + `endWorkoutAction`) — skips every still-open set on
+  every exercise (reuses `skipRemainingSets`), runs the standard `completeWorkout`
+  (exercise statuses, microcycle close), then the same week N→N+1 generation as a normal
+  completion (service-role, scoped to the user; a generation failure can't lose the
+  early-end). Routes to the next workout if one was generated, else the Workout tab —
+  mirroring the Complete sheet.
+- **End mesocycle** (`endMesocycle` + `endMesocycleAction`) — for every not-yet-finished
+  workout of the meso: skip all open sets, then close it (**completed** if anything was
+  logged on it, **skipped** if untouched); then mark every microcycle and the mesocycle
+  `completed`. **Logged sets are never modified** — only open planned slots are skipped
+  and statuses advance; no week generation runs (the meso is over). Routes to the meso
+  detail page.
+- **Pure helpers** `src/lib/logging/end.ts` — `isRemainingWorkout(status)`,
+  `endWorkoutStatus(hasLoggedSets)`, and `remainingSetNumbers(prescribed, logged,
+  skipped)` (the open-slot computation). **+8 unit tests** (136 total).
+
+### Recorded deviations
+
+- **Notes items deferred.** The §9 menu also specs *Mesocycle notes* and *New/Edit
+  workout note* rows — both depend on the §8 **notes-model** split (pinned vs session
+  note), which is its own backlog slice. Those rows are omitted here rather than stubbed;
+  the menu ships with the navigation + end-early items that don't need the notes model.
+- **"Add exercise" deferred.** The §9 *Add exercise* row (group-aware picker against the
+  live workout) is its own piece of work; not built this slice. Edit day routes to the
+  planner board (the planner does not yet deep-link the current day pre-selected —
+  acceptable, the day is one tap on the board).
+- **No separate in-app audit row.** The spec calls these "audited" queries; like the
+  existing `completeWorkout`/`deleteMesocycle`, the end actions are deliberate,
+  RLS-scoped, confirm-gated server actions rather than rows in `mcp_write_audit` (that
+  table is the MCP write boundary, not in-app actions). Built in the house ledger style
+  (the `⋮` control + grouped menu aren't separately mocked).
+- **End mesocycle from the Day View** acts on the meso behind the viewed workout; it's
+  offered only while that meso is `active`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (136/136), `npm run build` green.
+The end helpers are unit-tested; the IO (`endWorkout`/`endMesocycle`) reuses the
+smoke-tested `skipRemainingSets`/`completeWorkout` paths and is user-scoped through the
+existing `workouts`/`workout_exercises`/`microcycles`/`mesocycles` RLS — logged_sets are
+never written, so the completion-lock policy is unaffected. In-browser interaction QA of
+the menu + the two confirm flows on a device still pending (as for other screens).
+
+## 2026-06-16 — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
+
+On-device review of the planner board surfaced three concrete, reproducible
+bugs (the prior optimistic-bridge fix didn't cover them). No schema change;
+`main` deployable.
+
+### Fixed
+
+- **Stacked day-sheet + group-picker ("two edit-day windows / non-responsive
+  window").** Opening **+ ADD MUSCLE GROUP** from the EDIT DAY sheet left the
+  day sheet mounted **behind** the picker, so the picker (which looks like the
+  day sheet) appeared to "slide up over another window," and on close the stale
+  day sheet underneath read as non-responsive. Now it's **single-sheet at a
+  time**: opening the picker from the day sheet **closes** the day sheet (after
+  persisting its label/weekday) and **reopens** it when the picker closes — but
+  only when the picker was opened from the day sheet (a `returnToDaySheet` flag;
+  the board's own + ADD MUSCLE GROUP returns to the board).
+- **Day-tab `+` then Cancel still added the day.** In editing (staged) mode the
+  `+` committed the day to the working copy immediately, so Cancel/✕ didn't undo
+  it. The day sheet now distinguishes **DONE** (`onDone` — commit) from
+  **Cancel/✕/scrim** (`onCancel`); a just-added, never-confirmed day is tracked
+  (`pendingNewDayId`) and **rolled back on cancel** (in both staged and live
+  modes; the optimistic draft ghost is cleared too). The button reads **ADD
+  DAY** for a new day, **DONE** for an existing one.
+- **"Application error" past 7 days.** A week is 7 days — the DB checks
+  (`meso_days.day_number ≤ 7`, `mesocycles.days_per_week ≤ 7`) threw once a
+  user added an 8th. The day-tab `+` is now **hidden at 7 days** (`atDayLimit`),
+  and day numbering picks the **smallest unused 1..7** (`nextDayNumber`) instead
+  of `max+1` — so removing then re-adding a day no longer pushes `day_number`
+  past 7 (the live `addMesoDay` query got the same fix). `saveMesoPlan` schema
+  tightened from `max(14)` to `max(7)` to match the DB.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (128/128), `npm run build`
+green. The fixes are planner interaction state + a day-numbering correction
+(client + the `addMesoDay` query); RLS unchanged. In-browser re-test of the
+three flows on a device recommended to confirm.
+
+## 2026-06-16 — Planner reorder (groups + exercises) + draft add-day sheet fix
+
+Closes the remaining two open items from the 2026-06-16 notes batch ("Not done
+yet"): **planner reorder** and the **add-day sheet dismissal** bug. No schema
+change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Reorder muscle groups within a day** — up/down (▲▼) move controls on each
+  group row in the EDIT DAY sheet (fig 2.5). **Reorder exercises within a
+  group** — ▲▼ controls on each filled slot row on the board (replacing the
+  decorative `⋮⋮` grip). Both work in **both persistence modes**: staged into
+  the local `workDays` copy when editing a planned/active meso (persisted on
+  SAVE CHANGES), or a **live position rewrite** on a draft.
+- **No migration needed.** `meso_day_groups.position` and
+  `meso_exercises.slot_number`/`position` already exist, with **no unique
+  constraint** on the ordering columns — so the live reorder is a plain
+  index→position rewrite (`reorderDayGroups` / `reorderGroupExercises`,
+  scoped to the day/group), no temp-value swap. *(The prior PROGRESS note's
+  "no position column" premise was outdated.)*
+- **Pure helper** `moveInOrder(ids, id, delta)` (`planner/groups.ts`) — moves
+  one item up/down in an id list, no-op (same reference) past either end or for
+  an unknown id; drives both modes. **+5 unit tests** (128 total).
+- **Draft add-day sheet dismissal fix.** The draft (live) add-day flow set
+  `daySetupId` to a brand-new day before revalidation had put it in props, so
+  the day-setup sheet briefly had no backing day. `addDay` now seeds an
+  **optimistic local day** from the returned insert row (`withPending`) so the
+  sheet renders immediately and reconciles (drops the optimistic row) once the
+  revalidated props include it — taking `addDay…→revalidate` out of the
+  interaction loop without breaking the draft's live persistence / "continue
+  editing" guarantee.
+
+### Recorded deviations
+
+- **Reorder is up/down move controls, not pointer/touch drag-and-drop.** The
+  notes asked for DnD "ideally"; up/down is the accessible fallback the note
+  itself offered, works identically in both persistence modes (no half-working
+  DnD across modes), and matches the existing day-view **Move up/down** pattern.
+  Square-corner ledger styling preserved.
+- **Group reorder lives in the EDIT DAY sheet; exercise reorder is inline on
+  the board.** Groups are a day-structure concern (edited in the day sheet);
+  exercises are shown as slots on the board, so their ▲▼ sit on the slot rows.
+- **Live exercise reorder packs fills to the top slots** (slot_number 1..n in
+  the new order) — a cleared mid-group slot moves to the bottom on reorder.
+  Acceptable (no logged data here) and arguably tidier.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (128/128), `npm run build`
+green. `moveInOrder` is unit-tested; the live reorder writes are user-scoped
+through the existing `meso_day_groups`/`meso_exercises` RLS (planning rows only —
+no logged history touched). The dismissal fix is client state (optimistic
+bridge); code review showed the editing path was already sound (sheet keyed by
+`day.id`, balanced scroll-lock). In-browser pixel/interaction QA of the reorder
+controls and the draft add-day flow still pending (as for other screens).
+
+## 2026-06-16 — Edit macrocycle (fig 2.3 engine, prefilled + safe re-plan)
+
+Closes the **Edit macrocycle** item teed up in the prior 2026-06-16 notes batch
+("Not done yet"). Create-macro existed; the edit surface (rename · goal ·
+duration · block length · notes · re-plan/re-phase the meso slots) was the gap.
+No schema change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Edit screen** `/cycles/macro/[macroId]/edit` (`EditMacroForm`) — the same
+  fig 2.3 create engine, **prefilled** from the macro and recomputing the
+  realistic target / per-month rate / meso-count / phase preview live via
+  `planMacrocycle`. Adds a **GOAL NOTES** field (optional, edit-only — create
+  didn't expose it though the column + action already supported it). The
+  `EDIT MACROCYCLE — SOON` placeholder on the Overview (2.2) is now a real link.
+- **`updateMacrocycle`** (`queries/macro.ts`) — updates the macro row (name,
+  goal, duration, block length, notes, recomputed `target_*`/`rate_*`/
+  `recommended_duration_months`/`target_end_date`) then **reconciles the
+  unplanned mesocycle slots** to the new plan size. **Locked mesos
+  (planned/active/completed/abandoned) and every logged set are never touched** —
+  only `unplanned` placeholders are added, removed (surplus trimmed from the
+  tail so the earliest open slots survive), or re-phased; positions re-sequence
+  contiguously. The final count can never drop below the locked count.
+- **Pure decision helpers** — `reconcileMacroSlots` (orderedMesos + target →
+  `{ removeIds, addCount }`) and `macroEditImpact` (locked vs unplanned counts,
+  surfaced to the form so the re-plan note reads "keeps your N planned/active/
+  completed mesocycles; adds/removes M open slots"). **+5 unit tests** (123
+  total) covering grow / shrink-from-tail / never-below-locked / no-op.
+
+### Recorded deviations
+
+- **GOAL NOTES on edit only** — the create form omits it (the engine card is the
+  focus there); the edit form is the natural place to annotate an existing arc.
+  Built in the house ledger style.
+- **Re-phasing applies to unplanned slots only** — a planned/active/completed
+  meso keeps the phase the user assigned when planning it; only open
+  placeholders pick up the recomputed phase spread.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (123/123), `npm run build`
+green; the `/cycles/macro/[macroId]/edit` route compiles. The reconcile decision
+is a pure unit-tested helper; the surrounding IO (`updateMacrocycle`) is
+user-scoped through the existing `macrocycles`/`mesocycles` RLS and guards
+deletes to `status = 'unplanned'`. In-browser QA of the edit/re-plan flow on a
+real macro still pending (as for other screens).
+
+## 2026-06-16 — Notes batch: scroll-lock, gender, dark mode, feedback-flow revision, planner polish
+
+Worked the 2026-06-16 notes batch. Most items shipped this slice; the larger
+ones (full drag-and-drop reorder, edit-macrocycle, and one bug that needs
+in-app reproduction) are teed up below as planned work. Vertical slice; `main`
+deployable. One `DATA` migration (applied to hosted).
+
+### Done
+
+- **Overlay scroll-lock.** New ref-counted `useScrollLock` hook wired into
+  `BottomSheet`, the day-view `AnchoredMenu` (exercise/set menus), and the
+  Workout Complete sheet — the page behind any tray/menu/overlay no longer
+  scrolls (and the scrollbar gap is compensated so the layout doesn't jump).
+- **Exercise history shows the year.** `ExerciseHistoryList` date now reads
+  `D MON 'YY` (was day/month only), so older sessions are unambiguous.
+- **Move exercise up (day view).** The 1.2 exercise menu gained **Move up**
+  alongside **Move down**; the position swap is factored into one
+  `moveExercise(delta)` helper + `moveExerciseUpAction`.
+- **Edit feedback (active workouts).** The 1.2 menu gained **Edit/Add
+  feedback**; the feedback sheet prefills from any saved row and is keyed per
+  exercise.
+- **Gender captured.** Onboarding step 1 and the profile editor now set
+  `profiles.gender` (the column already existed and the macro target engine
+  already read it — this was a pure UI gap). 4-way: female / male / other /
+  prefer-not.
+- **Full-screen exercise picker (planner).** `BottomSheet` gained a
+  `fullHeight` mode (pinned header + footer, scrollable middle); the meso
+  planner's exercise picker now rises to nearly the whole screen.
+- **Discard a draft.** New `discardDraftAction` (guarded to `draft` status, so
+  it can never touch a planned/active cycle or logged history) surfaced as
+  **DISCARD DRAFT** on both the plan-a-meso entry banner and the draft board.
+- **Dark mode (light / dark / system).** A dark ledger palette as
+  CSS-custom-property overrides (ink ⇄ cream on warm near-black, lifted accent,
+  light menu shadow) under `[data-theme=dark]` / `(prefers-color-scheme:
+  dark)[data-theme=system]`; every ink/cream utility adapts with no markup
+  changes. Applied to `<html data-theme>` before paint via an inline script
+  (default `system`, no flash); `ThemeToggle` in More settings persists to
+  `localStorage`. The three hardcoded ink SVG strokes in the day view switched
+  to `currentColor`.
+- **Feedback-flow revision (DATA).** Migration `20260616000001` adds nullable
+  `exercise_feedback.soreness` (0–10) and `soreness_days` (0–5) — applied to
+  hosted, no new advisor lints, RLS unchanged. The **first** exercise logged
+  for a muscle group now prompts a *recovery check* (soreness from the last
+  session of that group + how many days sore) instead of joint pain; **joint
+  pain is asked once**, with the group-complete prompt (pump/workload).
+  Middle-of-group exercises no longer auto-prompt; a one-exercise group shows
+  everything. Soreness rows carry `muscle_group_id` but null pump/workload, so
+  the engine's group-feedback guard (pump/workload non-null) ignores them — **no
+  engine behavior change** (engine consumption of soreness is a future slice).
+- **Planner active-day guard.** The board's "snap active day back to day 1"
+  effect no longer fires while a setup/add-groups sheet references a day the
+  just-revalidated `days` hasn't caught up to (a latent wedge in the live draft
+  path).
+
+### Recorded deviations
+
+- **Gender / theme / discard / soreness controls** are built in the house
+  ledger style — none are in the stock mockups (the mockups predate these asks).
+- **Joint pain is now group-level** (stored on the closing exercise) rather than
+  per-exercise, per the user's explicit "remove the redundancy" request. The
+  engine still reads `joint_pain` per exercise; in practice it's now populated on
+  the group's last exercise.
+- **Theme is a device setting** (localStorage), not a `profiles` column — instant,
+  no migration, and the natural home for a per-device preference.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (118/118), `npm run build`
+green. Soreness migration applied to hosted and columns re-queried; security
+advisors show no new lints. In-browser pixel/interaction QA of the new
+surfaces (dark palette, full-screen picker, soreness prompt) still pending, as
+for the other screens.
+
+### Not done yet — planned work (from the same notes batch)
+
+- **Planner reorder (muscle groups + exercises).** ✅ **Shipped** in the
+  2026-06-16 (latest) entry above. Note: `meso_day_groups` **already had a
+  `position` column** (and `meso_exercises.slot_number`), with no unique
+  constraint on either — so **no migration was needed**; the prior assumption
+  here was wrong. Reorder via up/down move controls (accessible fallback),
+  staged in editing mode / live position rewrite on a draft.
+- **Edit macrocycle.** ✅ **Shipped** in the 2026-06-16 (latest) entry above —
+  `/cycles/macro/[macroId]/edit` + `updateMacrocycle`; reconciles unplanned
+  slots only, locked mesos + logged history immutable.
+- **Add-day sheet won't dismiss (BUG).** ✅ **Targeted fix shipped** in the
+  2026-06-16 (latest) entry above — the draft add-day path now opens the
+  day-setup sheet from an **optimistic local day** (the returned insert row)
+  instead of waiting on revalidation, removing the `addDay…→revalidate` gap
+  that left the sheet without a backing day. Code review showed the editing
+  path was already sound (the sheet is keyed by `day.id`, so revalidation
+  updates props in place without remount, and scroll-lock is balanced).
+  In-browser confirmation on a device still recommended.
+## 2026-06-16 (latest) — App icon design handoff wired in (S4 wordmark + slider)
+
+Replaced the placeholder barbell icons with the final **S4** mark from the design
+handoff (`design_handoff_app_icon`): the stacked **WORK / OUT** Archivo-800 wordmark
+over a single snap-to-stop slider rule (ink track + orange pip at 62%), on cream
+`#F4F0E6` — the icon now reads as the product's own slider control.
+
+### Done
+
+- Dropped the production PNGs into `public/icons/`: `icon-192`, `icon-512`,
+  `icon-maskable-512` (paper system, full-bleed) plus the new `icon-180` for iOS.
+- Wired `icons` into `src/app/layout.tsx` metadata — `apple-touch-icon` (180) and
+  explicit `<link rel="icon">` for 192/512. `manifest.webmanifest` already pointed at
+  the three icon paths (project `name`/`start_url` kept; not the handoff placeholder).
+- Retired `scripts/generate-icons.mjs` — the placeholder generator would clobber the
+  real assets if re-run; the design handoff is now the source of truth.
+- Stashed the editable master + dark variants under `docs/design/app-icon/`
+  (`icon-source.html`, README spec, `icon-512-dark`, `icon-maskable-512-dark`) for
+  regeneration. Dark icons not shipped to `public/` — dark mode is out of scope (rule 9).
+- No favicon: the wordmark is illegible at 16–32px; deferred per the handoff note.
 
 ## 2026-06-16 — Madeline's history imported (16 standalone mesos, 3,696 sets)
 

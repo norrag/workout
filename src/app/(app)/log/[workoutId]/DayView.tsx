@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
@@ -12,19 +13,26 @@ import type {
   WorkoutDetail,
 } from "@/lib/queries/logging";
 import type { Units } from "@/lib/types/database";
+import { predictRepsAtWeight, type EngineParams } from "@/lib/engine";
 import {
   addSetAction,
   amendSetAction,
+  clearPinnedNoteAction,
   completeWorkoutAction,
   deleteSetAction,
+  endMesocycleAction,
+  endWorkoutAction,
   listReplacementCandidatesAction,
   logSetAction,
+  updateSetWeightAction,
   moveExerciseDownAction,
+  moveExerciseUpAction,
   removeExerciseAction,
   removeSetAction,
   replaceExerciseAction,
   saveFeedbackAction,
   savePinnedNoteAction,
+  saveSessionNoteAction,
   skipRemainingAction,
   toggleSkipSetAction,
   unlogSetAction,
@@ -41,6 +49,10 @@ function shortDate(iso: string | null): string {
 }
 
 type Commit = (fn: () => Promise<void>) => void;
+
+/** Which note bucket the unified note sheet (09 §8) opened from. "menu" defaults
+ * to the session note; "pinned"/"session" edit that specific existing note. */
+type NoteOrigin = "menu" | "pinned" | "session";
 
 /** Planned slot count, widened to cover any logged/skipped beyond it. */
 function plannedSetCount(we: LoggedExercise): number {
@@ -73,9 +85,11 @@ function exerciseDone(we: LoggedExercise): boolean {
 export function DayView({
   detail,
   units,
+  params,
 }: {
   detail: WorkoutDetail;
   units: Units;
+  params: EngineParams;
 }) {
   const { workout, microcycle, mesocycle, exercises } = detail;
   const readOnly = workout.status === "completed" || workout.status === "skipped";
@@ -87,7 +101,10 @@ export function DayView({
   } | null>(null);
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
-  const [noteFor, setNoteFor] = useState<LoggedExercise | null>(null);
+  const [noteSheet, setNoteSheet] = useState<{
+    we: LoggedExercise;
+    origin: NoteOrigin;
+  } | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<LoggedExercise | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [dropPending, setDropPending] = useState<Record<string, boolean>>({});
@@ -107,16 +124,27 @@ export function DayView({
 
   const allDone = exercises.length > 0 && exercises.every(exerciseDone);
 
+  const groupSiblings = (we: LoggedExercise) =>
+    exercises.filter(
+      (x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id,
+    );
+  // first to be completed in its group → recovery/soreness prompt
+  const isFirstOfGroup = (we: LoggedExercise) =>
+    groupSiblings(we).every((x) => !exerciseDone(x));
+  // group fully done (this exercise closed it) → joint pain + pump + workload
   const isLastOfGroup = (we: LoggedExercise) =>
-    exercises
-      .filter((x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id)
-      .every(exerciseDone);
+    groupSiblings(we).every(exerciseDone);
 
   return (
     <div>
       <DayHeader
         mesoId={mesocycle.id}
         mesoName={mesocycle.name}
+        workoutId={workout.id}
+        workoutActive={
+          workout.status === "planned" || workout.status === "in_progress"
+        }
+        mesoActive={mesocycle.status === "active"}
         weekNumber={microcycle.week_number}
         dayNumber={workout.day_number}
         isDeload={microcycle.is_deload}
@@ -135,6 +163,8 @@ export function DayView({
           index={i}
           units={units}
           readOnly={readOnly}
+          params={params}
+          microTargetRir={microcycle.target_rir}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
           dropPending={dropPending[we.id] ?? false}
@@ -151,12 +181,20 @@ export function DayView({
           onCloseSetMenu={() => setSetMenu(null)}
           onHistory={() => setHistoryFor(we)}
           onReplace={() => setReplaceFor(we)}
-          onNote={() => setNoteFor(we)}
+          onNote={(origin) => setNoteSheet({ we, origin })}
+          onFeedback={() => setFeedbackFor(we)}
           onToggleDrop={() =>
             setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
           }
           onLogged={(wasLast) => {
-            if (wasLast && !we.feedback) setFeedbackFor(we);
+            // only prompt on the first (soreness) and group-closing (joint
+            // pain + pump + workload) exercises — middle ones don't auto-ask
+            if (
+              wasLast &&
+              !we.feedback &&
+              (isFirstOfGroup(we) || isLastOfGroup(we))
+            )
+              setFeedbackFor(we);
           }}
           commit={commit}
         />
@@ -174,9 +212,10 @@ export function DayView({
       )}
 
       <NoteSheet
-        we={noteFor}
+        key={noteSheet ? `${noteSheet.we.id}-${noteSheet.origin}` : "none"}
+        sheet={noteSheet}
         workoutId={workout.id}
-        onClose={() => setNoteFor(null)}
+        onClose={() => setNoteSheet(null)}
         commit={commit}
       />
       <ReplaceSheet
@@ -197,9 +236,11 @@ export function DayView({
         onClose={() => setHistoryFor(null)}
       />
       <FeedbackSheet
+        key={feedbackFor?.id ?? "none"}
         we={feedbackFor}
         workoutId={workout.id}
         weekNumber={microcycle.week_number}
+        withSoreness={feedbackFor ? isFirstOfGroup(feedbackFor) : false}
         withGroupScope={feedbackFor ? isLastOfGroup(feedbackFor) : false}
         onClose={() => setFeedbackFor(null)}
         commit={commit}
@@ -221,6 +262,9 @@ export function DayView({
 function DayHeader({
   mesoId,
   mesoName,
+  workoutId,
+  workoutActive,
+  mesoActive,
   weekNumber,
   dayNumber,
   isDeload,
@@ -232,6 +276,9 @@ function DayHeader({
 }: {
   mesoId: string;
   mesoName: string;
+  workoutId: string;
+  workoutActive: boolean;
+  mesoActive: boolean;
   weekNumber: number;
   dayNumber: number;
   isDeload: boolean;
@@ -292,7 +339,7 @@ function DayHeader({
             <path
               d="M2.5 4.5 L6 8 L9.5 4.5"
               fill="none"
-              stroke="#17140F"
+              stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -397,10 +444,19 @@ function DayHeader({
           <div className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em]">
             W{weekNumber}·D{dayNumber}
           </div>
-          <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
-            {dateLabel}
-            <br />
-            <span className="font-bold text-accent">{rirLabel}</span>
+          <div className="flex items-stretch gap-2.5">
+            <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
+              {dateLabel}
+              <br />
+              <span className="font-bold text-accent">{rirLabel}</span>
+            </div>
+            <WorkoutOptionsMenu
+              mesoId={mesoId}
+              workoutId={workoutId}
+              dayNumber={dayNumber}
+              workoutActive={workoutActive}
+              mesoActive={mesoActive}
+            />
           </div>
         </div>
         <div className="relative h-[3px] bg-ink">
@@ -415,6 +471,174 @@ function DayHeader({
 }
 
 // ---------------------------------------------------------------------------
+// workout / mesocycle options menu (fig 1.1 header ⋮, 09 session-5 §9)
+// ---------------------------------------------------------------------------
+
+function WorkoutOptionsMenu({
+  mesoId,
+  workoutId,
+  dayNumber,
+  workoutActive,
+  mesoActive,
+}: {
+  mesoId: string;
+  workoutId: string;
+  dayNumber: number;
+  workoutActive: boolean;
+  mesoActive: boolean;
+}) {
+  const router = useRouter();
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
+  const [, startEnding] = useTransition();
+
+  const go = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
+
+  const endWorkout = () =>
+    startEnding(async () => {
+      const res = await endWorkoutAction({ workout_id: workoutId });
+      setConfirm(null);
+      router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+    });
+
+  const endMeso = () =>
+    startEnding(async () => {
+      await endMesocycleAction({ workout_id: workoutId, meso_id: mesoId });
+      setConfirm(null);
+      router.push(`/cycles/meso/${mesoId}`);
+    });
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={btnRef}
+        aria-label="workout and mesocycle options"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-6 items-center justify-center self-stretch pb-1 text-[18px] leading-none tracking-[1px] ${
+          open ? "text-ink" : "text-ink/45"
+        }`}
+      >
+        ⋮
+      </button>
+
+      <AnchoredMenu
+        open={open}
+        triggerRef={btnRef}
+        align="right"
+        label="workout and mesocycle options"
+        onClose={() => setOpen(false)}
+      >
+        <div className="border-b border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+          MESOCYCLE
+        </div>
+        <MenuRow
+          label="Edit mesocycle"
+          trailing="PLANNER"
+          onClick={() => go(`/cycles/meso/${mesoId}/plan`)}
+        />
+        <MenuRow
+          label="Mesocycle stats"
+          trailing="STATS"
+          onClick={() => go(`/cycles/meso/${mesoId}/stats`)}
+        />
+        {mesoActive && (
+          <MenuRow
+            label="End mesocycle"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("meso");
+            }}
+          />
+        )}
+
+        <div className="border-y border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+          WORKOUT
+        </div>
+        <MenuRow
+          label="Edit day"
+          trailing="PLANNER"
+          onClick={() => go(`/cycles/meso/${mesoId}/plan?day=${dayNumber}`)}
+        />
+        {workoutActive && (
+          <MenuRow
+            label="End workout"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("workout");
+            }}
+          />
+        )}
+      </AnchoredMenu>
+
+      <BottomSheet
+        open={confirm === "workout"}
+        onClose={() => setConfirm(null)}
+        title="End workout"
+        subtitle="SKIP REMAINING · COMPLETE"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This skips every set you haven&apos;t logged and completes the
+          workout now. Anything already logged is kept. This can&apos;t be
+          undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={endWorkout}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            END WORKOUT
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={confirm === "meso"}
+        onClose={() => setConfirm(null)}
+        title="End mesocycle"
+        subtitle="SKIP REMAINING DAYS · COMPLETE"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This skips all remaining sets on every remaining day of the
+          mesocycle and marks the whole mesocycle complete. Logged history is
+          kept; nothing further is generated. This can&apos;t be undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={endMeso}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            END MESOCYCLE
+          </button>
+        </div>
+      </BottomSheet>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // exercise block + set grid (fig 1.1)
 // ---------------------------------------------------------------------------
 
@@ -423,6 +647,8 @@ function ExerciseBlock({
   index,
   units,
   readOnly,
+  params,
+  microTargetRir,
   menuOpen,
   setMenuTarget,
   dropPending,
@@ -434,6 +660,7 @@ function ExerciseBlock({
   onHistory,
   onReplace,
   onNote,
+  onFeedback,
   onToggleDrop,
   onLogged,
   commit,
@@ -442,6 +669,8 @@ function ExerciseBlock({
   index: number;
   units: Units;
   readOnly: boolean;
+  params: EngineParams;
+  microTargetRir: number;
   menuOpen: boolean;
   setMenuTarget: number | null;
   dropPending: boolean;
@@ -452,7 +681,8 @@ function ExerciseBlock({
   onCloseSetMenu: () => void;
   onHistory: () => void;
   onReplace: () => void;
-  onNote: () => void;
+  onNote: (origin: NoteOrigin) => void;
+  onFeedback: () => void;
   onToggleDrop: () => void;
   onLogged: (wasLastPlannedSet: boolean) => void;
   commit: Commit;
@@ -487,8 +717,8 @@ function ExerciseBlock({
         <div className="flex gap-2">
           <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={onHistory}>
             <svg width="14" height="14" viewBox="0 0 14 14">
-              <circle cx="7" cy="7" r="5.5" fill="none" stroke="#17140F" strokeWidth="1.3" />
-              <path d="M7 4v3l2 1.5" fill="none" stroke="#17140F" strokeWidth="1.3" />
+              <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
             </svg>
           </button>
           <button
@@ -511,9 +741,35 @@ function ExerciseBlock({
         </div>
       </div>
       {we.pinned_note && (
-        <div className="mt-[7px] border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
-          PINNED — {we.pinned_note.body}
+        <div className="mt-[7px] flex items-start justify-between gap-2 border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
+          <span>PINNED — {we.pinned_note.body}</span>
+          {!readOnly && (
+            <button
+              type="button"
+              aria-label="edit pinned note"
+              onClick={() => onNote("pinned")}
+              className="-my-1 shrink-0 px-1.5 py-1 text-[12px] text-ink/45"
+            >
+              ✎
+            </button>
+          )}
         </div>
+      )}
+      {we.feedback?.notes && (
+        <button
+          type="button"
+          disabled={readOnly}
+          aria-label="edit session note"
+          onClick={() => onNote("session")}
+          className="mt-[7px] flex w-full items-start justify-between gap-2 border-l-2 border-ink/35 py-[5px] pl-2.5 text-left text-[11px] font-medium text-ink/60 disabled:cursor-default"
+        >
+          <span>NOTE — {we.feedback.notes}</span>
+          {!readOnly && (
+            <span aria-hidden className="shrink-0 px-1.5 text-[12px] text-ink/40">
+              ✎
+            </span>
+          )}
+        </button>
       )}
 
       {!skipped && (
@@ -542,6 +798,8 @@ function ExerciseBlock({
                 setNumber={setNumber}
                 state={state}
                 readOnly={readOnly}
+                params={params}
+                targetRir={we.target_rir ?? microTargetRir}
                 logged={logged ?? null}
                 isLastRow={setNumber === plannedSets}
                 dropPending={dropPending}
@@ -586,10 +844,11 @@ function ExerciseBlock({
           }}
         />
         <MenuRow
-          label={we.pinned_note ? "Edit pinned note" : "New note"}
+          label={we.pinned_note || we.feedback?.notes ? "Notes" : "Add note"}
+          trailing={we.pinned_note || we.feedback?.notes ? "›" : undefined}
           onClick={() => {
             onCloseMenu();
-            onNote();
+            onNote("menu");
           }}
         />
         {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
@@ -606,6 +865,20 @@ function ExerciseBlock({
         )}
         {!readOnly && (
           <>
+            {index > 0 && (
+              <MenuRow
+                label="Move up"
+                onClick={() => {
+                  commit(() =>
+                    moveExerciseUpAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
+                  onCloseMenu();
+                }}
+              />
+            )}
             {!isLast && (
               <MenuRow
                 label="Move down"
@@ -630,6 +903,13 @@ function ExerciseBlock({
                   }),
                 );
                 onCloseMenu();
+              }}
+            />
+            <MenuRow
+              label={we.feedback ? "Edit feedback" : "Add feedback"}
+              onClick={() => {
+                onCloseMenu();
+                onFeedback();
               }}
             />
             {nextSetNumber !== 0 && (
@@ -735,6 +1015,8 @@ function AnchoredMenu({
     return () => window.removeEventListener("resize", place);
   }, [open, triggerRef, align, width]);
 
+  useScrollLock(open);
+
   if (!open) return null;
   return (
     <>
@@ -806,6 +1088,8 @@ function SetRow({
   setNumber,
   state,
   readOnly,
+  params,
+  targetRir,
   logged,
   isLastRow,
   dropPending,
@@ -820,6 +1104,8 @@ function SetRow({
   setNumber: number;
   state: "logged" | "skipped" | "next" | "future";
   readOnly: boolean;
+  params: EngineParams;
+  targetRir: number;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
   isLastRow: boolean;
   dropPending: boolean;
@@ -833,22 +1119,45 @@ function SetRow({
   const prescribedWeight = we.prescribed_weight;
   const prescribedReps = we.prescribed_reps;
   const lastLogged = we.sets.at(-1);
+  const anchor = we.e1rm_anchor;
+  // per-set planned weight override (doc 11): persists an edited weight for an
+  // unlogged set, and is where auto-match writes the shared weight
+  const plannedWeight = we.set_weights?.[String(setNumber)] ?? null;
+
+  // reps that land on the target RIR at a given weight, from the recency-
+  // weighted strength anchor (doc 11); null when there's no usable history
+  const predictReps = (w: number): number | null =>
+    predictRepsAtWeight(anchor, w, targetRir, params);
+
   const initialWeight =
-    logged?.weight ?? lastLogged?.weight ?? prescribedWeight ?? 0;
-  const initialReps = logged?.reps ?? prescribedReps ?? lastLogged?.reps ?? 8;
+    logged?.weight ?? plannedWeight ?? lastLogged?.weight ?? prescribedWeight ?? 0;
+  // unlogged rows start from the predicted reps for their weight; logged rows
+  // show what was done; fall back to the prescription when there's no anchor
+  const initialReps =
+    logged?.reps ??
+    (state !== "logged" ? predictReps(initialWeight) : null) ??
+    prescribedReps ??
+    lastLogged?.reps ??
+    8;
+  // the planned weight shown on static (future) rows
+  const futureWeight = plannedWeight ?? prescribedWeight;
   const [weight, setWeight] = useState(String(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
   const edited = useRef(false);
+  // once the user types their own reps, stop auto-predicting for this row
+  const repsManual = useRef(false);
   const router = useRouter();
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
-  // re-sync when the server state for this row changes
+  // re-sync when the server state for this row changes (incl. an auto-match or
+  // edited planned weight landing via set_weights)
   useEffect(() => {
     setWeight(String(initialWeight));
     setReps(String(initialReps));
     edited.current = false;
+    repsManual.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logged?.id, logged?.weight, logged?.reps]);
+  }, [logged?.id, logged?.weight, logged?.reps, plannedWeight]);
 
   // denser rows (09 §5): 32px box, 14px value, 21px log box
   const cellBase =
@@ -862,11 +1171,27 @@ function SetRow({
           ? `${cellBase} border border-ink/15 font-medium text-ink/30 line-through`
           : `${cellBase} border border-ink/25 font-medium text-ink/45`;
 
+  // persist an edited planned weight for this unlogged set; the server scopes
+  // it to just this set or every unlogged set per the auto-match setting
+  const persistPlannedWeight = (w: number) => {
+    if (w === (plannedWeight ?? prescribedWeight)) return;
+    commit(() =>
+      updateSetWeightAction({
+        workout_id: we.workout_id,
+        workout_exercise_id: we.id,
+        set_number: setNumber,
+        weight: w,
+      }),
+    );
+  };
+
   const save = () => {
     const w = Number(weight);
     const r = Number(reps);
     if (Number.isNaN(w) || Number.isNaN(r)) return;
     if (state === "next") {
+      // logSetAction carries the weight to the other sets itself when
+      // auto-match is on (server-side, after the insert)
       commit(() =>
         logSetAction({
           workout_id: we.workout_id,
@@ -891,6 +1216,7 @@ function SetRow({
           rir_reported: logged.rir_reported,
         }),
       );
+      if (w !== logged.weight) persistPlannedWeight(w);
       edited.current = false;
     }
   };
@@ -915,10 +1241,14 @@ function SetRow({
       {staticCells ? (
         <>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {prescribedWeight ?? "—"}
+            {futureWeight ?? "—"}
           </div>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {prescribedReps ?? "—"}
+            {/* future rows show the reps that hit target RIR at the planned
+                weight, falling back to the prescription without an anchor */}
+            {(futureWeight != null ? predictReps(futureWeight) : null) ??
+              prescribedReps ??
+              "—"}
           </div>
         </>
       ) : (
@@ -932,7 +1262,24 @@ function SetRow({
               setWeight(e.target.value);
               edited.current = true;
             }}
-            onBlur={() => state === "logged" && save()}
+            onBlur={() => {
+              // once the user finishes typing the weight (not live): persist the
+              // planned weight so it survives navigation + feeds auto-match, then
+              // re-estimate reps unless the user set their own. Only on unlogged
+              // rows — a logged row's reps/weight are recorded actuals.
+              if (state === "next") {
+                const w = Number(weight);
+                if (weight !== "" && !Number.isNaN(w)) {
+                  if (edited.current) persistPlannedWeight(w);
+                  if (!repsManual.current) {
+                    const predicted = predictReps(w);
+                    if (predicted != null) setReps(String(predicted));
+                  }
+                }
+              } else if (state === "logged") {
+                save();
+              }
+            }}
             className={cell}
           />
           <input
@@ -943,6 +1290,7 @@ function SetRow({
             onChange={(e) => {
               setReps(e.target.value);
               edited.current = true;
+              repsManual.current = true;
             }}
             onBlur={() => state === "logged" && save()}
             className={cell}
@@ -1101,28 +1449,95 @@ function SetRow({
 }
 
 // ---------------------------------------------------------------------------
-// note sheet (from the 1.2 menu)
+// note sheet (09 §8) — one sheet for both kinds of exercise note. A "Pin to
+// this exercise" checkbox decides where it lands: pinned = an attribute of the
+// exercise, shown in every workout; unpinned = a note saved with just this
+// session's log. Flipping the pin on an existing note moves it between buckets.
 // ---------------------------------------------------------------------------
 
 function NoteSheet({
-  we,
+  sheet,
   workoutId,
   onClose,
   commit,
 }: {
-  we: LoggedExercise | null;
+  sheet: { we: LoggedExercise; origin: NoteOrigin } | null;
   workoutId: string;
   onClose: () => void;
   commit: Commit;
 }) {
-  const [note, setNote] = useState("");
+  const we = sheet?.we ?? null;
+  const origin = sheet?.origin ?? "menu";
+  // "pinned" origin edits the pinned note; "menu"/"session" default to the
+  // session note (the common mid-workout "note about today" case).
+  const originBucket: "pinned" | "session" =
+    origin === "pinned" ? "pinned" : "session";
+  const originText =
+    originBucket === "pinned"
+      ? (we?.pinned_note?.body ?? "")
+      : (we?.feedback?.notes ?? "");
+
+  const [note, setNote] = useState(originText);
+  const [pinned, setPinned] = useState(originBucket === "pinned");
   if (!we) return null;
+
+  const body = note.trim();
+  const wid = workoutId;
+  // nothing to do only when the box is empty and there was no note here to clear
+  const noop = !body && originText.trim() === "";
+
+  const save = () => {
+    commit(async () => {
+      if (!body) {
+        if (originBucket === "pinned")
+          await clearPinnedNoteAction({
+            workout_id: wid,
+            exercise_id: we.exercise_id,
+          });
+        else
+          await saveSessionNoteAction({
+            workout_id: wid,
+            workout_exercise_id: we.id,
+            note: null,
+          });
+        return;
+      }
+      if (pinned) {
+        await savePinnedNoteAction({
+          workout_id: wid,
+          exercise_id: we.exercise_id,
+          body,
+        });
+        // moved up from a session note → clear the session copy
+        if (originBucket === "session" && we.feedback?.notes)
+          await saveSessionNoteAction({
+            workout_id: wid,
+            workout_exercise_id: we.id,
+            note: null,
+          });
+      } else {
+        await saveSessionNoteAction({
+          workout_id: wid,
+          workout_exercise_id: we.id,
+          note: body,
+        });
+        // moved down from the pinned note → unpin it
+        if (originBucket === "pinned")
+          await clearPinnedNoteAction({
+            workout_id: wid,
+            exercise_id: we.exercise_id,
+          });
+      }
+    });
+    onClose();
+  };
+
   return (
     <BottomSheet
       open
       onClose={onClose}
-      title="New note"
-      subtitle={`${we.exercise_name.toUpperCase()} — PINNED IN EVERY WORKOUT`}
+      title={originText ? "Edit note" : "Add note"}
+      subtitle={we.exercise_name.toUpperCase()}
     >
       <textarea
         value={note}
@@ -1131,8 +1546,32 @@ function NoteSheet({
         rows={3}
         autoFocus
         className="min-h-16 w-full border-[1.5px] border-ink bg-paper px-3 py-2.5 text-[13px] leading-normal text-ink placeholder:text-ink/40 focus:outline-none"
-        placeholder="e.g. handle grip, underhand, strict"
+        placeholder="e.g. cambered bar, strict form — or how it felt today"
       />
+
+      {/* pin toggle: decides exercise-wide vs this-session-only */}
+      <button
+        type="button"
+        onClick={() => setPinned((v) => !v)}
+        className="mt-3.5 flex w-full items-start gap-2.5 text-left"
+      >
+        <div
+          className={`mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[11px] ${
+            pinned ? "bg-accent text-bg-base" : "border-[1.5px] border-ink/40"
+          }`}
+        >
+          {pinned ? "✓" : ""}
+        </div>
+        <div>
+          <div className="text-[12.5px] font-semibold">Pin to this exercise</div>
+          <div className="mt-0.5 text-[11px] leading-[1.45] text-ink/55">
+            {pinned
+              ? "Stays on this exercise in every workout."
+              : "Saved with just this session — a note on how it went today."}
+          </div>
+        </div>
+      </button>
+
       <div className="mt-4 flex items-center justify-end gap-2.5">
         <button
           type="button"
@@ -1143,21 +1582,11 @@ function NoteSheet({
         </button>
         <button
           type="button"
-          disabled={!note.trim()}
-          onClick={() => {
-            commit(() =>
-              savePinnedNoteAction({
-                workout_id: workoutId,
-                exercise_id: we.exercise_id,
-                body: note.trim(),
-              }),
-            );
-            setNote("");
-            onClose();
-          }}
+          disabled={noop}
+          onClick={save}
           className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
         >
-          SAVE
+          {!body && originText ? "CLEAR" : "SAVE"}
         </button>
       </div>
     </BottomSheet>
@@ -1260,10 +1689,20 @@ function ReplaceSheet({
 
 const PAIN_OPTIONS = ["None", "Low", "Moderate", "High"];
 
+/**
+ * Feedback prompt (fig 1.4), revised 2026-06-16:
+ * - After the FIRST exercise of a muscle group → recovery: how sore the user
+ *   was from the LAST time they trained that group (0–10) + how many days they
+ *   stayed sore (0–5). No joint-pain question here (was redundant).
+ * - When the group is COMPLETE (last exercise) → joint pain + pump + workload.
+ * - A single-exercise group is both, so it shows everything at once.
+ * Editing via the menu re-opens with whatever the row already holds.
+ */
 function FeedbackSheet({
   we,
   workoutId,
   weekNumber,
+  withSoreness,
   withGroupScope,
   onClose,
   commit,
@@ -1271,53 +1710,117 @@ function FeedbackSheet({
   we: LoggedExercise | null;
   workoutId: string;
   weekNumber: number;
+  withSoreness: boolean;
   withGroupScope: boolean;
   onClose: () => void;
   commit: Commit;
 }) {
-  const [pain, setPain] = useState<number | null>(null);
-  const [pump, setPump] = useState(5);
-  const [workload, setWorkload] = useState(5);
+  // prefill from any existing feedback (editing) — the sheet is keyed per
+  // exercise so these initial values are correct on each open
+  const existing = we?.feedback ?? null;
+  const [pain, setPain] = useState<number | null>(existing?.joint_pain ?? null);
+  const [pump, setPump] = useState(existing?.pump ?? 5);
+  const [workload, setWorkload] = useState(existing?.workload ?? 5);
+  const [soreness, setSoreness] = useState(existing?.soreness ?? 3);
+  const [sorenessDays, setSorenessDays] = useState<number | null>(
+    existing?.soreness_days ?? null,
+  );
   const [workloadInfo, setWorkloadInfo] = useState(true);
   const [pumpInfo, setPumpInfo] = useState(false);
 
   if (!we) return null;
   const mg = we.muscle_group || "Session";
 
+  // show a section when its role applies OR the row already carries that data
+  const showSoreness = withSoreness || existing?.soreness != null;
+  const showGroup =
+    withGroupScope ||
+    existing?.joint_pain != null ||
+    existing?.pump != null ||
+    existing?.workload != null;
+
+  const disabled =
+    (showGroup && pain === null) || (showSoreness && sorenessDays === null);
+
   return (
     <BottomSheet
       open
       onClose={onClose}
       title="Feedback"
-      subtitle={`${mg.toUpperCase()} — AFTER ${we.exercise_name.toUpperCase()} · FEEDS W${weekNumber + 1} TARGETS`}
+      subtitle={`${mg.toUpperCase()} — ${showSoreness && !showGroup ? "RECOVERY CHECK" : `AFTER ${we.exercise_name.toUpperCase()}`} · FEEDS W${weekNumber + 1} TARGETS`}
     >
-      <div>
-        <div className="text-[13px] font-bold">
-          Joint pain{" "}
-          <span className="text-xs font-normal text-ink/55">
-            — during {we.exercise_name.toLowerCase()}
-          </span>
+      {showSoreness && (
+        <div className={showGroup ? "mb-1" : ""}>
+          <div className="text-[13px] font-bold">
+            {mg} soreness{" "}
+            <span className="text-xs font-normal text-ink/55">
+              — from last {mg.toLowerCase()} session
+            </span>
+          </div>
+          <div className="mt-3">
+            <SnapSlider
+              label={`${mg} soreness last session`}
+              value={soreness}
+              onChange={setSoreness}
+              leftLabel="NONE"
+              rightLabel="VERY SORE"
+            />
+          </div>
+          <div className="mt-4 text-[13px] font-bold">
+            Days sore{" "}
+            <span className="text-xs font-normal text-ink/55">
+              — after that session
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-6 gap-[6px]">
+            {[0, 1, 2, 3, 4, 5].map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={sorenessDays === d}
+                onClick={() => setSorenessDays(d)}
+                className={`numeral h-[44px] text-sm ${
+                  sorenessDays === d
+                    ? "bg-accent font-bold text-bg-base"
+                    : "border border-ink/40 font-medium text-ink"
+                }`}
+              >
+                {d === 5 ? "5+" : d}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-2 grid grid-cols-4 gap-[7px]">
-          {PAIN_OPTIONS.map((opt, i) => (
-            <button
-              key={opt}
-              type="button"
-              aria-pressed={pain === i}
-              onClick={() => setPain(i)}
-              className={`h-[46px] text-xs ${
-                pain === i
-                  ? "bg-accent font-bold text-bg-base"
-                  : "border border-ink/40 font-medium text-ink"
-              }`}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
-      {withGroupScope && (
+      {showGroup && (
+        <div className={showSoreness ? "mt-5" : ""}>
+          <div className="text-[13px] font-bold">
+            Joint pain{" "}
+            <span className="text-xs font-normal text-ink/55">
+              — during {we.exercise_name.toLowerCase()}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-[7px]">
+            {PAIN_OPTIONS.map((opt, i) => (
+              <button
+                key={opt}
+                type="button"
+                aria-pressed={pain === i}
+                onClick={() => setPain(i)}
+                className={`h-[46px] text-xs ${
+                  pain === i
+                    ? "bg-accent font-bold text-bg-base"
+                    : "border border-ink/40 font-medium text-ink"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showGroup && (
         <>
           <div className="mt-5">
             <div className="flex items-center gap-2">
@@ -1407,16 +1910,19 @@ function FeedbackSheet({
         </button>
         <button
           type="button"
-          disabled={pain === null}
+          disabled={disabled}
           onClick={() => {
             commit(() =>
               saveFeedbackAction({
                 workout_id: workoutId,
                 workout_exercise_id: we.id,
-                joint_pain: pain,
-                muscle_group_id: withGroupScope ? we.muscle_group_id : null,
-                pump: withGroupScope ? pump : null,
-                workload: withGroupScope ? workload : null,
+                joint_pain: showGroup ? pain : null,
+                muscle_group_id:
+                  showGroup || showSoreness ? we.muscle_group_id : null,
+                pump: showGroup ? pump : null,
+                workload: showGroup ? workload : null,
+                soreness: showSoreness ? soreness : null,
+                soreness_days: showSoreness ? sorenessDays : null,
               }),
             );
             onClose();
@@ -1470,6 +1976,7 @@ function CompleteSheet({
   const { render, shown } = useSheetTransition(open);
   const sliderValue = { fatigue, effort, performance };
   const setSlider = { fatigue: setFatigue, effort: setEffort, performance: setPerformance };
+  useScrollLock(render);
   if (!render) return null;
 
   const { workout, microcycle, exercises } = detail;

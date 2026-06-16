@@ -14,6 +14,8 @@ import {
   finalizeDraftMeso,
   removeDayGroup,
   removeMesoDay,
+  reorderDayGroups,
+  reorderGroupExercises,
   saveMesoPlan,
   setGroupExercises,
   updateDayGroup,
@@ -23,6 +25,7 @@ import type { MesoDayRow } from "@/lib/types/database";
 import {
   createMacrocycleWithMesos,
   planUnplannedMeso,
+  updateMacrocycle,
 } from "@/lib/queries/macro";
 import {
   getActiveEngineParams,
@@ -88,6 +91,45 @@ export async function createMacrocycleAction(
   await createMacrocycleWithMesos(supabase, user.id, parsed.data, profile, params);
   revalidatePath("/cycles");
   redirect("/cycles");
+}
+
+const editMacroSchema = z.object({
+  macro_id: z.string().uuid(),
+  name: z.string().min(1, "Name is required").max(80),
+  goal_type: z.enum(["hypertrophy", "strength", "cut", "maintain"]),
+  duration_months: z.coerce.number().int().min(1).max(60).nullable(),
+  meso_length_weeks: z.coerce.number().int().min(4).max(6),
+  goal_notes: z.string().max(280).nullable(),
+});
+
+/** Edit an existing macrocycle (rename · goal · duration · notes · re-plan). */
+export async function editMacrocycleAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const rawDuration = formData.get("duration_months");
+  const parsed = editMacroSchema.safeParse({
+    macro_id: formData.get("macro_id"),
+    name: formData.get("name"),
+    goal_type: formData.get("goal_type"),
+    duration_months: rawDuration ? rawDuration : null,
+    meso_length_weeks: formData.get("meso_length_weeks"),
+    goal_notes: formData.get("goal_notes") || null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const { supabase, user } = await requireUser();
+  const profile = await getProfile(supabase, user.id);
+  if (!profile) redirect("/onboarding");
+  const { params } = await getActiveEngineParams(supabase);
+
+  const { macro_id, ...input } = parsed.data;
+  await updateMacrocycle(supabase, user.id, macro_id, input, profile, params);
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/macro/${macro_id}`);
+  redirect(`/cycles/macro/${macro_id}`);
 }
 
 /** `+ PLAN` on an unplanned placeholder (figs 2.1/2.2) → planner board. */
@@ -327,6 +369,46 @@ export async function removeGroupAction(input: {
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
+const reorderGroupsSchema = z.object({
+  meso_id: z.string().uuid(),
+  day_id: z.string().uuid(),
+  ordered_group_ids: z.array(z.string().uuid()).min(1).max(20),
+});
+
+/** Live (draft) reorder of a day's muscle groups (fig 2.5). */
+export async function reorderDayGroupsAction(input: {
+  meso_id: string;
+  day_id: string;
+  ordered_group_ids: string[];
+}): Promise<void> {
+  const parsed = reorderGroupsSchema.parse(input);
+  const { supabase } = await requireUser();
+  await reorderDayGroups(supabase, parsed.day_id, parsed.ordered_group_ids);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
+const reorderExercisesSchema = z.object({
+  meso_id: z.string().uuid(),
+  group_id: z.string().uuid(),
+  ordered_fill_ids: z.array(z.string().uuid()).min(1).max(10),
+});
+
+/** Live (draft) reorder of a group's exercises (fig 2.7 slots). */
+export async function reorderGroupExercisesAction(input: {
+  meso_id: string;
+  group_id: string;
+  ordered_fill_ids: string[];
+}): Promise<void> {
+  const parsed = reorderExercisesSchema.parse(input);
+  const { supabase } = await requireUser();
+  await reorderGroupExercises(
+    supabase,
+    parsed.group_id,
+    parsed.ordered_fill_ids,
+  );
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
 // ---------------------------------------------------------------------------
 // staged plan save (fig 2.5): editing a non-draft meso stages changes locally;
 // SAVE CHANGES commits the whole plan in one write. For an active meso, open
@@ -339,7 +421,8 @@ const planSaveSchema = z.object({
   days: z
     .array(
       z.object({
-        day_number: z.number().int().min(1).max(14),
+        // a week is 7 days (DB checks: day_number ≤ 7, days_per_week ≤ 7)
+        day_number: z.number().int().min(1).max(7),
         label: z.string().max(40).nullable(),
         weekday: z.number().int().min(1).max(7).nullable(),
         groups: z.array(
@@ -357,7 +440,7 @@ const planSaveSchema = z.object({
         ),
       }),
     )
-    .max(14),
+    .max(7),
 });
 
 export async function saveMesoPlanAction(input: {
@@ -440,4 +523,24 @@ export async function deleteMesoAction(formData: FormData): Promise<void> {
   await deleteMesocycle(supabase, user.id, mesoId);
   revalidatePath("/cycles");
   redirect("/cycles");
+}
+
+/**
+ * Discard the in-progress draft (the one-at-a-time build). Only deletes a meso
+ * still in `draft` status, so it can never remove a planned/active cycle or any
+ * logged history. Lands back on the plan-a-meso entry.
+ */
+export async function discardDraftAction(formData: FormData): Promise<void> {
+  const mesoId = z.string().uuid().parse(formData.get("meso_id"));
+  const { supabase, user } = await requireUser();
+  const { data: meso } = await supabase
+    .from("mesocycles")
+    .select("status")
+    .eq("id", mesoId)
+    .maybeSingle();
+  if (meso?.status === "draft") {
+    await deleteMesocycle(supabase, user.id, mesoId);
+  }
+  revalidatePath("/cycles");
+  redirect("/cycles/plan");
 }

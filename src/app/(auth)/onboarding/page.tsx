@@ -37,6 +37,9 @@ export default function OnboardingPage() {
   const [experience, setExperience] = useState<
     "beginner" | "intermediate" | "advanced"
   >("beginner");
+  const [gender, setGender] = useState<
+    "female" | "male" | "other" | "undisclosed"
+  >("undisclosed");
   const [equipment, setEquipment] = useState<string[]>([
     "barbell",
     "dumbbell",
@@ -77,6 +80,7 @@ export default function OnboardingPage() {
 
       {/* hidden carriers so all panels submit regardless of which is shown */}
       <input type="hidden" name="experience_level" value={experience} />
+      <input type="hidden" name="gender" value={gender} />
       {equipment.map((v) => (
         <input key={v} type="hidden" name="preferred_equipment" value={v} />
       ))}
@@ -88,6 +92,21 @@ export default function OnboardingPage() {
         </p>
         <Input label="Name" name="display_name" required maxLength={60} />
         <Input label="Age" name="age" type="number" min={13} max={120} required />
+        <div className="flex flex-col gap-1.5">
+          <span className="label-caps text-[10px] font-semibold text-ink/55">
+            Sex — calibrates muscle-gain targets
+          </span>
+          <SegmentedControl
+            options={[
+              { value: "female", label: "FEMALE" },
+              { value: "male", label: "MALE" },
+              { value: "other", label: "OTHER" },
+              { value: "undisclosed", label: "PREFER NOT" },
+            ]}
+            value={gender}
+            onChange={setGender}
+          />
+        </div>
         <Input
           label="Height — cm"
           name="height_cm"

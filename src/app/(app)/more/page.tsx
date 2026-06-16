@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/queries/profiles";
 import { signOut } from "@/app/(auth)/actions";
 import { UnitsToggle } from "./UnitsToggle";
+import { ThemeToggle } from "./ThemeToggle";
+import { AutoMatchToggle } from "./AutoMatchToggle";
 
 function formatHeight(heightCm: number | null, units: string): string | null {
   if (heightCm == null) return null;
@@ -83,6 +85,19 @@ export default async function MorePage() {
       <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
         <div className="text-sm font-semibold">Units</div>
         <UnitsToggle units={units} />
+      </div>
+      <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
+        <div className="text-sm font-semibold">Theme</div>
+        <ThemeToggle />
+      </div>
+      <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
+        <div className="pr-3">
+          <div className="text-sm font-semibold">Match weight across sets</div>
+          <div className="mt-0.5 text-[10px] font-medium tracking-[0.04em] text-ink/55">
+            CHANGING A SET&apos;S WEIGHT UPDATES THE REST
+          </div>
+        </div>
+        <AutoMatchToggle enabled={profile?.auto_match_weights ?? false} />
       </div>
       <div className="flex items-center justify-between border-b border-ink/15 py-3.5">
         <div className="text-sm font-semibold">AI connector</div>

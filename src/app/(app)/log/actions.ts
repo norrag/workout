@@ -8,14 +8,19 @@ import { listPickerExercises } from "@/lib/queries/exercises";
 import {
   adjustPrescribedSets,
   amendSet,
+  clearPinnedNote,
   clearSkippedSets,
   completeWorkout,
   deleteLoggedSet,
+  endMesocycle,
+  endWorkout,
   logSet,
+  setPlannedSetWeight,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
   savePinnedNote,
+  saveSessionNote,
   saveWorkoutFeedback,
   setSetSkipped,
   skipRemainingSets,
@@ -69,6 +74,17 @@ export async function logSetAction(input: {
     set_type: parsed.set_type,
     unit: profile?.units ?? "lb",
   });
+  // auto-match (doc 11): carry the logged weight onto the remaining unlogged
+  // sets. Done here (after the insert excludes this set) to avoid a client race.
+  if (profile?.auto_match_weights) {
+    await setPlannedSetWeight(
+      supabase,
+      parsed.workout_exercise_id,
+      parsed.set_number,
+      parsed.weight,
+      true,
+    );
+  }
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }
@@ -103,6 +119,38 @@ const weTargetSchema = z.object({
   workout_id: z.string().uuid(),
   workout_exercise_id: z.string().uuid(),
 });
+
+const setWeightSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  set_number: z.coerce.number().int().min(1).max(30),
+  weight: z.coerce.number().min(0).max(2000),
+});
+
+/**
+ * Persist an edited planned weight for an upcoming (unlogged) set (doc 11). The
+ * weight always sticks; the user's `auto_match_weights` setting decides whether
+ * it lands on just this set or every still-unlogged set of the exercise.
+ */
+export async function updateSetWeightAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  set_number: number;
+  weight: number;
+}): Promise<void> {
+  const parsed = setWeightSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  const profile = await getProfile(supabase, user.id);
+  await setPlannedSetWeight(
+    supabase,
+    parsed.workout_exercise_id,
+    parsed.set_number,
+    parsed.weight,
+    profile?.auto_match_weights ?? false,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
 
 export async function addSetAction(input: {
   workout_id: string;
@@ -244,6 +292,49 @@ export async function savePinnedNoteAction(input: {
   revalidatePath("/workout");
 }
 
+const clearPinnedSchema = z.object({
+  workout_id: z.string().uuid(),
+  exercise_id: z.string().uuid(),
+});
+
+/** Unpin the exercise's pinned note (used when a note is unpinned/cleared or
+ * moved to session-only from the unified note sheet). */
+export async function clearPinnedNoteAction(input: {
+  workout_id: string;
+  exercise_id: string;
+}): Promise<void> {
+  const parsed = clearPinnedSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await clearPinnedNote(supabase, user.id, parsed.exercise_id);
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const sessionNoteSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  note: z.string().max(500).nullable(),
+});
+
+/** Session log note (09 §8) — saved with the workout's exercise log; the
+ * completion lock keeps it editable only while the workout is in_progress. */
+export async function saveSessionNoteAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  note: string | null;
+}): Promise<void> {
+  const parsed = sessionNoteSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await saveSessionNote(
+    supabase,
+    user.id,
+    parsed.workout_exercise_id,
+    parsed.note,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
 const feedbackSchema = z.object({
   workout_id: z.string().uuid(),
   workout_exercise_id: z.string().uuid(),
@@ -251,6 +342,8 @@ const feedbackSchema = z.object({
   muscle_group_id: z.string().uuid().nullable(),
   pump: z.coerce.number().int().min(0).max(10).nullable(),
   workload: z.coerce.number().int().min(0).max(10).nullable(),
+  soreness: z.coerce.number().int().min(0).max(10).nullable(),
+  soreness_days: z.coerce.number().int().min(0).max(5).nullable(),
 });
 
 export async function saveFeedbackAction(input: {
@@ -260,6 +353,8 @@ export async function saveFeedbackAction(input: {
   muscle_group_id: string | null;
   pump: number | null;
   workload: number | null;
+  soreness: number | null;
+  soreness_days: number | null;
 }): Promise<void> {
   const parsed = feedbackSchema.parse(input);
   const { supabase, user } = await requireUser();
@@ -269,6 +364,8 @@ export async function saveFeedbackAction(input: {
     muscle_group_id: parsed.muscle_group_id,
     pump: parsed.pump,
     workload: parsed.workload,
+    soreness: parsed.soreness,
+    soreness_days: parsed.soreness_days,
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
@@ -331,22 +428,25 @@ export async function listReplacementCandidatesAction(
   }));
 }
 
-export async function moveExerciseDownAction(input: {
-  workout_id: string;
-  workout_exercise_id: string;
-}): Promise<void> {
-  const parsed = weTargetSchema.parse(input);
+/** Swap an exercise with its neighbour (delta -1 = up, +1 = down). */
+async function moveExercise(
+  workoutId: string,
+  workoutExerciseId: string,
+  delta: -1 | 1,
+): Promise<void> {
   const { supabase } = await requireUser();
   const { data: wes, error } = await supabase
     .from("workout_exercises")
     .select("id, position")
-    .eq("workout_id", parsed.workout_id)
+    .eq("workout_id", workoutId)
     .order("position");
   if (error) throw error;
-  const idx = (wes ?? []).findIndex((w) => w.id === parsed.workout_exercise_id);
-  if (idx < 0 || idx >= (wes ?? []).length - 1) return;
-  const a = wes![idx];
-  const b = wes![idx + 1];
+  const list = wes ?? [];
+  const idx = list.findIndex((w) => w.id === workoutExerciseId);
+  const target = idx + delta;
+  if (idx < 0 || target < 0 || target >= list.length) return;
+  const a = list[idx];
+  const b = list[target];
   const { error: e1 } = await supabase
     .from("workout_exercises")
     .update({ position: b.position })
@@ -357,8 +457,24 @@ export async function moveExerciseDownAction(input: {
     .update({ position: a.position })
     .eq("id", b.id);
   if (e2) throw e2;
-  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath(`/log/${workoutId}`);
   revalidatePath("/workout");
+}
+
+export async function moveExerciseDownAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  await moveExercise(parsed.workout_id, parsed.workout_exercise_id, 1);
+}
+
+export async function moveExerciseUpAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  await moveExercise(parsed.workout_id, parsed.workout_exercise_id, -1);
 }
 
 const completeSchema = z.object({
@@ -418,4 +534,60 @@ export async function completeWorkoutAction(input: {
   revalidatePath("/workout");
   revalidatePath(`/log/${parsed.workout_id}`);
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// end early (fig 1.1 options menu, 09 session-5 §9)
+// ---------------------------------------------------------------------------
+
+const endWorkoutSchema = z.object({ workout_id: z.string().uuid() });
+
+/** End workout = skip every remaining set + complete + advance the week. */
+export async function endWorkoutAction(input: {
+  workout_id: string;
+}): Promise<AdvanceResult> {
+  const parsed = endWorkoutSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await endWorkout(supabase, user.id, parsed.workout_id);
+
+  // same week N → N+1 generation as a normal completion; a failure must not
+  // lose the early-end (the workout tab re-runs the job on next open).
+  let result: AdvanceResult;
+  try {
+    result = await advanceWeekAfterWorkout(
+      createServiceClient(),
+      user.id,
+      parsed.workout_id,
+    );
+  } catch (error) {
+    console.error("week generation failed after ending workout", error);
+    result = {
+      summary:
+        "Workout ended. Next week's targets recalculate when you next open the app.",
+      nextWorkoutId: null,
+      nextLabel: null,
+    };
+  }
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  return result;
+}
+
+const endMesoSchema = z.object({
+  workout_id: z.string().uuid(),
+  meso_id: z.string().uuid(),
+});
+
+/** End mesocycle = skip/close every remaining workout, then complete the meso. */
+export async function endMesocycleAction(input: {
+  workout_id: string;
+  meso_id: string;
+}): Promise<void> {
+  const parsed = endMesoSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await endMesocycle(supabase, user.id, parsed.meso_id);
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}`);
+  revalidatePath("/cycles");
 }

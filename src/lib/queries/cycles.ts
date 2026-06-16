@@ -467,11 +467,19 @@ export async function addMesoDay(
   const { data: existing, error: existingError } = await supabase
     .from("meso_days")
     .select("day_number")
-    .eq("mesocycle_id", mesoId)
-    .order("day_number", { ascending: false })
-    .limit(1);
+    .eq("mesocycle_id", mesoId);
   if (existingError) throw existingError;
-  const nextNumber = (existing?.[0]?.day_number ?? 0) + 1;
+  // smallest unused 1..7 (a week is 7 days; day_number ≤ 7 is a DB check). Not
+  // max+1 — that would push a later add past 7 after a day was removed.
+  const taken = new Set((existing ?? []).map((d) => d.day_number));
+  let nextNumber = 0;
+  for (let n = 1; n <= 7; n++) {
+    if (!taken.has(n)) {
+      nextNumber = n;
+      break;
+    }
+  }
+  if (nextNumber === 0) throw new Error("A week can hold at most 7 training days");
 
   const { data, error } = await supabase
     .from("meso_days")
@@ -724,6 +732,47 @@ export async function removeDayGroup(
     .delete()
     .eq("id", groupId);
   if (error) throw error;
+}
+
+/**
+ * Reorder a day's muscle groups: rewrite each group's `position` to its index
+ * in `orderedGroupIds` (1..n). Scoped to the day; `position` has no unique
+ * constraint, so a plain rewrite is safe (no temp-value swap dance). Used by
+ * the live (draft) reorder path — staged edits reorder the local copy instead.
+ */
+export async function reorderDayGroups(
+  supabase: Client,
+  dayId: string,
+  orderedGroupIds: string[],
+): Promise<void> {
+  for (let i = 0; i < orderedGroupIds.length; i++) {
+    const { error } = await supabase
+      .from("meso_day_groups")
+      .update({ position: i + 1 })
+      .eq("id", orderedGroupIds[i])
+      .eq("meso_day_id", dayId);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Reorder a group's exercises: rewrite each fill's `slot_number`/`position` to
+ * its index in `orderedFillIds` (1..n), packing fills to the top slots. Scoped
+ * to the group. Live (draft) reorder path; staged edits reorder locally.
+ */
+export async function reorderGroupExercises(
+  supabase: Client,
+  groupId: string,
+  orderedFillIds: string[],
+): Promise<void> {
+  for (let i = 0; i < orderedFillIds.length; i++) {
+    const { error } = await supabase
+      .from("meso_exercises")
+      .update({ slot_number: i + 1, position: i + 1 })
+      .eq("id", orderedFillIds[i])
+      .eq("meso_day_group_id", groupId);
+    if (error) throw error;
+  }
 }
 
 export async function clearSlot(
