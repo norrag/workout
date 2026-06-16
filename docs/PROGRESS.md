@@ -2,7 +2,25 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-15 (latest) — Full training history imported (27 mesos, 6,745 sets)
+## 2026-06-16 (latest) — Madeline's history imported (16 standalone mesos, 3,696 sets)
+
+Same pipeline as Garron's import, for the second account (Madeline,
+`0af27789…`, `docs/data/master_exercise_history_madeline.csv`, 1,533 rows). She
+didn't track macrocycles, so every meso is **standalone** (`macrocycle_id` and
+`logged_sets.macrocycle_id` NULL — surfaced via `cycles.ts` `standaloneMesos`).
+
+### Done
+
+- Loaded via REST into `public.import_hist`, then ran `scripts/history-build-standalone.sql`
+  (the macro-less variant of `history-build.sql`, idempotency-guarded): **16 mesocycles**,
+  **87 microcycles**, 108-equiv day plan, **170 workouts**, **1,533 workout_exercises**,
+  **3,696 logged_sets** — all `completed`, joined to the shared library via `legacy_id`.
+- `scripts/import-history.py` now takes the CSV path as an argument (defaults to Garron's).
+- **Verified:** 16/16 mesos standalone, 0 macros, logged-set count == expected, 91 exercises
+  in `v_exercise_prs`, all 16 mesos in `v_meso_summary`; 2024-03-21 → 2026-06-11. Garron's
+  27 mesos untouched.
+
+## 2026-06-15 — Full training history imported (27 mesos, 6,745 sets)
 
 Imported Garron's complete logged history (`docs/data/master_exercise_history_garron.csv`,
 2,925 rows) into the live account `3183ce71…`. Built the whole hierarchy server-side from a

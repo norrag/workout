@@ -23,10 +23,11 @@ Full procedure (one-time):
   5. drop table public.import_hist;               # also drops the temp anon grant
 """
 from __future__ import annotations
-import csv, datetime, json, pathlib
+import csv, datetime, json, pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SRC = ROOT / "docs" / "data" / "master_exercise_history_garron.csv"
+SRC = (pathlib.Path(sys.argv[1]) if len(sys.argv) > 1
+       else ROOT / "docs" / "data" / "master_exercise_history_garron.csv")
 OUT = pathlib.Path("/tmp/hist"); OUT.mkdir(parents=True, exist_ok=True)
 SETCOLS = [f"Set {i}" for i in range(1, 10)]
 BATCH = 600
