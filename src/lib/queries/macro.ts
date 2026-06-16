@@ -260,9 +260,11 @@ async function buildMacroStats(
 ): Promise<MacroStats> {
   const totalVolume = summary?.total_volume ?? 0;
   const sessionsLogged = summary?.sessions_logged ?? 0;
+  // adherence = attended / due over working (non-deload) weeks, counting only
+  // decided days (completed|skipped); planned/in_progress and deload are excluded
   const adherencePct =
-    summary && summary.workouts_total > 0
-      ? Math.round((summary.sessions_logged / summary.workouts_total) * 100)
+    summary && summary.sessions_due > 0
+      ? Math.round((summary.sessions_attended / summary.sessions_due) * 100)
       : null;
 
   let estStrengthPct: number | null = null;

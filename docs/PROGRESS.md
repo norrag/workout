@@ -2,7 +2,21 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Imported-history adherence fix (missed working-week days)
+## 2026-06-16 (latest) — Adherence rule: attended/due over working weeks, decided days only
+
+Made the adherence definition correct as a stock rule (migration
+`20260616000001_adherence_rule.sql`). The shared summary views now expose
+`sessions_attended` (completed) and `sessions_due` (completed|skipped), both over
+**working (non-deload) weeks only**; `macro.ts` computes adherence =
+attended / due. Consequences:
+- **Deload weeks excluded** — a skipped/short deload is never an absence.
+- **Future/unstarted days excluded** — `planned`/`in_progress` aren't counted, so a
+  meso in progress isn't dinged for days that haven't come up yet (only decided
+  days — completed or skipped — count, i.e. days prior to the current one).
+- Garron's completed macros read 91–96%; the active macro 88% (reflects only its
+  3 real past misses, not the 3 upcoming week-3 days). Views recompute live.
+
+## 2026-06-16 — Imported-history adherence fix (missed working-week days)
 
 The history import only created `completed` workout rows for days that had logged
 sets, so `v_macro_summary` / `v_meso_summary` showed **100% adherence** even where
