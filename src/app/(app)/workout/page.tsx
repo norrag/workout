@@ -5,6 +5,7 @@ import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
 import { catchUpProgression } from "@/lib/queries/progression";
+import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
 import { VolumeView } from "@/components/stats/MesoStatsViews";
@@ -49,7 +50,14 @@ export default async function WorkoutPage() {
       state.nextWorkout.id,
     );
     if (detail) {
-      return <DayView detail={detail} units={profile?.units ?? "lb"} />;
+      const { params: engineParams } = await getActiveEngineParams(supabase);
+      return (
+        <DayView
+          detail={detail}
+          units={profile?.units ?? "lb"}
+          params={engineParams}
+        />
+      );
     }
   }
 

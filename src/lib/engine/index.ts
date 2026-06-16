@@ -41,6 +41,14 @@ export {
   type E1rmConfidence,
 } from "./e1rm";
 export {
+  predictRepsAtWeight,
+  impliedRirAtReps,
+  effectiveRepsForE1rm,
+  recencyWeightedE1rm,
+  type E1rmSample,
+  type E1rmAnchor,
+} from "./reps";
+export {
   composeAutoregulationSummary,
   composeMesoCompleteSummary,
   type SummaryContext,
