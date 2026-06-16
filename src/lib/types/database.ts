@@ -280,6 +280,8 @@ export type ExerciseFeedbackRow = {
   joint_pain: number | null;
   pump: number | null;
   workload: number | null;
+  soreness: number | null;
+  soreness_days: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

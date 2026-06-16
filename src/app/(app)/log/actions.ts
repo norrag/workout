@@ -251,6 +251,8 @@ const feedbackSchema = z.object({
   muscle_group_id: z.string().uuid().nullable(),
   pump: z.coerce.number().int().min(0).max(10).nullable(),
   workload: z.coerce.number().int().min(0).max(10).nullable(),
+  soreness: z.coerce.number().int().min(0).max(10).nullable(),
+  soreness_days: z.coerce.number().int().min(0).max(5).nullable(),
 });
 
 export async function saveFeedbackAction(input: {
@@ -260,6 +262,8 @@ export async function saveFeedbackAction(input: {
   muscle_group_id: string | null;
   pump: number | null;
   workload: number | null;
+  soreness: number | null;
+  soreness_days: number | null;
 }): Promise<void> {
   const parsed = feedbackSchema.parse(input);
   const { supabase, user } = await requireUser();
@@ -269,6 +273,8 @@ export async function saveFeedbackAction(input: {
     muscle_group_id: parsed.muscle_group_id,
     pump: parsed.pump,
     workload: parsed.workload,
+    soreness: parsed.soreness,
+    soreness_days: parsed.soreness_days,
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
