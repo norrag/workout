@@ -2,7 +2,21 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
+## 2026-06-16 (latest) — Engine explainer doc + reps↔weight↔RIR gap analysis (review, no code change)
+
+Added [11-workout-engine-explainer.md](11-workout-engine-explainer.md): a
+detailed walkthrough of how the per-set progression engine (`prescribe()`)
+currently decides weight/reps/sets and **when** it runs (post-completion, week
+N→N+1 — *not* during live logging), plus the live `SetRow` behavior. Documents
+that the requested **weight⇄reps linkage to hit target RIR from history does not
+exist today** (reps are a frozen copy of `prescribed_reps`; the e1RM model is
+used only for stats), and proposes a spec-compliant design (a pure
+`predictRepsAtWeight` inverting the e1RM curve, anchored on exercise history).
+Also proposes the **auto-match-weights setting** (`profiles.auto_match_weights`
++ More-tab toggle + unlogged-set propagation). Docs-only; no engine/schema
+change yet — awaiting review of the design before implementing.
+
+## 2026-06-16 — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
 
 On-device review of the planner board surfaced three concrete, reproducible
 bugs (the prior optimistic-bridge fix didn't cover them). No schema change;
