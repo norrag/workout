@@ -6,7 +6,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { HistorySheet } from "@/components/HistorySheet";
 import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
-import { groupByRegion, planGroupExercises } from "@/lib/planner/groups";
+import { groupByRegion, moveInOrder, planGroupExercises } from "@/lib/planner/groups";
 import {
   addDayAction,
   addGroupsAction,
@@ -15,6 +15,8 @@ import {
   finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
+  reorderDayGroupsAction,
+  reorderGroupExercisesAction,
   saveMesoPlanAction,
   setGroupExercisesAction,
   updateDayAction,
@@ -79,6 +81,14 @@ function tmpId(): string {
   return `tmp-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
 }
 
+/** Append an optimistic, not-yet-revalidated day so a sheet opened right after
+ *  a live insert (draft path) has its backing day immediately — bridges the
+ *  addDay→revalidate gap that left the day-setup sheet without a day. */
+function withPending(base: ViewDay[], pending: ViewDay | null): ViewDay[] {
+  if (!pending || base.some((d) => d.id === pending.id)) return base;
+  return [...base, pending];
+}
+
 function toWorkDays(days: PlannedDay[]): ViewDay[] {
   return days.map((d) => ({
     id: d.id,
@@ -118,6 +128,18 @@ function nextWeekday(used: (number | null)[]): number {
   return 1;
 }
 
+// A week has 7 days, so the plan caps at 7 training days (DB checks enforce
+// day_number ≤ 7 and days_per_week ≤ 7).
+const MAX_DAYS = 7;
+
+/** Smallest unused day number in 1..7 — not max+1, so removals don't push a
+ *  later add past the day_number ≤ 7 check. Returns null when the week is full. */
+function nextDayNumber(used: number[]): number | null {
+  const taken = new Set(used);
+  for (let n = 1; n <= MAX_DAYS; n++) if (!taken.has(n)) return n;
+  return null;
+}
+
 function shortDate(iso: string): string {
   const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
@@ -150,14 +172,24 @@ export function PlannerBoard({
   // mode no server action runs mid-edit, so props won't change underneath it.
   const [workDays, setWorkDays] = useState<ViewDay[]>(() => toWorkDays(plan.days));
   const [dirty, setDirty] = useState(false);
+  // optimistic bridge for the draft (live) path — see withPending
+  const [pendingDay, setPendingDay] = useState<ViewDay | null>(null);
 
-  const days: ViewDay[] = editing ? workDays : toWorkDays(plan.days);
+  const days: ViewDay[] = editing
+    ? workDays
+    : withPending(toWorkDays(plan.days), pendingDay);
 
   const [activeDayId, setActiveDayId] = useState<string | null>(
     days[0]?.id ?? null,
   );
   const [daySetupId, setDaySetupId] = useState<string | null>(null);
+  // a just-added day not yet confirmed via DONE — cancelling the sheet rolls it
+  // back (so the day-tab `+` → cancel doesn't leave an orphan day).
+  const [pendingNewDayId, setPendingNewDayId] = useState<string | null>(null);
   const [addGroupsDayId, setAddGroupsDayId] = useState<string | null>(null);
+  // whether closing the group picker should return to the day sheet (only when
+  // it was opened from there, not from the board's own + ADD MUSCLE GROUP).
+  const [returnToDaySheet, setReturnToDaySheet] = useState(false);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -166,20 +198,26 @@ export function PlannerBoard({
   const commit: Commit = (fn) => startTransition(fn);
 
   // ----- mutators -----------------------------------------------------------
+  const atDayLimit = days.length >= MAX_DAYS;
+
   const addDay = () => {
+    if (atDayLimit) return;
     if (editing) {
+      const dayNumber = nextDayNumber(workDays.map((d) => d.day_number));
+      if (dayNumber == null) return;
       const id = tmpId();
       setWorkDays((ds) => [
         ...ds,
         {
           id,
-          day_number: Math.max(0, ...ds.map((d) => d.day_number)) + 1,
+          day_number: dayNumber,
           label: null,
           weekday: nextWeekday(ds.map((d) => d.weekday)),
           groups: [],
         },
       ]);
       setActiveDayId(id);
+      setPendingNewDayId(id);
       setDaySetupId(id);
       setDirty(true);
       return;
@@ -187,7 +225,17 @@ export function PlannerBoard({
     const weekday = nextWeekday(days.map((d) => d.weekday));
     commit(async () => {
       const created = await addDayAction({ meso_id: meso.id, label: null, weekday });
+      // render the day-setup sheet immediately from the returned row instead of
+      // waiting on revalidation (the documented add-day "won't dismiss" gap).
+      setPendingDay({
+        id: created.id,
+        day_number: created.day_number,
+        label: created.label,
+        weekday: created.weekday,
+        groups: [],
+      });
       setActiveDayId(created.id);
+      setPendingNewDayId(created.id);
       setDaySetupId(created.id);
     });
   };
@@ -204,6 +252,8 @@ export function PlannerBoard({
   };
 
   const removeDay = (dayId: string) => {
+    // clear the optimistic ghost if we're removing the not-yet-revalidated day
+    if (pendingDay?.id === dayId) setPendingDay(null);
     if (editing) {
       setWorkDays((ds) => ds.filter((d) => d.id !== dayId));
       setDirty(true);
@@ -303,6 +353,71 @@ export function PlannerBoard({
     );
   };
 
+  // reorder a muscle group within its day (−1 up / +1 down). Staged in editing
+  // mode; a live position rewrite on a draft.
+  const moveGroup = (dayId: string, groupId: string, delta: number) => {
+    const day = days.find((d) => d.id === dayId);
+    if (!day) return;
+    const ids = day.groups.map((g) => g.id);
+    const ordered = moveInOrder(ids, groupId, delta);
+    if (ordered === ids) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => {
+          if (d.id !== dayId) return d;
+          const byId = new Map(d.groups.map((g) => [g.id, g]));
+          return { ...d, groups: ordered.map((id) => byId.get(id)!) };
+        }),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      reorderDayGroupsAction({
+        meso_id: meso.id,
+        day_id: dayId,
+        ordered_group_ids: ordered,
+      }),
+    );
+  };
+
+  // reorder an exercise within its group, packing fills to the top slots.
+  const moveFill = (groupId: string, fillId: string, delta: number) => {
+    const group = days.flatMap((d) => d.groups).find((g) => g.id === groupId);
+    if (!group) return;
+    const sorted = [...group.fills].sort((a, b) => a.slot_number - b.slot_number);
+    const sortedIds = sorted.map((f) => f.id);
+    const ordered = moveInOrder(sortedIds, fillId, delta);
+    if (ordered === sortedIds) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) => {
+            if (g.id !== groupId) return g;
+            const byId = new Map(g.fills.map((f) => [f.id, f]));
+            return {
+              ...g,
+              fills: ordered.map((id, i) => ({
+                ...byId.get(id)!,
+                slot_number: i + 1,
+              })),
+            };
+          }),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      reorderGroupExercisesAction({
+        meso_id: meso.id,
+        group_id: groupId,
+        ordered_fill_ids: ordered,
+      }),
+    );
+  };
+
   const clearFill = (groupId: string, fill: ViewFill) => {
     if (editing) {
       setWorkDays((ds) =>
@@ -323,6 +438,64 @@ export function PlannerBoard({
     );
   };
 
+  // ----- day-setup sheet flow ----------------------------------------------
+  // Single sheet at a time: opening the muscle-group picker closes the day
+  // sheet (so they never stack/double-render); closing the picker reopens it.
+
+  /** DONE on the day sheet: persist label/weekday, confirm the day. */
+  const confirmDaySheet = (
+    dayId: string,
+    label: string | null,
+    weekday: number | null,
+  ) => {
+    saveDay(dayId, label, weekday);
+    setPendingNewDayId(null);
+    setDaySetupId(null);
+  };
+
+  /** Cancel/✕/scrim on the day sheet: roll back a never-confirmed new day. */
+  const cancelDaySheet = (dayId: string) => {
+    setDaySetupId(null);
+    if (dayId === pendingNewDayId) {
+      setPendingNewDayId(null);
+      removeDay(dayId);
+    }
+  };
+
+  const removeDayFromSheet = (dayId: string) => {
+    setDaySetupId(null);
+    setPendingNewDayId(null);
+    removeDay(dayId);
+  };
+
+  /** + ADD MUSCLE GROUP from the day sheet: persist the day's label/weekday,
+   *  then hand off to the picker (closing the day sheet — single sheet). */
+  const openAddGroupsFromSheet = (
+    dayId: string,
+    label: string | null,
+    weekday: number | null,
+  ) => {
+    saveDay(dayId, label, weekday);
+    setDaySetupId(null);
+    setReturnToDaySheet(true);
+    setAddGroupsDayId(dayId);
+  };
+
+  /** + ADD MUSCLE GROUP on the board itself (no day sheet to return to). */
+  const openAddGroupsFromBoard = (dayId: string) => {
+    setReturnToDaySheet(false);
+    setAddGroupsDayId(dayId);
+  };
+
+  /** Closing the picker returns to the day sheet only if opened from there. */
+  const closeAddGroups = (dayId: string) => {
+    setAddGroupsDayId(null);
+    if (returnToDaySheet && days.some((d) => d.id === dayId)) {
+      setDaySetupId(dayId);
+    }
+    setReturnToDaySheet(false);
+  };
+
   const doSave = () => {
     const payload = days.map((d) => ({
       day_number: d.day_number,
@@ -340,6 +513,13 @@ export function PlannerBoard({
     }));
     commit(() => saveMesoPlanAction({ meso_id: meso.id, days: payload }));
   };
+
+  useEffect(() => {
+    // drop the optimistic day once the revalidated props include it
+    if (pendingDay && plan.days.some((d) => d.id === pendingDay.id)) {
+      setPendingDay(null);
+    }
+  }, [plan.days, pendingDay]);
 
   useEffect(() => {
     // Don't snap the active day back to day-1 while a setup / add-groups sheet
@@ -414,14 +594,16 @@ export function PlannerBoard({
               </button>
             );
           })}
-          <button
-            type="button"
-            aria-label="add day"
-            onClick={addDay}
-            className="flex-[0_0_40px] border-l border-ink/25 py-[9px] text-center text-sm font-semibold text-ink/60"
-          >
-            +
-          </button>
+          {!atDayLimit && (
+            <button
+              type="button"
+              aria-label="add day"
+              onClick={addDay}
+              className="flex-[0_0_40px] border-l border-ink/25 py-[9px] text-center text-sm font-semibold text-ink/60"
+            >
+              +
+            </button>
+          )}
         </div>
       ) : (
         <button
@@ -472,15 +654,41 @@ export function PlannerBoard({
                     SETS
                   </div>
                 </div>
-                {Array.from({ length: group.exercise_slots }, (_, i) => {
+                {(() => {
+                  const sortedFills = [...group.fills].sort(
+                    (a, b) => a.slot_number - b.slot_number,
+                  );
+                  return Array.from({ length: group.exercise_slots }, (_, i) => {
                   const slotNumber = i + 1;
                   const fill = group.fills.find((f) => f.slot_number === slotNumber);
+                  const fillIndex = fill
+                    ? sortedFills.findIndex((f) => f.id === fill.id)
+                    : -1;
                   return fill ? (
                     <div
                       key={slotNumber}
                       className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-1.5 last:border-b-0"
                     >
-                      <div className="text-[13px] tracking-[-1px] text-ink/35">⋮⋮</div>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          aria-label={`move ${fill.exercise_name} up`}
+                          disabled={fillIndex <= 0}
+                          onClick={() => moveFill(group.id, fill.id, -1)}
+                          className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`move ${fill.exercise_name} down`}
+                          disabled={fillIndex >= sortedFills.length - 1}
+                          onClick={() => moveFill(group.id, fill.id, 1)}
+                          className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className="flex-1 text-left"
@@ -523,13 +731,14 @@ export function PlannerBoard({
                       <div className="text-[15px] font-bold">›</div>
                     </button>
                   );
-                })}
+                  });
+                })()}
               </div>
             ))}
 
             <button
               type="button"
-              onClick={() => setAddGroupsDayId(activeDay.id)}
+              onClick={() => openAddGroupsFromBoard(activeDay.id)}
               className="mt-3.5 w-full border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
             >
               + ADD MUSCLE GROUP
@@ -601,12 +810,16 @@ export function PlannerBoard({
           <DaySetupSheet
             key={setupDay.id}
             day={setupDay}
-            onSaveDay={(label, weekday) => saveDay(setupDay.id, label, weekday)}
-            onRemoveDay={() => removeDay(setupDay.id)}
+            isNew={setupDay.id === pendingNewDayId}
+            onDone={(label, weekday) => confirmDaySheet(setupDay.id, label, weekday)}
+            onCancel={() => cancelDaySheet(setupDay.id)}
+            onRemoveDay={() => removeDayFromSheet(setupDay.id)}
             onUpdateGroupSlots={updateGroupSlots}
+            onMoveGroup={(groupId, delta) => moveGroup(setupDay.id, groupId, delta)}
             onRemoveGroup={removeGroup}
-            onAddGroups={() => setAddGroupsDayId(setupDay.id)}
-            onClose={() => setDaySetupId(null)}
+            onAddGroups={(label, weekday) =>
+              openAddGroupsFromSheet(setupDay.id, label, weekday)
+            }
           />
         ) : null;
       })()}
@@ -620,7 +833,7 @@ export function PlannerBoard({
             day={target}
             muscleGroups={muscleGroups}
             onAdd={(ids) => addGroups(target.id, ids)}
-            onClose={() => setAddGroupsDayId(null)}
+            onClose={() => closeAddGroups(target.id)}
           />
         ) : null;
       })()}
@@ -833,28 +1046,30 @@ function FinalizeSheet({
 
 function DaySetupSheet({
   day,
-  onSaveDay,
+  isNew,
+  onDone,
+  onCancel,
   onRemoveDay,
   onUpdateGroupSlots,
+  onMoveGroup,
   onRemoveGroup,
   onAddGroups,
-  onClose,
 }: {
   day: ViewDay;
-  onSaveDay: (label: string | null, weekday: number | null) => void;
+  isNew: boolean;
+  onDone: (label: string | null, weekday: number | null) => void;
+  onCancel: () => void;
   onRemoveDay: () => void;
   onUpdateGroupSlots: (groupId: string, slots: number) => void;
+  onMoveGroup: (groupId: string, delta: number) => void;
   onRemoveGroup: (groupId: string) => void;
-  onAddGroups: () => void;
-  onClose: () => void;
+  onAddGroups: (label: string | null, weekday: number | null) => void;
 }) {
   const [label, setLabel] = useState(day.label ?? "");
   const [weekday, setWeekday] = useState<number | null>(day.weekday ?? null);
 
-  const save = () => {
-    onSaveDay(label.trim() || null, weekday);
-    onClose();
-  };
+  const save = () => onDone(label.trim() || null, weekday);
+  const addGroups = () => onAddGroups(label.trim() || null, weekday);
 
   const stepBtn =
     "flex h-9 w-9 items-center justify-center border-[1.5px] border-ink text-[17px] font-semibold";
@@ -862,7 +1077,7 @@ function DaySetupSheet({
   return (
     <BottomSheet
       open
-      onClose={onClose}
+      onClose={onCancel}
       title={`Day ${day.day_number}`}
       subtitle={`${weekday ? (WEEKDAYS.find((w) => w.value === weekday)?.label ?? "") + " · " : ""}${day.groups.length} ${day.groups.length === 1 ? "GROUP" : "GROUPS"}`}
     >
@@ -901,10 +1116,7 @@ function DaySetupSheet({
       <div className="mt-3.5 flex justify-end">
         <button
           type="button"
-          onClick={() => {
-            onRemoveDay();
-            onClose();
-          }}
+          onClick={onRemoveDay}
           className="text-[11px] font-bold text-accent"
         >
           Remove day
@@ -914,11 +1126,31 @@ function DaySetupSheet({
       <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
         MUSCLE GROUPS — EXERCISES PER GROUP
       </div>
-      {day.groups.map((group) => (
+      {day.groups.map((group, gi) => (
         <div
           key={group.id}
           className="flex items-center gap-2.5 border-b border-ink/15 py-2"
         >
+          <div className="flex flex-col">
+            <button
+              type="button"
+              aria-label={`move ${group.muscle_group} up`}
+              disabled={gi === 0}
+              onClick={() => onMoveGroup(group.id, -1)}
+              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              aria-label={`move ${group.muscle_group} down`}
+              disabled={gi === day.groups.length - 1}
+              onClick={() => onMoveGroup(group.id, 1)}
+              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+            >
+              ▼
+            </button>
+          </div>
           <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
             {badge(group.muscle_group)}
           </div>
@@ -963,7 +1195,7 @@ function DaySetupSheet({
 
       <button
         type="button"
-        onClick={onAddGroups}
+        onClick={addGroups}
         className="mt-3 w-full border-[1.5px] border-dashed border-ink/45 py-[11px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
       >
         + ADD MUSCLE GROUP
@@ -976,7 +1208,7 @@ function DaySetupSheet({
       <div className="mt-4 flex items-center justify-end gap-2.5">
         <button
           type="button"
-          onClick={onClose}
+          onClick={onCancel}
           className="px-4 py-3 text-[13px] font-semibold text-ink/60"
         >
           Cancel
@@ -986,7 +1218,7 @@ function DaySetupSheet({
           onClick={save}
           className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
         >
-          DONE
+          {isNew ? "ADD DAY" : "DONE"}
         </button>
       </div>
     </BottomSheet>

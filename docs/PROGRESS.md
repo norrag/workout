@@ -2,7 +2,149 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Notes batch: scroll-lock, gender, dark mode, feedback-flow revision, planner polish
+## 2026-06-16 (latest) — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
+
+On-device review of the planner board surfaced three concrete, reproducible
+bugs (the prior optimistic-bridge fix didn't cover them). No schema change;
+`main` deployable.
+
+### Fixed
+
+- **Stacked day-sheet + group-picker ("two edit-day windows / non-responsive
+  window").** Opening **+ ADD MUSCLE GROUP** from the EDIT DAY sheet left the
+  day sheet mounted **behind** the picker, so the picker (which looks like the
+  day sheet) appeared to "slide up over another window," and on close the stale
+  day sheet underneath read as non-responsive. Now it's **single-sheet at a
+  time**: opening the picker from the day sheet **closes** the day sheet (after
+  persisting its label/weekday) and **reopens** it when the picker closes — but
+  only when the picker was opened from the day sheet (a `returnToDaySheet` flag;
+  the board's own + ADD MUSCLE GROUP returns to the board).
+- **Day-tab `+` then Cancel still added the day.** In editing (staged) mode the
+  `+` committed the day to the working copy immediately, so Cancel/✕ didn't undo
+  it. The day sheet now distinguishes **DONE** (`onDone` — commit) from
+  **Cancel/✕/scrim** (`onCancel`); a just-added, never-confirmed day is tracked
+  (`pendingNewDayId`) and **rolled back on cancel** (in both staged and live
+  modes; the optimistic draft ghost is cleared too). The button reads **ADD
+  DAY** for a new day, **DONE** for an existing one.
+- **"Application error" past 7 days.** A week is 7 days — the DB checks
+  (`meso_days.day_number ≤ 7`, `mesocycles.days_per_week ≤ 7`) threw once a
+  user added an 8th. The day-tab `+` is now **hidden at 7 days** (`atDayLimit`),
+  and day numbering picks the **smallest unused 1..7** (`nextDayNumber`) instead
+  of `max+1` — so removing then re-adding a day no longer pushes `day_number`
+  past 7 (the live `addMesoDay` query got the same fix). `saveMesoPlan` schema
+  tightened from `max(14)` to `max(7)` to match the DB.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (128/128), `npm run build`
+green. The fixes are planner interaction state + a day-numbering correction
+(client + the `addMesoDay` query); RLS unchanged. In-browser re-test of the
+three flows on a device recommended to confirm.
+
+## 2026-06-16 — Planner reorder (groups + exercises) + draft add-day sheet fix
+
+Closes the remaining two open items from the 2026-06-16 notes batch ("Not done
+yet"): **planner reorder** and the **add-day sheet dismissal** bug. No schema
+change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Reorder muscle groups within a day** — up/down (▲▼) move controls on each
+  group row in the EDIT DAY sheet (fig 2.5). **Reorder exercises within a
+  group** — ▲▼ controls on each filled slot row on the board (replacing the
+  decorative `⋮⋮` grip). Both work in **both persistence modes**: staged into
+  the local `workDays` copy when editing a planned/active meso (persisted on
+  SAVE CHANGES), or a **live position rewrite** on a draft.
+- **No migration needed.** `meso_day_groups.position` and
+  `meso_exercises.slot_number`/`position` already exist, with **no unique
+  constraint** on the ordering columns — so the live reorder is a plain
+  index→position rewrite (`reorderDayGroups` / `reorderGroupExercises`,
+  scoped to the day/group), no temp-value swap. *(The prior PROGRESS note's
+  "no position column" premise was outdated.)*
+- **Pure helper** `moveInOrder(ids, id, delta)` (`planner/groups.ts`) — moves
+  one item up/down in an id list, no-op (same reference) past either end or for
+  an unknown id; drives both modes. **+5 unit tests** (128 total).
+- **Draft add-day sheet dismissal fix.** The draft (live) add-day flow set
+  `daySetupId` to a brand-new day before revalidation had put it in props, so
+  the day-setup sheet briefly had no backing day. `addDay` now seeds an
+  **optimistic local day** from the returned insert row (`withPending`) so the
+  sheet renders immediately and reconciles (drops the optimistic row) once the
+  revalidated props include it — taking `addDay…→revalidate` out of the
+  interaction loop without breaking the draft's live persistence / "continue
+  editing" guarantee.
+
+### Recorded deviations
+
+- **Reorder is up/down move controls, not pointer/touch drag-and-drop.** The
+  notes asked for DnD "ideally"; up/down is the accessible fallback the note
+  itself offered, works identically in both persistence modes (no half-working
+  DnD across modes), and matches the existing day-view **Move up/down** pattern.
+  Square-corner ledger styling preserved.
+- **Group reorder lives in the EDIT DAY sheet; exercise reorder is inline on
+  the board.** Groups are a day-structure concern (edited in the day sheet);
+  exercises are shown as slots on the board, so their ▲▼ sit on the slot rows.
+- **Live exercise reorder packs fills to the top slots** (slot_number 1..n in
+  the new order) — a cleared mid-group slot moves to the bottom on reorder.
+  Acceptable (no logged data here) and arguably tidier.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (128/128), `npm run build`
+green. `moveInOrder` is unit-tested; the live reorder writes are user-scoped
+through the existing `meso_day_groups`/`meso_exercises` RLS (planning rows only —
+no logged history touched). The dismissal fix is client state (optimistic
+bridge); code review showed the editing path was already sound (sheet keyed by
+`day.id`, balanced scroll-lock). In-browser pixel/interaction QA of the reorder
+controls and the draft add-day flow still pending (as for other screens).
+
+## 2026-06-16 — Edit macrocycle (fig 2.3 engine, prefilled + safe re-plan)
+
+Closes the **Edit macrocycle** item teed up in the prior 2026-06-16 notes batch
+("Not done yet"). Create-macro existed; the edit surface (rename · goal ·
+duration · block length · notes · re-plan/re-phase the meso slots) was the gap.
+No schema change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Edit screen** `/cycles/macro/[macroId]/edit` (`EditMacroForm`) — the same
+  fig 2.3 create engine, **prefilled** from the macro and recomputing the
+  realistic target / per-month rate / meso-count / phase preview live via
+  `planMacrocycle`. Adds a **GOAL NOTES** field (optional, edit-only — create
+  didn't expose it though the column + action already supported it). The
+  `EDIT MACROCYCLE — SOON` placeholder on the Overview (2.2) is now a real link.
+- **`updateMacrocycle`** (`queries/macro.ts`) — updates the macro row (name,
+  goal, duration, block length, notes, recomputed `target_*`/`rate_*`/
+  `recommended_duration_months`/`target_end_date`) then **reconciles the
+  unplanned mesocycle slots** to the new plan size. **Locked mesos
+  (planned/active/completed/abandoned) and every logged set are never touched** —
+  only `unplanned` placeholders are added, removed (surplus trimmed from the
+  tail so the earliest open slots survive), or re-phased; positions re-sequence
+  contiguously. The final count can never drop below the locked count.
+- **Pure decision helpers** — `reconcileMacroSlots` (orderedMesos + target →
+  `{ removeIds, addCount }`) and `macroEditImpact` (locked vs unplanned counts,
+  surfaced to the form so the re-plan note reads "keeps your N planned/active/
+  completed mesocycles; adds/removes M open slots"). **+5 unit tests** (123
+  total) covering grow / shrink-from-tail / never-below-locked / no-op.
+
+### Recorded deviations
+
+- **GOAL NOTES on edit only** — the create form omits it (the engine card is the
+  focus there); the edit form is the natural place to annotate an existing arc.
+  Built in the house ledger style.
+- **Re-phasing applies to unplanned slots only** — a planned/active/completed
+  meso keeps the phase the user assigned when planning it; only open
+  placeholders pick up the recomputed phase spread.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (123/123), `npm run build`
+green; the `/cycles/macro/[macroId]/edit` route compiles. The reconcile decision
+is a pure unit-tested helper; the surrounding IO (`updateMacrocycle`) is
+user-scoped through the existing `macrocycles`/`mesocycles` RLS and guards
+deletes to `status = 'unplanned'`. In-browser QA of the edit/re-plan flow on a
+real macro still pending (as for other screens).
+
+## 2026-06-16 — Notes batch: scroll-lock, gender, dark mode, feedback-flow revision, planner polish
 
 Worked the 2026-06-16 notes batch. Most items shipped this slice; the larger
 ones (full drag-and-drop reorder, edit-macrocycle, and one bug that needs
@@ -77,28 +219,23 @@ for the other screens.
 
 ### Not done yet — planned work (from the same notes batch)
 
-- **Planner drag-and-drop reorder (muscle groups + exercises).** The ask is to
-  reorder muscle groups within a day and exercises within a group, ideally via
-  drag-and-drop. This needs (a) a stable ordering for groups — `meso_day_groups`
-  has no `position` column today, so a `DATA` migration + ordered reads; (b)
-  reorder mutators that work in **both** persistence modes (live draft via new
-  swap actions, staged edit via local `workDays`); and (c) a pointer/touch DnD
-  surface (or up/down arrows as the accessible fallback). Deferred as its own
-  vertical slice so it isn't shipped half-working across the two modes.
-- **Edit macrocycle.** Create-macro exists; the edit surface (rename, adjust
-  goal/duration/notes, re-plan/re-phase the meso slots) is unbuilt. Needs a
-  macro edit form + queries mirroring `createMacrocycleWithMesos`, with the same
-  history-protection rules as meso edits (completed/active mesos immutable).
-- **Add-day sheet won't dismiss (BUG, needs in-app repro).** Still reported on
-  the **draft** board. The 2026-06-15 staged-edit fix only covered the *editing*
-  (non-draft) path; **drafts still build via the live `addDay…` → `revalidate`
-  flow**, which is the class of bug that fix addressed. The active-day guard
-  above removes one latent wedge, but the dismissal symptom needs to be
-  reproduced in-browser to confirm the cause (likely revalidation timing vs.
-  client state, or an exit-animation scrim). Candidate proper fix: give the
-  draft board the same local working-copy model as editing, mapping each live
-  insert's returned id back into local state (tmp→real), so no revalidation sits
-  in the interaction loop.
+- **Planner reorder (muscle groups + exercises).** ✅ **Shipped** in the
+  2026-06-16 (latest) entry above. Note: `meso_day_groups` **already had a
+  `position` column** (and `meso_exercises.slot_number`), with no unique
+  constraint on either — so **no migration was needed**; the prior assumption
+  here was wrong. Reorder via up/down move controls (accessible fallback),
+  staged in editing mode / live position rewrite on a draft.
+- **Edit macrocycle.** ✅ **Shipped** in the 2026-06-16 (latest) entry above —
+  `/cycles/macro/[macroId]/edit` + `updateMacrocycle`; reconciles unplanned
+  slots only, locked mesos + logged history immutable.
+- **Add-day sheet won't dismiss (BUG).** ✅ **Targeted fix shipped** in the
+  2026-06-16 (latest) entry above — the draft add-day path now opens the
+  day-setup sheet from an **optimistic local day** (the returned insert row)
+  instead of waiting on revalidation, removing the `addDay…→revalidate` gap
+  that left the sheet without a backing day. Code review showed the editing
+  path was already sound (the sheet is keyed by `day.id`, so revalidation
+  updates props in place without remount, and scroll-lock is balanced).
+  In-browser confirmation on a device still recommended.
 ## 2026-06-16 (latest) — App icon design handoff wired in (S4 wordmark + slider)
 
 Replaced the placeholder barbell icons with the final **S4** mark from the design

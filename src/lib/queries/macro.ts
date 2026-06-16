@@ -168,6 +168,213 @@ export async function createMacrocycleWithMesos(
   return macro;
 }
 
+export interface EditMacroInput {
+  name: string;
+  goal_type: MacroGoalType;
+  duration_months: number | null;
+  meso_length_weeks: number;
+  goal_notes: string | null;
+}
+
+/**
+ * How an edit will reconcile the macro's mesocycle slots — surfaced to the
+ * edit form so the user knows what re-planning touches before they save.
+ * Only `unplanned` placeholders are ever added, removed, or re-phased;
+ * planned/active/completed mesos (and their logged history) are immutable.
+ */
+export interface MacroEditImpact {
+  /** mesos that won't be touched (anything past `unplanned`) */
+  lockedCount: number;
+  /** unplanned placeholders currently on the macro */
+  unplannedCount: number;
+}
+
+export function macroEditImpact(mesos: MesocycleRow[]): MacroEditImpact {
+  let locked = 0;
+  let unplanned = 0;
+  for (const m of mesos) {
+    if (m.status === "unplanned") unplanned += 1;
+    else locked += 1;
+  }
+  return { lockedCount: locked, unplannedCount: unplanned };
+}
+
+export interface SlotReconcile {
+  /** unplanned placeholder ids to delete (surplus, highest position first) */
+  removeIds: string[];
+  /** new unplanned placeholders to insert to reach the target count */
+  addCount: number;
+}
+
+/**
+ * Pure decision for reconciling a macro's mesocycle slots to a new plan size.
+ * Locked mesos (anything past `unplanned`) are never removed, so the final
+ * count can't drop below them; only unplanned placeholders are added/removed.
+ * `mesos` must be in position order (lowest first) — surplus is trimmed from
+ * the tail so the earliest open slots survive.
+ */
+export function reconcileMacroSlots(
+  mesos: Pick<MesocycleRow, "id" | "status">[],
+  mesoCount: number,
+): SlotReconcile {
+  const unplanned = mesos.filter((m) => m.status === "unplanned");
+  const lockedCount = mesos.length - unplanned.length;
+  const desiredUnplanned = Math.max(0, mesoCount - lockedCount);
+  const removeIds = unplanned.slice(desiredUnplanned).map((m) => m.id);
+  const addCount = Math.max(0, desiredUnplanned - unplanned.length);
+  return { removeIds, addCount };
+}
+
+/**
+ * Edit a macrocycle: rename, adjust goal/duration/block-length/notes, then
+ * re-plan its **unplanned** mesocycle slots to the recomputed plan. Locked
+ * mesos (planned/active/completed/abandoned) and every logged set are never
+ * touched — only unplanned placeholders are added, removed, or re-phased, and
+ * positions are re-sequenced to stay contiguous.
+ */
+export async function updateMacrocycle(
+  supabase: Client,
+  userId: string,
+  macroId: string,
+  input: EditMacroInput,
+  profile: ProfileRow,
+  params: EngineParams,
+  now: Date = new Date(),
+): Promise<void> {
+  const { data: macro, error: macroErr } = await supabase
+    .from("macrocycles")
+    .select("*")
+    .eq("id", macroId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (macroErr) throw macroErr;
+  if (!macro) throw new Error("Macrocycle not found");
+
+  const plan = planForMacro(
+    {
+      goal_type: input.goal_type,
+      duration_months: input.duration_months,
+      meso_length_weeks: input.meso_length_weeks,
+    },
+    profile,
+    params,
+    now,
+  );
+
+  // target_end_date = start + chosen/recommended months
+  const start = new Date(`${macro.start_date}T12:00:00`);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + plan.durationMonths);
+  const targetEnd = end.toISOString().slice(0, 10);
+
+  const { error: updErr } = await supabase
+    .from("macrocycles")
+    .update({
+      name: input.name,
+      goal_type: input.goal_type,
+      goal_notes: input.goal_notes,
+      duration_months: plan.durationMonths,
+      meso_length_weeks: input.meso_length_weeks,
+      recommended_duration_months: plan.recommendedDurationMonths,
+      target_low: plan.target.low,
+      target_high: plan.target.high,
+      target_unit: plan.target.unit,
+      target_direction: plan.target.direction,
+      rate_low: plan.perMonthRate.low,
+      rate_high: plan.perMonthRate.high,
+      target_end_date: targetEnd,
+    })
+    .eq("id", macroId)
+    .eq("user_id", userId);
+  if (updErr) throw updErr;
+
+  // --- reconcile the unplanned slots to the new plan ---
+  const { data: mesos, error: mesoErr } = await supabase
+    .from("mesocycles")
+    .select("*")
+    .eq("macrocycle_id", macroId)
+    .order("position", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (mesoErr) throw mesoErr;
+
+  const ordered = mesos ?? [];
+  const { removeIds, addCount } = reconcileMacroSlots(ordered, plan.mesoCount);
+  const removeSet = new Set(removeIds);
+  const locked = ordered.filter((m) => m.status !== "unplanned");
+  const keptUnplanned = ordered.filter(
+    (m) => m.status === "unplanned" && !removeSet.has(m.id),
+  );
+
+  // drop the surplus unplanned placeholders (highest position first)
+  if (removeIds.length > 0) {
+    const { error } = await supabase
+      .from("mesocycles")
+      .delete()
+      .in("id", removeIds)
+      .eq("user_id", userId)
+      .eq("status", "unplanned");
+    if (error) throw error;
+  }
+
+  // add new unplanned placeholders to reach the desired count
+  let added: MesocycleRow[] = [];
+  if (addCount > 0) {
+    const rows = Array.from({ length: addCount }, () => ({
+      user_id: userId,
+      macrocycle_id: macroId,
+      // position/phase set in the re-sequence pass below
+      position: null,
+      phase: null,
+      name: "Mesocycle",
+      weeks: input.meso_length_weeks,
+      days_per_week: 1,
+      includes_deload: true,
+      rir_start: 3,
+      rir_end: 0,
+      status: "unplanned" as const,
+      template_id: null,
+      start_date: null,
+    }));
+    const { data: ins, error } = await supabase
+      .from("mesocycles")
+      .insert(rows)
+      .select();
+    if (error) throw error;
+    added = ins ?? [];
+  }
+
+  // re-sequence positions contiguously; re-phase + resize unplanned slots only
+  const survivors = [...locked, ...keptUnplanned, ...added].sort((a, b) => {
+    // locked + kept keep their relative order; new ones fall to the end
+    const pa = a.position ?? Number.MAX_SAFE_INTEGER;
+    const pb = b.position ?? Number.MAX_SAFE_INTEGER;
+    return pa - pb;
+  });
+
+  for (let i = 0; i < survivors.length; i++) {
+    const m = survivors[i];
+    const pos = i + 1;
+    const isUnplanned = m.status === "unplanned";
+    const phase = isUnplanned ? (plan.phases[i] ?? m.phase) : m.phase;
+    const weeks = isUnplanned ? input.meso_length_weeks : m.weeks;
+    const name =
+      isUnplanned && m.name === "Mesocycle" ? `Mesocycle ${pos}` : m.name;
+    if (
+      m.position === pos &&
+      m.phase === phase &&
+      m.weeks === weeks &&
+      m.name === name
+    )
+      continue;
+    const { error } = await supabase
+      .from("mesocycles")
+      .update({ position: pos, phase, weeks, name })
+      .eq("id", m.id)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+}
+
 /**
  * Flip an unplanned placeholder to `planned` so it can be filled on the board
  * (the macro's `+ PLAN` action). Weeks/RIR were seeded at macro creation.

@@ -291,9 +291,12 @@ export default async function MacroOverviewPage({
         </div>
       </div>
 
-      <div className="mb-6 mt-[18px] border-[1.5px] border-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em] text-ink/45">
-        EDIT MACROCYCLE — SOON
-      </div>
+      <Link
+        href={`/cycles/macro/${macroId}/edit`}
+        className="mb-6 mt-[18px] block border-[1.5px] border-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em] text-ink"
+      >
+        EDIT MACROCYCLE
+      </Link>
     </div>
   );
 }
