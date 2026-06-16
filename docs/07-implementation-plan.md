@@ -183,7 +183,9 @@ hard rules (append-only migration + RLS + tests in the same PR; engine changes n
 - [x] **Macrocycle Overview (2.2)** net-new: realistic target card (range + per-month rate +
       training-age/bodyweight/experience chips), mesocycle timeline (phase + status), macro stats
       (`v_macro_summary`). **No progress-vs-projection / body-weight bar.** *(2026-06-14:
-      `/cycles/macro/[macroId]`; `FULL ›` + an edit screen deferred — see PROGRESS.)*
+      `/cycles/macro/[macroId]`; `FULL ›` deferred. **Edit macrocycle shipped 2026-06-16:**
+      `/cycles/macro/[macroId]/edit` + `updateMacrocycle` — rename/goal/duration/block-length/notes
+      + safe re-plan of unplanned slots only, locked mesos + logged history immutable.)*
 - [x] **Create Macrocycle engine (2.3)** net-new: goal / duration / block-length inputs, live
       target + meso-count + phase preview (`planMacrocycle`), creates `unplanned` mesos.
       *(2026-06-14: `/cycles/new` `CreateMacroForm`, live client recompute.)*

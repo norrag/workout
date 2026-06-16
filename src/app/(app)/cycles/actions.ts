@@ -23,6 +23,7 @@ import type { MesoDayRow } from "@/lib/types/database";
 import {
   createMacrocycleWithMesos,
   planUnplannedMeso,
+  updateMacrocycle,
 } from "@/lib/queries/macro";
 import {
   getActiveEngineParams,
@@ -88,6 +89,45 @@ export async function createMacrocycleAction(
   await createMacrocycleWithMesos(supabase, user.id, parsed.data, profile, params);
   revalidatePath("/cycles");
   redirect("/cycles");
+}
+
+const editMacroSchema = z.object({
+  macro_id: z.string().uuid(),
+  name: z.string().min(1, "Name is required").max(80),
+  goal_type: z.enum(["hypertrophy", "strength", "cut", "maintain"]),
+  duration_months: z.coerce.number().int().min(1).max(60).nullable(),
+  meso_length_weeks: z.coerce.number().int().min(4).max(6),
+  goal_notes: z.string().max(280).nullable(),
+});
+
+/** Edit an existing macrocycle (rename · goal · duration · notes · re-plan). */
+export async function editMacrocycleAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const rawDuration = formData.get("duration_months");
+  const parsed = editMacroSchema.safeParse({
+    macro_id: formData.get("macro_id"),
+    name: formData.get("name"),
+    goal_type: formData.get("goal_type"),
+    duration_months: rawDuration ? rawDuration : null,
+    meso_length_weeks: formData.get("meso_length_weeks"),
+    goal_notes: formData.get("goal_notes") || null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const { supabase, user } = await requireUser();
+  const profile = await getProfile(supabase, user.id);
+  if (!profile) redirect("/onboarding");
+  const { params } = await getActiveEngineParams(supabase);
+
+  const { macro_id, ...input } = parsed.data;
+  await updateMacrocycle(supabase, user.id, macro_id, input, profile, params);
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/macro/${macro_id}`);
+  redirect(`/cycles/macro/${macro_id}`);
 }
 
 /** `+ PLAN` on an unplanned placeholder (figs 2.1/2.2) → planner board. */

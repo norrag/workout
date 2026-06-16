@@ -2,7 +2,54 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Notes batch: scroll-lock, gender, dark mode, feedback-flow revision, planner polish
+## 2026-06-16 (latest) — Edit macrocycle (fig 2.3 engine, prefilled + safe re-plan)
+
+Closes the **Edit macrocycle** item teed up in the prior 2026-06-16 notes batch
+("Not done yet"). Create-macro existed; the edit surface (rename · goal ·
+duration · block length · notes · re-plan/re-phase the meso slots) was the gap.
+No schema change; `main` deployable. Vertical slice.
+
+### Done
+
+- **Edit screen** `/cycles/macro/[macroId]/edit` (`EditMacroForm`) — the same
+  fig 2.3 create engine, **prefilled** from the macro and recomputing the
+  realistic target / per-month rate / meso-count / phase preview live via
+  `planMacrocycle`. Adds a **GOAL NOTES** field (optional, edit-only — create
+  didn't expose it though the column + action already supported it). The
+  `EDIT MACROCYCLE — SOON` placeholder on the Overview (2.2) is now a real link.
+- **`updateMacrocycle`** (`queries/macro.ts`) — updates the macro row (name,
+  goal, duration, block length, notes, recomputed `target_*`/`rate_*`/
+  `recommended_duration_months`/`target_end_date`) then **reconciles the
+  unplanned mesocycle slots** to the new plan size. **Locked mesos
+  (planned/active/completed/abandoned) and every logged set are never touched** —
+  only `unplanned` placeholders are added, removed (surplus trimmed from the
+  tail so the earliest open slots survive), or re-phased; positions re-sequence
+  contiguously. The final count can never drop below the locked count.
+- **Pure decision helpers** — `reconcileMacroSlots` (orderedMesos + target →
+  `{ removeIds, addCount }`) and `macroEditImpact` (locked vs unplanned counts,
+  surfaced to the form so the re-plan note reads "keeps your N planned/active/
+  completed mesocycles; adds/removes M open slots"). **+5 unit tests** (123
+  total) covering grow / shrink-from-tail / never-below-locked / no-op.
+
+### Recorded deviations
+
+- **GOAL NOTES on edit only** — the create form omits it (the engine card is the
+  focus there); the edit form is the natural place to annotate an existing arc.
+  Built in the house ledger style.
+- **Re-phasing applies to unplanned slots only** — a planned/active/completed
+  meso keeps the phase the user assigned when planning it; only open
+  placeholders pick up the recomputed phase spread.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (123/123), `npm run build`
+green; the `/cycles/macro/[macroId]/edit` route compiles. The reconcile decision
+is a pure unit-tested helper; the surrounding IO (`updateMacrocycle`) is
+user-scoped through the existing `macrocycles`/`mesocycles` RLS and guards
+deletes to `status = 'unplanned'`. In-browser QA of the edit/re-plan flow on a
+real macro still pending (as for other screens).
+
+## 2026-06-16 — Notes batch: scroll-lock, gender, dark mode, feedback-flow revision, planner polish
 
 Worked the 2026-06-16 notes batch. Most items shipped this slice; the larger
 ones (full drag-and-drop reorder, edit-macrocycle, and one bug that needs
@@ -85,10 +132,9 @@ for the other screens.
   swap actions, staged edit via local `workDays`); and (c) a pointer/touch DnD
   surface (or up/down arrows as the accessible fallback). Deferred as its own
   vertical slice so it isn't shipped half-working across the two modes.
-- **Edit macrocycle.** Create-macro exists; the edit surface (rename, adjust
-  goal/duration/notes, re-plan/re-phase the meso slots) is unbuilt. Needs a
-  macro edit form + queries mirroring `createMacrocycleWithMesos`, with the same
-  history-protection rules as meso edits (completed/active mesos immutable).
+- **Edit macrocycle.** ✅ **Shipped** in the 2026-06-16 (latest) entry above —
+  `/cycles/macro/[macroId]/edit` + `updateMacrocycle`; reconciles unplanned
+  slots only, locked mesos + logged history immutable.
 - **Add-day sheet won't dismiss (BUG, needs in-app repro).** Still reported on
   the **draft** board. The 2026-06-15 staged-edit fix only covered the *editing*
   (non-draft) path; **drafts still build via the live `addDay…` → `revalidate`
