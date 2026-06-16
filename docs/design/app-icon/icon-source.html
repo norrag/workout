@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>workout — app icon master (S4)</title>
+<style>
+  /* Editable master art for the "S4 — Wordmark + Slider" icon.
+     Pure CSS + the Archivo variable font (bundled, same folder).
+     The .icon box is the full-square master (no rounding); the OS
+     applies its own corner mask at install time. Change --size to
+     re-scale; everything inside is proportional. */
+  @font-face {
+    font-family: "Archivo";
+    src: url("./assets/Archivo-Variable.ttf") format("truetype");
+    font-weight: 100 900;
+    font-display: block;
+  }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #d9d7d1;
+    display: flex; gap: 40px; flex-wrap: wrap;
+    align-items: center; justify-content: center;
+    min-height: 100vh; font-family: "Archivo", sans-serif;
+  }
+
+  .icon {
+    --size: 512px;            /* master export size */
+    --ink: #17140F;          /* foreground (paper) */
+    --bg: #F4F0E6;           /* background (paper) */
+    --light: rgba(23,20,15,0.2);
+    --tick: rgba(23,20,15,0.5);
+    --orange: #C14B2A;
+    --pip-radius: 0px;       /* square pip */
+
+    width: var(--size); height: var(--size);
+    background: var(--bg); color: var(--ink);
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: stretch;
+    gap: calc(var(--size) * 0.0682);                 /* 12/176 */
+    padding: 0 calc(var(--size) * 0.1477);           /* 26/176 */
+  }
+  .icon .wm {
+    font-weight: 800; line-height: 1; letter-spacing: 0.01em;
+    font-size: calc(var(--size) * 0.1875);           /* 33/176 */
+  }
+  .icon .rule {
+    position: relative;
+    height: calc(var(--size) * 0.1477);              /* 26/176 */
+    margin-top: calc(var(--size) * 0.0170);          /*  3/176 */
+  }
+  .icon .track, .icon .fill {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    height: calc(var(--size) * 0.0170);              /*  3/176 (track) */
+  }
+  .icon .track { left: 0; right: 0; background: var(--light); }
+  .icon .fill  { left: 0; width: 62%; background: var(--ink); }   /* value */
+  .icon .tick {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: calc(var(--size) * 0.0170); height: calc(var(--size) * 0.1023); /* 18/176 */
+    background: var(--tick);
+  }
+  .icon .tick.l { left: 0; }
+  .icon .tick.r { right: 0; }
+  .icon .pip {
+    position: absolute; top: 50%; left: 62%;
+    transform: translate(-50%, -50%);
+    width: calc(var(--size) * 0.1477); height: calc(var(--size) * 0.1477); /* 26/176 */
+    background: var(--orange); border-radius: var(--pip-radius);
+  }
+
+  /* Dark theme: a muted terracotta cousin of the paper ledger. */
+  .icon.dark {
+    --ink: #F2F2F0; --bg: #0B0B0C;
+    --light: #34343A; --tick: #6E6E74; --orange: #C8593B;
+    --pip-radius: calc(var(--size) * 0.017);
+  }
+  /* Maskable: keep all content inside the central 80% safe zone. */
+  .icon.maskable > * { transform-origin: center; }
+  .icon.maskable { position: relative; }
+  .icon.maskable .inner { transform: scale(0.8); transform-origin: center; }
+  .label { width: 100%; text-align: center; font: 600 12px "Archivo"; letter-spacing: 0.14em; color: #555; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="icon">
+    <div class="wm">WORK</div>
+    <div class="wm">OUT</div>
+    <div class="rule">
+      <div class="track"></div>
+      <div class="fill"></div>
+      <div class="tick l"></div>
+      <div class="tick r"></div>
+      <div class="pip"></div>
+    </div>
+  </div>
+
+  <div class="icon dark">
+    <div class="wm">WORK</div>
+    <div class="wm">OUT</div>
+    <div class="rule">
+      <div class="track"></div>
+      <div class="fill"></div>
+      <div class="tick l"></div>
+      <div class="tick r"></div>
+      <div class="pip"></div>
+    </div>
+  </div>
+</body>
+</html>

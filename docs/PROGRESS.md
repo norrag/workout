@@ -2,7 +2,28 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Madeline's history imported (16 standalone mesos, 3,696 sets)
+## 2026-06-16 (latest) — App icon design handoff wired in (S4 wordmark + slider)
+
+Replaced the placeholder barbell icons with the final **S4** mark from the design
+handoff (`design_handoff_app_icon`): the stacked **WORK / OUT** Archivo-800 wordmark
+over a single snap-to-stop slider rule (ink track + orange pip at 62%), on cream
+`#F4F0E6` — the icon now reads as the product's own slider control.
+
+### Done
+
+- Dropped the production PNGs into `public/icons/`: `icon-192`, `icon-512`,
+  `icon-maskable-512` (paper system, full-bleed) plus the new `icon-180` for iOS.
+- Wired `icons` into `src/app/layout.tsx` metadata — `apple-touch-icon` (180) and
+  explicit `<link rel="icon">` for 192/512. `manifest.webmanifest` already pointed at
+  the three icon paths (project `name`/`start_url` kept; not the handoff placeholder).
+- Retired `scripts/generate-icons.mjs` — the placeholder generator would clobber the
+  real assets if re-run; the design handoff is now the source of truth.
+- Stashed the editable master + dark variants under `docs/design/app-icon/`
+  (`icon-source.html`, README spec, `icon-512-dark`, `icon-maskable-512-dark`) for
+  regeneration. Dark icons not shipped to `public/` — dark mode is out of scope (rule 9).
+- No favicon: the wordmark is illegible at 16–32px; deferred per the handoff note.
+
+## 2026-06-16 — Madeline's history imported (16 standalone mesos, 3,696 sets)
 
 Same pipeline as Garron's import, for the second account (Madeline,
 `0af27789…`, `docs/data/master_exercise_history_madeline.csv`, 1,533 rows). She
