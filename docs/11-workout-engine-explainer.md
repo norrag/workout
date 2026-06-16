@@ -12,6 +12,22 @@ It is descriptive of code as of this branch; the authoritative *intent* lives in
 [10-metrics-spec.md](10-metrics-spec.md) (numbers). Where this doc and those
 disagree, those win and this doc is stale.
 
+## Decisions locked (2026-06-16) — and shipped
+
+The §6 proposals were reviewed and accepted with these choices, and are now
+**implemented** (see §8):
+
+1. **Anchor = recency-weighted e1RM**, not all-time best — so the predictor
+   tracks current form and legitimately drops when performance dips (e.g. a cut
+   deficit). Half-life `e1rm.recency_halflife_days` (default 30 d), tunable.
+2. **The RIR premise (the user's framing).** The app *prescribes* a target RIR
+   and trusts the user to hit it honestly. A logged `weight × reps` against a
+   target RIR therefore **is** an RIR data point — there is **no separate
+   per-set RIR capture**. The sliders (effort / performance / fatigue, workload
+   / pump) are the cross-check on how it actually went and feed the next target.
+   So all e1RM math uses the set's prescribed target RIR as the assumed RIR.
+3. **Predicted reps = a single integer** (rounded), clamped ≥ 1.
+
 ---
 
 ## 0. TL;DR
@@ -293,14 +309,9 @@ passed in — engine stays pure):
 - `SetRow` in `DayView.tsx` recomputes the reps default from the helper as
   weight changes.
 
-**Open design questions for you:**
-- Anchor = all-time best e1RM, or a recency-weighted/last-meso e1RM (the latter
-  tracks current form better, the former is more stable)?
-- Should we also start **capturing per-set RIR** at log time (a third cell or a
-  quick chip)? Without it, week-to-week `assessPerformance` can't see "harder
-  than asked," and the live estimate can't be validated against reality.
-- Round predicted reps to integer (simplest) vs show a small range
-  (e.g. "8–9")?
+**Resolved (2026-06-16):** recency-weighted anchor; **no** separate per-set RIR
+capture (the prescribed target RIR is the assumed RIR — the RIR premise above);
+single integer reps. See §8 for what shipped.
 
 ### Request #2 — "Explain the current engine" (this document)
 
@@ -356,5 +367,38 @@ profile flag; optionally optimistic propagation in `DayView` for snappiness.
 - **Design discipline (hard rule #7/#8):** the new toggle and any "estimated"
   affordance follow the light-ledger system and the mockups; record any
   authorized deviation in `docs/PROGRESS.md`.
+
+---
+
+## 8. What shipped (2026-06-16)
+
+**Live reps ⇄ weight ⇄ RIR linkage (request #1):**
+- New pure engine module `src/lib/engine/reps.ts`:
+  - `effectiveRepsForE1rm()` — inverts the averaged Epley/Brzycki curve by
+    bisection (deterministic).
+  - `predictRepsAtWeight(e1rm, weight, targetRir, params)` — reps to hit the
+    target RIR at a weight; integer, clamped ≥ 1.
+  - `impliedRirAtReps()` — the converse hint.
+  - `recencyWeightedE1rm(samples, params)` — the strength anchor; each sample's
+    e1RM weighted by `0.5^(ageDays / recency_halflife_days) × confidence`. Pure
+    (the caller supplies `ageDays`).
+- Param `e1rm.recency_halflife_days` added (`params.ts` default + engine_params
+  **v6** seed). Golden/property tests in `__tests__/reps.test.ts`.
+- Query `getExerciseE1rmAnchors()` (`queries/logging.ts`) computes the anchor
+  per exercise from recent working sets, using each set's prescribed target RIR
+  as the assumed RIR (the RIR premise); attached as `LoggedExercise.e1rm_anchor`.
+- `DayView` `SetRow`: editable rows re-estimate reps from the anchor as the
+  weight changes (until the user types their own reps); future/static rows
+  display the predicted reps at the planned weight. Falls back to the
+  prescription when there's no anchor.
+
+**Auto-match weights (request #3):**
+- `profiles.auto_match_weights` column (migration `20260616000002`), off by
+  default; rides the existing owner-only profiles RLS (new RLS tests added).
+- More-tab toggle (`more/AutoMatchToggle.tsx` + `setAutoMatchWeights` action).
+- `matchWeightAction` / `matchWeightAcrossSets()` propagate a just-entered
+  weight onto the exercise's **unlogged** sets via `prescribed_weight`; logged
+  history is never rewritten. Triggered from `SetRow.save()` on log/amend when
+  the setting is on (composes with the predictor: shared weight, per-row reps).
 </content>
 </invoke>

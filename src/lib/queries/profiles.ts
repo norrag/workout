@@ -34,6 +34,7 @@ export async function updateProfile(
       | "preferred_equipment"
       | "units"
       | "week_starts_on"
+      | "auto_match_weights"
       | "onboarded_at"
     >
   >,

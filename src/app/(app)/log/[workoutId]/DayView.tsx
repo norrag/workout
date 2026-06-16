@@ -13,6 +13,7 @@ import type {
   WorkoutDetail,
 } from "@/lib/queries/logging";
 import type { Units } from "@/lib/types/database";
+import { predictRepsAtWeight, type EngineParams } from "@/lib/engine";
 import {
   addSetAction,
   amendSetAction,
@@ -20,6 +21,7 @@ import {
   deleteSetAction,
   listReplacementCandidatesAction,
   logSetAction,
+  matchWeightAction,
   moveExerciseDownAction,
   moveExerciseUpAction,
   removeExerciseAction,
@@ -75,9 +77,13 @@ function exerciseDone(we: LoggedExercise): boolean {
 export function DayView({
   detail,
   units,
+  autoMatch,
+  params,
 }: {
   detail: WorkoutDetail;
   units: Units;
+  autoMatch: boolean;
+  params: EngineParams;
 }) {
   const { workout, microcycle, mesocycle, exercises } = detail;
   const readOnly = workout.status === "completed" || workout.status === "skipped";
@@ -143,6 +149,9 @@ export function DayView({
           index={i}
           units={units}
           readOnly={readOnly}
+          autoMatch={autoMatch}
+          params={params}
+          microTargetRir={microcycle.target_rir}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
           dropPending={dropPending[we.id] ?? false}
@@ -441,6 +450,9 @@ function ExerciseBlock({
   index,
   units,
   readOnly,
+  autoMatch,
+  params,
+  microTargetRir,
   menuOpen,
   setMenuTarget,
   dropPending,
@@ -461,6 +473,9 @@ function ExerciseBlock({
   index: number;
   units: Units;
   readOnly: boolean;
+  autoMatch: boolean;
+  params: EngineParams;
+  microTargetRir: number;
   menuOpen: boolean;
   setMenuTarget: number | null;
   dropPending: boolean;
@@ -562,6 +577,9 @@ function ExerciseBlock({
                 setNumber={setNumber}
                 state={state}
                 readOnly={readOnly}
+                autoMatch={autoMatch}
+                params={params}
+                targetRir={we.target_rir ?? microTargetRir}
                 logged={logged ?? null}
                 isLastRow={setNumber === plannedSets}
                 dropPending={dropPending}
@@ -849,6 +867,9 @@ function SetRow({
   setNumber,
   state,
   readOnly,
+  autoMatch,
+  params,
+  targetRir,
   logged,
   isLastRow,
   dropPending,
@@ -863,6 +884,9 @@ function SetRow({
   setNumber: number;
   state: "logged" | "skipped" | "next" | "future";
   readOnly: boolean;
+  autoMatch: boolean;
+  params: EngineParams;
+  targetRir: number;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
   isLastRow: boolean;
   dropPending: boolean;
@@ -876,12 +900,28 @@ function SetRow({
   const prescribedWeight = we.prescribed_weight;
   const prescribedReps = we.prescribed_reps;
   const lastLogged = we.sets.at(-1);
+  const anchor = we.e1rm_anchor;
+
+  // reps that land on the target RIR at a given weight, from the recency-
+  // weighted strength anchor (doc 11); null when there's no usable history
+  const predictReps = (w: number): number | null =>
+    predictRepsAtWeight(anchor, w, targetRir, params);
+
   const initialWeight =
     logged?.weight ?? lastLogged?.weight ?? prescribedWeight ?? 0;
-  const initialReps = logged?.reps ?? prescribedReps ?? lastLogged?.reps ?? 8;
+  // unlogged rows start from the predicted reps for their weight; logged rows
+  // show what was done; fall back to the prescription when there's no anchor
+  const initialReps =
+    logged?.reps ??
+    (state !== "logged" ? predictReps(initialWeight) : null) ??
+    prescribedReps ??
+    lastLogged?.reps ??
+    8;
   const [weight, setWeight] = useState(String(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
   const edited = useRef(false);
+  // once the user types their own reps, stop auto-predicting for this row
+  const repsManual = useRef(false);
   const router = useRouter();
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -890,6 +930,7 @@ function SetRow({
     setWeight(String(initialWeight));
     setReps(String(initialReps));
     edited.current = false;
+    repsManual.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged?.id, logged?.weight, logged?.reps]);
 
@@ -904,6 +945,18 @@ function SetRow({
         : state === "skipped"
           ? `${cellBase} border border-ink/15 font-medium text-ink/30 line-through`
           : `${cellBase} border border-ink/25 font-medium text-ink/45`;
+
+  // auto-match (doc 11): push this weight onto the exercise's unlogged sets
+  const matchWeight = (w: number) => {
+    if (!autoMatch) return;
+    commit(() =>
+      matchWeightAction({
+        workout_id: we.workout_id,
+        workout_exercise_id: we.id,
+        weight: w,
+      }),
+    );
+  };
 
   const save = () => {
     const w = Number(weight);
@@ -921,6 +974,7 @@ function SetRow({
           set_type: dropPending ? "drop" : "straight",
         }),
       );
+      matchWeight(w);
       if (dropPending) onToggleDrop();
       onLogged();
       router.refresh();
@@ -934,6 +988,7 @@ function SetRow({
           rir_reported: logged.rir_reported,
         }),
       );
+      if (w !== logged.weight) matchWeight(w);
       edited.current = false;
     }
   };
@@ -961,7 +1016,11 @@ function SetRow({
             {prescribedWeight ?? "—"}
           </div>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {prescribedReps ?? "—"}
+            {/* future rows show the reps that hit target RIR at the planned
+                weight, falling back to the prescription without an anchor */}
+            {(prescribedWeight != null ? predictReps(prescribedWeight) : null) ??
+              prescribedReps ??
+              "—"}
           </div>
         </>
       ) : (
@@ -972,8 +1031,15 @@ function SetRow({
             aria-label={`set ${setNumber} weight`}
             value={weight}
             onChange={(e) => {
-              setWeight(e.target.value);
+              const v = e.target.value;
+              setWeight(v);
               edited.current = true;
+              // re-estimate reps for the new weight unless the user set their own
+              const w = Number(v);
+              if (!repsManual.current && v !== "" && !Number.isNaN(w)) {
+                const predicted = predictReps(w);
+                if (predicted != null) setReps(String(predicted));
+              }
             }}
             onBlur={() => state === "logged" && save()}
             className={cell}
@@ -986,6 +1052,7 @@ function SetRow({
             onChange={(e) => {
               setReps(e.target.value);
               edited.current = true;
+              repsManual.current = true;
             }}
             onBlur={() => state === "logged" && save()}
             className={cell}

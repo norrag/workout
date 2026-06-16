@@ -30,6 +30,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     preferred_equipment: [],
     units: "lb",
     week_starts_on: 1,
+    auto_match_weights: false,
     role: "user",
     onboarded_at: null,
     created_at: "2026-01-01T00:00:00Z",

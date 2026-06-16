@@ -64,6 +64,8 @@ export type ProfileRow = {
   preferred_equipment: string[];
   units: Units;
   week_starts_on: number;
+  /** auto-match a changed set weight across the exercise's unlogged sets (doc 11) */
+  auto_match_weights: boolean;
   role: "user" | "admin";
   onboarded_at: string | null;
   created_at: string;

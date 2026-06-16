@@ -2,19 +2,40 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Engine explainer doc + reps↔weight↔RIR gap analysis (review, no code change)
+## 2026-06-16 (latest) — Live reps⇄weight⇄RIR predictor + auto-match-weights setting
 
-Added [11-workout-engine-explainer.md](11-workout-engine-explainer.md): a
-detailed walkthrough of how the per-set progression engine (`prescribe()`)
-currently decides weight/reps/sets and **when** it runs (post-completion, week
-N→N+1 — *not* during live logging), plus the live `SetRow` behavior. Documents
-that the requested **weight⇄reps linkage to hit target RIR from history does not
-exist today** (reps are a frozen copy of `prescribed_reps`; the e1RM model is
-used only for stats), and proposes a spec-compliant design (a pure
-`predictRepsAtWeight` inverting the e1RM curve, anchored on exercise history).
-Also proposes the **auto-match-weights setting** (`profiles.auto_match_weights`
-+ More-tab toggle + unlogged-set propagation). Docs-only; no engine/schema
-change yet — awaiting review of the design before implementing.
+Implements [11-workout-engine-explainer.md](11-workout-engine-explainer.md) §6
+after design review. Vertical slice; `main` deployable.
+
+### Done
+
+- **Live reps prediction (request #1).** New pure engine module
+  `src/lib/engine/reps.ts` — `predictRepsAtWeight` / `impliedRirAtReps` (invert
+  the averaged Epley/Brzycki e1RM curve by bisection) + `recencyWeightedE1rm`
+  (the strength anchor: each sample's e1RM weighted by
+  `0.5^(ageDays/recency_halflife_days) × confidence`, pure — caller supplies
+  ageDays). On the Day View, changing a set's weight now re-estimates the reps
+  that hit the row's **target RIR** from the user's recent history, until the
+  user types their own reps; future rows display the predicted reps at the
+  planned weight. New param `e1rm.recency_halflife_days` (default 30 d, engine
+  params **v6**). 13 golden/property tests.
+- **RIR premise (decision).** No separate per-set RIR capture: the prescribed
+  target RIR is the assumed RIR for all e1RM math (the app prescribes RIR and
+  trusts the honest log). Anchor recency-weighted so it tracks current form
+  (e.g. drops on a cut). Predicted reps = single integer.
+- **Auto-match weights (request #3).** New `profiles.auto_match_weights`
+  (migration `20260616000002`, off by default), More-tab ON/OFF toggle, and
+  propagation of a just-entered weight onto the exercise's **unlogged** sets
+  (via `prescribed_weight`; logged history untouched — hard rule #5). Rides the
+  existing owner-only profiles RLS; new RLS tests added.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (141/141), `npm run build`
+green. No mockup figure exists for these (live predictor is a behavior change,
+not a layout change; the toggle mirrors the existing Units control) — the reps
+field updates in place with no new chrome, so no pixel deviation to record.
+RLS unchanged except the additive column (covered by existing policies).
 
 ## 2026-06-16 — Planner board bug fixes: sheet stacking, eager day-add, 7-day cap (on-device review)
 

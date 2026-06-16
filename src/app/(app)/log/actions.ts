@@ -12,6 +12,7 @@ import {
   completeWorkout,
   deleteLoggedSet,
   logSet,
+  matchWeightAcrossSets,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
@@ -103,6 +104,35 @@ const weTargetSchema = z.object({
   workout_id: z.string().uuid(),
   workout_exercise_id: z.string().uuid(),
 });
+
+const matchWeightSchema = z.object({
+  workout_id: z.string().uuid(),
+  workout_exercise_id: z.string().uuid(),
+  weight: z.coerce.number().min(0).max(2000),
+});
+
+/**
+ * Auto-match weights (doc 11): propagate a just-entered weight to the
+ * exercise's unlogged sets. No-op unless the user's setting is on, so the
+ * client can call it unconditionally.
+ */
+export async function matchWeightAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+  weight: number;
+}): Promise<void> {
+  const parsed = matchWeightSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  const profile = await getProfile(supabase, user.id);
+  if (!profile?.auto_match_weights) return;
+  await matchWeightAcrossSets(
+    supabase,
+    parsed.workout_exercise_id,
+    parsed.weight,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
 
 export async function addSetAction(input: {
   workout_id: string;

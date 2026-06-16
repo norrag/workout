@@ -20,3 +20,15 @@ export async function setUnits(units: string): Promise<void> {
   revalidatePath("/more");
   revalidatePath("/more/profile");
 }
+
+export async function setAutoMatchWeights(enabled: boolean): Promise<void> {
+  const parsed = z.boolean().parse(enabled);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  await updateProfile(supabase, user.id, { auto_match_weights: parsed });
+  revalidatePath("/more");
+}
