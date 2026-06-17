@@ -53,9 +53,9 @@ WORKOUT app (Vercel)                         Supabase (auth server)
 | Resource server `/api/mcp` (JWT verify, RLS, tools) | app code | ✅ shipped (Slice 1) |
 | Protected-resource metadata (RFC 9728) | app code | ✅ shipped (Slice 1) |
 | `get_current_state` tool + `current-cycle` resource | app code | ✅ shipped (Slice 1) |
-| **Consent UI** `/oauth/consent` + `/api/oauth/decision` | app code | ⛔ **not built yet** — required; Claude will build this |
-| **OAuth 2.1 server enabled** | Supabase dashboard | ⛔ **human step** |
-| **Authorization Path + Site URL** | Supabase dashboard | ⛔ **human step** |
+| **Consent UI** `/oauth/consent` + `/api/oauth/decision` | app code | ✅ shipped (sign-in preserves `authorization_id`) |
+| **OAuth 2.1 server enabled** | Supabase dashboard | ✅ live (AS discovery + DCR verified) |
+| **Authorization Path + Site URL** | Supabase dashboard | ✅ done |
 | Env vars present on Vercel | Vercel dashboard | ⚠️ verify (no *new* vars required) |
 
 ---
@@ -98,25 +98,24 @@ curl -s https://juqvbiymmdcggctdqoiq.supabase.co/.well-known/oauth-authorization
 # Expect JSON with authorization_endpoint / token_endpoint / jwks_uri (not a 404).
 ```
 
-## Step 2 — (Claude) Build the consent UI
+## Step 2 — Consent UI (shipped)
 
-Required app code, not yet built (tracked as a follow-up slice). It is:
+Built as app code:
 
-- `app/oauth/consent/page.tsx` — reads `authorization_id`, requires a signed-in
-  WORKOUT user (redirect to `/sign-in` preserving the id), calls
-  `supabase.auth.oauth.getAuthorizationDetails(id)`, renders a ledger-styled
-  consent screen (client name, redirect URI, requested scopes) with
-  Approve/Deny.
-- `app/api/oauth/decision/route.ts` — POST handler calling
-  `approveAuthorization` / `denyAuthorization` and redirecting to the returned
-  `redirect_url`.
+- `src/app/oauth/consent/page.tsx` — reads `authorization_id`, requires a
+  signed-in WORKOUT user (redirects to `/sign-in?redirect=…` preserving the id),
+  calls `supabase.auth.oauth.getAuthorizationDetails(id)`, renders a
+  ledger-styled consent screen (client name, account, redirect URI, requested
+  scopes) with Deny/Approve; auto-redirects if already consented.
+- `src/app/api/oauth/decision/route.ts` — POST handler calling
+  `approveAuthorization` / `denyAuthorization` (as the signed-in user) and
+  redirecting to the returned `redirect_url`.
+- `signIn` now honors a same-origin `?redirect=` param; both routes are public
+  in the auth middleware so the `authorization_id` survives sign-in.
 
-`@supabase/supabase-js@2.108+` (installed) exposes these methods. The path must
-match the **Authorization Path** from Step 1 (`/oauth/consent`).
-
-> Until this exists, a connecting client reaches the consent redirect and has
-> nowhere to land — so the handshake can't complete even with the server
-> enabled. Build Step 2 and do Step 1 together.
+The path matches the **Authorization Path** (`/oauth/consent`). Verified:
+unauthenticated visits redirect to sign-in with the id preserved; missing-id and
+no-session POSTs handled gracefully.
 
 ## Step 3 — (human) Verify Vercel environment variables
 

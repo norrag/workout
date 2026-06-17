@@ -12,6 +12,11 @@ const PUBLIC_PATHS = [
   // not the app's auth cookie — never redirect them to /sign-in (05 §Auth).
   "/api/mcp",
   "/.well-known/oauth-protected-resource",
+  // OAuth consent screen + decision handler: these manage their own auth and
+  // must preserve the `authorization_id` through sign-in rather than being
+  // blanket-redirected to /sign-in by the middleware.
+  "/oauth/consent",
+  "/api/oauth/decision",
 ];
 
 export async function updateSession(request: NextRequest) {
