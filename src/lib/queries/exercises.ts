@@ -318,6 +318,39 @@ export async function listPinnedNotes(
   return data ?? [];
 }
 
+export interface PinnedNoteWithExercise extends ExerciseNoteRow {
+  exercise_name: string;
+}
+
+/** Every pinned note the user holds, with exercise names (MCP get_exercise_notes). */
+export async function listAllPinnedNotes(
+  supabase: Client,
+  userId: string,
+): Promise<PinnedNoteWithExercise[]> {
+  const { data, error } = await supabase
+    .from("exercise_notes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_pinned", true)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  const { data: exercises, error: exError } = await supabase
+    .from("exercises")
+    .select("id, name")
+    .in(
+      "id",
+      data.map((n) => n.exercise_id),
+    );
+  if (exError) throw exError;
+  const nameById = new Map((exercises ?? []).map((e) => [e.id, e.name]));
+  return data.map((n) => ({
+    ...n,
+    exercise_name: nameById.get(n.exercise_id) ?? "",
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // exercise picker (fig 2.6) — pre-filtered to a muscle group, exclusions
 // removed, with last-performed data

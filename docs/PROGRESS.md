@@ -2,7 +2,66 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6: OAuth consent UI (connector handshake completable)
+## 2026-06-17 (latest) — Phase 6 Slice 2a: MCP read/analysis tools
+
+First half of 07 Phase 6 Slice 2 — the **read/analysis tool surface** for the
+MCP connector. Twelve thin, zod-validated read tools wrapping the existing
+`src/lib/queries/` layer + one new engine-decision reader; identity always from
+the session (hard rule #5), every shape matching the in-app stats views (05
+§Data-shape contract). Vertical slice; `main` deployable; no schema change. The
+coaching suite (overview/recent-sessions/analyze/compare/balance/affinity) is
+Slice 2b, next.
+
+### Done
+
+- **Read tools (`src/lib/mcp/tools/read.ts`, `registerReadTools`).**
+  `get_profile`, `get_macrocycles`, `get_mesocycle` (groups-first plan),
+  `get_mesocycle_summary` (adherence + volume + est. strength + feedback +
+  per-exercise e1RM progress), `get_macrocycle_summary` (fig 2.2 target/timeline/
+  stats via `planForMacro`), `get_exercise_history` (both note kinds),
+  `get_muscle_group_volume` (planned vs logged sets per group per week),
+  `search_exercises` (name/equipment/muscle filter), `search_templates`,
+  `get_exercise_notes` (all pinned notes), `get_exclusions`, and
+  `explain_prescription`. Each handler resolves identity from the token-bound RLS
+  client; pure shaper functions (`formatProfile`/`formatMesoSummary`/… ) are
+  exported and unit-tested without I/O, mirroring `formatCurrentState`.
+- **New query-layer readers.** `getLatestPrescriptionDecision` (progression.ts) —
+  the most recent `engine_decisions` row for one of the user's exercises (walks
+  the user's `workout_exercises` → latest decision; RLS-scoped, no service role),
+  surfaced by `explain_prescription`. `listAllPinnedNotes` (exercises.ts) — every
+  pinned note with exercise names, for `get_exercise_notes`.
+- **`workout://profile` resource** alongside `workout://current-cycle`, same
+  shape as `get_profile`.
+- **Honesty guardrails (10 §9) in copy.** e1RM/strength/targets labeled
+  estimates; exclusions flagged "never recommend"; the prescription tool states
+  the engine — not the model — owns every number.
+- **Tests (`__tests__/read-tools.test.ts`, +24 → 184 total).** Pure-shaper tests
+  for all twelve shapers (found/not-found, adherence math, estimate labels, both
+  note kinds, custom-exercise flagging, week sorting), registration of every tool
+  name, the **no-`user_id`-arg** contract across the whole surface, the profile
+  resource, and unauthenticated-call rejection.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (184/184), `npm run build`
+green. Tools are read-only over existing RLS-scoped views/queries + the pure
+engine; no new write surface, no migration. End-to-end `tools/call` against the
+hosted project (per the Slice 1 recipe) is the owner's check once merged.
+
+### Deviations
+
+- **Tool naming:** `get_mesocycle_summary` / `get_macrocycle_summary` (the spec
+  lists `get_meso_summary` / `get_macro_summary`) — spelled out to read clearly in
+  a client's tool list; constants documented in `read.ts`.
+- **Read tools grouped in one `read.ts` module** with per-tool register functions
+  + a `registerReadTools` aggregator, rather than one file per tool — keeps the
+  twelve thin wrappers reviewable in one place (get-current-state.ts stays its own
+  file). Matches the 05 §Module layout `tools/` intent.
+- **`search_exercises` equipment is a free `z.string()`** (cast to `EquipmentType`)
+  rather than a zod enum — the stored vocabulary has 14 values incl. legacy
+  variants; an unmatched value simply returns no rows.
+
+## 2026-06-17 — Phase 6: OAuth consent UI (connector handshake completable)
 
 Builds the app-side **OAuth 2.1 consent flow** the Supabase OAuth server
 requires, so an MCP client (Claude) can complete the authorization-code

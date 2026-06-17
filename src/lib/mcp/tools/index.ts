@@ -1,6 +1,7 @@
 import "server-only";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerGetCurrentState } from "./get-current-state";
+import { registerReadTools } from "./read";
 
 /**
  * Register every MCP tool on the server. Tools are thin, zod-validated wrappers
@@ -12,4 +13,5 @@ import { registerGetCurrentState } from "./get-current-state";
  */
 export function registerTools(server: McpServer) {
   registerGetCurrentState(server);
+  registerReadTools(server);
 }
