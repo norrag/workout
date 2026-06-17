@@ -48,13 +48,15 @@ export async function getCyclesOverview(
         .from("macrocycles")
         .select("*")
         .eq("user_id", userId)
-        .order("start_date", { ascending: false }),
+        .order("created_at", { ascending: false }),
       supabase
         .from("mesocycles")
         .select("*")
         .eq("user_id", userId)
         .neq("status", "draft")
-        .order("created_at"),
+        // newest first; standalone mesos render in this order, while
+        // within-macro mesos are re-sorted by plan position in orderMesos.
+        .order("created_at", { ascending: false }),
     ]);
   if (macroError) throw macroError;
   if (mesoError) throw mesoError;

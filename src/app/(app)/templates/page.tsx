@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
 import { RedeemForm } from "@/components/RedeemForm";
+import { startScratchDraftAction } from "../cycles/actions";
 
 /** Templates tab (fig 3.3): stock + own templates, search, start-from-template. */
 export default async function TemplatesPage({
@@ -23,9 +24,16 @@ export default async function TemplatesPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="title-display text-[32px]">templates</h1>
-        <div className="border-[1.5px] border-ink/30 px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em] text-ink/40">
-          + NEW
-        </div>
+        {/* New template = open the planner board (a fresh draft); build the
+            split there, then SAVE AS TEMPLATE. (#7 — redirect to the planner.) */}
+        <form action={startScratchDraftAction}>
+          <button
+            type="submit"
+            className="border-[1.5px] border-ink px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em]"
+          >
+            + NEW
+          </button>
+        </form>
       </div>
 
       <form method="get">

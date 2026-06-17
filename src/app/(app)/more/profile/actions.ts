@@ -129,8 +129,23 @@ export async function setGender(value: string): Promise<void> {
   revalidate();
 }
 
+const EQUIPMENT_VALUES = new Set([
+  "barbell",
+  "dumbbell",
+  "machine",
+  "cable",
+  "smith",
+  "bodyweight",
+  "bands",
+  "kettlebell",
+]);
+
 export async function setEquipment(values: string[]): Promise<void> {
-  const parsed = equipmentSchema.parse(values);
+  // Filter to the canonical vocabulary first so a stale legacy value carried in
+  // from older data (e.g. "free_weights") can't fail the parse / crash the page.
+  const parsed = equipmentSchema.parse(
+    values.filter((v) => EQUIPMENT_VALUES.has(v)),
+  );
   const { supabase, user } = await requireUser();
   await updateProfile(supabase, user.id, { preferred_equipment: parsed });
   revalidate();

@@ -32,6 +32,8 @@ const EQUIPMENT = [
   "kettlebell",
 ] as const;
 
+const KNOWN_EQUIPMENT = new Set<string>(EQUIPMENT);
+
 type EditableField = "display_name" | "age" | "height_cm" | "bodyweight" | "training_since";
 
 const FIELD_META: Record<
@@ -86,8 +88,10 @@ export function ProfileEditor({
   const [experience, setExperienceLocal] = useState(
     profile.experience_level ?? "beginner",
   );
+  // Drop any legacy/unknown equipment values (e.g. pre-pivot "free_weights")
+  // so a toggle never resends a value the canonical vocabulary rejects.
   const [equipment, setEquipmentLocal] = useState<string[]>(
-    profile.preferred_equipment ?? [],
+    (profile.preferred_equipment ?? []).filter((v) => KNOWN_EQUIPMENT.has(v)),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");

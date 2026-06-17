@@ -17,6 +17,7 @@ import {
   removeGroupAction,
   reorderDayGroupsAction,
   reorderGroupExercisesAction,
+  saveMesoAsTemplateAction,
   saveMesoPlanAction,
   setGroupExercisesAction,
   updateDayAction,
@@ -758,6 +759,20 @@ export function PlannerBoard({
         <p className="mt-4 text-sm text-ink/60">
           Add a training day to start planning the week.
         </p>
+      )}
+
+      {/* save as template (#7) — reusable split from the current plan. Saves the
+          persisted plan, so stage + SAVE CHANGES first when editing a live meso. */}
+      {hasExercise && (
+        <form action={saveMesoAsTemplateAction} className="mt-6">
+          <input type="hidden" name="meso_id" value={meso.id} />
+          <button
+            type="submit"
+            className="w-full border-[1.5px] border-ink/40 py-3 text-center text-[11px] font-bold tracking-[0.1em] text-ink/70"
+          >
+            SAVE AS TEMPLATE
+          </button>
+        </form>
       )}
 
       {/* bottom action */}
