@@ -2,7 +2,57 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6 Slice 2a: MCP read/analysis tools
+## 2026-06-17 (latest) — Phase 6 Slice 2b: MCP coaching suite
+
+Completes 07 Phase 6 **Slice 2** — the coaching/analysis tools on top of the
+Slice 2a read surface. Six read-only tools giving the model a coach's-eye view,
+built on the shared views + the pure engine; no write surface, no migration.
+Same branch/PR as 2a; `main` deployable.
+
+### Done
+
+- **Coaching tools (`src/lib/mcp/tools/coaching.ts`, `registerCoachingTools`).**
+  `get_training_overview` (one-call snapshot: who + current position + active-meso
+  adherence/fatigue + key-lift e1RM trend), `get_recent_sessions` (reverse-chron
+  completed workouts with session feedback + notes), `analyze_exercise_progress`
+  (e1RM trend + **stall/plateau detection**), `compare_mesocycles` (side-by-side
+  rollups, caller order preserved), `get_muscle_balance` (push/pull/legs split +
+  per-muscle weekly sets, advisory-only), `get_exercise_affinity` (the
+  exercise-selection profile — frequency/recency/loads × pinned note × aggregated
+  joint-pain/workload/pump feedback, exclusions respected).
+- **Pure `detectStall`** (exported, unit-tested): classifies an e1RM series as
+  improving / plateau / declining by comparing the recent window's best against
+  the prior best (tolerance-guarded), with `sessions_since_best`. Drives the
+  progress analysis without touching the engine.
+- **New query-layer readers (`src/lib/queries/coaching.ts`).** `getRecentSessions`,
+  `getExerciseAffinity` (the `logged_sets`/`v_exercise_overview` × muscle-groups ×
+  notes × feedback rollup), and `getExerciseE1rmSeries` — all RLS-scoped, no
+  service role.
+- **Honesty guardrails (10 §9).** e1RM/strength labeled estimates everywhere;
+  balance is advisory-only and explicitly states MEV/MAV/MRV landmarks are **not
+  yet parameterized** (10 §8 remaining), so no per-muscle threshold is asserted;
+  pump/soreness framed as secondary.
+- **Tests (`__tests__/coaching-tools.test.ts`, +16 → 200 total).** `detectStall`
+  across improving/plateau/declining/insufficient/null-handling, every shaper,
+  registration of all six tools, the no-`user_id` contract, and
+  unauthenticated-call rejection.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (200/200), `npm run build`
+green. End-to-end `tools/call` against hosted is the owner's check.
+
+### Deviations
+
+- **`get_muscle_balance` uses the implemented push/pull/legs + per-muscle weekly
+  sets** (the same `getMesoStats` balance the in-app screen shows) rather than
+  MEV/MAV/MRV landmark comparison — those landmarks aren't in `engine_params` yet
+  (10 §8 remaining). The tool says so in its payload, keeping it honest.
+- **`get_exercise_affinity` aggregates feedback via `workout_exercises`** (the
+  exercise↔feedback join), bounded to the user's trained exercises; capped at 60
+  rows per call.
+
+## 2026-06-17 — Phase 6 Slice 2a: MCP read/analysis tools
 
 First half of 07 Phase 6 Slice 2 — the **read/analysis tool surface** for the
 MCP connector. Twelve thin, zod-validated read tools wrapping the existing

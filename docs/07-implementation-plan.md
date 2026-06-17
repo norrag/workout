@@ -144,12 +144,17 @@ deployable:
       end-to-end against hosted (401 discovery + real-token `tools/call`). **External dep still open:**
       enabling Supabase's native **OAuth 2.1 Server** (AS metadata 404s today) — a dashboard toggle,
       not code; the resource-server side is complete and the connect flow works once it's on.)*
-- [ ] **Slice 2 — read/analysis + coaching suite.** Spec read tools (profile, cycles, exercise
+- [x] **Slice 2 — read/analysis + coaching suite.** Spec read tools (profile, cycles, exercise
       history with both note kinds, muscle-group volume, meso/macro summaries, PRs, search,
       `explain_prescription`) + coaching tools (`get_training_overview`, `get_recent_sessions`,
       `analyze_exercise_progress`, `compare_mesocycles`, `get_muscle_balance`,
       `get_exercise_affinity`, `get_exercise_notes`/`get_exclusions`) + remaining resources. New
-      query-layer readers for `engine_decisions` and the affinity rollup.
+      query-layer readers for `engine_decisions` and the affinity rollup. *(2026-06-17: shipped in
+      two sub-slices — 2a read/analysis (12 tools + `getLatestPrescriptionDecision`/`listAllPinnedNotes`
+      + `workout://profile`), 2b coaching (6 tools + `getRecentSessions`/`getExerciseAffinity`/
+      `getExerciseE1rmSeries` + pure `detectStall`). 18 tools total; +40 tests (200). No migration.
+      `get_muscle_balance` is push/pull/legs + per-muscle weekly sets advisory-only — MEV/MAV/MRV
+      landmarks aren't parameterized yet (10 §8 remaining).)*
 - [ ] **Slice 3 — write/planning (drafts, audited).** create_macrocycle, create_mesocycle
       (groups-first, `planned`), create_template, create_custom_exercise, update_macrocycle_goals,
       manage_exclusions, log_note — all written to `mcp_write_audit`; verify a drafted meso surfaces
