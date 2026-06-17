@@ -145,3 +145,16 @@ select gen_random_uuid(), we.id, '0af27789-ac5b-4f34-88e5-eac9b14a9304',
        null, false, 'straight', 'lb'
 from t_we we
 cross join lateral unnest(we.reps) with ordinality as s(rep, ord);
+
+-- ---- skipped workouts: missed days in working (non-deload) weeks, so adherence
+--      reflects reality instead of 100%. One per planned day with no workout;
+--      deload weeks are left as-logged (their reduced volume is intentional). --
+insert into public.workouts (microcycle_id, user_id, day_number, status)
+select mc.id, '0af27789-ac5b-4f34-88e5-eac9b14a9304', md.day, 'skipped'
+from t_micro mc
+join t_mday md on md.meso = mc.meso
+where not mc.is_deload
+  and not exists (
+    select 1 from t_workout w
+    where w.meso = mc.meso and w.week = mc.week and w.day = md.day
+  );

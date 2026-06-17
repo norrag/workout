@@ -459,6 +459,8 @@ export type VMesoSummaryRow = {
   avg_pump: number | null;
   avg_overall_fatigue: number | null;
   avg_performance: number | null;
+  sessions_attended: number;
+  sessions_due: number;
 }
 
 export type VMacroSummaryRow = {
@@ -470,6 +472,8 @@ export type VMacroSummaryRow = {
   working_sets: number;
   total_volume: number;
   first_week_start: string | null;
+  sessions_attended: number;
+  sessions_due: number;
 }
 
 export type VExerciseOverviewRow = {
