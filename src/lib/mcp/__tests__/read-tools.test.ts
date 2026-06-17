@@ -218,6 +218,7 @@ function mesoSummaryRow(overrides: Partial<VMesoSummaryRow> = {}): VMesoSummaryR
     avg_performance: 3.2,
     sessions_attended: 15,
     sessions_due: 16,
+    working_reps: 2400,
     ...overrides,
   };
 }
@@ -239,8 +240,26 @@ describe("formatMesoSummary", () => {
     ]);
     expect(out.adherence_pct).toBe(Math.round((15 / 16) * 100));
     expect(out.best_e1rm_estimate).toBe(315);
+    expect(out.working_reps).toBe(2400);
     const scores = out.progress_scores as Record<string, unknown>[];
     expect(scores[0]).toMatchObject({ e1rm_change_pct: 5 });
+  });
+
+  it("exposes both adherence denominators (due vs full block)", () => {
+    const out = formatMesoSummary(
+      mesoSummaryRow({
+        sessions_attended: 10,
+        sessions_due: 10,
+        workouts_completed: 10,
+        workouts_total: 16,
+      }),
+      [],
+    );
+    const adherence = out.adherence as Record<string, unknown>;
+    expect(adherence.adherence_pct).toBe(100); // 10/10 due
+    expect(adherence.block_completion_pct).toBe(63); // 10/16 generated
+    expect(adherence.total_due).toBe(10);
+    expect(adherence.workouts_generated).toBe(16);
   });
 
   it("returns null adherence when nothing was due", () => {

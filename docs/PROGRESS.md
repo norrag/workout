@@ -2,7 +2,56 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Responsiveness Slice 2: instant nav skeletons + request dedup
+## 2026-06-17 (latest) — MCP tooling review: metric-truth view fixes
+
+Response to the external *MCP Tooling Review* — full triage in
+[mcp-tooling-review-response.md](mcp-tooling-review-response.md). Every finding
+was verified against the code and reproduced read-only against the live project
+before changing anything.
+
+### Done
+
+- **P0-1 — `v_meso_summary` join fan-out (metric inflation).** The view joined
+  `logged_sets` with `workout_exercises` + `exercise_feedback` +
+  `workout_feedback` on the workout grain, so each set was multiplied by
+  `(#exercises × #feedback rows)`. This inflated `working_sets` (1104 → **153**)
+  and `total_volume` (859k → **138k**) and skewed feedback averages. Migration
+  `20260617000003_metric_truth_view_fixes.sql` pre-aggregates set facts and the
+  two feedback tables in separate CTEs. Added `working_reps` (true rep sum) to
+  the view, `VMesoSummaryRow`, and `get_mesocycle_summary`.
+- **P0-2 — `v_meso_week_sets` planned-set fan-out.** `sum(prescribed_sets)` was
+  multiplied by logged-set count per exercise (the real cause of "45 planned vs
+  15 logged"; both sides already use the same `muscle_group_id` attribution).
+  Rewritten to collapse each `workout_exercise` first. Planned now equals logged
+  for completed weeks.
+- **P1-1 — adherence denominators.** `get_mesocycle_summary` now returns an
+  explicit `adherence` object (attended/due vs completed/generated +
+  `block_completion_pct`); legacy `adherence_pct` retained.
+- **P0-5 (partial) — `compare_mesocycles`.** Added `comparison_basis`, per-block
+  `sets_per_workout` / `volume_per_workout` rates, and `warnings[]` for
+  active/incomplete, unequal-duration, and deload-mismatch comparisons.
+- **P0-4 (partial) — decision linkage.** `get_engine_decisions` now returns
+  `exercise_id` + `workout_exercise_id` (already resolved, previously dropped).
+- **P2 — macro placeholder names.** Extracted pure `placeholderName()`; auto
+  names re-align to position on reconcile (no more "Mesocycle 4" at slot 3 / two
+  "Mesocycle 5"s). User-renamed slots untouched.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (229/229) green. Both view
+fixes reproduced read-only against the live DB. New tests cover `working_reps`,
+dual adherence denominators, compare normalization/warnings, and
+`placeholderName`.
+
+### Deferred (need schema/engine work — own PRs; see review-response doc)
+
+P0-3 engine-params immutable snapshots (read-time default-merge breaks
+historical reproducibility); P0-4 full decision integrity (persist source +
+immutable `logged_set_id`/`sequence_index`, RIR-fallback note, structured
+trace); P1-2 chainable `get_mesocycle`; P1-3 replay diagnostics + simulation;
+P1-4/P2 common response envelope + cross-tool consistency.
+
+## 2026-06-17 — Responsiveness Slice 2: instant nav skeletons + request dedup
 
 Builds on Slice 1. Makes page switches paint immediately and trims redundant
 per-render queries.

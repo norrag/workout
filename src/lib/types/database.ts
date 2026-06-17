@@ -461,6 +461,7 @@ export type VMesoSummaryRow = {
   avg_performance: number | null;
   sessions_attended: number;
   sessions_due: number;
+  working_reps: number;
 }
 
 export type VMacroSummaryRow = {

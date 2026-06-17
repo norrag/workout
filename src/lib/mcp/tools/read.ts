@@ -213,6 +213,10 @@ export function formatMesoSummary(
     row.sessions_due > 0
       ? Math.round((row.sessions_attended / row.sessions_due) * 100)
       : null;
+  const block_completion_pct =
+    row.workouts_total > 0
+      ? Math.round((row.workouts_completed / row.workouts_total) * 100)
+      : null;
   return {
     found: true,
     mesocycle_id: row.mesocycle_id,
@@ -225,9 +229,21 @@ export function formatMesoSummary(
     workouts_completed: row.workouts_completed,
     workouts_total: row.workouts_total,
     working_sets: row.working_sets,
+    working_reps: row.working_reps,
     total_volume: row.total_volume,
     best_e1rm_estimate: row.best_e1rm,
     adherence_pct,
+    // adherence_pct = attended/due over working (non-deload) weeks; block
+    // completion = completed sessions over every session generated so far. The
+    // two denominators differ, so both are surfaced rather than inferred.
+    adherence: {
+      attended_due: row.sessions_attended,
+      total_due: row.sessions_due,
+      adherence_pct,
+      workouts_completed: row.workouts_completed,
+      workouts_generated: row.workouts_total,
+      block_completion_pct,
+    },
     feedback: {
       avg_joint_pain: row.avg_joint_pain,
       avg_pump: row.avg_pump,

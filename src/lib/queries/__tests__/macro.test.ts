@@ -9,6 +9,7 @@ import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
 import {
   macroEditImpact,
   phaseLabel,
+  placeholderName,
   planForMacro,
   profileToMacroProfile,
   reconcileMacroSlots,
@@ -119,6 +120,22 @@ describe("macroEditImpact", () => {
       meso("d", "unplanned"),
     ] as MesocycleRow[]);
     expect(impact).toEqual({ lockedCount: 2, unplannedCount: 2 });
+  });
+});
+
+describe("placeholderName", () => {
+  it("realigns a stale auto-name to its new position", () => {
+    expect(placeholderName("Mesocycle 4", "unplanned", 3)).toBe("Mesocycle 3");
+    expect(placeholderName("Mesocycle", "unplanned", 5)).toBe("Mesocycle 5");
+  });
+
+  it("leaves user-renamed placeholders untouched", () => {
+    expect(placeholderName("Peak Block", "unplanned", 3)).toBe("Peak Block");
+  });
+
+  it("never renames planned or locked mesos", () => {
+    expect(placeholderName("Mesocycle 4", "planned", 3)).toBe("Mesocycle 4");
+    expect(placeholderName("Mesocycle 2", "completed", 1)).toBe("Mesocycle 2");
   });
 });
 

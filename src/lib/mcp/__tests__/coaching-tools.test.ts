@@ -168,7 +168,10 @@ describe("formatCompareMesos", () => {
         name: "Block 1",
         status: "completed",
         weeks: 5,
+        includes_deload: true,
+        workouts_completed: 16,
         working_sets: 200,
+        working_reps: 2000,
         total_volume: 100000,
         best_e1rm: 300,
         sessions_attended: 15,
@@ -181,6 +184,51 @@ describe("formatCompareMesos", () => {
     expect((out.mesocycles as Record<string, unknown>[])[0].adherence_pct).toBe(
       Math.round((15 / 16) * 100),
     );
+  });
+
+  it("normalizes totals per completed workout and warns on incomparable blocks", () => {
+    const rows = [
+      {
+        mesocycle_id: "m1",
+        name: "May",
+        status: "completed",
+        weeks: 4,
+        includes_deload: false,
+        workouts_completed: 16,
+        working_sets: 320,
+        working_reps: 3200,
+        total_volume: 160000,
+        best_e1rm: 300,
+        sessions_attended: 13,
+        sessions_due: 16,
+        avg_overall_fatigue: 2,
+        avg_performance: 3,
+      },
+      {
+        mesocycle_id: "m2",
+        name: "June",
+        status: "active",
+        weeks: 5,
+        includes_deload: true,
+        workouts_completed: 10,
+        working_sets: 150,
+        working_reps: 1500,
+        total_volume: 90000,
+        best_e1rm: 310,
+        sessions_attended: 10,
+        sessions_due: 10,
+        avg_overall_fatigue: 2,
+        avg_performance: 3,
+      },
+    ] as unknown as VMesoSummaryRow[];
+    const out = formatCompareMesos(rows);
+    expect(out.comparison_basis).toBe("completed_workouts");
+    const warnings = out.warnings as string[];
+    // active/incomplete + different durations + deload mismatch
+    expect(warnings.length).toBe(3);
+    const mesos = out.mesocycles as Record<string, unknown>[];
+    expect(mesos[0].volume_per_workout).toBe(10000); // 160000 / 16
+    expect(mesos[1].sets_per_workout).toBe(15); // 150 / 10
   });
 });
 

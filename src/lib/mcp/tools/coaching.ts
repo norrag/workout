@@ -279,24 +279,53 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
 // --- compare_mesocycles ----------------------------------------------------
 
 export function formatCompareMesos(rows: VMesoSummaryRow[]): Record<string, unknown> {
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  // raw block totals aren't directly comparable when the blocks differ in
+  // length, deload structure, or completion, so we expose per-completed-workout
+  // rates alongside the totals and flag what makes a naïve comparison unsafe.
+  const warnings: string[] = [];
+  if (rows.some((r) => r.status === "active")) {
+    warnings.push(
+      "One or more blocks are active/incomplete — totals reflect work logged so far, not a full block. Compare the per-workout rates instead.",
+    );
+  }
+  if (new Set(rows.map((r) => r.weeks)).size > 1) {
+    warnings.push("Blocks have different planned durations (weeks).");
+  }
+  if (new Set(rows.map((r) => r.includes_deload)).size > 1) {
+    warnings.push("Blocks differ in deload structure.");
+  }
   return {
     count: rows.length,
-    mesocycles: rows.map((r) => ({
-      mesocycle_id: r.mesocycle_id,
-      name: r.name,
-      status: r.status,
-      weeks: r.weeks,
-      working_sets: r.working_sets,
-      total_volume: r.total_volume,
-      best_e1rm_estimate: r.best_e1rm,
-      adherence_pct:
-        r.sessions_due > 0
-          ? Math.round((r.sessions_attended / r.sessions_due) * 100)
-          : null,
-      avg_overall_fatigue: r.avg_overall_fatigue,
-      avg_performance: r.avg_performance,
-    })),
-    note: "Side-by-side rollups from the shared meso-summary view; e1RM is an estimate.",
+    comparison_basis: "completed_workouts",
+    warnings,
+    mesocycles: rows.map((r) => {
+      const completed = r.workouts_completed ?? 0;
+      const perWorkout = completed > 0;
+      return {
+        mesocycle_id: r.mesocycle_id,
+        name: r.name,
+        status: r.status,
+        weeks: r.weeks,
+        workouts_completed: completed,
+        includes_deload: r.includes_deload,
+        working_sets: r.working_sets,
+        working_reps: r.working_reps,
+        total_volume: r.total_volume,
+        // normalized so blocks of different length / completion are comparable
+        sets_per_workout: perWorkout ? round1(r.working_sets / completed) : null,
+        volume_per_workout:
+          perWorkout && r.total_volume != null ? round1(r.total_volume / completed) : null,
+        best_e1rm_estimate: r.best_e1rm,
+        adherence_pct:
+          r.sessions_due > 0
+            ? Math.round((r.sessions_attended / r.sessions_due) * 100)
+            : null,
+        avg_overall_fatigue: r.avg_overall_fatigue,
+        avg_performance: r.avg_performance,
+      };
+    }),
+    note: "Side-by-side rollups from the shared meso-summary view. Prefer the per-workout rates over raw totals when blocks differ; e1RM is an estimate.",
   };
 }
 

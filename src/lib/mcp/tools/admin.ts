@@ -314,6 +314,10 @@ function shapeDecisions(decisions: DecisionRecord[]): Record<string, unknown> {
     count: decisions.length,
     decisions: decisions.map((d) => ({
       decision_id: d.id,
+      // linkage so a decision chains into get_exercise_history /
+      // explain_prescription / exercise-filtered tools without a re-lookup
+      exercise_id: d.exercise_id,
+      workout_exercise_id: d.workout_exercise_id,
       exercise_name: d.exercise_name,
       coordinate: d.coordinate,
       params_version: d.params_version,

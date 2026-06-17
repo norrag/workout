@@ -225,6 +225,20 @@ export function reconcileMacroSlots(
   return { removeIds, addCount };
 }
 
+/** Matches the auto-generated placeholder name pattern ("Mesocycle" / "Mesocycle 4"). */
+const AUTO_PLACEHOLDER_NAME = /^Mesocycle( \d+)?$/;
+
+/**
+ * Name an unplanned placeholder for its (1-based) position. Auto-generated names
+ * are re-aligned so a re-sequence can't leave "Mesocycle 4" at slot 3 or two
+ * "Mesocycle 5"s; user-renamed slots and planned/locked mesos keep their name.
+ * Pure.
+ */
+export function placeholderName(name: string, status: string, position: number): string {
+  const isAutoName = AUTO_PLACEHOLDER_NAME.test(name);
+  return status === "unplanned" && isAutoName ? `Mesocycle ${position}` : name;
+}
+
 /**
  * Edit a macrocycle: rename, adjust goal/duration/block-length/notes, then
  * re-plan its **unplanned** mesocycle slots to the recomputed plan. Locked
@@ -357,8 +371,7 @@ export async function updateMacrocycle(
     const isUnplanned = m.status === "unplanned";
     const phase = isUnplanned ? (plan.phases[i] ?? m.phase) : m.phase;
     const weeks = isUnplanned ? input.meso_length_weeks : m.weeks;
-    const name =
-      isUnplanned && m.name === "Mesocycle" ? `Mesocycle ${pos}` : m.name;
+    const name = placeholderName(m.name, m.status, pos);
     if (
       m.position === pos &&
       m.phase === phase &&
