@@ -96,43 +96,47 @@ export default async function PlannedDayPage({
         <span className="numeral">{totalSets}</span> PLANNED SETS
       </div>
 
-      {/* groups → planned exercises (read-only) */}
-      <div className="mt-3">
-        {planDay.groups.map((group) => (
-          <div key={group.id} className="mt-3 first:mt-0">
-            <div className="flex items-center gap-2 border-b-[1.5px] border-ink py-1.5">
-              <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
+      {/* flat planned-exercise list in day order, across groups (read-only, #2) */}
+      <div className="mt-3 border-t-[1.5px] border-ink">
+        {planDay.groups
+          .flatMap((group, gi) =>
+            group.fills.map((fill, si) => ({
+              fill,
+              group,
+              key: [fill.position ?? 0, gi, fill.slot_number ?? si + 1] as const,
+            })),
+          )
+          .sort(
+            (a, b) =>
+              a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2],
+          )
+          .map(({ fill, group }) => (
+            <div
+              key={fill.id}
+              className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 last:border-b-0"
+            >
+              <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
                 {group.muscle_group.slice(0, 2).toUpperCase()}
               </div>
-              <div className="flex-1 text-[10px] font-extrabold tracking-[0.14em]">
-                {group.muscle_group.toUpperCase()}
+              <div className="flex-1">
+                <div className="text-[15px] font-semibold">
+                  {fill.exercise_name}
+                </div>
+                <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                  {group.muscle_group.toUpperCase()}
+                </div>
+              </div>
+              <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                <span className="numeral">{fill.initial_sets}</span> SETS ·{" "}
+                {targetRir} RIR
               </div>
             </div>
-            {group.fills.length > 0 ? (
-              group.fills.map((fill) => (
-                <div
-                  key={fill.id}
-                  className="flex items-center justify-between border-b border-ink/[0.18] py-2.5 pl-1.5 last:border-b-0"
-                >
-                  <div className="text-[15px] font-semibold">
-                    {fill.exercise_name}
-                  </div>
-                  <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/55">
-                    <span className="numeral">{fill.initial_sets}</span> SETS ·{" "}
-                    {targetRir} RIR
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-2.5 pl-1.5 text-[12px] text-ink/45">
-                No exercises picked for this group yet.
-              </div>
-            )}
-          </div>
-        ))}
-        {planDay.groups.length === 0 && (
-          <p className="mt-4 text-sm text-ink/55">
-            This day has no muscle groups planned yet.
+          ))}
+        {planDay.groups.every((g) => g.fills.length === 0) && (
+          <p className="py-4 text-sm text-ink/55">
+            {planDay.groups.length === 0
+              ? "This day has no muscle groups planned yet."
+              : "No exercises picked for this day yet."}
           </p>
         )}
       </div>

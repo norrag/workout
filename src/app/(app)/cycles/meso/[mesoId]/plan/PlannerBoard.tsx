@@ -15,8 +15,9 @@ import {
   finalizeMesoAction,
   removeDayAction,
   removeGroupAction,
+  reorderDayExercisesAction,
   reorderDayGroupsAction,
-  reorderGroupExercisesAction,
+  saveMesoAsTemplateAction,
   saveMesoPlanAction,
   setGroupExercisesAction,
   updateDayAction,
@@ -58,6 +59,8 @@ interface ViewFill {
   exercise_name: string;
   initial_sets: number;
   slot_number: number;
+  /** day-level order across all groups (#2 flat list) */
+  day_position: number;
 }
 interface ViewGroup {
   id: string;
@@ -90,25 +93,51 @@ function withPending(base: ViewDay[], pending: ViewDay | null): ViewDay[] {
 }
 
 function toWorkDays(days: PlannedDay[]): ViewDay[] {
-  return days.map((d) => ({
-    id: d.id,
-    day_number: d.day_number,
-    label: d.label,
-    weekday: d.weekday,
-    groups: d.groups.map((g) => ({
-      id: g.id,
-      muscle_group: g.muscle_group,
-      muscle_group_id: g.muscle_group_id,
-      exercise_slots: g.exercise_slots,
-      fills: g.fills.map((f, i) => ({
-        id: f.id,
-        exercise_id: f.exercise_id,
-        exercise_name: f.exercise_name,
-        initial_sets: f.initial_sets,
-        slot_number: f.slot_number ?? i + 1,
+  return days.map((d) => {
+    // flat day order across groups (#2): sort every fill by stored day-level
+    // position, breaking ties by group order then group-local slot (so legacy
+    // rows where position mirrored slot_number stay group-clustered).
+    const dayPosById = new Map<string, number>();
+    d.groups
+      .flatMap((g, gi) =>
+        g.fills.map((f, si) => ({
+          id: f.id,
+          pos: f.position ?? 0,
+          gi,
+          slot: f.slot_number ?? si + 1,
+        })),
+      )
+      .sort((a, b) => a.pos - b.pos || a.gi - b.gi || a.slot - b.slot)
+      .forEach((x, idx) => dayPosById.set(x.id, idx + 1));
+
+    return {
+      id: d.id,
+      day_number: d.day_number,
+      label: d.label,
+      weekday: d.weekday,
+      groups: d.groups.map((g) => ({
+        id: g.id,
+        muscle_group: g.muscle_group,
+        muscle_group_id: g.muscle_group_id,
+        exercise_slots: g.exercise_slots,
+        fills: g.fills.map((f, i) => ({
+          id: f.id,
+          exercise_id: f.exercise_id,
+          exercise_name: f.exercise_name,
+          initial_sets: f.initial_sets,
+          slot_number: f.slot_number ?? i + 1,
+          day_position: dayPosById.get(f.id) ?? i + 1,
+        })),
       })),
-    })),
-  }));
+    };
+  });
+}
+
+/** All of a day's filled exercises in flat day order (across groups). */
+function flatDayFills(day: ViewDay): { fill: ViewFill; group: ViewGroup }[] {
+  return day.groups
+    .flatMap((g) => g.fills.map((f) => ({ fill: f, group: g })))
+    .sort((a, b) => a.fill.day_position - b.fill.day_position);
 }
 
 function badge(name: string): string {
@@ -326,31 +355,50 @@ export function PlannerBoard({
   const setGroupExercises = (groupId: string, exerciseIds: string[]) => {
     if (editing) {
       setWorkDays((ds) =>
-        ds.map((d) => ({
-          ...d,
-          groups: d.groups.map((g) => {
-            if (g.id !== groupId) return g;
-            const layout = planGroupExercises(
-              g.fills.map((f) => ({
-                exercise_id: f.exercise_id,
-                initial_sets: f.initial_sets,
-              })),
-              exerciseIds,
-              3,
-            );
-            return {
-              ...g,
-              exercise_slots: Math.max(layout.length, 1),
-              fills: layout.map((l) => ({
-                id: tmpId(),
-                exercise_id: l.exercise_id,
-                exercise_name: exercises.find((e) => e.id === l.exercise_id)?.name ?? "",
-                initial_sets: l.initial_sets,
-                slot_number: l.slot_number,
-              })),
-            };
-          }),
-        })),
+        ds.map((d) => {
+          if (!d.groups.some((g) => g.id === groupId)) return d;
+          // newly added exercises append after the day's current last position;
+          // retained ones keep their day order (matched by exercise id).
+          let nextDayPos = Math.max(
+            0,
+            ...d.groups.flatMap((g) => g.fills.map((f) => f.day_position)),
+          );
+          return {
+            ...d,
+            groups: d.groups.map((g) => {
+              if (g.id !== groupId) return g;
+              const prevByExercise = new Map(
+                g.fills.map((f) => [f.exercise_id, f]),
+              );
+              const layout = planGroupExercises(
+                g.fills.map((f) => ({
+                  exercise_id: f.exercise_id,
+                  initial_sets: f.initial_sets,
+                })),
+                exerciseIds,
+                3,
+              );
+              return {
+                ...g,
+                // keep the configured slot count — picking fewer than the slots
+                // leaves the rest open rather than shrinking the group.
+                exercise_slots: Math.max(layout.length, g.exercise_slots),
+                fills: layout.map((l) => {
+                  const prev = prevByExercise.get(l.exercise_id);
+                  return {
+                    id: prev?.id ?? tmpId(),
+                    exercise_id: l.exercise_id,
+                    exercise_name:
+                      exercises.find((e) => e.id === l.exercise_id)?.name ?? "",
+                    initial_sets: l.initial_sets,
+                    slot_number: l.slot_number,
+                    day_position: prev?.day_position ?? ++nextDayPos,
+                  };
+                }),
+              };
+            }),
+          };
+        }),
       );
       setDirty(true);
       return;
@@ -388,38 +436,38 @@ export function PlannerBoard({
     );
   };
 
-  // reorder an exercise within its group, packing fills to the top slots.
-  const moveFill = (groupId: string, fillId: string, delta: number) => {
-    const group = days.flatMap((d) => d.groups).find((g) => g.id === groupId);
-    if (!group) return;
-    const sorted = [...group.fills].sort((a, b) => a.slot_number - b.slot_number);
-    const sortedIds = sorted.map((f) => f.id);
-    const ordered = moveInOrder(sortedIds, fillId, delta);
-    if (ordered === sortedIds) return;
+  // reorder an exercise anywhere in the day, across muscle groups (#2 flat list).
+  const moveDayExercise = (dayId: string, fillId: string, delta: number) => {
+    const day = days.find((d) => d.id === dayId);
+    if (!day) return;
+    const orderedFills = flatDayFills(day).map((x) => x.fill.id);
+    const ordered = moveInOrder(orderedFills, fillId, delta);
+    if (ordered === orderedFills) return;
+    const posById = new Map(ordered.map((id, i) => [id, i + 1]));
     if (editing) {
       setWorkDays((ds) =>
-        ds.map((d) => ({
-          ...d,
-          groups: d.groups.map((g) => {
-            if (g.id !== groupId) return g;
-            const byId = new Map(g.fills.map((f) => [f.id, f]));
-            return {
-              ...g,
-              fills: ordered.map((id, i) => ({
-                ...byId.get(id)!,
-                slot_number: i + 1,
-              })),
-            };
-          }),
-        })),
+        ds.map((d) =>
+          d.id !== dayId
+            ? d
+            : {
+                ...d,
+                groups: d.groups.map((g) => ({
+                  ...g,
+                  fills: g.fills.map((f) => ({
+                    ...f,
+                    day_position: posById.get(f.id) ?? f.day_position,
+                  })),
+                })),
+              },
+        ),
       );
       setDirty(true);
       return;
     }
     commit(() =>
-      reorderGroupExercisesAction({
+      reorderDayExercisesAction({
         meso_id: meso.id,
-        group_id: groupId,
+        day_id: dayId,
         ordered_fill_ids: ordered,
       }),
     );
@@ -504,20 +552,27 @@ export function PlannerBoard({
   };
 
   const doSave = () => {
-    const payload = days.map((d) => ({
-      day_number: d.day_number,
-      label: d.label,
-      weekday: d.weekday,
-      groups: d.groups.map((g) => ({
-        muscle_group_id: g.muscle_group_id,
-        exercise_slots: g.exercise_slots,
-        fills: g.fills.map((f) => ({
-          slot_number: f.slot_number,
-          exercise_id: f.exercise_id,
-          initial_sets: f.initial_sets,
+    const payload = days.map((d) => {
+      // normalise the flat day order to 1..n so saved positions are clean
+      const orderById = new Map(
+        flatDayFills(d).map((x, i) => [x.fill.id, i + 1]),
+      );
+      return {
+        day_number: d.day_number,
+        label: d.label,
+        weekday: d.weekday,
+        groups: d.groups.map((g) => ({
+          muscle_group_id: g.muscle_group_id,
+          exercise_slots: g.exercise_slots,
+          fills: g.fills.map((f) => ({
+            slot_number: f.slot_number,
+            exercise_id: f.exercise_id,
+            initial_sets: f.initial_sets,
+            day_position: orderById.get(f.id) ?? f.day_position,
+          })),
         })),
-      })),
-    }));
+      };
+    });
     commit(() => saveMesoPlanAction({ meso_id: meso.id, days: payload }));
   };
 
@@ -641,107 +696,102 @@ export function PlannerBoard({
             </button>
           </div>
 
-          {/* day board — groups with slots */}
+          {/* day board — one flat, ordered list across all muscle groups (#2).
+              Each row carries its muscle-group badge; ▲▼ move it anywhere in the
+              day, across groups. Open slots and add-group sit below. */}
           <div className="mt-3">
-            {activeDay.groups.map((group) => (
-              <div key={group.id} className="mt-3 first:mt-0">
-                <div className="flex items-center gap-2 border-b-[1.5px] border-ink py-1.5">
-                  <div className="flex h-[22px] w-[22px] items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
+            {(() => {
+              const flat = flatDayFills(activeDay);
+              return flat.map(({ fill, group }, idx) => (
+                <div
+                  key={fill.id}
+                  className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-0.5 last:border-b-0"
+                >
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      aria-label={`move ${fill.exercise_name} up`}
+                      disabled={idx <= 0}
+                      onClick={() => moveDayExercise(activeDay.id, fill.id, -1)}
+                      className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`move ${fill.exercise_name} down`}
+                      disabled={idx >= flat.length - 1}
+                      onClick={() => moveDayExercise(activeDay.id, fill.id, 1)}
+                      className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                  <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
                     {badge(group.muscle_group)}
                   </div>
-                  <div className="flex-1 text-[10px] font-extrabold tracking-[0.14em]">
-                    {group.muscle_group.toUpperCase()} —{" "}
-                    <span className="numeral">{group.exercise_slots}</span>{" "}
-                    {group.exercise_slots === 1 ? "EXERCISE" : "EXERCISES"}
-                  </div>
-                  <div className="text-[9px] font-semibold tracking-[0.1em] text-ink/50">
-                    <span className="numeral">
-                      {group.fills.reduce((s, f) => s + f.initial_sets, 0)}
-                    </span>{" "}
-                    SETS
-                  </div>
-                </div>
-                {(() => {
-                  const sortedFills = [...group.fills].sort(
-                    (a, b) => a.slot_number - b.slot_number,
-                  );
-                  return Array.from({ length: group.exercise_slots }, (_, i) => {
-                  const slotNumber = i + 1;
-                  const fill = group.fills.find((f) => f.slot_number === slotNumber);
-                  const fillIndex = fill
-                    ? sortedFills.findIndex((f) => f.id === fill.id)
-                    : -1;
-                  return fill ? (
-                    <div
-                      key={slotNumber}
-                      className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-1.5 last:border-b-0"
-                    >
-                      <div className="flex flex-col">
-                        <button
-                          type="button"
-                          aria-label={`move ${fill.exercise_name} up`}
-                          disabled={fillIndex <= 0}
-                          onClick={() => moveFill(group.id, fill.id, -1)}
-                          className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`move ${fill.exercise_name} down`}
-                          disabled={fillIndex >= sortedFills.length - 1}
-                          onClick={() => moveFill(group.id, fill.id, 1)}
-                          className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        className="flex-1 text-left"
-                        onClick={() => setPicker({ group, day: activeDay })}
-                      >
-                        <div className="text-[15px] font-semibold">
-                          {fill.exercise_name}
-                        </div>
-                        <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
-                          {exercises
-                            .find((e) => e.id === fill.exercise_id)
-                            ?.equipment_type.toUpperCase() ?? ""}{" "}
-                          · START <span className="numeral">{fill.initial_sets}</span> SETS
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`remove ${fill.exercise_name}`}
-                        onClick={() => clearFill(group.id, fill)}
-                        className="px-1 text-[13px] text-ink/40"
-                      >
-                        ✕
-                      </button>
+                  <button
+                    type="button"
+                    className="flex-1 text-left"
+                    onClick={() => setPicker({ group, day: activeDay })}
+                  >
+                    <div className="text-[15px] font-semibold">
+                      {fill.exercise_name}
                     </div>
-                  ) : (
-                    <button
-                      key={slotNumber}
-                      type="button"
-                      onClick={() => setPicker({ group, day: activeDay })}
-                      className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5 text-left"
-                    >
-                      <div className="flex-1">
-                        <div className="text-sm font-semibold text-ink/60">
-                          Slot <span className="numeral">{slotNumber}</span> — pick exercise
-                        </div>
-                        <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/45">
-                          PICKER FILTERED TO {group.muscle_group.toUpperCase()}
-                        </div>
-                      </div>
-                      <div className="text-[15px] font-bold">›</div>
-                    </button>
-                  );
-                  });
-                })()}
-              </div>
-            ))}
+                    <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                      {group.muscle_group.toUpperCase()} ·{" "}
+                      {exercises
+                        .find((e) => e.id === fill.exercise_id)
+                        ?.equipment_type.toUpperCase() ?? ""}{" "}
+                      · START <span className="numeral">{fill.initial_sets}</span> SETS
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`remove ${fill.exercise_name}`}
+                    onClick={() => clearFill(group.id, fill)}
+                    className="px-1 text-[13px] text-ink/40"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ));
+            })()}
+
+            {/* open slots, one row per group with remaining capacity */}
+            {/* one row per open slot (so a group set to N exercises shows N
+                pickable rows, not a single collapsed one) */}
+            {activeDay.groups.flatMap((group) => {
+              const open = group.exercise_slots - group.fills.length;
+              if (open <= 0) return [];
+              return Array.from({ length: open }, (_, k) => (
+                <button
+                  key={`${group.id}-open-${k}`}
+                  type="button"
+                  onClick={() => setPicker({ group, day: activeDay })}
+                  className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5 text-left"
+                >
+                  <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-dashed border-ink/45 text-[9px] font-extrabold text-ink/55">
+                    {badge(group.muscle_group)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-ink/60">
+                      {group.muscle_group} — pick exercise
+                    </div>
+                    <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/45">
+                      OPEN SLOT · {group.muscle_group.toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="text-[15px] font-bold">›</div>
+                </button>
+              ));
+            })}
+
+            {activeDay.groups.length === 0 && (
+              <p className="text-sm text-ink/60">
+                Add a muscle group to start picking exercises.
+              </p>
+            )}
 
             <button
               type="button"
@@ -758,6 +808,20 @@ export function PlannerBoard({
         <p className="mt-4 text-sm text-ink/60">
           Add a training day to start planning the week.
         </p>
+      )}
+
+      {/* save as template (#7) — reusable split from the current plan. Saves the
+          persisted plan, so stage + SAVE CHANGES first when editing a live meso. */}
+      {hasExercise && (
+        <form action={saveMesoAsTemplateAction} className="mt-6">
+          <input type="hidden" name="meso_id" value={meso.id} />
+          <button
+            type="submit"
+            className="w-full border-[1.5px] border-ink/40 py-3 text-center text-[11px] font-bold tracking-[0.1em] text-ink/70"
+          >
+            SAVE AS TEMPLATE
+          </button>
+        </form>
       )}
 
       {/* bottom action */}

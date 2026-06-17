@@ -18,12 +18,14 @@ import type { Units } from "@/lib/types/database";
 import { predictRepsAtWeight, type EngineParams } from "@/lib/engine";
 import {
   addSetAction,
+  addWorkoutExercisesAction,
   amendSetAction,
   clearPinnedNoteAction,
   completeWorkoutAction,
   deleteSetAction,
   endMesocycleAction,
   endWorkoutAction,
+  listAddExerciseCandidatesAction,
   listReplacementCandidatesAction,
   logSetAction,
   updateSetWeightAction,
@@ -41,6 +43,7 @@ import {
   unskipAllAction,
   type ReplacementCandidate,
 } from "../actions";
+import type { AddExerciseCandidate } from "@/lib/queries/exercises";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -455,7 +458,6 @@ function DayHeader({
             <WorkoutOptionsMenu
               mesoId={mesoId}
               workoutId={workoutId}
-              dayNumber={dayNumber}
               workoutActive={workoutActive}
               mesoActive={mesoActive}
             />
@@ -479,13 +481,11 @@ function DayHeader({
 function WorkoutOptionsMenu({
   mesoId,
   workoutId,
-  dayNumber,
   workoutActive,
   mesoActive,
 }: {
   mesoId: string;
   workoutId: string;
-  dayNumber: number;
   workoutActive: boolean;
   mesoActive: boolean;
 }) {
@@ -493,6 +493,7 @@ function WorkoutOptionsMenu({
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [, startEnding] = useTransition();
 
   const go = (href: string) => {
@@ -539,11 +540,6 @@ function WorkoutOptionsMenu({
           MESOCYCLE
         </div>
         <MenuRow
-          label="Edit mesocycle"
-          trailing="PLANNER"
-          onClick={() => go(`/cycles/meso/${mesoId}/plan`)}
-        />
-        <MenuRow
           label="Mesocycle stats"
           trailing="STATS"
           onClick={() => go(`/cycles/meso/${mesoId}/stats`)}
@@ -562,11 +558,16 @@ function WorkoutOptionsMenu({
         <div className="border-y border-ink/10 px-4 pb-2 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
           WORKOUT
         </div>
-        <MenuRow
-          label="Edit day"
-          trailing="PLANNER"
-          onClick={() => go(`/cycles/meso/${mesoId}/plan?day=${dayNumber}`)}
-        />
+        {workoutActive && (
+          <MenuRow
+            label="Add exercise"
+            trailing="PICKER"
+            onClick={() => {
+              setOpen(false);
+              setAddOpen(true);
+            }}
+          />
+        )}
         {workoutActive && (
           <MenuRow
             label="End workout"
@@ -578,6 +579,12 @@ function WorkoutOptionsMenu({
           />
         )}
       </AnchoredMenu>
+
+      <AddExerciseSheet
+        open={addOpen}
+        workoutId={workoutId}
+        onClose={() => setAddOpen(false)}
+      />
 
       <BottomSheet
         open={confirm === "workout"}
@@ -1630,10 +1637,13 @@ function ReplaceSheet({
     null,
   );
   const [search, setSearch] = useState("");
+  // #4: repeat the substitution on the same day in future incomplete weeks
+  const [repeat, setRepeat] = useState(false);
 
   useEffect(() => {
     setCandidates(null);
     setSearch("");
+    setRepeat(false);
     if (!we?.muscle_group_id) return;
     listReplacementCandidatesAction(we.muscle_group_id).then(setCandidates);
   }, [we]);
@@ -1663,7 +1673,26 @@ function ReplaceSheet({
         </div>
       </div>
 
-      <div className="mt-3.5 max-h-[46dvh] overflow-y-auto">
+      {/* #4: repeat across the same day in future weeks (incomplete only) */}
+      <button
+        type="button"
+        onClick={() => setRepeat((r) => !r)}
+        aria-pressed={repeat}
+        className="mt-2.5 flex w-full items-center gap-2.5 border border-ink/30 px-3 py-2.5 text-left"
+      >
+        <div
+          className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center text-[11px] ${
+            repeat ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/45"
+          }`}
+        >
+          {repeat ? "✓" : ""}
+        </div>
+        <div className="text-[11.5px] leading-snug text-ink/70">
+          Repeat this change on this day in future weeks
+        </div>
+      </button>
+
+      <div className="mt-3.5 max-h-[42dvh] overflow-y-auto">
         {candidates === null ? (
           <p className="py-4 text-sm text-ink/45">Loading…</p>
         ) : visible.length === 0 ? (
@@ -1679,6 +1708,7 @@ function ReplaceSheet({
                     workout_id: we.workout_id,
                     workout_exercise_id: we.id,
                     exercise_id: c.id,
+                    propagate: repeat,
                   });
                 });
                 onClose();
@@ -1699,6 +1729,210 @@ function ReplaceSheet({
           ))
         )}
       </div>
+    </BottomSheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// add exercise (workout ⋮ menu) — open picker with muscle-group + equipment
+// filters; picks land at the bottom of the day's list and reorder as normal.
+// ---------------------------------------------------------------------------
+
+function AddExerciseSheet({
+  open,
+  workoutId,
+  onClose,
+}: {
+  open: boolean;
+  workoutId: string;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{
+    exercises: AddExerciseCandidate[];
+    muscleGroups: { id: string; name: string }[];
+  } | null>(null);
+  const [search, setSearch] = useState("");
+  const [mg, setMg] = useState<string | null>(null);
+  const [equip, setEquip] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [repeat, setRepeat] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) return;
+    setData(null);
+    setSearch("");
+    setMg(null);
+    setEquip(null);
+    setSelected(new Set());
+    setRepeat(false);
+    listAddExerciseCandidatesAction().then(setData);
+  }, [open]);
+
+  if (!open) return null;
+
+  const exercises = data?.exercises ?? [];
+  const muscleGroups = data?.muscleGroups ?? [];
+  const equipTypes = [...new Set(exercises.map((e) => e.equipment_type))].sort();
+  const q = search.trim().toLowerCase();
+  const visible = exercises
+    .filter((e) => !mg || e.muscle_group_ids.includes(mg))
+    .filter((e) => !equip || e.equipment_type === equip)
+    .filter((e) => !q || e.name.toLowerCase().includes(q))
+    .slice(0, 200);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const add = () => {
+    if (selected.size === 0) return;
+    const ids = [...selected];
+    startTransition(async () => {
+      await addWorkoutExercisesAction({
+        workout_id: workoutId,
+        exercise_ids: ids,
+        propagate: repeat,
+      });
+      onClose();
+    });
+  };
+
+  const chip =
+    "flex h-8 flex-shrink-0 items-center px-3 text-[10px] font-bold tracking-[0.1em]";
+
+  return (
+    <BottomSheet
+      open
+      fullHeight
+      onClose={onClose}
+      title="Add exercise"
+      subtitle="ADDED TO THE BOTTOM — REORDER AS NORMAL"
+    >
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search"
+        className="h-[42px] w-full border-[1.5px] border-ink bg-paper px-3 text-[13px] text-ink placeholder:text-ink/45 focus:outline-none"
+      />
+
+      {/* muscle-group filter */}
+      <div className="mt-2.5 flex gap-1.5 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setMg(null)}
+          className={`${chip} ${mg === null ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
+        >
+          ALL GROUPS
+        </button>
+        {muscleGroups.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => setMg(mg === g.id ? null : g.id)}
+            className={`${chip} ${mg === g.id ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
+          >
+            {g.name.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* equipment filter */}
+      {equipTypes.length > 1 && (
+        <div className="mt-1.5 flex gap-1.5 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setEquip(null)}
+            className={`${chip} ${equip === null ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
+          >
+            ALL EQUIP
+          </button>
+          {equipTypes.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setEquip(equip === t ? null : t)}
+              className={`${chip} ${equip === t ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+        {data === null ? (
+          <p className="py-4 text-sm text-ink/45">Loading…</p>
+        ) : visible.length === 0 ? (
+          <p className="py-4 text-sm text-ink/45">No matches.</p>
+        ) : (
+          visible.map((e) => {
+            const sel = selected.has(e.id);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => toggle(e.id)}
+                className="flex w-full items-center gap-3 border-b border-ink/[0.18] py-[11px] text-left last:border-b-0"
+              >
+                <div
+                  className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-[12px] ${
+                    sel ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/40"
+                  }`}
+                >
+                  {sel ? "✓" : ""}
+                </div>
+                <div className="flex-1">
+                  <div className="text-[15px] font-bold">{e.name}</div>
+                  <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                    {e.equipment_type.toUpperCase()} ·{" "}
+                    {e.last_performed_at
+                      ? `LAST ${shortDate(e.last_performed_at)}`
+                      : "NEVER PERFORMED"}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* repeat across the same day in future incomplete weeks */}
+      <button
+        type="button"
+        onClick={() => setRepeat((r) => !r)}
+        aria-pressed={repeat}
+        className="mt-3 flex w-full items-center gap-2.5 border border-ink/30 px-3 py-2.5 text-left"
+      >
+        <div
+          className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center text-[11px] ${
+            repeat ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/45"
+          }`}
+        >
+          {repeat ? "✓" : ""}
+        </div>
+        <div className="text-[11.5px] leading-snug text-ink/70">
+          Repeat this change on this day in future weeks
+        </div>
+      </button>
+
+      <button
+        type="button"
+        disabled={selected.size === 0 || pending}
+        onClick={add}
+        className="mt-3 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+      >
+        {pending
+          ? "ADDING"
+          : `ADD ${selected.size > 0 ? selected.size : ""} ${selected.size === 1 ? "EXERCISE" : "EXERCISES"}`.replace(
+              "  ",
+              " ",
+            )}
+      </button>
     </BottomSheet>
   );
 }

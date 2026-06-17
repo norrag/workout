@@ -3,12 +3,19 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
 import { RedeemForm } from "@/components/RedeemForm";
+import { startScratchDraftAction } from "../cycles/actions";
+import { TemplateFilters } from "./TemplateFilters";
 
-/** Templates tab (fig 3.3): stock + own templates, search, start-from-template. */
+/** Templates tab (fig 3.3): stock + own templates, search, filters, start-from-template. */
 export default async function TemplatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    days?: string;
+    emphasis?: string;
+    gender?: string;
+  }>;
 }) {
   const supabase = await createClient();
   const {
@@ -16,19 +23,35 @@ export default async function TemplatesPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { q } = await searchParams;
-  const templates = await listTemplates(supabase, { search: q });
+  const { q, days, emphasis, gender } = await searchParams;
+  const templates = await listTemplates(supabase, {
+    search: q,
+    days: days ? Number(days) : undefined,
+    emphasis,
+    gender,
+  });
 
   return (
     <div>
       <div className="flex items-center justify-between">
         <h1 className="title-display text-[32px]">templates</h1>
-        <div className="border-[1.5px] border-ink/30 px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em] text-ink/40">
-          + NEW
-        </div>
+        {/* New template = open the planner board (a fresh draft); build the
+            split there, then SAVE AS TEMPLATE. (#7 — redirect to the planner.) */}
+        <form action={startScratchDraftAction}>
+          <button
+            type="submit"
+            className="border-[1.5px] border-ink px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em]"
+          >
+            + NEW
+          </button>
+        </form>
       </div>
 
       <form method="get">
+        {/* keep active filters when submitting a search */}
+        {days && <input type="hidden" name="days" value={days} />}
+        {emphasis && <input type="hidden" name="emphasis" value={emphasis} />}
+        {gender && <input type="hidden" name="gender" value={gender} />}
         <input
           type="search"
           name="q"
@@ -37,6 +60,7 @@ export default async function TemplatesPage({
           className="mt-4 h-[46px] w-full border-[1.5px] border-ink bg-paper px-3.5 text-sm text-ink placeholder:text-ink/45 focus:outline-none"
         />
       </form>
+      <TemplateFilters days={days} emphasis={emphasis} gender={gender} />
       <RedeemForm />
 
       <div className="mt-4 border-t-[1.5px] border-ink">

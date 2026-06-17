@@ -237,12 +237,17 @@ export default async function MesoDetailPage({
       </div>
 
       <div className="mt-5 flex gap-2.5">
-        <Link
-          href={`/cycles/meso/${meso.id}/plan`}
-          className="flex-1 border-[1.5px] border-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em]"
-        >
-          {meso.status === "planned" ? "EDIT PLAN" : "EDIT WEEKS"}
-        </Link>
+        {/* Once any set is logged the plan is locked here — edits (add/remove/
+            reorder/substitute) are made directly from the workout page so the
+            engine and logged history stay consistent. */}
+        {!deletion.hasHistory && (
+          <Link
+            href={`/cycles/meso/${meso.id}/plan`}
+            className="flex-1 border-[1.5px] border-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em]"
+          >
+            {meso.status === "planned" ? "EDIT PLAN" : "EDIT WEEKS"}
+          </Link>
+        )}
         {meso.status === "active" && nextWorkout && currentMicro ? (
           <Link
             href={`/log/${nextWorkout.id}`}
@@ -256,6 +261,13 @@ export default async function MesoDetailPage({
           </div>
         ) : null}
       </div>
+      {deletion.hasHistory && (
+        <p className="mt-2 text-[11px] leading-normal text-ink/55">
+          This mesocycle has logged workouts, so its plan is locked here. Adjust
+          exercises, order, or substitutions from the workout page — changes carry
+          forward to the same day in future weeks.
+        </p>
+      )}
       <Link
         href={`/cycles/meso/${meso.id}/stats`}
         className="mt-2.5 block border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70"

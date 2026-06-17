@@ -377,6 +377,74 @@ export interface PickerExercise extends ExerciseRow {
   best_reps: number | null;
 }
 
+export interface AddExerciseCandidate {
+  id: string;
+  name: string;
+  equipment_type: string;
+  muscle_group_ids: string[];
+  last_performed_at: string | null;
+}
+
+/** Full picker dataset for the workout "Add exercise" sheet — every visible
+ *  exercise with its muscle groups + equipment (for open filters), exclusions
+ *  removed, plus the muscle-group list for the filter dropdown. */
+export async function getAddExerciseCandidates(
+  supabase: Client,
+  userId: string,
+): Promise<{
+  exercises: AddExerciseCandidate[];
+  muscleGroups: { id: string; name: string }[];
+}> {
+  const [
+    { data: exercises, error: exError },
+    { data: links, error: linkError },
+    { data: muscleGroups, error: mgError },
+    { data: exclusions, error: exclError },
+    { data: prs, error: prError },
+  ] = await Promise.all([
+    supabase.from("exercises").select("id, name, equipment_type").order("name"),
+    supabase.from("exercise_muscle_groups").select("exercise_id, muscle_group_id"),
+    supabase.from("muscle_groups").select("id, name").order("name"),
+    supabase
+      .from("excluded_exercises")
+      .select("exercise_id")
+      .eq("user_id", userId),
+    supabase
+      .from("v_exercise_prs")
+      .select("exercise_id, last_performed_at")
+      .eq("user_id", userId),
+  ]);
+  if (exError) throw exError;
+  if (linkError) throw linkError;
+  if (mgError) throw mgError;
+  if (exclError) throw exclError;
+  if (prError) throw prError;
+
+  const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
+  const mgByExercise = new Map<string, string[]>();
+  for (const l of links ?? []) {
+    const arr = mgByExercise.get(l.exercise_id) ?? [];
+    arr.push(l.muscle_group_id);
+    mgByExercise.set(l.exercise_id, arr);
+  }
+  const lastById = new Map(
+    (prs ?? []).map((p) => [p.exercise_id, p.last_performed_at]),
+  );
+
+  return {
+    exercises: (exercises ?? [])
+      .filter((e) => !excluded.has(e.id))
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        equipment_type: e.equipment_type,
+        muscle_group_ids: mgByExercise.get(e.id) ?? [],
+        last_performed_at: lastById.get(e.id) ?? null,
+      })),
+    muscleGroups: muscleGroups ?? [],
+  };
+}
+
 export async function listPickerExercises(
   supabase: Client,
   userId: string,

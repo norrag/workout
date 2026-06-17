@@ -204,7 +204,9 @@ function registerCreateMesocycle(server: McpServer) {
         status: "planned",
       });
 
-      const days: PlanDayInput[] = args.days.map((day) => ({
+      const days: PlanDayInput[] = args.days.map((day) => {
+        let dayPos = 0; // day-wide order across groups (#2)
+        return {
         day_number: day.day_number,
         label: day.label ?? null,
         weekday: day.weekday ?? null,
@@ -215,9 +217,11 @@ function registerCreateMesocycle(server: McpServer) {
             slot_number: i + 1,
             exercise_id: ex.exercise_id,
             initial_sets: ex.sets ?? 3,
+            day_position: ++dayPos,
           })),
         })),
-      }));
+        };
+      });
       await saveMesoPlan(client, userId, meso.id, days);
 
       const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk, ${args.days.length} day/wk) as planned`;

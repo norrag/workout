@@ -769,6 +769,233 @@ export async function replaceWorkoutExercise(
   return { error: null };
 }
 
+// ---------------------------------------------------------------------------
+// propagation to future same-day workouts (workout-page editing). A reorder or
+// substitution made on a live workout carries forward to the same training day
+// in later, not-yet-started weeks of the same mesocycle (incomplete only).
+// Logged history is never touched (replaceWorkoutExercise no-ops once sets
+// exist). New weeks generate from the prior week's workout, so this only has to
+// reach weeks that were already materialised before the edit.
+// ---------------------------------------------------------------------------
+
+/** Workout ids of the same training day in later (incomplete) weeks of the
+ *  same mesocycle — the targets a reorder/substitution propagates to. */
+export async function getFutureSiblingWorkoutIds(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+): Promise<string[]> {
+  const { data: workout, error: wErr } = await supabase
+    .from("workouts")
+    .select("id, microcycle_id, day_number")
+    .eq("id", workoutId)
+    .maybeSingle();
+  if (wErr) throw wErr;
+  if (!workout) return [];
+
+  const { data: micro, error: mErr } = await supabase
+    .from("microcycles")
+    .select("id, mesocycle_id, week_number")
+    .eq("id", workout.microcycle_id)
+    .maybeSingle();
+  if (mErr) throw mErr;
+  if (!micro) return [];
+
+  const { data: laterMicros, error: lmErr } = await supabase
+    .from("microcycles")
+    .select("id")
+    .eq("mesocycle_id", micro.mesocycle_id)
+    .gt("week_number", micro.week_number);
+  if (lmErr) throw lmErr;
+  const laterIds = (laterMicros ?? []).map((m) => m.id);
+  if (laterIds.length === 0) return [];
+
+  const { data: workouts, error: wsErr } = await supabase
+    .from("workouts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("day_number", workout.day_number)
+    .in("microcycle_id", laterIds)
+    .in("status", ["planned", "in_progress"]);
+  if (wsErr) throw wsErr;
+  return (workouts ?? []).map((w) => w.id);
+}
+
+/** Pure: order a target list to match a source exercise order (by exercise_id).
+ *  Targets not present in the source keep their relative order at the end. */
+export function reorderToMatch<T extends { exercise_id: string }>(
+  targets: T[],
+  sourceExerciseOrder: string[],
+): T[] {
+  const order = new Map<string, number>();
+  sourceExerciseOrder.forEach((id, i) => {
+    if (!order.has(id)) order.set(id, i);
+  });
+  return targets
+    .map((t, idx) => ({
+      t,
+      key: order.get(t.exercise_id) ?? Number.MAX_SAFE_INTEGER,
+      idx,
+    }))
+    .sort((a, b) => a.key - b.key || a.idx - b.idx)
+    .map((x) => x.t);
+}
+
+/** Reorder each target workout's exercises to match the source order (by
+ *  exercise_id). Exercises not present in the source keep their relative order
+ *  at the end. */
+export async function propagateExerciseOrder(
+  supabase: Client,
+  sourceWorkoutId: string,
+  targetWorkoutIds: string[],
+): Promise<void> {
+  if (targetWorkoutIds.length === 0) return;
+  const { data: sourceWes, error: sErr } = await supabase
+    .from("workout_exercises")
+    .select("exercise_id, position")
+    .eq("workout_id", sourceWorkoutId)
+    .order("position");
+  if (sErr) throw sErr;
+  const sourceOrder = (sourceWes ?? []).map((we) => we.exercise_id);
+
+  for (const targetId of targetWorkoutIds) {
+    const { data: targetWes, error: tErr } = await supabase
+      .from("workout_exercises")
+      .select("id, exercise_id, position")
+      .eq("workout_id", targetId)
+      .order("position");
+    if (tErr) throw tErr;
+    const ranked = reorderToMatch(targetWes ?? [], sourceOrder);
+    for (let i = 0; i < ranked.length; i++) {
+      if (ranked[i].position === i + 1) continue; // no unique constraint on position
+      const { error } = await supabase
+        .from("workout_exercises")
+        .update({ position: i + 1 })
+        .eq("id", ranked[i].id);
+      if (error) throw error;
+    }
+  }
+}
+
+/** Substitute oldExerciseId → newExerciseId on each target workout's matching
+ *  unstarted slot. Skips a workout that already has the new exercise; the
+ *  underlying replace no-ops where sets are logged. */
+export async function propagateSubstitution(
+  supabase: Client,
+  userId: string,
+  targetWorkoutIds: string[],
+  oldExerciseId: string,
+  newExerciseId: string,
+): Promise<void> {
+  if (targetWorkoutIds.length === 0 || oldExerciseId === newExerciseId) return;
+  for (const targetId of targetWorkoutIds) {
+    const { data: wes, error } = await supabase
+      .from("workout_exercises")
+      .select("id, exercise_id")
+      .eq("workout_id", targetId);
+    if (error) throw error;
+    const list = wes ?? [];
+    if (list.some((w) => w.exercise_id === newExerciseId)) continue;
+    const target = list.find((w) => w.exercise_id === oldExerciseId);
+    if (!target) continue;
+    await replaceWorkoutExercise(supabase, userId, target.id, newExerciseId);
+  }
+}
+
+/** Add exercises to a live workout (workout-page editing). Each lands at the
+ *  bottom of the list (max position + 1), tagged with its primary muscle group,
+ *  prescription seeded from the user's all-time best — the user reorders as
+ *  normal. Logged history is untouched (these are new pending slots). */
+export async function addWorkoutExercises(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+  exerciseIds: string[],
+): Promise<void> {
+  if (exerciseIds.length === 0) return;
+
+  const { data: maxRow, error: maxErr } = await supabase
+    .from("workout_exercises")
+    .select("position")
+    .eq("workout_id", workoutId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (maxErr) throw maxErr;
+  let pos = maxRow?.position ?? 0;
+
+  const { data: workout, error: wErr } = await supabase
+    .from("workouts")
+    .select("microcycle_id")
+    .eq("id", workoutId)
+    .single();
+  if (wErr) throw wErr;
+  const { data: micro, error: mErr } = await supabase
+    .from("microcycles")
+    .select("target_rir")
+    .eq("id", workout.microcycle_id)
+    .single();
+  if (mErr) throw mErr;
+
+  const [{ data: links, error: linkErr }, { data: prs, error: prErr }] =
+    await Promise.all([
+      supabase
+        .from("exercise_muscle_groups")
+        .select("exercise_id, muscle_group_id")
+        .in("exercise_id", exerciseIds)
+        .eq("role", "primary"),
+      supabase
+        .from("v_exercise_prs")
+        .select("exercise_id, best_weight, best_reps")
+        .eq("user_id", userId)
+        .in("exercise_id", exerciseIds),
+    ]);
+  if (linkErr) throw linkErr;
+  if (prErr) throw prErr;
+  const mgByEx = new Map((links ?? []).map((l) => [l.exercise_id, l.muscle_group_id]));
+  const prByEx = new Map((prs ?? []).map((p) => [p.exercise_id, p]));
+
+  const rows = exerciseIds.map((id) => {
+    const pr = prByEx.get(id);
+    return {
+      workout_id: workoutId,
+      exercise_id: id,
+      muscle_group_id: mgByEx.get(id) ?? null,
+      position: ++pos,
+      prescribed_weight: pr?.best_weight ?? null,
+      prescribed_reps: pr?.best_reps ?? null,
+      prescribed_sets: 3,
+      target_rir: micro.target_rir,
+      status: "pending" as const,
+      notes: "Added during the workout",
+    };
+  });
+  const { error } = await supabase.from("workout_exercises").insert(rows);
+  if (error) throw error;
+}
+
+/** Add the same exercises to each target workout's bottom (workout-page
+ *  add-exercise propagation), skipping any a target already has. */
+export async function propagateAddedExercises(
+  supabase: Client,
+  userId: string,
+  targetWorkoutIds: string[],
+  exerciseIds: string[],
+): Promise<void> {
+  if (targetWorkoutIds.length === 0 || exerciseIds.length === 0) return;
+  for (const targetId of targetWorkoutIds) {
+    const { data: existing, error } = await supabase
+      .from("workout_exercises")
+      .select("exercise_id")
+      .eq("workout_id", targetId);
+    if (error) throw error;
+    const have = new Set((existing ?? []).map((e) => e.exercise_id));
+    const toAdd = exerciseIds.filter((id) => !have.has(id));
+    if (toAdd.length > 0)
+      await addWorkoutExercises(supabase, userId, targetId, toAdd);
+  }
+}
+
 export async function savePinnedNote(
   supabase: Client,
   userId: string,
