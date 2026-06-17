@@ -163,14 +163,19 @@ deployable:
       pure `resolveMuscleGroupIds` + `removeExclusionByExercise`; +7 tests (207). No migration.
       Deviations: create_mesocycle drafts standalone (macro-slot attach in-app); log_note pinned-only;
       no tracking_type on custom exercises (schema gap).)*
-- [ ] **Slice 4 — admin/tuning + replay (role-gated by `profiles.role`).** list/get/diff
+- [x] **Slice 4 — admin/tuning + replay (role-gated by `profiles.role`).** list/get/diff
       `engine_params`, propose_engine_params (inactive, zod-gated), activate_engine_params (explicit
       version-echo confirm), get_engine_decisions (filterable inspector), replay_decisions (re-run
-      historical decisions/mesos against a candidate version via `buildEngineInputs` +
-      `prescribe`/`seedMeso`, return diffs). Synthetic scenario fixtures shared with the test suite.
-- [ ] Likely **one migration**: index `engine_decisions (user_id, exercise_id, created_at,
-      params_version)` for the inspector/replay filters (+ RLS confirm). Rate-limiting + payload
-      caps/pagination + the security pass fold into Phase 7.
+      historical decisions against a candidate version via `prescribe`, return diffs).
+      *(2026-06-17: shipped. 6 admin tools behind `resolveAdmin`; pure `deepMerge`/`diffParams`/
+      `diffPrescription`/`replayDecisions` (+12 tests, 219); `engine-admin.ts` query layer. Replay
+      re-runs the real engine over stored `engine_decisions.inputs`. Inspector/replay scoped to the
+      admin's OWN decisions (keeps rule #5 absolute; cross-user deferred).)*
+- [x] **One migration** (`20260617000001`): additive index `engine_decisions (user_id,
+      params_version, created_at desc)` for the inspector/replay version filter — applied to hosted,
+      no RLS change, no new problematic advisor lints. *(The table has no `exercise_id` column —
+      exercise filtering resolves through `workout_exercises` — so the index keys on `params_version`
+      instead.)* Rate-limiting + payload caps/pagination + the security pass fold into Phase 7.
 
 **Accept:** from Claude, a user gets a grounded meso summary and exercise-selection-aware advice,
 and a drafted next meso appears in-app as planned; an admin changes a progression increment,

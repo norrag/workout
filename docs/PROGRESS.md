@@ -2,7 +2,63 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6 Slice 3: MCP write/planning tools (audited drafts)
+## 2026-06-17 (latest) — Phase 6 Slice 4: MCP admin/tuning + replay (Phase 6 complete)
+
+Final Phase 6 slice — the **admin/tuning + replay** surface, role-gated by
+`profiles.role = 'admin'`. The MCP connector is now the entire admin interface
+(08 §3): inspect decisions → propose a params version → replay real history
+against it → review diffs → activate, all in chat, no admin UI, no deploy. One
+additive index migration. Same branch/PR; `main` deployable. **Phase 6 done.**
+
+### Done
+
+- **Admin tools (`src/lib/mcp/tools/admin.ts`, `registerAdminTools`).**
+  `list_engine_params`, `get_engine_params` (single version or a dot-path **diff**
+  of two), `propose_engine_params` (writes a new **inactive** version; `base_version`
+  + partial overrides deep-merged, then **`engineParamsSchema`-validated** — a
+  malformed set is rejected and can never be activated), `activate_engine_params`
+  (requires `confirm_version` to echo `version`; deactivates the current active
+  first to respect the single-active partial unique index), `get_engine_decisions`
+  (the caller's own decisions, filter by params version / exercise / date), and
+  `replay_decisions` (re-run stored decisions against a candidate version, return
+  load/reps/sets/RIR diffs — read-only, nothing written). Every tool is gated by
+  `resolveAdmin` (denies non-admins); the two writes audit to `mcp_write_audit`.
+- **Pure helpers (exported, unit-tested).** `deepMerge` (nested param overrides
+  without dropping siblings, no mutation), `diffParams` (differing dot-paths),
+  `diffPrescription` (changed prescription fields, ignores rationale prose), and
+  `replayDecisions` (re-runs `prescribe(storedInputs, candidateParams)`, counting
+  changed/errored — malformed historical inputs are counted as errors, never
+  crash the call).
+- **Query layer (`src/lib/queries/engine-admin.ts`).** `listEngineParams`,
+  `getEngineParamsVersion`, `proposeEngineParams`, `activateEngineParams`,
+  `getEngineDecisions`. `engine_params` RLS already gates writes to `is_admin()`,
+  so the admin's own token-bound client suffices — **no service role** for tuning;
+  service role stays only for the `mcp_write_audit` insert.
+- **Migration `20260617000001_engine_decisions_inspector_idx.sql`** (applied to
+  hosted): additive index `engine_decisions (user_id, params_version, created_at
+  desc)` for the inspector/replay version filter. No table/column/RLS change;
+  advisors show no new problematic lints (the index reads "unused" until first
+  query, expected; the pre-existing `auth_rls_initplan` WARN is unrelated).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (219/219, +12), `npm run build`
+green; migration applied to hosted and the index confirmed present. The replay
+path re-runs the **real engine** (`prescribe`) over stored inputs, so a diff is
+exactly what would change. End-to-end admin loop against hosted (propose →
+replay → activate) is the owner's check with an admin account.
+
+### Deviations
+
+- **Inspector/replay are scoped to the calling admin's own decisions** (no
+  `user_id` argument) to keep hard rule #5 absolute. Cross-user admin inspection
+  would need a deliberate rule-5 exception; deferred. In practice an admin tunes
+  against their own real mesos.
+- **`propose_engine_params` takes `base_version` + a partial override** (deep-merged)
+  as the ergonomic path, as well as a full params object — either way the result
+  is schema-validated before storage.
+
+## 2026-06-17 — Phase 6 Slice 3: MCP write/planning tools (audited drafts)
 
 07 Phase 6 **Slice 3** — the write/planning surface. Seven tools that let the
 model propose *structure* while the **engine fills every prescribed number**;

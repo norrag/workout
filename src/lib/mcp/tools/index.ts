@@ -4,6 +4,7 @@ import { registerGetCurrentState } from "./get-current-state";
 import { registerReadTools } from "./read";
 import { registerCoachingTools } from "./coaching";
 import { registerWriteTools } from "./write";
+import { registerAdminTools } from "./admin";
 
 /**
  * Register every MCP tool on the server. Tools are thin, zod-validated wrappers
@@ -18,4 +19,5 @@ export function registerTools(server: McpServer) {
   registerReadTools(server);
   registerCoachingTools(server);
   registerWriteTools(server);
+  registerAdminTools(server);
 }
