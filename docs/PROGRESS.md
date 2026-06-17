@@ -57,6 +57,26 @@ green. **Runtime smoke against the hosted Supabase project:** (1)
 from the token and returns the RLS-scoped state (empty for the fresh test user) as
 text + `structuredContent`.
 
+### Setup runbooks added (2026-06-16 follow-up)
+
+Documented the human-only setup in `docs/deployment/`: `mcp-connector-setup.md`
+(architecture, enable-OAuth-server steps, env-var table, end-to-end test
+recipes) and `manual-operations.md` (standing list of dashboard/secret ops
+Claude can't perform). CLAUDE.md now points at both.
+
+**Hosting clarification:** the MCP server is **co-hosted in the same Next.js app**
+at `/api/mcp` (not a separate Vercel project, unlike the standalone
+`ngs-inventory-mcp` pattern) — deliberate per 05 §Transport (shared query
+layer/engine/views, stateless transport, Supabase is the auth server).
+
+**Found while documenting (important):** Supabase's OAuth server requires the
+app to host a **consent UI** at the configured Authorization Path
+(`/oauth/consent` + `/api/oauth/decision`, via
+`supabase.auth.oauth.getAuthorizationDetails/approve/deny`). This is required
+app code **not built in Slice 1** — without it the authorization-code handshake
+can't complete even once the server is enabled. `@supabase/supabase-js@2.108`
+(installed) exposes the methods. Tracked as the immediate next slice.
+
 ### Remaining / external (carried to follow-up)
 
 - **Enable Supabase's native OAuth 2.1 Server on the hosted project** — the
