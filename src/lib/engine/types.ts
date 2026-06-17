@@ -12,6 +12,13 @@ export const loggedSetInputSchema = z.object({
   reps: z.number().int().min(0),
   rirReported: z.number().int().min(0).max(10).nullable().default(null),
   isWarmup: z.boolean().default(false),
+  // immutable identity of the logged set this input came from + its stable
+  // position in the source workout (P0-4). `setNumber` alone is not a reliable
+  // key — warmup and working sets can both number from 1 — so a decision keyed
+  // only by set number showed duplicates (1, 1, 2). The engine ignores these;
+  // they make the recorded decision auditable back to the exact rows.
+  loggedSetId: z.string().uuid().nullish(),
+  sequenceIndex: z.number().int().min(0).nullish(),
 });
 
 // fig 1.4: joint pain 0–3 per exercise; pump and workload 0–10 sliders
@@ -78,9 +85,22 @@ export type EngineInputs = z.infer<typeof engineInputsSchema>;
 export type LoggedSetInput = z.infer<typeof loggedSetInputSchema>;
 export type PrescriptionBase = z.infer<typeof prescriptionSchema>;
 
+/**
+ * One structured step in the engine's reasoning (P0-4). The human `rationale`
+ * is derived from these on the autoregulation path, so the trace and the prose
+ * can never drift; `rule` is a stable code (performance, feedback, load, rir,
+ * deload, seed, cold_start) callers can group/filter on.
+ */
+export interface DecisionTraceStep {
+  rule: string;
+  detail: string;
+}
+
 export interface Prescription extends PrescriptionBase {
   /** human-readable explanation surfaced in the UI and over MCP */
   rationale: string;
+  /** structured reasoning the rationale is composed from */
+  trace: DecisionTraceStep[];
 }
 
 export type EngineParams = z.infer<typeof engineParamsSchema>;

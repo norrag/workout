@@ -14,6 +14,23 @@ describe("prescribe — performance delta (§3)", () => {
     expect(out.rationale).toMatch(/\+2\.5 kg/);
   });
 
+  it("emits a structured trace the rationale is composed from (P0-4)", () => {
+    const out = prescribe(baseInputs(), params);
+    expect(out.trace.length).toBeGreaterThan(0);
+    // every trace step has a stable rule code + detail
+    for (const step of out.trace) {
+      expect(typeof step.rule).toBe("string");
+      expect(step.detail.length).toBeGreaterThan(0);
+    }
+    // the load step is what drove the +2.5 kg increase
+    expect(out.trace.some((s) => s.rule === "load")).toBe(true);
+    // rationale === the trace details joined, capitalized, terminated
+    const composed =
+      out.trace.map((s) => s.detail).join("; ").replace(/^./, (c) => c.toUpperCase()) +
+      ".";
+    expect(out.rationale).toBe(composed);
+  });
+
   it("scales the increment by experience level", () => {
     const out = prescribe(
       baseInputs({ user: { experienceLevel: "beginner", units: "kg" } }),

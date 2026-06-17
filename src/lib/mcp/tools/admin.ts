@@ -100,7 +100,8 @@ export interface PrescriptionDiff {
 /** Compare a stored prescription with a replayed one (ignores rationale prose). */
 export function diffPrescription(
   stored: Record<string, unknown>,
-  replayed: Prescription,
+  replayed: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir"> &
+    Partial<Pick<Prescription, "rationale" | "trace">>,
 ): PrescriptionDiff {
   const fields: PrescriptionDiff["fields"] = {};
   for (const key of ["weight", "reps", "sets", "targetRir"] as const) {
@@ -332,10 +333,16 @@ function shapeDecisions(decisions: DecisionRecord[]): Record<string, unknown> {
       // linkage so a decision chains into get_exercise_history /
       // explain_prescription / exercise-filtered tools without a re-lookup
       exercise_id: d.exercise_id,
-      workout_exercise_id: d.workout_exercise_id,
       exercise_name: d.exercise_name,
+      workout_exercise_id: d.workout_exercise_id,
+      source_workout_exercise_id: d.source_workout_exercise_id,
+      workout_id: d.workout_id,
+      microcycle_id: d.microcycle_id,
+      mesocycle_id: d.mesocycle_id,
       coordinate: d.coordinate,
       params_version: d.params_version,
+      params_hash: d.params_hash,
+      provenance: d.provenance,
       created_at: d.created_at,
       inputs: d.inputs,
       output: d.output,

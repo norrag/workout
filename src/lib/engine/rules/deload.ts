@@ -32,5 +32,11 @@ export function prescribeDeload(
     sets,
     targetRir: params.deload.target_rir,
     rationale: `Deload: ${Math.round(params.deload.load_pct * 100)}% of peak load, ${sets} sets, ${params.deload.target_rir}+ RIR. Recover before the next block.`,
+    trace: [
+      {
+        rule: "deload",
+        detail: `deload: ${Math.round(params.deload.load_pct * 100)}% of peak load, ${sets} sets, ${params.deload.target_rir}+ RIR`,
+      },
+    ],
   };
 }

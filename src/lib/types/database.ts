@@ -380,9 +380,16 @@ export type EngineDecisionRow = {
   id: string;
   user_id: string;
   workout_exercise_id: string | null;
+  exercise_id: string | null;
+  source_workout_exercise_id: string | null;
+  workout_id: string | null;
+  microcycle_id: string | null;
+  mesocycle_id: string | null;
   inputs: Record<string, unknown>;
   output: Record<string, unknown>;
   params_version: number;
+  params_hash: string | null;
+  provenance: Record<string, unknown> | null;
   created_at: string;
 }
 

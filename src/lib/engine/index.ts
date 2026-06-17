@@ -8,6 +8,7 @@ import {
   engineInputsSchema,
   type EngineInputs,
   type Prescription,
+  type DecisionTraceStep,
 } from "./types";
 import { assessPerformance } from "./rules/performance";
 import { modulateFromFeedback } from "./rules/feedback";
@@ -68,7 +69,7 @@ export function prescribe(
     return prescribeDeload(inputs, params);
   }
 
-  const reasons: string[] = [];
+  const reasons: DecisionTraceStep[] = [];
 
   // §1 anchor on actuals
   const perf = assessPerformance(inputs, params.small_miss_reps);
@@ -95,6 +96,12 @@ export function prescribe(
       sets: clampSets(base.sets, params),
       targetRir: inputs.week.targetRir,
       rationale: `Starting prescription at ${inputs.week.targetRir} RIR (${perf.detail}).`,
+      trace: [
+        {
+          rule: "cold_start",
+          detail: `starting prescription at ${inputs.week.targetRir} RIR (${perf.detail})`,
+        },
+      ],
     };
   }
 
@@ -106,7 +113,7 @@ export function prescribe(
 
   // §4 feedback modulation (computed first: the pain gate caps §3 increases)
   const mod = modulateFromFeedback(inputs, params);
-  reasons.push(...mod.notes);
+  reasons.push(...mod.notes.map((detail) => ({ rule: "feedback", detail })));
 
   // §2 RIR step: dropping target RIR with the same load is itself progression
   const prevRir = inputs.previous?.targetRir ?? inputs.week.targetRir;
@@ -125,38 +132,45 @@ export function prescribe(
     const wantsLoad = style === "load_first" || perf.outcome === "beat";
     if (wantsLoad && !mod.painGated && !mod.sessionDampened) {
       weight = baseWeight + increment;
-      reasons.unshift(
-        `+${increment} ${inputs.user.units}: ${perf.detail}`,
-      );
+      reasons.unshift({
+        rule: "load",
+        detail: `+${increment} ${inputs.user.units}: ${perf.detail}`,
+      });
       if (rirStepped) {
-        reasons.push(
-          `target RIR steps ${prevRir} to ${inputs.week.targetRir}`,
-        );
+        reasons.push({
+          rule: "rir",
+          detail: `target RIR steps ${prevRir} to ${inputs.week.targetRir}`,
+        });
       }
     } else if (style === "reps_first" && !mod.sessionDampened) {
       reps = baseReps + 1;
-      reasons.unshift(`+1 rep: ${perf.detail}`);
+      reasons.unshift({ rule: "load", detail: `+1 rep: ${perf.detail}` });
     } else {
       weight = baseWeight;
       if (mod.painGated || mod.sessionDampened) {
-        reasons.unshift(`hold ${baseWeight} ${inputs.user.units}: ${perf.detail}`);
+        reasons.unshift({
+          rule: "load",
+          detail: `hold ${baseWeight} ${inputs.user.units}: ${perf.detail}`,
+        });
       } else {
-        reasons.unshift(
-          rirStepped
+        reasons.unshift({
+          rule: "load",
+          detail: rirStepped
             ? `hold load; RIR drop ${prevRir} to ${inputs.week.targetRir} is the progression (${perf.detail})`
             : `hold steady per ${inputs.goalType} goal (${perf.detail})`,
-        );
+        });
       }
     }
   } else if (perf.outcome === "small_miss") {
     weight = baseWeight;
-    reasons.unshift(`hold load, close miss: ${perf.detail}`);
+    reasons.unshift({ rule: "load", detail: `hold load, close miss: ${perf.detail}` });
   } else {
     // big miss
     weight = baseWeight * params.regression_pct;
-    reasons.unshift(
-      `-${Math.round((1 - params.regression_pct) * 100)}% load: ${perf.detail}`,
-    );
+    reasons.unshift({
+      rule: "load",
+      detail: `-${Math.round((1 - params.regression_pct) * 100)}% load: ${perf.detail}`,
+    });
   }
 
   // pain gate is a hard bound: never above what was actually handled
@@ -182,7 +196,9 @@ export function prescribe(
     reps,
     sets,
     targetRir: inputs.week.targetRir,
-    rationale: capitalize(reasons.join("; ") + "."),
+    // rationale is derived from the trace so the two can never drift (P0-4)
+    rationale: capitalize(reasons.map((r) => r.detail).join("; ") + "."),
+    trace: reasons,
   };
 }
 
@@ -208,6 +224,12 @@ export function seedMeso(
       sets: clampSets(priorPeak.sets, params),
       targetRir: startRir,
       rationale: `Seeded from prior meso peak, backed off ${Math.round((1 - params.meso_seed_backoff_pct) * 100)}% to start at ${startRir} RIR.`,
+      trace: [
+        {
+          rule: "seed",
+          detail: `seeded from prior meso peak, backed off ${Math.round((1 - params.meso_seed_backoff_pct) * 100)}% to start at ${startRir} RIR`,
+        },
+      ],
     };
   }
   return {
@@ -219,6 +241,12 @@ export function seedMeso(
     sets: clampSets(initial?.sets ?? params.min_sets, params),
     targetRir: startRir,
     rationale: `No prior history; starting from plan defaults at ${startRir} RIR.`,
+    trace: [
+      {
+        rule: "seed",
+        detail: `no prior history; starting from plan defaults at ${startRir} RIR`,
+      },
+    ],
   };
 }
 

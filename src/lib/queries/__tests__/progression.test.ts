@@ -173,6 +173,12 @@ describe("buildEngineInputs", () => {
     });
   });
 
+  it("carries the immutable logged_set id + stable sequence index (P0-4)", () => {
+    const inputs = buildEngineInputs(base);
+    expect(inputs.actualSets[0]).toMatchObject({ loggedSetId: "s-1", sequenceIndex: 0 });
+    expect(inputs.actualSets[1]).toMatchObject({ loggedSetId: "s-2", sequenceIndex: 1 });
+  });
+
   it("tolerates missing feedback and null prescription fields", () => {
     const inputs = buildEngineInputs({
       ...base,
