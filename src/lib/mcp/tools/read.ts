@@ -150,6 +150,46 @@ export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
     return { found: false, summary: "No mesocycle with that id is visible to the user." };
   }
   const { meso, days } = plan;
+  // every level carries the id that chains into the next tool (P1-2):
+  // muscle_group_id → get_muscle_group_volume, exercise_id → get_exercise_history
+  // / explain_prescription, day_id / slot_id for precise addressing. Plus planned-
+  // set totals (the initial, week-1 prescription) per slot, group, day, and meso.
+  let mesoPlannedSets = 0;
+  const shapedDays = days.map((day) => {
+    let dayPlannedSets = 0;
+    const groups = day.groups.map((g) => {
+      let groupPlannedSets = 0;
+      const exercises = g.fills.map((f) => {
+        const sets = f.initial_sets ?? 0;
+        groupPlannedSets += sets;
+        return {
+          slot_id: f.id,
+          slot_number: f.slot_number,
+          exercise_id: f.exercise_id,
+          exercise_name: f.exercise_name,
+          planned_sets: f.initial_sets,
+        };
+      });
+      dayPlannedSets += groupPlannedSets;
+      return {
+        group_id: g.id,
+        muscle_group_id: g.muscle_group_id,
+        muscle_group: g.muscle_group,
+        exercise_slots: g.exercise_slots,
+        planned_sets: groupPlannedSets,
+        exercises,
+      };
+    });
+    mesoPlannedSets += dayPlannedSets;
+    return {
+      day_id: day.id,
+      day_number: day.day_number,
+      label: day.label,
+      weekday: day.weekday,
+      planned_sets: dayPlannedSets,
+      groups,
+    };
+  });
   return {
     found: true,
     mesocycle: {
@@ -163,21 +203,12 @@ export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
       rir_ramp: { start: meso.rir_start, end: meso.rir_end },
       status: meso.status,
       start_date: meso.start_date,
+      planned_sets_per_week: mesoPlannedSets,
     },
-    days: days.map((day) => ({
-      day_number: day.day_number,
-      label: day.label,
-      weekday: day.weekday,
-      groups: day.groups.map((g) => ({
-        muscle_group: g.muscle_group,
-        exercise_slots: g.exercise_slots,
-        exercises: g.fills.map((f) => ({
-          slot_number: f.slot_number,
-          exercise_name: f.exercise_name,
-          planned_sets: f.initial_sets,
-        })),
-      })),
-    })),
+    days: shapedDays,
+    note:
+      "planned_sets are the week-1 prescription; the engine autoregulates per " +
+      "week from there — use get_muscle_group_volume for planned-vs-logged by week.",
   };
 }
 

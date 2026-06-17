@@ -166,15 +166,19 @@ describe("formatMesoPlan", () => {
       },
       days: [
         {
+          id: "day-1",
           day_number: 1,
           label: "Push",
           weekday: 1,
           groups: [
             {
+              id: "grp-1",
+              muscle_group_id: "mg-chest",
               muscle_group: "Chest",
               exercise_slots: 2,
               fills: [
-                { slot_number: 1, exercise_name: "Bench Press", initial_sets: 3 },
+                { id: "slot-1", exercise_id: "ex-bench", slot_number: 1, exercise_name: "Bench Press", initial_sets: 3 },
+                { id: "slot-2", exercise_id: "ex-fly", slot_number: 2, exercise_name: "Fly", initial_sets: 2 },
               ],
             },
           ],
@@ -184,12 +188,22 @@ describe("formatMesoPlan", () => {
     const out = formatMesoPlan(plan) as Record<string, unknown>;
     expect(out.found).toBe(true);
     const days = out.days as Record<string, unknown>[];
+    expect(days[0]).toMatchObject({ day_id: "day-1", planned_sets: 5 });
     const group = (days[0].groups as Record<string, unknown>[])[0];
-    expect(group.muscle_group).toBe("Chest");
+    expect(group).toMatchObject({
+      group_id: "grp-1",
+      muscle_group_id: "mg-chest",
+      muscle_group: "Chest",
+      planned_sets: 5,
+    });
     expect((group.exercises as Record<string, unknown>[])[0]).toMatchObject({
+      slot_id: "slot-1",
+      exercise_id: "ex-bench",
       exercise_name: "Bench Press",
       planned_sets: 3,
     });
+    // meso-level total chains the plan into a weekly-volume comparison
+    expect((out.mesocycle as Record<string, unknown>).planned_sets_per_week).toBe(5);
   });
 });
 
