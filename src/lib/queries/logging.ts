@@ -974,6 +974,28 @@ export async function addWorkoutExercises(
   if (error) throw error;
 }
 
+/** Add the same exercises to each target workout's bottom (workout-page
+ *  add-exercise propagation), skipping any a target already has. */
+export async function propagateAddedExercises(
+  supabase: Client,
+  userId: string,
+  targetWorkoutIds: string[],
+  exerciseIds: string[],
+): Promise<void> {
+  if (targetWorkoutIds.length === 0 || exerciseIds.length === 0) return;
+  for (const targetId of targetWorkoutIds) {
+    const { data: existing, error } = await supabase
+      .from("workout_exercises")
+      .select("exercise_id")
+      .eq("workout_id", targetId);
+    if (error) throw error;
+    const have = new Set((existing ?? []).map((e) => e.exercise_id));
+    const toAdd = exerciseIds.filter((id) => !have.has(id));
+    if (toAdd.length > 0)
+      await addWorkoutExercises(supabase, userId, targetId, toAdd);
+  }
+}
+
 export async function savePinnedNote(
   supabase: Client,
   userId: string,

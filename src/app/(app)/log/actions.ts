@@ -21,6 +21,7 @@ import {
   endWorkout,
   getFutureSiblingWorkoutIds,
   logSet,
+  propagateAddedExercises,
   propagateExerciseOrder,
   propagateSubstitution,
   setPlannedSetWeight,
@@ -452,12 +453,15 @@ export async function listAddExerciseCandidatesAction(): Promise<{
 const addExercisesSchema = z.object({
   workout_id: z.string().uuid(),
   exercise_ids: z.array(z.string().uuid()).min(1).max(20),
+  // #4: also add to the same day in future incomplete weeks
+  propagate: z.boolean().optional(),
 });
 
 /** Add picked exercises to the bottom of a live workout (workout-page editing). */
 export async function addWorkoutExercisesAction(input: {
   workout_id: string;
   exercise_ids: string[];
+  propagate?: boolean;
 }): Promise<void> {
   const parsed = addExercisesSchema.parse(input);
   const { supabase, user } = await requireUser();
@@ -467,6 +471,19 @@ export async function addWorkoutExercisesAction(input: {
     parsed.workout_id,
     parsed.exercise_ids,
   );
+  if (parsed.propagate) {
+    const siblings = await getFutureSiblingWorkoutIds(
+      supabase,
+      user.id,
+      parsed.workout_id,
+    );
+    await propagateAddedExercises(
+      supabase,
+      user.id,
+      siblings,
+      parsed.exercise_ids,
+    );
+  }
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }

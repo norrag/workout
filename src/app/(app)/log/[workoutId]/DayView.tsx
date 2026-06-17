@@ -1668,7 +1668,7 @@ function ReplaceSheet({
           {repeat ? "✓" : ""}
         </div>
         <div className="text-[11.5px] leading-snug text-ink/70">
-          Repeat this swap on this day in future weeks
+          Repeat this change on this day in future weeks
         </div>
       </button>
 
@@ -1735,6 +1735,7 @@ function AddExerciseSheet({
   const [mg, setMg] = useState<string | null>(null);
   const [equip, setEquip] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [repeat, setRepeat] = useState(false);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -1744,6 +1745,7 @@ function AddExerciseSheet({
     setMg(null);
     setEquip(null);
     setSelected(new Set());
+    setRepeat(false);
     listAddExerciseCandidatesAction().then(setData);
   }, [open]);
 
@@ -1771,7 +1773,11 @@ function AddExerciseSheet({
     if (selected.size === 0) return;
     const ids = [...selected];
     startTransition(async () => {
-      await addWorkoutExercisesAction({ workout_id: workoutId, exercise_ids: ids });
+      await addWorkoutExercisesAction({
+        workout_id: workoutId,
+        exercise_ids: ids,
+        propagate: repeat,
+      });
       onClose();
     });
   };
@@ -1875,11 +1881,30 @@ function AddExerciseSheet({
         )}
       </div>
 
+      {/* repeat across the same day in future incomplete weeks */}
+      <button
+        type="button"
+        onClick={() => setRepeat((r) => !r)}
+        aria-pressed={repeat}
+        className="mt-3 flex w-full items-center gap-2.5 border border-ink/30 px-3 py-2.5 text-left"
+      >
+        <div
+          className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center text-[11px] ${
+            repeat ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/45"
+          }`}
+        >
+          {repeat ? "✓" : ""}
+        </div>
+        <div className="text-[11.5px] leading-snug text-ink/70">
+          Repeat this change on this day in future weeks
+        </div>
+      </button>
+
       <button
         type="button"
         disabled={selected.size === 0 || pending}
         onClick={add}
-        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+        className="mt-3 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
       >
         {pending
           ? "ADDING"
