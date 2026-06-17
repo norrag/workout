@@ -13,6 +13,22 @@ export interface AuthFormState {
   error: string | null;
 }
 
+/**
+ * Only allow same-origin relative redirects (e.g. the OAuth consent return
+ * path). Prevents an open redirect via a crafted `?redirect=` value.
+ */
+function safeRedirect(value: FormDataEntryValue | null): string {
+  if (typeof value !== "string") return "/workout";
+  if (
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.startsWith("/\\")
+  ) {
+    return value;
+  }
+  return "/workout";
+}
+
 export async function signIn(
   _prev: AuthFormState,
   formData: FormData,
@@ -29,7 +45,7 @@ export async function signIn(
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) return { error: error.message };
 
-  redirect("/workout");
+  redirect(safeRedirect(formData.get("redirect")));
 }
 
 export async function signUp(

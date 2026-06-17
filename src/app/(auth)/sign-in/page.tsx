@@ -1,18 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn, type AuthFormState } from "../actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 const initialState: AuthFormState = { error: null };
 
+/** Carries an optional `?redirect=` (e.g. the OAuth consent return path). */
+function RedirectField() {
+  const redirectTo = useSearchParams().get("redirect") ?? "";
+  return redirectTo ? (
+    <input type="hidden" name="redirect" value={redirectTo} />
+  ) : null;
+}
+
 export default function SignInPage() {
   const [state, formAction, pending] = useActionState(signIn, initialState);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      <Suspense fallback={null}>
+        <RedirectField />
+      </Suspense>
       <Input
         label="Email"
         name="email"

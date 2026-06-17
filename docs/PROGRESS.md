@@ -2,7 +2,49 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-16 (latest) — Phase 6 Slice 1: MCP transport + auth + get_current_state
+## 2026-06-17 (latest) — Phase 6: OAuth consent UI (connector handshake completable)
+
+Builds the app-side **OAuth 2.1 consent flow** the Supabase OAuth server
+requires, so an MCP client (Claude) can complete the authorization-code
+handshake against WORKOUT. Human dashboard steps were completed by the owner
+(OAuth server enabled, Authorization Path `/oauth/consent`, Site URL/redirects);
+verified the AS discovery + dynamic client registration are live. `main`
+deployable; no schema change.
+
+### Done
+
+- **Consent screen** `src/app/oauth/consent/page.tsx` — Supabase redirects here
+  with `authorization_id`; the page requires a signed-in user (else
+  `/sign-in?redirect=…` preserving the id), fetches
+  `supabase.auth.oauth.getAuthorizationDetails`, and renders a ledger-styled
+  consent screen (client name, account, redirect URI, requested scopes with
+  plain-language labels) + Deny/Approve. Auto-redirects when already consented;
+  graceful states for missing/invalid `authorization_id`.
+- **Decision handler** `src/app/api/oauth/decision/route.ts` — POST calls
+  `approveAuthorization` / `denyAuthorization` as the signed-in user (no
+  `user_id` trusted) and 302s to Supabase's returned client `redirect_url`.
+- **Sign-in redirect** — `signIn` honors a **same-origin** `?redirect=` param
+  (`safeRedirect` guards against open redirects); the sign-in page carries it as
+  a hidden field (Suspense-wrapped `useSearchParams`). Middleware now treats
+  `/oauth/consent` + `/api/oauth/decision` as public (they manage their own
+  auth and must preserve the id).
+
+### Verified
+
+`typecheck`, `lint`, `test` (160/160), `build` green. Runtime smoke on the built
+server: `/oauth/consent` with no id → graceful 200; with an id but no session →
+307 to `/sign-in?redirect=…` (id preserved); `/api/oauth/decision` → 400 (no id)
+/ 307 to sign-in (no session). Confirmed against hosted Supabase: AS discovery
+returns full metadata (incl. `registration_endpoint`) and **dynamic client
+registration** returns a `client_id`. Full Claude connect (consent → token →
+`get_current_state`) is the owner's end-to-end check (runbook Test C).
+
+### Deviations
+
+- No mockup for the consent screen — house ledger style (recorded).
+- A test OAuth client was registered via DCR during the smoke check (harmless).
+
+## 2026-06-16 — Phase 6 Slice 1: MCP transport + auth + get_current_state
 
 First MCP connector slice (07 Phase 6, slice 1). `/api/mcp` is live as a
 Streamable-HTTP **resource server** that validates Supabase-issued bearer JWTs
