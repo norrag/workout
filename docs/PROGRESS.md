@@ -2,6 +2,72 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-17 (latest) — Responsiveness Slice 2: instant nav skeletons + request dedup
+
+Builds on Slice 1. Makes page switches paint immediately and trims redundant
+per-render queries.
+
+### Done
+
+- **Route loading boundaries.** `(app)/loading.tsx` (generic tab skeleton) plus
+  DayView-shaped overrides at `(app)/workout/loading.tsx` and
+  `(app)/log/[workoutId]/loading.tsx`. Paired with the Slice 1 BottomNav
+  prefetch, a tapped tab now paints a skeleton instantly instead of blocking on
+  the RSC fetch. New `Skeleton` + `DayViewSkeleton` primitives (square, ink-wash,
+  pulse disabled under prefers-reduced-motion).
+- **Request-level dedup.** `getActiveEngineParams` wrapped in React `cache()` —
+  it was read twice per `/log` and `/workout` render (page + `getWorkoutDetail`).
+  Safe: the active params are global and immutable within a request. `getProfile`
+  deliberately left uncached (can change mid-request after an update).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run build` green.
+
+## 2026-06-17 — Responsiveness Slice 1: set-logging hot path + nav feedback
+
+First slice of a broader speed/responsiveness pass. Goal: every common action
+acknowledges the tap **immediately**, and background writes never block the UI.
+
+### Done
+
+- **`LogCheckbox` (`src/components/ui/LogCheckbox.tsx`).** The set LOG control as
+  a single 21px square with three states: empty outline → **in-flight perimeter
+  spinner** (the outline itself with a gap travelling the perimeter, an animated
+  SVG `stroke-dashoffset` with `pathLength=100`) → filled `✓`. Honors
+  `prefers-reduced-motion` (gap pulses in place instead of travelling). Brief
+  shake + rollback on failure.
+- **Background set logging.** `SetRow` now logs via a **per-row `useTransition`**
+  so only the tapped box spins; the write is fire-and-forget. **Removed the
+  redundant `router.refresh()`** — the server action already `revalidatePath`s,
+  so the box resolved via the action's own RSC refresh instead of a *second*
+  full `getWorkoutDetail` refetch (13 round-trips + a 600-set e1RM scan) per tap.
+  Uncheck uses the same path. On failure the box rolls back (shake) and a quiet
+  toast appears.
+- **Toast surface (`src/components/ui/Toast.tsx`).** Minimal context provider
+  mounted in `(app)/layout.tsx` for non-blocking write failures (online-only, no
+  offline outbox, per CLAUDE.md hard rule #9).
+- **Nav feedback (`BottomNav`).** Explicit `prefetch` + `useLinkStatus` so a
+  tapped tab marks itself (■ cue + pulse) instantly, before the next route paints.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (219/219), `npm run build`
+all green.
+
+### Roadmap (later slices, not in this PR)
+
+- Tag-scoped caching so logging a set invalidates only the sets, not the cached
+  e1RM anchors; cache the recency-weighted anchors so they aren't recomputed per
+  tap. Per-route `loading.tsx` skeletons. Stale-while-revalidate for read-heavy
+  stats/history surfaces.
+
+### Deviations
+
+- Logging is **spinner-on-control**, not blind-optimistic: the box shows the
+  in-flight spinner until the server confirms, then flips to `✓` (owner's choice).
+  This keeps the LOG box honest about persisted state while still acknowledging
+  the tap instantly.
 ## 2026-06-17 (latest) — Feedback batch 2: template filters, multi-slot fix, workout add-exercise, menu cleanup
 
 On-device follow-up to the previous batch. Same branch/PR (#27); `main`

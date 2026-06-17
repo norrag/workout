@@ -83,3 +83,58 @@ body {
   letter-spacing: 0.22em;
   text-transform: lowercase;
 }
+
+/*
+ * LogCheckbox in-flight state — a gap travels around the square outline while a
+ * set write is in the background. pathLength is normalised to 100 so the dash
+ * geometry is square-size-independent.
+ */
+.log-checkbox-gap {
+  stroke-dasharray: 80 20;
+  stroke-dashoffset: 0;
+  animation: log-gap-travel 0.8s linear infinite;
+}
+
+@keyframes log-gap-travel {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+/* Brief shake when a background write rolls back on failure. */
+.log-checkbox-shake {
+  animation: log-checkbox-shake 0.32s ease-in-out;
+}
+
+@keyframes log-checkbox-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No travelling gap — pulse the static outline instead. */
+  .log-checkbox-gap {
+    animation: log-checkbox-pulse 1.1s ease-in-out infinite;
+  }
+  .log-checkbox-shake {
+    animation: none;
+  }
+}
+
+@keyframes log-checkbox-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
