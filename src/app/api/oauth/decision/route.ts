@@ -28,6 +28,7 @@ export async function POST(request: Request): Promise<Response> {
   } = await supabase.auth.getUser();
   if (!user) {
     // Session expired mid-flow — send back to sign in, returning to consent.
+    // 303 so the browser issues a GET to the sign-in page (this is a POST).
     return NextResponse.redirect(
       new URL(
         `/sign-in?redirect=${encodeURIComponent(
@@ -35,6 +36,7 @@ export async function POST(request: Request): Promise<Response> {
         )}`,
         request.url,
       ),
+      303,
     );
   }
 
@@ -50,5 +52,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  return NextResponse.redirect(data.redirect_url);
+  // 303 See Other: this handler is reached by POST (the consent form), but the
+  // OAuth client's redirect_uri callback expects a GET. 303 forces the method
+  // to GET; the default (307) would replay the POST and the client returns
+  // "Method Not Allowed".
+  return NextResponse.redirect(data.redirect_url, 303);
 }
