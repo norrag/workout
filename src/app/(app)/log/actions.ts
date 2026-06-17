@@ -14,7 +14,10 @@ import {
   deleteLoggedSet,
   endMesocycle,
   endWorkout,
+  getFutureSiblingWorkoutIds,
   logSet,
+  propagateExerciseOrder,
+  propagateSubstitution,
   setPlannedSetWeight,
   removeWorkoutExercise,
   replaceWorkoutExercise,
@@ -384,21 +387,49 @@ const replaceSchema = z.object({
   workout_id: z.string().uuid(),
   workout_exercise_id: z.string().uuid(),
   exercise_id: z.string().uuid(),
+  // #4: also substitute on the same day in future incomplete weeks
+  propagate: z.boolean().optional(),
 });
 
 export async function replaceExerciseAction(input: {
   workout_id: string;
   workout_exercise_id: string;
   exercise_id: string;
+  propagate?: boolean;
 }): Promise<{ error: string | null }> {
   const parsed = replaceSchema.parse(input);
   const { supabase, user } = await requireUser();
+
+  // capture the outgoing movement before the swap so we can find it in the
+  // future workouts (which still hold the old exercise).
+  const { data: current } = await supabase
+    .from("workout_exercises")
+    .select("exercise_id")
+    .eq("id", parsed.workout_exercise_id)
+    .maybeSingle();
+
   const result = await replaceWorkoutExercise(
     supabase,
     user.id,
     parsed.workout_exercise_id,
     parsed.exercise_id,
   );
+
+  if (!result.error && parsed.propagate && current?.exercise_id) {
+    const siblings = await getFutureSiblingWorkoutIds(
+      supabase,
+      user.id,
+      parsed.workout_id,
+    );
+    await propagateSubstitution(
+      supabase,
+      user.id,
+      siblings,
+      current.exercise_id,
+      parsed.exercise_id,
+    );
+  }
+
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
   return result;
@@ -428,13 +459,15 @@ export async function listReplacementCandidatesAction(
   }));
 }
 
-/** Swap an exercise with its neighbour (delta -1 = up, +1 = down). */
+/** Swap an exercise with its neighbour (delta -1 = up, +1 = down). The new
+ *  order is persisted and carried forward to the same training day in future
+ *  incomplete weeks of the mesocycle (#4 — reorders propagate automatically). */
 async function moveExercise(
   workoutId: string,
   workoutExerciseId: string,
   delta: -1 | 1,
 ): Promise<void> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { data: wes, error } = await supabase
     .from("workout_exercises")
     .select("id, position")
@@ -457,6 +490,11 @@ async function moveExercise(
     .update({ position: a.position })
     .eq("id", b.id);
   if (e2) throw e2;
+
+  // carry the new order forward to later weeks' same day (incomplete only)
+  const siblings = await getFutureSiblingWorkoutIds(supabase, user.id, workoutId);
+  await propagateExerciseOrder(supabase, workoutId, siblings);
+
   revalidatePath(`/log/${workoutId}`);
   revalidatePath("/workout");
 }

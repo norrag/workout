@@ -1610,10 +1610,13 @@ function ReplaceSheet({
     null,
   );
   const [search, setSearch] = useState("");
+  // #4: repeat the substitution on the same day in future incomplete weeks
+  const [repeat, setRepeat] = useState(false);
 
   useEffect(() => {
     setCandidates(null);
     setSearch("");
+    setRepeat(false);
     if (!we?.muscle_group_id) return;
     listReplacementCandidatesAction(we.muscle_group_id).then(setCandidates);
   }, [we]);
@@ -1643,7 +1646,26 @@ function ReplaceSheet({
         </div>
       </div>
 
-      <div className="mt-3.5 max-h-[46dvh] overflow-y-auto">
+      {/* #4: repeat across the same day in future weeks (incomplete only) */}
+      <button
+        type="button"
+        onClick={() => setRepeat((r) => !r)}
+        aria-pressed={repeat}
+        className="mt-2.5 flex w-full items-center gap-2.5 border border-ink/30 px-3 py-2.5 text-left"
+      >
+        <div
+          className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center text-[11px] ${
+            repeat ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/45"
+          }`}
+        >
+          {repeat ? "✓" : ""}
+        </div>
+        <div className="text-[11.5px] leading-snug text-ink/70">
+          Repeat this swap on this day in future weeks
+        </div>
+      </button>
+
+      <div className="mt-3.5 max-h-[42dvh] overflow-y-auto">
         {candidates === null ? (
           <p className="py-4 text-sm text-ink/45">Loading…</p>
         ) : visible.length === 0 ? (
@@ -1659,6 +1681,7 @@ function ReplaceSheet({
                     workout_id: we.workout_id,
                     workout_exercise_id: we.id,
                     exercise_id: c.id,
+                    propagate: repeat,
                   });
                 });
                 onClose();
