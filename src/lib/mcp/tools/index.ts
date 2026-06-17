@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerGetCurrentState } from "./get-current-state";
 import { registerReadTools } from "./read";
 import { registerCoachingTools } from "./coaching";
+import { registerWriteTools } from "./write";
 
 /**
  * Register every MCP tool on the server. Tools are thin, zod-validated wrappers
@@ -16,4 +17,5 @@ export function registerTools(server: McpServer) {
   registerGetCurrentState(server);
   registerReadTools(server);
   registerCoachingTools(server);
+  registerWriteTools(server);
 }

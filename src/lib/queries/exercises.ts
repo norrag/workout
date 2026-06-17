@@ -297,6 +297,21 @@ export async function removeExclusion(
   if (error) throw error;
 }
 
+/** Remove an exclusion addressed by exercise (the MCP knows exercise ids, not
+ * exclusion-row ids). No-op if the exercise isn't excluded. */
+export async function removeExclusionByExercise(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("excluded_exercises")
+    .delete()
+    .eq("user_id", userId)
+    .eq("exercise_id", exerciseId);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // pinned notes (figs 1.1/1.2)
 // ---------------------------------------------------------------------------

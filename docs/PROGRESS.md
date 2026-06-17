@@ -2,7 +2,61 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6 Slice 2b: MCP coaching suite
+## 2026-06-17 (latest) — Phase 6 Slice 3: MCP write/planning tools (audited drafts)
+
+07 Phase 6 **Slice 3** — the write/planning surface. Seven tools that let the
+model propose *structure* while the **engine fills every prescribed number**;
+all writes are draft/append, RLS-scoped, and recorded to `mcp_write_audit`. No
+deletes of logged history (hard rule #5). Same branch/PR; `main` deployable; no
+schema change.
+
+### Done
+
+- **Write tools (`src/lib/mcp/tools/write.ts`, `registerWriteTools`).**
+  `create_macrocycle` (engine `planMacrocycle` sizes target/timeframe/meso-count/
+  phases + unplanned placeholders), `create_mesocycle` (groups-first → `planned`
+  for in-app review; engine sets numbers on activation), `create_template` (from
+  an existing meso), `create_custom_exercise`, `update_macrocycle_goals` (engine
+  re-plans unplanned slots only; locked mesos + logged history immutable),
+  `manage_exclusions` (add/remove by exercise), `log_note` (durable pinned note;
+  empty clears). Each validates with zod, resolves identity from the session,
+  and returns a friendly `{ ok, … }` result.
+- **Audit trail (`src/lib/mcp/audit.ts`).** `recordMcpWrite(userId, tool, args,
+  summary)` writes one `mcp_write_audit` row per successful write — tool name, a
+  **sha256 hash of the args** (not the raw note text), and a short summary. The
+  table has no user-insert policy, so this is the single service-role write site
+  (hard rule #4), always with the server-derived `userId`. `hashArgs` is pure +
+  unit-tested.
+- **Pure `resolveMuscleGroupIds`.** Maps requested muscle-group names → library
+  ids (case-insensitive, trimmed), collecting unknowns so a typo fails cleanly
+  instead of silently dropping a group. Unit-tested.
+- **New query reader.** `removeExclusionByExercise` (exercises.ts) — the MCP
+  addresses exclusions by exercise id, not exclusion-row id.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (207/207, +7), `npm run build`
+green. Write paths reuse the smoke-tested app query layer (`createMacrocycleWithMesos`/
+`saveMesoPlan`/`updateMacrocycle`/`createCustomExercise`/`savePinnedNote`), all
+user-scoped through existing RLS; the engine — not the model — fills prescriptions.
+End-to-end drafting against hosted (verify a drafted meso surfaces in-app as
+`planned`) is the owner's check.
+
+### Deviations
+
+- **`create_mesocycle` drafts a standalone meso** (`macrocycle_id` null) rather
+  than filling a macro `position` — cross-entity slot attachment is fragile over
+  MCP; the user attaches it to a macro slot in-app. Recorded; revisit if needed.
+- **`log_note` is pinned-only.** Session log notes are RLS-gated to the live
+  workout (completion lock) and need a `workout_exercise_id` no read tool
+  currently surfaces, so the MCP writes the durable pinned note; session notes
+  stay an in-workout action.
+- **`create_custom_exercise` omits tracking type** — `exercises.tracking_type`
+  isn't in the schema yet (09 backlog, deferred), so the column isn't written.
+- **No in-app revocation/inspector for the audit log this slice** — the audit
+  table is owner-readable; surfacing it is a later UI concern.
+
+## 2026-06-17 — Phase 6 Slice 2b: MCP coaching suite
 
 Completes 07 Phase 6 **Slice 2** — the coaching/analysis tools on top of the
 Slice 2a read surface. Six read-only tools giving the model a coach's-eye view,

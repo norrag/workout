@@ -155,10 +155,14 @@ deployable:
       `getExerciseE1rmSeries` + pure `detectStall`). 18 tools total; +40 tests (200). No migration.
       `get_muscle_balance` is push/pull/legs + per-muscle weekly sets advisory-only — MEV/MAV/MRV
       landmarks aren't parameterized yet (10 §8 remaining).)*
-- [ ] **Slice 3 — write/planning (drafts, audited).** create_macrocycle, create_mesocycle
+- [x] **Slice 3 — write/planning (drafts, audited).** create_macrocycle, create_mesocycle
       (groups-first, `planned`), create_template, create_custom_exercise, update_macrocycle_goals,
       manage_exclusions, log_note — all written to `mcp_write_audit`; verify a drafted meso surfaces
       in-app as `planned`. Engine fills every prescribed number; the LLM only proposes structure.
+      *(2026-06-17: shipped. 7 tools + `recordMcpWrite`/`hashArgs` audit (service-role, args hashed) +
+      pure `resolveMuscleGroupIds` + `removeExclusionByExercise`; +7 tests (207). No migration.
+      Deviations: create_mesocycle drafts standalone (macro-slot attach in-app); log_note pinned-only;
+      no tracking_type on custom exercises (schema gap).)*
 - [ ] **Slice 4 — admin/tuning + replay (role-gated by `profiles.role`).** list/get/diff
       `engine_params`, propose_engine_params (inactive, zod-gated), activate_engine_params (explicit
       version-echo confirm), get_engine_decisions (filterable inspector), replay_decisions (re-run
