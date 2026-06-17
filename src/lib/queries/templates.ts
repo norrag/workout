@@ -225,6 +225,7 @@ export async function applyTemplateToMeso(
       .single();
     if (dayError) throw dayError;
 
+    let dayPos = 0; // day-wide order across groups (#2)
     for (const group of day.groups) {
       const { data: mesoGroup, error: groupError } = await supabase
         .from("meso_day_groups")
@@ -248,7 +249,7 @@ export async function applyTemplateToMeso(
               day_of_week: null,
               meso_day_group_id: mesoGroup.id,
               slot_number: f.slot_number,
-              position: f.slot_number,
+              position: ++dayPos,
               exercise_id: f.exercise_id,
               initial_weight: null,
               initial_reps: null,

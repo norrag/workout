@@ -14,6 +14,7 @@ import {
   finalizeDraftMeso,
   removeDayGroup,
   removeMesoDay,
+  reorderDayExercises,
   reorderDayGroups,
   reorderGroupExercises,
   saveMesoPlan,
@@ -409,6 +410,24 @@ export async function reorderGroupExercisesAction(input: {
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 
+const reorderDayExercisesSchema = z.object({
+  meso_id: z.string().uuid(),
+  day_id: z.string().uuid(),
+  ordered_fill_ids: z.array(z.string().uuid()).min(1).max(70),
+});
+
+/** Live (draft) reorder of a day's exercises across all groups (#2 flat list). */
+export async function reorderDayExercisesAction(input: {
+  meso_id: string;
+  day_id: string;
+  ordered_fill_ids: string[];
+}): Promise<void> {
+  const parsed = reorderDayExercisesSchema.parse(input);
+  const { supabase } = await requireUser();
+  await reorderDayExercises(supabase, parsed.ordered_fill_ids);
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
 // ---------------------------------------------------------------------------
 // staged plan save (fig 2.5): editing a non-draft meso stages changes locally;
 // SAVE CHANGES commits the whole plan in one write. For an active meso, open
@@ -434,6 +453,7 @@ const planSaveSchema = z.object({
                 slot_number: z.number().int().min(1).max(10),
                 exercise_id: z.string().uuid(),
                 initial_sets: z.number().int().min(1).max(10),
+                day_position: z.number().int().min(1).max(70),
               }),
             ),
           }),
@@ -452,7 +472,12 @@ export async function saveMesoPlanAction(input: {
     groups: {
       muscle_group_id: string;
       exercise_slots: number;
-      fills: { slot_number: number; exercise_id: string; initial_sets: number }[];
+      fills: {
+        slot_number: number;
+        exercise_id: string;
+        initial_sets: number;
+        day_position: number;
+      }[];
     }[];
   }[];
 }): Promise<void> {
