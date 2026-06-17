@@ -380,7 +380,9 @@ export function PlannerBoard({
               );
               return {
                 ...g,
-                exercise_slots: Math.max(layout.length, 1),
+                // keep the configured slot count — picking fewer than the slots
+                // leaves the rest open rather than shrinking the group.
+                exercise_slots: Math.max(layout.length, g.exercise_slots),
                 fills: layout.map((l) => {
                   const prev = prevByExercise.get(l.exercise_id);
                   return {
@@ -757,12 +759,14 @@ export function PlannerBoard({
             })()}
 
             {/* open slots, one row per group with remaining capacity */}
-            {activeDay.groups.map((group) => {
+            {/* one row per open slot (so a group set to N exercises shows N
+                pickable rows, not a single collapsed one) */}
+            {activeDay.groups.flatMap((group) => {
               const open = group.exercise_slots - group.fills.length;
-              if (open <= 0) return null;
-              return (
+              if (open <= 0) return [];
+              return Array.from({ length: open }, (_, k) => (
                 <button
-                  key={group.id}
+                  key={`${group.id}-open-${k}`}
                   type="button"
                   onClick={() => setPicker({ group, day: activeDay })}
                   className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5 text-left"
@@ -775,13 +779,12 @@ export function PlannerBoard({
                       {group.muscle_group} — pick exercise
                     </div>
                     <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/45">
-                      <span className="numeral">{open}</span> OPEN{" "}
-                      {open === 1 ? "SLOT" : "SLOTS"}
+                      OPEN SLOT · {group.muscle_group.toUpperCase()}
                     </div>
                   </div>
                   <div className="text-[15px] font-bold">›</div>
                 </button>
-              );
+              ));
             })}
 
             {activeDay.groups.length === 0 && (

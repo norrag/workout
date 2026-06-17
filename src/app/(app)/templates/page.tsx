@@ -4,12 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
 import { RedeemForm } from "@/components/RedeemForm";
 import { startScratchDraftAction } from "../cycles/actions";
+import { TemplateFilters } from "./TemplateFilters";
 
-/** Templates tab (fig 3.3): stock + own templates, search, start-from-template. */
+/** Templates tab (fig 3.3): stock + own templates, search, filters, start-from-template. */
 export default async function TemplatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    days?: string;
+    emphasis?: string;
+    gender?: string;
+  }>;
 }) {
   const supabase = await createClient();
   const {
@@ -17,8 +23,13 @@ export default async function TemplatesPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { q } = await searchParams;
-  const templates = await listTemplates(supabase, { search: q });
+  const { q, days, emphasis, gender } = await searchParams;
+  const templates = await listTemplates(supabase, {
+    search: q,
+    days: days ? Number(days) : undefined,
+    emphasis,
+    gender,
+  });
 
   return (
     <div>
@@ -37,6 +48,10 @@ export default async function TemplatesPage({
       </div>
 
       <form method="get">
+        {/* keep active filters when submitting a search */}
+        {days && <input type="hidden" name="days" value={days} />}
+        {emphasis && <input type="hidden" name="emphasis" value={emphasis} />}
+        {gender && <input type="hidden" name="gender" value={gender} />}
         <input
           type="search"
           name="q"
@@ -45,6 +60,7 @@ export default async function TemplatesPage({
           className="mt-4 h-[46px] w-full border-[1.5px] border-ink bg-paper px-3.5 text-sm text-ink placeholder:text-ink/45 focus:outline-none"
         />
       </form>
+      <TemplateFilters days={days} emphasis={emphasis} gender={gender} />
       <RedeemForm />
 
       <div className="mt-4 border-t-[1.5px] border-ink">

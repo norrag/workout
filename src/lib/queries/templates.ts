@@ -8,12 +8,27 @@ type Client = SupabaseClient<Database>;
 // templates (fig 3.3) — list, detail, planner round-trip (07 Phase 5)
 // ---------------------------------------------------------------------------
 
+export interface TemplateFilters {
+  search?: string;
+  /** training days per week */
+  days?: number;
+  /** templates.emphasis (split) */
+  emphasis?: string;
+  /** 'female' | 'male' — includes 'any'-tagged templates too */
+  gender?: string;
+}
+
 export async function listTemplates(
   supabase: Client,
-  opts: { search?: string } = {},
+  opts: TemplateFilters = {},
 ): Promise<TemplateRow[]> {
   let query = supabase.from("templates").select("*").order("name");
   if (opts.search) query = query.ilike("name", `%${opts.search}%`);
+  if (opts.days) query = query.eq("days_per_week", opts.days);
+  if (opts.emphasis) query = query.eq("emphasis", opts.emphasis);
+  // a gender filter includes the gender-neutral ("any") templates
+  if (opts.gender === "female" || opts.gender === "male")
+    query = query.in("intended_gender", [opts.gender, "any"]);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];

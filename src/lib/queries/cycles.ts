@@ -592,7 +592,7 @@ export async function setGroupExercises(
   // append brand-new ones after the day's current last position.
   const { data: grp, error: grpError } = await supabase
     .from("meso_day_groups")
-    .select("meso_day_id")
+    .select("meso_day_id, exercise_slots")
     .eq("id", input.meso_day_group_id)
     .single();
   if (grpError) throw grpError;
@@ -644,7 +644,8 @@ export async function setGroupExercises(
 
   const { error: updError } = await supabase
     .from("meso_day_groups")
-    .update({ exercise_slots: Math.max(layout.length, 1) })
+    // keep the configured slot count — picking fewer leaves the rest open
+    .update({ exercise_slots: Math.max(layout.length, grp.exercise_slots) })
     .eq("id", input.meso_day_group_id);
   if (updError) throw updError;
 }

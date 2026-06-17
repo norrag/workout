@@ -4,8 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { listPickerExercises } from "@/lib/queries/exercises";
 import {
+  getAddExerciseCandidates,
+  listPickerExercises,
+  type AddExerciseCandidate,
+} from "@/lib/queries/exercises";
+import {
+  addWorkoutExercises,
   adjustPrescribedSets,
   amendSet,
   clearPinnedNote,
@@ -433,6 +438,37 @@ export async function replaceExerciseAction(input: {
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
   return result;
+}
+
+/** Candidates + muscle-group list for the workout "Add exercise" picker. */
+export async function listAddExerciseCandidatesAction(): Promise<{
+  exercises: AddExerciseCandidate[];
+  muscleGroups: { id: string; name: string }[];
+}> {
+  const { supabase, user } = await requireUser();
+  return getAddExerciseCandidates(supabase, user.id);
+}
+
+const addExercisesSchema = z.object({
+  workout_id: z.string().uuid(),
+  exercise_ids: z.array(z.string().uuid()).min(1).max(20),
+});
+
+/** Add picked exercises to the bottom of a live workout (workout-page editing). */
+export async function addWorkoutExercisesAction(input: {
+  workout_id: string;
+  exercise_ids: string[];
+}): Promise<void> {
+  const parsed = addExercisesSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await addWorkoutExercises(
+    supabase,
+    user.id,
+    parsed.workout_id,
+    parsed.exercise_ids,
+  );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
 }
 
 export interface ReplacementCandidate {

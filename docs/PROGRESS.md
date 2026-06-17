@@ -2,7 +2,50 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Feedback batch: templates, flat planner, post-log lock, workout-page propagation, fixes
+## 2026-06-17 (latest) — Feedback batch 2: template filters, multi-slot fix, workout add-exercise, menu cleanup
+
+On-device follow-up to the previous batch. Same branch/PR (#27); `main`
+deployable; no schema change.
+
+### Done
+
+- **Template filters.** The templates tab gains a filter bar — **days/week, split
+  (emphasis), and intended audience** — alongside search. `listTemplates` takes
+  the filters (`TemplateFilters`); the client `TemplateFilters` bar updates the
+  URL query so the server page re-queries. A gender filter includes the
+  gender-neutral ("any") templates; search preserves the active filters.
+- **Multi-slot planner fix.** In the flat board (#2), a group set to N exercises
+  now renders **one open-slot row per open slot** (was a single collapsed
+  "N slots" row), and picking **fewer** exercises than the configured count
+  **no longer shrinks the group** — `setGroupExercises` (staged + live query)
+  keeps `exercise_slots = max(picked, configured)`, so the remaining slots stay
+  open and fillable.
+- **Workout "Add exercise."** New `⋮`-menu action (active workouts) opens a picker
+  with **open muscle-group + equipment filters** + search; picks are appended to
+  the **bottom** of the day's list (`addWorkoutExercises` → bottom position,
+  primary muscle group, prescription seeded from the user's best) and reorder as
+  normal. New `getAddExerciseCandidates` query + `addWorkoutExercisesAction`.
+- **Workout menu cleanup.** Removed the planner deep-links ("Edit mesocycle" and
+  "Edit day") from the workout `⋮` menu — all in-session editing now happens on
+  the workout page (add / remove / reorder / replace), consistent with the
+  post-log direction. Stats / End workout / End mesocycle remain.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (224/224), `npm run build`
+all green. On-device QA of the add-exercise picker, the multi-slot planner flow,
+and the template filters is the owner's check.
+
+### Notes
+
+- Removing **"Edit day"** (not just "Edit mesocycle") from the workout menu is a
+  deliberate extension of the requested change — both opened the planner, which
+  the post-log model moves away from.
+- The add-exercise picker is multi-select and appends in selection order; a newly
+  added exercise seeds `prescribed_sets = 3` at the user's all-time best, then the
+  engine carries it forward like any other slot.
+
+## 2026-06-17 — Feedback batch: templates, flat planner, post-log lock, workout-page propagation, fixes
 
 Seven on-device feedback notes addressed in one vertical slice. `main`
 deployable; one append-only data migration (stock templates); no schema change.

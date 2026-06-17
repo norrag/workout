@@ -902,6 +902,78 @@ export async function propagateSubstitution(
   }
 }
 
+/** Add exercises to a live workout (workout-page editing). Each lands at the
+ *  bottom of the list (max position + 1), tagged with its primary muscle group,
+ *  prescription seeded from the user's all-time best — the user reorders as
+ *  normal. Logged history is untouched (these are new pending slots). */
+export async function addWorkoutExercises(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+  exerciseIds: string[],
+): Promise<void> {
+  if (exerciseIds.length === 0) return;
+
+  const { data: maxRow, error: maxErr } = await supabase
+    .from("workout_exercises")
+    .select("position")
+    .eq("workout_id", workoutId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (maxErr) throw maxErr;
+  let pos = maxRow?.position ?? 0;
+
+  const { data: workout, error: wErr } = await supabase
+    .from("workouts")
+    .select("microcycle_id")
+    .eq("id", workoutId)
+    .single();
+  if (wErr) throw wErr;
+  const { data: micro, error: mErr } = await supabase
+    .from("microcycles")
+    .select("target_rir")
+    .eq("id", workout.microcycle_id)
+    .single();
+  if (mErr) throw mErr;
+
+  const [{ data: links, error: linkErr }, { data: prs, error: prErr }] =
+    await Promise.all([
+      supabase
+        .from("exercise_muscle_groups")
+        .select("exercise_id, muscle_group_id")
+        .in("exercise_id", exerciseIds)
+        .eq("role", "primary"),
+      supabase
+        .from("v_exercise_prs")
+        .select("exercise_id, best_weight, best_reps")
+        .eq("user_id", userId)
+        .in("exercise_id", exerciseIds),
+    ]);
+  if (linkErr) throw linkErr;
+  if (prErr) throw prErr;
+  const mgByEx = new Map((links ?? []).map((l) => [l.exercise_id, l.muscle_group_id]));
+  const prByEx = new Map((prs ?? []).map((p) => [p.exercise_id, p]));
+
+  const rows = exerciseIds.map((id) => {
+    const pr = prByEx.get(id);
+    return {
+      workout_id: workoutId,
+      exercise_id: id,
+      muscle_group_id: mgByEx.get(id) ?? null,
+      position: ++pos,
+      prescribed_weight: pr?.best_weight ?? null,
+      prescribed_reps: pr?.best_reps ?? null,
+      prescribed_sets: 3,
+      target_rir: micro.target_rir,
+      status: "pending" as const,
+      notes: "Added during the workout",
+    };
+  });
+  const { error } = await supabase.from("workout_exercises").insert(rows);
+  if (error) throw error;
+}
+
 export async function savePinnedNote(
   supabase: Client,
   userId: string,
