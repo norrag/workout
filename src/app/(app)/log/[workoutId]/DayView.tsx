@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { useScrollLock } from "@/components/ui/useScrollLock";
 import { SnapSlider } from "@/components/ui/SnapSlider";
+import { LogCheckbox } from "@/components/ui/LogCheckbox";
+import { useToast } from "@/components/ui/Toast";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
   LoggedExercise,
@@ -1146,8 +1148,28 @@ function SetRow({
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
   const repsManual = useRef(false);
-  const router = useRouter();
   const menuBtnRef = useRef<HTMLButtonElement>(null);
+  // per-row transition so the LOG box spins in isolation; the write fires in the
+  // background and the box resolves via revalidatePath — no full-page refresh
+  const [logging, startLogging] = useTransition();
+  const [logError, setLogError] = useState(false);
+  const toast = useToast();
+
+  // fire a logging write in the background: the box shows the perimeter spinner
+  // while it runs, resolves to its server state on success, or rolls back with a
+  // brief shake + a quiet toast on failure (online-only, no offline outbox)
+  const runLog = (action: () => Promise<void>, onOk?: () => void) => {
+    setLogError(false);
+    startLogging(async () => {
+      try {
+        await action();
+        onOk?.();
+      } catch {
+        setLogError(true);
+        toast("Couldn't save that set — check your connection");
+      }
+    });
+  };
 
   // re-sync when the server state for this row changes (incl. an auto-match or
   // edited planned weight landing via set_weights)
@@ -1191,21 +1213,24 @@ function SetRow({
     if (Number.isNaN(w) || Number.isNaN(r)) return;
     if (state === "next") {
       // logSetAction carries the weight to the other sets itself when
-      // auto-match is on (server-side, after the insert)
-      commit(() =>
-        logSetAction({
-          workout_id: we.workout_id,
-          workout_exercise_id: we.id,
-          set_number: setNumber,
-          weight: w,
-          reps: r,
-          rir_reported: null,
-          set_type: dropPending ? "drop" : "straight",
-        }),
+      // auto-match is on (server-side, after the insert). Fire-and-forget in the
+      // background; the side effects (drop reset, feedback prompt) run on success
+      runLog(
+        () =>
+          logSetAction({
+            workout_id: we.workout_id,
+            workout_exercise_id: we.id,
+            set_number: setNumber,
+            weight: w,
+            reps: r,
+            rir_reported: null,
+            set_type: dropPending ? "drop" : "straight",
+          }),
+        () => {
+          if (dropPending) onToggleDrop();
+          onLogged();
+        },
       );
-      if (dropPending) onToggleDrop();
-      onLogged();
-      router.refresh();
     } else if (state === "logged" && logged && edited.current) {
       commit(() =>
         amendSetAction({
@@ -1299,35 +1324,30 @@ function SetRow({
       )}
       {/* LOG column — ≥44px-wide tap target around the 21px visual box */}
       <div className="flex h-8 items-center justify-center">
-        {state === "logged" ? (
-          readOnly ? (
-            <div className="flex h-[21px] w-[21px] items-center justify-center bg-ink text-[12px] text-bg-base">
-              ✓
-            </div>
-          ) : (
-            <button
-              type="button"
-              aria-label={`uncheck set ${setNumber}`}
-              onClick={() => {
+        {state === "logged" || state === "next" ? (
+          <LogCheckbox
+            checked={state === "logged"}
+            loading={logging}
+            error={logError}
+            readOnly={readOnly}
+            ariaLabel={
+              state === "logged"
+                ? `uncheck set ${setNumber}`
+                : `log set ${setNumber}`
+            }
+            onClick={() => {
+              if (state === "logged") {
                 if (logged)
-                  commit(() =>
+                  runLog(() =>
                     unlogSetAction({
                       workout_id: we.workout_id,
                       set_id: logged.id,
                     }),
                   );
-              }}
-              className="flex h-[21px] w-[21px] items-center justify-center bg-ink text-[12px] text-bg-base"
-            >
-              ✓
-            </button>
-          )
-        ) : state === "next" ? (
-          <button
-            type="button"
-            aria-label={`log set ${setNumber}`}
-            onClick={save}
-            className="h-[21px] w-[21px] border-2 border-ink"
+              } else {
+                save();
+              }
+            }}
           />
         ) : state === "skipped" ? (
           <span className="text-[8px] font-bold tracking-[0.08em] text-ink/40">

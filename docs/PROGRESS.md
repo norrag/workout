@@ -2,7 +2,52 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6 Slice 4: MCP admin/tuning + replay (Phase 6 complete)
+## 2026-06-17 (latest) — Responsiveness Slice 1: set-logging hot path + nav feedback
+
+First slice of a broader speed/responsiveness pass. Goal: every common action
+acknowledges the tap **immediately**, and background writes never block the UI.
+
+### Done
+
+- **`LogCheckbox` (`src/components/ui/LogCheckbox.tsx`).** The set LOG control as
+  a single 21px square with three states: empty outline → **in-flight perimeter
+  spinner** (the outline itself with a gap travelling the perimeter, an animated
+  SVG `stroke-dashoffset` with `pathLength=100`) → filled `✓`. Honors
+  `prefers-reduced-motion` (gap pulses in place instead of travelling). Brief
+  shake + rollback on failure.
+- **Background set logging.** `SetRow` now logs via a **per-row `useTransition`**
+  so only the tapped box spins; the write is fire-and-forget. **Removed the
+  redundant `router.refresh()`** — the server action already `revalidatePath`s,
+  so the box resolved via the action's own RSC refresh instead of a *second*
+  full `getWorkoutDetail` refetch (13 round-trips + a 600-set e1RM scan) per tap.
+  Uncheck uses the same path. On failure the box rolls back (shake) and a quiet
+  toast appears.
+- **Toast surface (`src/components/ui/Toast.tsx`).** Minimal context provider
+  mounted in `(app)/layout.tsx` for non-blocking write failures (online-only, no
+  offline outbox, per CLAUDE.md hard rule #9).
+- **Nav feedback (`BottomNav`).** Explicit `prefetch` + `useLinkStatus` so a
+  tapped tab marks itself (■ cue + pulse) instantly, before the next route paints.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (219/219), `npm run build`
+all green.
+
+### Roadmap (later slices, not in this PR)
+
+- Tag-scoped caching so logging a set invalidates only the sets, not the cached
+  e1RM anchors; cache the recency-weighted anchors so they aren't recomputed per
+  tap. Per-route `loading.tsx` skeletons. Stale-while-revalidate for read-heavy
+  stats/history surfaces.
+
+### Deviations
+
+- Logging is **spinner-on-control**, not blind-optimistic: the box shows the
+  in-flight spinner until the server confirms, then flips to `✓` (owner's choice).
+  This keeps the LOG box honest about persisted state while still acknowledging
+  the tap instantly.
+
+## 2026-06-17 — Phase 6 Slice 4: MCP admin/tuning + replay (Phase 6 complete)
 
 Final Phase 6 slice — the **admin/tuning + replay** surface, role-gated by
 `profiles.role = 'admin'`. The MCP connector is now the entire admin interface
