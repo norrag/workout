@@ -15,6 +15,7 @@ import {
   type E1rmPoint,
 } from "@/lib/queries/coaching";
 import { resolveSession, type McpExtra } from "../session";
+import { toolResult, type EnvelopeOpts } from "../envelope";
 import { formatCurrentState } from "./get-current-state";
 
 /**
@@ -25,11 +26,8 @@ import { formatCurrentState } from "./get-current-state";
  * are exported for tests.
  */
 
-function jsonResult(payload: Record<string, unknown>) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-    structuredContent: payload,
-  };
+function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
+  return toolResult(payload, opts);
 }
 
 // --- stall / plateau detection (pure) --------------------------------------

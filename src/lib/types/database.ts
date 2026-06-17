@@ -473,6 +473,10 @@ export type VMesoSummaryRow = {
   sessions_attended: number;
   sessions_due: number;
   working_reps: number;
+  n_joint_pain: number;
+  n_pump: number;
+  n_overall_fatigue: number;
+  n_performance: number;
 }
 
 export type VMacroSummaryRow = {

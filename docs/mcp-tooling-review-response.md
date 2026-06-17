@@ -166,11 +166,70 @@ average, documented scale ranges, deterministic ordering, and cursor pagination
 for decisions. Broad but mechanical; best done as one consistency pass after the
 P0 schema work lands.
 
+## Follow-up pass (2026-06-17) — deferred backlog addressed
+
+The staged items above were implemented as a sequence of vertical slices on
+`claude/youthful-franklin-1r3qfn`. Migrations were applied to the live project
+(`juqvbiymmdcggctdqoiq`); the earlier `metric_truth_view_fixes` migration was
+applied at the same time (it had not yet reached the live DB), and a latent
+`create or replace view` type-widening bug in it — `sum()` promoted
+`planned_sets`/`logged_sets` to `numeric` — was fixed with explicit `::bigint`
+casts.
+
+### P0-3 — Engine-params reproducibility (DONE)
+`20260617000004` adds `schema_version` / `params_hash` / `code_sha` /
+`is_replayable` to `engine_params` and backfills v1–v6 (only v6, the active
+complete snapshot, is replayable; v1–v5 were stored partial and are flagged
+non-replayable; v1 predates the schema → `schema_version = 1`).
+`src/lib/queries/params-provenance.ts` adds canonical (sorted-key) hashing and
+`resolveProvenance` (replayable only when the stored bytes deep-equal the
+parsed-with-defaults result). `getEngineParamsVersion` no longer re-parses with
+defaults and hands that back as "the version" — it returns the stored bytes, a
+separately-`resolved` full set, provenance, and a hash-verified flag.
+`propose_engine_params` now stores a fully-materialized snapshot with hash +
+schema version + build id; `get_engine_params` diffs the stored bytes so legacy
+versions show their real deltas.
+
+### P0-4 (full) — Decision-event integrity (DONE)
+`20260617000005` persists `exercise_id`, `source_workout_exercise_id`,
+`workout_id`, `microcycle_id`, `mesocycle_id`, `params_hash`, and a
+`provenance` jsonb on `engine_decisions` (legacy rows backfilled for the
+join-resolvable coordinates). Each engine input set now carries an immutable
+`loggedSetId` + stable `sequenceIndex` (fixes the 1,1,2 set-number collision);
+`prescribe()` emits a structured `DecisionTraceStep[]` from which the human
+rationale is *derived* (prose and trace can't drift; rationale strings
+unchanged); the recording path records the RIR-fallback rule + count and the
+engine build. `get_engine_decisions` reads linkage from the persisted columns.
+
+### P1-2 — `get_mesocycle` chainable (DONE)
+`formatMesoPlan` now exposes `day_id` / `group_id` / `muscle_group_id` /
+`slot_id` / `exercise_id` at each level plus planned-set totals per slot, group,
+day, and a meso `planned_sets_per_week`.
+
+### P1-3 — `replay_decisions` diagnostics (DONE)
+Outcome breakdown (`unchanged` / `changed` / `invalid_source` /
+`execution_error`), rule-coverage counts, candidate + source build identity
+(version/hash/sha), an optional bounded unchanged-sample, and a new
+`simulate_prescriptions` tool for hypothetical inputs.
+
+### P1-4 / P2 — Common envelope & consistency (DONE)
+`src/lib/mcp/envelope.ts` wraps every tool response in
+`{ schema_version, generated_at, units, data_quality, data }`; `units` is
+populated where the handler has the profile; `get_mesocycle_summary` carries
+feedback sample counts + coverage (new count columns on `v_meso_summary`,
+`20260617000006`) and documented scale ranges; `get_engine_decisions` gained
+keyset (cursor) pagination via `next_cursor`.
+
 ## Verification
 
-- `npm run typecheck`, `npm run lint`, `npm run test` — all green (229 tests).
+- `npm run typecheck`, `npm run lint`, `npm run test` — all green (246 tests).
 - Both view fixes reproduced read-only against the live project
   (`juqvbiymmdcggctdqoiq`) before and after, confirming the corrected numbers.
+- All four new migrations applied to the live project.
 - New unit tests: `working_reps` + dual adherence denominators
   (`read-tools.test.ts`), compare normalization + warnings
-  (`coaching-tools.test.ts`), and `placeholderName` (`macro.test.ts`).
+  (`coaching-tools.test.ts`), `placeholderName` (`macro.test.ts`), params
+  provenance (`params-provenance.test.ts`), the structured trace
+  (`prescribe.test.ts`), set-identity threading (`progression.test.ts`), replay
+  diagnostics (`admin-tools.test.ts`), chainable plan ids + meso totals
+  (`read-tools.test.ts`), and the response envelope (`envelope.test.ts`).

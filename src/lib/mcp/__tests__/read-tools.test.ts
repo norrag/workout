@@ -233,6 +233,10 @@ function mesoSummaryRow(overrides: Partial<VMesoSummaryRow> = {}): VMesoSummaryR
     sessions_attended: 15,
     sessions_due: 16,
     working_reps: 2400,
+    n_joint_pain: 60,
+    n_pump: 60,
+    n_overall_fatigue: 15,
+    n_performance: 15,
     ...overrides,
   };
 }

@@ -29,19 +29,23 @@ import {
 } from "@/lib/queries/progression";
 import type { TemplateRow, EquipmentType } from "@/lib/types/database";
 import { resolveSession, type McpExtra } from "../session";
+import {
+  toolResult,
+  feedbackCoverage,
+  FEEDBACK_SCALES,
+  type EnvelopeOpts,
+} from "../envelope";
 
 /**
  * Slice 2 read/analysis tools (07 Phase 6). Thin, zod-validated wrappers over
  * the existing `src/lib/queries/` layer; every handler resolves identity from
  * the session (hard rule #5) and returns the same view-layer shapes the stats
  * screens use (05 §Data-shape contract). Pure shapers are exported for tests.
+ * Every response is wrapped in the shared envelope (P1-4).
  */
 
-function jsonResult(payload: Record<string, unknown>) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-    structuredContent: payload,
-  };
+function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
+  return toolResult(payload, opts);
 }
 
 // --- get_profile -----------------------------------------------------------
@@ -90,7 +94,8 @@ function registerGetProfile(server: McpServer) {
     },
     async (_args: Record<string, never>, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      return jsonResult(formatProfile(await getProfile(client, userId)));
+      const profile = await getProfile(client, userId);
+      return jsonResult(formatProfile(profile), { units: profile?.units ?? null });
     },
   );
 }
@@ -276,10 +281,17 @@ export function formatMesoSummary(
       block_completion_pct,
     },
     feedback: {
+      // each average carries the count of observations behind it (P1-4): a
+      // single grumpy session and twenty honest ones no longer read the same
       avg_joint_pain: row.avg_joint_pain,
+      n_joint_pain: row.n_joint_pain,
       avg_pump: row.avg_pump,
+      n_pump: row.n_pump,
       avg_overall_fatigue: row.avg_overall_fatigue,
+      n_overall_fatigue: row.n_overall_fatigue,
       avg_performance: row.avg_performance,
+      n_performance: row.n_performance,
+      scales: FEEDBACK_SCALES,
     },
     progress_scores: scores.map((s) => ({
       exercise_id: s.exercise_id,
@@ -306,7 +318,7 @@ function registerGetMesoSummary(server: McpServer) {
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data: row, error }, scores] = await Promise.all([
+      const [{ data: row, error }, scores, profile] = await Promise.all([
         client
           .from("v_meso_summary")
           .select("*")
@@ -314,9 +326,24 @@ function registerGetMesoSummary(server: McpServer) {
           .eq("mesocycle_id", mesocycle_id)
           .maybeSingle(),
         getMesoProgressScores(client, userId, mesocycle_id),
+        getProfile(client, userId),
       ]);
       if (error) throw error;
-      return jsonResult(formatMesoSummary(row, scores));
+      const dataQuality = row
+        ? feedbackCoverage(
+            {
+              joint_pain: row.n_joint_pain,
+              pump: row.n_pump,
+              overall_fatigue: row.n_overall_fatigue,
+              performance: row.n_performance,
+            },
+            row.sessions_due,
+          )
+        : null;
+      return jsonResult(formatMesoSummary(row, scores), {
+        units: profile?.units ?? null,
+        dataQuality,
+      });
     },
   );
 }

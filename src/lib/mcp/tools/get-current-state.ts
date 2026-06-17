@@ -2,6 +2,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getCurrentState, type CurrentState } from "@/lib/queries/cycles";
 import { resolveSession, type McpExtra } from "../session";
+import { toolResult } from "../envelope";
 
 /**
  * `get_current_state` — the model's grounding call: the user's active
@@ -123,10 +124,7 @@ export function registerGetCurrentState(server: McpServer) {
       const { client, userId } = resolveSession(extra);
       const state = await getCurrentState(client, userId);
       const payload = formatCurrentState(state);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-        structuredContent: payload as unknown as Record<string, unknown>,
-      };
+      return toolResult(payload as unknown as Record<string, unknown>);
     },
   );
 }

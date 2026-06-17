@@ -171,6 +171,8 @@ export interface DecisionFilters {
   exerciseId?: string;
   since?: string;
   limit?: number;
+  /** keyset cursor: return decisions strictly older than this created_at (P1-4) */
+  cursor?: string;
 }
 
 /**
@@ -193,6 +195,7 @@ export async function getEngineDecisions(
     .limit(Math.min(filters.limit ?? 25, 100));
   if (filters.paramsVersion != null) query = query.eq("params_version", filters.paramsVersion);
   if (filters.since) query = query.gte("created_at", filters.since);
+  if (filters.cursor) query = query.lt("created_at", filters.cursor);
   // exercise filter is now a direct column predicate (persisted exercise_id)
   if (filters.exerciseId) query = query.eq("exercise_id", filters.exerciseId);
 

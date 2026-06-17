@@ -17,6 +17,7 @@ import {
   type DecisionRecord,
 } from "@/lib/queries/engine-admin";
 import { resolveSession, type McpExtra, type McpClient } from "../session";
+import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
 
 /**
@@ -27,11 +28,8 @@ import { recordMcpWrite } from "../audit";
  * merge/diff/replay helpers are exported for tests.
  */
 
-function jsonResult(payload: Record<string, unknown>) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-    structuredContent: payload,
-  };
+function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
+  return toolResult(payload, opts);
 }
 
 /** Fetch the session and assert the caller is an admin (else deny). */
@@ -423,20 +421,35 @@ function registerGetEngineDecisions(server: McpServer) {
         exercise_id: z.string().uuid().optional(),
         since: z.string().optional().describe("ISO date/time lower bound"),
         limit: z.number().int().min(1).max(100).optional(),
+        cursor: z
+          .string()
+          .optional()
+          .describe("keyset cursor from a prior page's next_cursor (created_at)"),
       },
     },
     async (
-      args: { params_version?: number; exercise_id?: string; since?: string; limit?: number },
+      args: {
+        params_version?: number;
+        exercise_id?: string;
+        since?: string;
+        limit?: number;
+        cursor?: string;
+      },
       extra: McpExtra,
     ) => {
       const { client, userId } = await resolveAdmin(extra);
+      const limit = Math.min(args.limit ?? 25, 100);
       const decisions = await getEngineDecisions(client, userId, {
         paramsVersion: args.params_version,
         exerciseId: args.exercise_id,
         since: args.since,
-        limit: args.limit,
+        limit,
+        cursor: args.cursor,
       });
-      return jsonResult(shapeDecisions(decisions));
+      // a full page implies there may be more; hand back the keyset to continue
+      const next_cursor =
+        decisions.length === limit ? decisions[decisions.length - 1].created_at : null;
+      return jsonResult({ ...shapeDecisions(decisions), next_cursor });
     },
   );
 }
