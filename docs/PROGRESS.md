@@ -2,7 +2,226 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6: OAuth consent UI (connector handshake completable)
+## 2026-06-17 (latest) — Phase 6 Slice 4: MCP admin/tuning + replay (Phase 6 complete)
+
+Final Phase 6 slice — the **admin/tuning + replay** surface, role-gated by
+`profiles.role = 'admin'`. The MCP connector is now the entire admin interface
+(08 §3): inspect decisions → propose a params version → replay real history
+against it → review diffs → activate, all in chat, no admin UI, no deploy. One
+additive index migration. Same branch/PR; `main` deployable. **Phase 6 done.**
+
+### Done
+
+- **Admin tools (`src/lib/mcp/tools/admin.ts`, `registerAdminTools`).**
+  `list_engine_params`, `get_engine_params` (single version or a dot-path **diff**
+  of two), `propose_engine_params` (writes a new **inactive** version; `base_version`
+  + partial overrides deep-merged, then **`engineParamsSchema`-validated** — a
+  malformed set is rejected and can never be activated), `activate_engine_params`
+  (requires `confirm_version` to echo `version`; deactivates the current active
+  first to respect the single-active partial unique index), `get_engine_decisions`
+  (the caller's own decisions, filter by params version / exercise / date), and
+  `replay_decisions` (re-run stored decisions against a candidate version, return
+  load/reps/sets/RIR diffs — read-only, nothing written). Every tool is gated by
+  `resolveAdmin` (denies non-admins); the two writes audit to `mcp_write_audit`.
+- **Pure helpers (exported, unit-tested).** `deepMerge` (nested param overrides
+  without dropping siblings, no mutation), `diffParams` (differing dot-paths),
+  `diffPrescription` (changed prescription fields, ignores rationale prose), and
+  `replayDecisions` (re-runs `prescribe(storedInputs, candidateParams)`, counting
+  changed/errored — malformed historical inputs are counted as errors, never
+  crash the call).
+- **Query layer (`src/lib/queries/engine-admin.ts`).** `listEngineParams`,
+  `getEngineParamsVersion`, `proposeEngineParams`, `activateEngineParams`,
+  `getEngineDecisions`. `engine_params` RLS already gates writes to `is_admin()`,
+  so the admin's own token-bound client suffices — **no service role** for tuning;
+  service role stays only for the `mcp_write_audit` insert.
+- **Migration `20260617000001_engine_decisions_inspector_idx.sql`** (applied to
+  hosted): additive index `engine_decisions (user_id, params_version, created_at
+  desc)` for the inspector/replay version filter. No table/column/RLS change;
+  advisors show no new problematic lints (the index reads "unused" until first
+  query, expected; the pre-existing `auth_rls_initplan` WARN is unrelated).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (219/219, +12), `npm run build`
+green; migration applied to hosted and the index confirmed present. The replay
+path re-runs the **real engine** (`prescribe`) over stored inputs, so a diff is
+exactly what would change. End-to-end admin loop against hosted (propose →
+replay → activate) is the owner's check with an admin account.
+
+### Deviations
+
+- **Inspector/replay are scoped to the calling admin's own decisions** (no
+  `user_id` argument) to keep hard rule #5 absolute. Cross-user admin inspection
+  would need a deliberate rule-5 exception; deferred. In practice an admin tunes
+  against their own real mesos.
+- **`propose_engine_params` takes `base_version` + a partial override** (deep-merged)
+  as the ergonomic path, as well as a full params object — either way the result
+  is schema-validated before storage.
+
+## 2026-06-17 — Phase 6 Slice 3: MCP write/planning tools (audited drafts)
+
+07 Phase 6 **Slice 3** — the write/planning surface. Seven tools that let the
+model propose *structure* while the **engine fills every prescribed number**;
+all writes are draft/append, RLS-scoped, and recorded to `mcp_write_audit`. No
+deletes of logged history (hard rule #5). Same branch/PR; `main` deployable; no
+schema change.
+
+### Done
+
+- **Write tools (`src/lib/mcp/tools/write.ts`, `registerWriteTools`).**
+  `create_macrocycle` (engine `planMacrocycle` sizes target/timeframe/meso-count/
+  phases + unplanned placeholders), `create_mesocycle` (groups-first → `planned`
+  for in-app review; engine sets numbers on activation), `create_template` (from
+  an existing meso), `create_custom_exercise`, `update_macrocycle_goals` (engine
+  re-plans unplanned slots only; locked mesos + logged history immutable),
+  `manage_exclusions` (add/remove by exercise), `log_note` (durable pinned note;
+  empty clears). Each validates with zod, resolves identity from the session,
+  and returns a friendly `{ ok, … }` result.
+- **Audit trail (`src/lib/mcp/audit.ts`).** `recordMcpWrite(userId, tool, args,
+  summary)` writes one `mcp_write_audit` row per successful write — tool name, a
+  **sha256 hash of the args** (not the raw note text), and a short summary. The
+  table has no user-insert policy, so this is the single service-role write site
+  (hard rule #4), always with the server-derived `userId`. `hashArgs` is pure +
+  unit-tested.
+- **Pure `resolveMuscleGroupIds`.** Maps requested muscle-group names → library
+  ids (case-insensitive, trimmed), collecting unknowns so a typo fails cleanly
+  instead of silently dropping a group. Unit-tested.
+- **New query reader.** `removeExclusionByExercise` (exercises.ts) — the MCP
+  addresses exclusions by exercise id, not exclusion-row id.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (207/207, +7), `npm run build`
+green. Write paths reuse the smoke-tested app query layer (`createMacrocycleWithMesos`/
+`saveMesoPlan`/`updateMacrocycle`/`createCustomExercise`/`savePinnedNote`), all
+user-scoped through existing RLS; the engine — not the model — fills prescriptions.
+End-to-end drafting against hosted (verify a drafted meso surfaces in-app as
+`planned`) is the owner's check.
+
+### Deviations
+
+- **`create_mesocycle` drafts a standalone meso** (`macrocycle_id` null) rather
+  than filling a macro `position` — cross-entity slot attachment is fragile over
+  MCP; the user attaches it to a macro slot in-app. Recorded; revisit if needed.
+- **`log_note` is pinned-only.** Session log notes are RLS-gated to the live
+  workout (completion lock) and need a `workout_exercise_id` no read tool
+  currently surfaces, so the MCP writes the durable pinned note; session notes
+  stay an in-workout action.
+- **`create_custom_exercise` omits tracking type** — `exercises.tracking_type`
+  isn't in the schema yet (09 backlog, deferred), so the column isn't written.
+- **No in-app revocation/inspector for the audit log this slice** — the audit
+  table is owner-readable; surfacing it is a later UI concern.
+
+## 2026-06-17 — Phase 6 Slice 2b: MCP coaching suite
+
+Completes 07 Phase 6 **Slice 2** — the coaching/analysis tools on top of the
+Slice 2a read surface. Six read-only tools giving the model a coach's-eye view,
+built on the shared views + the pure engine; no write surface, no migration.
+Same branch/PR as 2a; `main` deployable.
+
+### Done
+
+- **Coaching tools (`src/lib/mcp/tools/coaching.ts`, `registerCoachingTools`).**
+  `get_training_overview` (one-call snapshot: who + current position + active-meso
+  adherence/fatigue + key-lift e1RM trend), `get_recent_sessions` (reverse-chron
+  completed workouts with session feedback + notes), `analyze_exercise_progress`
+  (e1RM trend + **stall/plateau detection**), `compare_mesocycles` (side-by-side
+  rollups, caller order preserved), `get_muscle_balance` (push/pull/legs split +
+  per-muscle weekly sets, advisory-only), `get_exercise_affinity` (the
+  exercise-selection profile — frequency/recency/loads × pinned note × aggregated
+  joint-pain/workload/pump feedback, exclusions respected).
+- **Pure `detectStall`** (exported, unit-tested): classifies an e1RM series as
+  improving / plateau / declining by comparing the recent window's best against
+  the prior best (tolerance-guarded), with `sessions_since_best`. Drives the
+  progress analysis without touching the engine.
+- **New query-layer readers (`src/lib/queries/coaching.ts`).** `getRecentSessions`,
+  `getExerciseAffinity` (the `logged_sets`/`v_exercise_overview` × muscle-groups ×
+  notes × feedback rollup), and `getExerciseE1rmSeries` — all RLS-scoped, no
+  service role.
+- **Honesty guardrails (10 §9).** e1RM/strength labeled estimates everywhere;
+  balance is advisory-only and explicitly states MEV/MAV/MRV landmarks are **not
+  yet parameterized** (10 §8 remaining), so no per-muscle threshold is asserted;
+  pump/soreness framed as secondary.
+- **Tests (`__tests__/coaching-tools.test.ts`, +16 → 200 total).** `detectStall`
+  across improving/plateau/declining/insufficient/null-handling, every shaper,
+  registration of all six tools, the no-`user_id` contract, and
+  unauthenticated-call rejection.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (200/200), `npm run build`
+green. End-to-end `tools/call` against hosted is the owner's check.
+
+### Deviations
+
+- **`get_muscle_balance` uses the implemented push/pull/legs + per-muscle weekly
+  sets** (the same `getMesoStats` balance the in-app screen shows) rather than
+  MEV/MAV/MRV landmark comparison — those landmarks aren't in `engine_params` yet
+  (10 §8 remaining). The tool says so in its payload, keeping it honest.
+- **`get_exercise_affinity` aggregates feedback via `workout_exercises`** (the
+  exercise↔feedback join), bounded to the user's trained exercises; capped at 60
+  rows per call.
+
+## 2026-06-17 — Phase 6 Slice 2a: MCP read/analysis tools
+
+First half of 07 Phase 6 Slice 2 — the **read/analysis tool surface** for the
+MCP connector. Twelve thin, zod-validated read tools wrapping the existing
+`src/lib/queries/` layer + one new engine-decision reader; identity always from
+the session (hard rule #5), every shape matching the in-app stats views (05
+§Data-shape contract). Vertical slice; `main` deployable; no schema change. The
+coaching suite (overview/recent-sessions/analyze/compare/balance/affinity) is
+Slice 2b, next.
+
+### Done
+
+- **Read tools (`src/lib/mcp/tools/read.ts`, `registerReadTools`).**
+  `get_profile`, `get_macrocycles`, `get_mesocycle` (groups-first plan),
+  `get_mesocycle_summary` (adherence + volume + est. strength + feedback +
+  per-exercise e1RM progress), `get_macrocycle_summary` (fig 2.2 target/timeline/
+  stats via `planForMacro`), `get_exercise_history` (both note kinds),
+  `get_muscle_group_volume` (planned vs logged sets per group per week),
+  `search_exercises` (name/equipment/muscle filter), `search_templates`,
+  `get_exercise_notes` (all pinned notes), `get_exclusions`, and
+  `explain_prescription`. Each handler resolves identity from the token-bound RLS
+  client; pure shaper functions (`formatProfile`/`formatMesoSummary`/… ) are
+  exported and unit-tested without I/O, mirroring `formatCurrentState`.
+- **New query-layer readers.** `getLatestPrescriptionDecision` (progression.ts) —
+  the most recent `engine_decisions` row for one of the user's exercises (walks
+  the user's `workout_exercises` → latest decision; RLS-scoped, no service role),
+  surfaced by `explain_prescription`. `listAllPinnedNotes` (exercises.ts) — every
+  pinned note with exercise names, for `get_exercise_notes`.
+- **`workout://profile` resource** alongside `workout://current-cycle`, same
+  shape as `get_profile`.
+- **Honesty guardrails (10 §9) in copy.** e1RM/strength/targets labeled
+  estimates; exclusions flagged "never recommend"; the prescription tool states
+  the engine — not the model — owns every number.
+- **Tests (`__tests__/read-tools.test.ts`, +24 → 184 total).** Pure-shaper tests
+  for all twelve shapers (found/not-found, adherence math, estimate labels, both
+  note kinds, custom-exercise flagging, week sorting), registration of every tool
+  name, the **no-`user_id`-arg** contract across the whole surface, the profile
+  resource, and unauthenticated-call rejection.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (184/184), `npm run build`
+green. Tools are read-only over existing RLS-scoped views/queries + the pure
+engine; no new write surface, no migration. End-to-end `tools/call` against the
+hosted project (per the Slice 1 recipe) is the owner's check once merged.
+
+### Deviations
+
+- **Tool naming:** `get_mesocycle_summary` / `get_macrocycle_summary` (the spec
+  lists `get_meso_summary` / `get_macro_summary`) — spelled out to read clearly in
+  a client's tool list; constants documented in `read.ts`.
+- **Read tools grouped in one `read.ts` module** with per-tool register functions
+  + a `registerReadTools` aggregator, rather than one file per tool — keeps the
+  twelve thin wrappers reviewable in one place (get-current-state.ts stays its own
+  file). Matches the 05 §Module layout `tools/` intent.
+- **`search_exercises` equipment is a free `z.string()`** (cast to `EquipmentType`)
+  rather than a zod enum — the stored vocabulary has 14 values incl. legacy
+  variants; an unmatched value simply returns no rows.
+
+## 2026-06-17 — Phase 6: OAuth consent UI (connector handshake completable)
 
 Builds the app-side **OAuth 2.1 consent flow** the Supabase OAuth server
 requires, so an MCP client (Claude) can complete the authorization-code

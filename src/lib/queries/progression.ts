@@ -613,3 +613,94 @@ export async function advanceWeekAfterWorkout(
     nextLabel,
   };
 }
+
+// ---------------------------------------------------------------------------
+// engine-decision reader (05 §explain_prescription) — surfaces the engine's
+// recorded inputs/output/rationale for a prescription. Read-only and
+// RLS-scoped: `engine_decisions` selects are gated to the owner (or admin), so
+// this runs on the caller's own token-bound client, no service role.
+// ---------------------------------------------------------------------------
+
+export interface PrescriptionDecision {
+  exercise_id: string;
+  exercise_name: string;
+  workout_exercise_id: string;
+  /** W·D the prescription was generated for, when resolvable */
+  coordinate: string | null;
+  decided_at: string;
+  params_version: number;
+  inputs: Record<string, unknown>;
+  output: Record<string, unknown>;
+}
+
+/**
+ * The most recent engine decision for one of the user's exercises. Walks the
+ * user's `workout_exercises` for the exercise (RLS-scoped through the parent
+ * workout), then the latest `engine_decisions` row keyed to those. Returns null
+ * when the engine has never prescribed the exercise for this user.
+ */
+export async function getLatestPrescriptionDecision(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<PrescriptionDecision | null> {
+  const [{ data: exercise, error: exError }, { data: wes, error: weError }] =
+    await Promise.all([
+      supabase.from("exercises").select("name").eq("id", exerciseId).maybeSingle(),
+      supabase
+        .from("workout_exercises")
+        .select("id, workout_id")
+        .eq("exercise_id", exerciseId),
+    ]);
+  if (exError) throw exError;
+  if (weError) throw weError;
+  if (!wes || wes.length === 0) return null;
+
+  const weById = new Map(wes.map((w) => [w.id, w]));
+  const { data: decisions, error: decError } = await supabase
+    .from("engine_decisions")
+    .select("*")
+    .eq("user_id", userId)
+    .in(
+      "workout_exercise_id",
+      wes.map((w) => w.id),
+    )
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (decError) throw decError;
+  if (!decisions || decisions.length === 0) return null;
+  const decision = decisions[0];
+
+  let coordinate: string | null = null;
+  const we = decision.workout_exercise_id
+    ? weById.get(decision.workout_exercise_id)
+    : undefined;
+  if (we) {
+    const { data: workout, error: wError } = await supabase
+      .from("workouts")
+      .select("day_number, microcycle_id")
+      .eq("id", we.workout_id)
+      .maybeSingle();
+    if (wError) throw wError;
+    if (workout) {
+      const { data: micro, error: mError } = await supabase
+        .from("microcycles")
+        .select("week_number")
+        .eq("id", workout.microcycle_id)
+        .maybeSingle();
+      if (mError) throw mError;
+      if (micro) coordinate = `W${micro.week_number}·D${workout.day_number}`;
+    }
+  }
+
+  return {
+    exercise_id: exerciseId,
+    exercise_name: exercise?.name ?? "",
+    workout_exercise_id: decision.workout_exercise_id ?? "",
+    coordinate,
+    decided_at: decision.created_at,
+    params_version: decision.params_version,
+    inputs: decision.inputs,
+    output: decision.output,
+  };
+}
