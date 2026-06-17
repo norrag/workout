@@ -24,43 +24,51 @@ interface SeedCtx {
  *  (shared by meso start and the open-workout regeneration on a plan edit). */
 function buildDayExerciseRows(workoutId: string, day: PlannedDay, ctx: SeedCtx) {
   let position = 1;
-  return day.groups.flatMap((group) =>
-    group.fills.map((fill) => {
-      const equipment = toEngineEquipment(
-        ctx.equipmentById.get(fill.exercise_id) ?? "other",
-      );
-      const pr = ctx.prById.get(fill.exercise_id);
-      const seeded = seedMeso(
-        pr?.best_weight != null
-          ? { weight: pr.best_weight, reps: pr.best_reps, sets: fill.initial_sets }
-          : null,
-        {
-          weight: fill.initial_weight,
-          reps: fill.initial_reps,
-          sets: fill.initial_sets,
-        },
-        { equipmentType: equipment },
-        {
-          experienceLevel: ctx.experienceLevel ?? "beginner",
-          units: ctx.units,
-        },
-        ctx.targetRir,
-        ctx.params,
-      );
-      return {
-        workout_id: workoutId,
-        exercise_id: fill.exercise_id,
-        muscle_group_id: group.muscle_group_id,
-        position: position++,
-        prescribed_weight: seeded.weight,
-        prescribed_reps: seeded.reps,
-        prescribed_sets: seeded.sets,
-        target_rir: seeded.targetRir,
-        status: "pending" as const,
-        notes: seeded.rationale,
-      };
-    }),
-  );
+  // flat day order (across groups, #2): meso_exercises.position is the day-level
+  // order; group.position + slot_number break ties for legacy/clustered rows.
+  const ordered = day.groups
+    .flatMap((group) => group.fills.map((fill) => ({ group, fill })))
+    .sort(
+      (a, b) =>
+        a.fill.position - b.fill.position ||
+        a.group.position - b.group.position ||
+        (a.fill.slot_number ?? 0) - (b.fill.slot_number ?? 0),
+    );
+  return ordered.map(({ group, fill }) => {
+    const equipment = toEngineEquipment(
+      ctx.equipmentById.get(fill.exercise_id) ?? "other",
+    );
+    const pr = ctx.prById.get(fill.exercise_id);
+    const seeded = seedMeso(
+      pr?.best_weight != null
+        ? { weight: pr.best_weight, reps: pr.best_reps, sets: fill.initial_sets }
+        : null,
+      {
+        weight: fill.initial_weight,
+        reps: fill.initial_reps,
+        sets: fill.initial_sets,
+      },
+      { equipmentType: equipment },
+      {
+        experienceLevel: ctx.experienceLevel ?? "beginner",
+        units: ctx.units,
+      },
+      ctx.targetRir,
+      ctx.params,
+    );
+    return {
+      workout_id: workoutId,
+      exercise_id: fill.exercise_id,
+      muscle_group_id: group.muscle_group_id,
+      position: position++,
+      prescribed_weight: seeded.weight,
+      prescribed_reps: seeded.reps,
+      prescribed_sets: seeded.sets,
+      target_rir: seeded.targetRir,
+      status: "pending" as const,
+      notes: seeded.rationale,
+    };
+  });
 }
 
 export interface ActiveEngineParams {

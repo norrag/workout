@@ -8,12 +8,27 @@ type Client = SupabaseClient<Database>;
 // templates (fig 3.3) — list, detail, planner round-trip (07 Phase 5)
 // ---------------------------------------------------------------------------
 
+export interface TemplateFilters {
+  search?: string;
+  /** training days per week */
+  days?: number;
+  /** templates.emphasis (split) */
+  emphasis?: string;
+  /** 'female' | 'male' — includes 'any'-tagged templates too */
+  gender?: string;
+}
+
 export async function listTemplates(
   supabase: Client,
-  opts: { search?: string } = {},
+  opts: TemplateFilters = {},
 ): Promise<TemplateRow[]> {
   let query = supabase.from("templates").select("*").order("name");
   if (opts.search) query = query.ilike("name", `%${opts.search}%`);
+  if (opts.days) query = query.eq("days_per_week", opts.days);
+  if (opts.emphasis) query = query.eq("emphasis", opts.emphasis);
+  // a gender filter includes the gender-neutral ("any") templates
+  if (opts.gender === "female" || opts.gender === "male")
+    query = query.in("intended_gender", [opts.gender, "any"]);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
@@ -225,6 +240,7 @@ export async function applyTemplateToMeso(
       .single();
     if (dayError) throw dayError;
 
+    let dayPos = 0; // day-wide order across groups (#2)
     for (const group of day.groups) {
       const { data: mesoGroup, error: groupError } = await supabase
         .from("meso_day_groups")
@@ -248,7 +264,7 @@ export async function applyTemplateToMeso(
               day_of_week: null,
               meso_day_group_id: mesoGroup.id,
               slot_number: f.slot_number,
-              position: f.slot_number,
+              position: ++dayPos,
               exercise_id: f.exercise_id,
               initial_weight: null,
               initial_reps: null,

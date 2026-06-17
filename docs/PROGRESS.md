@@ -2,7 +2,125 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Phase 6 Slice 4: MCP admin/tuning + replay (Phase 6 complete)
+## 2026-06-17 (latest) — Feedback batch 2: template filters, multi-slot fix, workout add-exercise, menu cleanup
+
+On-device follow-up to the previous batch. Same branch/PR (#27); `main`
+deployable; no schema change.
+
+### Done
+
+- **Template filters.** The templates tab gains a filter bar — **days/week, split
+  (emphasis), and intended audience** — alongside search. `listTemplates` takes
+  the filters (`TemplateFilters`); the client `TemplateFilters` bar updates the
+  URL query so the server page re-queries. A gender filter includes the
+  gender-neutral ("any") templates; search preserves the active filters.
+- **Multi-slot planner fix.** In the flat board (#2), a group set to N exercises
+  now renders **one open-slot row per open slot** (was a single collapsed
+  "N slots" row), and picking **fewer** exercises than the configured count
+  **no longer shrinks the group** — `setGroupExercises` (staged + live query)
+  keeps `exercise_slots = max(picked, configured)`, so the remaining slots stay
+  open and fillable.
+- **Workout "Add exercise."** New `⋮`-menu action (active workouts) opens a picker
+  with **open muscle-group + equipment filters** + search; picks are appended to
+  the **bottom** of the day's list (`addWorkoutExercises` → bottom position,
+  primary muscle group, prescription seeded from the user's best) and reorder as
+  normal. New `getAddExerciseCandidates` query + `addWorkoutExercisesAction`.
+- **Workout menu cleanup.** Removed the planner deep-links ("Edit mesocycle" and
+  "Edit day") from the workout `⋮` menu — all in-session editing now happens on
+  the workout page (add / remove / reorder / replace), consistent with the
+  post-log direction. Stats / End workout / End mesocycle remain.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (224/224), `npm run build`
+all green. On-device QA of the add-exercise picker, the multi-slot planner flow,
+and the template filters is the owner's check.
+
+### Notes
+
+- Removing **"Edit day"** (not just "Edit mesocycle") from the workout menu is a
+  deliberate extension of the requested change — both opened the planner, which
+  the post-log model moves away from.
+- The add-exercise picker is multi-select and appends in selection order; a newly
+  added exercise seeds `prescribed_sets = 3` at the user's all-time best, then the
+  engine carries it forward like any other slot.
+
+## 2026-06-17 — Feedback batch: templates, flat planner, post-log lock, workout-page propagation, fixes
+
+Seven on-device feedback notes addressed in one vertical slice. `main`
+deployable; one append-only data migration (stock templates); no schema change.
+
+### Done
+
+- **#1 Stock template library** (`supabase/migrations/20260617000002_seed_stock_templates.sql`,
+  applied to hosted). Eight well-designed stock templates (`templates.user_id` null)
+  spanning day counts 2–6, splits (full body, upper/lower, push/pull/legs ×2,
+  five-day body-part, upper-emphasis, glute/lower-emphasis), and intended
+  audiences (any/male/female). Fully structured in the groups-first shape so each
+  opens the planner prefilled. The seed resolves exercises by name **disambiguated
+  by the slot's muscle group** (so duplicate names like "Hack Squat" land
+  correctly) and is **idempotent** (guarded on a sentinel name). `template_day_groups`
+  is unique per (day, muscle group), so a day's repeated group is one group with
+  multiple ordered slots.
+- **#2 Flat, cross-group planner ordering.** The planner board renders each day as
+  one flat ordered list of exercises (muscle-group badge per row) instead of fixed
+  group sections; ▲▼ move an exercise **anywhere in the day, across groups** (glute
+  → quad → glute is now expressible). `meso_exercises.position` becomes the
+  **day-level** order; every writer emits day-wide positions (`saveMesoPlan`, live
+  `setGroupExercises` append-after-max, `applyTemplateToMeso`, `copyMesoStructure`,
+  MCP `create_mesocycle`); new `reorderDayExercises` powers live draft reordering;
+  `getMesoPlan` + generation's `buildDayExerciseRows` sort by it (group + slot
+  tie-breaks keep legacy rows clustered → existing mesos unchanged). The order
+  flows through generation into the logged workout (DayView is position-ordered)
+  and the read-only planned-day preview (now also flat). The EDIT DAY sheet still
+  manages groups, slot counts, and group order; open slots render below the list.
+- **#3 Post-log meso lock.** The mesocycle summary page hides the EDIT entry point
+  once any set is logged (`getMesoDeletionImpact.hasHistory`), with a note that
+  edits move to the workout page.
+- **#4 Workout-page reorder & substitution propagation.** Reorders on a live
+  workout persist and carry forward to the **same training day in later incomplete
+  weeks** automatically (match by exercise id; unmatched stay at the end).
+  Substituting an exercise gains a **"Repeat this swap on this day in future
+  weeks" checkbox** — checked applies to future incomplete same-day workouts,
+  unchecked stays local. Logged history is never touched (the replace no-ops where
+  sets exist). New helpers `getFutureSiblingWorkoutIds` / `propagateExerciseOrder`
+  / `propagateSubstitution` + a pure `reorderToMatch` (unit-tested). New weeks
+  still generate from the prior week's workout, so the change also chains forward.
+- **#5 Equipment-settings crash.** Legacy `preferred_equipment` values (a pre-pivot
+  account stored `free_weights`/`machines`/`cables`) failed the zod enum parse and
+  crashed the profile toggle. Sanitised to the canonical vocabulary in both the UI
+  (`ProfileEditor`) and `setEquipment`, and cleaned the affected live row.
+- **#6 Cycle sort order.** Cycles page lists macros and standalone mesos
+  newest-first (`getCyclesOverview` orders by `created_at desc`).
+- **#7 New-template button.** Templates `+ NEW` now starts a draft and opens the
+  planner board; the planner board gains a **SAVE AS TEMPLATE** action (both draft
+  and editing modes) so the planner is the single build-and-save surface.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (224/224, +5 for
+`reorderToMatch`), `npm run build` all green. Templates seed applied to hosted and
+row counts confirmed (8 templates, 2–6 days, 9–30 exercises each). The flat-order
+change is backward compatible: generation/board tie-break by group+slot, so
+existing mesos (position = legacy slot_number) keep their current order; only an
+explicit reorder/save writes day-wide positions. On-device QA of the planner
+flat-list interactions and the workout-page propagation is the owner's check.
+
+### Deviations / notes
+
+- **Templates store group-clustered order** (schema is one muscle group per day,
+  multiple ordered slots), so a template can't encode an interleaved cross-group
+  order; the flat ordering (#2) is a meso-planner capability. Re-applying a
+  template clusters by group, then the user can interleave.
+- **#4 propagation reaches already-materialised future weeks**; weeks generated
+  later inherit via the prior-week copy, so no extra plumbing into the engine.
+  Add/remove of an exercise stays per-workout (only reorder + substitution
+  propagate, per the note).
+- **#3 leaves the Day-View `⋮` "Edit mesocycle/day" planner links** in place — they
+  open the planner, which still allows future-only edits; the note scoped the lock
+  to the summary page.
+
+## 2026-06-17 — Phase 6 Slice 4: MCP admin/tuning + replay (Phase 6 complete)
 
 Final Phase 6 slice — the **admin/tuning + replay** surface, role-gated by
 `profiles.role = 'admin'`. The MCP connector is now the entire admin interface

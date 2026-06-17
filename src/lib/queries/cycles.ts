@@ -48,13 +48,15 @@ export async function getCyclesOverview(
         .from("macrocycles")
         .select("*")
         .eq("user_id", userId)
-        .order("start_date", { ascending: false }),
+        .order("created_at", { ascending: false }),
       supabase
         .from("mesocycles")
         .select("*")
         .eq("user_id", userId)
         .neq("status", "draft")
-        .order("created_at"),
+        // newest first; standalone mesos render in this order, while
+        // within-macro mesos are re-sorted by plan position in orderMesos.
+        .order("created_at", { ascending: false }),
     ]);
   if (macroError) throw macroError;
   if (mesoError) throw mesoError;
@@ -233,9 +235,12 @@ export async function getMesoPlan(
       .eq("mesocycle_id", mesoId)
       .order("day_number"),
     supabase
+      // position is the day-level order (across groups); slot_number breaks ties
+      // for legacy rows where position mirrored the group-local slot.
       .from("meso_exercises")
       .select("*")
       .eq("mesocycle_id", mesoId)
+      .order("position")
       .order("slot_number"),
     supabase.from("muscle_groups").select("*"),
   ]);
@@ -417,6 +422,7 @@ export async function copyMesoStructure(
       .single();
     if (dayError) throw dayError;
 
+    let dayPos = 0; // day-wide order across groups (#2)
     for (const group of day.groups) {
       const { data: mesoGroup, error: groupError } = await supabase
         .from("meso_day_groups")
@@ -439,7 +445,7 @@ export async function copyMesoStructure(
               day_of_week: null,
               meso_day_group_id: mesoGroup.id,
               slot_number: f.slot_number,
-              position: f.slot_number,
+              position: ++dayPos,
               exercise_id: f.exercise_id,
               initial_weight: null,
               initial_reps: null,
@@ -577,10 +583,35 @@ export async function setGroupExercises(
 ): Promise<void> {
   const { data: current, error: curError } = await supabase
     .from("meso_exercises")
-    .select("exercise_id, initial_sets")
+    .select("exercise_id, initial_sets, position")
     .eq("meso_day_group_id", input.meso_day_group_id)
     .order("slot_number");
   if (curError) throw curError;
+
+  // day-wide order (#2): keep retained exercises at their existing day position;
+  // append brand-new ones after the day's current last position.
+  const { data: grp, error: grpError } = await supabase
+    .from("meso_day_groups")
+    .select("meso_day_id, exercise_slots")
+    .eq("id", input.meso_day_group_id)
+    .single();
+  if (grpError) throw grpError;
+  const { data: dayGroups, error: dgError } = await supabase
+    .from("meso_day_groups")
+    .select("id")
+    .eq("meso_day_id", grp.meso_day_id);
+  if (dgError) throw dgError;
+  const { data: dayEx, error: dayExError } = await supabase
+    .from("meso_exercises")
+    .select("exercise_id, position, meso_day_group_id")
+    .in("meso_day_group_id", (dayGroups ?? []).map((g) => g.id));
+  if (dayExError) throw dayExError;
+  let dayMax = Math.max(0, ...(dayEx ?? []).map((e) => e.position));
+  const oldPosInGroup = new Map(
+    (dayEx ?? [])
+      .filter((e) => e.meso_day_group_id === input.meso_day_group_id)
+      .map((e) => [e.exercise_id, e.position]),
+  );
 
   const layout = planGroupExercises(
     current ?? [],
@@ -601,7 +632,7 @@ export async function setGroupExercises(
         day_of_week: null,
         meso_day_group_id: input.meso_day_group_id,
         slot_number: l.slot_number,
-        position: l.slot_number,
+        position: oldPosInGroup.get(l.exercise_id) ?? ++dayMax,
         exercise_id: l.exercise_id,
         initial_weight: null,
         initial_reps: null,
@@ -613,7 +644,8 @@ export async function setGroupExercises(
 
   const { error: updError } = await supabase
     .from("meso_day_groups")
-    .update({ exercise_slots: Math.max(layout.length, 1) })
+    // keep the configured slot count — picking fewer leaves the rest open
+    .update({ exercise_slots: Math.max(layout.length, grp.exercise_slots) })
     .eq("id", input.meso_day_group_id);
   if (updError) throw updError;
 }
@@ -630,7 +662,13 @@ export async function setGroupExercises(
 export interface PlanGroupInput {
   muscle_group_id: string;
   exercise_slots: number;
-  fills: { slot_number: number; exercise_id: string; initial_sets: number }[];
+  fills: {
+    slot_number: number;
+    exercise_id: string;
+    initial_sets: number;
+    /** day-level order across all groups (1..n); drives the flat board order */
+    day_position: number;
+  }[];
 }
 
 export interface PlanDayInput {
@@ -692,7 +730,8 @@ export async function saveMesoPlan(
               meso_day_group_id: groupRow.id,
               day_of_week: null,
               slot_number: f.slot_number,
-              position: f.slot_number,
+              // day-level order (across groups), not the group-local slot
+              position: f.day_position,
               exercise_id: f.exercise_id,
               initial_weight: null,
               initial_reps: null,
@@ -771,6 +810,25 @@ export async function reorderGroupExercises(
       .update({ slot_number: i + 1, position: i + 1 })
       .eq("id", orderedFillIds[i])
       .eq("meso_day_group_id", groupId);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Reorder a day's exercises across ALL its groups (the flat day order, 08/#2):
+ * rewrite each fill's day-level `position` to its index in `orderedFillIds`
+ * (1..n). `slot_number` (group-local) is left untouched. Scoped per fill id
+ * (RLS keeps it to the owner's meso). Live (draft) reorder path.
+ */
+export async function reorderDayExercises(
+  supabase: Client,
+  orderedFillIds: string[],
+): Promise<void> {
+  for (let i = 0; i < orderedFillIds.length; i++) {
+    const { error } = await supabase
+      .from("meso_exercises")
+      .update({ position: i + 1 })
+      .eq("id", orderedFillIds[i]);
     if (error) throw error;
   }
 }
