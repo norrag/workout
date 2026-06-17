@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 import {
   engineParamsSchema,
   rirRamp,
@@ -68,7 +69,11 @@ export interface ActiveEngineParams {
   params: EngineParams;
 }
 
-export async function getActiveEngineParams(
+// Request-deduped: the active params are global and immutable within a request
+// (they only change via a separate admin-activation request), yet this is read
+// multiple times per render (page + getWorkoutDetail). cache() collapses those
+// to a single query without risking cross-request or post-mutation staleness.
+export const getActiveEngineParams = cache(async function getActiveEngineParams(
   supabase: Client,
 ): Promise<ActiveEngineParams> {
   const { data, error } = await supabase
@@ -78,7 +83,7 @@ export async function getActiveEngineParams(
     .single();
   if (error) throw error;
   return { version: data.version, params: engineParamsSchema.parse(data.params) };
-}
+});
 
 /**
  * Activate a planned meso: build the full microcycle ramp and the week-1

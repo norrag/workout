@@ -2,7 +2,29 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-17 (latest) — Responsiveness Slice 1: set-logging hot path + nav feedback
+## 2026-06-17 (latest) — Responsiveness Slice 2: instant nav skeletons + request dedup
+
+Builds on Slice 1. Makes page switches paint immediately and trims redundant
+per-render queries.
+
+### Done
+
+- **Route loading boundaries.** `(app)/loading.tsx` (generic tab skeleton) plus
+  DayView-shaped overrides at `(app)/workout/loading.tsx` and
+  `(app)/log/[workoutId]/loading.tsx`. Paired with the Slice 1 BottomNav
+  prefetch, a tapped tab now paints a skeleton instantly instead of blocking on
+  the RSC fetch. New `Skeleton` + `DayViewSkeleton` primitives (square, ink-wash,
+  pulse disabled under prefers-reduced-motion).
+- **Request-level dedup.** `getActiveEngineParams` wrapped in React `cache()` —
+  it was read twice per `/log` and `/workout` render (page + `getWorkoutDetail`).
+  Safe: the active params are global and immutable within a request. `getProfile`
+  deliberately left uncached (can change mid-request after an update).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run build` green.
+
+## 2026-06-17 — Responsiveness Slice 1: set-logging hot path + nav feedback
 
 First slice of a broader speed/responsiveness pass. Goal: every common action
 acknowledges the tap **immediately**, and background writes never block the UI.
