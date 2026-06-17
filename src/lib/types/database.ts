@@ -368,6 +368,10 @@ export type EngineParamsRow = {
   params: Record<string, unknown>;
   is_active: boolean;
   notes: string | null;
+  schema_version: number | null;
+  params_hash: string | null;
+  code_sha: string | null;
+  is_replayable: boolean;
   created_at: string;
   updated_at: string;
 }

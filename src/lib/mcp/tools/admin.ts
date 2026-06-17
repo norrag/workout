@@ -200,7 +200,16 @@ function registerGetEngineParams(server: McpServer) {
           version: a.version,
           is_active: a.is_active,
           notes: a.notes,
-          params: a.params as unknown as Record<string, unknown>,
+          // P0-3: the params exactly as stored, plus provenance. `is_replayable`
+          // is false for legacy versions stored before snapshots existed — their
+          // values were back-filled from defaults at read time, so they cannot be
+          // reproduced byte-for-byte; `resolved` is the best-effort full set.
+          schema_version: a.schema_version,
+          params_hash: a.params_hash,
+          is_replayable: a.is_replayable,
+          hash_verified: a.hash_verified,
+          params: a.params,
+          resolved: a.resolved as unknown as Record<string, unknown> | null,
         });
       }
       const b = await getEngineParamsVersion(client, compare_to_version);
@@ -210,7 +219,13 @@ function registerGetEngineParams(server: McpServer) {
         found: true,
         from_version: a.version,
         to_version: b.version,
+        // diff the stored bytes, not the defaults-filled view — so legacy versions
+        // that only differ in what was actually written show their real deltas
         diff: diffParams(a.params, b.params),
+        note:
+          a.is_replayable && b.is_replayable
+            ? undefined
+            : "One or both versions predate immutable snapshots; the diff reflects stored values only.",
       });
     },
   );
@@ -396,16 +411,22 @@ function registerReplayDecisions(server: McpServer) {
       const candidate = await getEngineParamsVersion(client, args.candidate_version);
       if (!candidate)
         return jsonResult({ ok: false, error: `candidate version ${args.candidate_version} not found` });
+      if (!candidate.resolved)
+        return jsonResult({
+          ok: false,
+          error: `candidate version ${args.candidate_version} no longer validates against the current schema and cannot be replayed`,
+        });
       const decisions = await getEngineDecisions(client, userId, {
         paramsVersion: args.params_version,
         exerciseId: args.exercise_id,
         since: args.since,
         limit: args.limit,
       });
-      const outcome = replayDecisions(decisions, candidate.params);
+      const outcome = replayDecisions(decisions, candidate.resolved);
       return jsonResult({
         ok: true,
         candidate_version: args.candidate_version,
+        candidate_is_replayable: candidate.is_replayable,
         ...outcome,
         note: "Diffs are what would change under the candidate; nothing was written. Activate separately.",
       });

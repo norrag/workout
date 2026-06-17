@@ -1,6 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { engineParamsSchema, type EngineParams } from "@/lib/engine";
 import type { Database } from "@/lib/types/database";
+import {
+  CURRENT_PARAMS_SCHEMA_VERSION,
+  engineCodeSha,
+  hashParams,
+  materializeParams,
+  resolveProvenance,
+  type ParamsProvenance,
+} from "./params-provenance";
 
 type Client = SupabaseClient<Database>;
 
@@ -16,20 +24,29 @@ export interface EngineParamVersion {
   version: number;
   is_active: boolean;
   notes: string | null;
+  schema_version: number | null;
+  params_hash: string | null;
+  is_replayable: boolean;
   created_at: string;
 }
 
 export async function listEngineParams(client: Client): Promise<EngineParamVersion[]> {
   const { data, error } = await client
     .from("engine_params")
-    .select("version, is_active, notes, created_at")
+    .select("version, is_active, notes, schema_version, params_hash, is_replayable, created_at")
     .order("version", { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
 
 export interface EngineParamsDetail extends EngineParamVersion {
-  params: EngineParams;
+  /** the params exactly as stored — no defaults injected on read (P0-3) */
+  params: Record<string, unknown>;
+  /** stored params resolved to a full EngineParams; null if they no longer validate */
+  resolved: EngineParams | null;
+  provenance: ParamsProvenance;
+  /** the recorded hash matches a fresh hash of the stored params */
+  hash_verified: boolean;
 }
 
 export async function getEngineParamsVersion(
@@ -43,26 +60,41 @@ export async function getEngineParamsVersion(
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
+  // P0-3: do NOT re-parse-with-defaults and hand that back as "the version".
+  // Return the stored bytes; resolve a usable EngineParams separately and carry
+  // an explicit replayability flag instead of silently materializing.
+  const stored = data.params;
+  const parsed = engineParamsSchema.safeParse(stored);
+  const provenance = resolveProvenance(stored, { code_sha: data.code_sha });
   return {
     version: data.version,
     is_active: data.is_active,
     notes: data.notes,
+    schema_version: data.schema_version,
+    params_hash: data.params_hash,
+    is_replayable: data.is_replayable,
     created_at: data.created_at,
-    params: engineParamsSchema.parse(data.params),
+    params: stored,
+    resolved: parsed.success ? parsed.data : null,
+    provenance,
+    hash_verified: data.params_hash != null && data.params_hash === provenance.params_hash,
   };
 }
 
 /**
- * Write a new INACTIVE param version (max+1). The params are validated by
- * `engineParamsSchema` before insert, so a malformed set can never be stored —
- * and therefore never activated.
+ * Write a new INACTIVE param version (max+1) as an immutable, self-describing
+ * snapshot (P0-3): the params are fully materialized (every default resolved)
+ * before storage, with a content hash, schema version, and engine build id, so
+ * the version can be reproduced exactly later. A malformed set can never be
+ * stored — and therefore never activated.
  */
 export async function proposeEngineParams(
   client: Client,
   params: EngineParams,
   notes: string | null,
 ): Promise<number> {
-  const validated = engineParamsSchema.parse(params);
+  const materialized = materializeParams(params);
+  const snapshot = materialized as unknown as Record<string, unknown>;
   const { data: top, error: topError } = await client
     .from("engine_params")
     .select("version")
@@ -74,9 +106,13 @@ export async function proposeEngineParams(
 
   const { error } = await client.from("engine_params").insert({
     version: nextVersion,
-    params: validated as unknown as Record<string, unknown>,
+    params: snapshot,
     is_active: false,
     notes,
+    schema_version: CURRENT_PARAMS_SCHEMA_VERSION,
+    params_hash: hashParams(snapshot),
+    code_sha: engineCodeSha(),
+    is_replayable: true,
   });
   if (error) throw error;
   return nextVersion;

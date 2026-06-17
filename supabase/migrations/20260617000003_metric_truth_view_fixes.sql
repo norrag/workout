@@ -138,8 +138,10 @@ select
   mc.is_deload,
   wes.muscle_group_id,
   mg.name as muscle_group,
-  sum(wes.prescribed_sets) as planned_sets,
-  sum(wes.logged_sets) as logged_sets
+  -- cast back to bigint so `create or replace view` keeps the original column
+  -- types (sum() of the per-we counts widens to numeric otherwise)
+  sum(wes.prescribed_sets)::bigint as planned_sets,
+  sum(wes.logged_sets)::bigint as logged_sets
 from public.microcycles mc
   join public.workouts w on w.microcycle_id = mc.id
   join we_sets wes on wes.workout_id = w.id
