@@ -99,12 +99,15 @@ export default async function MorePage() {
         </div>
         <AutoMatchToggle enabled={profile?.auto_match_weights ?? false} />
       </div>
-      <div className="flex items-center justify-between border-b border-ink/15 py-3.5">
+      <Link
+        href="/more/connector"
+        className="flex items-center justify-between border-b border-ink/15 py-3.5"
+      >
         <div className="text-sm font-semibold">AI connector</div>
         <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
-          NOT CONNECTED ›
+          SET UP ›
         </div>
-      </div>
+      </Link>
       <div className="flex items-center justify-between border-b border-ink/15 py-3.5">
         <div className="text-sm font-semibold">Export training data</div>
         <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">

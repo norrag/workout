@@ -2,6 +2,103 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-16 (latest) — Phase 6 Slice 1: MCP transport + auth + get_current_state
+
+First MCP connector slice (07 Phase 6, slice 1). `/api/mcp` is live as a
+Streamable-HTTP **resource server** that validates Supabase-issued bearer JWTs
+and exposes one grounding read tool. Vertical slice; `main` deployable; no
+schema change. Verified end-to-end against the hosted project with a real token.
+
+### Done
+
+- **Deps.** Added `mcp-handler`, `@modelcontextprotocol/sdk`, `jose`.
+- **Transport (`src/app/api/mcp/route.ts`).** Stateless Streamable-HTTP at exactly
+  `/api/mcp` (Node runtime, `force-dynamic`); SSE disabled (retired from the spec,
+  needs Redis). Server name/version + the domain **instructions string** (RIR,
+  cycle hierarchy, units, "engine owns the numbers") wired in.
+- **Auth bridge (`src/lib/mcp/auth.ts`).** `verifyMcpToken` validates the bearer
+  JWT against the project **JWKS** (ES256 confirmed enabled on the hosted project)
+  via `jose`, checking issuer `<url>/auth/v1`; identity (`sub`) is stashed in
+  `authInfo.extra.userId`. `createMcpRlsClient(token)` forwards the JWT as the
+  `Authorization` header so **RLS does per-user scoping** — no `user_id` ever
+  crosses the tool boundary (hard rule #5). Missing/invalid token → `undefined`
+  → 401.
+- **Discovery (`/.well-known/oauth-protected-resource`).** RFC 9728 metadata via
+  `protectedResourceHandler`, pointing clients at the Supabase OAuth AS
+  (`MCP_AUTH_ISSUER` overrides). Built lazily per request (issuer resolved from
+  runtime env, not build time) + CORS `OPTIONS`. The app auth middleware now
+  treats `/api/mcp` + the metadata path as public (bearer-auth, not cookie-auth)
+  so they aren't redirected to `/sign-in`.
+- **Session + tool + resource (`src/lib/mcp/`).** `resolveSession(extra)` →
+  `{ userId, token, clientId, scopes, client }` is the single identity-resolution
+  point every handler starts from. `get_current_state` (empty input schema) wraps
+  the existing `getCurrentState` query → pure `formatCurrentState` shaper
+  (active macro→meso→micro→next workout + target RIR + one-line summary).
+  `workout://current-cycle` resource returns the same shape. `server.ts` registers
+  the surface; `tools/index.ts` is the slice-by-slice registry.
+- **More → AI connector (fig 4.4).** Row now links to a new `/more/connector`
+  page: intro, the copyable MCP endpoint, how-to-connect steps, and access/
+  revocation notes. House ledger style (no specific mockup for the detail screen).
+- **Tests (`src/lib/mcp/__tests__/`, +11 → 160 total).** A capture-server harness
+  (`fakeAuthInfo`/`fakeExtra`) + tests covering `formatCurrentState` (no meso /
+  full active / deload / meso-without-workout), tool+resource registration, the
+  empty-input-schema contract, **auth-gating** (unauthenticated and
+  no-`sub` calls both throw), and `verifyMcpToken` default-deny. `server-only` is
+  aliased to a stub in `vitest.config.ts` so server-tagged modules are testable.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (160/160), `npm run build`
+green. **Runtime smoke against the hosted Supabase project:** (1)
+`/.well-known/oauth-protected-resource` returns correct metadata; (2) POST
+`/api/mcp` with no/invalid token → 401 with a spec-compliant
+`WWW-Authenticate: Bearer … resource_metadata=…`; (3) with a real ES256 user JWT,
+`tools/list` shows the tool and `tools/call get_current_state` resolves identity
+from the token and returns the RLS-scoped state (empty for the fresh test user) as
+text + `structuredContent`.
+
+### Setup runbooks added (2026-06-16 follow-up)
+
+Documented the human-only setup in `docs/deployment/`: `mcp-connector-setup.md`
+(architecture, enable-OAuth-server steps, env-var table, end-to-end test
+recipes) and `manual-operations.md` (standing list of dashboard/secret ops
+Claude can't perform). CLAUDE.md now points at both.
+
+**Hosting clarification:** the MCP server is **co-hosted in the same Next.js app**
+at `/api/mcp` (not a separate Vercel project, unlike the standalone
+`ngs-inventory-mcp` pattern) — deliberate per 05 §Transport (shared query
+layer/engine/views, stateless transport, Supabase is the auth server).
+
+**Found while documenting (important):** Supabase's OAuth server requires the
+app to host a **consent UI** at the configured Authorization Path
+(`/oauth/consent` + `/api/oauth/decision`, via
+`supabase.auth.oauth.getAuthorizationDetails/approve/deny`). This is required
+app code **not built in Slice 1** — without it the authorization-code handshake
+can't complete even once the server is enabled. `@supabase/supabase-js@2.108`
+(installed) exposes the methods. Tracked as the immediate next slice.
+
+### Remaining / external (carried to follow-up)
+
+- **Enable Supabase's native OAuth 2.1 Server on the hosted project** — the
+  resource-server side (JWKS verify, 401 discovery) is done and works with any
+  Supabase-issued JWT, but the AS metadata endpoint
+  (`/.well-known/oauth-authorization-server`) currently 404s, so DCR + the
+  authorization-code/PKCE handshake a remote client uses to *obtain* a token isn't
+  live yet. This is a dashboard toggle, not a code change. Once on, the connect
+  flow on `/more/connector` works as written.
+- **In-app revocation UI** depends on the OAuth-grants API surfacing connected
+  clients; the connector page documents revocation via the client / connected-apps
+  for now.
+- Slices 2–4 (read/coaching suite, write/planning drafts, admin/tuning + replay)
+  per 07 Phase 6.
+
+### Deviations
+
+- **No specific mockup for the AI-connector detail screen** (4.4 only specs the
+  row); `/more/connector` is built in the house ledger style.
+- A throwaway confirmed auth user was created during the hosted smoke test (no app
+  data); harmless orphan, left in place (no service-role delete from this session).
+
 ## 2026-06-16 (latest) — Adherence rule: attended/due over working weeks, decided days only
 
 Made the adherence definition correct as a stock rule (migration
