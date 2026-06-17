@@ -1,7 +1,12 @@
 import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { prescribe, type EngineInputs, type EngineParams, type Prescription } from "@/lib/engine";
+import {
+  engineInputsSchema,
+  prescribe,
+  type EngineParams,
+  type Prescription,
+} from "@/lib/engine";
 import { getProfile } from "@/lib/queries/profiles";
 import {
   listEngineParams,
@@ -112,46 +117,99 @@ export function diffPrescription(
   return { changed: Object.keys(fields).length > 0, fields };
 }
 
+export interface ReplayOutcomeBreakdown {
+  unchanged: number;
+  changed: number;
+  /** decision.inputs no longer parse as engine inputs */
+  invalid_source: number;
+  /** prescribe() threw on otherwise-valid inputs */
+  execution_error: number;
+}
+
+export interface ReplaySample {
+  decision_id: string;
+  exercise_name: string | null;
+  coordinate: string | null;
+}
+
 export interface ReplayOutcome {
   total: number;
   changed: number;
-  diffs: {
-    decision_id: string;
-    exercise_name: string | null;
-    coordinate: string | null;
-    fields: PrescriptionDiff["fields"];
-  }[];
+  /** legacy alias: every decision that did not yield a clean diff */
   errors: number;
+  outcomes: ReplayOutcomeBreakdown;
+  /** how many replayed prescriptions exercised each engine rule */
+  rule_coverage: Record<string, number>;
+  diffs: (ReplaySample & { fields: PrescriptionDiff["fields"] })[];
+  /** a bounded sample of decisions the candidate would leave unchanged */
+  unchanged_sample: ReplaySample[];
 }
 
-/** Re-run stored decisions against candidate params; collect the diffs. Pure. */
+/**
+ * Re-run stored decisions against candidate params and classify each outcome
+ * (P1-3). Pure: no I/O. `unchangedSampleSize` bounds the optional sample of
+ * decisions the candidate leaves untouched (0 = none).
+ */
 export function replayDecisions(
   decisions: DecisionRecord[],
   candidateParams: EngineParams,
+  unchangedSampleSize = 0,
 ): ReplayOutcome {
-  let changed = 0;
-  let errors = 0;
+  const outcomes: ReplayOutcomeBreakdown = {
+    unchanged: 0,
+    changed: 0,
+    invalid_source: 0,
+    execution_error: 0,
+  };
+  const rule_coverage: Record<string, number> = {};
   const diffs: ReplayOutcome["diffs"] = [];
+  const unchanged_sample: ReplaySample[] = [];
+
   for (const d of decisions) {
-    let replayed: Prescription;
-    try {
-      replayed = prescribe(d.inputs as unknown as EngineInputs, candidateParams);
-    } catch {
-      errors += 1;
+    const sample: ReplaySample = {
+      decision_id: d.id,
+      exercise_name: d.exercise_name,
+      coordinate: d.coordinate,
+    };
+
+    const parsed = engineInputsSchema.safeParse(d.inputs);
+    if (!parsed.success) {
+      outcomes.invalid_source += 1;
       continue;
     }
+
+    let replayed: Prescription;
+    try {
+      replayed = prescribe(parsed.data, candidateParams);
+    } catch {
+      outcomes.execution_error += 1;
+      continue;
+    }
+
+    // rule coverage from the candidate's resulting trace
+    for (const step of replayed.trace) {
+      rule_coverage[step.rule] = (rule_coverage[step.rule] ?? 0) + 1;
+    }
+
     const diff = diffPrescription(d.output, replayed);
     if (diff.changed) {
-      changed += 1;
-      diffs.push({
-        decision_id: d.id,
-        exercise_name: d.exercise_name,
-        coordinate: d.coordinate,
-        fields: diff.fields,
-      });
+      outcomes.changed += 1;
+      diffs.push({ ...sample, fields: diff.fields });
+    } else {
+      outcomes.unchanged += 1;
+      if (unchanged_sample.length < unchangedSampleSize) unchanged_sample.push(sample);
     }
   }
-  return { total: decisions.length, changed, diffs, errors };
+
+  return {
+    total: decisions.length,
+    changed: outcomes.changed,
+    errors: outcomes.invalid_source + outcomes.execution_error,
+    outcomes,
+    rule_coverage,
+    diffs,
+    unchanged_sample,
+  };
 }
 
 // --- list_engine_params / get_engine_params --------------------------------
@@ -402,6 +460,13 @@ function registerReplayDecisions(server: McpServer) {
         exercise_id: z.string().uuid().optional(),
         since: z.string().optional(),
         limit: z.number().int().min(1).max(100).optional(),
+        unchanged_sample: z
+          .number()
+          .int()
+          .min(0)
+          .max(20)
+          .optional()
+          .describe("include up to N decisions the candidate would leave unchanged"),
       },
     },
     async (
@@ -411,6 +476,7 @@ function registerReplayDecisions(server: McpServer) {
         exercise_id?: string;
         since?: string;
         limit?: number;
+        unchanged_sample?: number;
       },
       extra: McpExtra,
     ) => {
@@ -421,7 +487,9 @@ function registerReplayDecisions(server: McpServer) {
       if (!candidate.resolved)
         return jsonResult({
           ok: false,
+          // invalid_candidate: the candidate itself no longer validates
           error: `candidate version ${args.candidate_version} no longer validates against the current schema and cannot be replayed`,
+          invalid_candidate: true,
         });
       const decisions = await getEngineDecisions(client, userId, {
         paramsVersion: args.params_version,
@@ -429,13 +497,93 @@ function registerReplayDecisions(server: McpServer) {
         since: args.since,
         limit: args.limit,
       });
-      const outcome = replayDecisions(decisions, candidate.resolved);
+      const outcome = replayDecisions(
+        decisions,
+        candidate.resolved,
+        args.unchanged_sample ?? 0,
+      );
+      // source build identity (P0-3 linkage): which params versions + hashes the
+      // replayed decisions were originally recorded under
+      const sourceVersions = [...new Set(decisions.map((d) => d.params_version))].sort(
+        (a, b) => a - b,
+      );
+      const sourceHashes = [
+        ...new Set(decisions.map((d) => d.params_hash).filter((h): h is string => h != null)),
+      ];
       return jsonResult({
         ok: true,
-        candidate_version: args.candidate_version,
-        candidate_is_replayable: candidate.is_replayable,
+        candidate: {
+          version: candidate.version,
+          params_hash: candidate.params_hash,
+          code_sha: candidate.provenance.code_sha,
+          is_replayable: candidate.is_replayable,
+        },
+        source: {
+          params_versions: sourceVersions,
+          params_hashes: sourceHashes,
+        },
         ...outcome,
         note: "Diffs are what would change under the candidate; nothing was written. Activate separately.",
+      });
+    },
+  );
+}
+
+// --- simulate_prescriptions ------------------------------------------------
+
+export const SIMULATE_PRESCRIPTIONS = "simulate_prescriptions";
+function registerSimulatePrescriptions(server: McpServer) {
+  server.registerTool(
+    SIMULATE_PRESCRIPTIONS,
+    {
+      title: "Simulate prescriptions",
+      description:
+        "Admin only. Run a params version against hypothetical engine inputs " +
+        "(not stored history) and return what it would prescribe — for probing a " +
+        "candidate on cases the data hasn't produced yet. Each case is validated " +
+        "as engine inputs; invalid cases are reported, not silently dropped. " +
+        "Read-only; nothing is written.",
+      inputSchema: {
+        version: z.number().int().positive(),
+        cases: z.array(z.record(z.string(), z.unknown())).min(1).max(50),
+      },
+    },
+    async (
+      args: { version: number; cases: Record<string, unknown>[] },
+      extra: McpExtra,
+    ) => {
+      const { client } = await resolveAdmin(extra);
+      const params = await getEngineParamsVersion(client, args.version);
+      if (!params)
+        return jsonResult({ ok: false, error: `version ${args.version} not found` });
+      if (!params.resolved)
+        return jsonResult({
+          ok: false,
+          error: `version ${args.version} no longer validates and cannot be simulated`,
+          invalid_candidate: true,
+        });
+      const results = args.cases.map((c, index) => {
+        const parsed = engineInputsSchema.safeParse(c);
+        if (!parsed.success) {
+          return { case_index: index, ok: false, error: "invalid engine inputs" };
+        }
+        try {
+          const output = prescribe(parsed.data, params.resolved!);
+          return { case_index: index, ok: true, output };
+        } catch (e) {
+          return {
+            case_index: index,
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+          };
+        }
+      });
+      return jsonResult({
+        ok: true,
+        version: args.version,
+        params_hash: params.params_hash,
+        count: results.length,
+        results,
       });
     },
   );
@@ -450,4 +598,5 @@ export function registerAdminTools(server: McpServer) {
   registerActivateEngineParams(server);
   registerGetEngineDecisions(server);
   registerReplayDecisions(server);
+  registerSimulatePrescriptions(server);
 }

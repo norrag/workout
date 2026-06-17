@@ -18,6 +18,7 @@ import {
   ACTIVATE_ENGINE_PARAMS,
   GET_ENGINE_DECISIONS,
   REPLAY_DECISIONS,
+  SIMULATE_PRESCRIPTIONS,
 } from "../tools/admin";
 import { captureServer, fakeExtra } from "./harness";
 
@@ -156,6 +157,28 @@ describe("replayDecisions", () => {
     expect(outcome.changed).toBe(0);
     expect(outcome.errors).toBe(0);
   });
+
+  it("classifies outcomes and reports rule coverage (P1-3)", () => {
+    const good = decision(sampleInputs(), { weight: 999, reps: 8, sets: 3, targetRir: 2 });
+    const bad = decision({ not: "valid" }, { weight: 1, reps: 1, sets: 1, targetRir: 1 });
+    const outcome = replayDecisions([good, bad], DEFAULT_ENGINE_PARAMS as EngineParams);
+    expect(outcome.outcomes.changed).toBe(1);
+    expect(outcome.outcomes.invalid_source).toBe(1);
+    expect(outcome.outcomes.execution_error).toBe(0);
+    // the valid case exercised the load rule
+    expect(outcome.rule_coverage.load).toBe(1);
+  });
+
+  it("includes a bounded sample of unchanged decisions when asked", () => {
+    const inputs = sampleInputs();
+    const engineOut = prescribe(inputs as unknown as EngineInputs, DEFAULT_ENGINE_PARAMS);
+    const stored = decision(inputs, engineOut as unknown as Record<string, unknown>);
+    const none = replayDecisions([stored], DEFAULT_ENGINE_PARAMS as EngineParams, 0);
+    expect(none.unchanged_sample).toHaveLength(0);
+    const sampled = replayDecisions([stored], DEFAULT_ENGINE_PARAMS as EngineParams, 5);
+    expect(sampled.unchanged_sample).toHaveLength(1);
+    expect(sampled.outcomes.unchanged).toBe(1);
+  });
 });
 
 // --- registration + admin gating -------------------------------------------
@@ -167,6 +190,7 @@ const ALL_ADMIN_TOOLS = [
   ACTIVATE_ENGINE_PARAMS,
   GET_ENGINE_DECISIONS,
   REPLAY_DECISIONS,
+  SIMULATE_PRESCRIPTIONS,
 ];
 
 describe("admin-tool registration", () => {
