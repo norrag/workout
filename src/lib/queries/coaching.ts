@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { type EngineParams } from "@/lib/engine";
+import {
+  pickSessionE1rm,
+  type ExerciseSession,
+  type SessionSet,
+} from "@/lib/analysis/comparability";
 
 type Client = SupabaseClient<Database>;
 
@@ -352,33 +358,102 @@ export async function getExerciseAffinity(
 }
 
 // ---------------------------------------------------------------------------
-// exercise e1RM series (chronological) — feeds analyze_exercise_progress
-// stall/plateau detection. One row per session, oldest first.
+// exercise session series (chronological) — feeds analyze_exercise_progress'
+// comparability analysis (12 §Stage 3). One row per logged session, oldest
+// first, each tagged with the comparability dimensions (block goal + prescribed
+// RIR) and a confidence-aware, RIR-folded representative e1RM. Unlike
+// v_exercise_history's Epley-only e1RM, the e1RM here folds RIR into effective
+// reps and carries a confidence band ([10] §1), so trend/stall can down-weight
+// weak (high-rep / far-from-failure) estimates.
 // ---------------------------------------------------------------------------
 
-export interface E1rmPoint {
-  performed_on: string;
-  e1rm: number | null;
-  top_weight: number | null;
-  working_sets: number;
-}
-
-export async function getExerciseE1rmSeries(
+export async function getExerciseSessions(
   supabase: Client,
   userId: string,
   exerciseId: string,
-): Promise<E1rmPoint[]> {
-  const { data, error } = await supabase
-    .from("v_exercise_history")
-    .select("performed_on, e1rm, top_weight, working_sets")
-    .eq("user_id", userId)
-    .eq("exercise_id", exerciseId)
-    .order("performed_on", { ascending: true });
-  if (error) throw error;
-  return (data ?? []).map((r) => ({
-    performed_on: r.performed_on,
-    e1rm: r.e1rm,
-    top_weight: r.top_weight,
-    working_sets: r.working_sets,
-  }));
+  params: EngineParams,
+): Promise<ExerciseSession[]> {
+  // logged working sets for this lift, lifetime, RLS-scoped. Paginated against
+  // the row cap (a heavily trained lift can exceed it) with a stable order.
+  const sets = await fetchAllRows<{
+    workout_id: string;
+    mesocycle_id: string;
+    microcycle_id: string;
+    performed_at: string;
+    weight: number;
+    reps: number;
+    rir_reported: number | null;
+  }>((from, to) =>
+    supabase
+      .from("logged_sets")
+      .select("workout_id, mesocycle_id, microcycle_id, performed_at, weight, reps, rir_reported")
+      .eq("user_id", userId)
+      .eq("exercise_id", exerciseId)
+      .eq("is_warmup", false)
+      .order("performed_at")
+      .order("id")
+      .range(from, to),
+  );
+  if (sets.length === 0) return [];
+
+  // resolve the comparability dimensions: target RIR (microcycle), block name +
+  // macro (mesocycle), goal/phase (macrocycle).
+  const microIds = [...new Set(sets.map((s) => s.microcycle_id))];
+  const mesoIds = [...new Set(sets.map((s) => s.mesocycle_id))];
+  const [micros, mesos] = await Promise.all([
+    selectInChunks<{ id: string; target_rir: number | null }>(microIds, (c) =>
+      supabase.from("microcycles").select("id, target_rir").in("id", c),
+    ),
+    selectInChunks<{ id: string; name: string; macrocycle_id: string | null }>(mesoIds, (c) =>
+      supabase.from("mesocycles").select("id, name, macrocycle_id").in("id", c),
+    ),
+  ]);
+  const macroIds = [...new Set(mesos.map((m) => m.macrocycle_id).filter((id): id is string => id != null))];
+  const macros = await selectInChunks<{ id: string; goal_type: string }>(macroIds, (c) =>
+    supabase.from("macrocycles").select("id, goal_type").in("id", c),
+  );
+
+  const targetRirByMicro = new Map(micros.map((m) => [m.id, m.target_rir]));
+  const mesoById = new Map(mesos.map((m) => [m.id, m]));
+  const goalByMacro = new Map(macros.map((m) => [m.id, m.goal_type]));
+
+  // group by workout (one session), preserving the performed order
+  const byWorkout = new Map<
+    string,
+    { sets: SessionSet[]; first: (typeof sets)[number] }
+  >();
+  for (const s of sets) {
+    const cur = byWorkout.get(s.workout_id);
+    if (!cur) {
+      byWorkout.set(s.workout_id, {
+        sets: [{ weight: s.weight, reps: s.reps, rir: s.rir_reported }],
+        first: s,
+      });
+    } else {
+      cur.sets.push({ weight: s.weight, reps: s.reps, rir: s.rir_reported });
+    }
+  }
+
+  const out: ExerciseSession[] = [];
+  for (const { sets: workoutSets, first } of byWorkout.values()) {
+    const pick = pickSessionE1rm(workoutSets, params);
+    const meso = mesoById.get(first.mesocycle_id);
+    const goal =
+      meso?.macrocycle_id != null ? (goalByMacro.get(meso.macrocycle_id) ?? "unknown") : "unknown";
+    out.push({
+      performed_on: first.performed_at.slice(0, 10),
+      mesocycle_id: first.mesocycle_id,
+      meso_name: meso?.name ?? "",
+      goal_type: goal,
+      target_rir: targetRirByMicro.get(first.microcycle_id) ?? null,
+      e1rm: pick?.value ?? null,
+      confidence: pick?.confidence ?? null,
+      top_weight: pick?.top_weight ?? null,
+      top_reps: pick?.top_reps ?? null,
+      top_rir: pick?.top_rir ?? null,
+      working_sets: workoutSets.length,
+    });
+  }
+  // performed_at order is preserved by insertion (sets came back sorted)
+  return out.sort((a, b) => a.performed_on.localeCompare(b.performed_on));
 }

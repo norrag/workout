@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
 import type { VMesoSummaryRow } from "@/lib/types/database";
-import type { RecentSession, ExerciseAffinity, E1rmPoint } from "@/lib/queries/coaching";
+import type { RecentSession, ExerciseAffinity } from "@/lib/queries/coaching";
+import type { ExerciseSession } from "@/lib/analysis/comparability";
 import type { ExerciseOverview } from "@/lib/queries/exercises";
 import type { MesoBalance } from "@/lib/queries/stats";
 import {
@@ -148,8 +149,25 @@ describe("formatRecentSessions", () => {
 
 // --- formatExerciseAnalysis ------------------------------------------------
 
+function session(over: Partial<ExerciseSession>): ExerciseSession {
+  return {
+    performed_on: "2026-01-01",
+    mesocycle_id: "m1",
+    meso_name: "Block",
+    goal_type: "hypertrophy",
+    target_rir: 1,
+    e1rm: 100,
+    confidence: "high",
+    top_weight: 100,
+    top_reps: 8,
+    top_rir: 1,
+    working_sets: 3,
+    ...over,
+  };
+}
+
 describe("formatExerciseAnalysis", () => {
-  it("attaches a stall analysis and a plateau hint", () => {
+  it("attaches a current-phase stall analysis and a plateau hint", () => {
     const overview = {
       overview: {
         exercise_name: "Hack Squat",
@@ -159,17 +177,78 @@ describe("formatExerciseAnalysis", () => {
         best_e1rm: 300,
       },
     } as unknown as ExerciseOverview;
-    const series: E1rmPoint[] = [
-      { performed_on: "1", e1rm: 280, top_weight: 230, working_sets: 3 },
-      { performed_on: "2", e1rm: 300, top_weight: 250, working_sets: 3 },
-      { performed_on: "3", e1rm: 300, top_weight: 250, working_sets: 3 },
-      { performed_on: "4", e1rm: 299, top_weight: 250, working_sets: 3 },
-      { performed_on: "5", e1rm: 300, top_weight: 250, working_sets: 3 },
+    const sessions: ExerciseSession[] = [
+      session({ performed_on: "2026-05-01", e1rm: 280 }),
+      session({ performed_on: "2026-05-08", e1rm: 300 }),
+      session({ performed_on: "2026-05-15", e1rm: 300 }),
+      session({ performed_on: "2026-05-22", e1rm: 299 }),
+      session({ performed_on: "2026-05-29", e1rm: 300 }),
     ];
-    const out = formatExerciseAnalysis("e1", overview, series);
+    const out = formatExerciseAnalysis("e1", overview, sessions);
     expect(out.exercise_name).toBe("Hack Squat");
     expect((out.progress as Record<string, unknown>).trend).toBe("plateau");
     expect(out.note).toMatch(/new best/i);
+  });
+
+  it("does not read an alternating day-slot sawtooth as declining (12 §Stage 3 #1)", () => {
+    // the Dumbbell Curl case: two day-slots (heavier ~33, lighter ~27) inside
+    // one bulk; the latest happens to be the lighter slot. The single-latest read
+    // called this declining −18%; rolling + confidence must not.
+    const overview = {
+      overview: { exercise_name: "Dumbbell Curl", times_trained: 40, best_e1rm: 33 },
+    } as unknown as ExerciseOverview;
+    const bulk = (date: string, e1rm: number) =>
+      session({ performed_on: date, goal_type: "hypertrophy", e1rm, confidence: "moderate" });
+    const sessions: ExerciseSession[] = [
+      bulk("2026-05-01", 33),
+      bulk("2026-05-04", 27),
+      bulk("2026-05-08", 33),
+      bulk("2026-05-11", 27),
+      bulk("2026-05-15", 33),
+      bulk("2026-05-18", 27),
+    ];
+    const out = formatExerciseAnalysis("e1", overview, sessions);
+    const progress = out.progress as Record<string, unknown>;
+    expect(progress.trend).not.toBe("declining");
+    // rolling representative recovers the heavier slot, not the latest light one
+    expect(progress.rolling_e1rm).toBe(33);
+  });
+
+  it("segments and caveats a cut→bulk transition rather than alarming (12 §Stage 3 #2)", () => {
+    const overview = {
+      overview: { exercise_name: "Dumbbell Curl", times_trained: 100, best_e1rm: 49 },
+    } as unknown as ExerciseOverview;
+    const sessions: ExerciseSession[] = [
+      // cut block at heavier loads set the lifetime best
+      session({ performed_on: "2026-01-10", goal_type: "cut", e1rm: 49, target_rir: 1 }),
+      session({ performed_on: "2026-02-10", goal_type: "cut", e1rm: 48, target_rir: 1 }),
+      // current bulk at lighter loads, flat
+      session({
+        performed_on: "2026-05-10",
+        mesocycle_id: "m2",
+        goal_type: "hypertrophy",
+        e1rm: 30,
+        target_rir: 1,
+      }),
+      session({
+        performed_on: "2026-05-17",
+        mesocycle_id: "m2",
+        goal_type: "hypertrophy",
+        e1rm: 30,
+        target_rir: 1,
+      }),
+    ];
+    const out = formatExerciseAnalysis("e1", overview, sessions);
+    const progress = out.progress as Record<string, unknown>;
+    // headline is the current (bulk) phase, not a cross-phase −39% alarm
+    expect(progress.goal_type).toBe("hypertrophy");
+    expect(progress.best_e1rm).toBe(30);
+    expect((out.lifetime as Record<string, unknown>).crosses_phase).toBe(true);
+    expect(out.note).toMatch(/more than one phase/i);
+    const phases = out.phases as Record<string, unknown>[];
+    expect(phases).toHaveLength(2);
+    expect(phases[0].goal_type).toBe("cut");
+    expect(phases[1].goal_type).toBe("hypertrophy");
   });
 });
 
@@ -558,7 +637,7 @@ describe("registerTools error guard", () => {
 // --- formatExerciseAnalysis metric definitions (§5.2) ----------------------
 
 describe("formatExerciseAnalysis metric_definitions", () => {
-  it("labels the change window as lifetime", () => {
+  it("names the comparability metrics and carries times_trained", () => {
     const overview = {
       overview: {
         exercise_name: "Curl",
@@ -568,15 +647,14 @@ describe("formatExerciseAnalysis metric_definitions", () => {
         best_e1rm: 33,
       },
     } as unknown as ExerciseOverview;
-    const series: E1rmPoint[] = [
-      { performed_on: "1", e1rm: 33.33, top_weight: 30, working_sets: 3 },
-      { performed_on: "2", e1rm: 27.0, top_weight: 20, working_sets: 3 },
+    const sessions: ExerciseSession[] = [
+      session({ performed_on: "2026-05-01", e1rm: 33 }),
+      session({ performed_on: "2026-05-08", e1rm: 33 }),
     ];
-    const out = formatExerciseAnalysis("e1", overview, series);
+    const out = formatExerciseAnalysis("e1", overview, sessions);
     const defs = out.metric_definitions as Record<string, unknown>;
-    expect(defs.window).toBe("lifetime");
+    expect(defs.rolling_e1rm).toMatch(/rolling|last 3/i);
+    expect(defs.matched_rir).toMatch(/prescribed/i);
     expect(out.times_trained).toBe(144);
-    // the reported change reconciles with the rounded first/latest e1RM
-    expect((out.progress as Record<string, unknown>).change_pct).toBeCloseTo(-18.2, 1);
   });
 });

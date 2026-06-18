@@ -2,7 +2,75 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-18 (latest) — Connector coaching roadmap Stage 2: per-day session classification
+## 2026-06-18 (latest) — Connector coaching roadmap Stage 3: analysis comparability
+
+Third stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
+Fixes the false-stall class of bug (the Dumbbell Curl that read `declining −18%,
+stalled`) by making single-exercise analysis **compare like with like** — the four
+Stage 3 levers, all read/interpretation only (the engine still owns every
+prescribed number; honors [10] §9). **No schema, no new tool, no migration.**
+
+### Done
+
+- **Pure comparability analysers (`src/lib/analysis/comparability.ts`).** A new
+  neutral module (imported by both the query and MCP layers, so no
+  queries→server dependency):
+  - `pickSessionE1rm` — a session's representative e1RM is the strongest set in
+    the **most trustworthy confidence tier present** (a high-confidence 35×8 beats
+    a bigger low-confidence 20×11 number), folding RIR into effective reps via the
+    engine's `estimateE1rm` and carrying the [10] §1 band. (#3)
+  - `analyzeComparableProgress` — the **headline is the current phase only** (the
+    trailing run sharing the latest session's `goal_type`), and trend is driven by
+    a **rolling representative** (the trustworthy max over the last N sessions),
+    never a single latest read. Kills both the "latest was the light Day-3 slot"
+    artifact and the alternating-slot sawtooth. (#1, #2)
+  - `segmentPhases` — splits the lifetime series into contiguous `goal_type`
+    blocks so each phase reports on its own terms. (#2)
+  - `matchedRirComparison` — current vs previous meso compared **at the same
+    prescribed target RIR** (decision #2: RIR is the alignment key, not W·D),
+    flagged `cross_phase` when the goals differ. (#4)
+- **Enriched reader (`getExerciseSessions`, `src/lib/queries/coaching.ts`).**
+  Replaces `getExerciseE1rmSeries`: reads `logged_sets` per session (paginated,
+  RLS-scoped), computes the RIR-folded confidence-weighted top-set e1RM via the
+  engine, and tags each session with its block goal (`macrocycles.goal_type`) and
+  prescribed RIR (`microcycles.target_rir`) — the comparability dimensions
+  `v_exercise_history` (Epley-only, no RIR/goal/RIR) couldn't supply.
+- **Rebuilt `analyze_exercise_progress`.** Now returns `progress` (current-phase
+  rolling + confidence trend), `lifetime` (raw endpoints **explicitly flagged when
+  they cross a phase**), `phases[]`, and `matched_rir[]`, plus a `confidence_mix`
+  in `data_quality` and metric definitions naming each window. The note caveats a
+  cross-phase history and an all-low-confidence phase.
+- **Tests (+18 → 337 total).** `analysis/__tests__/comparability.test.ts` covers
+  tier-preference, phase segmentation, every trend (improving / plateau /
+  declining / insufficient), the **sawtooth-not-declining** and **cut→bulk
+  segmentation** cases from the roadmap's driving example, low-confidence
+  down-weighting, and matched-RIR; `coaching-tools.test.ts` asserts the tool shape.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (337/337), `npm run build` all
+green. End-to-end `tools/call` against the deployed connector is the owner's check
+once merged.
+
+### Notes / deviations
+
+- **e1RM now folds RIR (Epley·Brzycki average via the engine) in the analysis**,
+  where `v_exercise_history`/`v_exercise_overview` stay Epley-only. The tool keeps
+  the overview's lifetime `best_e1rm_estimate` for continuity and clarifies in
+  `metric_definitions` that the confidence-weighted current-phase best lives on
+  `progress` — a deliberate split, not drift.
+- **Confidence display weights (1.0/0.6/0.25) are module constants, not
+  `engine_params`** — read-side presentation weights, not a prescription tunable,
+  consistent with the Stage 2 fractional-weight call. The high/moderate/low
+  *bands* themselves remain the engine's `e1rm.*` params.
+- **`get_mesocycle_summary.progress_scores` left as-is.** Within a single meso the
+  goal_type is constant (phase-awareness moot) and it is the in-app, shared-view
+  metric ("one definition of progress"); changing it risks UI drift for little
+  gain. Noted as scoped-out rather than silently skipped.
+- Stages 4–5 (`edit_mesocycle`, session-order normalization) remain open; Stage 5
+  would sharpen the per-slot read this stage already defuses.
+
+## 2026-06-18 — Connector coaching roadmap Stage 2: per-day session classification
 
 Second stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
 Stops the "your low-set days are under-trained" misread when those days are legs

@@ -17,11 +17,17 @@ import { getMesoPlan } from "@/lib/queries/cycles";
 import {
   getRecentSessions,
   getExerciseAffinity,
-  getExerciseE1rmSeries,
+  getExerciseSessions,
   type RecentSession,
   type ExerciseAffinity,
-  type E1rmPoint,
 } from "@/lib/queries/coaching";
+import {
+  analyzeComparableProgress,
+  segmentPhases,
+  matchedRirComparison,
+  phaseGoals,
+  type ExerciseSession,
+} from "@/lib/analysis/comparability";
 import { resolveSession, type McpExtra } from "../session";
 import {
   toolResult,
@@ -274,10 +280,22 @@ function registerGetRecentSessions(server: McpServer) {
 export function formatExerciseAnalysis(
   exerciseId: string,
   overview: ExerciseOverview,
-  series: E1rmPoint[],
+  sessions: ExerciseSession[],
 ): Record<string, unknown> {
-  const analysis = detectStall(series.map((p) => p.e1rm));
   const ov = overview.overview;
+  // headline = the current phase only (12 §Stage 3 #1/#2): rolling + phase +
+  // confidence, so a single light-slot session no longer reads as a decline and
+  // a cut→bulk transition is segmented, not alarmed.
+  const progress = analyzeComparableProgress(sessions);
+  const phases = segmentPhases(sessions);
+  const matched = matchedRirComparison(sessions);
+  const goals = phaseGoals(sessions.filter((s) => s.e1rm != null));
+  // lifetime raw change is only honest *within* a phase; flag when it crosses one
+  const crossesPhase = goals.length > 1;
+  const estimable = sessions.filter((s) => s.e1rm != null);
+  const lifetimeFirst = estimable[0]?.e1rm ?? null;
+  const lifetimeLatest = estimable[estimable.length - 1]?.e1rm ?? null;
+
   return {
     exercise_id: exerciseId,
     exercise_name: ov?.exercise_name ?? null,
@@ -286,22 +304,63 @@ export function formatExerciseAnalysis(
     times_trained: ov?.times_trained ?? 0,
     last_performed_at: ov?.last_performed_at ?? null,
     weight_pr: ov?.weight_pr ?? null,
+    // overview best is the Epley-only lifetime peak (v_exercise_overview); the
+    // RIR-folded, confidence-weighted current-phase best lives on `progress`.
     best_e1rm_estimate: ov?.best_e1rm ?? null,
-    progress: analysis,
-    // name the window + formula so a coach (and other tools) read the same metric
-    // (§5.2). This is the lifetime span; the meso-scoped change lives on
-    // get_mesocycle_summary.progress_scores.
+    progress,
+    // raw lifetime endpoints, explicitly caveated when they span phases (12 §"Why")
+    lifetime: {
+      sessions: estimable.length,
+      first_e1rm: lifetimeFirst != null ? Math.round(lifetimeFirst) : null,
+      latest_e1rm: lifetimeLatest != null ? Math.round(lifetimeLatest) : null,
+      goal_types: goals,
+      crosses_phase: crossesPhase,
+    },
+    // per-block (goal_type) segments so each phase reads on its own terms
+    phases,
+    // current vs previous meso at matched prescribed RIR (decision #2) — the
+    // like-with-like cross-meso read; cross_phase flags a cut↔bulk crossing.
+    matched_rir: matched,
     metric_definitions: {
       change_pct:
-        "(latest e1RM − first e1RM) / first e1RM, over the exercise's whole logged history (Epley e1RM, whole-number estimates)",
-      sessions: "logged sessions with an estimable e1RM, oldest → newest",
-      window: "lifetime",
+        "(rolling e1RM − first e1RM) / first e1RM, within the current phase only (RIR-folded Epley·Brzycki e1RM, whole-number estimates)",
+      rolling_e1rm:
+        "confidence-weighted max over the last 3 comparable sessions — replaces the single latest read so an alternating day-slot or one light session doesn't read as a decline",
+      best_e1rm: "phase best, high/moderate-confidence preferred over low-confidence points",
+      phase: "a contiguous run of sessions sharing the macro goal_type (bulk/cut/…)",
+      matched_rir: "current vs previous meso compared at the same prescribed target RIR",
     },
-    note:
-      analysis.stalled && analysis.trend === "plateau"
-        ? "e1RM has not set a new best recently — consider a load/technique check or a deload (estimates)."
-        : "e1RM values are estimates; weigh them with the user's session notes and feedback.",
+    note: progressNote(progress, crossesPhase),
   };
+}
+
+function progressNote(
+  progress: ReturnType<typeof analyzeComparableProgress>,
+  crossesPhase: boolean,
+): string {
+  const parts: string[] = [];
+  if (progress.trend === "plateau") {
+    parts.push(
+      "Current-phase e1RM has not set a new best recently — consider a load/technique check or a deload (estimates).",
+    );
+  } else if (progress.trend === "declining") {
+    parts.push(
+      "Current-phase e1RM is trending down across recent comparable sessions, not just one light read — worth a closer look (estimates).",
+    );
+  } else {
+    parts.push("e1RM values are estimates; weigh them with the user's session notes and feedback.");
+  }
+  if (crossesPhase) {
+    parts.push(
+      "This lift's history spans more than one phase (e.g. cut and bulk); compare within a phase or use matched_rir — a raw lifetime change mixes intents and is not like-with-like.",
+    );
+  }
+  if (progress.confidence_mix.low > 0 && progress.confidence_mix.high + progress.confidence_mix.moderate === 0) {
+    parts.push(
+      "Every current-phase estimate is low-confidence (high-rep / far-from-failure sets) — read these as a band, not a precise number.",
+    );
+  }
+  return parts.join(" ");
 }
 
 export const ANALYZE_EXERCISE_PROGRESS = "analyze_exercise_progress";
@@ -311,24 +370,38 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
     {
       title: "Analyze exercise progress",
       description:
-        "e1RM trend, PRs, and stall/plateau detection for one exercise over its " +
-        "whole logged history. Flags when estimated strength has stopped " +
-        "progressing. e1RM is an estimate — read it alongside notes and feedback.",
+        "e1RM trend, PRs, and stall/plateau detection for one exercise — compared " +
+        "like with like: the headline trend is the current training phase only " +
+        "(bulk/cut/…), driven by a rolling window over recent sessions (not a " +
+        "single latest read) and down-weighting low-confidence estimates. Returns " +
+        "per-phase segments and a matched-prescribed-RIR comparison vs the prior " +
+        "block. e1RM is an estimate — read it alongside notes and feedback.",
       inputSchema: { exercise_id: z.string().uuid() },
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [overview, series, profile] = await Promise.all([
+      const { params } = await getActiveEngineParams(client);
+      const [overview, sessions, profile] = await Promise.all([
         getExerciseOverview(client, userId, exercise_id),
-        getExerciseE1rmSeries(client, userId, exercise_id),
+        getExerciseSessions(client, userId, exercise_id, params),
         getProfile(client, userId),
       ]);
-      return jsonResult(formatExerciseAnalysis(exercise_id, overview, series), {
+      const estimable = sessions.filter((s) => s.e1rm != null);
+      return jsonResult(formatExerciseAnalysis(exercise_id, overview, sessions), {
         units: profile?.units ?? null,
         dataQuality: {
           scales: scaleLegend("rir"),
-          samples: { e1rm_sessions: series.filter((p) => p.e1rm != null).length },
+          samples: {
+            e1rm_sessions: estimable.length,
+            confidence_mix: {
+              high: estimable.filter((s) => s.confidence === "high").length,
+              moderate: estimable.filter((s) => s.confidence === "moderate").length,
+              low: estimable.filter((s) => s.confidence === "low").length,
+            },
+          },
           estimates: E1RM_ESTIMATE_NOTE,
+          comparability:
+            "Trend is the current phase only; cross-phase and cross-meso reads are segmented (phases) or matched on prescribed RIR (matched_rir). e1RM folds RIR into effective reps and carries a confidence band ([10] §1).",
         },
       });
     },
