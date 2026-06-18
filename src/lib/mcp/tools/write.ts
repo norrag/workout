@@ -23,6 +23,7 @@ import {
 import { savePinnedNote, clearPinnedNote } from "@/lib/queries/logging";
 import { saveMesoAsTemplate } from "@/lib/queries/templates";
 import { resolveSession, type McpExtra } from "../session";
+import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
 
 /**
@@ -35,11 +36,8 @@ import { recordMcpWrite } from "../audit";
  * always the session's; no tool takes a `user_id`.
  */
 
-function jsonResult(payload: Record<string, unknown>) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-    structuredContent: payload,
-  };
+function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
+  return toolResult(payload, opts);
 }
 
 // --- muscle-group name resolution (pure) -----------------------------------

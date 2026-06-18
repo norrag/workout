@@ -29,19 +29,23 @@ import {
 } from "@/lib/queries/progression";
 import type { TemplateRow, EquipmentType } from "@/lib/types/database";
 import { resolveSession, type McpExtra } from "../session";
+import {
+  toolResult,
+  feedbackCoverage,
+  FEEDBACK_SCALES,
+  type EnvelopeOpts,
+} from "../envelope";
 
 /**
  * Slice 2 read/analysis tools (07 Phase 6). Thin, zod-validated wrappers over
  * the existing `src/lib/queries/` layer; every handler resolves identity from
  * the session (hard rule #5) and returns the same view-layer shapes the stats
  * screens use (05 §Data-shape contract). Pure shapers are exported for tests.
+ * Every response is wrapped in the shared envelope (P1-4).
  */
 
-function jsonResult(payload: Record<string, unknown>) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-    structuredContent: payload,
-  };
+function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
+  return toolResult(payload, opts);
 }
 
 // --- get_profile -----------------------------------------------------------
@@ -90,7 +94,8 @@ function registerGetProfile(server: McpServer) {
     },
     async (_args: Record<string, never>, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      return jsonResult(formatProfile(await getProfile(client, userId)));
+      const profile = await getProfile(client, userId);
+      return jsonResult(formatProfile(profile), { units: profile?.units ?? null });
     },
   );
 }
@@ -150,6 +155,46 @@ export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
     return { found: false, summary: "No mesocycle with that id is visible to the user." };
   }
   const { meso, days } = plan;
+  // every level carries the id that chains into the next tool (P1-2):
+  // muscle_group_id → get_muscle_group_volume, exercise_id → get_exercise_history
+  // / explain_prescription, day_id / slot_id for precise addressing. Plus planned-
+  // set totals (the initial, week-1 prescription) per slot, group, day, and meso.
+  let mesoPlannedSets = 0;
+  const shapedDays = days.map((day) => {
+    let dayPlannedSets = 0;
+    const groups = day.groups.map((g) => {
+      let groupPlannedSets = 0;
+      const exercises = g.fills.map((f) => {
+        const sets = f.initial_sets ?? 0;
+        groupPlannedSets += sets;
+        return {
+          slot_id: f.id,
+          slot_number: f.slot_number,
+          exercise_id: f.exercise_id,
+          exercise_name: f.exercise_name,
+          planned_sets: f.initial_sets,
+        };
+      });
+      dayPlannedSets += groupPlannedSets;
+      return {
+        group_id: g.id,
+        muscle_group_id: g.muscle_group_id,
+        muscle_group: g.muscle_group,
+        exercise_slots: g.exercise_slots,
+        planned_sets: groupPlannedSets,
+        exercises,
+      };
+    });
+    mesoPlannedSets += dayPlannedSets;
+    return {
+      day_id: day.id,
+      day_number: day.day_number,
+      label: day.label,
+      weekday: day.weekday,
+      planned_sets: dayPlannedSets,
+      groups,
+    };
+  });
   return {
     found: true,
     mesocycle: {
@@ -163,21 +208,12 @@ export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
       rir_ramp: { start: meso.rir_start, end: meso.rir_end },
       status: meso.status,
       start_date: meso.start_date,
+      planned_sets_per_week: mesoPlannedSets,
     },
-    days: days.map((day) => ({
-      day_number: day.day_number,
-      label: day.label,
-      weekday: day.weekday,
-      groups: day.groups.map((g) => ({
-        muscle_group: g.muscle_group,
-        exercise_slots: g.exercise_slots,
-        exercises: g.fills.map((f) => ({
-          slot_number: f.slot_number,
-          exercise_name: f.exercise_name,
-          planned_sets: f.initial_sets,
-        })),
-      })),
-    })),
+    days: shapedDays,
+    note:
+      "planned_sets are the week-1 prescription; the engine autoregulates per " +
+      "week from there — use get_muscle_group_volume for planned-vs-logged by week.",
   };
 }
 
@@ -213,6 +249,10 @@ export function formatMesoSummary(
     row.sessions_due > 0
       ? Math.round((row.sessions_attended / row.sessions_due) * 100)
       : null;
+  const block_completion_pct =
+    row.workouts_total > 0
+      ? Math.round((row.workouts_completed / row.workouts_total) * 100)
+      : null;
   return {
     found: true,
     mesocycle_id: row.mesocycle_id,
@@ -225,14 +265,33 @@ export function formatMesoSummary(
     workouts_completed: row.workouts_completed,
     workouts_total: row.workouts_total,
     working_sets: row.working_sets,
+    working_reps: row.working_reps,
     total_volume: row.total_volume,
     best_e1rm_estimate: row.best_e1rm,
     adherence_pct,
+    // adherence_pct = attended/due over working (non-deload) weeks; block
+    // completion = completed sessions over every session generated so far. The
+    // two denominators differ, so both are surfaced rather than inferred.
+    adherence: {
+      attended_due: row.sessions_attended,
+      total_due: row.sessions_due,
+      adherence_pct,
+      workouts_completed: row.workouts_completed,
+      workouts_generated: row.workouts_total,
+      block_completion_pct,
+    },
     feedback: {
+      // each average carries the count of observations behind it (P1-4): a
+      // single grumpy session and twenty honest ones no longer read the same
       avg_joint_pain: row.avg_joint_pain,
+      n_joint_pain: row.n_joint_pain,
       avg_pump: row.avg_pump,
+      n_pump: row.n_pump,
       avg_overall_fatigue: row.avg_overall_fatigue,
+      n_overall_fatigue: row.n_overall_fatigue,
       avg_performance: row.avg_performance,
+      n_performance: row.n_performance,
+      scales: FEEDBACK_SCALES,
     },
     progress_scores: scores.map((s) => ({
       exercise_id: s.exercise_id,
@@ -259,7 +318,7 @@ function registerGetMesoSummary(server: McpServer) {
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data: row, error }, scores] = await Promise.all([
+      const [{ data: row, error }, scores, profile] = await Promise.all([
         client
           .from("v_meso_summary")
           .select("*")
@@ -267,9 +326,24 @@ function registerGetMesoSummary(server: McpServer) {
           .eq("mesocycle_id", mesocycle_id)
           .maybeSingle(),
         getMesoProgressScores(client, userId, mesocycle_id),
+        getProfile(client, userId),
       ]);
       if (error) throw error;
-      return jsonResult(formatMesoSummary(row, scores));
+      const dataQuality = row
+        ? feedbackCoverage(
+            {
+              joint_pain: row.n_joint_pain,
+              pump: row.n_pump,
+              overall_fatigue: row.n_overall_fatigue,
+              performance: row.n_performance,
+            },
+            row.sessions_due,
+          )
+        : null;
+      return jsonResult(formatMesoSummary(row, scores), {
+        units: profile?.units ?? null,
+        dataQuality,
+      });
     },
   );
 }

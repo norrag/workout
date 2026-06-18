@@ -368,6 +368,10 @@ export type EngineParamsRow = {
   params: Record<string, unknown>;
   is_active: boolean;
   notes: string | null;
+  schema_version: number | null;
+  params_hash: string | null;
+  code_sha: string | null;
+  is_replayable: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -376,9 +380,16 @@ export type EngineDecisionRow = {
   id: string;
   user_id: string;
   workout_exercise_id: string | null;
+  exercise_id: string | null;
+  source_workout_exercise_id: string | null;
+  workout_id: string | null;
+  microcycle_id: string | null;
+  mesocycle_id: string | null;
   inputs: Record<string, unknown>;
   output: Record<string, unknown>;
   params_version: number;
+  params_hash: string | null;
+  provenance: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -461,6 +472,11 @@ export type VMesoSummaryRow = {
   avg_performance: number | null;
   sessions_attended: number;
   sessions_due: number;
+  working_reps: number;
+  n_joint_pain: number;
+  n_pump: number;
+  n_overall_fatigue: number;
+  n_performance: number;
 }
 
 export type VMacroSummaryRow = {

@@ -22,6 +22,7 @@ import type {
   WorkoutRow,
 } from "@/lib/types/database";
 import { getActiveEngineParams } from "./generation";
+import { engineCodeSha, hashParams } from "./params-provenance";
 
 /**
  * Week N → N+1 generation (07 Phase 4). Runs after a workout completes,
@@ -31,6 +32,30 @@ import { getActiveEngineParams } from "./generation";
  */
 
 type Client = SupabaseClient<Database>;
+
+/**
+ * Recording-time provenance for an engine decision (P0-4). The progression
+ * premise (doc 11) is that a logged set's RIR equals its prescribed target RIR
+ * — so a null `rir_reported` is treated as the week target, not missing data.
+ * That assumption was silently applied; this records when and how often, plus
+ * the engine build, so a decision is auditable after the fact.
+ */
+function decisionProvenance(
+  inputs: EngineInputs,
+  codeSha: string | null,
+): Record<string, unknown> {
+  const working = inputs.actualSets.filter((s) => !s.isWarmup);
+  const assumed = working.filter((s) => s.rirReported == null).length;
+  return {
+    code_sha: codeSha,
+    rir_fallback: {
+      rule: "null rir_reported assumed at the prescribed target RIR (doc 11)",
+      working_sets: working.length,
+      sets_assumed: assumed,
+      applied: assumed > 0,
+    },
+  };
+}
 
 export interface AdvanceResult {
   /** the fig 1.5 autoregulation copy for the workout-complete sheet */
@@ -92,12 +117,17 @@ export function buildEngineInputs(args: {
       sets: we.prescribed_sets ?? 1,
       targetRir: we.target_rir ?? args.microTargetRir,
     },
-    actualSets: args.sets.map((s) => ({
+    actualSets: args.sets.map((s, index) => ({
       setNumber: s.set_number,
       weight: s.weight,
       reps: s.reps,
       rirReported: s.rir_reported,
       isWarmup: s.is_warmup,
+      // P0-4: carry the immutable set id + a stable position so the recorded
+      // decision is auditable back to exact rows (set_number alone collides
+      // between warmup and working sets)
+      loggedSetId: s.id,
+      sequenceIndex: index,
     })),
     exerciseFeedback: {
       jointPain: args.feedback?.joint_pain ?? null,
@@ -201,7 +231,12 @@ async function generateDay(
     }
   }
 
-  const decisions: { inputs: EngineInputs; output: Prescription }[] = [];
+  const decisions: {
+    inputs: EngineInputs;
+    output: Prescription;
+    sourceWeId: string;
+    exerciseId: string;
+  }[] = [];
   const deltas: SummaryDelta[] = [];
   const rows = dayWes.map((we, index) => {
     const inputs = buildEngineInputs({
@@ -226,7 +261,7 @@ async function generateDay(
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
     });
     const output = prescribe(inputs, ctx.params);
-    decisions.push({ inputs, output });
+    decisions.push({ inputs, output, sourceWeId: we.id, exerciseId: we.exercise_id });
     deltas.push({
       exerciseName: ctx.nameByExercise.get(we.exercise_id) ?? "Exercise",
       previousWeight: we.prescribed_weight,
@@ -272,15 +307,27 @@ async function generateDay(
     const weIdByPosition = new Map(
       (newWes ?? []).map((we) => [we.position, we.id]),
     );
+    const paramsHash = hashParams(ctx.params as unknown as Record<string, unknown>);
+    const codeSha = engineCodeSha();
     const { error: decisionError } = await ctx.service
       .from("engine_decisions")
       .insert(
         decisions.map((d, index) => ({
           user_id: ctx.userId,
+          // workout_exercise_id = the generated (week-N+1) prescription target
           workout_exercise_id: weIdByPosition.get(index + 1) ?? null,
+          // P0-4: persist source identity + cycle coordinates so a decision
+          // chains into history/explain without a re-lookup
+          exercise_id: d.exerciseId,
+          source_workout_exercise_id: d.sourceWeId,
+          workout_id: workout.id,
+          microcycle_id: ctx.nextMicro.id,
+          mesocycle_id: ctx.meso.id,
           inputs: d.inputs as unknown as Record<string, unknown>,
           output: d.output as unknown as Record<string, unknown>,
           params_version: ctx.paramsVersion,
+          params_hash: paramsHash,
+          provenance: decisionProvenance(d.inputs, codeSha),
         })),
       );
     if (decisionError) throw decisionError;

@@ -166,15 +166,19 @@ describe("formatMesoPlan", () => {
       },
       days: [
         {
+          id: "day-1",
           day_number: 1,
           label: "Push",
           weekday: 1,
           groups: [
             {
+              id: "grp-1",
+              muscle_group_id: "mg-chest",
               muscle_group: "Chest",
               exercise_slots: 2,
               fills: [
-                { slot_number: 1, exercise_name: "Bench Press", initial_sets: 3 },
+                { id: "slot-1", exercise_id: "ex-bench", slot_number: 1, exercise_name: "Bench Press", initial_sets: 3 },
+                { id: "slot-2", exercise_id: "ex-fly", slot_number: 2, exercise_name: "Fly", initial_sets: 2 },
               ],
             },
           ],
@@ -184,12 +188,22 @@ describe("formatMesoPlan", () => {
     const out = formatMesoPlan(plan) as Record<string, unknown>;
     expect(out.found).toBe(true);
     const days = out.days as Record<string, unknown>[];
+    expect(days[0]).toMatchObject({ day_id: "day-1", planned_sets: 5 });
     const group = (days[0].groups as Record<string, unknown>[])[0];
-    expect(group.muscle_group).toBe("Chest");
+    expect(group).toMatchObject({
+      group_id: "grp-1",
+      muscle_group_id: "mg-chest",
+      muscle_group: "Chest",
+      planned_sets: 5,
+    });
     expect((group.exercises as Record<string, unknown>[])[0]).toMatchObject({
+      slot_id: "slot-1",
+      exercise_id: "ex-bench",
       exercise_name: "Bench Press",
       planned_sets: 3,
     });
+    // meso-level total chains the plan into a weekly-volume comparison
+    expect((out.mesocycle as Record<string, unknown>).planned_sets_per_week).toBe(5);
   });
 });
 
@@ -218,6 +232,11 @@ function mesoSummaryRow(overrides: Partial<VMesoSummaryRow> = {}): VMesoSummaryR
     avg_performance: 3.2,
     sessions_attended: 15,
     sessions_due: 16,
+    working_reps: 2400,
+    n_joint_pain: 60,
+    n_pump: 60,
+    n_overall_fatigue: 15,
+    n_performance: 15,
     ...overrides,
   };
 }
@@ -239,8 +258,26 @@ describe("formatMesoSummary", () => {
     ]);
     expect(out.adherence_pct).toBe(Math.round((15 / 16) * 100));
     expect(out.best_e1rm_estimate).toBe(315);
+    expect(out.working_reps).toBe(2400);
     const scores = out.progress_scores as Record<string, unknown>[];
     expect(scores[0]).toMatchObject({ e1rm_change_pct: 5 });
+  });
+
+  it("exposes both adherence denominators (due vs full block)", () => {
+    const out = formatMesoSummary(
+      mesoSummaryRow({
+        sessions_attended: 10,
+        sessions_due: 10,
+        workouts_completed: 10,
+        workouts_total: 16,
+      }),
+      [],
+    );
+    const adherence = out.adherence as Record<string, unknown>;
+    expect(adherence.adherence_pct).toBe(100); // 10/10 due
+    expect(adherence.block_completion_pct).toBe(63); // 10/16 generated
+    expect(adherence.total_due).toBe(10);
+    expect(adherence.workouts_generated).toBe(16);
   });
 
   it("returns null adherence when nothing was due", () => {
