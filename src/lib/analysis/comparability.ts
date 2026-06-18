@@ -51,6 +51,21 @@ export interface ExerciseSession {
   top_reps: number | null;
   top_rir: number | null;
   working_sets: number;
+  /**
+   * Stage 5 (session-order / fatigue-position) comparability dimensions:
+   * - `day_number`: the meso day-slot this session sits in (`workouts.day_number`).
+   *   A movement that occupies two day-slots (e.g. the curl on Day 1 at 25 lb and
+   *   Day 3 at 20 lb) is a sawtooth when pooled but two clean series when split.
+   * - `session_position`: the movement's 1-based ordinal within its session (1 =
+   *   trained first). Lets analysis tell "first movement, fresh" from "4th, fatigued."
+   * - `session_size`: how many exercises were trained that session (the denominator
+   *   for the position, e.g. "3rd of 6").
+   * All nullable: a session with no resolvable day/order leaves them null.
+   */
+  day_number: number | null;
+  day_label: string | null;
+  session_position: number | null;
+  session_size: number | null;
 }
 
 // --- confidence weighting ([10] §1) ----------------------------------------
@@ -364,6 +379,117 @@ export function matchedRirComparison(sessions: ExerciseSession[]): MatchedRirCom
     });
   }
   return out;
+}
+
+// --- per-day-slot series + fatigue position (Stage 5) ----------------------
+
+export interface DaySlotProgress {
+  /** the meso day-slot this series occupies (`workouts.day_number`) */
+  day_number: number;
+  day_label: string | null;
+  sessions: number;
+  /** typical performed ordinal of the movement on this day (1 = trained first) */
+  avg_position: number | null;
+  progress: ComparableProgress;
+}
+
+/**
+ * Split an exercise's sessions by the day-slot they occupy and analyse each
+ * slot on its own terms (Stage 5). A movement that sits in two day-slots — the
+ * Dumbbell Curl on Day 1 (25 lb) and Day 3 (20 lb) — is an alternating sawtooth
+ * when pooled, but keyed on day_number each slot is a clean, like-with-like
+ * series (the Day-1 slot reads flat, not declining). Only day-slots with at
+ * least `minSessions` estimable sessions are returned, ordered by day_number.
+ * Pure; the per-slot trend reuses the same rolling/phase/confidence logic.
+ */
+export function analyzeByDaySlot(
+  sessions: ExerciseSession[],
+  opts: AnalyzeProgressOpts & { minSessions?: number } = {},
+): DaySlotProgress[] {
+  const minSessions = opts.minSessions ?? 2;
+  const byDay = new Map<number, ExerciseSession[]>();
+  for (const s of sessions) {
+    if (s.day_number == null) continue;
+    const cur = byDay.get(s.day_number) ?? [];
+    cur.push(s);
+    byDay.set(s.day_number, cur);
+  }
+  const out: DaySlotProgress[] = [];
+  for (const [day_number, group] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
+    const estimable = group.filter((s) => s.e1rm != null);
+    if (estimable.length < minSessions) continue;
+    const positions = group
+      .map((s) => s.session_position)
+      .filter((p): p is number => p != null);
+    out.push({
+      day_number,
+      day_label: group.find((s) => s.day_label != null)?.day_label ?? null,
+      sessions: estimable.length,
+      avg_position:
+        positions.length > 0
+          ? Math.round((positions.reduce((a, b) => a + b, 0) / positions.length) * 10) / 10
+          : null,
+      progress: analyzeComparableProgress(group, opts),
+    });
+  }
+  return out;
+}
+
+export interface FatiguePositionSummary {
+  /** sessions for which a performed ordinal is known */
+  sessions: number;
+  /** mean ordinal within the session (1 = trained first) */
+  avg_position: number | null;
+  min_position: number | null;
+  max_position: number | null;
+  /** mean number of exercises in those sessions — the position's denominator */
+  avg_session_size: number | null;
+  /**
+   * The movement sits at a *variable* depth across sessions (ordinal spread ≥ 2).
+   * A set logged late in a session is pre-fatigued, so a lower e1RM there is not
+   * strictly comparable to one logged fresh — when this is set, treat a dip as a
+   * position artifact to rule out, not an automatic regression.
+   */
+  varies: boolean;
+}
+
+/**
+ * Summarise where in the session this movement is trained (Stage 5). Drives the
+ * fatigue-position caveat: an accessory done 5th some weeks and 2nd others
+ * shouldn't read as a regression on the later-position weeks. Pure; empty-safe.
+ */
+export function fatiguePosition(sessions: ExerciseSession[]): FatiguePositionSummary {
+  const positioned = sessions.filter(
+    (s): s is ExerciseSession & { session_position: number } => s.session_position != null,
+  );
+  if (positioned.length === 0) {
+    return {
+      sessions: 0,
+      avg_position: null,
+      min_position: null,
+      max_position: null,
+      avg_session_size: null,
+      varies: false,
+    };
+  }
+  const positions = positioned.map((s) => s.session_position);
+  const sizes = positioned
+    .map((s) => s.session_size)
+    .filter((n): n is number => n != null);
+  const min = Math.min(...positions);
+  const max = Math.max(...positions);
+  const avg = positions.reduce((a, b) => a + b, 0) / positions.length;
+  return {
+    sessions: positioned.length,
+    avg_position: Math.round(avg * 10) / 10,
+    min_position: min,
+    max_position: max,
+    avg_session_size:
+      sizes.length > 0
+        ? Math.round((sizes.reduce((a, b) => a + b, 0) / sizes.length) * 10) / 10
+        : null,
+    varies: max - min >= 2,
+  };
 }
 
 // --- helpers reused by the tool --------------------------------------------

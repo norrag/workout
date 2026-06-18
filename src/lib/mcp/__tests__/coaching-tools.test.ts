@@ -162,6 +162,10 @@ function session(over: Partial<ExerciseSession>): ExerciseSession {
     top_reps: 8,
     top_rir: 1,
     working_sets: 3,
+    day_number: 1,
+    day_label: null,
+    session_position: 1,
+    session_size: 4,
     ...over,
   };
 }
@@ -249,6 +253,44 @@ describe("formatExerciseAnalysis", () => {
     expect(phases).toHaveLength(2);
     expect(phases[0].goal_type).toBe("cut");
     expect(phases[1].goal_type).toBe("hypertrophy");
+  });
+
+  it("splits a two-day-slot movement into per-slot series and caveats the pool (12 §Stage 5)", () => {
+    const overview = {
+      overview: { exercise_name: "Dumbbell Curl", times_trained: 40, best_e1rm: 33 },
+    } as unknown as ExerciseOverview;
+    const d = (date: string, day: number, e1rm: number) =>
+      session({ performed_on: date, day_number: day, goal_type: "hypertrophy", e1rm, confidence: "moderate" });
+    const sessions: ExerciseSession[] = [
+      d("2026-05-01", 1, 33),
+      d("2026-05-04", 3, 27),
+      d("2026-05-08", 1, 33),
+      d("2026-05-11", 3, 27),
+      d("2026-05-15", 1, 33),
+      d("2026-05-18", 3, 27),
+    ];
+    const out = formatExerciseAnalysis("e1", overview, sessions);
+    const slots = out.day_slots as Record<string, unknown>[];
+    expect(slots).toHaveLength(2);
+    const day1 = slots.find((s) => s.day_number === 1)!;
+    expect((day1.progress as Record<string, unknown>).trend).not.toBe("declining");
+    expect((day1.progress as Record<string, unknown>).rolling_e1rm).toBe(33);
+    expect(out.note).toMatch(/day-slot/i);
+  });
+
+  it("flags variable session depth and omits day_slots for a single-slot lift (12 §Stage 5)", () => {
+    const overview = {
+      overview: { exercise_name: "Leg Extension", times_trained: 12, best_e1rm: 120 },
+    } as unknown as ExerciseOverview;
+    const sessions: ExerciseSession[] = [
+      session({ performed_on: "2026-05-01", e1rm: 120, session_position: 2, session_size: 6 }),
+      session({ performed_on: "2026-05-08", e1rm: 118, session_position: 6, session_size: 6 }),
+    ];
+    const out = formatExerciseAnalysis("e1", overview, sessions);
+    expect(out.day_slots).toEqual([]); // only one day-slot → not surfaced
+    const fatigue = out.fatigue_position as Record<string, unknown>;
+    expect(fatigue.varies).toBe(true);
+    expect(out.note).toMatch(/pre-fatigue/i);
   });
 });
 

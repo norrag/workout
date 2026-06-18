@@ -25,6 +25,8 @@ import {
   analyzeComparableProgress,
   segmentPhases,
   matchedRirComparison,
+  analyzeByDaySlot,
+  fatiguePosition,
   phaseGoals,
   type ExerciseSession,
 } from "@/lib/analysis/comparability";
@@ -290,6 +292,12 @@ export function formatExerciseAnalysis(
   const phases = segmentPhases(sessions);
   const matched = matchedRirComparison(sessions);
   const goals = phaseGoals(sessions.filter((s) => s.e1rm != null));
+  // Stage 5 — split the movement's two day-slots so a pooled sawtooth (the curl
+  // on Day 1 at 25 lb vs Day 3 at 20 lb) reads as two clean series, and surface
+  // where in the session it sits so a late-position dip isn't read as a decline.
+  const daySlots = analyzeByDaySlot(sessions);
+  const multiSlot = daySlots.length > 1;
+  const fatigue = fatiguePosition(sessions);
   // lifetime raw change is only honest *within* a phase; flag when it crosses one
   const crossesPhase = goals.length > 1;
   const estimable = sessions.filter((s) => s.e1rm != null);
@@ -321,6 +329,10 @@ export function formatExerciseAnalysis(
     // current vs previous meso at matched prescribed RIR (decision #2) — the
     // like-with-like cross-meso read; cross_phase flags a cut↔bulk crossing.
     matched_rir: matched,
+    // Stage 5 — per-day-slot series (only when the lift pools across ≥2 slots)
+    // and the session-order / fatigue-position summary.
+    day_slots: multiSlot ? daySlots : [],
+    fatigue_position: fatigue,
     metric_definitions: {
       change_pct:
         "(rolling e1RM − first e1RM) / first e1RM, within the current phase only (RIR-folded Epley·Brzycki e1RM, whole-number estimates)",
@@ -329,14 +341,20 @@ export function formatExerciseAnalysis(
       best_e1rm: "phase best, high/moderate-confidence preferred over low-confidence points",
       phase: "a contiguous run of sessions sharing the macro goal_type (bulk/cut/…)",
       matched_rir: "current vs previous meso compared at the same prescribed target RIR",
+      day_slots:
+        "the same movement analysed separately per meso day-slot (workouts.day_number) when it occupies more than one — each slot is a like-with-like series instead of a pooled sawtooth",
+      fatigue_position:
+        "where in the session the movement is trained (1 = first); avg/min/max ordinal and avg session size. varies=true means it sits at a variable depth, so a later-position dip may be fatigue, not regression",
     },
-    note: progressNote(progress, crossesPhase),
+    note: progressNote(progress, crossesPhase, multiSlot, fatigue),
   };
 }
 
 function progressNote(
   progress: ReturnType<typeof analyzeComparableProgress>,
   crossesPhase: boolean,
+  multiSlot: boolean,
+  fatigue: ReturnType<typeof fatiguePosition>,
 ): string {
   const parts: string[] = [];
   if (progress.trend === "plateau") {
@@ -353,6 +371,16 @@ function progressNote(
   if (crossesPhase) {
     parts.push(
       "This lift's history spans more than one phase (e.g. cut and bulk); compare within a phase or use matched_rir — a raw lifetime change mixes intents and is not like-with-like.",
+    );
+  }
+  if (multiSlot) {
+    parts.push(
+      "This movement is trained in more than one day-slot at different loads; read day_slots for the per-slot trend rather than the pooled series — the slots alternate and look like a sawtooth together.",
+    );
+  }
+  if (fatigue.varies) {
+    parts.push(
+      "It sits at a variable point in the session across weeks (see fatigue_position); a lower e1RM on a later-position week may be pre-fatigue, not a regression.",
     );
   }
   if (progress.confidence_mix.low > 0 && progress.confidence_mix.high + progress.confidence_mix.moderate === 0) {
@@ -374,8 +402,10 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
         "like with like: the headline trend is the current training phase only " +
         "(bulk/cut/…), driven by a rolling window over recent sessions (not a " +
         "single latest read) and down-weighting low-confidence estimates. Returns " +
-        "per-phase segments and a matched-prescribed-RIR comparison vs the prior " +
-        "block. e1RM is an estimate — read it alongside notes and feedback.",
+        "per-phase segments, a matched-prescribed-RIR comparison vs the prior " +
+        "block, per-day-slot series when the lift is trained on more than one day, " +
+        "and a fatigue-position summary (where in the session it sits). e1RM is an " +
+        "estimate — read it alongside notes and feedback.",
       inputSchema: { exercise_id: z.string().uuid() },
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
@@ -401,7 +431,7 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
           },
           estimates: E1RM_ESTIMATE_NOTE,
           comparability:
-            "Trend is the current phase only; cross-phase and cross-meso reads are segmented (phases) or matched on prescribed RIR (matched_rir). e1RM folds RIR into effective reps and carries a confidence band ([10] §1).",
+            "Trend is the current phase only; cross-phase and cross-meso reads are segmented (phases) or matched on prescribed RIR (matched_rir). A lift trained on more than one day-slot is also split per slot (day_slots), and session order is surfaced (fatigue_position) so a later-position dip isn't misread. e1RM folds RIR into effective reps and carries a confidence band ([10] §1).",
         },
       });
     },

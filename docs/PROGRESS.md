@@ -2,7 +2,76 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-18 (latest) — Connector coaching roadmap Stage 4: `edit_mesocycle` write tool
+## 2026-06-18 (latest) — Connector coaching roadmap Stage 5: session-order / fatigue-position normalization
+
+Fifth and final stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
+Makes single-exercise analysis fair to **where a movement sits** — splitting a
+lift's two day-slots so they aren't pooled into a sawtooth, and surfacing the
+movement's ordinal within its session so an accessory done late isn't misread as
+a regression versus the same lift done fresh. Sharpens Stage 3's defusing of the
+Dumbbell Curl false-stall. **Read/interpretation only — no schema, no migration.**
+
+### Pre-build data check (the stage's blocking gate) — resolved
+
+The actual **performed** exercise order is **partially** persisted: live logging
+stamps each `logged_sets.performed_at` at log time (distinct per set), but the
+backfilled history (`scripts/history-build.sql`) collapses every set in a workout
+to one timestamp. The **planned slot order** (`workout_exercises.position`) is,
+however, uniformly present for both live and historical sessions, and the
+**day-slot** (`workouts.day_number`) is always present. So Stage 5 is a
+**surfacing** stage: it derives the session ordinal from the persisted slot
+order and keys per-slot series on `day_number` — no capture/view change needed.
+
+### Done
+
+- **Pure analysers (`src/lib/analysis/comparability.ts`).** `analyzeByDaySlot`
+  groups an exercise's sessions by `day_number` and runs the Stage-3
+  rolling/phase/confidence trend on each slot independently (slots below a
+  minimum session count or with a null day are dropped); `fatiguePosition`
+  summarises the movement's ordinal within its session (avg/min/max position,
+  avg session size) and flags `varies` when the depth spread is ≥ 2 — the
+  comparability caveat. Both pure, empty-safe, deterministic.
+- **Session reader enrichment (`getExerciseSessions`, `src/lib/queries/coaching.ts`).**
+  Each `ExerciseSession` now carries `day_number` + `day_label`
+  (`workouts.day_number` → `meso_days.label`) and `session_position` +
+  `session_size` (rank of the slot's `workout_exercises.position` within its
+  workout, and the session's exercise count). Added `selectAllForIds` (chunks the
+  id filter **and** paginates each chunk) so the per-session slot fetch survives
+  both the URL-length and row caps for a heavily trained lift.
+- **`analyze_exercise_progress` surface (`src/lib/mcp/tools/coaching.ts`).** Adds
+  `day_slots` (only when the lift pools across ≥2 slots — each a like-with-like
+  per-slot series) and `fatigue_position`, with metric definitions and two new
+  honesty notes: read per-slot trends instead of the pooled sawtooth, and treat a
+  later-position dip as possible pre-fatigue rather than a regression.
+- **Tests (+8 → 361 total).** `analyzeByDaySlot` (two-slot split recovers the
+  heavier Day-1 series flat, min-session/null-day filtering, avg position) and
+  `fatiguePosition` (stable vs variable depth, empty-safe) in
+  `comparability.test.ts`; `formatExerciseAnalysis` surfacing the per-slot split
+  + caveat and the single-slot/variable-depth case in `coaching-tools.test.ts`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (361/361) all green. The
+acceptance cases hold: the Dumbbell Curl's Day-1 and Day-3 slots report as
+distinct series (Day-1 flat, not declining), and a movement trained at variable
+session depth carries the fatigue caveat. End-to-end `tools/call` against the
+deployed connector is the owner's check once merged.
+
+### Notes / deviations
+
+- **Session ordinal = persisted slot order, not reconstructed wall-clock order.**
+  Because backfilled history collapses per-set timestamps, the uniformly-available
+  signal is `workout_exercises.position` (the session's intended order), which is
+  exactly the "where in the session it sits" the stage targets. Live per-set
+  timestamps could refine this in future but aren't required for the acceptance
+  cases; no capture change was made (consistent with the stage's read-only scope).
+- **`day_slots` is emitted only when a lift occupies ≥2 day-slots** — for a
+  single-slot lift the per-slot series equals the headline, so it's omitted to
+  keep the payload focused.
+- Roadmap [12](12-connector-coaching-roadmap.md) is now fully implemented
+  (Stages 1–5 all landed).
+
+## 2026-06-18 — Connector coaching roadmap Stage 4: `edit_mesocycle` write tool
 
 Fourth stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
 Closes the biggest *functional* gap: the write surface was create + delete only,
