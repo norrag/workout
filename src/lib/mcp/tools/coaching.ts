@@ -20,6 +20,7 @@ import { resolveSession, type McpExtra } from "../session";
 import {
   toolResult,
   scaleLegend,
+  round1,
   E1RM_ESTIMATE_NOTE,
   FEEDBACK_HISTORY_NOTE,
   type EnvelopeOpts,
@@ -330,7 +331,6 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
 // --- compare_mesocycles ----------------------------------------------------
 
 export function formatCompareMesos(rows: VMesoSummaryRow[]): Record<string, unknown> {
-  const round1 = (n: number) => Math.round(n * 10) / 10;
   // raw block totals aren't directly comparable when the blocks differ in
   // length, deload structure, or completion, so we expose per-completed-workout
   // rates alongside the totals and flag what makes a naïve comparison unsafe.
@@ -362,18 +362,19 @@ export function formatCompareMesos(rows: VMesoSummaryRow[]): Record<string, unkn
         includes_deload: r.includes_deload,
         working_sets: r.working_sets,
         working_reps: r.working_reps,
-        total_volume: r.total_volume,
+        // round view-sourced floats so totals/means don't leak noise (§5.7)
+        total_volume: round1(r.total_volume),
         // normalized so blocks of different length / completion are comparable
         sets_per_workout: perWorkout ? round1(r.working_sets / completed) : null,
         volume_per_workout:
           perWorkout && r.total_volume != null ? round1(r.total_volume / completed) : null,
-        best_e1rm_estimate: r.best_e1rm,
+        best_e1rm_estimate: round1(r.best_e1rm),
         adherence_pct:
           r.sessions_due > 0
             ? Math.round((r.sessions_attended / r.sessions_due) * 100)
             : null,
-        avg_overall_fatigue: r.avg_overall_fatigue,
-        avg_performance: r.avg_performance,
+        avg_overall_fatigue: round1(r.avg_overall_fatigue),
+        avg_performance: round1(r.avg_performance),
       };
     }),
     note: "Side-by-side rollups from the shared meso-summary view. Prefer the per-workout rates over raw totals when blocks differ; e1RM is an estimate.",
@@ -548,8 +549,10 @@ export function formatAffinity(list: ExerciseAffinity[]): Record<string, unknown
       times_trained: a.times_trained,
       last_performed_at: a.last_performed_at,
       best_weight: a.best_weight,
-      best_e1rm_estimate: a.best_e1rm_estimate,
-      total_volume: a.total_volume,
+      // round e1RM/volume so the affinity profile matches the precision the
+      // other tools report (§5.7); feedback means are already 1-dp from mean()
+      best_e1rm_estimate: round1(a.best_e1rm_estimate),
+      total_volume: round1(a.total_volume),
       pinned_note: a.pinned_note,
       feedback: a.feedback,
     })),

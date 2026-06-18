@@ -287,6 +287,37 @@ describe("formatMesoSummary", () => {
     const out = formatMesoSummary(mesoSummaryRow({ sessions_due: 0 }), []);
     expect(out.adherence_pct).toBeNull();
   });
+
+  it("rounds view floats and reconciles progress change with the rounded e1RM (§5.7)", () => {
+    const out = formatMesoSummary(
+      mesoSummaryRow({
+        total_volume: 137773.123456,
+        best_e1rm: 314.6666666,
+        avg_pump: 6.512345,
+        avg_overall_fatigue: 2.149999,
+      }),
+      [
+        {
+          exercise_id: "e1",
+          exercise_name: "Dumbbell Curl",
+          first_e1rm: 33.33333333,
+          last_e1rm: 27.0,
+          score_pct: -15.9, // raw-float pct that disagrees with the displayed values
+        },
+      ],
+    );
+    expect(out.total_volume).toBe(137773.1);
+    expect(out.best_e1rm_estimate).toBe(314.7);
+    const feedback = out.feedback as Record<string, unknown>;
+    expect(feedback.avg_pump).toBe(6.5);
+    expect(feedback.avg_overall_fatigue).toBe(2.1);
+    const score = (out.progress_scores as Record<string, unknown>[])[0];
+    expect(score.first_e1rm_estimate).toBe(33.3);
+    expect(score.last_e1rm_estimate).toBe(27);
+    // change is recomputed from the rounded e1RM shown, not the raw float:
+    // (27 − 33.3) / 33.3 = −18.9%, so the payload reconciles with itself
+    expect(score.e1rm_change_pct).toBe(-18.9);
+  });
 });
 
 // --- formatMacroSummary ----------------------------------------------------
@@ -472,6 +503,8 @@ describe("formatTemplateSearch", () => {
       name: "PPL",
       is_custom: false,
     });
+    // §5.9: the discovery path now points at its execution path
+    expect(out.note).toContain("create_mesocycle");
   });
 });
 

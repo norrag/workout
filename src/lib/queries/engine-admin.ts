@@ -148,6 +148,61 @@ export async function activateEngineParams(
   if (activateError) throw activateError;
 }
 
+// ---------------------------------------------------------------------------
+// discard an inactive engine-params version (MCP undo for propose_engine_params,
+// §5.8). The tuning loop leaves inactive proposals behind (this QA left an
+// undeletable v7); admins can now discard one. Guarded: the ACTIVE version can
+// never be deleted, and a version referenced by any recorded engine_decision is
+// preserved so historical decisions keep a resolvable params snapshot (the
+// auditability the connector is built on). A new RLS delete policy
+// (20260618000002) gates the delete to admins.
+// ---------------------------------------------------------------------------
+
+export interface ParamsDeletionImpact {
+  found: boolean;
+  isActive: boolean;
+  decisionRefs: number;
+  deletable: boolean;
+}
+
+export async function getParamsDeletionImpact(
+  client: Client,
+  version: number,
+): Promise<ParamsDeletionImpact> {
+  const { data: row, error } = await client
+    .from("engine_params")
+    .select("version, is_active")
+    .eq("version", version)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) return { found: false, isActive: false, decisionRefs: 0, deletable: false };
+
+  const { count, error: refError } = await client
+    .from("engine_decisions")
+    .select("*", { count: "exact", head: true })
+    .eq("params_version", version);
+  if (refError) throw refError;
+  const decisionRefs = count ?? 0;
+  return {
+    found: true,
+    isActive: row.is_active,
+    decisionRefs,
+    deletable: !row.is_active && decisionRefs === 0,
+  };
+}
+
+export async function deleteEngineParamsVersion(
+  client: Client,
+  version: number,
+): Promise<void> {
+  const { error } = await client
+    .from("engine_params")
+    .delete()
+    .eq("version", version)
+    .eq("is_active", false);
+  if (error) throw error;
+}
+
 export interface DecisionRecord {
   id: string;
   workout_exercise_id: string | null;

@@ -471,6 +471,76 @@ export async function getMacroOverview(
   };
 }
 
+// ---------------------------------------------------------------------------
+// delete a macrocycle (MCP undo for create_macrocycle, §5.8). Deleting a macro
+// cascades to its mesocycles (FK on delete cascade) and would in turn destroy
+// any logged history under them — so this is refused whenever the macro holds
+// logged sets or an active/completed meso. Only an all-placeholder/planned
+// macro with no logged work is deletable (the fat-fingered create the review
+// asked to be able to undo). RLS `macrocycles_all_own` covers the delete.
+// ---------------------------------------------------------------------------
+
+export interface MacroDeletionImpact {
+  found: boolean;
+  loggedSets: number;
+  hasHistory: boolean;
+  mesoCount: number;
+  /** mesos that block deletion because they hold real training, not just plans */
+  blockingMesos: { id: string; name: string; status: string }[];
+}
+
+export async function getMacroDeletionImpact(
+  supabase: Client,
+  userId: string,
+  macroId: string,
+): Promise<MacroDeletionImpact> {
+  const { data: macro, error: macroError } = await supabase
+    .from("macrocycles")
+    .select("id")
+    .eq("id", macroId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (macroError) throw macroError;
+  if (!macro)
+    return { found: false, loggedSets: 0, hasHistory: false, mesoCount: 0, blockingMesos: [] };
+
+  const [{ data: mesos, error: mesoError }, { count, error: setError }] = await Promise.all([
+    supabase.from("mesocycles").select("id, name, status").eq("macrocycle_id", macroId),
+    supabase
+      .from("logged_sets")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("macrocycle_id", macroId),
+  ]);
+  if (mesoError) throw mesoError;
+  if (setError) throw setError;
+
+  const loggedSets = count ?? 0;
+  const blockingMesos = (mesos ?? [])
+    .filter((m) => m.status === "active" || m.status === "completed")
+    .map((m) => ({ id: m.id, name: m.name, status: m.status }));
+  return {
+    found: true,
+    loggedSets,
+    hasHistory: loggedSets > 0,
+    mesoCount: (mesos ?? []).length,
+    blockingMesos,
+  };
+}
+
+export async function deleteMacrocycle(
+  supabase: Client,
+  userId: string,
+  macroId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("macrocycles")
+    .delete()
+    .eq("id", macroId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
 /** Est. strength = mean e1RM trend on the macro's key lifts (by frequency). */
 async function buildMacroStats(
   supabase: Client,

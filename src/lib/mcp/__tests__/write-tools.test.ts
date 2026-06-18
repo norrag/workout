@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   resolveMuscleGroupIds,
   registerWriteTools,
@@ -9,9 +9,13 @@ import {
   UPDATE_MACROCYCLE_GOALS,
   MANAGE_EXCLUSIONS,
   LOG_NOTE,
+  DELETE_MESOCYCLE,
+  DELETE_MACROCYCLE,
+  DELETE_TEMPLATE,
+  DELETE_CUSTOM_EXERCISE,
 } from "../tools/write";
 import { hashArgs } from "../audit";
-import { captureServer, fakeExtra } from "./harness";
+import { captureServer, fakeExtra, fakeAuthInfo } from "./harness";
 
 // --- resolveMuscleGroupIds (pure) ------------------------------------------
 
@@ -63,6 +67,10 @@ const ALL_WRITE_TOOLS = [
   UPDATE_MACROCYCLE_GOALS,
   MANAGE_EXCLUSIONS,
   LOG_NOTE,
+  DELETE_MESOCYCLE,
+  DELETE_MACROCYCLE,
+  DELETE_TEMPLATE,
+  DELETE_CUSTOM_EXERCISE,
 ];
 
 describe("write-tool registration", () => {
@@ -93,5 +101,63 @@ describe("write-tool registration", () => {
         name,
       ).rejects.toThrow(/authenticated session/i);
     }
+  });
+});
+
+// --- create_mesocycle: template_id XOR days (§5.9) -------------------------
+// The structure-source guard runs before any DB call, so it is exercised with a
+// constructed RLS client (no network on construction) and no query is reached.
+
+describe("create_mesocycle structure source (§5.9)", () => {
+  beforeAll(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "test-anon-key";
+  });
+
+  function createMesoHandler() {
+    const { server, tools } = captureServer();
+    registerWriteTools(server);
+    return tools.get(CREATE_MESOCYCLE)!.handler;
+  }
+
+  function bodyOf(result: unknown): Record<string, unknown> {
+    const r = result as { content: { text: string }[] };
+    return JSON.parse(r.content[0].text).data;
+  }
+
+  it("rejects when neither template_id nor days is provided", async () => {
+    const handler = createMesoHandler();
+    const out = bodyOf(
+      await handler({ name: "Block", weeks: 5 }, fakeExtra(fakeAuthInfo("u1"))),
+    );
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toMatch(/exactly one/i);
+  });
+
+  it("rejects when both template_id and days are provided", async () => {
+    const handler = createMesoHandler();
+    const out = bodyOf(
+      await handler(
+        {
+          name: "Block",
+          weeks: 5,
+          template_id: "11111111-1111-1111-1111-111111111111",
+          days: [
+            {
+              day_number: 1,
+              groups: [
+                {
+                  muscle_group: "Chest",
+                  exercises: [{ exercise_id: "22222222-2222-2222-2222-222222222222" }],
+                },
+              ],
+            },
+          ],
+        },
+        fakeExtra(fakeAuthInfo("u1")),
+      ),
+    );
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toMatch(/exactly one/i);
   });
 });

@@ -242,6 +242,32 @@ describe("formatCompareMesos", () => {
     expect(mesos[0].volume_per_workout).toBe(10000); // 160000 / 16
     expect(mesos[1].sets_per_workout).toBe(15); // 150 / 10
   });
+
+  it("rounds view-sourced floats to one decimal (§5.7)", () => {
+    const rows = [
+      {
+        mesocycle_id: "m1",
+        name: "Block",
+        status: "completed",
+        weeks: 4,
+        includes_deload: true,
+        workouts_completed: 12,
+        working_sets: 150,
+        working_reps: 1500,
+        total_volume: 137773.123456,
+        best_e1rm: 27.333333333,
+        sessions_attended: 10,
+        sessions_due: 12,
+        avg_overall_fatigue: 5.1230769230769235,
+        avg_performance: 2.6666666666,
+      },
+    ] as unknown as VMesoSummaryRow[];
+    const meso = (formatCompareMesos(rows).mesocycles as Record<string, unknown>[])[0];
+    expect(meso.total_volume).toBe(137773.1);
+    expect(meso.best_e1rm_estimate).toBe(27.3);
+    expect(meso.avg_overall_fatigue).toBe(5.1);
+    expect(meso.avg_performance).toBe(2.7);
+  });
 });
 
 // --- formatMuscleBalance ---------------------------------------------------
@@ -359,6 +385,27 @@ describe("formatAffinity", () => {
     const ex = (out.exercises as Record<string, unknown>[])[0];
     expect(ex).toMatchObject({ name: "Hack Squat", pinned_note: "feet low" });
     expect((ex.feedback as Record<string, unknown>).avg_joint_pain).toBe(0.5);
+  });
+
+  it("rounds e1RM and volume to one decimal (§5.7)", () => {
+    const list: ExerciseAffinity[] = [
+      {
+        exercise_id: "e1",
+        name: "Dumbbell Curl",
+        equipment_type: "dumbbell",
+        muscles: [],
+        times_trained: 40,
+        last_performed_at: "2026-06-10",
+        best_weight: 50,
+        best_e1rm_estimate: 73.33333333333333,
+        total_volume: 17.083333333333,
+        pinned_note: null,
+        feedback: { sessions: 0, avg_joint_pain: null, avg_workload: null, avg_pump: null },
+      },
+    ];
+    const ex = (formatAffinity(list).exercises as Record<string, unknown>[])[0];
+    expect(ex.best_e1rm_estimate).toBe(73.3);
+    expect(ex.total_volume).toBe(17.1);
   });
 });
 

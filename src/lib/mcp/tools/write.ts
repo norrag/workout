@@ -7,11 +7,15 @@ import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
   createMacrocycleWithMesos,
   updateMacrocycle,
+  getMacroDeletionImpact,
+  deleteMacrocycle,
   type EditMacroInput,
 } from "@/lib/queries/macro";
 import {
   createMesocycle,
   saveMesoPlan,
+  getMesoDeletionImpact,
+  deleteMesocycle,
   type PlanDayInput,
 } from "@/lib/queries/cycles";
 import {
@@ -19,9 +23,16 @@ import {
   listMuscleGroups,
   addExclusion,
   removeExclusionByExercise,
+  getExerciseDeletionImpact,
+  deleteCustomExercise,
 } from "@/lib/queries/exercises";
 import { savePinnedNote, clearPinnedNote } from "@/lib/queries/logging";
-import { saveMesoAsTemplate } from "@/lib/queries/templates";
+import {
+  saveMesoAsTemplate,
+  applyTemplateToMeso,
+  getTemplateDetail,
+  deleteTemplate,
+} from "@/lib/queries/templates";
 import { resolveSession, type McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
@@ -154,18 +165,21 @@ function registerCreateMesocycle(server: McpServer) {
     {
       title: "Create mesocycle",
       description:
-        "Draft a groups-first mesocycle (days → muscle-group blocks → exercises) " +
-        "as a PLANNED meso for in-app review before activation. You set the " +
-        "structure and RIR ramp; the engine computes the actual loads/reps/sets " +
-        "when the meso is started. Get exercise ids from search_exercises. " +
-        "Standalone (not attached to a macro slot — do that in-app).",
+        "Draft a PLANNED meso for in-app review before activation, one of two ways: " +
+        "(a) pass a template_id from search_templates to start from that template's " +
+        "structure (the fastest path), or (b) build it from scratch by passing days " +
+        "(groups-first: days → muscle-group blocks → exercises, exercise ids from " +
+        "search_exercises). Pass exactly one of template_id or days. You set the " +
+        "RIR ramp; the engine computes the actual loads/reps/sets when the meso is " +
+        "started. Standalone (not attached to a macro slot — do that in-app).",
       inputSchema: {
         name: z.string().min(1).max(80),
         weeks: z.number().int().min(3).max(8),
         includes_deload: z.boolean().optional(),
         rir_start: z.number().int().min(0).max(6).optional(),
         rir_end: z.number().int().min(0).max(6).optional(),
-        days: z.array(mesoDaySchema).min(1).max(7),
+        template_id: z.string().uuid().optional(),
+        days: z.array(mesoDaySchema).min(1).max(7).optional(),
       },
     },
     async (
@@ -175,14 +189,58 @@ function registerCreateMesocycle(server: McpServer) {
         includes_deload?: boolean;
         rir_start?: number;
         rir_end?: number;
-        days: z.infer<typeof mesoDaySchema>[];
+        template_id?: string;
+        days?: z.infer<typeof mesoDaySchema>[];
       },
       extra: McpExtra,
     ) => {
       const { client, userId } = resolveSession(extra);
 
+      // exactly one structure source: a template to start from, or a hand-built
+      // day plan — never both, never neither
+      if ((args.template_id == null) === (args.days == null))
+        return jsonResult({
+          ok: false,
+          error: "pass exactly one of template_id (start from a template) or days (build from scratch).",
+        });
+
+      // --- start-from-template path (§5.9): templates are discoverable via
+      // search_templates but had no execution path; wire that here.
+      if (args.template_id != null) {
+        const detail = await getTemplateDetail(client, args.template_id);
+        if (!detail)
+          return jsonResult({ ok: false, error: "template not found or not visible." });
+        if (detail.days.length === 0)
+          return jsonResult({ ok: false, error: "that template has no days to start from." });
+
+        const meso = await createMesocycle(client, userId, {
+          name: args.name,
+          weeks: args.weeks,
+          includes_deload: args.includes_deload ?? true,
+          rir_start: args.rir_start ?? 3,
+          rir_end: args.rir_end ?? 0,
+          template_id: args.template_id,
+          status: "planned",
+        });
+        await applyTemplateToMeso(client, userId, meso.id, args.template_id);
+
+        const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk) from template "${detail.template.name}" as planned`;
+        await recordMcpWrite(
+          userId,
+          CREATE_MESOCYCLE,
+          { name: args.name, weeks: args.weeks, template_id: args.template_id },
+          summary,
+        );
+        return jsonResult({
+          ok: true,
+          mesocycle_id: meso.id,
+          summary: `${summary}. Review and start it in-app; the engine sets the numbers on activation.`,
+        });
+      }
+
+      const days = args.days!;
       // resolve every muscle-group name up front so a typo fails cleanly
-      const groupNames = args.days.flatMap((d) => d.groups.map((g) => g.muscle_group));
+      const groupNames = days.flatMap((d) => d.groups.map((g) => g.muscle_group));
       const { byName, missing } = resolveMuscleGroupIds(
         groupNames,
         await listMuscleGroups(client),
@@ -202,7 +260,7 @@ function registerCreateMesocycle(server: McpServer) {
         status: "planned",
       });
 
-      const days: PlanDayInput[] = args.days.map((day) => {
+      const planDays: PlanDayInput[] = days.map((day) => {
         let dayPos = 0; // day-wide order across groups (#2)
         return {
         day_number: day.day_number,
@@ -220,9 +278,9 @@ function registerCreateMesocycle(server: McpServer) {
         })),
         };
       });
-      await saveMesoPlan(client, userId, meso.id, days);
+      await saveMesoPlan(client, userId, meso.id, planDays);
 
-      const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk, ${args.days.length} day/wk) as planned`;
+      const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk, ${days.length} day/wk) as planned`;
       await recordMcpWrite(userId, CREATE_MESOCYCLE, args, summary);
       return jsonResult({
         ok: true,
@@ -452,6 +510,142 @@ function registerLogNote(server: McpServer) {
   );
 }
 
+// --- delete tools (§5.8 undo for the create tools) -------------------------
+// Each refuses to touch logged history — past workouts are immutable (hard rule
+// #5 / the review's editor note). They only ever remove planning artifacts a
+// user (or the model) created by mistake.
+
+export const DELETE_MESOCYCLE = "delete_mesocycle";
+function registerDeleteMesocycle(server: McpServer) {
+  server.registerTool(
+    DELETE_MESOCYCLE,
+    {
+      title: "Delete mesocycle",
+      description:
+        "Delete a mesocycle the user created (undo for create_mesocycle). Refused " +
+        "if any sets have been logged in it — logged history is never destroyed. " +
+        "Use this only to remove a planned/empty block created by mistake.",
+      inputSchema: { mesocycle_id: z.string().uuid() },
+    },
+    async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
+      const { client, userId } = resolveSession(extra);
+      const impact = await getMesoDeletionImpact(client, userId, mesocycle_id);
+      if (impact.hasHistory)
+        return jsonResult({
+          ok: false,
+          error: `cannot delete: ${impact.loggedSets} logged set(s) exist in this mesocycle. Logged history is never destroyed.`,
+        });
+      await deleteMesocycle(client, userId, mesocycle_id);
+      const summary = "deleted a planned mesocycle";
+      await recordMcpWrite(userId, DELETE_MESOCYCLE, { mesocycle_id }, summary);
+      return jsonResult({ ok: true, summary });
+    },
+  );
+}
+
+export const DELETE_MACROCYCLE = "delete_macrocycle";
+function registerDeleteMacrocycle(server: McpServer) {
+  server.registerTool(
+    DELETE_MACROCYCLE,
+    {
+      title: "Delete macrocycle",
+      description:
+        "Delete a macrocycle the user created, along with its (unplanned/planned) " +
+        "mesocycle placeholders (undo for create_macrocycle). Refused if any sets " +
+        "have been logged under it or it holds an active/completed mesocycle — " +
+        "logged history is never destroyed.",
+      inputSchema: { macrocycle_id: z.string().uuid() },
+    },
+    async ({ macrocycle_id }: { macrocycle_id: string }, extra: McpExtra) => {
+      const { client, userId } = resolveSession(extra);
+      const impact = await getMacroDeletionImpact(client, userId, macrocycle_id);
+      if (!impact.found)
+        return jsonResult({ ok: false, error: "Macrocycle not found." });
+      if (impact.hasHistory)
+        return jsonResult({
+          ok: false,
+          error: `cannot delete: ${impact.loggedSets} logged set(s) exist under this macrocycle. Logged history is never destroyed.`,
+        });
+      if (impact.blockingMesos.length > 0)
+        return jsonResult({
+          ok: false,
+          error: `cannot delete: it holds ${impact.blockingMesos.length} active/completed mesocycle(s) (${impact.blockingMesos
+            .map((m) => `"${m.name}"`)
+            .join(", ")}). Only an unstarted macrocycle can be removed.`,
+        });
+      await deleteMacrocycle(client, userId, macrocycle_id);
+      const summary = `deleted a macrocycle and its ${impact.mesoCount} placeholder meso(s)`;
+      await recordMcpWrite(userId, DELETE_MACROCYCLE, { macrocycle_id }, summary);
+      return jsonResult({ ok: true, summary });
+    },
+  );
+}
+
+export const DELETE_TEMPLATE = "delete_template";
+function registerDeleteTemplate(server: McpServer) {
+  server.registerTool(
+    DELETE_TEMPLATE,
+    {
+      title: "Delete template",
+      description:
+        "Delete one of the user's own templates (undo for create_template). Stock " +
+        "library templates cannot be deleted. A mesocycle already started from the " +
+        "template keeps its own copied plan and is unaffected.",
+      inputSchema: { template_id: z.string().uuid() },
+    },
+    async ({ template_id }: { template_id: string }, extra: McpExtra) => {
+      const { client, userId } = resolveSession(extra);
+      const { ok, error } = await deleteTemplate(client, userId, template_id);
+      if (!ok) return jsonResult({ ok: false, error });
+      const summary = "deleted a custom template";
+      await recordMcpWrite(userId, DELETE_TEMPLATE, { template_id }, summary);
+      return jsonResult({ ok: true, summary });
+    },
+  );
+}
+
+export const DELETE_CUSTOM_EXERCISE = "delete_custom_exercise";
+function registerDeleteCustomExercise(server: McpServer) {
+  server.registerTool(
+    DELETE_CUSTOM_EXERCISE,
+    {
+      title: "Delete custom exercise",
+      description:
+        "Delete a custom exercise the user added (undo for create_custom_exercise). " +
+        "Refused for stock library exercises, for any exercise with logged sets " +
+        "(deleting it would rewrite the past), and for one still referenced by a " +
+        "planned mesocycle or generated workout. To stop recommending a movement " +
+        "without deleting it, use manage_exclusions instead.",
+      inputSchema: { exercise_id: z.string().uuid() },
+    },
+    async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
+      const { client, userId } = resolveSession(extra);
+      const impact = await getExerciseDeletionImpact(client, userId, exercise_id);
+      if (!impact.found)
+        return jsonResult({ ok: false, error: "Exercise not found." });
+      if (!impact.isCustom)
+        return jsonResult({
+          ok: false,
+          error: "that is a stock library exercise — only your own custom exercises can be deleted.",
+        });
+      if (impact.loggedSets > 0)
+        return jsonResult({
+          ok: false,
+          error: `cannot delete: ${impact.loggedSets} logged set(s) reference this exercise. Logged history is never destroyed — exclude it instead (manage_exclusions).`,
+        });
+      if (impact.plannedRefs > 0 || impact.workoutRefs > 0)
+        return jsonResult({
+          ok: false,
+          error: `cannot delete: still used by ${impact.plannedRefs} planned slot(s) and ${impact.workoutRefs} generated workout(s). Remove it from those first, or exclude it (manage_exclusions).`,
+        });
+      await deleteCustomExercise(client, userId, exercise_id);
+      const summary = "deleted a custom exercise";
+      await recordMcpWrite(userId, DELETE_CUSTOM_EXERCISE, { exercise_id }, summary);
+      return jsonResult({ ok: true, summary });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 
 export function registerWriteTools(server: McpServer) {
@@ -462,4 +656,8 @@ export function registerWriteTools(server: McpServer) {
   registerUpdateMacrocycleGoals(server);
   registerManageExclusions(server);
   registerLogNote(server);
+  registerDeleteMesocycle(server);
+  registerDeleteMacrocycle(server);
+  registerDeleteTemplate(server);
+  registerDeleteCustomExercise(server);
 }

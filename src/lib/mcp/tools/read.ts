@@ -35,8 +35,10 @@ import {
   toolResult,
   feedbackCoverage,
   FEEDBACK_SCALES,
+  round1,
   type EnvelopeOpts,
 } from "../envelope";
+import { scoreProgress } from "@/lib/engine";
 
 /**
  * Slice 2 read/analysis tools (07 Phase 6). Thin, zod-validated wrappers over
@@ -268,8 +270,9 @@ export function formatMesoSummary(
     workouts_total: row.workouts_total,
     working_sets: row.working_sets,
     working_reps: row.working_reps,
-    total_volume: row.total_volume,
-    best_e1rm_estimate: row.best_e1rm,
+    // round view-sourced floats so the rollup doesn't leak noise (§5.7)
+    total_volume: round1(row.total_volume),
+    best_e1rm_estimate: round1(row.best_e1rm),
     adherence_pct,
     // adherence_pct = attended/due over working (non-deload) weeks; block
     // completion = completed sessions over every session generated so far. The
@@ -284,24 +287,32 @@ export function formatMesoSummary(
     },
     feedback: {
       // each average carries the count of observations behind it (P1-4): a
-      // single grumpy session and twenty honest ones no longer read the same
-      avg_joint_pain: row.avg_joint_pain,
+      // single grumpy session and twenty honest ones no longer read the same.
+      // means rounded to 1 dp so they don't print SQL float noise (§5.7)
+      avg_joint_pain: round1(row.avg_joint_pain),
       n_joint_pain: row.n_joint_pain,
-      avg_pump: row.avg_pump,
+      avg_pump: round1(row.avg_pump),
       n_pump: row.n_pump,
-      avg_overall_fatigue: row.avg_overall_fatigue,
+      avg_overall_fatigue: round1(row.avg_overall_fatigue),
       n_overall_fatigue: row.n_overall_fatigue,
-      avg_performance: row.avg_performance,
+      avg_performance: round1(row.avg_performance),
       n_performance: row.n_performance,
       scales: FEEDBACK_SCALES,
     },
-    progress_scores: scores.map((s) => ({
-      exercise_id: s.exercise_id,
-      exercise_name: s.exercise_name,
-      first_e1rm_estimate: s.first_e1rm,
-      last_e1rm_estimate: s.last_e1rm,
-      e1rm_change_pct: s.score_pct,
-    })),
+    progress_scores: scores.map((s) => {
+      // round the e1RM estimates for display and recompute the change from the
+      // *rounded* values so the percent reconciles with the numbers shown
+      // (the §5.2 self-consistency fix, applied here too) (§5.7)
+      const first = round1(s.first_e1rm);
+      const last = round1(s.last_e1rm);
+      return {
+        exercise_id: s.exercise_id,
+        exercise_name: s.exercise_name,
+        first_e1rm_estimate: first,
+        last_e1rm_estimate: last,
+        e1rm_change_pct: scoreProgress(first, last),
+      };
+    }),
     // name the window so this metric is not confused with the lifetime change on
     // analyze_exercise_progress (§5.2)
     metric_definitions: {
@@ -642,6 +653,7 @@ export function formatTemplateSearch(list: TemplateRow[]): Record<string, unknow
       description: t.description,
       is_custom: t.user_id != null,
     })),
+    note: "To use one, call create_mesocycle with its id as template_id — that drafts a planned meso from the template's structure for in-app review.",
   };
 }
 
@@ -653,7 +665,8 @@ function registerSearchTemplates(server: McpServer) {
       title: "Search templates",
       description:
         "Search reusable mesocycle templates (stock + the user's own) by name, " +
-        "with emphasis and days-per-week. Use a template id to start a meso from it.",
+        "with emphasis and days-per-week. Pass a template id to create_mesocycle " +
+        "(its template_id argument) to start a planned meso from it.",
       inputSchema: { search: z.string().optional() },
     },
     async ({ search }: { search?: string }, extra: McpExtra) => {

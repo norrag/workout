@@ -240,9 +240,9 @@ scientific-credibility and polish tiers are staged for a later session.
 | §5.3 | `data_quality` + scales legend missing on most tools | 🟠 | ✅ Done |
 | §5.4 | no volume landmarks (MEV/MAV/MRV) | 🟠 | ✅ Done |
 | §5.5 | `explain_prescription` empty on common case | 🟠 | ✅ Done |
-| §5.7 | unrounded float noise | 🟡 | ⏳ Staged |
-| §5.8 | no delete/undo for create/propose | 🟡 | ⏳ Staged (respect no-delete-logged rule) |
-| §5.9 | `search_templates` dead-ends | 🟡 | ⏳ Staged |
+| §5.7 | unrounded float noise | 🟡 | ✅ Done |
+| §5.8 | no delete/undo for create/propose | 🟡 | ✅ Done (respects no-delete-logged rule) |
+| §5.9 | `search_templates` dead-ends | 🟡 | ✅ Done |
 | §5.10 | incomplete planned-volume across weeks | 🟢 | ⏳ Staged |
 | §5.11 | rationale / validation polish | 🟢 | ⏳ Staged |
 | §5.12 | data-hygiene advisory | 🟢 | ⏳ Staged |
@@ -392,15 +392,85 @@ prefers the recorded decision and falls back to this projection, tagged
 with a what-if. Verified the projection path resolves for the curl (source
 W2·D3, 3 working sets, next week W3 target RIR 1). No migration.
 
-## Confirmed but staged (next passes — 🟡/🟢 polish & lifecycle)
+## Medium tier (🟡 lifecycle & polish) — fixed in this pass (2026-06-18)
 
-- **§5.7** consistent float rounding across `affinity` / `mesocycle_summary` /
-  `compare_mesocycles`.
-- **§5.8 / §5.9** delete/undo (or `dry_run`) for create/propose tools (respecting
-  the "no deleting logged history" rule) and wiring `search_templates` →
-  `create_mesocycle`.
+The three 🟡 Medium findings were implemented as one vertical slice. All
+query/formatter changes are unit-tested; one additive RLS migration was applied
+live.
+
+### §5.7 — Consistent float rounding (FIXED)
+
+The "precise/scientific" surface leaked SQL float noise: `affinity`,
+`mesocycle_summary`, and `compare_mesocycles` printed view-sourced floats raw
+(`73.33333333333333`, `5.1230769230769235`, `137773.123…`) while
+`analyze_exercise_progress` rounded. `envelope.ts` adds a shared, null-safe
+`roundTo(n, dp=1)` / `round1(n)` (used everywhere instead of ad-hoc
+`Math.round(n*10)/10` helpers). Every e1RM / volume / feedback-mean these three
+tools emit is now rounded to **1 dp**:
+- `formatAffinity` rounds `best_e1rm_estimate` + `total_volume` (feedback means
+  were already 1-dp from `mean()`).
+- `formatCompareMesos` rounds `total_volume`, `best_e1rm_estimate`,
+  `avg_overall_fatigue`, `avg_performance` (and reuses the shared helper for the
+  per-workout rates).
+- `formatMesoSummary` rounds `total_volume`, `best_e1rm_estimate`, every
+  `feedback.avg_*`, and the `progress_scores` e1RMs — and **recomputes**
+  `e1rm_change_pct` from the *rounded* e1RMs (the same self-consistency fix §5.2
+  applied to `detectStall`), so the percent reconciles with the numbers shown.
+
+### §5.8 — Delete/undo for the create/propose tools (FIXED)
+
+The create/propose tools had no paired delete, so a mistaken macro / meso /
+template / custom exercise / params proposal was permanent (this QA left an
+undeletable inactive **v7**). Added five guarded delete tools that **never
+destroy logged history** (hard rule #5 / the report's editor note — a movement
+or block with logged sets can't be deleted, since that would rewrite the past):
+
+| tool | undoes | refused when |
+|---|---|---|
+| `delete_mesocycle` | `create_mesocycle` | any logged sets in the meso |
+| `delete_macrocycle` | `create_macrocycle` | logged sets under it, or it holds an active/completed meso (else cascades its placeholder mesos) |
+| `delete_template` | `create_template` | not the user's own (stock templates) |
+| `delete_custom_exercise` | `create_custom_exercise` | stock exercise, any logged sets, or still referenced by a planned slot / generated workout (→ suggests `manage_exclusions`) |
+| `discard_engine_params` (admin) | `propose_engine_params` | version is active, or referenced by any recorded `engine_decision` (kept so decisions stay reproducible); requires `confirm_version` echo |
+
+Each tool checks a pure-ish `*DeletionImpact` query
+(`getMesoDeletionImpact` [existing], `getMacroDeletionImpact`,
+`getExerciseDeletionImpact`, `getParamsDeletionImpact`) before acting and
+records an `mcp_write_audit` row. `engine_params` had no RLS delete policy, so
+migration `20260618000002_engine_params_delete_policy` adds an admin-only one
+(**applied live** to `juqvbiymmdcggctdqoiq`; verified present); all other tables
+already had owner/admin delete policies.
+
+### §5.9 — `search_templates` → `create_mesocycle` (FIXED)
+
+`search_templates` advertised "use a template id to start a meso" but no tool
+instantiated one. `create_mesocycle` now takes an optional `template_id`
+(mutually exclusive with `days` — pass exactly one): it creates the planned meso
+and prefills its board via the existing `applyTemplateToMeso` (the same query the
+in-app start-from-template flow uses, so exclusions and structure behave
+identically). `search_templates`' description + payload `note` now point at that
+execution path.
+
+## Confirmed but staged (next pass — 🟢 Low polish)
+
 - **§5.10 / §5.11 / §5.12** planned-volume projection labeling, rationale/​
   validation polish, and a data-hygiene advisory.
+
+## Verification (2026-06-18 — Medium tier pass)
+
+- `npm run typecheck`, `npm run lint`, `npx vitest run` — all green (293 tests).
+- New unit tests: `roundTo`/`round1` precision + null/non-finite handling
+  (`envelope.test.ts`); §5.7 rounding on `formatAffinity` / `formatCompareMesos`
+  / `formatMesoSummary` incl. the self-consistent recomputed change
+  (`coaching-tools.test.ts` / `read-tools.test.ts`); the `create_mesocycle`
+  template-XOR-days guard (`write-tools.test.ts`); the `search_templates` →
+  `create_mesocycle` pointer (`read-tools.test.ts`); delete-tool registration +
+  auth gating (`write-tools.test.ts` / `admin-tools.test.ts`); and the deletion
+  guards' logged-history / active-meso / reference / active-version invariants
+  (`deletion-guards.test.ts`).
+- Migration `20260618000002` applied live; the new delete policy is the only
+  schema change. The tool/formatter changes deploy with this branch's connector
+  (Vercel).
 
 ## Verification (2026-06-18 — critical "Now" pass)
 
