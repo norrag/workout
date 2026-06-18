@@ -13,6 +13,8 @@ import {
   getEngineParamsVersion,
   proposeEngineParams,
   activateEngineParams,
+  getParamsDeletionImpact,
+  deleteEngineParamsVersion,
   getEngineDecisions,
   type DecisionRecord,
 } from "@/lib/queries/engine-admin";
@@ -578,7 +580,17 @@ function registerSimulatePrescriptions(server: McpServer) {
       const results = args.cases.map((c, index) => {
         const parsed = engineInputsSchema.safeParse(c);
         if (!parsed.success) {
-          return { case_index: index, ok: false, error: "invalid engine inputs" };
+          // field-level detail so an admin can see *which* input is wrong, not
+          // just "invalid engine inputs" (§5.11)
+          return {
+            case_index: index,
+            ok: false,
+            error: "invalid engine inputs",
+            issues: parsed.error.issues.map((i) => ({
+              path: i.path.join("."),
+              message: i.message,
+            })),
+          };
         }
         try {
           const output = prescribe(parsed.data, params.resolved!);
@@ -602,6 +614,56 @@ function registerSimulatePrescriptions(server: McpServer) {
   );
 }
 
+// --- discard_engine_params -------------------------------------------------
+
+export const DISCARD_ENGINE_PARAMS = "discard_engine_params";
+function registerDiscardEngineParams(server: McpServer) {
+  server.registerTool(
+    DISCARD_ENGINE_PARAMS,
+    {
+      title: "Discard engine params",
+      description:
+        "Admin only. Delete an INACTIVE engine-params version (undo for " +
+        "propose_engine_params — removes a mistaken proposal). The active version " +
+        "can never be discarded, and a version referenced by any recorded engine " +
+        "decision is preserved so historical decisions keep a resolvable params " +
+        "snapshot. Requires confirm_version to echo version.",
+      inputSchema: {
+        version: z.number().int().positive(),
+        confirm_version: z.number().int().positive(),
+      },
+    },
+    async (
+      { version, confirm_version }: { version: number; confirm_version: number },
+      extra: McpExtra,
+    ) => {
+      const { client, userId } = await resolveAdmin(extra);
+      if (version !== confirm_version)
+        return jsonResult({
+          ok: false,
+          error: `confirm_version (${confirm_version}) must echo version (${version}).`,
+        });
+      const impact = await getParamsDeletionImpact(client, version);
+      if (!impact.found)
+        return jsonResult({ ok: false, error: `engine_params version ${version} does not exist.` });
+      if (impact.isActive)
+        return jsonResult({
+          ok: false,
+          error: `version ${version} is active — activate a different version before discarding it.`,
+        });
+      if (impact.decisionRefs > 0)
+        return jsonResult({
+          ok: false,
+          error: `version ${version} is referenced by ${impact.decisionRefs} recorded decision(s); it is kept so those decisions stay reproducible.`,
+        });
+      await deleteEngineParamsVersion(client, version);
+      const summary = `discarded inactive engine_params v${version}`;
+      await recordMcpWrite(userId, DISCARD_ENGINE_PARAMS, { version }, summary);
+      return jsonResult({ ok: true, version, summary });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 
 export function registerAdminTools(server: McpServer) {
@@ -612,4 +674,5 @@ export function registerAdminTools(server: McpServer) {
   registerGetEngineDecisions(server);
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
+  registerDiscardEngineParams(server);
 }

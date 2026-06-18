@@ -55,6 +55,23 @@ export const E1RM_ESTIMATE_NOTE =
 export const FEEDBACK_HISTORY_NOTE =
   "Subjective feedback (joint pain / workload / pump / session ratings) was only captured from 2026-06-15; earlier sessions were migrated without it, so their feedback means are absent by design, not lost.";
 
+/**
+ * Round a number to `dp` decimal places (default 1), pass null/undefined
+ * through. The connector reports e1RM, volume, and feedback means from SQL
+ * views that emit raw floats (e.g. `73.33333333333333`, `5.1230769230769235`);
+ * rounding them consistently keeps the "precise/scientific" surface from
+ * leaking float noise and stops one tool disagreeing with another on the same
+ * number (§5.7). Pure.
+ */
+export function roundTo(n: number | null | undefined, dp = 1): number | null {
+  if (n == null || !Number.isFinite(n)) return n ?? null;
+  const f = 10 ** dp;
+  return Math.round(n * f) / f;
+}
+
+/** Round to one decimal place, null-safe — the connector's default precision. */
+export const round1 = (n: number | null | undefined): number | null => roundTo(n, 1);
+
 export type Units = "kg" | "lb";
 
 export interface EnvelopeOpts {

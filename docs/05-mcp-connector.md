@@ -35,7 +35,7 @@ The MCP connector lets users plug their training data into the LLM of their choi
 | `get_current_state` | active macro → meso → micro → next workout, with targets |
 | `get_macrocycles` / `get_mesocycle` | cycle structures, goals, status, RIR ramps |
 | `get_exercise_history` | time series for an exercise (weights, reps, volume, e1RM, feedback) with date-range / cycle filters; includes both **note kinds** (see Notes below) — the exercise's pinned note and the per-session log notes |
-| `get_muscle_group_volume` | weekly volume per muscle group |
+| `get_muscle_group_volume` | weekly planned-vs-logged volume per muscle group across the full meso; weeks the engine hasn't generated yet are labeled `not_yet_generated` (it autoregulates forward) rather than read as zero (review §5.10) |
 | `get_meso_summary` | per-meso rollup: adherence, progression achieved, feedback patterns, progress score |
 | `get_macro_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
 | `search_exercises` / `search_templates` | library queries with the same filters the UI uses |
@@ -57,6 +57,7 @@ guardrails (estimates labeled, pump/soreness secondary, balance advisory-only).
 | `get_muscle_balance` | weekly sets per muscle group vs MEV/MAV/MRV landmarks + push/pull/legs split with weak-point flags — **advisory only** (10 §9) |
 | `get_exercise_affinity` | **exercise-selection profile** per muscle group / equipment type: which movements the user actually trains (frequency, recency, recent loads & volume), each joined with its **pinned note** and **aggregated session feedback** (mean joint pain, workload, pump). Surfaces what the user relies on and tolerates well vs. what their notes/feedback flag — so recommendations and planning favor proven, well-received movements and steer clear of injury-sensitive or poorly-tolerated ones. Read over `logged_sets` × `exercise_muscle_groups` × `exercise_notes` × `exercise_feedback`; respects exclusions |
 | `get_exercise_notes` / `get_exclusions` | durable context: pinned notes across the library and the user's excluded movements with reasons |
+| `check_data_hygiene` | advisory flags for data-shape anomalies in the user's cycles — a macro duration that differs from the engine's recommendation, duplicate meso names within a macro, unplanned placeholders still on the `days_per_week = 1` default — so a coaching layer can gently surface (never silently "fix") them (review §5.12) |
 
 **Why selection history matters.** Prior exercise selection is itself a strong prior: an exercise
 the user has chosen repeatedly, loaded well, and left no pain/"felt off" notes on is a safe
@@ -68,14 +69,15 @@ plans stay grounded in the user's real movement preferences rather than a generi
 | Tool | Purpose |
 |---|---|
 | `create_macrocycle` | draft a macrocycle from `goal` (hypertrophy/strength/cut/maintain) + `meso_length_weeks` (+ optional `duration_months`); the **engine** (`planMacrocycle`) computes the profile-personalized target, a **recommended timeframe**, the meso count, and suggested phases — the LLM never invents the numbers (defaults in 10). Creates the macro + its `unplanned` meso placeholders |
-| `create_mesocycle` | draft/plan a meso in the groups-first shape (weeks, days with weekday + label, muscle-group blocks, slot fills, RIR ramp); attaches at a macro `position` or as standalone — created in `planned` status for in-app review before activation |
+| `create_mesocycle` | draft/plan a meso in `planned` status, either from a `template_id` (prefills the board via the same start-from-template path the app uses) **or** from a hand-built groups-first `days` spec (weeks, days with weekday + label, muscle-group blocks, slot fills, RIR ramp) — pass exactly one |
 | `create_template` | build a reusable template from a spec or from an existing meso |
 | `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, **tracking type**, description) |
 | `update_macrocycle_goals` | edit goal / duration / block length / timeline (the engine recomputes the target + phases); no goal-arc slots — superseded by positioned mesos |
 | `manage_exclusions` | add/remove excluded exercises with a reason |
 | `log_note` | attach a note — either a **pinned** note on an exercise (exercise-wide, persists across workouts) or a **session** note on a workout's exercise log (that day only). See Notes below |
+| `delete_mesocycle` / `delete_macrocycle` / `delete_template` / `delete_custom_exercise` | undo a mistaken create. Each **refuses to touch logged history** (a block/exercise with logged sets, or a still-referenced exercise/active block, is never deleted); only own (custom) templates/exercises are deletable. To stop recommending a movement without deleting it, use `manage_exclusions` |
 
-Write tools validate with the same zod schemas as the app's own forms and run server-side business validation (e.g., meso weeks 3–8). Anything the engine would generate (week prescriptions) is generated by the **engine**, not the LLM — the LLM proposes structure; the engine fills in numbers. Every write is recorded to `mcp_write_audit`.
+Write tools validate with the same zod schemas as the app's own forms and run server-side business validation (e.g., meso weeks 3–8). Anything the engine would generate (week prescriptions) is generated by the **engine**, not the LLM — the LLM proposes structure; the engine fills in numbers. Every write is recorded to `mcp_write_audit`. The delete tools are the bounded **undo** for the create tools (review §5.8) — they remove only planning artifacts and never logged history (hard rule #5).
 
 ### Admin & tuning (role-gated: `profiles.role = 'admin'`)
 
@@ -88,6 +90,8 @@ Per [08-design-decisions.md](08-design-decisions.md) §3, **the MCP connector is
 | `activate_engine_params` | activate a version — requires an explicit confirmation argument echoing the version number |
 | `get_engine_decisions` | decision inspector: filter by user/exercise/date/params version; full inputs, output, rationale |
 | `replay_decisions` | re-run historical decisions or a whole meso against a candidate param version; return prescription diffs |
+| `simulate_prescriptions` | probe hypothetical inputs against a candidate version (per-item isolated, invalid cases don't fail the batch) |
+| `discard_engine_params` | undo a `propose` — delete an **inactive** version (review §5.8); refused for the active version or any version referenced by a recorded decision (kept reproducible); requires a `confirm_version` echo |
 
 The tuning loop: inspect decisions → propose a version → replay real history against it → review diffs in chat → activate. Same tables and replay functions a future UI would use.
 
@@ -136,5 +140,5 @@ mcp/
 ## Safeguards
 
 - Rate limiting per token; payload caps on history queries (paginated).
-- Write tools restricted to draft/append operations; no deletes, no edits of logged history in v1.
+- Write tools are draft/append plus a bounded **undo**: the `delete_*` / `discard_engine_params` tools remove only planning artifacts a create produced by mistake and **never delete or edit logged history** — a block/exercise with logged sets (or a referenced/active one, or an in-use params version) is always refused (review §5.8, hard rule #5).
 - Audit log of MCP write operations (`mcp_write_audit`: tool, args hash, timestamp) readable by the owner; param activations always require the explicit-confirm argument.

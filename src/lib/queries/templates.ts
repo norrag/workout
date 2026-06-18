@@ -283,6 +283,39 @@ export async function applyTemplateToMeso(
   if (updateError) throw updateError;
 }
 
+// ---------------------------------------------------------------------------
+// delete a template (MCP undo for create_template, §5.8). Only the user's own
+// templates are deletable — stock templates (user_id is null) are shared
+// library data. Templates carry no logged history, so there is nothing to
+// protect beyond ownership; `template_days`/`template_exercises` cascade with
+// the row. RLS `templates_delete_own`. A meso started from this template keeps
+// its own copied plan (it references no template rows), so it is unaffected.
+// ---------------------------------------------------------------------------
+
+export async function deleteTemplate(
+  supabase: Client,
+  userId: string,
+  templateId: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  const { data: template, error: findError } = await supabase
+    .from("templates")
+    .select("id, user_id")
+    .eq("id", templateId)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (!template) return { ok: false, error: "Template not found." };
+  if (template.user_id !== userId)
+    return { ok: false, error: "Only your own (custom) templates can be deleted." };
+
+  const { error } = await supabase
+    .from("templates")
+    .delete()
+    .eq("id", templateId)
+    .eq("user_id", userId);
+  if (error) throw error;
+  return { ok: true, error: null };
+}
+
 const UPPER_GROUPS = new Set([
   "chest",
   "back",

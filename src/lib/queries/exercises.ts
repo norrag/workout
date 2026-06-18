@@ -92,6 +92,90 @@ export async function createCustomExercise(
   return data;
 }
 
+// ---------------------------------------------------------------------------
+// delete a custom exercise (MCP undo for create_custom_exercise, §5.8). Only a
+// user-owned (custom) exercise can be deleted, and never one with logged sets —
+// deleting a movement that has logged history would rewrite the past, which the
+// hard rules forbid (the review's editor note). A movement still referenced by
+// a planned meso or a generated workout is also refused (those FKs are NO
+// ACTION and would error anyway) so the tool returns a clean reason instead.
+// `exercise_muscle_groups` cascade-deletes with the row. RLS `exercises_delete_own`.
+// ---------------------------------------------------------------------------
+
+export interface ExerciseDeletionImpact {
+  found: boolean;
+  /** false for stock library exercises (user_id is null) — never deletable */
+  isCustom: boolean;
+  loggedSets: number;
+  plannedRefs: number;
+  workoutRefs: number;
+  /** safe to delete: custom, no logged history, no plan/workout references */
+  deletable: boolean;
+}
+
+export async function getExerciseDeletionImpact(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseDeletionImpact> {
+  const { data: exercise, error: exError } = await supabase
+    .from("exercises")
+    .select("id, user_id")
+    .eq("id", exerciseId)
+    .maybeSingle();
+  if (exError) throw exError;
+  if (!exercise)
+    return { found: false, isCustom: false, loggedSets: 0, plannedRefs: 0, workoutRefs: 0, deletable: false };
+
+  const isCustom = exercise.user_id === userId;
+  if (!isCustom)
+    return { found: true, isCustom: false, loggedSets: 0, plannedRefs: 0, workoutRefs: 0, deletable: false };
+
+  const [logged, planned, workout] = await Promise.all([
+    supabase
+      .from("logged_sets")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("exercise_id", exerciseId),
+    supabase
+      .from("meso_exercises")
+      .select("*", { count: "exact", head: true })
+      .eq("exercise_id", exerciseId),
+    supabase
+      .from("workout_exercises")
+      .select("*", { count: "exact", head: true })
+      .eq("exercise_id", exerciseId),
+  ]);
+  if (logged.error) throw logged.error;
+  if (planned.error) throw planned.error;
+  if (workout.error) throw workout.error;
+
+  const loggedSets = logged.count ?? 0;
+  const plannedRefs = planned.count ?? 0;
+  const workoutRefs = workout.count ?? 0;
+  return {
+    found: true,
+    isCustom: true,
+    loggedSets,
+    plannedRefs,
+    workoutRefs,
+    deletable: loggedSets === 0 && plannedRefs === 0 && workoutRefs === 0,
+  };
+}
+
+export async function deleteCustomExercise(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("exercises")
+    .delete()
+    .eq("id", exerciseId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
 export async function listMuscleGroups(supabase: Client) {
   const { data, error } = await supabase
     .from("muscle_groups")

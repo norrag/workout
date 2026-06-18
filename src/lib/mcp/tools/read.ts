@@ -35,8 +35,10 @@ import {
   toolResult,
   feedbackCoverage,
   FEEDBACK_SCALES,
+  round1,
   type EnvelopeOpts,
 } from "../envelope";
+import { scoreProgress } from "@/lib/engine";
 
 /**
  * Slice 2 read/analysis tools (07 Phase 6). Thin, zod-validated wrappers over
@@ -268,8 +270,9 @@ export function formatMesoSummary(
     workouts_total: row.workouts_total,
     working_sets: row.working_sets,
     working_reps: row.working_reps,
-    total_volume: row.total_volume,
-    best_e1rm_estimate: row.best_e1rm,
+    // round view-sourced floats so the rollup doesn't leak noise (§5.7)
+    total_volume: round1(row.total_volume),
+    best_e1rm_estimate: round1(row.best_e1rm),
     adherence_pct,
     // adherence_pct = attended/due over working (non-deload) weeks; block
     // completion = completed sessions over every session generated so far. The
@@ -284,24 +287,32 @@ export function formatMesoSummary(
     },
     feedback: {
       // each average carries the count of observations behind it (P1-4): a
-      // single grumpy session and twenty honest ones no longer read the same
-      avg_joint_pain: row.avg_joint_pain,
+      // single grumpy session and twenty honest ones no longer read the same.
+      // means rounded to 1 dp so they don't print SQL float noise (§5.7)
+      avg_joint_pain: round1(row.avg_joint_pain),
       n_joint_pain: row.n_joint_pain,
-      avg_pump: row.avg_pump,
+      avg_pump: round1(row.avg_pump),
       n_pump: row.n_pump,
-      avg_overall_fatigue: row.avg_overall_fatigue,
+      avg_overall_fatigue: round1(row.avg_overall_fatigue),
       n_overall_fatigue: row.n_overall_fatigue,
-      avg_performance: row.avg_performance,
+      avg_performance: round1(row.avg_performance),
       n_performance: row.n_performance,
       scales: FEEDBACK_SCALES,
     },
-    progress_scores: scores.map((s) => ({
-      exercise_id: s.exercise_id,
-      exercise_name: s.exercise_name,
-      first_e1rm_estimate: s.first_e1rm,
-      last_e1rm_estimate: s.last_e1rm,
-      e1rm_change_pct: s.score_pct,
-    })),
+    progress_scores: scores.map((s) => {
+      // round the e1RM estimates for display and recompute the change from the
+      // *rounded* values so the percent reconciles with the numbers shown
+      // (the §5.2 self-consistency fix, applied here too) (§5.7)
+      const first = round1(s.first_e1rm);
+      const last = round1(s.last_e1rm);
+      return {
+        exercise_id: s.exercise_id,
+        exercise_name: s.exercise_name,
+        first_e1rm_estimate: first,
+        last_e1rm_estimate: last,
+        e1rm_change_pct: scoreProgress(first, last),
+      };
+    }),
     // name the window so this metric is not confused with the lifetime change on
     // analyze_exercise_progress (§5.2)
     metric_definitions: {
@@ -517,31 +528,67 @@ function registerGetExerciseHistory(server: McpServer) {
 export function formatMuscleGroupVolume(
   mesocycleId: string,
   rows: VMesoWeekSetsRow[],
+  weeksTotal: number | null = null,
 ): Record<string, unknown> {
   const byGroup = new Map<
     string,
-    { name: string; weeks: { week_number: number; planned_sets: number | null; logged_sets: number; is_deload: boolean }[] }
+    {
+      name: string;
+      weeks: Map<number, { planned_sets: number | null; logged_sets: number; is_deload: boolean }>;
+    }
   >();
+  // weeks that actually have a generated workout (any group) — the engine
+  // autoregulates forward, so later weeks may not exist yet (§5.10)
+  const generatedWeeks = new Set<number>();
   for (const r of rows) {
+    generatedWeeks.add(r.week_number);
     const key = r.muscle_group_id ?? "unassigned";
     const name = r.muscle_group ?? "Unassigned";
-    const entry = byGroup.get(key) ?? { name, weeks: [] };
-    entry.weeks.push({
-      week_number: r.week_number,
+    const entry = byGroup.get(key) ?? { name, weeks: new Map() };
+    entry.weeks.set(r.week_number, {
       planned_sets: r.planned_sets,
       logged_sets: r.logged_sets,
       is_deload: r.is_deload,
     });
     byGroup.set(key, entry);
   }
+  const maxGenerated = generatedWeeks.size > 0 ? Math.max(...generatedWeeks) : 0;
+  // the week span to report: the meso's full planned length when known, else
+  // however far generation has reached
+  const span = Math.max(weeksTotal ?? 0, maxGenerated);
+
   return {
     mesocycle_id: mesocycleId,
+    weeks_total: weeksTotal,
+    weeks_generated: [...generatedWeeks].sort((a, b) => a - b),
     groups: [...byGroup.values()]
       .map((g) => ({
         muscle_group: g.name,
-        weeks: g.weeks.sort((a, b) => a.week_number - b.week_number),
+        weeks: Array.from({ length: span }, (_, i) => i + 1).map((week_number) => {
+          const cell = g.weeks.get(week_number);
+          if (!cell) {
+            // explicit so an uneven mid-meso picture reads as "not built yet",
+            // not as a real zero-volume week (§5.10)
+            return {
+              week_number,
+              planned_sets: null,
+              logged_sets: 0,
+              is_deload: false,
+              status: "not_yet_generated" as const,
+            };
+          }
+          return {
+            week_number,
+            planned_sets: cell.planned_sets,
+            logged_sets: cell.logged_sets,
+            is_deload: cell.is_deload,
+            status: cell.logged_sets > 0 ? ("logged" as const) : ("planned" as const),
+          };
+        }),
       }))
       .sort((a, b) => a.muscle_group.localeCompare(b.muscle_group)),
+    note:
+      "Planned sets exist only for weeks the engine has already generated; the engine autoregulates forward, so weeks past weeks_generated show status not_yet_generated (planned_sets null) rather than a real zero.",
   };
 }
 
@@ -554,18 +601,28 @@ function registerGetMuscleGroupVolume(server: McpServer) {
       description:
         "Weekly hard sets per muscle group for a mesocycle — planned (from the " +
         "autoregulated plan) vs actually logged, per week, with deload weeks " +
-        "flagged. The volume picture behind the meso.",
+        "flagged. Weeks the engine hasn't generated yet are marked " +
+        "not_yet_generated (it autoregulates forward). The volume picture behind the meso.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const { data, error } = await client
-        .from("v_meso_week_sets")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("mesocycle_id", mesocycle_id);
+      const [{ data, error }, { data: meso, error: mesoError }] = await Promise.all([
+        client
+          .from("v_meso_week_sets")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("mesocycle_id", mesocycle_id),
+        client
+          .from("mesocycles")
+          .select("weeks")
+          .eq("id", mesocycle_id)
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ]);
       if (error) throw error;
-      return jsonResult(formatMuscleGroupVolume(mesocycle_id, data ?? []));
+      if (mesoError) throw mesoError;
+      return jsonResult(formatMuscleGroupVolume(mesocycle_id, data ?? [], meso?.weeks ?? null));
     },
   );
 }
@@ -642,6 +699,7 @@ export function formatTemplateSearch(list: TemplateRow[]): Record<string, unknow
       description: t.description,
       is_custom: t.user_id != null,
     })),
+    note: "To use one, call create_mesocycle with its id as template_id — that drafts a planned meso from the template's structure for in-app review.",
   };
 }
 
@@ -653,7 +711,8 @@ function registerSearchTemplates(server: McpServer) {
       title: "Search templates",
       description:
         "Search reusable mesocycle templates (stock + the user's own) by name, " +
-        "with emphasis and days-per-week. Use a template id to start a meso from it.",
+        "with emphasis and days-per-week. Pass a template id to create_mesocycle " +
+        "(its template_id argument) to start a planned meso from it.",
       inputSchema: { search: z.string().optional() },
     },
     async ({ search }: { search?: string }, extra: McpExtra) => {

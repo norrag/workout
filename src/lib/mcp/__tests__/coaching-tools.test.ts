@@ -12,6 +12,8 @@ import {
   formatCompareMesos,
   formatMuscleBalance,
   formatAffinity,
+  detectDataHygiene,
+  type HygieneMacroInput,
   registerCoachingTools,
   GET_TRAINING_OVERVIEW,
   GET_RECENT_SESSIONS,
@@ -19,6 +21,7 @@ import {
   COMPARE_MESOCYCLES,
   GET_MUSCLE_BALANCE,
   GET_EXERCISE_AFFINITY,
+  CHECK_DATA_HYGIENE,
 } from "../tools/coaching";
 import { registerTools } from "../tools";
 import { captureServer, fakeExtra } from "./harness";
@@ -242,6 +245,32 @@ describe("formatCompareMesos", () => {
     expect(mesos[0].volume_per_workout).toBe(10000); // 160000 / 16
     expect(mesos[1].sets_per_workout).toBe(15); // 150 / 10
   });
+
+  it("rounds view-sourced floats to one decimal (§5.7)", () => {
+    const rows = [
+      {
+        mesocycle_id: "m1",
+        name: "Block",
+        status: "completed",
+        weeks: 4,
+        includes_deload: true,
+        workouts_completed: 12,
+        working_sets: 150,
+        working_reps: 1500,
+        total_volume: 137773.123456,
+        best_e1rm: 27.333333333,
+        sessions_attended: 10,
+        sessions_due: 12,
+        avg_overall_fatigue: 5.1230769230769235,
+        avg_performance: 2.6666666666,
+      },
+    ] as unknown as VMesoSummaryRow[];
+    const meso = (formatCompareMesos(rows).mesocycles as Record<string, unknown>[])[0];
+    expect(meso.total_volume).toBe(137773.1);
+    expect(meso.best_e1rm_estimate).toBe(27.3);
+    expect(meso.avg_overall_fatigue).toBe(5.1);
+    expect(meso.avg_performance).toBe(2.7);
+  });
 });
 
 // --- formatMuscleBalance ---------------------------------------------------
@@ -360,6 +389,83 @@ describe("formatAffinity", () => {
     expect(ex).toMatchObject({ name: "Hack Squat", pinned_note: "feet low" });
     expect((ex.feedback as Record<string, unknown>).avg_joint_pain).toBe(0.5);
   });
+
+  it("rounds e1RM and volume to one decimal (§5.7)", () => {
+    const list: ExerciseAffinity[] = [
+      {
+        exercise_id: "e1",
+        name: "Dumbbell Curl",
+        equipment_type: "dumbbell",
+        muscles: [],
+        times_trained: 40,
+        last_performed_at: "2026-06-10",
+        best_weight: 50,
+        best_e1rm_estimate: 73.33333333333333,
+        total_volume: 17.083333333333,
+        pinned_note: null,
+        feedback: { sessions: 0, avg_joint_pain: null, avg_workload: null, avg_pump: null },
+      },
+    ];
+    const ex = (formatAffinity(list).exercises as Record<string, unknown>[])[0];
+    expect(ex.best_e1rm_estimate).toBe(73.3);
+    expect(ex.total_volume).toBe(17.1);
+  });
+});
+
+// --- detectDataHygiene (§5.12) ---------------------------------------------
+
+describe("detectDataHygiene", () => {
+  it("flags duration mismatch, duplicate meso names, and placeholder defaults", () => {
+    const macros: HygieneMacroInput[] = [
+      {
+        id: "M1",
+        name: "May–Jun 2026",
+        duration_months: 6,
+        recommended_duration_months: 4,
+        mesos: [
+          { id: "m1", name: "Mesocycle 5", status: "completed", days_per_week: 4 },
+          { id: "m2", name: "Mesocycle 5", status: "planned", days_per_week: 4 },
+          { id: "m3", name: "Mesocycle 6", status: "unplanned", days_per_week: 1 },
+        ],
+      },
+    ];
+    const flags = detectDataHygiene(macros);
+    const kinds = flags.map((f) => f.kind);
+    expect(kinds).toContain("macro_duration_mismatch");
+    expect(kinds).toContain("duplicate_meso_names");
+    expect(kinds).toContain("unplanned_days_per_week_default");
+    const dup = flags.find((f) => f.kind === "duplicate_meso_names")!;
+    expect(dup.detail).toContain("Mesocycle 5");
+  });
+
+  it("returns nothing for clean cycles", () => {
+    const macros: HygieneMacroInput[] = [
+      {
+        id: "M1",
+        name: "Clean",
+        duration_months: 4,
+        recommended_duration_months: 4,
+        mesos: [
+          { id: "m1", name: "Block 1", status: "active", days_per_week: 4 },
+          { id: "m2", name: "Block 2", status: "planned", days_per_week: 4 },
+        ],
+      },
+    ];
+    expect(detectDataHygiene(macros)).toEqual([]);
+  });
+
+  it("does not flag a duration the user left to the engine (null)", () => {
+    const flags = detectDataHygiene([
+      {
+        id: "M1",
+        name: "Engine-sized",
+        duration_months: null,
+        recommended_duration_months: 4,
+        mesos: [],
+      },
+    ]);
+    expect(flags).toEqual([]);
+  });
 });
 
 // --- registration ----------------------------------------------------------
@@ -375,6 +481,7 @@ describe("coaching-tool registration", () => {
       COMPARE_MESOCYCLES,
       GET_MUSCLE_BALANCE,
       GET_EXERCISE_AFFINITY,
+      CHECK_DATA_HYGIENE,
     ]) {
       expect(tools.has(name), name).toBe(true);
     }

@@ -172,7 +172,16 @@ export function prescribe(
     }
   } else if (perf.outcome === "small_miss") {
     weight = baseWeight;
-    reasons.unshift({ rule: "load", detail: `hold load, close miss: ${perf.detail}` });
+    // a "small_miss" holds the load for two different reasons: a genuine
+    // reps-short miss, or reps met/beaten but at a lower RIR than target (the
+    // set was harder than prescribed). Word each accurately (§5.11) — calling
+    // the latter a "close miss" misread a set the lifter actually hit.
+    reasons.unshift({
+      rule: "load",
+      detail: perf.repsMet
+        ? `hold load, hit reps but below target RIR: ${perf.detail}`
+        : `hold load, close miss: ${perf.detail}`,
+    });
   } else {
     // big miss
     weight = baseWeight * params.regression_pct;

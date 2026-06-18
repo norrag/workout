@@ -8,6 +8,8 @@ import {
   scaleLegend,
   toStructuredError,
   toolError,
+  roundTo,
+  round1,
 } from "../envelope";
 
 describe("envelope", () => {
@@ -93,6 +95,26 @@ describe("scaleLegend", () => {
     // does not leak scales the tool never reports
     expect(legend).not.toHaveProperty("joint_pain");
     expect(legend).not.toHaveProperty("pump");
+  });
+});
+
+describe("roundTo / round1 (§5.7)", () => {
+  it("rounds to the requested precision and strips float noise", () => {
+    expect(round1(73.33333333333333)).toBe(73.3);
+    expect(round1(5.1230769230769235)).toBe(5.1);
+    expect(roundTo(137773.123456, 2)).toBe(137773.12);
+    expect(roundTo(27, 0)).toBe(27);
+  });
+
+  it("passes null/undefined through (null-safe)", () => {
+    expect(round1(null)).toBeNull();
+    expect(round1(undefined)).toBeNull();
+    expect(roundTo(null)).toBeNull();
+  });
+
+  it("leaves non-finite values alone", () => {
+    expect(round1(Infinity)).toBe(Infinity);
+    expect(Number.isNaN(round1(NaN) as number)).toBe(true);
   });
 });
 
