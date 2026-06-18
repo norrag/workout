@@ -8,7 +8,12 @@ import { getProfile } from "@/lib/queries/profiles";
 import { getCurrentState, getCyclesOverview } from "@/lib/queries/cycles";
 import { planForMacro } from "@/lib/queries/macro";
 import { getMesoProgressScores, getMesoStats, type MesoBalance } from "@/lib/queries/stats";
-import { getExerciseOverview, type ExerciseOverview } from "@/lib/queries/exercises";
+import {
+  getExerciseOverview,
+  getMusclesForExercises,
+  type ExerciseOverview,
+} from "@/lib/queries/exercises";
+import { getMesoPlan } from "@/lib/queries/cycles";
 import {
   getRecentSessions,
   getExerciseAffinity,
@@ -27,6 +32,7 @@ import {
   type EnvelopeOpts,
 } from "../envelope";
 import { formatCurrentState } from "./get-current-state";
+import { buildDayEmphasisList } from "./read";
 
 /**
  * Slice 2 coaching/analysis tools (05 §Coaching & analysis). Read-only views
@@ -438,6 +444,7 @@ export function formatMuscleBalance(
   contextLine: string | null,
   params: EngineParams,
   experience: ExperienceLevel,
+  days: ReturnType<typeof buildDayEmphasisList> = [],
 ): Record<string, unknown> {
   if (!balance) {
     return { found: false, mesocycle_id: mesocycleId, summary: "No meso visible for that id." };
@@ -483,6 +490,9 @@ export function formatMuscleBalance(
     context: contextLine,
     experience_level: experience,
     split: { push: balance.push, pull: balance.pull, legs: balance.legs },
+    // per-day emphasis (12 §2): so "is my volume uneven?" distinguishes a
+    // lower-set leg day (legs by design) from a genuine deficit. Context.
+    days,
     weekly_sets_per_muscle: perMuscle,
     advisory: advisoryParts.join(" "),
     landmarks_legend: {
@@ -503,19 +513,29 @@ function registerGetMuscleBalance(server: McpServer) {
       title: "Get muscle balance",
       description:
         "Weekly sets per muscle group and the push/pull/legs split for a " +
-        "mesocycle, with the in-app balance callout. Advisory only — a guide to " +
-        "weak points, not a hard prescription.",
+        "mesocycle, with the in-app balance callout and a per-day emphasis " +
+        "breakdown (so a lower-set leg day isn't misread as under-trained). " +
+        "Advisory only — a guide to weak points, not a hard prescription.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [stats, profile, { params }] = await Promise.all([
+      const [stats, profile, { params }, plan] = await Promise.all([
         getMesoStats(client, userId, mesocycle_id),
         getProfile(client, userId),
         getActiveEngineParams(client),
+        getMesoPlan(client, mesocycle_id),
       ]);
       const experience = (profile?.experience_level ??
         "intermediate") as ExperienceLevel;
+      let days: ReturnType<typeof buildDayEmphasisList> = [];
+      if (plan) {
+        const exerciseIds = plan.days.flatMap((d) =>
+          d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id)),
+        );
+        const roles = await getMusclesForExercises(client, exerciseIds);
+        days = buildDayEmphasisList(plan, roles);
+      }
       return jsonResult(
         formatMuscleBalance(
           mesocycle_id,
@@ -523,6 +543,7 @@ function registerGetMuscleBalance(server: McpServer) {
           stats?.contextLine ?? null,
           params,
           experience,
+          days,
         ),
         {
           dataQuality: {

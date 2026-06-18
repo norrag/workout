@@ -64,6 +64,15 @@ export {
   type VolumeLandmark,
   type VolumeAssessment,
 } from "./volume";
+export {
+  pplCategory,
+  classifyDayEmphasis,
+  type PplCategory,
+  type MuscleRole,
+  type DaySlotVolume,
+  type DayClassification,
+  type DayEmphasis,
+} from "./classification";
 export type { EngineInputs, Prescription, EngineParams };
 
 export function prescribe(

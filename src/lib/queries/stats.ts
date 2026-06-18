@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { scoreProgress } from "@/lib/engine";
+import { scoreProgress, pplCategory } from "@/lib/engine";
 import type {
   Database,
   MesocycleRow,
@@ -138,15 +138,15 @@ export interface MesoStats {
   performance: MesoPerformance;
 }
 
-/** push/pull/legs classification of the seeded muscle-group vocabulary. */
+/**
+ * push/pull/legs classification of the seeded muscle-group vocabulary. Delegates
+ * to the engine's canonical 10 §7 PPL map (`pplCategory`) so the in-app balance
+ * cards and the connector's per-day classification share one definition.
+ */
 export function balanceCategory(
   group: string,
 ): "push" | "pull" | "legs" | null {
-  const g = group.toLowerCase();
-  if (["chest", "shoulders", "triceps"].includes(g)) return "push";
-  if (["back", "biceps", "traps", "forearms"].includes(g)) return "pull";
-  if (["quads", "hamstrings", "glutes", "calves"].includes(g)) return "legs";
-  return null; // abs and anything unmapped stay out of the cards
+  return pplCategory(group);
 }
 
 /**
