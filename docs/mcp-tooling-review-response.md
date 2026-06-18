@@ -224,9 +224,28 @@ keyset (cursor) pagination via `next_cursor`.
 
 # Second Review — Test Report (2026-06-18)
 
-A fresh full-suite test run (`WorkoutConnectorTestReport.md`) raised a new set of
-findings §5.1–§5.12. This pass addresses the three **"Now" blockers** (the
-critical defects); the scientific-credibility and polish tiers are staged below.
+A fresh full-suite test run raised findings §5.1–§5.12. The original report is
+archived verbatim at `reviews/2026-06-18-connector-test-report.md`. This pass
+addresses the three **"Now" blockers** (the critical defects); the
+scientific-credibility and polish tiers are staged for a later session.
+
+## Status tracker
+
+| # | Finding | Sev | Status |
+|---|---|---|---|
+| §5.1 | `get_exercise_affinity` broken (no-arg / equipment) | 🔴 | ✅ Done |
+| §5.2 | analytics tools disagree (`times_trained` vs `session_count`; `change_pct`) | 🔴 | ✅ Done |
+| §5.1b | affinity feedback rollup path-dependent (row-cap truncation) | 🔴 | ✅ Done (follow-up) |
+| §5.6 | opaque `[object Object]` errors | 🟡 | ✅ Done |
+| §5.3 | `data_quality` + scales legend missing on most tools | 🟠 | ⏳ Staged |
+| §5.4 | no volume landmarks (MEV/MAV/MRV) | 🟠 | ⏳ Staged (needs migration) |
+| §5.5 | `explain_prescription` empty on common case | 🟠 | ⏳ Staged |
+| §5.7 | unrounded float noise | 🟡 | ⏳ Staged |
+| §5.8 | no delete/undo for create/propose | 🟡 | ⏳ Staged (respect no-delete-logged rule) |
+| §5.9 | `search_templates` dead-ends | 🟡 | ⏳ Staged |
+| §5.10 | incomplete planned-volume across weeks | 🟢 | ⏳ Staged |
+| §5.11 | rationale / validation polish | 🟢 | ⏳ Staged |
+| §5.12 | data-hygiene advisory | 🟢 | ⏳ Staged |
 
 ## Critical / "Now" — fixed in this pass
 
@@ -248,9 +267,30 @@ the limit — which is why it alone succeeded.
 - The candidate set is capped to the most-trained `AFFINITY_LIMIT` (60) *before*
   the heavy queries, since that is all the tool returns anyway.
 - A new `selectInChunks` helper splits every `.in(col, ids)` over ≥1 bounded
-  request (`ID_CHUNK = 150`), so no id list can overflow the URL — the
-  `exercise_feedback` query (the largest list, one row per logged set block) is
-  always chunked. Unit-tested in `coaching-affinity.test.ts`.
+  request (`ID_CHUNK = 150`), so no id list can overflow the URL. Unit-tested in
+  `coaching-affinity.test.ts`.
+
+### §5.1b — affinity feedback rollup path-dependent (FIXED, follow-up)
+
+A residual flagged after the first fix: the same exercise (Dumbbell Curl) showed
+`feedback.sessions: 0` on the no-arg call but `sessions: 4` (populated averages)
+on the `equipment: "dumbbell"` call — same exercise, same window.
+
+**Root cause:** PostgREST also caps every response at `db.max_rows`
+(**1000**, `supabase/config.toml`). The feedback rollup scanned **all**
+`workout_exercises` for the candidate set via `.in("exercise_id", [...])`; in the
+no-arg path that result exceeded 1000 rows and was silently truncated, so a
+popular exercise whose rows landed past the cap lost its `workout_exercise →
+exercise` mapping and read as zero feedback. The equipment filter shrank the set
+under the cap, so the same exercise resolved.
+
+**Fix (`src/lib/queries/coaching.ts`):** drive the rollup off the (sparse,
+unique-per-`workout_exercise`) `exercise_feedback` table instead — fetched with a
+new `fetchAllRows` `.range()` paginator so the row cap can't drop rows — and
+resolve `exercise_id` only for the workout-exercises that actually have feedback
+(a primary-key `.in("id", ...)` lookup, chunked well under the cap). The result
+is now identical across every call path. `fetchAllRows` is unit-tested for
+multi-window pagination in `coaching-affinity.test.ts`.
 
 ### §5.2 — Analytics tools disagree on the same numbers (FIXED)
 
@@ -301,13 +341,13 @@ every handler at the composition root so any thrown value becomes a structured
 
 ## Verification (2026-06-18 pass)
 
-- `npm run typecheck`, `npm run lint`, `npm run test` — all green (258 tests).
-- New unit tests: affinity id-chunking (`coaching-affinity.test.ts`),
-  structured-error serialization + the registry error guard
-  (`envelope.test.ts` / `coaching-tools.test.ts`), `detectStall` self-consistent
-  `change_pct` + lifetime `metric_definitions` (`coaching-tools.test.ts`), and
-  `get_exercise_history` lifetime-count/truncation reporting
-  (`read-tools.test.ts`).
+- `npm run typecheck`, `npm run lint`, `npm run test` — all green (261 tests).
+- New unit tests: affinity id-chunking **and `fetchAllRows` row-cap pagination**
+  (`coaching-affinity.test.ts`), structured-error serialization + the registry
+  error guard (`envelope.test.ts` / `coaching-tools.test.ts`), `detectStall`
+  self-consistent `change_pct` + lifetime `metric_definitions`
+  (`coaching-tools.test.ts`), and `get_exercise_history`
+  lifetime-count/truncation reporting (`read-tools.test.ts`).
 - No schema migration required for this pass (all fixes are query/formatter-level).
 
 ---

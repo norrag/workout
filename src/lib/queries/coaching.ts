@@ -169,6 +169,32 @@ export async function selectInChunks<T>(
   return out;
 }
 
+/**
+ * PostgREST also caps every response at `db.max_rows` (1000 here, see
+ * `supabase/config.toml`), so a single `.in(...)` over a large set silently
+ * drops rows past the cap — which is what made the unfiltered affinity feedback
+ * rollup path-dependent (a popular exercise's `workout_exercises` rows fell past
+ * the cap and read as zero feedback). `fetchAllRows` walks `.range()` windows
+ * until a short page proves exhaustion; the page query MUST carry a stable
+ * `.order(...)` or rows can repeat/skip across windows. Page size must be ≤ the
+ * server cap to make progress.
+ */
+export const PAGE_SIZE = 1000;
+
+export async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 export async function getExerciseAffinity(
   supabase: Client,
   userId: string,
@@ -233,7 +259,7 @@ export async function getExerciseAffinity(
   const keep = new Set(exerciseIds);
 
   // per-exercise extras only for the capped set
-  const [notes, prs, wes] = await Promise.all([
+  const [notes, prs] = await Promise.all([
     selectInChunks<{ exercise_id: string; body: string }>(exerciseIds, (c) =>
       supabase
         .from("exercise_notes")
@@ -243,40 +269,47 @@ export async function getExerciseAffinity(
         .in("exercise_id", c),
     ),
     supabase.from("v_exercise_prs").select("exercise_id, best_weight").eq("user_id", userId),
-    selectInChunks<{ id: string; exercise_id: string }>(exerciseIds, (c) =>
-      supabase.from("workout_exercises").select("id, exercise_id").in("exercise_id", c),
-    ),
   ]);
   if (prs.error) throw prs.error;
 
   const noteByExercise = new Map(notes.map((n) => [n.exercise_id, n.body]));
   const bestWeightByExercise = new Map((prs.data ?? []).map((p) => [p.exercise_id, p.best_weight]));
 
-  // feedback aggregation: exercise_feedback joins via workout_exercise → exercise.
-  // The workout_exercise id list is the largest of all (one row per logged set
-  // block), so it is always chunked — this is the path that previously failed.
-  const weToExercise = new Map(wes.map((w) => [w.id, w.exercise_id]));
-  const feedbackByExercise = new Map<
-    string,
-    { joint: number[]; workload: number[]; pump: number[]; sessions: number }
-  >();
-  const fb = await selectInChunks<{
+  // feedback aggregation: exercise_feedback carries no exercise_id, so resolve it
+  // through workout_exercises. Drive this off the (sparse, unique-per-we)
+  // feedback table — paginated so the row cap can't drop rows — and resolve
+  // exercise_id only for the workout_exercises that actually have feedback (a
+  // primary-key lookup, chunked well under the cap). Scanning the full
+  // workout_exercises set instead overflowed the 1000-row cap and made the
+  // rollup path-dependent (a popular exercise read as zero feedback no-arg but
+  // populated when an equipment filter shrank the set).
+  const feedbackRows = await fetchAllRows<{
     workout_exercise_id: string;
     joint_pain: number | null;
     workload: number | null;
     pump: number | null;
-  }>(
-    wes.map((w) => w.id),
-    (c) =>
-      supabase
-        .from("exercise_feedback")
-        .select("workout_exercise_id, joint_pain, workload, pump")
-        .eq("user_id", userId)
-        .in("workout_exercise_id", c),
+  }>((from, to) =>
+    supabase
+      .from("exercise_feedback")
+      .select("workout_exercise_id, joint_pain, workload, pump")
+      .eq("user_id", userId)
+      .order("workout_exercise_id")
+      .range(from, to),
   );
-  for (const row of fb) {
+  const feedbackWeIds = [...new Set(feedbackRows.map((f) => f.workout_exercise_id))];
+  const wes = await selectInChunks<{ id: string; exercise_id: string }>(feedbackWeIds, (c) =>
+    supabase.from("workout_exercises").select("id, exercise_id").in("id", c),
+  );
+  const weToExercise = new Map(wes.map((w) => [w.id, w.exercise_id]));
+
+  const feedbackByExercise = new Map<
+    string,
+    { joint: number[]; workload: number[]; pump: number[]; sessions: number }
+  >();
+  for (const row of feedbackRows) {
     const exId = weToExercise.get(row.workout_exercise_id);
-    if (!exId) continue;
+    // keep only feedback for the exercises this call actually reports
+    if (!exId || !keep.has(exId)) continue;
     const cur = feedbackByExercise.get(exId) ?? {
       joint: [],
       workload: [],
