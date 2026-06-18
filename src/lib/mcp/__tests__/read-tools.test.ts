@@ -674,6 +674,25 @@ describe("read-tool registration", () => {
     expect(resources.get("profile")?.uri).toBe("workout://profile");
   });
 
+  it("registers the coaching-guide resource and serves it without a session", async () => {
+    const { server, resources } = captureServer();
+    registerResources(server);
+    const guide = resources.get("coaching-guide");
+    expect(guide?.uri).toBe("workout://coaching-guide");
+    // Static reference text — no auth context needed.
+    const result = (await guide!.handler(
+      new URL("workout://coaching-guide"),
+      fakeExtra(undefined),
+    )) as { contents: { mimeType: string; text: string }[] };
+    const content = result.contents[0];
+    expect(content.mimeType).toBe("text/markdown");
+    // Grounded in the §9 guardrails, not a motivational-trainer voice.
+    expect(content.text).toMatch(/honesty guardrails/i);
+    expect(content.text).toMatch(/MEV/);
+    expect(content.text).toMatch(/RIR ramp/i);
+    expect(content.text).toMatch(/comparability/i);
+  });
+
   it("rejects an unauthenticated call on a representative tool", async () => {
     const { server, tools } = captureServer();
     registerReadTools(server);

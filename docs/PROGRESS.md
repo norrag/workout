@@ -2,6 +2,52 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-18 (latest) — Connector coaching roadmap Stage 1: paradigm + persona
+
+First stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
+Aligns the assistant with the app's science-based training paradigm so it reasons
+*with* the engine instead of second-guessing it, and inherits the [10] §9 honesty
+guardrails. Pure docs/instructions distillation — **no schema, no new tool**
+(per the stage's stated constraints).
+
+### Done
+
+- **Extended server instructions (`src/lib/mcp/server.ts`, `MCP_INSTRUCTIONS`).**
+  Added a compact **training paradigm** section (RIR ramp with 0-RIR as a
+  peak-week ceiling, fractional 1.0/0.5 volume counting, MEV→MRV autoregulation,
+  deload as a fatigue valve, "suspect comparability before regression") and a
+  **coaching stance** block reproducing the §9 guardrails (e1RM is a trend;
+  pump/soreness weak/secondary; deloads not a growth booster; push:pull
+  advisory; rate-of-gain & landmark numbers heuristic). Reframes per the stage:
+  the **client owns tone**, the **server owns domain paradigm + guardrails** —
+  explicitly steers off a motivational-trainer voice that overclaims. Points at
+  the new resource for depth so the string stays short (<3 KB).
+- **New `workout://coaching-guide` resource (`src/lib/mcp/coaching-guide.ts`,
+  registered in `resources.ts`).** Long-form markdown distilled from [10] (not
+  invented): e1RM + confidence bands, fractional volume, the MEV/MAV/MRV landmark
+  table, RIR ramp, the workload→sets autoregulation (joint-pain gate → workload →
+  pump nudge → MRV stop), double progression, deload, macro targets, the §9
+  guardrails verbatim-in-intent, and a **comparability** section (cross-phase,
+  slot pooling, single-latest, confidence) with primary-source citations. Static
+  reference text — no user data, so no session resolution.
+- **Tests (+8 → 303 total).** `__tests__/server.test.ts` asserts the
+  instructions teach the paradigm, carry the guardrails, point at the resource,
+  and stay short; `read-tools.test.ts` asserts the coaching-guide resource
+  registers, serves `text/markdown` without an auth context, and covers the
+  guardrails / landmarks / comparability.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (303/303) green.
+
+### Notes
+
+- Stages 2–5 (per-day classification, analysis comparability, `edit_mesocycle`,
+  session-order normalization) remain open; this stage is independent of them.
+- The guide deliberately tells the model the landmark/ramp numbers are tunable
+  `engine_params` defaults and must be read from the params, not hard-coded into
+  advice — consistent with hard rule #3.
+
 ## 2026-06-17 (latest) — MCP tooling review: metric-truth view fixes
 
 Response to the external *MCP Tooling Review* — full triage in
