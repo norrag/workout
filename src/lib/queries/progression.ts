@@ -751,3 +751,233 @@ export async function getLatestPrescriptionDecision(
     output: decision.output,
   };
 }
+
+// ---------------------------------------------------------------------------
+// projected prescription (§5.5) — when no decision was recorded for an exercise
+// yet (the engine only writes one when a week is *generated*, and the exercise
+// may not be in the latest generated day), recompute what the engine WOULD
+// prescribe next, read-only, from the exercise's most recent completed week.
+// Uses the same pure `prescribe()` and input assembly as live generation, so the
+// projection is the engine's, not the model's. Clearly labeled as a projection.
+// ---------------------------------------------------------------------------
+
+export interface ProjectedPrescription {
+  exercise_id: string;
+  exercise_name: string;
+  /** W·D the projection is computed from (the last completed session) */
+  source_coordinate: string | null;
+  /** the week the projection targets + how its RIR was chosen */
+  projected_for: { target_rir: number; is_deload: boolean; basis: string };
+  params_version: number;
+  inputs: Record<string, unknown>;
+  output: Record<string, unknown>;
+}
+
+export async function projectNextPrescription(
+  supabase: Client,
+  userId: string,
+  exerciseId: string,
+): Promise<ProjectedPrescription | null> {
+  const [{ data: exercise, error: exError }, { data: wes, error: weError }] =
+    await Promise.all([
+      supabase
+        .from("exercises")
+        .select("id, name, equipment_type")
+        .eq("id", exerciseId)
+        .maybeSingle(),
+      supabase.from("workout_exercises").select("*").eq("exercise_id", exerciseId),
+    ]);
+  if (exError) throw exError;
+  if (weError) throw weError;
+  if (!exercise || !wes || wes.length === 0) return null;
+
+  // the exercise's most recent *completed* workout = the projection source
+  const { data: sourceWorkout, error: swError } = await supabase
+    .from("workouts")
+    .select("*")
+    .in("id", wes.map((w) => w.workout_id))
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .order("performed_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (swError) throw swError;
+  if (!sourceWorkout) return null;
+
+  const { data: micro, error: microError } = await supabase
+    .from("microcycles")
+    .select("*")
+    .eq("id", sourceWorkout.microcycle_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (microError) throw microError;
+  if (!micro) return null;
+
+  const [
+    { data: meso, error: mesoError },
+    { data: micros, error: microsError },
+    { data: profile, error: profileError },
+  ] = await Promise.all([
+    supabase.from("mesocycles").select("*").eq("id", micro.mesocycle_id).maybeSingle(),
+    supabase
+      .from("microcycles")
+      .select("*")
+      .eq("mesocycle_id", micro.mesocycle_id)
+      .eq("user_id", userId)
+      .order("week_number"),
+    supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+  ]);
+  if (mesoError) throw mesoError;
+  if (microsError) throw microsError;
+  if (profileError) throw profileError;
+  if (!meso || !profile) return null;
+
+  // sibling workouts of the source week → the shared week-N picture
+  const { data: siblings, error: sibError } = await supabase
+    .from("workouts")
+    .select("*")
+    .eq("microcycle_id", micro.id)
+    .eq("user_id", userId)
+    .order("day_number");
+  if (sibError) throw sibError;
+  const weekWorkouts = siblings ?? [];
+  const weekWorkoutIds = weekWorkouts.map((w) => w.id);
+
+  const { data: weekWesData, error: weekWesError } = await supabase
+    .from("workout_exercises")
+    .select("*")
+    .in("workout_id", weekWorkoutIds);
+  if (weekWesError) throw weekWesError;
+  const weekWes = weekWesData ?? [];
+  const weekWeIds = weekWes.map((we) => we.id);
+
+  // the source we for THIS exercise in the source workout
+  const sourceWe = weekWes.find(
+    (we) => we.workout_id === sourceWorkout.id && we.exercise_id === exerciseId,
+  );
+  if (!sourceWe) return null;
+
+  // prior meso weeks (≤ N) for deload peak sizing
+  const priorMicroIds = (micros ?? [])
+    .filter((m) => m.week_number <= micro.week_number)
+    .map((m) => m.id);
+  const { data: mesoWorkouts, error: mwError } = await supabase
+    .from("workouts")
+    .select("id")
+    .in("microcycle_id", priorMicroIds)
+    .eq("user_id", userId);
+  if (mwError) throw mwError;
+
+  const [
+    { data: sets, error: setsError },
+    { data: feedback, error: fbError },
+    { data: workoutFeedback, error: wfError },
+    { data: mesoWes, error: mesoWesError },
+  ] = await Promise.all([
+    weekWeIds.length > 0
+      ? supabase
+          .from("logged_sets")
+          .select("*")
+          .in("workout_exercise_id", weekWeIds)
+          .eq("user_id", userId)
+          .order("set_number")
+      : Promise.resolve({ data: [] as LoggedSetRow[], error: null }),
+    weekWeIds.length > 0
+      ? supabase
+          .from("exercise_feedback")
+          .select("*")
+          .in("workout_exercise_id", weekWeIds)
+          .eq("user_id", userId)
+      : Promise.resolve({ data: [] as ExerciseFeedbackRow[], error: null }),
+    supabase
+      .from("workout_feedback")
+      .select("*")
+      .in("workout_id", weekWorkoutIds)
+      .eq("user_id", userId),
+    supabase
+      .from("workout_exercises")
+      .select("*")
+      .in("workout_id", (mesoWorkouts ?? []).map((w) => w.id)),
+  ]);
+  if (setsError) throw setsError;
+  if (fbError) throw fbError;
+  if (wfError) throw wfError;
+  if (mesoWesError) throw mesoWesError;
+
+  // goal context from the macrocycle (standalone → gain)
+  let macroGoal: MacroGoalType | null = null;
+  if (meso.macrocycle_id) {
+    const { data: macro, error } = await supabase
+      .from("macrocycles")
+      .select("goal_type")
+      .eq("id", meso.macrocycle_id)
+      .maybeSingle();
+    if (error) throw error;
+    macroGoal = macro?.goal_type ?? null;
+  }
+
+  const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
+
+  const setsByWe = new Map<string, LoggedSetRow[]>();
+  for (const s of sets ?? []) {
+    const cur = setsByWe.get(s.workout_exercise_id) ?? [];
+    cur.push(s);
+    setsByWe.set(s.workout_exercise_id, cur);
+  }
+  const feedbackByWe = new Map(
+    (feedback ?? []).map((f) => [f.workout_exercise_id, f]),
+  );
+
+  // group-scoped pump/workload from whichever exercise closed each group, for
+  // the source day (mirrors generateDay)
+  const dayWes = weekWes.filter((we) => we.workout_id === sourceWorkout.id);
+  const groupFeedback = new Map<string, { pump: number | null; workload: number | null }>();
+  for (const we of dayWes) {
+    const fb = feedbackByWe.get(we.id);
+    if (fb?.muscle_group_id && (fb.pump != null || fb.workload != null)) {
+      groupFeedback.set(fb.muscle_group_id, { pump: fb.pump, workload: fb.workload });
+    }
+  }
+
+  // target week: the meso's next microcycle if one exists, else hold this
+  // week's RIR (the meso is over / not yet extended — labeled so)
+  const nextMicro =
+    (micros ?? []).find((m) => m.week_number === micro.week_number + 1) ?? null;
+  const nextWeek = nextMicro
+    ? { targetRir: nextMicro.target_rir, isDeload: nextMicro.is_deload }
+    : { targetRir: micro.target_rir, isDeload: false };
+  const basis = nextMicro
+    ? `next week W${nextMicro.week_number} (target RIR ${nextMicro.target_rir}${nextMicro.is_deload ? ", deload" : ""})`
+    : `no later week exists in this block — projected holding W${micro.week_number}'s target RIR ${micro.target_rir}`;
+
+  const inputs = buildEngineInputs({
+    we: sourceWe,
+    sets: setsByWe.get(sourceWe.id) ?? [],
+    feedback: feedbackByWe.get(sourceWe.id) ?? null,
+    groupFeedback: sourceWe.muscle_group_id
+      ? (groupFeedback.get(sourceWe.muscle_group_id) ?? null)
+      : null,
+    workoutFeedback:
+      (workoutFeedback ?? []).find((f) => f.workout_id === sourceWorkout.id) ?? null,
+    microTargetRir: micro.target_rir,
+    nextWeek,
+    goal: engineGoal(macroGoal),
+    equipmentType: exercise.equipment_type,
+    profile,
+    muscleGroupWeeklySets: sourceWe.muscle_group_id
+      ? (weeklySetsByGroup(weekWes).get(sourceWe.muscle_group_id) ?? null)
+      : null,
+    weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
+  });
+  const output = prescribe(inputs, params);
+
+  return {
+    exercise_id: exerciseId,
+    exercise_name: exercise.name,
+    source_coordinate: `W${micro.week_number}·D${sourceWorkout.day_number}`,
+    projected_for: { target_rir: nextWeek.targetRir, is_deload: nextWeek.isDeload, basis },
+    params_version: paramsVersion,
+    inputs: inputs as unknown as Record<string, unknown>,
+    output: output as unknown as Record<string, unknown>,
+  };
+}

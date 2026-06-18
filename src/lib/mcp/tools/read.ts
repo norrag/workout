@@ -25,7 +25,9 @@ import {
 import { listTemplates } from "@/lib/queries/templates";
 import {
   getLatestPrescriptionDecision,
+  projectNextPrescription,
   type PrescriptionDecision,
+  type ProjectedPrescription,
 } from "@/lib/queries/progression";
 import type { TemplateRow, EquipmentType } from "@/lib/types/database";
 import { resolveSession, type McpExtra } from "../session";
@@ -731,26 +733,46 @@ function registerGetExclusions(server: McpServer) {
 export function formatPrescriptionDecision(
   exerciseId: string,
   decision: PrescriptionDecision | null,
+  projected: ProjectedPrescription | null = null,
 ): Record<string, unknown> {
-  if (!decision) {
+  if (decision) {
     return {
-      found: false,
-      exercise_id: exerciseId,
-      summary:
-        "The engine has no recorded prescription for this exercise yet (it is " +
-        "written when a new week is generated).",
+      found: true,
+      source: "recorded",
+      exercise_id: decision.exercise_id,
+      exercise_name: decision.exercise_name,
+      coordinate: decision.coordinate,
+      decided_at: decision.decided_at,
+      params_version: decision.params_version,
+      inputs: decision.inputs,
+      output: decision.output,
+      note: "Recorded engine decision. The engine — not the model — computes every prescribed load, rep, and set; this surfaces its recorded rationale.",
+    };
+  }
+  // §5.5: no decision was recorded (the engine only writes one when a week is
+  // generated, and this exercise may not be in the latest generated day). Fall
+  // back to a read-only projection recomputed from the last completed session
+  // with the same pure engine, clearly labeled as a projection.
+  if (projected) {
+    return {
+      found: true,
+      source: "projected",
+      exercise_id: projected.exercise_id,
+      exercise_name: projected.exercise_name,
+      source_coordinate: projected.source_coordinate,
+      projected_for: projected.projected_for,
+      params_version: projected.params_version,
+      inputs: projected.inputs,
+      output: projected.output,
+      note: "No engine decision is recorded for this exercise yet (one is written only when a week is generated, and it may not be in the latest generated day). This is a read-only projection: the same engine recomputed against the last completed session — what it WOULD prescribe next. It is not yet a committed prescription.",
     };
   }
   return {
-    found: true,
-    exercise_id: decision.exercise_id,
-    exercise_name: decision.exercise_name,
-    coordinate: decision.coordinate,
-    decided_at: decision.decided_at,
-    params_version: decision.params_version,
-    inputs: decision.inputs,
-    output: decision.output,
-    note: "The engine — not the model — computes every prescribed load, rep, and set. This surfaces its recorded rationale.",
+    found: false,
+    exercise_id: exerciseId,
+    summary:
+      "No recorded or projectable prescription for this exercise — the engine " +
+      "has never prescribed it and there is no completed session to project from.",
   };
 }
 
@@ -761,15 +783,23 @@ function registerExplainPrescription(server: McpServer) {
     {
       title: "Explain a prescription",
       description:
-        "Surface the engine's recorded decision for the most recent prescription " +
-        "of an exercise: the inputs it saw, the output (load / reps / sets), and " +
-        "its rationale. Use it to explain why a number changed.",
+        "Surface the engine's decision for an exercise's prescription: the inputs " +
+        "it saw, the output (load / reps / sets), and its rationale. Prefers the " +
+        "recorded decision; if none exists yet, returns a read-only projection " +
+        "recomputed from the last completed session (source: 'projected'). Use it " +
+        "to explain why a number changed or what the engine will do next.",
       inputSchema: { exercise_id: z.string().uuid() },
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
       const decision = await getLatestPrescriptionDecision(client, userId, exercise_id);
-      return jsonResult(formatPrescriptionDecision(exercise_id, decision));
+      // only pay for the projection assembly when there's no recorded decision
+      const projected = decision
+        ? null
+        : await projectNextPrescription(client, userId, exercise_id);
+      return jsonResult(
+        formatPrescriptionDecision(exercise_id, decision, projected),
+      );
     },
   );
 }

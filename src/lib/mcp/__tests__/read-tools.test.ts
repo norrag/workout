@@ -14,7 +14,10 @@ import type {
   ExerciseWithMuscles,
   PinnedNoteWithExercise,
 } from "@/lib/queries/exercises";
-import type { PrescriptionDecision } from "@/lib/queries/progression";
+import type {
+  PrescriptionDecision,
+  ProjectedPrescription,
+} from "@/lib/queries/progression";
 import {
   formatProfile,
   formatMacrocycles,
@@ -508,12 +511,12 @@ describe("formatPinnedNotes / formatExclusions", () => {
 // --- formatPrescriptionDecision --------------------------------------------
 
 describe("formatPrescriptionDecision", () => {
-  it("flags no decision", () => {
-    const out = formatPrescriptionDecision("e1", null);
+  it("flags no decision and no projection", () => {
+    const out = formatPrescriptionDecision("e1", null, null);
     expect(out.found).toBe(false);
   });
 
-  it("surfaces inputs/output and the engine-owns-numbers note", () => {
+  it("surfaces a recorded decision's inputs/output and the engine-owns-numbers note", () => {
     const decision: PrescriptionDecision = {
       exercise_id: "e1",
       exercise_name: "Hack Squat",
@@ -526,8 +529,53 @@ describe("formatPrescriptionDecision", () => {
     };
     const out = formatPrescriptionDecision("e1", decision);
     expect(out.found).toBe(true);
+    expect(out.source).toBe("recorded");
     expect(out.output).toMatchObject({ weight: 255 });
     expect(out.params_version).toBe(6);
+  });
+
+  it("falls back to a projection when no decision is recorded (§5.5)", () => {
+    const projected: ProjectedPrescription = {
+      exercise_id: "e1",
+      exercise_name: "Dumbbell Curl (2-Arm)",
+      source_coordinate: "W3·D1",
+      projected_for: { target_rir: 1, is_deload: false, basis: "next week W4 (target RIR 1)" },
+      params_version: 8,
+      inputs: { previous: { weight: 35 } },
+      output: { weight: 35, sets: 3, rationale: "hold load; RIR drop is the progression" },
+    };
+    const out = formatPrescriptionDecision("e1", null, projected);
+    expect(out.found).toBe(true);
+    expect(out.source).toBe("projected");
+    expect(out.source_coordinate).toBe("W3·D1");
+    expect(out.projected_for).toMatchObject({ target_rir: 1 });
+    expect(out.output).toMatchObject({ weight: 35 });
+    expect(out.note).toMatch(/projection/i);
+  });
+
+  it("prefers the recorded decision over a projection when both are present", () => {
+    const decision: PrescriptionDecision = {
+      exercise_id: "e1",
+      exercise_name: "Hack Squat",
+      workout_exercise_id: "we1",
+      coordinate: "W3·D2",
+      decided_at: "2026-06-15T00:00:00Z",
+      params_version: 6,
+      inputs: {},
+      output: { weight: 255 },
+    };
+    const projected: ProjectedPrescription = {
+      exercise_id: "e1",
+      exercise_name: "Hack Squat",
+      source_coordinate: "W3·D2",
+      projected_for: { target_rir: 0, is_deload: false, basis: "x" },
+      params_version: 8,
+      inputs: {},
+      output: { weight: 999 },
+    };
+    const out = formatPrescriptionDecision("e1", decision, projected);
+    expect(out.source).toBe("recorded");
+    expect(out.output).toMatchObject({ weight: 255 });
   });
 });
 
