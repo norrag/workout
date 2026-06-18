@@ -2,6 +2,8 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ProfileRow, VMesoSummaryRow } from "@/lib/types/database";
+import { assessMuscleVolume, type EngineParams, type ExperienceLevel } from "@/lib/engine";
+import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getMesoProgressScores, getMesoStats, type MesoBalance } from "@/lib/queries/stats";
@@ -15,7 +17,13 @@ import {
   type E1rmPoint,
 } from "@/lib/queries/coaching";
 import { resolveSession, type McpExtra } from "../session";
-import { toolResult, type EnvelopeOpts } from "../envelope";
+import {
+  toolResult,
+  scaleLegend,
+  E1RM_ESTIMATE_NOTE,
+  FEEDBACK_HISTORY_NOTE,
+  type EnvelopeOpts,
+} from "../envelope";
 import { formatCurrentState } from "./get-current-state";
 
 /**
@@ -190,6 +198,15 @@ function registerGetTrainingOverview(server: McpServer) {
 
       return jsonResult(
         formatTrainingOverview({ profile, currentState, activeSummary, topLifts }),
+        {
+          units: profile?.units ?? null,
+          dataQuality: {
+            scales: scaleLegend("overall_fatigue", "rir"),
+            samples: { active_meso_fatigue_sessions: activeSummary?.n_overall_fatigue ?? 0 },
+            estimates: E1RM_ESTIMATE_NOTE,
+            note: "key_lift_trend change_pct is the within-active-mesocycle e1RM change. " + FEEDBACK_HISTORY_NOTE,
+          },
+        },
       );
     },
   );
@@ -228,9 +245,18 @@ function registerGetRecentSessions(server: McpServer) {
     },
     async ({ limit }: { limit?: number }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      return jsonResult(
-        formatRecentSessions(await getRecentSessions(client, userId, limit ?? 10)),
-      );
+      const sessions = await getRecentSessions(client, userId, limit ?? 10);
+      const withFeedback = sessions.filter((s) => s.feedback != null).length;
+      return jsonResult(formatRecentSessions(sessions), {
+        dataQuality: {
+          scales: scaleLegend("overall_fatigue", "effort_rating", "performance_rating"),
+          samples: {
+            sessions_returned: sessions.length,
+            sessions_with_feedback: withFeedback,
+          },
+          note: FEEDBACK_HISTORY_NOTE,
+        },
+      });
     },
   );
 }
@@ -284,11 +310,19 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [overview, series] = await Promise.all([
+      const [overview, series, profile] = await Promise.all([
         getExerciseOverview(client, userId, exercise_id),
         getExerciseE1rmSeries(client, userId, exercise_id),
+        getProfile(client, userId),
       ]);
-      return jsonResult(formatExerciseAnalysis(exercise_id, overview, series));
+      return jsonResult(formatExerciseAnalysis(exercise_id, overview, series), {
+        units: profile?.units ?? null,
+        dataQuality: {
+          scales: scaleLegend("rir"),
+          samples: { e1rm_sessions: series.filter((p) => p.e1rm != null).length },
+          estimates: E1RM_ESTIMATE_NOTE,
+        },
+      });
     },
   );
 }
@@ -361,18 +395,35 @@ function registerCompareMesocycles(server: McpServer) {
     },
     async ({ mesocycle_ids }: { mesocycle_ids: string[] }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const { data, error } = await client
-        .from("v_meso_summary")
-        .select("*")
-        .eq("user_id", userId)
-        .in("mesocycle_id", mesocycle_ids);
+      const [{ data, error }, profile] = await Promise.all([
+        client
+          .from("v_meso_summary")
+          .select("*")
+          .eq("user_id", userId)
+          .in("mesocycle_id", mesocycle_ids),
+        getProfile(client, userId),
+      ]);
       if (error) throw error;
       // preserve the caller's order
       const byId = new Map((data ?? []).map((r) => [r.mesocycle_id, r]));
       const ordered = mesocycle_ids
         .map((id) => byId.get(id))
         .filter((r): r is VMesoSummaryRow => r != null);
-      return jsonResult(formatCompareMesos(ordered));
+      return jsonResult(formatCompareMesos(ordered), {
+        units: profile?.units ?? null,
+        dataQuality: {
+          scales: scaleLegend("overall_fatigue", "performance_rating"),
+          // feedback sample sizes vary per block — surface them so a low-n
+          // average isn't read as authoritative (§5.3)
+          per_block_feedback_samples: ordered.map((r) => ({
+            mesocycle_id: r.mesocycle_id,
+            n_overall_fatigue: r.n_overall_fatigue,
+            n_performance: r.n_performance,
+          })),
+          estimates: E1RM_ESTIMATE_NOTE,
+          note: FEEDBACK_HISTORY_NOTE,
+        },
+      });
     },
   );
 }
@@ -383,21 +434,62 @@ export function formatMuscleBalance(
   mesocycleId: string,
   balance: MesoBalance | null,
   contextLine: string | null,
+  params: EngineParams,
+  experience: ExperienceLevel,
 ): Record<string, unknown> {
   if (!balance) {
     return { found: false, mesocycle_id: mesocycleId, summary: "No meso visible for that id." };
   }
+
+  // §5.4: assert each muscle against its experience-scaled MEV/MAV/MRV band so
+  // the tool can say a muscle is *below maintenance volume*, not only flag
+  // relative imbalance. Heuristic + advisory (10 §9).
+  const perMuscle = balance.bars.map((b) => {
+    const lm = assessMuscleVolume(params, b.name, b.avg, experience);
+    return {
+      muscle_group: b.name,
+      avg_weekly_sets: b.avg,
+      landmark: lm
+        ? {
+            mev: lm.mev,
+            mav: lm.mav,
+            mrv: lm.mrv,
+            zone: lm.zone,
+            note: lm.note,
+          }
+        : null,
+    };
+  });
+
+  const belowMev = perMuscle
+    .filter((m) => m.landmark?.zone === "below_mev")
+    .map((m) => m.muscle_group);
+  const aboveMrv = perMuscle
+    .filter((m) => m.landmark?.zone === "above_mrv")
+    .map((m) => m.muscle_group);
+
+  // append the absolute-threshold read to the relative-balance advisory
+  const advisoryParts = [balance.note];
+  if (belowMev.length > 0)
+    advisoryParts.push(`Below MEV (likely under-stimulated): ${belowMev.join(", ")}.`);
+  if (aboveMrv.length > 0)
+    advisoryParts.push(`Above MRV (likely beyond recovery): ${aboveMrv.join(", ")}.`);
+
   return {
     found: true,
     mesocycle_id: mesocycleId,
     context: contextLine,
+    experience_level: experience,
     split: { push: balance.push, pull: balance.pull, legs: balance.legs },
-    weekly_sets_per_muscle: balance.bars.map((b) => ({
-      muscle_group: b.name,
-      avg_weekly_sets: b.avg,
-    })),
-    advisory: balance.note,
-    note: "Advisory only (10 §9): push/pull/legs balance is a guide, not a rule. MEV/MAV/MRV landmarks are not yet parameterized, so no per-muscle threshold is asserted.",
+    weekly_sets_per_muscle: perMuscle,
+    advisory: advisoryParts.join(" "),
+    landmarks_legend: {
+      basis: `weekly direct-equivalent sets vs MEV/MAV/MRV, scaled for an ${experience} lifter`,
+      mev: "minimum effective volume (productive floor)",
+      mav: "maximum adaptive volume (top of the productive work zone)",
+      mrv: "maximum recoverable volume (ceiling)",
+    },
+    note: "Advisory only (10 §9): push/pull/legs balance and MEV/MAV/MRV landmarks are heuristic, tunable starting points with large individual variance — a guide to weak points, not a hard prescription.",
   };
 }
 
@@ -415,13 +507,29 @@ function registerGetMuscleBalance(server: McpServer) {
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const stats = await getMesoStats(client, userId, mesocycle_id);
+      const [stats, profile, { params }] = await Promise.all([
+        getMesoStats(client, userId, mesocycle_id),
+        getProfile(client, userId),
+        getActiveEngineParams(client),
+      ]);
+      const experience = (profile?.experience_level ??
+        "intermediate") as ExperienceLevel;
       return jsonResult(
         formatMuscleBalance(
           mesocycle_id,
           stats?.balance ?? null,
           stats?.contextLine ?? null,
+          params,
+          experience,
         ),
+        {
+          dataQuality: {
+            basis: "avg weekly working sets per muscle across the meso's non-deload weeks (planned where a week isn't generated yet)",
+            landmarks:
+              "MEV/MAV/MRV are heuristic RP/Israetel starting points, scaled by experience and tunable via engine_params.volume — advisory, large individual variance (10 §9)",
+            experience_level: experience,
+          },
+        },
       );
     },
   );
@@ -471,11 +579,25 @@ function registerGetExerciseAffinity(server: McpServer) {
       extra: McpExtra,
     ) => {
       const { client, userId } = resolveSession(extra);
-      const list = await getExerciseAffinity(client, userId, {
-        muscleGroupId: args.muscle_group_id,
-        equipment: args.equipment,
+      const [list, profile] = await Promise.all([
+        getExerciseAffinity(client, userId, {
+          muscleGroupId: args.muscle_group_id,
+          equipment: args.equipment,
+        }),
+        getProfile(client, userId),
+      ]);
+      return jsonResult(formatAffinity(list.slice(0, 60)), {
+        units: profile?.units ?? null,
+        dataQuality: {
+          scales: scaleLegend("joint_pain", "workload", "pump"),
+          // each exercise's feedback means are over its own feedback.sessions
+          // (0 = none captured) — sample size is per-row, not global (§5.3)
+          feedback_basis:
+            "per-exercise feedback means cover only that exercise's sessions logged WITH feedback (see each row's feedback.sessions); 0 = none captured",
+          estimates: E1RM_ESTIMATE_NOTE,
+          note: FEEDBACK_HISTORY_NOTE,
+        },
       });
-      return jsonResult(formatAffinity(list.slice(0, 60)));
     },
   );
 }

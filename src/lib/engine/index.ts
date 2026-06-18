@@ -55,6 +55,15 @@ export {
   type SummaryContext,
   type SummaryDelta,
 } from "./summary";
+export {
+  muscleVolumeLandmark,
+  classifyVolume,
+  assessMuscleVolume,
+  type ExperienceLevel,
+  type VolumeZone,
+  type VolumeLandmark,
+  type VolumeAssessment,
+} from "./volume";
 export type { EngineInputs, Prescription, EngineParams };
 
 export function prescribe(

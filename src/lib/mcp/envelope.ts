@@ -29,6 +29,32 @@ export const FEEDBACK_SCALES = {
   rir: "reps in reserve (lower = closer to failure)",
 } as const;
 
+export type FeedbackScaleKey = keyof typeof FEEDBACK_SCALES;
+
+/**
+ * The legend for just the named feedback fields (so a tool that only emits
+ * fatigue/effort/performance doesn't ship the joint-pain/pump scales it never
+ * reports). Pure. (§5.3)
+ */
+export function scaleLegend(...keys: FeedbackScaleKey[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of keys) out[k] = FEEDBACK_SCALES[k];
+  return out;
+}
+
+/** Standing caveat that e1RM-derived numbers are estimates, not tested maxes. */
+export const E1RM_ESTIMATE_NOTE =
+  "e1RM and any e1RM-derived change are Epley-based estimates, not tested 1RMs — read trends, not absolute values.";
+
+/**
+ * Standing caveat that feedback was only captured from this date (earlier
+ * history was migrated from another app without exportable feedback — the
+ * report's editor's note). Surfaced so sparse early feedback reads as expected,
+ * not missing. (§5.3 / §5.5)
+ */
+export const FEEDBACK_HISTORY_NOTE =
+  "Subjective feedback (joint pain / workload / pump / session ratings) was only captured from 2026-06-15; earlier sessions were migrated without it, so their feedback means are absent by design, not lost.";
+
 export type Units = "kg" | "lb";
 
 export interface EnvelopeOpts {

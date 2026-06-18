@@ -27,7 +27,8 @@ import { engineParamsSchema, type EngineParams } from "@/lib/engine";
  */
 
 /** Bumped whenever `engineParamsSchema`'s *shape* changes incompatibly. */
-export const CURRENT_PARAMS_SCHEMA_VERSION = 2;
+// v3 adds the §5.4 `volume` block (MEV/MAV/MRV landmarks + experience scale).
+export const CURRENT_PARAMS_SCHEMA_VERSION = 3;
 
 /** Deterministic JSON with recursively sorted object keys. Pure. */
 export function canonicalize(value: unknown): string {
