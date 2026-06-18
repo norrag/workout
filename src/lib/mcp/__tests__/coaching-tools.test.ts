@@ -19,6 +19,7 @@ import {
   GET_MUSCLE_BALANCE,
   GET_EXERCISE_AFFINITY,
 } from "../tools/coaching";
+import { registerTools } from "../tools";
 import { captureServer, fakeExtra } from "./harness";
 
 // --- detectStall -----------------------------------------------------------
@@ -58,6 +59,16 @@ describe("detectStall", () => {
     const out = detectStall([200, null, 210, null, 220]);
     expect(out.sessions).toBe(3);
     expect(out.trend).toBe("improving");
+  });
+
+  it("computes change_pct from the rounded e1RM it reports (§5.2 self-consistency)", () => {
+    // raw floats whose rounded values are 33 → 27; the percent must reconcile
+    // with the displayed first/latest, not the raw floats.
+    const out = detectStall([33.33, 30, 27.0]);
+    expect(out.first_e1rm).toBe(33);
+    expect(out.latest_e1rm).toBe(27);
+    // (27 - 33) / 33 = -18.2%, matching what the payload shows
+    expect(out.change_pct).toBeCloseTo(-18.2, 1);
   });
 });
 
@@ -319,5 +330,50 @@ describe("coaching-tool registration", () => {
     await expect(tool.handler({}, fakeExtra(undefined))).rejects.toThrow(
       /authenticated session/i,
     );
+  });
+});
+
+// --- error handling at the composition root (§5.6) -------------------------
+
+describe("registerTools error guard", () => {
+  it("turns a thrown handler error into a structured isError result", async () => {
+    const { server, tools } = captureServer();
+    registerTools(server);
+    const tool = tools.get(GET_TRAINING_OVERVIEW)!;
+    // unauthenticated → resolveSession throws; the guard must catch it
+    const result = (await tool.handler({}, fakeExtra(undefined))) as {
+      isError?: boolean;
+      content: { text: string }[];
+    };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).not.toContain("[object Object]");
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error.message).toMatch(/authenticated session/i);
+  });
+});
+
+// --- formatExerciseAnalysis metric definitions (§5.2) ----------------------
+
+describe("formatExerciseAnalysis metric_definitions", () => {
+  it("labels the change window as lifetime", () => {
+    const overview = {
+      overview: {
+        exercise_name: "Curl",
+        times_trained: 144,
+        last_performed_at: "2026-06-10",
+        weight_pr: 30,
+        best_e1rm: 33,
+      },
+    } as unknown as ExerciseOverview;
+    const series: E1rmPoint[] = [
+      { performed_on: "1", e1rm: 33.33, top_weight: 30, working_sets: 3 },
+      { performed_on: "2", e1rm: 27.0, top_weight: 20, working_sets: 3 },
+    ];
+    const out = formatExerciseAnalysis("e1", overview, series);
+    const defs = out.metric_definitions as Record<string, unknown>;
+    expect(defs.window).toBe("lifetime");
+    expect(out.times_trained).toBe(144);
+    // the reported change reconciles with the rounded first/latest e1RM
+    expect((out.progress as Record<string, unknown>).change_pct).toBeCloseTo(-18.2, 1);
   });
 });

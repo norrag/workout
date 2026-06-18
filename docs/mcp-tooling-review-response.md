@@ -220,6 +220,98 @@ feedback sample counts + coverage (new count columns on `v_meso_summary`,
 `20260617000006`) and documented scale ranges; `get_engine_decisions` gained
 keyset (cursor) pagination via `next_cursor`.
 
+---
+
+# Second Review — Test Report (2026-06-18)
+
+A fresh full-suite test run (`WorkoutConnectorTestReport.md`) raised a new set of
+findings §5.1–§5.12. This pass addresses the three **"Now" blockers** (the
+critical defects); the scientific-credibility and polish tiers are staged below.
+
+## Critical / "Now" — fixed in this pass
+
+### §5.1 — `get_exercise_affinity` broken in 2 of its 3 modes (FIXED)
+
+**Confirmed, root cause identified.** The no-arg and `equipment`-only calls
+errored while the `muscle_group_id` call worked. The difference was set size:
+`getExerciseAffinity` fetched **all** of the user's `workout_exercises`, then ran
+`exercise_feedback.in("workout_exercise_id", [...])` with that full id list.
+PostgREST renders `.in()` into the **request URL**, so a user with a long
+training history overflowed the URL-length limit and the request failed. The
+`muscle_group_id` path happened to narrow the candidate set enough to stay under
+the limit — which is why it alone succeeded.
+
+**Fix (`src/lib/queries/coaching.ts`):**
+- All filters (exclusions, muscle group, **equipment**) are now applied to the
+  candidate set *before* the per-set fan-out, and the equipment filter is matched
+  against `exercises.equipment_type` up front rather than post-hoc.
+- The candidate set is capped to the most-trained `AFFINITY_LIMIT` (60) *before*
+  the heavy queries, since that is all the tool returns anyway.
+- A new `selectInChunks` helper splits every `.in(col, ids)` over ≥1 bounded
+  request (`ID_CHUNK = 150`), so no id list can overflow the URL — the
+  `exercise_feedback` query (the largest list, one row per logged set block) is
+  always chunked. Unit-tested in `coaching-affinity.test.ts`.
+
+### §5.2 — Analytics tools disagree on the same numbers (FIXED)
+
+Confirmed and split into two distinct causes:
+
+1. **`times_trained: 144` vs `session_count: 43`.** `get_exercise_history`
+   truncates to the 120 most-recent *sets* (a UI cap), which deduped to ~43
+   sessions, and reported that as `session_count` — undercounting the lifetime
+   total. `formatExerciseHistory` now reports `session_count` as the **lifetime
+   total** (from `v_exercise_overview.times_trained`, the same definition
+   `analyze_exercise_progress.times_trained` uses), plus `sessions_shown` and a
+   `truncated` flag for the returned window. The two numbers now agree.
+2. **`change_pct` disagreeing across tools and with its own payload.**
+   `analyze_exercise_progress` reported `−15.9%` while showing first e1RM 33 →
+   latest 27 (which is `−18.2%`): `detectStall` computed the percent from the raw
+   e1RM floats but displayed the rounded values. It now computes `change_pct`
+   from the same rounded e1RM it reports, so the payload reconciles with itself.
+   The cross-tool difference is a **legitimate window difference** (lifetime vs
+   meso-scoped), so each tool now carries a `metric_definitions` block naming the
+   window + formula: `analyze_exercise_progress` = lifetime,
+   `get_mesocycle_summary.progress_scores` = within the mesocycle.
+
+### §5.6 — Opaque error serialization (`[object Object]`) (FIXED)
+
+Tool handlers `throw` raw Supabase error objects; the SDK stringifies a thrown
+value with `String()`, so a plain object surfaced as `[object Object]`.
+`envelope.ts` adds `toStructuredError` / `toolError`, and `registerTools` wraps
+every handler at the composition root so any thrown value becomes a structured
+`{ error: { code, message, detail } }` result flagged `isError`. The pure
+`register*` functions stay unwrapped for unit testing.
+
+## Confirmed but staged (next passes)
+
+- **§5.3** propagate `data_quality` + scales legend to every feedback/estimate
+  tool (only `get_mesocycle_summary` has it today).
+- **§5.4** parameterize per-muscle MEV/MAV/MRV and let `get_muscle_balance`
+  assert thresholds (needs `engine_params` + migration work).
+- **§5.5** `explain_prescription` fall back to the latest *historical* decision
+  (note: feedback history before 2026-06-15 was migrated without full feedback,
+  so some emptiness there is expected per the report's editor's note).
+- **§5.7** consistent float rounding across `affinity` / `mesocycle_summary` /
+  `compare_mesocycles`.
+- **§5.8 / §5.9** delete/undo (or `dry_run`) for create/propose tools (respecting
+  the "no deleting logged history" rule) and wiring `search_templates` →
+  `create_mesocycle`.
+- **§5.10 / §5.11 / §5.12** planned-volume projection labeling, rationale/​
+  validation polish, and a data-hygiene advisory.
+
+## Verification (2026-06-18 pass)
+
+- `npm run typecheck`, `npm run lint`, `npm run test` — all green (258 tests).
+- New unit tests: affinity id-chunking (`coaching-affinity.test.ts`),
+  structured-error serialization + the registry error guard
+  (`envelope.test.ts` / `coaching-tools.test.ts`), `detectStall` self-consistent
+  `change_pct` + lifetime `metric_definitions` (`coaching-tools.test.ts`), and
+  `get_exercise_history` lifetime-count/truncation reporting
+  (`read-tools.test.ts`).
+- No schema migration required for this pass (all fixes are query/formatter-level).
+
+---
+
 ## Verification
 
 - `npm run typecheck`, `npm run lint`, `npm run test` — all green (246 tests).

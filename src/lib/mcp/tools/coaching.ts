@@ -71,10 +71,18 @@ export function detectStall(
   const first = points[0];
   const latest = points[points.length - 1];
   const best = Math.max(...points);
+  // e1RM is reported as a whole-number estimate; compute the percent change from
+  // those same rounded values so change_pct reconciles with the first/latest the
+  // payload shows (§5.2 — previously it used the raw floats and disagreed).
+  const firstRounded = Math.round(first);
+  const latestRounded = Math.round(latest);
   // sessions since the best was *first* reached — conveys how long it has held
   const firstBestIdx = points.findIndex((v) => v === best);
   const sessionsSinceBest = points.length - 1 - firstBestIdx;
-  const changePct = first > 0 ? Math.round(((latest - first) / first) * 1000) / 10 : null;
+  const changePct =
+    firstRounded > 0
+      ? Math.round(((latestRounded - firstRounded) / firstRounded) * 1000) / 10
+      : null;
 
   // compare the recent window's best against everything before it: a new best
   // over the prior portion is real progress; matching it is a plateau.
@@ -92,9 +100,9 @@ export function detectStall(
 
   return {
     sessions: points.length,
-    first_e1rm: Math.round(first),
+    first_e1rm: firstRounded,
     best_e1rm: Math.round(best),
-    latest_e1rm: Math.round(latest),
+    latest_e1rm: latestRounded,
     change_pct: changePct,
     sessions_since_best: sessionsSinceBest,
     trend,
@@ -239,11 +247,22 @@ export function formatExerciseAnalysis(
   return {
     exercise_id: exerciseId,
     exercise_name: ov?.exercise_name ?? null,
+    // lifetime distinct training sessions (sessions with a logged working set);
+    // matches get_exercise_history.session_count and get_exercise_affinity.
     times_trained: ov?.times_trained ?? 0,
     last_performed_at: ov?.last_performed_at ?? null,
     weight_pr: ov?.weight_pr ?? null,
     best_e1rm_estimate: ov?.best_e1rm ?? null,
     progress: analysis,
+    // name the window + formula so a coach (and other tools) read the same metric
+    // (§5.2). This is the lifetime span; the meso-scoped change lives on
+    // get_mesocycle_summary.progress_scores.
+    metric_definitions: {
+      change_pct:
+        "(latest e1RM − first e1RM) / first e1RM, over the exercise's whole logged history (Epley e1RM, whole-number estimates)",
+      sessions: "logged sessions with an estimable e1RM, oldest → newest",
+      window: "lifetime",
+    },
     note:
       analysis.stalled && analysis.trend === "plateau"
         ? "e1RM has not set a new best recently — consider a load/technique check or a deload (estimates)."

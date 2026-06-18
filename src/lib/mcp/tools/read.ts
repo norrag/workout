@@ -300,7 +300,14 @@ export function formatMesoSummary(
       last_e1rm_estimate: s.last_e1rm,
       e1rm_change_pct: s.score_pct,
     })),
-    note: "e1RM values are estimates; adherence counts decided days over working (non-deload) weeks.",
+    // name the window so this metric is not confused with the lifetime change on
+    // analyze_exercise_progress (§5.2)
+    metric_definitions: {
+      e1rm_change_pct:
+        "(last e1RM − first e1RM) / first e1RM, within this mesocycle only (first → last logged session of the block)",
+      window: "this mesocycle",
+    },
+    note: "e1RM values are estimates; adherence counts decided days over working (non-deload) weeks. For the lifetime trend of one exercise use analyze_exercise_progress.",
   };
 }
 
@@ -424,11 +431,20 @@ export function formatExerciseHistory(
   exerciseId: string,
   sessions: HistoryEntry[],
   pinnedNote: ExerciseNoteRow | null,
+  totalSessions: number | null = null,
 ): Record<string, unknown> {
+  const shown = sessions.length;
+  // session_count is the lifetime total (matching analyze_exercise_progress
+  // .times_trained); the returned list is the most-recent window, which is
+  // capped, so the two must not be conflated (§5.2).
+  const count = totalSessions ?? shown;
+  const truncated = totalSessions != null && totalSessions > shown;
   return {
     exercise_id: exerciseId,
     pinned_note: pinnedNote?.body ?? null,
-    session_count: sessions.length,
+    session_count: count,
+    sessions_shown: shown,
+    truncated,
     sessions: sessions.map((s) => ({
       performed_on: s.performed_on,
       mesocycle_id: s.mesocycle_id,
@@ -439,7 +455,9 @@ export function formatExerciseHistory(
       reps_at_top: s.reps,
       session_note: s.session_note,
     })),
-    note: "Pinned note = durable context for the movement; session notes = day-to-day observations.",
+    note: truncated
+      ? `Showing the ${shown} most recent of ${count} lifetime sessions (the list is capped). session_count is the lifetime total. Pinned note = durable context; session notes = day-to-day observations.`
+      : "session_count is the lifetime total. Pinned note = durable context for the movement; session notes = day-to-day observations.",
   };
 }
 
@@ -457,11 +475,25 @@ function registerGetExerciseHistory(server: McpServer) {
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [sessions, pinned] = await Promise.all([
+      const [sessions, pinned, overview] = await Promise.all([
         getExerciseHistory(client, userId, exercise_id),
         listPinnedNotes(client, userId, [exercise_id]),
+        client
+          .from("v_exercise_overview")
+          .select("times_trained")
+          .eq("user_id", userId)
+          .eq("exercise_id", exercise_id)
+          .maybeSingle(),
       ]);
-      return jsonResult(formatExerciseHistory(exercise_id, sessions, pinned[0] ?? null));
+      if (overview.error) throw overview.error;
+      return jsonResult(
+        formatExerciseHistory(
+          exercise_id,
+          sessions,
+          pinned[0] ?? null,
+          overview.data?.times_trained ?? null,
+        ),
+      );
     },
   );
 }
