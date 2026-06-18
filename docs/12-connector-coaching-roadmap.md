@@ -58,6 +58,10 @@ goal.
 
 ## Stage 1 — Coaching paradigm + persona in the connector
 
+**Status: landed 2026-06-18** (`src/lib/mcp/server.ts` instructions +
+`workout://coaching-guide` resource in `src/lib/mcp/coaching-guide.ts`). See
+[PROGRESS.md](PROGRESS.md).
+
 **Goal.** Align the assistant with the app's science-based training paradigm so
 it reasons *with* the engine instead of second-guessing it, and so it inherits
 the §9 honesty guardrails.
