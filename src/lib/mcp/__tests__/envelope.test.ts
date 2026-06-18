@@ -5,6 +5,8 @@ import {
   envelope,
   toolResult,
   feedbackCoverage,
+  toStructuredError,
+  toolError,
 } from "../envelope";
 
 describe("envelope", () => {
@@ -33,6 +35,49 @@ describe("toolResult", () => {
     const parsed = JSON.parse(r.content[0].text);
     expect(parsed.units).toBe("kg");
     expect(parsed.data.ok).toBe(true);
+  });
+});
+
+describe("toStructuredError", () => {
+  it("serializes a PostgREST-shaped error object (no more [object Object], §5.6)", () => {
+    const e = toStructuredError({
+      code: "PGRST116",
+      message: "URI too long",
+      details: "the query string exceeded the limit",
+      hint: "use a smaller filter",
+    });
+    expect(e).toEqual({
+      code: "PGRST116",
+      message: "URI too long",
+      detail: "the query string exceeded the limit",
+    });
+  });
+
+  it("serializes a thrown Error with its name as the code", () => {
+    const e = toStructuredError(new TypeError("boom"));
+    expect(e.code).toBe("TypeError");
+    expect(e.message).toBe("boom");
+    expect(e.detail).toBeNull();
+  });
+
+  it("falls back to String() for primitives", () => {
+    expect(toStructuredError("nope")).toEqual({
+      code: "tool_error",
+      message: "nope",
+      detail: null,
+    });
+  });
+});
+
+describe("toolError", () => {
+  it("flags isError and carries a structured error body", () => {
+    const r = toolError({ message: "bad" });
+    expect(r.isError).toBe(true);
+    const parsed = JSON.parse(r.content[0].text);
+    expect(parsed.error.message).toBe("bad");
+    expect((r.structuredContent.error as Record<string, unknown>).message).toBe("bad");
+    // crucially: never the opaque stringified object the SDK would emit
+    expect(r.content[0].text).not.toContain("[object Object]");
   });
 });
 

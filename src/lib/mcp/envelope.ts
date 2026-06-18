@@ -65,6 +65,60 @@ export function toolResult(data: Record<string, unknown>, opts: EnvelopeOpts = {
   };
 }
 
+export interface StructuredError {
+  code: string;
+  message: string;
+  detail: string | null;
+}
+
+/**
+ * Turn an arbitrary thrown value into a structured `{ code, message, detail }`
+ * (MCP tooling review §5.6). The SDK stringifies a thrown error with `String()`,
+ * so throwing a plain Supabase error object surfaced as the opaque
+ * `[object Object]` a consumer can't diagnose. Pure.
+ */
+export function toStructuredError(err: unknown): StructuredError {
+  if (err instanceof Error) {
+    // PostgrestError-shaped values are also Error instances in some clients;
+    // pull the richer fields when present.
+    const e = err as Error & { code?: string; details?: string; hint?: string };
+    return {
+      code: e.code ?? e.name ?? "tool_error",
+      message: e.message,
+      detail: e.details ?? e.hint ?? null,
+    };
+  }
+  if (err && typeof err === "object") {
+    const e = err as {
+      code?: string;
+      message?: string;
+      details?: string;
+      hint?: string;
+      error?: string;
+    };
+    return {
+      code: e.code ?? "tool_error",
+      message: e.message ?? e.error ?? "Unknown tool error",
+      detail: e.details ?? e.hint ?? null,
+    };
+  }
+  return { code: "tool_error", message: String(err), detail: null };
+}
+
+/**
+ * A standard error tool result: a structured `{ error }` body flagged with
+ * `isError` so a consumer never has to parse `[object Object]` (§5.6).
+ */
+export function toolError(err: unknown) {
+  const error = toStructuredError(err);
+  const payload = { error };
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    structuredContent: payload as unknown as Record<string, unknown>,
+    isError: true as const,
+  };
+}
+
 /**
  * Count non-null samples behind a set of averages and express coverage over the
  * expected denominator — the "sample counts/coverage beside every average" the

@@ -144,12 +144,64 @@ function mean(values: number[]): number | null {
   return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
 }
 
+/** How many exercises the affinity profile reports (most-trained first). */
+export const AFFINITY_LIMIT = 60;
+
+/**
+ * PostgREST renders `.in(col, ids)` into the request URL, so an unbounded id
+ * list overflows the URL-length limit and the query fails with an opaque error
+ * (the real cause of the no-arg / equipment affinity breakage, §5.1 — the
+ * `muscle_group_id` path happened to narrow the set enough to stay under it).
+ * Splitting the list into bounded chunks keeps every request well-formed.
+ */
+export const ID_CHUNK = 150;
+
+export async function selectInChunks<T>(
+  ids: string[],
+  run: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const { data, error } = await run(ids.slice(i, i + ID_CHUNK));
+    if (error) throw error;
+    if (data) out.push(...data);
+  }
+  return out;
+}
+
+/**
+ * PostgREST also caps every response at `db.max_rows` (1000 here, see
+ * `supabase/config.toml`), so a single `.in(...)` over a large set silently
+ * drops rows past the cap — which is what made the unfiltered affinity feedback
+ * rollup path-dependent (a popular exercise's `workout_exercises` rows fell past
+ * the cap and read as zero feedback). `fetchAllRows` walks `.range()` windows
+ * until a short page proves exhaustion; the page query MUST carry a stable
+ * `.order(...)` or rows can repeat/skip across windows. Page size must be ≤ the
+ * server cap to make progress.
+ */
+export const PAGE_SIZE = 1000;
+
+export async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 export async function getExerciseAffinity(
   supabase: Client,
   userId: string,
   opts: { muscleGroupId?: string; equipment?: string } = {},
 ): Promise<ExerciseAffinity[]> {
-  // exercises the user has actually trained (frequency / recency / loads)
+  // exercises the user has actually trained (frequency / recency / loads),
+  // most-trained first so the post-filter cap keeps the most relevant movements
   const { data: overview, error: ovError } = await supabase
     .from("v_exercise_overview")
     .select("*")
@@ -158,102 +210,124 @@ export async function getExerciseAffinity(
   if (ovError) throw ovError;
   if (!overview || overview.length === 0) return [];
 
-  let exerciseIds = overview.map((o) => o.exercise_id);
+  const allIds = overview.map((o) => o.exercise_id);
 
-  // optional muscle-group filter (by membership)
-  let muscleLinks: { exercise_id: string; muscle_group_id: string; role: "primary" | "secondary" }[] = [];
-  {
-    const { data: links, error } = await supabase
-      .from("exercise_muscle_groups")
-      .select("exercise_id, muscle_group_id, role")
-      .in("exercise_id", exerciseIds);
-    if (error) throw error;
-    muscleLinks = links ?? [];
-  }
-  if (opts.muscleGroupId) {
-    const inGroup = new Set(
-      muscleLinks
-        .filter((l) => l.muscle_group_id === opts.muscleGroupId)
-        .map((l) => l.exercise_id),
-    );
-    exerciseIds = exerciseIds.filter((id) => inGroup.has(id));
-    if (exerciseIds.length === 0) return [];
-  }
-
-  const [
-    { data: exercises, error: exError },
-    { data: groups, error: mgError },
-    { data: exclusions, error: exclError },
-    { data: notes, error: noteError },
-    { data: prs, error: prError },
-    { data: wes, error: weError },
-  ] = await Promise.all([
-    supabase.from("exercises").select("id, name, equipment_type").in("id", exerciseIds),
+  // exercise-grained metadata needed to filter — bounded by the number of
+  // distinct exercises trained, but chunked so a heavy library can't overflow.
+  const [exercises, muscleLinks, groups, exclusionRows] = await Promise.all([
+    selectInChunks<{ id: string; name: string; equipment_type: string }>(allIds, (c) =>
+      supabase.from("exercises").select("id, name, equipment_type").in("id", c),
+    ),
+    selectInChunks<{ exercise_id: string; muscle_group_id: string; role: "primary" | "secondary" }>(
+      allIds,
+      (c) =>
+        supabase
+          .from("exercise_muscle_groups")
+          .select("exercise_id, muscle_group_id, role")
+          .in("exercise_id", c),
+    ),
     supabase.from("muscle_groups").select("id, name"),
     supabase.from("excluded_exercises").select("exercise_id").eq("user_id", userId),
-    supabase
-      .from("exercise_notes")
-      .select("exercise_id, body")
-      .eq("user_id", userId)
-      .eq("is_pinned", true)
-      .in("exercise_id", exerciseIds),
-    supabase.from("v_exercise_prs").select("exercise_id, best_weight").eq("user_id", userId),
-    supabase
-      .from("workout_exercises")
-      .select("id, exercise_id")
-      .in("exercise_id", exerciseIds),
   ]);
-  if (exError) throw exError;
-  if (mgError) throw mgError;
-  if (exclError) throw exclError;
-  if (noteError) throw noteError;
-  if (prError) throw prError;
-  if (weError) throw weError;
+  if (groups.error) throw groups.error;
+  if (exclusionRows.error) throw exclusionRows.error;
 
-  const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
-  const exerciseById = new Map((exercises ?? []).map((e) => [e.id, e]));
-  const groupNameById = new Map((groups ?? []).map((g) => [g.id, g.name]));
-  const noteByExercise = new Map((notes ?? []).map((n) => [n.exercise_id, n.body]));
-  const bestWeightByExercise = new Map((prs ?? []).map((p) => [p.exercise_id, p.best_weight]));
+  const exerciseById = new Map(exercises.map((e) => [e.id, e]));
+  const groupNameById = new Map((groups.data ?? []).map((g) => [g.id, g.name]));
+  const excluded = new Set((exclusionRows.data ?? []).map((x) => x.exercise_id));
+  const inGroup = opts.muscleGroupId
+    ? new Set(
+        muscleLinks
+          .filter((l) => l.muscle_group_id === opts.muscleGroupId)
+          .map((l) => l.exercise_id),
+      )
+    : null;
+  const equip = opts.equipment?.toLowerCase() ?? null;
 
-  // feedback aggregation: exercise_feedback joins via workout_exercise → exercise
-  const weToExercise = new Map((wes ?? []).map((w) => [w.id, w.exercise_id]));
+  // apply every filter to the candidate set *before* the heavy per-set fan-out,
+  // then cap to the most-trained AFFINITY_LIMIT (the list is already ordered)
+  const exerciseIds = allIds
+    .filter((id) => {
+      if (excluded.has(id)) return false;
+      if (inGroup && !inGroup.has(id)) return false;
+      if (equip && (exerciseById.get(id)?.equipment_type ?? "").toLowerCase() !== equip)
+        return false;
+      return true;
+    })
+    .slice(0, AFFINITY_LIMIT);
+  if (exerciseIds.length === 0) return [];
+  const keep = new Set(exerciseIds);
+
+  // per-exercise extras only for the capped set
+  const [notes, prs] = await Promise.all([
+    selectInChunks<{ exercise_id: string; body: string }>(exerciseIds, (c) =>
+      supabase
+        .from("exercise_notes")
+        .select("exercise_id, body")
+        .eq("user_id", userId)
+        .eq("is_pinned", true)
+        .in("exercise_id", c),
+    ),
+    supabase.from("v_exercise_prs").select("exercise_id, best_weight").eq("user_id", userId),
+  ]);
+  if (prs.error) throw prs.error;
+
+  const noteByExercise = new Map(notes.map((n) => [n.exercise_id, n.body]));
+  const bestWeightByExercise = new Map((prs.data ?? []).map((p) => [p.exercise_id, p.best_weight]));
+
+  // feedback aggregation: exercise_feedback carries no exercise_id, so resolve it
+  // through workout_exercises. Drive this off the (sparse, unique-per-we)
+  // feedback table — paginated so the row cap can't drop rows — and resolve
+  // exercise_id only for the workout_exercises that actually have feedback (a
+  // primary-key lookup, chunked well under the cap). Scanning the full
+  // workout_exercises set instead overflowed the 1000-row cap and made the
+  // rollup path-dependent (a popular exercise read as zero feedback no-arg but
+  // populated when an equipment filter shrank the set).
+  const feedbackRows = await fetchAllRows<{
+    workout_exercise_id: string;
+    joint_pain: number | null;
+    workload: number | null;
+    pump: number | null;
+  }>((from, to) =>
+    supabase
+      .from("exercise_feedback")
+      .select("workout_exercise_id, joint_pain, workload, pump")
+      .eq("user_id", userId)
+      .order("workout_exercise_id")
+      .range(from, to),
+  );
+  const feedbackWeIds = [...new Set(feedbackRows.map((f) => f.workout_exercise_id))];
+  const wes = await selectInChunks<{ id: string; exercise_id: string }>(feedbackWeIds, (c) =>
+    supabase.from("workout_exercises").select("id, exercise_id").in("id", c),
+  );
+  const weToExercise = new Map(wes.map((w) => [w.id, w.exercise_id]));
+
   const feedbackByExercise = new Map<
     string,
     { joint: number[]; workload: number[]; pump: number[]; sessions: number }
   >();
-  if ((wes ?? []).length > 0) {
-    const { data: fb, error: fbError } = await supabase
-      .from("exercise_feedback")
-      .select("workout_exercise_id, joint_pain, workload, pump")
-      .eq("user_id", userId)
-      .in(
-        "workout_exercise_id",
-        (wes ?? []).map((w) => w.id),
-      );
-    if (fbError) throw fbError;
-    for (const row of fb ?? []) {
-      const exId = weToExercise.get(row.workout_exercise_id);
-      if (!exId) continue;
-      const cur = feedbackByExercise.get(exId) ?? {
-        joint: [],
-        workload: [],
-        pump: [],
-        sessions: 0,
-      };
-      cur.sessions += 1;
-      if (row.joint_pain != null) cur.joint.push(row.joint_pain);
-      if (row.workload != null) cur.workload.push(row.workload);
-      if (row.pump != null) cur.pump.push(row.pump);
-      feedbackByExercise.set(exId, cur);
-    }
+  for (const row of feedbackRows) {
+    const exId = weToExercise.get(row.workout_exercise_id);
+    // keep only feedback for the exercises this call actually reports
+    if (!exId || !keep.has(exId)) continue;
+    const cur = feedbackByExercise.get(exId) ?? {
+      joint: [],
+      workload: [],
+      pump: [],
+      sessions: 0,
+    };
+    cur.sessions += 1;
+    if (row.joint_pain != null) cur.joint.push(row.joint_pain);
+    if (row.workload != null) cur.workload.push(row.workload);
+    if (row.pump != null) cur.pump.push(row.pump);
+    feedbackByExercise.set(exId, cur);
   }
 
   return overview
-    .filter((o) => exerciseIds.includes(o.exercise_id) && !excluded.has(o.exercise_id))
+    .filter((o) => keep.has(o.exercise_id))
     .map((o) => {
       const ex = exerciseById.get(o.exercise_id);
-      const fb = feedbackByExercise.get(o.exercise_id);
+      const fbAgg = feedbackByExercise.get(o.exercise_id);
       return {
         exercise_id: o.exercise_id,
         name: ex?.name ?? o.exercise_name,
@@ -268,16 +342,12 @@ export async function getExerciseAffinity(
         total_volume: o.total_volume,
         pinned_note: noteByExercise.get(o.exercise_id) ?? null,
         feedback: {
-          sessions: fb?.sessions ?? 0,
-          avg_joint_pain: mean(fb?.joint ?? []),
-          avg_workload: mean(fb?.workload ?? []),
-          avg_pump: mean(fb?.pump ?? []),
+          sessions: fbAgg?.sessions ?? 0,
+          avg_joint_pain: mean(fbAgg?.joint ?? []),
+          avg_workload: mean(fbAgg?.workload ?? []),
+          avg_pump: mean(fbAgg?.pump ?? []),
         },
       };
-    })
-    .filter((a) => {
-      if (!opts.equipment) return true;
-      return a.equipment_type.toLowerCase() === opts.equipment.toLowerCase();
     });
 }
 

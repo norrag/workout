@@ -360,6 +360,34 @@ describe("formatExerciseHistory", () => {
     expect(out.pinned_note).toBeNull();
     expect(out.session_count).toBe(0);
   });
+
+  it("reports the lifetime total and flags a truncated window (§5.2)", () => {
+    const sessions: HistoryEntry[] = [
+      {
+        mesocycle_id: "m1",
+        meso_name: "Block 1",
+        coordinate: "W2·D1",
+        performed_on: "2026-06-10",
+        top_weight: 225,
+        reps: "8",
+        is_deload: false,
+        session_note: null,
+      },
+    ];
+    const out = formatExerciseHistory("e1", sessions, null, 144);
+    // session_count is the lifetime total (matches analyze_exercise_progress),
+    // sessions_shown is the returned window
+    expect(out.session_count).toBe(144);
+    expect(out.sessions_shown).toBe(1);
+    expect(out.truncated).toBe(true);
+    expect(out.note).toMatch(/most recent/i);
+  });
+
+  it("does not flag truncation when the window covers all sessions", () => {
+    const out = formatExerciseHistory("e1", [], null, 0);
+    expect(out.session_count).toBe(0);
+    expect(out.truncated).toBe(false);
+  });
 });
 
 // --- formatMuscleGroupVolume -----------------------------------------------
