@@ -36,6 +36,7 @@ import {
 import { resolveSession, type McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
+import { registerEditMesocycle } from "./edit";
 
 /**
  * Slice 3 write/planning tools (07 Phase 6, 05 §Write). The model proposes
@@ -651,6 +652,7 @@ function registerDeleteCustomExercise(server: McpServer) {
 export function registerWriteTools(server: McpServer) {
   registerCreateMacrocycle(server);
   registerCreateMesocycle(server);
+  registerEditMesocycle(server);
   registerCreateTemplate(server);
   registerCreateCustomExercise(server);
   registerUpdateMacrocycleGoals(server);

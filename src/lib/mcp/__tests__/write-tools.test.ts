@@ -14,6 +14,7 @@ import {
   DELETE_TEMPLATE,
   DELETE_CUSTOM_EXERCISE,
 } from "../tools/write";
+import { EDIT_MESOCYCLE } from "../tools/edit";
 import { hashArgs } from "../audit";
 import { captureServer, fakeExtra, fakeAuthInfo } from "./harness";
 
@@ -62,6 +63,7 @@ describe("hashArgs", () => {
 const ALL_WRITE_TOOLS = [
   CREATE_MACROCYCLE,
   CREATE_MESOCYCLE,
+  EDIT_MESOCYCLE,
   CREATE_TEMPLATE,
   CREATE_CUSTOM_EXERCISE,
   UPDATE_MACROCYCLE_GOALS,
