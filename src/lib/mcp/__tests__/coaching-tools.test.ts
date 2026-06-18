@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
 import type { VMesoSummaryRow } from "@/lib/types/database";
 import type { RecentSession, ExerciseAffinity, E1rmPoint } from "@/lib/queries/coaching";
 import type { ExerciseOverview } from "@/lib/queries/exercises";
@@ -246,8 +247,12 @@ describe("formatCompareMesos", () => {
 // --- formatMuscleBalance ---------------------------------------------------
 
 describe("formatMuscleBalance", () => {
+  const P = DEFAULT_ENGINE_PARAMS;
+
   it("flags not-found", () => {
-    expect(formatMuscleBalance("m1", null, null).found).toBe(false);
+    expect(
+      formatMuscleBalance("m1", null, null, P, "intermediate").found,
+    ).toBe(false);
   });
 
   it("surfaces split, per-muscle sets, and an advisory note", () => {
@@ -258,7 +263,7 @@ describe("formatMuscleBalance", () => {
       bars: [{ name: "Chest", avg: 12 }],
       note: "Reasonably balanced.",
     };
-    const out = formatMuscleBalance("m1", balance, "Week 3 of 5");
+    const out = formatMuscleBalance("m1", balance, "Week 3 of 5", P, "intermediate");
     expect(out.found).toBe(true);
     expect(out.split).toMatchObject({ push: 40, legs: 50 });
     expect((out.weekly_sets_per_muscle as Record<string, unknown>[])[0]).toMatchObject({
@@ -266,6 +271,67 @@ describe("formatMuscleBalance", () => {
       avg_weekly_sets: 12,
     });
     expect(out.note).toMatch(/advisory only/i);
+  });
+
+  it("asserts MEV/MAV/MRV zones per muscle (§5.4)", () => {
+    const balance: MesoBalance = {
+      push: 4,
+      pull: 0,
+      legs: 0,
+      // chest 4 sets is under the intermediate MEV (8); biceps 30 over MRV (26)
+      bars: [
+        { name: "chest", avg: 4 },
+        { name: "biceps", avg: 30 },
+        { name: "back", avg: 15 },
+      ],
+      note: "Push : pull skewed.",
+    };
+    const out = formatMuscleBalance("m1", balance, null, P, "intermediate");
+    const muscles = out.weekly_sets_per_muscle as Record<string, unknown>[];
+    const byName = new Map(muscles.map((m) => [m.muscle_group as string, m]));
+
+    expect((byName.get("chest")!.landmark as Record<string, unknown>).zone).toBe("below_mev");
+    expect((byName.get("biceps")!.landmark as Record<string, unknown>).zone).toBe("above_mrv");
+    expect((byName.get("back")!.landmark as Record<string, unknown>).zone).toBe("optimal");
+    expect(out.advisory).toMatch(/Below MEV.*chest/i);
+    expect(out.advisory).toMatch(/Above MRV.*biceps/i);
+    expect(out.landmarks_legend).toBeTruthy();
+  });
+
+  it("scales the band down for a beginner", () => {
+    const balance: MesoBalance = {
+      push: 0,
+      pull: 0,
+      legs: 0,
+      bars: [{ name: "chest", avg: 6 }],
+      note: "",
+    };
+    // chest MEV 8 at intermediate, 8*0.7≈6 at beginner → 6 sets is at the floor,
+    // below_mev for intermediate but optimal for a beginner
+    const inter = formatMuscleBalance("m1", balance, null, P, "intermediate");
+    const beg = formatMuscleBalance("m1", balance, null, P, "beginner");
+    const interZone = (
+      (inter.weekly_sets_per_muscle as Record<string, unknown>[])[0]
+        .landmark as Record<string, unknown>
+    ).zone;
+    const begZone = (
+      (beg.weekly_sets_per_muscle as Record<string, unknown>[])[0]
+        .landmark as Record<string, unknown>
+    ).zone;
+    expect(interZone).toBe("below_mev");
+    expect(begZone).toBe("optimal");
+  });
+
+  it("leaves unparameterized muscles (traps) with a null landmark", () => {
+    const balance: MesoBalance = {
+      push: 0,
+      pull: 10,
+      legs: 0,
+      bars: [{ name: "traps", avg: 10 }],
+      note: "",
+    };
+    const out = formatMuscleBalance("m1", balance, null, P, "intermediate");
+    expect((out.weekly_sets_per_muscle as Record<string, unknown>[])[0].landmark).toBeNull();
   });
 });
 

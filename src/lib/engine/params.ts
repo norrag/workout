@@ -288,6 +288,39 @@ export const engineParamsSchema = z.object({
       selection: z.enum(["frequency"]),
     })
     .default({ n: 5, selection: "frequency" }),
+
+  // §2 weekly-set volume landmarks (MEV / MAV_high / MRV). The dose-response
+  // band (~10–20 hard sets/muscle/week) is evidenced; the per-muscle numbers
+  // are heuristic RP/Israetel starting points (10 §2/§8 — tunable, not gospel).
+  // Stored as `[MEV, MAV_high, MRV]` direct-equivalent weekly sets for an
+  // *intermediate*; `experience_scale` shifts the whole band by training level
+  // (beginners start lower with a lower ceiling). Keyed by the app's
+  // muscle-group names (spec's "delts" → "shoulders"). Added with `.default()`
+  // so rows predating it still parse; an admin can tune via propose_engine_params.
+  volume: z
+    .object({
+      landmarks: z.record(z.string(), z.tuple([z.number(), z.number(), z.number()])),
+      experience_scale: z.object({
+        beginner: z.number().positive(),
+        intermediate: z.number().positive(),
+        advanced: z.number().positive(),
+      }),
+    })
+    .default({
+      landmarks: {
+        back: [10, 22, 25],
+        chest: [8, 20, 22],
+        quads: [8, 18, 20],
+        hamstrings: [6, 16, 20],
+        glutes: [4, 16, 20],
+        shoulders: [8, 20, 26],
+        biceps: [6, 20, 26],
+        triceps: [6, 18, 24],
+        calves: [6, 16, 20],
+        abs: [4, 16, 25],
+      },
+      experience_scale: { beginner: 0.7, intermediate: 1.0, advanced: 1.1 },
+    }),
 });
 
 export type EngineParams = z.infer<typeof engineParamsSchema>;

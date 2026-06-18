@@ -2,6 +2,8 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ProfileRow, VMesoSummaryRow } from "@/lib/types/database";
+import { assessMuscleVolume, type EngineParams, type ExperienceLevel } from "@/lib/engine";
+import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getMesoProgressScores, getMesoStats, type MesoBalance } from "@/lib/queries/stats";
@@ -383,21 +385,62 @@ export function formatMuscleBalance(
   mesocycleId: string,
   balance: MesoBalance | null,
   contextLine: string | null,
+  params: EngineParams,
+  experience: ExperienceLevel,
 ): Record<string, unknown> {
   if (!balance) {
     return { found: false, mesocycle_id: mesocycleId, summary: "No meso visible for that id." };
   }
+
+  // §5.4: assert each muscle against its experience-scaled MEV/MAV/MRV band so
+  // the tool can say a muscle is *below maintenance volume*, not only flag
+  // relative imbalance. Heuristic + advisory (10 §9).
+  const perMuscle = balance.bars.map((b) => {
+    const lm = assessMuscleVolume(params, b.name, b.avg, experience);
+    return {
+      muscle_group: b.name,
+      avg_weekly_sets: b.avg,
+      landmark: lm
+        ? {
+            mev: lm.mev,
+            mav: lm.mav,
+            mrv: lm.mrv,
+            zone: lm.zone,
+            note: lm.note,
+          }
+        : null,
+    };
+  });
+
+  const belowMev = perMuscle
+    .filter((m) => m.landmark?.zone === "below_mev")
+    .map((m) => m.muscle_group);
+  const aboveMrv = perMuscle
+    .filter((m) => m.landmark?.zone === "above_mrv")
+    .map((m) => m.muscle_group);
+
+  // append the absolute-threshold read to the relative-balance advisory
+  const advisoryParts = [balance.note];
+  if (belowMev.length > 0)
+    advisoryParts.push(`Below MEV (likely under-stimulated): ${belowMev.join(", ")}.`);
+  if (aboveMrv.length > 0)
+    advisoryParts.push(`Above MRV (likely beyond recovery): ${aboveMrv.join(", ")}.`);
+
   return {
     found: true,
     mesocycle_id: mesocycleId,
     context: contextLine,
+    experience_level: experience,
     split: { push: balance.push, pull: balance.pull, legs: balance.legs },
-    weekly_sets_per_muscle: balance.bars.map((b) => ({
-      muscle_group: b.name,
-      avg_weekly_sets: b.avg,
-    })),
-    advisory: balance.note,
-    note: "Advisory only (10 §9): push/pull/legs balance is a guide, not a rule. MEV/MAV/MRV landmarks are not yet parameterized, so no per-muscle threshold is asserted.",
+    weekly_sets_per_muscle: perMuscle,
+    advisory: advisoryParts.join(" "),
+    landmarks_legend: {
+      basis: `weekly direct-equivalent sets vs MEV/MAV/MRV, scaled for an ${experience} lifter`,
+      mev: "minimum effective volume (productive floor)",
+      mav: "maximum adaptive volume (top of the productive work zone)",
+      mrv: "maximum recoverable volume (ceiling)",
+    },
+    note: "Advisory only (10 §9): push/pull/legs balance and MEV/MAV/MRV landmarks are heuristic, tunable starting points with large individual variance — a guide to weak points, not a hard prescription.",
   };
 }
 
@@ -415,12 +458,20 @@ function registerGetMuscleBalance(server: McpServer) {
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const stats = await getMesoStats(client, userId, mesocycle_id);
+      const [stats, profile, { params }] = await Promise.all([
+        getMesoStats(client, userId, mesocycle_id),
+        getProfile(client, userId),
+        getActiveEngineParams(client),
+      ]);
+      const experience = (profile?.experience_level ??
+        "intermediate") as ExperienceLevel;
       return jsonResult(
         formatMuscleBalance(
           mesocycle_id,
           stats?.balance ?? null,
           stats?.contextLine ?? null,
+          params,
+          experience,
         ),
       );
     },
