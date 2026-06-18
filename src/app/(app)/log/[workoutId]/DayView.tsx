@@ -724,6 +724,29 @@ function ExerciseBlock({
           {skipped ? " · SKIPPED" : ""}
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            aria-label={`${we.exercise_name} note`}
+            className={iconBtn}
+            onClick={() => onNote("menu")}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <path
+                d="M2.5 1.5h6L11.5 4.5v8h-9z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M4.5 6.5h5M4.5 9h5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
           <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={onHistory}>
             <svg width="14" height="14" viewBox="0 0 14 14">
               <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
