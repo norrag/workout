@@ -475,7 +475,7 @@ function registerGetExerciseHistory(server: McpServer) {
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [sessions, pinned, overview] = await Promise.all([
+      const [sessions, pinned, overview, profile] = await Promise.all([
         getExerciseHistory(client, userId, exercise_id),
         listPinnedNotes(client, userId, [exercise_id]),
         client
@@ -484,6 +484,7 @@ function registerGetExerciseHistory(server: McpServer) {
           .eq("user_id", userId)
           .eq("exercise_id", exercise_id)
           .maybeSingle(),
+        getProfile(client, userId),
       ]);
       if (overview.error) throw overview.error;
       return jsonResult(
@@ -493,6 +494,17 @@ function registerGetExerciseHistory(server: McpServer) {
           pinned[0] ?? null,
           overview.data?.times_trained ?? null,
         ),
+        {
+          units: profile?.units ?? null,
+          dataQuality: {
+            samples: {
+              sessions_shown: sessions.length,
+              lifetime_sessions: overview.data?.times_trained ?? null,
+            },
+            estimates:
+              "top_weight × reps drive Epley e1RM elsewhere; per-session rows here are logged actuals, not estimates",
+          },
+        },
       );
     },
   );

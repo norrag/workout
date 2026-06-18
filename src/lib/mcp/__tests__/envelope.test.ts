@@ -5,6 +5,7 @@ import {
   envelope,
   toolResult,
   feedbackCoverage,
+  scaleLegend,
   toStructuredError,
   toolError,
 } from "../envelope";
@@ -78,6 +79,20 @@ describe("toolError", () => {
     expect((r.structuredContent.error as Record<string, unknown>).message).toBe("bad");
     // crucially: never the opaque stringified object the SDK would emit
     expect(r.content[0].text).not.toContain("[object Object]");
+  });
+});
+
+describe("scaleLegend", () => {
+  it("returns only the requested scales (§5.3)", () => {
+    const legend = scaleLegend("overall_fatigue", "effort_rating", "performance_rating");
+    expect(legend).toEqual({
+      overall_fatigue: FEEDBACK_SCALES.overall_fatigue,
+      effort_rating: FEEDBACK_SCALES.effort_rating,
+      performance_rating: FEEDBACK_SCALES.performance_rating,
+    });
+    // does not leak scales the tool never reports
+    expect(legend).not.toHaveProperty("joint_pain");
+    expect(legend).not.toHaveProperty("pump");
   });
 });
 
