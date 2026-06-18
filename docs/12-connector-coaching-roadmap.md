@@ -131,6 +131,11 @@ from a genuine deficit.
 
 ## Stage 3 — Analysis comparability upgrade
 
+**Status: landed 2026-06-18** (`src/lib/analysis/comparability.ts` pure
+analysers + `getExerciseSessions` enriched reader in
+`src/lib/queries/coaching.ts`; rebuilt `analyze_exercise_progress`). See
+[PROGRESS.md](PROGRESS.md).
+
 **Goal.** Fix the false-stall class of bug (the curl) by making single-exercise
 analysis compare like with like. This is the highest-accuracy-per-effort stage.
 
