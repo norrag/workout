@@ -456,6 +456,29 @@ describe("formatMuscleGroupVolume", () => {
     const weeks = groups[0].weeks as Record<string, unknown>[];
     expect(weeks.map((w) => w.week_number)).toEqual([1, 2]);
   });
+
+  it("labels weeks past generation as not_yet_generated, not zero (§5.10)", () => {
+    // a 5-week meso where only weeks 1–3 of chest have been generated
+    const rows: VMesoWeekSetsRow[] = [1, 2, 3].map((week_number) => ({
+      user_id: "u1",
+      mesocycle_id: "m1",
+      week_number,
+      is_deload: false,
+      muscle_group_id: "g1",
+      muscle_group: "Chest",
+      planned_sets: 10,
+      logged_sets: week_number === 3 ? 0 : 10,
+    }));
+    const out = formatMuscleGroupVolume("m1", rows, 5) as Record<string, unknown>;
+    expect(out.weeks_total).toBe(5);
+    expect(out.weeks_generated).toEqual([1, 2, 3]);
+    const weeks = (out.groups as Record<string, unknown>[])[0].weeks as Record<string, unknown>[];
+    expect(weeks).toHaveLength(5);
+    expect(weeks[0].status).toBe("logged"); // logged > 0
+    expect(weeks[2].status).toBe("planned"); // generated, nothing logged yet
+    expect(weeks[3]).toMatchObject({ status: "not_yet_generated", planned_sets: null, logged_sets: 0 });
+    expect(weeks[4].status).toBe("not_yet_generated");
+  });
 });
 
 // --- formatExerciseSearch / Templates / Notes / Exclusions -----------------

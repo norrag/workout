@@ -243,9 +243,9 @@ scientific-credibility and polish tiers are staged for a later session.
 | §5.7 | unrounded float noise | 🟡 | ✅ Done |
 | §5.8 | no delete/undo for create/propose | 🟡 | ✅ Done (respects no-delete-logged rule) |
 | §5.9 | `search_templates` dead-ends | 🟡 | ✅ Done |
-| §5.10 | incomplete planned-volume across weeks | 🟢 | ⏳ Staged |
-| §5.11 | rationale / validation polish | 🟢 | ⏳ Staged |
-| §5.12 | data-hygiene advisory | 🟢 | ⏳ Staged |
+| §5.10 | incomplete planned-volume across weeks | 🟢 | ✅ Done |
+| §5.11 | rationale / validation polish | 🟢 | ✅ Done |
+| §5.12 | data-hygiene advisory | 🟢 | ✅ Done |
 
 ## Critical / "Now" — fixed in this pass
 
@@ -451,10 +451,59 @@ in-app start-from-template flow uses, so exclusions and structure behave
 identically). `search_templates`' description + payload `note` now point at that
 execution path.
 
-## Confirmed but staged (next pass — 🟢 Low polish)
+## Low tier (🟢 polish) — fixed in this pass (2026-06-18)
 
-- **§5.10 / §5.11 / §5.12** planned-volume projection labeling, rationale/​
-  validation polish, and a data-hygiene advisory.
+The three 🟢 Low findings, completing the review. All query/formatter/engine
+changes are unit-tested; no schema change.
+
+### §5.10 — Planned-volume labeled across the full meso (FIXED)
+
+`get_muscle_group_volume` read straight off `v_meso_week_sets`, which only has
+rows for **generated** workouts — and the engine autoregulates forward, so
+mid-meso some groups had weeks 1–4 while others had 1–3, with the gap silently
+absent (it read like a real zero-volume week). `formatMuscleGroupVolume` now
+takes the meso's total `weeks` and emits a row for **every** week 1…weeks_total
+per group: generated weeks carry `status: "logged" | "planned"`, and weeks past
+generation are explicit `status: "not_yet_generated"` with `planned_sets: null`.
+Adds `weeks_total`, `weeks_generated`, and a note so an uneven mid-meso picture
+reads as "not built yet," not a zero.
+
+### §5.11 — Rationale & validation polish (FIXED)
+
+- **"close miss" wording.** `assessPerformance` lumped two situations into
+  `small_miss`: a genuine reps-short miss, *and* reps met/beaten but at a lower
+  RIR than target (harder than prescribed). Both hold the load, but the engine
+  worded both as "close miss" — wrong for the second. Added a pure `repsMet`
+  flag to the assessment; `prescribe()` now words the reps-met case "hold load,
+  hit reps but below target RIR" and keeps "close miss" only for an actual
+  reps-short miss. **Engine behavior is unchanged** (load/reps/sets identical;
+  only the derived rationale string differs) — all golden/prescribe tests stay
+  green, with a new case asserting the corrected wording.
+- **Validation detail.** `simulate_prescriptions` returned a bare
+  `"invalid engine inputs"`; it now attaches the zod `issues` (`path` +
+  `message`) per rejected case so an admin sees which input is wrong.
+
+### §5.12 — Data-hygiene advisory (FIXED)
+
+New read tool `check_data_hygiene` surfaces the data-shape anomalies the
+connector previously returned without comment: a macrocycle whose stored
+`duration_months` differs from the engine's recommendation (live-recomputed via
+`planForMacro`), duplicate mesocycle names within a macro, and unplanned
+placeholders still on the `days_per_week = 1` storage default. A pure
+`detectDataHygiene` returns advisory `{ kind, severity, subject, detail }` flags
+(framed as advisory, never auto-corrected). The "all feedback = 2" heuristic was
+intentionally **omitted**: feedback before 2026-06-15 was migrated without it
+(the editor's note), so equal early values are expected and flagging them would
+be noise.
+
+## Verification (2026-06-18 — Low tier pass)
+
+- `npm run typecheck`, `npm run lint`, `npx vitest run` — all green (298 tests).
+- New unit tests: `not_yet_generated` week labeling (`read-tools.test.ts`); the
+  reps-met-but-below-RIR wording, behavior unchanged (`prescribe.test.ts`); and
+  `detectDataHygiene` flags + clean/null-duration cases + `check_data_hygiene`
+  registration (`coaching-tools.test.ts`).
+- No schema migration (all fixes are query/formatter/engine-rationale level).
 
 ## Verification (2026-06-18 — Medium tier pass)
 

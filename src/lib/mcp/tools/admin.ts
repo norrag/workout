@@ -580,7 +580,17 @@ function registerSimulatePrescriptions(server: McpServer) {
       const results = args.cases.map((c, index) => {
         const parsed = engineInputsSchema.safeParse(c);
         if (!parsed.success) {
-          return { case_index: index, ok: false, error: "invalid engine inputs" };
+          // field-level detail so an admin can see *which* input is wrong, not
+          // just "invalid engine inputs" (§5.11)
+          return {
+            case_index: index,
+            ok: false,
+            error: "invalid engine inputs",
+            issues: parsed.error.issues.map((i) => ({
+              path: i.path.join("."),
+              message: i.message,
+            })),
+          };
         }
         try {
           const output = prescribe(parsed.data, params.resolved!);

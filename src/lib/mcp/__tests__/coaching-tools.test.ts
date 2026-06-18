@@ -12,6 +12,8 @@ import {
   formatCompareMesos,
   formatMuscleBalance,
   formatAffinity,
+  detectDataHygiene,
+  type HygieneMacroInput,
   registerCoachingTools,
   GET_TRAINING_OVERVIEW,
   GET_RECENT_SESSIONS,
@@ -19,6 +21,7 @@ import {
   COMPARE_MESOCYCLES,
   GET_MUSCLE_BALANCE,
   GET_EXERCISE_AFFINITY,
+  CHECK_DATA_HYGIENE,
 } from "../tools/coaching";
 import { registerTools } from "../tools";
 import { captureServer, fakeExtra } from "./harness";
@@ -409,6 +412,62 @@ describe("formatAffinity", () => {
   });
 });
 
+// --- detectDataHygiene (§5.12) ---------------------------------------------
+
+describe("detectDataHygiene", () => {
+  it("flags duration mismatch, duplicate meso names, and placeholder defaults", () => {
+    const macros: HygieneMacroInput[] = [
+      {
+        id: "M1",
+        name: "May–Jun 2026",
+        duration_months: 6,
+        recommended_duration_months: 4,
+        mesos: [
+          { id: "m1", name: "Mesocycle 5", status: "completed", days_per_week: 4 },
+          { id: "m2", name: "Mesocycle 5", status: "planned", days_per_week: 4 },
+          { id: "m3", name: "Mesocycle 6", status: "unplanned", days_per_week: 1 },
+        ],
+      },
+    ];
+    const flags = detectDataHygiene(macros);
+    const kinds = flags.map((f) => f.kind);
+    expect(kinds).toContain("macro_duration_mismatch");
+    expect(kinds).toContain("duplicate_meso_names");
+    expect(kinds).toContain("unplanned_days_per_week_default");
+    const dup = flags.find((f) => f.kind === "duplicate_meso_names")!;
+    expect(dup.detail).toContain("Mesocycle 5");
+  });
+
+  it("returns nothing for clean cycles", () => {
+    const macros: HygieneMacroInput[] = [
+      {
+        id: "M1",
+        name: "Clean",
+        duration_months: 4,
+        recommended_duration_months: 4,
+        mesos: [
+          { id: "m1", name: "Block 1", status: "active", days_per_week: 4 },
+          { id: "m2", name: "Block 2", status: "planned", days_per_week: 4 },
+        ],
+      },
+    ];
+    expect(detectDataHygiene(macros)).toEqual([]);
+  });
+
+  it("does not flag a duration the user left to the engine (null)", () => {
+    const flags = detectDataHygiene([
+      {
+        id: "M1",
+        name: "Engine-sized",
+        duration_months: null,
+        recommended_duration_months: 4,
+        mesos: [],
+      },
+    ]);
+    expect(flags).toEqual([]);
+  });
+});
+
 // --- registration ----------------------------------------------------------
 
 describe("coaching-tool registration", () => {
@@ -422,6 +481,7 @@ describe("coaching-tool registration", () => {
       COMPARE_MESOCYCLES,
       GET_MUSCLE_BALANCE,
       GET_EXERCISE_AFFINITY,
+      CHECK_DATA_HYGIENE,
     ]) {
       expect(tools.has(name), name).toBe(true);
     }

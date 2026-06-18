@@ -7,6 +7,13 @@ export interface PerformanceAssessment {
   workingSetCount: number;
   /** met = hit prescribed reps at/under target RIR; beat = exceeded them */
   outcome: "met" | "beat" | "small_miss" | "big_miss" | "no_data";
+  /**
+   * whether the prescribed reps were met (or exceeded). A `small_miss` can be
+   * either a genuine reps-short miss (false) or reps met/beaten but at a lower
+   * RIR than target — i.e. harder than prescribed — (true); they hold the load
+   * for different reasons, so the rationale wording differs (§5.11).
+   */
+  repsMet: boolean;
   detail: string;
 }
 
@@ -25,6 +32,7 @@ export function assessPerformance(
       bestReps: null,
       workingSetCount: working.length,
       outcome: "no_data",
+      repsMet: false,
       detail: "no logged history for this exercise",
     };
   }
@@ -42,6 +50,7 @@ export function assessPerformance(
       bestReps: best.reps,
       workingSetCount: working.length,
       outcome: "met",
+      repsMet: true,
       detail: `did ${best.weight}×${best.reps} with no rep target`,
     };
   }
@@ -68,6 +77,7 @@ export function assessPerformance(
     bestReps: best.reps,
     workingSetCount: working.length,
     outcome,
+    repsMet: repDelta >= 0,
     detail: `did ${best.weight}×${best.reps}${rirNote} vs ${inputs.previous.weight ?? "?"}×${prescribedReps} prescribed at ${targetRir} RIR`,
   };
 }

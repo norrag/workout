@@ -528,31 +528,67 @@ function registerGetExerciseHistory(server: McpServer) {
 export function formatMuscleGroupVolume(
   mesocycleId: string,
   rows: VMesoWeekSetsRow[],
+  weeksTotal: number | null = null,
 ): Record<string, unknown> {
   const byGroup = new Map<
     string,
-    { name: string; weeks: { week_number: number; planned_sets: number | null; logged_sets: number; is_deload: boolean }[] }
+    {
+      name: string;
+      weeks: Map<number, { planned_sets: number | null; logged_sets: number; is_deload: boolean }>;
+    }
   >();
+  // weeks that actually have a generated workout (any group) — the engine
+  // autoregulates forward, so later weeks may not exist yet (§5.10)
+  const generatedWeeks = new Set<number>();
   for (const r of rows) {
+    generatedWeeks.add(r.week_number);
     const key = r.muscle_group_id ?? "unassigned";
     const name = r.muscle_group ?? "Unassigned";
-    const entry = byGroup.get(key) ?? { name, weeks: [] };
-    entry.weeks.push({
-      week_number: r.week_number,
+    const entry = byGroup.get(key) ?? { name, weeks: new Map() };
+    entry.weeks.set(r.week_number, {
       planned_sets: r.planned_sets,
       logged_sets: r.logged_sets,
       is_deload: r.is_deload,
     });
     byGroup.set(key, entry);
   }
+  const maxGenerated = generatedWeeks.size > 0 ? Math.max(...generatedWeeks) : 0;
+  // the week span to report: the meso's full planned length when known, else
+  // however far generation has reached
+  const span = Math.max(weeksTotal ?? 0, maxGenerated);
+
   return {
     mesocycle_id: mesocycleId,
+    weeks_total: weeksTotal,
+    weeks_generated: [...generatedWeeks].sort((a, b) => a - b),
     groups: [...byGroup.values()]
       .map((g) => ({
         muscle_group: g.name,
-        weeks: g.weeks.sort((a, b) => a.week_number - b.week_number),
+        weeks: Array.from({ length: span }, (_, i) => i + 1).map((week_number) => {
+          const cell = g.weeks.get(week_number);
+          if (!cell) {
+            // explicit so an uneven mid-meso picture reads as "not built yet",
+            // not as a real zero-volume week (§5.10)
+            return {
+              week_number,
+              planned_sets: null,
+              logged_sets: 0,
+              is_deload: false,
+              status: "not_yet_generated" as const,
+            };
+          }
+          return {
+            week_number,
+            planned_sets: cell.planned_sets,
+            logged_sets: cell.logged_sets,
+            is_deload: cell.is_deload,
+            status: cell.logged_sets > 0 ? ("logged" as const) : ("planned" as const),
+          };
+        }),
       }))
       .sort((a, b) => a.muscle_group.localeCompare(b.muscle_group)),
+    note:
+      "Planned sets exist only for weeks the engine has already generated; the engine autoregulates forward, so weeks past weeks_generated show status not_yet_generated (planned_sets null) rather than a real zero.",
   };
 }
 
@@ -565,18 +601,28 @@ function registerGetMuscleGroupVolume(server: McpServer) {
       description:
         "Weekly hard sets per muscle group for a mesocycle — planned (from the " +
         "autoregulated plan) vs actually logged, per week, with deload weeks " +
-        "flagged. The volume picture behind the meso.",
+        "flagged. Weeks the engine hasn't generated yet are marked " +
+        "not_yet_generated (it autoregulates forward). The volume picture behind the meso.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const { data, error } = await client
-        .from("v_meso_week_sets")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("mesocycle_id", mesocycle_id);
+      const [{ data, error }, { data: meso, error: mesoError }] = await Promise.all([
+        client
+          .from("v_meso_week_sets")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("mesocycle_id", mesocycle_id),
+        client
+          .from("mesocycles")
+          .select("weeks")
+          .eq("id", mesocycle_id)
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ]);
       if (error) throw error;
-      return jsonResult(formatMuscleGroupVolume(mesocycle_id, data ?? []));
+      if (mesoError) throw mesoError;
+      return jsonResult(formatMuscleGroupVolume(mesocycle_id, data ?? [], meso?.weeks ?? null));
     },
   );
 }

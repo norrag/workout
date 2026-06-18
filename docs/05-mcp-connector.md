@@ -35,7 +35,7 @@ The MCP connector lets users plug their training data into the LLM of their choi
 | `get_current_state` | active macro → meso → micro → next workout, with targets |
 | `get_macrocycles` / `get_mesocycle` | cycle structures, goals, status, RIR ramps |
 | `get_exercise_history` | time series for an exercise (weights, reps, volume, e1RM, feedback) with date-range / cycle filters; includes both **note kinds** (see Notes below) — the exercise's pinned note and the per-session log notes |
-| `get_muscle_group_volume` | weekly volume per muscle group |
+| `get_muscle_group_volume` | weekly planned-vs-logged volume per muscle group across the full meso; weeks the engine hasn't generated yet are labeled `not_yet_generated` (it autoregulates forward) rather than read as zero (review §5.10) |
 | `get_meso_summary` | per-meso rollup: adherence, progression achieved, feedback patterns, progress score |
 | `get_macro_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
 | `search_exercises` / `search_templates` | library queries with the same filters the UI uses |
@@ -57,6 +57,7 @@ guardrails (estimates labeled, pump/soreness secondary, balance advisory-only).
 | `get_muscle_balance` | weekly sets per muscle group vs MEV/MAV/MRV landmarks + push/pull/legs split with weak-point flags — **advisory only** (10 §9) |
 | `get_exercise_affinity` | **exercise-selection profile** per muscle group / equipment type: which movements the user actually trains (frequency, recency, recent loads & volume), each joined with its **pinned note** and **aggregated session feedback** (mean joint pain, workload, pump). Surfaces what the user relies on and tolerates well vs. what their notes/feedback flag — so recommendations and planning favor proven, well-received movements and steer clear of injury-sensitive or poorly-tolerated ones. Read over `logged_sets` × `exercise_muscle_groups` × `exercise_notes` × `exercise_feedback`; respects exclusions |
 | `get_exercise_notes` / `get_exclusions` | durable context: pinned notes across the library and the user's excluded movements with reasons |
+| `check_data_hygiene` | advisory flags for data-shape anomalies in the user's cycles — a macro duration that differs from the engine's recommendation, duplicate meso names within a macro, unplanned placeholders still on the `days_per_week = 1` default — so a coaching layer can gently surface (never silently "fix") them (review §5.12) |
 
 **Why selection history matters.** Prior exercise selection is itself a strong prior: an exercise
 the user has chosen repeatedly, loaded well, and left no pain/"felt off" notes on is a safe

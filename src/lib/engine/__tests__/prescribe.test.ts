@@ -94,6 +94,22 @@ describe("prescribe — performance delta (§3)", () => {
     expect(out.rationale).toMatch(/close miss/);
   });
 
+  it("reps met but at a lower RIR than target: holds load, worded as not a miss (§5.11)", () => {
+    const out = prescribe(
+      baseInputs({
+        // hit the prescribed 8 reps but at 1 RIR vs the 3 RIR target — harder
+        // than prescribed, so the load holds; this is NOT a missed-reps set
+        actualSets: [
+          { setNumber: 1, weight: 100, reps: 8, rirReported: 1, isWarmup: false },
+        ],
+      }),
+      params,
+    );
+    expect(out.weight).toBe(100);
+    expect(out.rationale).toMatch(/hit reps but below target RIR/);
+    expect(out.rationale).not.toMatch(/close miss/);
+  });
+
   it("big miss: regresses load by regression_pct", () => {
     const out = prescribe(
       baseInputs({

@@ -5,7 +5,8 @@ import type { ProfileRow, VMesoSummaryRow } from "@/lib/types/database";
 import { assessMuscleVolume, type EngineParams, type ExperienceLevel } from "@/lib/engine";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
-import { getCurrentState } from "@/lib/queries/cycles";
+import { getCurrentState, getCyclesOverview } from "@/lib/queries/cycles";
+import { planForMacro } from "@/lib/queries/macro";
 import { getMesoProgressScores, getMesoStats, type MesoBalance } from "@/lib/queries/stats";
 import { getExerciseOverview, type ExerciseOverview } from "@/lib/queries/exercises";
 import {
@@ -605,6 +606,139 @@ function registerGetExerciseAffinity(server: McpServer) {
   );
 }
 
+// --- check_data_hygiene (§5.12) --------------------------------------------
+
+export interface HygieneFlag {
+  kind:
+    | "macro_duration_mismatch"
+    | "duplicate_meso_names"
+    | "unplanned_days_per_week_default";
+  severity: "warning" | "info";
+  subject_id: string | null;
+  subject: string;
+  detail: string;
+}
+
+export interface HygieneMacroInput {
+  id: string;
+  name: string;
+  duration_months: number | null;
+  /** the engine's recommended duration for this macro's goal + profile */
+  recommended_duration_months: number | null;
+  mesos: { id: string; name: string; status: string; days_per_week: number | null }[];
+}
+
+/**
+ * Detect the data-shape anomalies the connector faithfully returns without
+ * comment (review §5.12): a macro whose stored duration differs from what the
+ * engine would recommend, duplicate mesocycle names within a macro, and
+ * unplanned placeholders still reporting the `days_per_week = 1` storage
+ * default. Advisory, not errors — a coaching layer should gently surface them.
+ * Pure. (The "all feedback = 2" heuristic is intentionally omitted: feedback
+ * before 2026-06-15 was migrated without it, so equal early values are expected
+ * — the report's editor note — and flagging them would be noise.)
+ */
+export function detectDataHygiene(macros: HygieneMacroInput[]): HygieneFlag[] {
+  const flags: HygieneFlag[] = [];
+  for (const m of macros) {
+    if (
+      m.duration_months != null &&
+      m.recommended_duration_months != null &&
+      m.duration_months !== m.recommended_duration_months
+    ) {
+      flags.push({
+        kind: "macro_duration_mismatch",
+        severity: "info",
+        subject_id: m.id,
+        subject: m.name,
+        detail: `duration is ${m.duration_months} month(s); the engine recommends ${m.recommended_duration_months} for this goal and profile.`,
+      });
+    }
+
+    const counts = new Map<string, { name: string; n: number }>();
+    for (const meso of m.mesos) {
+      const key = meso.name.trim().toLowerCase();
+      const cur = counts.get(key) ?? { name: meso.name, n: 0 };
+      cur.n += 1;
+      counts.set(key, cur);
+    }
+    for (const { name, n } of counts.values()) {
+      if (n > 1)
+        flags.push({
+          kind: "duplicate_meso_names",
+          severity: "warning",
+          subject_id: m.id,
+          subject: m.name,
+          detail: `${n} mesocycles in this macrocycle share the name "${name}".`,
+        });
+    }
+
+    const placeholders = m.mesos.filter(
+      (x) => x.status === "unplanned" && x.days_per_week === 1,
+    );
+    if (placeholders.length > 0)
+      flags.push({
+        kind: "unplanned_days_per_week_default",
+        severity: "info",
+        subject_id: m.id,
+        subject: m.name,
+        detail: `${placeholders.length} unplanned placeholder meso(s) report days_per_week = 1, a storage default until they are planned.`,
+      });
+  }
+  return flags;
+}
+
+export function formatDataHygiene(flags: HygieneFlag[]): Record<string, unknown> {
+  return {
+    count: flags.length,
+    flags,
+    note:
+      flags.length === 0
+        ? "No structural data-shape anomalies detected in the user's cycles."
+        : "Advisory only — these are data-shape anomalies (naming / duration / placeholder defaults), not errors. Surface them gently; never silently 'correct' the user's data.",
+  };
+}
+
+export const CHECK_DATA_HYGIENE = "check_data_hygiene";
+function registerCheckDataHygiene(server: McpServer) {
+  server.registerTool(
+    CHECK_DATA_HYGIENE,
+    {
+      title: "Check data hygiene",
+      description:
+        "Flag structural data-shape anomalies in the user's cycles a coaching " +
+        "layer should gently surface: a macrocycle whose duration differs from the " +
+        "engine's recommendation, duplicate mesocycle names within a macro, and " +
+        "unplanned placeholders still on the days_per_week=1 default. Advisory, not " +
+        "errors. Takes no arguments.",
+      inputSchema: {},
+    },
+    async (_args: Record<string, never>, extra: McpExtra) => {
+      const { client, userId } = resolveSession(extra);
+      const [overview, profile, { params }] = await Promise.all([
+        getCyclesOverview(client, userId),
+        getProfile(client, userId),
+        getActiveEngineParams(client),
+      ]);
+      const macros: HygieneMacroInput[] = overview.macros.map((macro) => ({
+        id: macro.id,
+        name: macro.name,
+        duration_months: macro.duration_months,
+        recommended_duration_months: profile
+          ? planForMacro(macro, profile, params).recommendedDurationMonths
+          : null,
+        mesos: macro.mesos.map((m) => ({
+          id: m.id,
+          name: m.name,
+          status: m.status,
+          days_per_week: m.days_per_week,
+        })),
+      }));
+      return jsonResult(formatDataHygiene(detectDataHygiene(macros)));
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 
 export function registerCoachingTools(server: McpServer) {
@@ -614,4 +748,5 @@ export function registerCoachingTools(server: McpServer) {
   registerCompareMesocycles(server);
   registerGetMuscleBalance(server);
   registerGetExerciseAffinity(server);
+  registerCheckDataHygiene(server);
 }
