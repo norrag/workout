@@ -362,6 +362,36 @@ describe("formatMuscleBalance", () => {
     const out = formatMuscleBalance("m1", balance, null, P, "intermediate");
     expect((out.weekly_sets_per_muscle as Record<string, unknown>[])[0].landmark).toBeNull();
   });
+
+  it("includes a per-day emphasis breakdown when days are supplied (12 §2)", () => {
+    const balance: MesoBalance = {
+      push: 20,
+      pull: 18,
+      legs: 12,
+      bars: [{ name: "Quads", avg: 6 }],
+      note: "Legs carry the lowest weekly volume.",
+    };
+    const days = [
+      {
+        day_number: 2,
+        label: "Legs",
+        weekday: 3,
+        planned_sets: 10,
+        emphasis: {
+          classification: "legs" as const,
+          fractional_sets: { push: 0, pull: 0, legs: 13 },
+          total_fractional_sets: 13,
+          dominant: "legs" as const,
+        },
+      },
+    ];
+    const out = formatMuscleBalance("m1", balance, null, P, "intermediate", days);
+    const outDays = out.days as Record<string, unknown>[];
+    expect(outDays).toHaveLength(1);
+    expect((outDays[0].emphasis as Record<string, unknown>).classification).toBe("legs");
+    // defaults to an empty array when no days are supplied
+    expect(formatMuscleBalance("m1", balance, null, P, "intermediate").days).toEqual([]);
+  });
 });
 
 // --- formatAffinity --------------------------------------------------------

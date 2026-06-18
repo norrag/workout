@@ -22,6 +22,8 @@ import {
   formatProfile,
   formatMacrocycles,
   formatMesoPlan,
+  buildDayEmphasisList,
+  type RolesByExercise,
   formatMesoSummary,
   formatMacroSummary,
   formatExerciseHistory,
@@ -207,6 +209,108 @@ describe("formatMesoPlan", () => {
     });
     // meso-level total chains the plan into a weekly-volume comparison
     expect((out.mesocycle as Record<string, unknown>).planned_sets_per_week).toBe(5);
+    // no roles supplied → emphasis is present but unclassified (additive, safe)
+    expect((days[0].emphasis as Record<string, unknown>).classification).toBe("unclassified");
+  });
+
+  it("derives a per-day emphasis from the exercises' muscle roles (12 §2)", () => {
+    const plan = {
+      meso: {
+        id: "m1",
+        name: "Block 1",
+        position: 1,
+        phase: "accumulation",
+        weeks: 5,
+        days_per_week: 2,
+        includes_deload: true,
+        rir_start: 3,
+        rir_end: 0,
+        status: "active",
+        start_date: "2026-06-01",
+      },
+      days: [
+        {
+          id: "day-1",
+          day_number: 1,
+          label: "Upper",
+          weekday: 1,
+          groups: [
+            {
+              id: "grp-1",
+              muscle_group_id: "mg-chest",
+              muscle_group: "Chest",
+              exercise_slots: 1,
+              fills: [
+                { id: "s1", exercise_id: "ex-bench", slot_number: 1, exercise_name: "Bench", initial_sets: 4 },
+              ],
+            },
+          ],
+        },
+        {
+          id: "day-2",
+          day_number: 2,
+          label: "Legs",
+          weekday: 3,
+          groups: [
+            {
+              id: "grp-2",
+              muscle_group_id: "mg-quads",
+              muscle_group: "Quads",
+              exercise_slots: 1,
+              fills: [
+                { id: "s2", exercise_id: "ex-squat", slot_number: 1, exercise_name: "Squat", initial_sets: 3 },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as MesoPlan;
+    const roles: RolesByExercise = new Map([
+      ["ex-bench", [
+        { name: "chest", role: "primary" },
+        { name: "triceps", role: "secondary" },
+      ]],
+      ["ex-squat", [
+        { name: "quads", role: "primary" },
+        { name: "glutes", role: "secondary" },
+      ]],
+    ]);
+    const out = formatMesoPlan(plan, roles) as Record<string, unknown>;
+    const days = out.days as Record<string, unknown>[];
+    expect((days[0].emphasis as Record<string, unknown>).classification).toBe("upper-push");
+    expect((days[1].emphasis as Record<string, unknown>).classification).toBe("legs");
+  });
+
+  it("buildDayEmphasisList returns a compact per-day summary", () => {
+    const plan = {
+      meso: { id: "m1" },
+      days: [
+        {
+          id: "day-1",
+          day_number: 1,
+          label: "Legs",
+          weekday: 3,
+          groups: [
+            {
+              id: "g",
+              muscle_group_id: "mg",
+              muscle_group: "Quads",
+              exercise_slots: 1,
+              fills: [
+                { id: "s", exercise_id: "ex-squat", slot_number: 1, exercise_name: "Squat", initial_sets: 3 },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as MesoPlan;
+    const roles: RolesByExercise = new Map([
+      ["ex-squat", [{ name: "quads", role: "primary" }]],
+    ]);
+    const list = buildDayEmphasisList(plan, roles);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ day_number: 1, label: "Legs", planned_sets: 3 });
+    expect(list[0].emphasis.classification).toBe("legs");
   });
 });
 

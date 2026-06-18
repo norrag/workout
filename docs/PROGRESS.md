@@ -2,7 +2,64 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-18 (latest) — Connector coaching roadmap Stage 1: paradigm + persona
+## 2026-06-18 (latest) — Connector coaching roadmap Stage 2: per-day session classification
+
+Second stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
+Stops the "your low-set days are under-trained" misread when those days are legs
+by design (the observed gap: leg days carry fewer sets than upper days). Adds a
+deterministic, derived per-day **emphasis** label computed from the [10] §7
+fractional-volume PPL map — **context, not a verdict** (12 §2). Read/derived only;
+**no schema, no new tool, no new stored column**.
+
+### Done
+
+- **Pure classifier (`src/lib/engine/classification.ts`).** `pplCategory` — the
+  canonical [10] §7 push/pull/legs map on the app's seeded muscle-group vocabulary
+  (single `shoulders` group → push; traps/forearms → pull; abs/unmapped → null).
+  `classifyDayEmphasis(slots)` credits each slot's planned sets fractionally
+  (1.0 primary / 0.5 secondary) across the exercise's **own** muscle roles, sums
+  per PPL category, and labels the day `legs` / `upper-push` / `upper-pull` /
+  `upper` / `full-body` / `unclassified` by dominant share. Pure + deterministic;
+  thresholds documented and overridable for tests.
+- **One PPL map.** `src/lib/queries/stats.ts` `balanceCategory` now delegates to
+  `pplCategory`, so the in-app balance cards and the connector's per-day
+  classification share a single definition (no drift).
+- **Surfaced in `get_mesocycle`.** Each day carries an `emphasis`
+  `{ classification, fractional_sets, total_fractional_sets, dominant }`. The tool
+  fetches the exercises' muscle roles (new `getMusclesForExercises` reader,
+  `src/lib/queries/exercises.ts`, RLS-scoped) and the description/note frame the
+  label as fair-reading context, not judgment.
+- **Surfaced in `get_muscle_balance`.** Gains a `days[]` breakdown (per day:
+  planned sets + emphasis) via the shared `buildDayEmphasisList`, so "is my volume
+  uneven?" distinguishes a lower-set leg day (legs by design) from a genuine
+  deficit. The MEV/MAV/MRV deficit read is unchanged — the label only adds context.
+- **Tests (+16 → 319 total).** `engine/__tests__/classification.test.ts` covers the
+  §7 map and every label (legs / upper-push / upper-pull / upper / full-body /
+  unclassified), fractional 0.5 secondary counting, zero/negative-set handling, and
+  determinism; `read-tools.test.ts` and `coaching-tools.test.ts` assert the derived
+  emphasis surfaces in `get_mesocycle` and `get_muscle_balance`.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (319/319), `npm run build` all
+green. The classification reuses the §7 map + fractional counting per the stage's
+constraints; no schema/migration. End-to-end `tools/call` against the deployed
+connector is the owner's check once merged.
+
+### Notes / deviations
+
+- **Fractional weights (1.0/0.5) are module constants, not `engine_params`.** The
+  §8 sketch listed `volume.direct/indirect` but the implemented schema never added
+  them; `server.ts`/`coaching-guide.ts` already treat 1.0/0.5 as the fixed §7 rule,
+  so the classifier matches that rather than inventing a param field (which would be
+  a schema/version change out of scope for a read-only stage).
+- **Classification uses each exercise's own muscle roles**, not the planner group's
+  assigned muscle — the §7-correct attribution, so a movement's true stimulus drives
+  the label.
+- Stages 3–5 (analysis comparability, `edit_mesocycle`, session-order) remain open;
+  this stage is independent of them.
+
+## 2026-06-18 — Connector coaching roadmap Stage 1: paradigm + persona
 
 First stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
 Aligns the assistant with the app's science-based training paradigm so it reasons

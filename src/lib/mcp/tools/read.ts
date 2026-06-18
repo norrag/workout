@@ -18,6 +18,7 @@ import {
   listExclusions,
   listPinnedNotes,
   listAllPinnedNotes,
+  getMusclesForExercises,
   type ExerciseWithMuscles,
   type ExclusionWithExercise,
   type PinnedNoteWithExercise,
@@ -38,7 +39,7 @@ import {
   round1,
   type EnvelopeOpts,
 } from "../envelope";
-import { scoreProgress } from "@/lib/engine";
+import { scoreProgress, classifyDayEmphasis, type MuscleRole } from "@/lib/engine";
 
 /**
  * Slice 2 read/analysis tools (07 Phase 6). Thin, zod-validated wrappers over
@@ -154,7 +155,47 @@ function registerGetMacrocycles(server: McpServer) {
 
 // --- get_mesocycle ---------------------------------------------------------
 
-export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
+/** Map = exercise_id → its muscle roles (for fractional PPL classification). */
+export type RolesByExercise = Map<string, MuscleRole[]>;
+
+/**
+ * Derived per-day emphasis (12 §2): fractional 1.0/0.5 volume across each
+ * exercise's own muscle roles, mapped to push/pull/legs and labelled by the
+ * dominant category. Context to prevent the "low-set leg day = under-trained"
+ * misread, never a verdict. Pure given the roles map.
+ */
+export function dayEmphasis(
+  day: MesoPlan["days"][number],
+  rolesByExercise: RolesByExercise,
+) {
+  const slots = day.groups.flatMap((g) =>
+    g.fills.map((f) => ({
+      sets: f.initial_sets ?? 0,
+      muscles: rolesByExercise.get(f.exercise_id) ?? [],
+    })),
+  );
+  return classifyDayEmphasis(slots);
+}
+
+/** Compact per-day emphasis list (day → planned sets + PPL classification),
+ *  shared by get_mesocycle and get_muscle_balance. Pure given the roles map. */
+export function buildDayEmphasisList(plan: MesoPlan, rolesByExercise: RolesByExercise) {
+  return plan.days.map((d) => ({
+    day_number: d.day_number,
+    label: d.label,
+    weekday: d.weekday,
+    planned_sets: d.groups.reduce(
+      (n, g) => n + g.fills.reduce((s, f) => s + (f.initial_sets ?? 0), 0),
+      0,
+    ),
+    emphasis: dayEmphasis(d, rolesByExercise),
+  }));
+}
+
+export function formatMesoPlan(
+  plan: MesoPlan | null,
+  rolesByExercise: RolesByExercise = new Map(),
+): Record<string, unknown> {
   if (!plan) {
     return { found: false, summary: "No mesocycle with that id is visible to the user." };
   }
@@ -196,6 +237,9 @@ export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
       label: day.label,
       weekday: day.weekday,
       planned_sets: dayPlannedSets,
+      // derived session emphasis (12 §2): fractional-volume PPL label so a low-
+      // set leg day reads as "legs by design", not as an under-trained day.
+      emphasis: dayEmphasis(day, rolesByExercise),
       groups,
     };
   });
@@ -217,7 +261,9 @@ export function formatMesoPlan(plan: MesoPlan | null): Record<string, unknown> {
     days: shapedDays,
     note:
       "planned_sets are the week-1 prescription; the engine autoregulates per " +
-      "week from there — use get_muscle_group_volume for planned-vs-logged by week.",
+      "week from there — use get_muscle_group_volume for planned-vs-logged by week. " +
+      "emphasis is a derived push/pull/legs label (fractional 1.0/0.5 volume) — " +
+      "context to read a day's set count fairly (a leg day is meant to be lower-set), not a verdict.",
   };
 }
 
@@ -229,13 +275,21 @@ function registerGetMesocycle(server: McpServer) {
       title: "Get mesocycle plan",
       description:
         "The groups-first plan for one mesocycle: its days (weekday + label), " +
-        "the muscle-group blocks on each day, and the exercises filling each " +
-        "slot with planned set counts. Use get_mesocycle_summary for performance.",
+        "the muscle-group blocks on each day, the exercises filling each slot " +
+        "with planned set counts, and a derived per-day emphasis label " +
+        "(push/pull/legs by fractional volume) so a day's set count reads fairly. " +
+        "Use get_mesocycle_summary for performance.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client } = resolveSession(extra);
-      return jsonResult(formatMesoPlan(await getMesoPlan(client, mesocycle_id)));
+      const plan = await getMesoPlan(client, mesocycle_id);
+      if (!plan) return jsonResult(formatMesoPlan(null));
+      const exerciseIds = plan.days.flatMap((d) =>
+        d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id)),
+      );
+      const roles = await getMusclesForExercises(client, exerciseIds);
+      return jsonResult(formatMesoPlan(plan, roles));
     },
   );
 }

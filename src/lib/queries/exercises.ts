@@ -51,6 +51,38 @@ export async function listExercises(
   }));
 }
 
+/**
+ * Muscle roles (name + primary/secondary) for a set of exercises, keyed by
+ * exercise id. Powers the connector's per-day PPL classification (12 §2) —
+ * fractional 1.0/0.5 volume counting needs each exercise's own roles, not just
+ * the planner group's assigned muscle. RLS gates visibility; no service role.
+ */
+export async function getMusclesForExercises(
+  supabase: Client,
+  exerciseIds: string[],
+): Promise<Map<string, { name: string; role: "primary" | "secondary" }[]>> {
+  const map = new Map<string, { name: string; role: "primary" | "secondary" }[]>();
+  const ids = [...new Set(exerciseIds)];
+  if (ids.length === 0) return map;
+  const [{ data: links, error: linkError }, { data: groups, error: mgError }] =
+    await Promise.all([
+      supabase
+        .from("exercise_muscle_groups")
+        .select("exercise_id, muscle_group_id, role")
+        .in("exercise_id", ids),
+      supabase.from("muscle_groups").select("id, name"),
+    ]);
+  if (linkError) throw linkError;
+  if (mgError) throw mgError;
+  const nameById = new Map((groups ?? []).map((g) => [g.id, g.name]));
+  for (const l of links ?? []) {
+    const arr = map.get(l.exercise_id) ?? [];
+    arr.push({ name: nameById.get(l.muscle_group_id) ?? "", role: l.role });
+    map.set(l.exercise_id, arr);
+  }
+  return map;
+}
+
 export async function createCustomExercise(
   supabase: Client,
   userId: string,

@@ -99,6 +99,10 @@ pump correctly without being prompted.
 
 ## Stage 2 — Per-day session classification (derived field)
 
+**Status: landed 2026-06-18** (`src/lib/engine/classification.ts` pure classifier;
+surfaced per day in `get_mesocycle` and per day in `get_muscle_balance`). See
+[PROGRESS.md](PROGRESS.md).
+
 **Goal.** Stop the "your low-set days are under-trained" misread when those days
 are legs by design (the exact gap observed: Day 2 = 12 sets and Day 4 = 10 sets
 are leg days; Day 1 = 29 and Day 3 = 20 are upper).
