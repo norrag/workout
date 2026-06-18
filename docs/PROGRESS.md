@@ -2,7 +2,87 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-18 (latest) — Connector coaching roadmap Stage 3: analysis comparability
+## 2026-06-18 (latest) — Connector coaching roadmap Stage 4: `edit_mesocycle` write tool
+
+Fourth stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
+Closes the biggest *functional* gap: the write surface was create + delete only,
+so "analyze → suggest → apply on approval" had no **apply** step. `edit_mesocycle`
+is the first structural write on an existing meso, unlocking agentic rebalancing
+(e.g. `get_muscle_balance` flags quads below MEV → add a slot → ramp it forward).
+The LLM edits **structure + the week-1 baseline only**; the **engine still owns
+every prescribed number** (hard rule #3) and logged history is never touched
+(hard rule #5). **No schema, no migration** — it re-saves the planner board through
+the existing app query layer.
+
+### Done
+
+- **Pure edit core (`applyMesoEdits`, `src/lib/mcp/tools/edit.ts`).** A neutral,
+  I/O-free model of the planner board (days → groups → slot fills) plus a
+  transformer that applies a sequence of the five Stage-4 operations and emits a
+  fresh `PlanDayInput[]` for `saveMesoPlan`. Pure (no clock/IO/randomness),
+  order-sensitive, and **non-mutating** (deep-clones its input). The five
+  operations (12 §Stage 4): `add_exercise` (day + muscle-group name + exercise id,
+  optional baseline sets — creates the group block if absent), `remove_exercise`
+  (by `slot_id`; shrinks the group, drops a group emptied by the removal),
+  `swap_exercise` (`slot_id` + new exercise, sets/position preserved),
+  `reorder_day` (full day permutation by `slot_id`, validated), and
+  `set_baseline_sets` (week-1 baseline on a slot). Day positions are renumbered
+  1..n; a group that would exceed the 10-slot cap is rejected.
+- **`edit_mesocycle` tool.** Validates with zod (a `discriminatedUnion` over the
+  five ops, ≤20 per call), identity from the session (no `user_id` — hard rule #5).
+  Server-side business validation: only a **planned or active** meso is editable
+  (a `completed`/`abandoned`/`draft`/`unplanned` one is refused); add/swap
+  exercise ids must exist & be RLS-visible; muscle-group names resolve via the
+  shared `resolveMuscleGroupIds`. **Target rule (decision #1):** for an active
+  meso, a day whose **current-week** workout is completed or in progress is
+  refused; untouched later days of the current week — and all future weeks — stay
+  editable. On success it `saveMesoPlan`s the edited board and, for an active meso,
+  runs `regenerateOpenWorkouts` so the engine **ramps the new structure forward**
+  into the open (not-started) workouts; completed/in-progress/skipped workouts and
+  every logged set are untouched. Records a `mcp_write_audit` row.
+- **Tests (`__tests__/edit-tools.test.ts`, +16 → 353 total).** `applyMesoEdits`
+  across every operation (add to existing/new group, slot-cap rejection, remove +
+  group-drop + gap-close, swap, baseline, reorder + permutation guard),
+  composition + touched-day reporting, **purity** (input unchanged), untouched-day
+  preservation; tool registration, the no-`user_id` contract, and
+  unauthenticated-call rejection. `EDIT_MESOCYCLE` added to the write-tool
+  registration suite.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (353/353), `npm run build`
+all green. The tool reuses the smoke-tested `saveMesoPlan` + `regenerateOpenWorkouts`
+path the app's own `saveMesoPlanAction` uses for active mesos, so the structural
+merge / logged-history protection is the proven one. End-to-end `tools/call`
+against the deployed connector (edit an active meso → confirm open workouts
+re-derive while logged history is intact) is the owner's check once merged.
+
+### Notes / deviations
+
+- **In-place only (the stage's default).** The open question (save-to-template +
+  restart for larger restructures) is left to the in-app path; `edit_mesocycle`
+  stays bounded to the five operations.
+- **Reorder on an *active* meso takes full effect on the plan and on future,
+  not-yet-generated weeks; already-generated open workouts keep their current
+  exercise order** — `regenerateOpenWorkouts` is a structural *merge* (add/remove
+  + keep surviving prescriptions), it doesn't reseed order, consistent with the
+  app's own plan-save. Live within-session reordering stays an in-app action. On a
+  **planned** meso (no workouts yet) reorder applies in full.
+- **`set_baseline_sets` is the week-1 baseline (`meso_exercises.initial_sets`).**
+  On an active meso the structural merge keeps each surviving exercise's
+  engine-progressed prescription, so changing the baseline only affects
+  newly-added slots and future-generated weeks — it never rewrites an
+  already-generated week. Documented in the tool copy.
+- **Editing normalizes a *touched* group's slot count to its filled slots**
+  (an add grows it, a remove drops the open slot); untouched groups/days keep
+  their exact structure, so a planned open slot elsewhere survives an unrelated
+  edit. Over MCP the model fills slots directly, so this trades the (planner-only)
+  open-slot affordance for predictable, fully-filled days.
+- Stage 5 (session-order / fatigue-position normalization) remains open and is
+  gated on its own data-capture check; it enhances Stage 3 and is independent of
+  this stage.
+
+## 2026-06-18 — Connector coaching roadmap Stage 3: analysis comparability
 
 Third stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
 Fixes the false-stall class of bug (the Dumbbell Curl that read `declining −18%,

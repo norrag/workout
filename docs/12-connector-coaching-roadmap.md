@@ -172,6 +172,11 @@ not required — rolling + phase + confidence already defuse the example.
 
 ## Stage 4 — `edit_mesocycle` write tool
 
+**Status: landed 2026-06-18** (`src/lib/mcp/tools/edit.ts` — pure
+`applyMesoEdits` transformer + the `edit_mesocycle` tool, registered in
+`registerWriteTools`; reuses `saveMesoPlan` + `regenerateOpenWorkouts`). See
+[PROGRESS.md](PROGRESS.md).
+
 **Goal.** Close the biggest *functional* gap: today the write surface is
 create + delete only, so the "analyze → suggest → apply on approval" loop has no
 apply step. This unlocks agentic rebalancing (e.g. `get_muscle_balance` flags
