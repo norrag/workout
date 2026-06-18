@@ -216,16 +216,23 @@ write is audited.
 
 ## Stage 5 — Session-order / fatigue-position normalization
 
+**Status: landed 2026-06-18** (`analyzeByDaySlot` + `fatiguePosition` pure
+analysers in `src/lib/analysis/comparability.ts`; `getExerciseSessions` enriched
+with day-slot + session-position dimensions; `analyze_exercise_progress` returns
+`day_slots` + `fatigue_position`). See [PROGRESS.md](PROGRESS.md).
+
 **Goal.** Make performance fair to where a movement sits in the session — the
 leg-extensions-after-heavy-deadlifts problem, and a contributor to the two-slot
 curl divergence.
 
-**Pre-build data check (blocking).** Confirm whether the **actual performed
-exercise order within a session** is persisted, not just the planned slot order.
-Signals already present: the plan has `slot_number` and ordered groups, and
-logged sets expose a `sequenceIndex` (seen in `explain_prescription` inputs).
-If actual per-session sequence is stored, this stage is *surfacing*; if not, it
-needs a small capture/view change first.
+**Pre-build data check (blocking) — resolved.** The actual **performed** order is
+only partially persisted: live logging stamps each `logged_sets.performed_at` at
+log time, but the backfilled history (`scripts/history-build.sql`) collapses a
+workout's sets to one timestamp. The **planned slot order**
+(`workout_exercises.position`) and the **day-slot** (`workouts.day_number`) are,
+however, uniformly present. So this stage is *surfacing*: the session ordinal is
+derived from the persisted slot order and per-slot series key on `day_number` —
+no capture/view change was needed.
 
 **Scope (if data supports it).**
 - Per-(exercise, day-slot) series so a movement's two slots are analyzed

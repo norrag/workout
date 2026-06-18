@@ -5,6 +5,8 @@ import {
   segmentPhases,
   analyzeComparableProgress,
   matchedRirComparison,
+  analyzeByDaySlot,
+  fatiguePosition,
   phaseGoals,
   CONFIDENCE_WEIGHT,
   type ExerciseSession,
@@ -25,6 +27,10 @@ function session(over: Partial<ExerciseSession>): ExerciseSession {
     top_reps: 8,
     top_rir: 1,
     working_sets: 3,
+    day_number: 1,
+    day_label: null,
+    session_position: 1,
+    session_size: 4,
     ...over,
   };
 }
@@ -203,6 +209,81 @@ describe("matchedRirComparison", () => {
 
   it("returns nothing without a comparable pair", () => {
     expect(matchedRirComparison([session({ mesocycle_id: "m1" })])).toEqual([]);
+  });
+});
+
+// --- analyzeByDaySlot (Stage 5) --------------------------------------------
+
+describe("analyzeByDaySlot", () => {
+  it("splits a movement's two day-slots into clean series instead of a pooled sawtooth", () => {
+    // the Dumbbell Curl: Day 1 flat at ~33, Day 3 flat at ~27. Pooled they
+    // alternate; per-slot each is flat (a plateau, never a decline).
+    const d = (date: string, day: number, e1rm: number) =>
+      session({ performed_on: date, day_number: day, e1rm, confidence: "moderate" });
+    const slots = analyzeByDaySlot([
+      d("2026-05-01", 1, 33),
+      d("2026-05-04", 3, 27),
+      d("2026-05-08", 1, 33),
+      d("2026-05-11", 3, 27),
+      d("2026-05-15", 1, 33),
+      d("2026-05-18", 3, 27),
+    ]);
+    expect(slots).toHaveLength(2);
+    const day1 = slots.find((s) => s.day_number === 1)!;
+    const day3 = slots.find((s) => s.day_number === 3)!;
+    expect(day1.sessions).toBe(3);
+    expect(day1.progress.trend).not.toBe("declining");
+    expect(day1.progress.rolling_e1rm).toBe(33);
+    expect(day3.progress.rolling_e1rm).toBe(27);
+  });
+
+  it("drops slots below the minimum session count and ignores null day_number", () => {
+    const slots = analyzeByDaySlot([
+      session({ day_number: 1, e1rm: 100 }),
+      session({ day_number: 1, e1rm: 102 }),
+      session({ day_number: 2, e1rm: 80 }), // only one session on day 2 → dropped
+      session({ day_number: null, e1rm: 90 }), // no day-slot → ignored
+    ]);
+    expect(slots.map((s) => s.day_number)).toEqual([1]);
+  });
+
+  it("averages the performed position per slot", () => {
+    const slots = analyzeByDaySlot([
+      session({ day_number: 1, e1rm: 100, session_position: 2 }),
+      session({ day_number: 1, e1rm: 101, session_position: 4 }),
+    ]);
+    expect(slots[0].avg_position).toBe(3);
+  });
+});
+
+// --- fatiguePosition (Stage 5) ---------------------------------------------
+
+describe("fatiguePosition", () => {
+  it("summarises a stable session position", () => {
+    const out = fatiguePosition([
+      session({ session_position: 2, session_size: 6 }),
+      session({ session_position: 2, session_size: 6 }),
+      session({ session_position: 3, session_size: 6 }),
+    ]);
+    expect(out.sessions).toBe(3);
+    expect(out.avg_position).toBeCloseTo(2.3, 1);
+    expect(out.min_position).toBe(2);
+    expect(out.max_position).toBe(3);
+    expect(out.avg_session_size).toBe(6);
+    expect(out.varies).toBe(false);
+  });
+
+  it("flags a movement trained at variable session depth", () => {
+    const out = fatiguePosition([
+      session({ session_position: 2 }),
+      session({ session_position: 5 }), // fresh some weeks, deep others
+    ]);
+    expect(out.varies).toBe(true);
+  });
+
+  it("is empty-safe when no position is known", () => {
+    const out = fatiguePosition([session({ session_position: null })]);
+    expect(out).toMatchObject({ sessions: 0, avg_position: null, varies: false });
   });
 });
 

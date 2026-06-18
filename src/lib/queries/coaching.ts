@@ -201,6 +201,30 @@ export async function fetchAllRows<T>(
   return out;
 }
 
+/**
+ * Fetch every row whose id is in `ids`, chunking the id filter (URL-length cap)
+ * *and* paginating each chunk (row cap) — for an `.in(ids)` query that can both
+ * have a long id list and return more rows than the cap (e.g. all
+ * workout_exercises across a heavily trained lift's sessions). The page query
+ * must carry a stable `.order(...)`.
+ */
+export async function selectAllForIds<T>(
+  ids: string[],
+  run: (
+    chunk: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const chunk = ids.slice(i, i + ID_CHUNK);
+    const rows = await fetchAllRows<T>((from, to) => run(chunk, from, to));
+    out.push(...rows);
+  }
+  return out;
+}
+
 export async function getExerciseAffinity(
   supabase: Client,
   userId: string,
@@ -359,12 +383,15 @@ export async function getExerciseAffinity(
 
 // ---------------------------------------------------------------------------
 // exercise session series (chronological) — feeds analyze_exercise_progress'
-// comparability analysis (12 §Stage 3). One row per logged session, oldest
-// first, each tagged with the comparability dimensions (block goal + prescribed
-// RIR) and a confidence-aware, RIR-folded representative e1RM. Unlike
-// v_exercise_history's Epley-only e1RM, the e1RM here folds RIR into effective
-// reps and carries a confidence band ([10] §1), so trend/stall can down-weight
-// weak (high-rep / far-from-failure) estimates.
+// comparability analysis (12 §Stage 3 + §Stage 5). One row per logged session,
+// oldest first, each tagged with the comparability dimensions (block goal +
+// prescribed RIR + Stage 5's day-slot and session-order position) and a
+// confidence-aware, RIR-folded representative e1RM. Unlike v_exercise_history's
+// Epley-only e1RM, the e1RM here folds RIR into effective reps and carries a
+// confidence band ([10] §1), so trend/stall can down-weight weak (high-rep /
+// far-from-failure) estimates. The day-slot (workouts.day_number) and session
+// position (workout_exercises.position rank) let the analysis separate a
+// movement's two day-slots and normalize for fatigue position (12 §Stage 5).
 // ---------------------------------------------------------------------------
 
 export async function getExerciseSessions(
@@ -377,6 +404,7 @@ export async function getExerciseSessions(
   // the row cap (a heavily trained lift can exceed it) with a stable order.
   const sets = await fetchAllRows<{
     workout_id: string;
+    workout_exercise_id: string;
     mesocycle_id: string;
     microcycle_id: string;
     performed_at: string;
@@ -386,7 +414,9 @@ export async function getExerciseSessions(
   }>((from, to) =>
     supabase
       .from("logged_sets")
-      .select("workout_id, mesocycle_id, microcycle_id, performed_at, weight, reps, rir_reported")
+      .select(
+        "workout_id, workout_exercise_id, mesocycle_id, microcycle_id, performed_at, weight, reps, rir_reported",
+      )
       .eq("user_id", userId)
       .eq("exercise_id", exerciseId)
       .eq("is_warmup", false)
@@ -397,25 +427,77 @@ export async function getExerciseSessions(
   if (sets.length === 0) return [];
 
   // resolve the comparability dimensions: target RIR (microcycle), block name +
-  // macro (mesocycle), goal/phase (macrocycle).
+  // macro (mesocycle), goal/phase (macrocycle), and the Stage 5 session-order
+  // dimensions: the day-slot (workouts.day_number + meso_days.label) and the
+  // movement's ordinal within its session (workout_exercises.position).
   const microIds = [...new Set(sets.map((s) => s.microcycle_id))];
   const mesoIds = [...new Set(sets.map((s) => s.mesocycle_id))];
-  const [micros, mesos] = await Promise.all([
+  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
+  const [micros, mesos, workouts, slotPositions] = await Promise.all([
     selectInChunks<{ id: string; target_rir: number | null }>(microIds, (c) =>
       supabase.from("microcycles").select("id, target_rir").in("id", c),
     ),
     selectInChunks<{ id: string; name: string; macrocycle_id: string | null }>(mesoIds, (c) =>
       supabase.from("mesocycles").select("id, name, macrocycle_id").in("id", c),
     ),
+    selectInChunks<{ id: string; day_number: number }>(workoutIds, (c) =>
+      supabase.from("workouts").select("id, day_number").in("id", c),
+    ),
+    // every exercise slot in those sessions — to rank the target movement's
+    // performed position (1 = first) and the session's exercise count. Chunked
+    // *and* paginated: a heavily trained lift's sessions can exceed the row cap.
+    selectAllForIds<{ id: string; workout_id: string; position: number }>(
+      workoutIds,
+      (c, from, to) =>
+        supabase
+          .from("workout_exercises")
+          .select("id, workout_id, position")
+          .in("workout_id", c)
+          .order("workout_id")
+          .order("position")
+          .order("id")
+          .range(from, to),
+    ),
   ]);
   const macroIds = [...new Set(mesos.map((m) => m.macrocycle_id).filter((id): id is string => id != null))];
-  const macros = await selectInChunks<{ id: string; goal_type: string }>(macroIds, (c) =>
-    supabase.from("macrocycles").select("id, goal_type").in("id", c),
-  );
+  // day labels keyed on (mesocycle, day_number) — meso_days carries the label.
+  const dayByWorkout = new Map(workouts.map((w) => [w.id, w.day_number]));
+  const [macros, mesoDays] = await Promise.all([
+    selectInChunks<{ id: string; goal_type: string }>(macroIds, (c) =>
+      supabase.from("macrocycles").select("id, goal_type").in("id", c),
+    ),
+    selectInChunks<{ mesocycle_id: string; day_number: number; label: string | null }>(
+      mesoIds,
+      (c) =>
+        supabase
+          .from("meso_days")
+          .select("mesocycle_id, day_number, label")
+          .in("mesocycle_id", c),
+    ),
+  ]);
 
   const targetRirByMicro = new Map(micros.map((m) => [m.id, m.target_rir]));
   const mesoById = new Map(mesos.map((m) => [m.id, m]));
   const goalByMacro = new Map(macros.map((m) => [m.id, m.goal_type]));
+  const labelByMesoDay = new Map(
+    mesoDays.map((d) => [`${d.mesocycle_id}:${d.day_number}`, d.label]),
+  );
+
+  // rank each session's exercise slots by position → a 1-based ordinal per
+  // workout_exercise, and the session's exercise count (the ordinal denominator).
+  const slotsByWorkout = new Map<string, { id: string; position: number }[]>();
+  for (const s of slotPositions) {
+    const cur = slotsByWorkout.get(s.workout_id) ?? [];
+    cur.push({ id: s.id, position: s.position });
+    slotsByWorkout.set(s.workout_id, cur);
+  }
+  const ordinalByWe = new Map<string, number>();
+  const sizeByWorkout = new Map<string, number>();
+  for (const [wid, slots] of slotsByWorkout) {
+    const ranked = [...slots].sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+    sizeByWorkout.set(wid, ranked.length);
+    ranked.forEach((slot, i) => ordinalByWe.set(slot.id, i + 1));
+  }
 
   // group by workout (one session), preserving the performed order
   const byWorkout = new Map<
@@ -440,6 +522,7 @@ export async function getExerciseSessions(
     const meso = mesoById.get(first.mesocycle_id);
     const goal =
       meso?.macrocycle_id != null ? (goalByMacro.get(meso.macrocycle_id) ?? "unknown") : "unknown";
+    const dayNumber = dayByWorkout.get(first.workout_id) ?? null;
     out.push({
       performed_on: first.performed_at.slice(0, 10),
       mesocycle_id: first.mesocycle_id,
@@ -452,6 +535,13 @@ export async function getExerciseSessions(
       top_reps: pick?.top_reps ?? null,
       top_rir: pick?.top_rir ?? null,
       working_sets: workoutSets.length,
+      day_number: dayNumber,
+      day_label:
+        dayNumber != null
+          ? (labelByMesoDay.get(`${first.mesocycle_id}:${dayNumber}`) ?? null)
+          : null,
+      session_position: ordinalByWe.get(first.workout_exercise_id) ?? null,
+      session_size: sizeByWorkout.get(first.workout_id) ?? null,
     });
   }
   // performed_at order is preserved by insertion (sets came back sorted)
