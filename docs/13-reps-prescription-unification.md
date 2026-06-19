@@ -74,6 +74,19 @@ all internally correct; the defect is the **divergence**, not a data-flow bug.
    exercise's sets to the engine's prescribed weight (and therefore predicted
    reps), so a user who edits, forgets the original, and changes their mind can
    get back.
+5. **Predicted-reps clamp = a fixed sanity band** (param `reps_predict.{min,max}`,
+   e.g. 3–30). Under RIR grading (#3) the displayed reps are a *hint only* and
+   never drive progression, so the clamp is cosmetic — it just stops a confident
+   anchor from cueing "1 rep" / "28 reps" at edge weights. The richer per-slot
+   "clamp to this slot's intended rep range" is deferred: the active plan does not
+   carry a rep range (only `template_exercises.default_rep_range` does;
+   `meso_exercises` keeps a single `initial_reps`), so it needs extra plumbing
+   (see §6).
+6. **Low-confidence anchor suppresses the predictor.** When the recency-weighted
+   anchor's confidence is below `params.reps_predict.min_confidence` (this user's
+   history spans 5–35 lb on one lift), fall back to the plan's reps rather than
+   cue a number the model isn't sure of. The predictor re-engages once enough
+   comparable sets exist.
 
 ## 3. Changes
 
@@ -89,9 +102,10 @@ all internally correct; the defect is the **divergence**, not a data-flow bug.
     (`types.ts`, zod). When null (cold start / no history) fall back to the
     existing carried-forward / `initial.reps` behavior so week 1 still equals the
     plan.
-  - Clamp predicted reps to a sane band (e.g. `params.reps_predict.{min,max}` or
-    the meso's intended rep range) so a low-confidence anchor cannot cue wild
-    numbers.
+  - Clamp predicted reps to the fixed sanity band `params.reps_predict.{min,max}`
+    (decision #5); cosmetic under RIR grading. Suppress the predictor entirely
+    when anchor confidence < `params.reps_predict.min_confidence` (decision #6),
+    falling back to the plan reps.
 - `recencyWeightedE1rm` (`reps.ts`): expose the **best** (recency-weighted max)
   alongside the mean, selected by a param `params.e1rm.anchor_method:
   'best' | 'mean'` (default `'best'`). `getExerciseE1rmAnchors`
@@ -132,7 +146,8 @@ all internally correct; the defect is the **divergence**, not a data-flow bug.
 ### 3.4 Params + schema
 
 - `engine_params` new version (v9) adding: `e1rm.anchor_method` (`'best'`),
-  `rir_tolerance`, `rir_regress_gap`, and `reps_predict` band. Mirror in
+  `rir_tolerance`, `rir_regress_gap`, and `reps_predict` (`{min, max,
+  min_confidence}`). Mirror in
   `src/lib/engine/params.ts` `DEFAULT_ENGINE_PARAMS` and the seed. Schema test so
   a bad row cannot activate (hard rule #3). Append-only migration; no edits to
   applied migrations (hard rule #2).
@@ -161,13 +176,19 @@ deployable. Activate v9 via the admin MCP `propose_engine_params` →
 user's recent decisions against v9 before activating (`replay_decisions`) to
 confirm the new reps/grading look sane.
 
-## 6. Open decisions (confirm on review)
+## 6. Resolved (2026-06-19 review)
 
-1. **Grading basis** — adopt the RIR-inference grading (§3.2) now, or ship reps
-   unification alone first and keep rep-count grading with a widened tolerance?
-   Recommendation: do both together; the RIR basis is what makes overshoot safe.
-2. **Predicted-reps band** — clamp to a fixed `{min,max}` or to the meso's
-   intended rep range per slot? Latter needs a rep-range source on the plan.
-3. **Anchor confidence floor** — should a low-confidence anchor (this user's
-   history spans 5–35 lb) suppress the predictor in favor of the plan until
-   enough comparable sets exist?
+1. **Grading basis** — adopt RIR-inference grading (§3.2) together with the reps
+   unification; the RIR basis is what makes overshoot safe.
+2. **Predicted-reps band** — fixed `{min,max}` sanity band now (decision #5);
+   cosmetic under RIR grading.
+3. **Anchor confidence floor** — yes; low-confidence anchor falls back to the
+   plan reps (decision #6).
+
+### Deferred refinement
+
+- **Per-slot rep-range clamp.** Clamp/center the predicted reps on the slot's
+  intended rep range instead of a global band. Needs schema plumbing: add a
+  rep-range column to `meso_exercises` and copy `template_exercises.default_rep_range`
+  onto it at meso-build time, then have the engine read it. Track as a follow-up
+  once this slice lands.
