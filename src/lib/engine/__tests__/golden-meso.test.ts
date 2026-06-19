@@ -53,6 +53,7 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100kg start"
           muscleGroupWeeklySets: 12,
           weekPeak: { weight: peak.weight, reps: peak.reps, sets: peak.sets, targetRir: peak.targetRir },
           initial: null,
+          strengthAnchor: null,
         },
         params,
       );

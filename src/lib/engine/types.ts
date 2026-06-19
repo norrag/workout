@@ -70,6 +70,17 @@ export const engineInputsSchema = z.object({
   muscleGroupWeeklySets: z.number().int().min(0).nullable().default(null),
   // peak (heaviest) working prescription of the meso, for deload sizing
   weekPeak: prescriptionSchema.nullable().default(null),
+  // recency-weighted strength anchor (e1RM + its confidence) for rep-window
+  // weight selection + RIR grading (doc 13). The caller computes it from history
+  // (engine stays pure); null — or a confidence below reps_predict.min_confidence
+  // — falls back to the carried-forward plan / increment path.
+  strengthAnchor: z
+    .object({
+      value: z.number().positive(),
+      confidence: z.enum(["high", "moderate", "low"]),
+    })
+    .nullable()
+    .default(null),
   // plan defaults for cold starts (meso_exercises.initial_*)
   initial: z
     .object({

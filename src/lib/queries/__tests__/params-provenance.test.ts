@@ -44,6 +44,15 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("matches the v9 migration hash (code + migration stay in lockstep)", () => {
+    // the active engine_params v9 row hard-codes this sha256; if DEFAULT changes
+    // without re-seeding the migration, this fails loudly rather than silently
+    // shipping an unreplayable active row.
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("1e9b0579f4283816c786f92702b0eec56ce45cbab81ef0e24f1140eed397a841");
+  });
+
   it("flags a partial (defaults-needed) version as not replayable", () => {
     // a valid-but-incomplete set: drops the optional metric blocks, which the
     // schema fills with defaults — so reading it injects values it never stored.

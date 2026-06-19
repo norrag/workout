@@ -1,4 +1,6 @@
 import type { EngineInputs, LoggedSetInput } from "../types";
+import type { EngineParams } from "../params";
+import { impliedRirAtReps } from "../reps";
 
 export interface PerformanceAssessment {
   /** best working set actually performed (anchor for next week) */
@@ -79,5 +81,44 @@ export function assessPerformance(
     outcome,
     repsMet: repDelta >= 0,
     detail: `did ${best.weight}×${best.reps}${rirNote} vs ${inputs.previous.weight ?? "?"}×${prescribedReps} prescribed at ${targetRir} RIR`,
+  };
+}
+
+export type RirGrade = "on_track" | "easier" | "harder";
+
+/**
+ * Grade last week on RIR rather than rep count (doc 13 §4.3): infer the RIR the
+ * lifter actually hit (from their best set vs the strength anchor) and compare it
+ * to the week's target. Overshooting intensity (a harder set than asked) is a
+ * *hold*, never a regress; genuine under-performance is carried by the falling
+ * anchor, so this only colors the rationale. Null without a usable anchor/set.
+ */
+export function gradeOnRir(
+  perf: PerformanceAssessment,
+  anchorValue: number,
+  targetRir: number,
+  params: EngineParams,
+): { grade: RirGrade; detail: string } | null {
+  if (perf.bestWeight == null || perf.bestReps == null) return null;
+  const achieved = impliedRirAtReps(
+    anchorValue,
+    perf.bestWeight,
+    perf.bestReps,
+    params,
+  );
+  if (achieved == null) return null;
+  const tol = params.rir_tolerance;
+  if (Math.abs(achieved - targetRir) <= tol) {
+    return { grade: "on_track", detail: `on target at ~${achieved} RIR` };
+  }
+  if (achieved - targetRir > tol) {
+    return {
+      grade: "easier",
+      detail: `easier than asked (~${achieved} RIR vs ${targetRir} target)`,
+    };
+  }
+  return {
+    grade: "harder",
+    detail: `harder than asked (~${achieved} vs ${targetRir} RIR) — held, not a miss`,
   };
 }

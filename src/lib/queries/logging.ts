@@ -16,6 +16,7 @@ import {
   recencyWeightedE1rm,
   type EngineParams,
   type E1rmSample,
+  type E1rmAnchor,
 } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
 
@@ -35,8 +36,8 @@ export async function getExerciseE1rmAnchors(
   userId: string,
   exerciseIds: string[],
   params: EngineParams,
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+): Promise<Map<string, E1rmAnchor>> {
+  const out = new Map<string, E1rmAnchor>();
   if (exerciseIds.length === 0) return out;
 
   const { data: sets, error } = await supabase
@@ -76,6 +77,8 @@ export async function getExerciseE1rmAnchors(
       reps: s.reps,
       targetRir: s.rir_reported ?? targetRirByWe.get(s.workout_exercise_id) ?? null,
       ageDays,
+      // session = one exercise on one day (doc 13 §9.3 session_best anchor)
+      sessionKey: s.workout_exercise_id,
     };
     const cur = byExercise.get(s.exercise_id) ?? [];
     cur.push(sample);
@@ -84,7 +87,7 @@ export async function getExerciseE1rmAnchors(
 
   for (const [exerciseId, samples] of byExercise) {
     const anchor = recencyWeightedE1rm(samples, params);
-    if (anchor) out.set(exerciseId, anchor.value);
+    if (anchor) out.set(exerciseId, anchor);
   }
   return out;
 }
@@ -383,7 +386,7 @@ export async function getWorkoutDetail(
       sets: (sets ?? []).filter((s) => s.workout_exercise_id === we.id),
       pinned_note: noteByExercise.get(we.exercise_id) ?? null,
       feedback: feedbackByWe.get(we.id) ?? null,
-      e1rm_anchor: e1rmAnchors.get(we.exercise_id) ?? null,
+      e1rm_anchor: e1rmAnchors.get(we.exercise_id)?.value ?? null,
     })),
   };
 }

@@ -11,6 +11,10 @@ export interface SummaryDelta {
   previousSets: number;
   nextWeight: number | null;
   nextSets: number;
+  // reps move on the rep-window path (load held, reps climb the range — doc 13
+  // §9.4); surfaced when the weight is unchanged so it doesn't read as a no-op.
+  previousReps?: number | null;
+  nextReps?: number | null;
 }
 
 export interface SummaryContext {
@@ -41,10 +45,17 @@ export function composeAutoregulationSummary(ctx: SummaryContext): string {
         ? round2(d.nextWeight - d.previousWeight)
         : 0;
     const setDelta = d.nextSets - d.previousSets;
+    const repDelta =
+      d.previousReps != null && d.nextReps != null
+        ? d.nextReps - d.previousReps
+        : 0;
     if (weightDelta !== 0) {
       clauses.push(
         `${d.exerciseName} ${signed(weightDelta)} ${ctx.units}`,
       );
+    } else if (repDelta !== 0) {
+      // load held, reps walk the window (Option-A week)
+      clauses.push(`${d.exerciseName} reps ${d.previousReps} to ${d.nextReps}`);
     } else if (setDelta !== 0) {
       clauses.push(
         `${d.exerciseName} ${signed(setDelta)} ${Math.abs(setDelta) === 1 ? "set" : "sets"}`,

@@ -83,16 +83,16 @@ function feedback(
 }
 
 describe("engineGoal", () => {
-  it("maps hypertrophy and strength to gain (progressive overload)", () => {
-    expect(engineGoal("hypertrophy")).toBe("gain");
-    expect(engineGoal("strength")).toBe("gain");
+  it("keeps hypertrophy and strength distinct (doc 13 §9.1 per-goal windows)", () => {
+    expect(engineGoal("hypertrophy")).toBe("hypertrophy");
+    expect(engineGoal("strength")).toBe("strength");
   });
   it("passes cut and maintain through", () => {
     expect(engineGoal("cut")).toBe("cut");
     expect(engineGoal("maintain")).toBe("maintain");
   });
-  it("defaults to gain for standalone mesos (no macro goal)", () => {
-    expect(engineGoal(null)).toBe("gain");
+  it("defaults to the hypertrophy window for standalone mesos (no macro goal)", () => {
+    expect(engineGoal(null)).toBe("hypertrophy");
   });
 });
 
@@ -134,11 +134,12 @@ describe("buildEngineInputs", () => {
     workoutFeedback: null,
     microTargetRir: 2,
     nextWeek: { targetRir: 1, isDeload: false },
-    goal: "gain" as const,
+    goal: "hypertrophy" as const,
     equipmentType: "barbell",
     profile: { experience_level: "intermediate" as const, units: "lb" as const },
     muscleGroupWeeklySets: 12,
     weekPeak: null,
+    strengthAnchor: null,
   };
 
   it("maps week-N rows onto the engine input shape", () => {

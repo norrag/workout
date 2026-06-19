@@ -19,6 +19,7 @@ export function baseInputs(
     muscleGroupWeeklySets: 10,
     weekPeak: null,
     initial: null,
+    strengthAnchor: null,
     ...overrides,
   };
 }

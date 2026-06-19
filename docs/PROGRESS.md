@@ -2545,3 +2545,43 @@ The first builds of the 1.x–4.x screens improvised layouts from the spec prose
 3. **Phase 3 — logging flow**: logging UI (primitives exist), feedback sheets, offline outbox + sync, Playwright e2e
 4. **Phase 4 remainder**: week N→N+1 generation job wiring `prescribe()` to data + `engine_decisions` audit writes
 5. Phases 5–8 per the plan
+
+## 2026-06-19 — rep-window prescription engine (doc 13 + §9)
+
+Built the doc 13 model with the §9 amendments (per-goal windows, Option-A
+schedule, session-best anchor). **Param-gated** (doc 13 decision 8): activating
+`engine_params` v9 turns it on; the legacy increment/rep-count path stays in code
+and is byte-for-byte preserved (the existing golden + `prescribe.test.ts` assert
+it under `weight_selection=increment`).
+
+- **Engine.** `weightForRepsAtRir()` (closed-form converse of
+  `predictRepsAtWeight`); `recencyWeightedE1rm` now selects `session_best` /
+  `best` / `mean` via `e1rm.anchor_method` (session_best = recency-weighted best
+  set → mean of that set's session, `E1rmSample.sessionKey`). `prescribe()` gained
+  a mode-gated rep-window path: pick the load that lands reps in the goal's window
+  at the target RIR from the anchor (Option-A: reps climb the window, load held
+  within the meso, stepping on window-cap or anchor change); RIR grading
+  (`gradeOnRir`, overshoot holds, never regresses); swap-in / cold-start seeding
+  from the anchor. The anchor subsumes the old +increment / −regression rules in
+  this mode.
+- **Per-goal windows.** `engineGoal()` no longer collapses strength/hypertrophy →
+  `gain`; `goalTypes` widened (`gain` kept as a hypertrophy alias). `rep_window`
+  defaults: hypertrophy/cut/maintain 8–12 (6–15), strength 3–5 (2–6).
+- **Plumbing.** `getExerciseE1rmAnchors` now carries confidence + session grouping
+  (shared by the live predictor); `buildEngineInputs`/`generateDay` thread the
+  anchor into `prescribe()`. Workout-Complete summary surfaces rep deltas.
+- **Params.** v9 migration seeds a materialized snapshot (schema_version 4);
+  versions ≤ 8 flagged non-replayable. A provenance test locks the v9 hash to
+  `DEFAULT_ENGINE_PARAMS`.
+- **Tests.** New `rep-window.test.ts` (Option-A schedule, overperformance
+  repricing, per-goal windows, bounds, RIR grading, seeding, fallback gate),
+  `weightForRepsAtRir` + anchor-method coverage, bounds property test exercises
+  the rep-window path. 381 pass, typecheck + lint clean.
+
+**Activation is a manual step** (doc 13 §6, not done here): propose/activate v9 via
+the admin MCP and `replay_decisions` / `simulate_prescriptions` a sample against
+v9 to confirm reps/weights look sane on real data before flipping it live.
+
+**Deferred to a fast-follow** (doc 13 §4.4 / §8): the "Reset to prescription"
+exercise-menu item (UI), and per-slot rep ranges (plumb
+`template_exercises.default_rep_range` → `meso_exercises`).

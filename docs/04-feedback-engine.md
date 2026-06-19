@@ -28,6 +28,17 @@ In priority order (most → least weight in v1):
 
 ## v1 algorithm sketch (rule-based, parameterized)
 
+> **Amended by [13-reps-prescription-unification.md](13-reps-prescription-unification.md) (active in engine_params v9).**
+> The default engine now uses **rep-window weight selection + RIR grading** rather
+> than the increment-on-actuals + rep-count rule below. Step 3's fixed `+increment`
+> / `regression_pct` and the §5 "hypertrophy → add load" bias are **superseded**:
+> the prescribed weight is chosen so reps land in a per-goal window (strength 3–5,
+> hypertrophy 8–12) at the target RIR from the recency-weighted strength anchor;
+> reps climb the window with the RIR ramp (load held within the meso), and the
+> anchor — not a fixed step — carries overload and regression. The rule below is
+> retained as the param-gated `weight_selection=increment` / `grading=reps` path
+> (rollback parity). See doc 13 §§2–4 and §9 for the authoritative model.
+
 Per exercise, when generating week *N+1* from week *N*:
 
 1. **Anchor on actuals.** Start from last week's best working sets (weight × reps achieved), not the prescription.

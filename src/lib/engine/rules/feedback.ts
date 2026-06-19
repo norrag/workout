@@ -40,7 +40,7 @@ export function modulateFromFeedback(
   } else if (
     workloadEasy &&
     pumpGood &&
-    inputs.goalType === "gain" &&
+    (inputs.goalType === "gain" || inputs.goalType === "hypertrophy") &&
     (inputs.muscleGroupWeeklySets === null ||
       inputs.muscleGroupWeeklySets < params.mg_set_ceiling)
   ) {
