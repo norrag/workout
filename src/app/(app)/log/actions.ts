@@ -25,6 +25,7 @@ import {
   propagateExerciseOrder,
   propagateSubstitution,
   setPlannedSetWeight,
+  clearPlannedSetWeights,
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
@@ -157,6 +158,22 @@ export async function updateSetWeightAction(input: {
     parsed.weight,
     profile?.auto_match_weights ?? false,
   );
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+/**
+ * Reset an exercise's unlogged sets back to the engine prescription (doc 13
+ * §4.4): drop the per-set planned-weight overrides so the prescribed weight (and
+ * its predicted reps) shows again. Logged history is untouched.
+ */
+export async function resetToPrescriptionAction(input: {
+  workout_id: string;
+  workout_exercise_id: string;
+}): Promise<void> {
+  const parsed = weTargetSchema.parse(input);
+  const { supabase } = await requireUser();
+  await clearPlannedSetWeights(supabase, parsed.workout_exercise_id);
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }
