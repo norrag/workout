@@ -226,3 +226,93 @@ single `engine_params` activation, not a redeploy.
   intended range instead of the global 8–12. Needs schema plumbing: add a
   rep-range column to `meso_exercises` and copy `template_exercises.default_rep_range`
   onto it at meso-build time. Follow-up once this slice lands.
+
+## 9. Amendments locked for build (2026-06-19)
+
+Three improvements were reviewed and locked before implementing §4. They amend
+decisions 2 and 4 and resolve the §8 within-window schedule. **Where §9 differs
+from earlier sections, §9 wins.**
+
+### 9.1 Rep window is **per-goal**, not global (amends decision 2)
+
+The global `8–12 / 5–15` window is hypertrophy-shaped and wrong for strength work.
+The window becomes a per-goal map `rep_window.<goal>` resolved inside `prescribe()`
+from the macrocycle goal:
+
+| goal | target_low–high | min–max |
+|---|---|---|
+| `hypertrophy` (and legacy `gain`) | 8–12 | 6–15 |
+| `strength` | 3–5 | 2–6 |
+| `cut` | 8–12 | 6–15 |
+| `maintain` | 8–12 | 6–15 |
+
+This requires **un-collapsing the engine goal**: today `engineGoal()`
+(`progression.ts:75`) folds `strength` and `hypertrophy` both into `gain`, so
+`prescribe()` cannot pick a window by goal. Extend the per-set `goalTypes` to
+`cut | strength | hypertrophy | maintain`, keep `gain` as a parse-time **alias of
+`hypertrophy`** for back-compat with stored decisions/params, and have
+`engineGoal()` return the real goal. `progression_style` / window lookups key on
+the widened goal. Per-slot windows (§8) remain the later refinement; per-goal is
+the v1 baseline. The same unified mechanism (anchor → weight selection) serves
+**both** strength and hypertrophy — there is no separate `load_first` path; the
+goal only selects the window (and, later, the within-window schedule emphasis).
+
+### 9.2 Within-window schedule = **Option A** double progression (resolves §8)
+
+§4.2 step 1 left the schedule open and hinted "the RIR ramp biases the target
+toward the **low** end as weeks intensify." Implemented literally that reproduces
+the **load-creeps-every-week-at-fixed-reps** behavior the rep-window model exists
+to remove. Resolve it the other way (Option A):
+
+```
+prevReps = best working-set reps logged vs last week's prescription
+if prevReps >= window.target_high:        // topped the window
+    targetReps = window.target_low        // reset to the bottom …
+                                          // … weight rises (fewer eff-reps / higher anchor)
+else:
+    targetReps = clamp(prevReps + 1, window.target_low, window.target_high)
+weight = roundToStep(weightForRepsAtRir(anchor, targetReps, week.targetRir))
+```
+
+Because `targetReps` climbs +1/week while the RIR ramp drops `targetRir` −1/week,
+effective reps (`targetReps + targetRir·offset`) stay ~constant, so **the weight is
+held within the meso** — the lifter works *up the rep range* at a steady load and
+the load only moves when (a) they top the window (reset low, load steps) or (b) the
+**anchor** changes (real strength change, incl. caught overperformance). This is
+the behavior the whole thread asked for, now expressed inside doc 13's
+anchor→weight framework rather than as a separate `rep_ramp` engine.
+
+### 9.3 Anchor = **`session_best`** (amends decision 4)
+
+`best` (recency-weighted single max set) is the right *direction* — we'd rather
+catch a sandbagger than coddle over-trainers — but a lone blow-out set (e.g. a
+20-rep burnout that leaves the following sets gutted) over-prices it. Compromise,
+locked as the **default** `e1rm.anchor_method`:
+
+1. Compute each recent working set's e1RM + recency weight (existing `estimateE1rm`
+   + `0.5^(age/halflife)`).
+2. Find the **recency-weighted best set** (`argmax` of `e1RM × recencyWeight`).
+3. Anchor value = **mean of every working set's e1RM in that set's session**, where
+   *session* = the set's `workout_exercise_id` (one exercise, one day).
+4. Anchor confidence = the best confidence present in that session (lenient floor,
+   matching the "lean aggressive" call).
+
+So the best recent session sets the anchor, but a single fluke within it is
+averaged against the diminished sets that followed it. `best` and `mean` stay
+selectable via `e1rm.anchor_method` for replay/rollback. Pure: the caller supplies
+each sample's `sessionKey` + `ageDays` (engine stays clock-free).
+
+### 9.4 Surface rep deltas on Workout Complete (1.5)
+
+`SummaryDelta` (`summary.ts`) carries only weight + sets today, so a rep-only
+progression (the common Option-A week) renders as "all targets hold." Add
+`previousReps`/`nextReps` and a clause ("Hack Squat reps 8 → 9") used when the
+weight is unchanged.
+
+### 9.5 Net effect on the build (§4)
+
+Unchanged from §4 except: `rep_window` is a per-goal map; `anchor_method` default
+is `session_best` and `E1rmSample` gains `sessionKey`; `engineGoal()` stops
+collapsing; the §4.2 weight-selection uses the 9.2 schedule; `SummaryDelta` gains
+reps. All still one vertical slice, param-gated (decision 8), append-only migration,
+tests per hard rule #3.
