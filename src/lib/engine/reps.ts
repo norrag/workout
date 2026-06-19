@@ -72,6 +72,30 @@ export function predictRepsAtWeight(
 }
 
 /**
+ * The weight that lands `reps` on `targetRir` for a lift whose strength anchor
+ * is `e1rm` — the converse of `predictRepsAtWeight`, used by the rep-window
+ * prescription (doc 13 §4.1) to *choose the load* for a target rep. Closed-form:
+ * both Epley and Brzycki are linear in weight, so `e1RM = weight × k(effReps)`
+ * and `weight = e1RM / k`. No bisection. Null without a usable anchor/reps.
+ */
+export function weightForRepsAtRir(
+  e1rm: number | null,
+  reps: number,
+  targetRir: number,
+  rawParams: EngineParams,
+): number | null {
+  const params = engineParamsSchema.parse(rawParams);
+  if (e1rm == null || e1rm <= 0 || reps <= 0) return null;
+  const eff = reps + targetRir * params.e1rm.rir_offset;
+  // averaged Epley/Brzycki factor; past 36 effective reps Brzycki is invalid so
+  // fall back to Epley alone (mirrors e1rm.ts / effectiveRepsForE1rm)
+  const k =
+    eff >= 36 ? 1 + eff / 30 : (1 + eff / 30 + 36 / (37 - eff)) / 2;
+  if (k <= 0) return null;
+  return e1rm / k;
+}
+
+/**
  * The RIR implied by doing `reps` at `weight` against the anchor — the converse
  * hint surfaced when the user edits reps instead of weight. Clamped ≥ 0; null
  * when there's no usable anchor.
@@ -97,6 +121,13 @@ export interface E1rmSample {
   targetRir: number | null;
   /** days before the reference point; the caller computes it (engine stays pure) */
   ageDays: number;
+  /**
+   * Groups sets into one session for the `session_best` anchor (doc 13 §9.3) —
+   * in practice the `workout_exercise_id` (one exercise, one day). Optional: the
+   * `mean`/`best` methods ignore it, and `session_best` treats a missing key as a
+   * singleton session.
+   */
+  sessionKey?: string | null;
 }
 
 export interface E1rmAnchor {
@@ -104,12 +135,29 @@ export interface E1rmAnchor {
   confidence: E1rmConfidence;
 }
 
+const CONF_WEIGHT: Record<E1rmConfidence, number> = {
+  high: 1,
+  moderate: 0.6,
+  low: 0.3,
+};
+
+/** Strongest confidence present, for a session-averaged anchor (lenient floor). */
+function bestConfidence(cs: E1rmConfidence[]): E1rmConfidence {
+  if (cs.includes("high")) return "high";
+  if (cs.includes("moderate")) return "moderate";
+  return "low";
+}
+
 /**
- * Recency-weighted strength anchor (decision: recency-weighted e1RM). Each
- * sample's e1RM is weighted by `0.5^(ageDays / recency_halflife_days)` and by a
- * confidence factor (high > moderate > low), so recent, near-failure sets
- * dominate and the anchor falls when current performance dips. Pure: the caller
- * supplies `ageDays` (no clock here).
+ * Recency-weighted strength anchor (doc 11 + doc 13 §9.3). Each sample's e1RM is
+ * weighted by `0.5^(ageDays / recency_halflife_days)`; `params.e1rm.anchor_method`
+ * selects how those fold into one number:
+ *  - `mean` (legacy): confidence-weighted average — recent near-failure sets
+ *    dominate, the anchor falls when performance dips.
+ *  - `best`: the recency-weighted single max set (`argmax e1RM × recency`).
+ *  - `session_best` (default): that best set's *session* (all its working sets,
+ *    grouped by `sessionKey`), averaged — robust to a lone blow-out set.
+ * Pure: the caller supplies `ageDays`/`sessionKey` (no clock, no I/O here).
  */
 export function recencyWeightedE1rm(
   samples: E1rmSample[],
@@ -117,33 +165,67 @@ export function recencyWeightedE1rm(
 ): E1rmAnchor | null {
   const params = engineParamsSchema.parse(rawParams);
   const halflife = params.e1rm.recency_halflife_days;
-  const confWeight: Record<E1rmConfidence, number> = {
-    high: 1,
-    moderate: 0.6,
-    low: 0.3,
-  };
+  const method = params.e1rm.anchor_method;
 
-  let weightedSum = 0;
-  let weightTotal = 0;
-  let best: { value: number; confidence: E1rmConfidence } | null = null;
-
+  const entries: {
+    value: number;
+    confidence: E1rmConfidence;
+    recency: number;
+    sessionKey?: string | null;
+  }[] = [];
   for (const s of samples) {
     const est = estimateE1rm(s.weight, s.reps, s.targetRir, params);
     if (!est) continue;
     const recency = Math.pow(0.5, Math.max(0, s.ageDays) / halflife);
-    const w = recency * confWeight[est.confidence];
-    if (w <= 0) continue;
-    weightedSum += est.value * w;
-    weightTotal += w;
-    if (!best || est.value > best.value) {
-      best = { value: est.value, confidence: est.confidence };
+    if (recency <= 0) continue;
+    entries.push({
+      value: est.value,
+      confidence: est.confidence,
+      recency,
+      sessionKey: s.sessionKey,
+    });
+  }
+  if (entries.length === 0) return null;
+
+  if (method === "mean") {
+    let weightedSum = 0;
+    let weightTotal = 0;
+    let best: { value: number; confidence: E1rmConfidence } | null = null;
+    for (const e of entries) {
+      const w = e.recency * CONF_WEIGHT[e.confidence];
+      if (w <= 0) continue;
+      weightedSum += e.value * w;
+      weightTotal += w;
+      if (!best || e.value > best.value) best = e;
     }
+    if (weightTotal === 0) return null;
+    return {
+      value: Math.round((weightedSum / weightTotal) * 10) / 10,
+      confidence: best!.confidence,
+    };
   }
 
-  if (weightTotal === 0) return null;
-  // confidence of the anchor = the best contributing sample's confidence
+  // `best` and `session_best` both start from the recency-weighted best set
+  let bestEntry = entries[0];
+  for (const e of entries) {
+    if (e.value * e.recency > bestEntry.value * bestEntry.recency) bestEntry = e;
+  }
+
+  if (method === "best") {
+    return {
+      value: Math.round(bestEntry.value * 10) / 10,
+      confidence: bestEntry.confidence,
+    };
+  }
+
+  // session_best: average every working set from the best set's session
+  const session =
+    bestEntry.sessionKey == null
+      ? [bestEntry]
+      : entries.filter((e) => e.sessionKey === bestEntry.sessionKey);
+  const mean = session.reduce((acc, e) => acc + e.value, 0) / session.length;
   return {
-    value: Math.round((weightedSum / weightTotal) * 10) / 10,
-    confidence: best!.confidence,
+    value: Math.round(mean * 10) / 10,
+    confidence: bestConfidence(session.map((e) => e.confidence)),
   };
 }

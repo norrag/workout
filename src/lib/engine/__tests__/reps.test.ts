@@ -5,12 +5,21 @@ import { estimateE1rm } from "../e1rm";
 import {
   effectiveRepsForE1rm,
   predictRepsAtWeight,
+  weightForRepsAtRir,
   impliedRirAtReps,
   recencyWeightedE1rm,
   type E1rmSample,
 } from "../reps";
 
-const params = DEFAULT_ENGINE_PARAMS;
+const params = DEFAULT_ENGINE_PARAMS; // anchor_method = session_best (v9)
+const meanParams = {
+  ...params,
+  e1rm: { ...params.e1rm, anchor_method: "mean" as const },
+};
+const bestParams = {
+  ...params,
+  e1rm: { ...params.e1rm, anchor_method: "best" as const },
+};
 
 describe("effectiveRepsForE1rm (inverse of the averaged curve)", () => {
   it("round-trips the forward e1RM model", () => {
@@ -84,16 +93,16 @@ describe("recencyWeightedE1rm", () => {
     expect(recencyWeightedE1rm([], params)).toBeNull();
   });
 
-  it("weights recent sessions over old ones", () => {
+  it("mean: weights recent sessions over old ones", () => {
     // an old strong set and a fresh weaker set: the anchor sits below the old
     // peak because recency pulls toward the fresh, lower estimate
-    const old = estimateE1rm(120, 8, 2, params)!.value;
-    const fresh = estimateE1rm(100, 8, 2, params)!.value;
+    const old = estimateE1rm(120, 8, 2, meanParams)!.value;
+    const fresh = estimateE1rm(100, 8, 2, meanParams)!.value;
     const samples: E1rmSample[] = [
       { weight: 120, reps: 8, targetRir: 2, ageDays: 90 },
       { weight: 100, reps: 8, targetRir: 2, ageDays: 0 },
     ];
-    const anchor = recencyWeightedE1rm(samples, params)!;
+    const anchor = recencyWeightedE1rm(samples, meanParams)!;
     expect(anchor.value).toBeLessThan(old);
     expect(anchor.value).toBeGreaterThan(fresh);
     // and closer to the fresh estimate than the old one (3 half-lives apart)
@@ -110,5 +119,82 @@ describe("recencyWeightedE1rm", () => {
     )!;
     expect(anchor.value).toBeCloseTo(expected.value, 1);
     expect(anchor.confidence).toBe(expected.confidence);
+  });
+
+  it("best: takes the recency-weighted single max set", () => {
+    const samples: E1rmSample[] = [
+      { weight: 100, reps: 8, targetRir: 2, ageDays: 0 },
+      { weight: 110, reps: 8, targetRir: 2, ageDays: 0 },
+      { weight: 90, reps: 8, targetRir: 2, ageDays: 0 },
+    ];
+    const anchor = recencyWeightedE1rm(samples, bestParams)!;
+    const top = estimateE1rm(110, 8, 2, bestParams)!.value;
+    expect(anchor.value).toBeCloseTo(top, 1);
+  });
+
+  it("session_best: averages the blow-out set's session, taming a fluke", () => {
+    // a sandbagged session that finally goes hard: one huge set then two
+    // diminished ones. `best` would anchor on the 20-rep fluke; `session_best`
+    // averages the whole session so it lands between.
+    const session = "we-1";
+    const samples: E1rmSample[] = [
+      { weight: 190, reps: 20, targetRir: 0, ageDays: 0, sessionKey: session },
+      { weight: 190, reps: 12, targetRir: 0, ageDays: 0, sessionKey: session },
+      { weight: 190, reps: 8, targetRir: 0, ageDays: 0, sessionKey: session },
+    ];
+    const sessionBest = recencyWeightedE1rm(samples, params)!.value;
+    const rawBest = recencyWeightedE1rm(samples, bestParams)!.value;
+    const meanOfSession =
+      (estimateE1rm(190, 20, 0, params)!.value +
+        estimateE1rm(190, 12, 0, params)!.value +
+        estimateE1rm(190, 8, 0, params)!.value) /
+      3;
+    expect(sessionBest).toBeCloseTo(meanOfSession, 1);
+    expect(sessionBest).toBeLessThan(rawBest); // tempered vs the lone fluke
+  });
+
+  it("session_best: only averages within the best set's session", () => {
+    const samples: E1rmSample[] = [
+      // strongest session (recent)
+      { weight: 150, reps: 5, targetRir: 1, ageDays: 1, sessionKey: "A" },
+      { weight: 150, reps: 4, targetRir: 1, ageDays: 1, sessionKey: "A" },
+      // an unrelated lighter session the same week must not dilute it
+      { weight: 90, reps: 12, targetRir: 1, ageDays: 0, sessionKey: "B" },
+    ];
+    const anchor = recencyWeightedE1rm(samples, params)!.value;
+    const sessionAMean =
+      (estimateE1rm(150, 5, 1, params)!.value +
+        estimateE1rm(150, 4, 1, params)!.value) /
+      2;
+    expect(anchor).toBeCloseTo(sessionAMean, 1);
+  });
+});
+
+describe("weightForRepsAtRir (converse of predictRepsAtWeight)", () => {
+  it("round-trips: pick a weight for N reps → predict N back", () => {
+    const anchor = estimateE1rm(100, 8, 2, params)!.value;
+    for (const reps of [5, 8, 10, 12]) {
+      const w = weightForRepsAtRir(anchor, reps, 2, params)!;
+      expect(predictRepsAtWeight(anchor, w, 2, params)).toBe(reps);
+    }
+  });
+
+  it("more target reps ⇒ lighter weight at the same RIR", () => {
+    const anchor = estimateE1rm(100, 8, 2, params)!.value;
+    const heavy = weightForRepsAtRir(anchor, 5, 2, params)!;
+    const light = weightForRepsAtRir(anchor, 12, 2, params)!;
+    expect(light).toBeLessThan(heavy);
+  });
+
+  it("a lower target RIR ⇒ heavier weight for the same reps", () => {
+    const anchor = estimateE1rm(100, 8, 2, params)!.value;
+    const at2 = weightForRepsAtRir(anchor, 8, 2, params)!;
+    const at0 = weightForRepsAtRir(anchor, 8, 0, params)!;
+    expect(at0).toBeGreaterThan(at2);
+  });
+
+  it("returns null without a usable anchor or reps", () => {
+    expect(weightForRepsAtRir(null, 8, 2, params)).toBeNull();
+    expect(weightForRepsAtRir(120, 0, 2, params)).toBeNull();
   });
 });

@@ -6,9 +6,11 @@ import {
   toEngineEquipment,
   type EngineInputs,
   type EngineParams,
+  type E1rmAnchor,
   type Prescription,
   type SummaryDelta,
 } from "@/lib/engine";
+import { getExerciseE1rmAnchors } from "./logging";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -65,12 +67,13 @@ export interface AdvanceResult {
   nextLabel: string | null;
 }
 
-type EngineGoal = "cut" | "gain" | "maintain";
+type EngineGoal = "cut" | "strength" | "hypertrophy" | "maintain";
 
 /**
- * Map the macrocycle goal onto a progression-engine goal: hypertrophy and
- * strength both drive progressive overload (gain); cut/maintain pass through.
- * Standalone mesos (no macro goal) default to gain.
+ * Map the macrocycle goal onto a progression-engine goal. Strength and
+ * hypertrophy are now kept distinct (doc 13 §9.1) so the engine can pick a rep
+ * window per goal; both still drive progressive overload, cut/maintain pass
+ * through. Standalone mesos (no macro goal) default to the hypertrophy window.
  */
 export function engineGoal(macroGoal: MacroGoalType | null): EngineGoal {
   switch (macroGoal) {
@@ -79,9 +82,10 @@ export function engineGoal(macroGoal: MacroGoalType | null): EngineGoal {
     case "maintain":
       return "maintain";
     case "strength":
+      return "strength";
     case "hypertrophy":
     default:
-      return "gain";
+      return "hypertrophy";
   }
 }
 
@@ -99,6 +103,7 @@ export function buildEngineInputs(args: {
   profile: Pick<ProfileRow, "experience_level" | "units">;
   muscleGroupWeeklySets: number | null;
   weekPeak: EngineInputs["weekPeak"];
+  strengthAnchor: EngineInputs["strengthAnchor"];
 }): EngineInputs {
   const { we } = args;
   return {
@@ -144,6 +149,7 @@ export function buildEngineInputs(args: {
     muscleGroupWeeklySets: args.muscleGroupWeeklySets,
     weekPeak: args.weekPeak,
     initial: null,
+    strengthAnchor: args.strengthAnchor,
   };
 }
 
@@ -199,6 +205,7 @@ interface WeekContext {
   workoutFeedbackByWorkout: Map<string, WorkoutFeedbackRow>;
   mgWeeklySets: Map<string, number>;
   peaks: Map<string, NonNullable<EngineInputs["weekPeak"]>>;
+  anchorsByExercise: Map<string, E1rmAnchor>;
   equipmentByExercise: Map<string, string>;
   nameByExercise: Map<string, string>;
 }
@@ -259,6 +266,7 @@ async function generateDay(
         ? (ctx.mgWeeklySets.get(we.muscle_group_id) ?? null)
         : null,
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
+      strengthAnchor: ctx.anchorsByExercise.get(we.exercise_id) ?? null,
     });
     const output = prescribe(inputs, ctx.params);
     decisions.push({ inputs, output, sourceWeId: we.id, exerciseId: we.exercise_id });
@@ -546,6 +554,16 @@ export async function advanceWeekAfterWorkout(
   const { version: paramsVersion, params } =
     await getActiveEngineParams(service);
 
+  // recency-weighted strength anchors (value + confidence) per exercise, for
+  // rep-window weight selection + RIR grading (doc 13). Cross-history, so a
+  // mid-cycle swap-in with prior history is seeded sensibly.
+  const anchorsByExercise = await getExerciseE1rmAnchors(
+    service,
+    userId,
+    exerciseIds,
+    params,
+  );
+
   const setsByWe = new Map<string, LoggedSetRow[]>();
   for (const s of sets ?? []) {
     const cur = setsByWe.get(s.workout_exercise_id) ?? [];
@@ -573,6 +591,7 @@ export async function advanceWeekAfterWorkout(
     ),
     mgWeeklySets: weeklySetsByGroup(weekWes),
     peaks: peakByExercise(mesoWes ?? [], micro.target_rir),
+    anchorsByExercise,
     equipmentByExercise: new Map(
       (exercises ?? []).map((e) => [e.id, e.equipment_type]),
     ),
@@ -950,6 +969,12 @@ export async function projectNextPrescription(
     ? `next week W${nextMicro.week_number} (target RIR ${nextMicro.target_rir}${nextMicro.is_deload ? ", deload" : ""})`
     : `no later week exists in this block — projected holding W${micro.week_number}'s target RIR ${micro.target_rir}`;
 
+  const anchors = await getExerciseE1rmAnchors(
+    supabase,
+    userId,
+    [exerciseId],
+    params,
+  );
   const inputs = buildEngineInputs({
     we: sourceWe,
     sets: setsByWe.get(sourceWe.id) ?? [],
@@ -968,6 +993,7 @@ export async function projectNextPrescription(
       ? (weeklySetsByGroup(weekWes).get(sourceWe.muscle_group_id) ?? null)
       : null,
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
+    strengthAnchor: anchors.get(exerciseId) ?? null,
   });
   const output = prescribe(inputs, params);
 

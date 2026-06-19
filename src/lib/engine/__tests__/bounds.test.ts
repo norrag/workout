@@ -58,6 +58,14 @@ function randomInputs(r: () => number): EngineInputs {
     muscleGroupWeeklySets: int(0, 25),
     weekPeak: { weight, reps, sets, targetRir },
     initial: null,
+    // exercise the rep-window path too, half the time, at varied confidence
+    strengthAnchor:
+      r() < 0.5
+        ? {
+            value: 20 + Math.round(r() * 200),
+            confidence: pick(["low", "moderate", "high"] as const),
+          }
+        : null,
   };
 }
 

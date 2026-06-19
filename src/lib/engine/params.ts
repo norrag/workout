@@ -48,7 +48,17 @@ export const experienceLevels = [
   "advanced",
 ] as const;
 
-export const goalTypes = ["cut", "gain", "maintain"] as const;
+// per-set engine goals that drive prescribe(). Widened (doc 13 §9.1) so the
+// engine can tell strength from hypertrophy and pick a rep window per goal;
+// `gain` is retained as a back-compat alias of `hypertrophy` (older stored
+// decisions / engine_params rows still parse and behave identically).
+export const goalTypes = [
+  "cut",
+  "gain",
+  "strength",
+  "hypertrophy",
+  "maintain",
+] as const;
 
 // long-term macrocycle goal vocabulary (figs 2.2/2.3, doc 09/10). Distinct
 // from the per-set `goalTypes` that drive `prescribe()`: a macrocycle carries
@@ -126,6 +136,54 @@ export const engineParamsSchema = z.object({
   // weights are rounded to this loadable step per equipment, in each unit
   rounding: perEquipmentStep,
 
+  // ----- doc 13: rep-window prescription (param-gated, decision 8) -----------
+  // Added with `.default()` (legacy = the v8-equivalent increment/reps path) so
+  // pre-v9 rows parse to today's behavior; v9 + DEFAULT_ENGINE_PARAMS select the
+  // new modes. Switching back is an engine_params activation, not a redeploy.
+
+  // how the prescribed weight is chosen: `increment` = legacy +step on actuals;
+  // `rep_window` = pick the weight that lands reps in the goal's window at the
+  // target RIR, from the strength anchor (doc 13 §2, §9.2).
+  weight_selection: z.enum(["rep_window", "increment"]).default("increment"),
+  // how performance is graded: `reps` = legacy rep-delta; `rir` = infer achieved
+  // RIR and compare to target (overshooting intensity is a hold, never a regress).
+  grading: z.enum(["rir", "reps"]).default("reps"),
+  // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
+  // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
+  // fixed −%, carries genuine regression — doc 13 §4.3).
+  rir_tolerance: z.number().min(0).default(1),
+  rir_regress_gap: z.number().min(0).default(2),
+  // productive rep window per goal (doc 13 §9.1): target_low..high is the
+  // double-progression band; min..max are the hard bounds the prescribed reps
+  // stay inside. Keyed by the widened goal vocabulary; `gain` mirrors
+  // `hypertrophy`. Resolved in prescribe() from the macrocycle goal.
+  rep_window: z
+    .record(
+      z.enum(goalTypes),
+      z.object({
+        target_low: z.number().int().positive(),
+        target_high: z.number().int().positive(),
+        min: z.number().int().positive(),
+        max: z.number().int().positive(),
+      }),
+    )
+    .default({
+      hypertrophy: { target_low: 8, target_high: 12, min: 6, max: 15 },
+      gain: { target_low: 8, target_high: 12, min: 6, max: 15 },
+      strength: { target_low: 3, target_high: 5, min: 2, max: 6 },
+      cut: { target_low: 8, target_high: 12, min: 6, max: 15 },
+      maintain: { target_low: 8, target_high: 12, min: 6, max: 15 },
+    }),
+  // below this confidence, don't reprice off a shaky anchor — hold the plan
+  // (doc 13 decision 6). `low` (the default) reprices on almost any signal,
+  // matching the "lean aggressive" call; the session-average anchor (§9.3)
+  // already tempers a single fluke set.
+  reps_predict: z
+    .object({
+      min_confidence: z.enum(["high", "moderate", "low"]),
+    })
+    .default({ min_confidence: "low" }),
+
   // ----- metric blocks (10-metrics-spec.md §8) -------------------------------
   // Added with `.default()` so the active v2 row (which predates them) still
   // parses; an explicit v3 row seeds the values for admin tuning.
@@ -143,6 +201,15 @@ export const engineParamsSchema = z.object({
       // predictor tracks current form and legitimately drops when performance
       // dips (e.g. on a cut). Tunable like everything else.
       recency_halflife_days: z.number().positive().default(30),
+      // strength-anchor selection (doc 13 decision 4 + §9.3). `mean` is the
+      // legacy recency-weighted average; `best` the recency-weighted single max
+      // set; `session_best` (the locked default) takes the recency-weighted best
+      // set then averages every working set from *that session* — robust to one
+      // blow-out set. Defaulted to `mean` here so a pre-v9 row keeps its old live
+      // predictor; the v9 row + DEFAULT_ENGINE_PARAMS select `session_best`.
+      anchor_method: z
+        .enum(["session_best", "best", "mean"])
+        .default("mean"),
     })
     .default({
       rir_offset: 1.0,
@@ -151,6 +218,7 @@ export const engineParamsSchema = z.object({
       high_max_rir: 2,
       mod_max_rir: 3,
       recency_halflife_days: 30,
+      anchor_method: "mean",
     }),
 
   // §5 profile-personalized macrocycle target + recommended-timeframe engine
@@ -345,6 +413,8 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = engineParamsSchema.parse({
   },
   progression_style: {
     gain: "load_first",
+    hypertrophy: "load_first",
+    strength: "load_first",
     cut: "hold",
     maintain: "hold",
   },
@@ -373,4 +443,28 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = engineParamsSchema.parse({
     kettlebell: { kg: 4.0, lb: 9 },
     other: { kg: 2.5, lb: 5 },
   },
+  // doc 13 v9: the new rep-window prescription + RIR grading + session-best
+  // anchor are the active defaults; the schema keeps legacy fallbacks so older
+  // engine_params rows still parse to the increment path.
+  e1rm: {
+    rir_offset: 1.0,
+    high_max_eff_reps: 8,
+    mod_max_eff_reps: 12,
+    high_max_rir: 2,
+    mod_max_rir: 3,
+    recency_halflife_days: 30,
+    anchor_method: "session_best",
+  },
+  weight_selection: "rep_window",
+  grading: "rir",
+  rir_tolerance: 1,
+  rir_regress_gap: 2,
+  rep_window: {
+    hypertrophy: { target_low: 8, target_high: 12, min: 6, max: 15 },
+    gain: { target_low: 8, target_high: 12, min: 6, max: 15 },
+    strength: { target_low: 3, target_high: 5, min: 2, max: 6 },
+    cut: { target_low: 8, target_high: 12, min: 6, max: 15 },
+    maintain: { target_low: 8, target_high: 12, min: 6, max: 15 },
+  },
+  reps_predict: { min_confidence: "low" },
 });
