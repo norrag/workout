@@ -28,7 +28,9 @@ import { engineParamsSchema, type EngineParams } from "@/lib/engine";
 
 /** Bumped whenever `engineParamsSchema`'s *shape* changes incompatibly. */
 // v3 adds the §5.4 `volume` block (MEV/MAV/MRV landmarks + experience scale).
-export const CURRENT_PARAMS_SCHEMA_VERSION = 3;
+// v4 adds the doc 13 rep-window block (weight_selection, grading, rep_window,
+// rir_tolerance/rir_regress_gap, reps_predict, e1rm.anchor_method).
+export const CURRENT_PARAMS_SCHEMA_VERSION = 4;
 
 /** Deterministic JSON with recursively sorted object keys. Pure. */
 export function canonicalize(value: unknown): string {

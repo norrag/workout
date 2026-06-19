@@ -276,6 +276,8 @@ async function generateDay(
       previousSets: we.prescribed_sets ?? 1,
       nextWeight: output.weight,
       nextSets: output.sets,
+      previousReps: we.prescribed_reps,
+      nextReps: output.reps,
     });
     return {
       exercise_id: we.exercise_id,

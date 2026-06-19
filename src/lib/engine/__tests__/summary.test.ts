@@ -88,6 +88,24 @@ describe("composeAutoregulationSummary (fig 1.5 copy)", () => {
     );
   });
 
+  it("reports a held-load rep climb (rep-window Option-A week)", () => {
+    const out = composeAutoregulationSummary({
+      ...base,
+      deltas: [
+        {
+          exerciseName: "Hack Squat",
+          previousWeight: 180,
+          previousSets: 3,
+          nextWeight: 180, // load held
+          nextSets: 3,
+          previousReps: 8,
+          nextReps: 9,
+        },
+      ],
+    });
+    expect(out).toContain("Hack Squat reps 8 to 9");
+  });
+
   it("reports load drops with a minus sign", () => {
     const out = composeAutoregulationSummary({
       ...base,
