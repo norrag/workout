@@ -18,6 +18,13 @@ import {
   getEngineDecisions,
   type DecisionRecord,
 } from "@/lib/queries/engine-admin";
+import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  getRegenerablePlannedDecisions,
+  planRegeneration,
+  applyRegeneration,
+} from "@/lib/queries/regeneration";
+import { createServiceClient } from "@/lib/supabase/service";
 import { resolveSession, type McpExtra, type McpClient } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
@@ -664,6 +671,95 @@ function registerDiscardEngineParams(server: McpServer) {
   );
 }
 
+// --- regenerate_planned_prescriptions --------------------------------------
+
+export const REGENERATE_PLANNED_PRESCRIPTIONS = "regenerate_planned_prescriptions";
+function registerRegeneratePlannedPrescriptions(server: McpServer) {
+  server.registerTool(
+    REGENERATE_PLANNED_PRESCRIPTIONS,
+    {
+      title: "Regenerate planned prescriptions",
+      description:
+        "Admin only. Re-run the engine on not-yet-started PLANNED prescriptions " +
+        "whose last decision predates the ACTIVE engine_params version, and write " +
+        "the refreshed weight / reps / sets / RIR back (with a fresh audited " +
+        "decision). Run this after activate_engine_params so already-planned " +
+        "future workouts pick up the change. DRY RUN by default — returns the " +
+        'diffs and writes nothing; pass confirm="apply" to write. Never touches ' +
+        "in-progress / completed workouts, logged sets, or manual per-set weight " +
+        "overrides. Operates across all users (no user_id argument); optionally " +
+        "scope to one mesocycle_id.",
+      inputSchema: {
+        mesocycle_id: z.string().uuid().optional(),
+        confirm: z
+          .string()
+          .optional()
+          .describe('pass "apply" to write the changes; omit for a dry run'),
+        limit: z.number().int().min(1).max(500).optional(),
+      },
+    },
+    async (
+      args: { mesocycle_id?: string; confirm?: string; limit?: number },
+      extra: McpExtra,
+    ) => {
+      // authorize with the caller's (RLS) client, then switch to the service
+      // client for the privileged, per-user-scoped cross-user writes (hard rule
+      // #4). No user_id is ever taken from input (hard rule #5).
+      const { userId } = await resolveAdmin(extra);
+      const service = createServiceClient();
+      const { version, params } = await getActiveEngineParams(service);
+      const candidates = await getRegenerablePlannedDecisions(service, version, {
+        mesocycleId: args.mesocycle_id,
+        limit: args.limit ?? 200,
+      });
+      const plan = planRegeneration(candidates, params);
+
+      const diffs = plan.items
+        .filter((i) => i.status === "changed")
+        .map((i) => ({
+          exercise_name: i.candidate.exerciseName,
+          coordinate: i.candidate.coordinate,
+          from_params_version: i.candidate.fromParamsVersion,
+          fields: Object.fromEntries(
+            (i.changedFields ?? []).map((f) => [f.field, { from: f.from, to: f.to }]),
+          ),
+        }));
+
+      if (args.confirm !== "apply") {
+        return jsonResult({
+          ok: true,
+          dry_run: true,
+          active_version: version,
+          ...plan.counts,
+          diffs,
+          note:
+            plan.counts.changed > 0
+              ? 'Dry run — nothing written. Re-run with confirm="apply" to write these changes.'
+              : "Nothing to apply — every planned prescription is already current (or the active params leave it unchanged).",
+        });
+      }
+
+      const applied = await applyRegeneration(service, plan.items, version, params);
+      const summary = `regenerated ${applied.updatedExercises} planned prescription(s) to engine_params v${version}`;
+      await recordMcpWrite(
+        userId,
+        REGENERATE_PLANNED_PRESCRIPTIONS,
+        { mesocycle_id: args.mesocycle_id, version, limit: args.limit },
+        summary,
+      );
+      return jsonResult({
+        ok: true,
+        dry_run: false,
+        active_version: version,
+        ...plan.counts,
+        applied,
+        diffs,
+        summary,
+      });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 
 export function registerAdminTools(server: McpServer) {
@@ -675,4 +771,5 @@ export function registerAdminTools(server: McpServer) {
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
+  registerRegeneratePlannedPrescriptions(server);
 }

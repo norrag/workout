@@ -2585,3 +2585,42 @@ v9 to confirm reps/weights look sane on real data before flipping it live.
 **Deferred to a fast-follow** (doc 13 §4.4 / §8): the "Reset to prescription"
 exercise-menu item (UI), and per-slot rep ranges (plumb
 `template_exercises.default_rep_range` → `meso_exercises`).
+
+## 2026-06-19 — Reset to prescription (shipped) + regenerate planned prescriptions
+
+Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
+
+- **"Reset to prescription" exercise-menu item** (`dc019bd`, already on `main`):
+  clears an exercise's `set_weights` overrides so unlogged sets fall back to the
+  stored `prescribed_weight` (→ predicted reps); logged history untouched. It is
+  **gated to appear only when overrides exist** (nothing to reset otherwise), so
+  on a freshly-generated day it is intentionally hidden until you edit a weight —
+  this is by design, not a bug (kept as-is per owner call). Per-slot rep ranges
+  remain deferred.
+- **`regenerate_planned_prescriptions` admin MCP tool** (`src/lib/mcp/tools/admin.ts`
+  + `src/lib/queries/regeneration.ts`). `prescribe()` only fires at week N→N+1
+  generation, so activating a new `engine_params` version leaves *already
+  generated, not-yet-performed* workouts stale — nothing re-fires the engine for
+  them. This tool re-runs the engine on those planned prescriptions (the
+  write-back counterpart of `replay_decisions`): for each `planned` workout
+  exercise with **no logged set** whose latest decision predates the active
+  version, replay its stored inputs against the active params and write the
+  refreshed weight/reps/sets/RIR back, plus a fresh `engine_decisions` row
+  (`provenance.regenerated`) so the audit chain stays intact.
+  - **Safety:** dry-run by default (returns diffs, writes nothing); `confirm="apply"`
+    to write. Never touches in-progress/completed workouts, logged sets, or manual
+    `set_weights` overrides (which compose on top — clear them with "Reset to
+    prescription"). Pairs with `activate_engine_params`.
+  - **Scope:** all users (admin-gated; service-role client with per-row,
+    server-derived user scoping — hard rule #4; **no `user_id` argument** —
+    hard rule #5, covered by the existing admin-tool test). Optional `mesocycle_id`
+    filter; `limit` cap.
+  - **Caveat (documented):** replays each prescription's stored inputs, so the
+    strength anchor is as-computed-at-generation — exactly right for the tunables
+    consumed inside `prescribe()` (rep windows, increments, grading,
+    weight-selection); only anchor-shaping params (`e1rm.anchor_method`, halflife)
+    would be slightly stale, and the dry-run diff shows it before applying.
+  - **Tests.** Pure `planRegeneration` (changed / unchanged / invalid-source /
+    mixed-batch classification); tool added to the admin registration / no-`user_id`
+    / unauthenticated coverage. 386 pass, typecheck + lint clean. No schema change
+    (reuses existing columns; append-only respected).

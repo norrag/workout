@@ -92,8 +92,9 @@ Per [08-design-decisions.md](08-design-decisions.md) §3, **the MCP connector is
 | `replay_decisions` | re-run historical decisions or a whole meso against a candidate param version; return prescription diffs |
 | `simulate_prescriptions` | probe hypothetical inputs against a candidate version (per-item isolated, invalid cases don't fail the batch) |
 | `discard_engine_params` | undo a `propose` — delete an **inactive** version (review §5.8); refused for the active version or any version referenced by a recorded decision (kept reproducible); requires a `confirm_version` echo |
+| `regenerate_planned_prescriptions` | re-run the engine on not-yet-started **planned** prescriptions whose last decision predates the active version, writing refreshed weight/reps/sets/RIR back with a fresh audited decision; **dry-run by default** (`confirm="apply"` to write); never touches in-progress/completed workouts, logged sets, or manual weight overrides; all users (no `user_id` arg), optional `mesocycle_id` scope |
 
-The tuning loop: inspect decisions → propose a version → replay real history against it → review diffs in chat → activate. Same tables and replay functions a future UI would use.
+The tuning loop: inspect decisions → propose a version → replay real history against it → review diffs in chat → activate → **`regenerate_planned_prescriptions`** (dry-run, then `confirm="apply"`) so already-planned future workouts pick up the new version. Same tables and replay functions a future UI would use.
 
 ## Notes — two kinds, both exposed
 
