@@ -38,6 +38,7 @@ import {
   savePinnedNoteAction,
   saveSessionNoteAction,
   skipRemainingAction,
+  resetToPrescriptionAction,
   toggleSkipSetAction,
   unlogSetAction,
   unskipAllAction,
@@ -950,6 +951,20 @@ function ExerciseBlock({
                 onClick={() => {
                   commit(() =>
                     skipRemainingAction({
+                      workout_id: we.workout_id,
+                      workout_exercise_id: we.id,
+                    }),
+                  );
+                  onCloseMenu();
+                }}
+              />
+            )}
+            {Object.keys(we.set_weights ?? {}).length > 0 && (
+              <MenuRow
+                label="Reset to prescription"
+                onClick={() => {
+                  commit(() =>
+                    resetToPrescriptionAction({
                       workout_id: we.workout_id,
                       workout_exercise_id: we.id,
                     }),

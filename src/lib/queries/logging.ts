@@ -697,6 +697,23 @@ export async function setPlannedSetWeight(
   if (error) throw error;
 }
 
+/**
+ * Reset an exercise to its engine prescription (doc 13 §4.4): clear the
+ * `set_weights` overrides so every unlogged set falls back to `prescribed_weight`
+ * (and its predicted reps). Logged sets live in `logged_sets` and are untouched —
+ * this only drops the per-set planned-weight map (hard rule #5, append-only).
+ */
+export async function clearPlannedSetWeights(
+  supabase: Client,
+  workoutExerciseId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("workout_exercises")
+    .update({ set_weights: {} })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
 export async function setExerciseStatus(
   supabase: Client,
   workoutExerciseId: string,
