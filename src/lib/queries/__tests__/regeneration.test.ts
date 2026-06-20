@@ -91,6 +91,25 @@ describe("recomputeRow", () => {
     expect(res.output!.targetRir).toBe(0);
   });
 
+  it("overlays a live macro-goal change so a re-goaled meso reprices the row (doc 14 phase 4)", () => {
+    // macro goal flows into the engine as `goalType`; with a strength anchor present
+    // the engine prices reps into the goal's rep window (doc 13), so re-goaling a
+    // meso hypertrophy→strength produces a different prescription on its open rows.
+    const anchor: E1rmAnchor = { value: 230, confidence: "high" };
+    const hyper = recomputeRow(
+      { ...args({ anchor }), liveConfig: sampleConfig({ goal: "hypertrophy" }) },
+      PARAMS,
+    );
+    const strength = recomputeRow(
+      { ...args({ anchor }), liveConfig: sampleConfig({ goal: "strength" }) },
+      PARAMS,
+    );
+    expect(hyper.output).toBeDefined();
+    expect(strength.output).toBeDefined();
+    // the goal moved the prescription into a different rep window
+    expect(strength.output!.reps).not.toBe(hyper.output!.reps);
+  });
+
   it("classifies a corrupt stored decision as invalid_source (self-heal path)", () => {
     // the live config is always validly built; only corruption in the row's stored
     // DERIVED history (here actualSets) makes the rebuilt inputs un-replayable, and

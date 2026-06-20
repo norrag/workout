@@ -1,6 +1,6 @@
 # 14 — Prescription Freshness: dependency tracking & recompute (design)
 
-Status: **phases 1–3 built (2026-06-20); phases 4–5 designed, not yet built.**
+Status: **phases 1–4 built (2026-06-20); phase 5 (optional) designed, not yet built.**
 Authoritative design for how stored prescriptions stay correct when any of their
 inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
 **redesigns the `params_version` staleness gate** into one general framework; that
@@ -83,6 +83,37 @@ slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 > migration was NOT applied to the hosted DB from this session** (the apply was
 > blocked) — it must be applied on deploy before the override reads resolve (see the
 > manual-operations runbook + PROGRESS "Remaining / external").
+
+> **Phase 4 landed (backfill the already-flowing sources into the contract, §7).**
+> Verification slice — **no schema change, no new code wiring**. The remaining
+> sources (profile experience/units, macro goal, meso config: RIR ramp + deload)
+> already flow as resolved config dimensions (`user.*`, `goalType`, `week.*`), so the
+> fingerprint already sees them; phase 4 proves "scope falls out of the fingerprint"
+> with targeted tests that a change to each source moves the fingerprint of EXACTLY
+> its in-scope rows and is byte-identical for every row outside it. Added to
+> `fingerprint.test.ts` (modelling the reconcile's per-row check, like the phase-3
+> override scoping test): **profile** is a universal dimension (an experience/units
+> edit moves every one of the user's rows across exercises/goals/weeks; cross-user
+> isolation is structural — the reconcile is scoped to one `userId` — plus no
+> cross-user fingerprint collision); **macro goal** moves only the rows whose goal
+> resolves from that macro (a two-meso/two-macro model: re-goaling macro A moves its
+> rows, macro B's stay byte-identical); **meso config** moves rows per microcycle (a
+> 3-week ramp where re-tuning week 2's RIR moves only week-2 rows and the deload
+> toggle moves that week's rows; cross-meso isolation is structural). One
+> `recomputeRow` test in `regeneration.test.ts` ties a macro-goal change to a
+> repriced prescription (hypertrophy→strength reprices the rep window with an anchor
+> present). 474 tests (+9); typecheck/lint/build green. **Deviations as built:** (a)
+> scope verification is at the fingerprint level (pure, like the existing override
+> test), not a DB-backed `reconcilePrescriptions` integration test — consistent with
+> the codebase's no-DB-mock test approach, and the read-path resolution is already
+> golden-tested for write/check parity (§3); (b) cross-user and cross-meso isolation
+> are asserted as non-collision + noted as structurally enforced by the reconcile's
+> `userId`/`mesoId` scoping, since at the pure-hash level a different scope is just an
+> independent input; (c) the recompute-output tie is shown for macro goal (clearly
+> behavioral via the rep window) and, generically, the existing week-RIR overlay test
+> covers meso config — a units/experience recompute-output assertion was omitted as
+> brittle (rounding-dependent), the fingerprint divergence being the load-bearing
+> proof.
 
 ---
 
@@ -481,8 +512,13 @@ the record shows one mechanism, not two.
    deviations (notably: under the active rep-window params the increment moves the
    fingerprint always but a prescribed number only on the legacy increment path; and
    the migration still needs applying to hosted).
-4. **Backfill the rest into the contract** as they arise (profile already flows;
-   macro goal already flows; meso config already flows) — verify each with a test
-   that a change recomputes the right rows and nothing else.
+4. **✅ DONE (2026-06-20) — Backfill the rest into the contract** (§7). Verification
+   slice (no schema, no new wiring): the already-flowing sources (profile
+   experience/units, macro goal, meso config RIR ramp + deload) are proven scoped by
+   targeted tests modelling the reconcile's per-row check — a change to each moves the
+   fingerprint of exactly its in-scope rows and nothing else (`fingerprint.test.ts`),
+   plus a `recomputeRow` test tying a macro-goal change to a repriced prescription
+   (`regeneration.test.ts`). See the phase-4 status note up top for as-built
+   deviations.
 5. **(Optional) history token / Tier-0 epoch** only if a real need or profiling
    appears.

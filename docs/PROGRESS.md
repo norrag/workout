@@ -2,7 +2,69 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Prescription freshness: first per-user override, editable increment (doc 14 phase 3)
+## 2026-06-20 (latest) — Prescription freshness: backfill the already-flowing sources into the contract (doc 14 phase 4)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 4** (§7): the verification slice that closes the dependency-fingerprint
+framework over its remaining inputs. The sources phase 4 names — **profile**
+(experience/units), **macro goal**, and **meso config** (RIR ramp + deload) —
+already flow as resolved config dimensions (`user.*`, `goalType`, `week.*`), so the
+fingerprint already sees them; nothing new had to be wired. What phase 4 owns is the
+**proof** that "scope falls out of the fingerprint" — a change to one source goes
+stale for **exactly** its in-scope rows and is byte-identical for every row outside
+it. **No schema change, no new code wiring** — tests only. `main` deployable; 474
+tests (+9) pass; typecheck / lint / build green.
+
+### Done
+
+- **Source-scoping tests (`fingerprint.test.ts`).** A new `describe` modelling the
+  reconcile's per-row check (it resolves the profile once per user, the goal once per
+  meso, the week per microcycle, then hashes each open row) — the same shape as the
+  phase-3 increment-override scoping test:
+  - **Profile** is a UNIVERSAL dimension: an experience-level or units edit moves
+    every one of the user's rows across exercises / goals / weeks. Cross-user
+    isolation is structural (the reconcile is scoped to one `userId`), reinforced by
+    a no-cross-user-collision assertion.
+  - **Macro goal** moves only the rows whose goal resolves from that macro: a
+    two-meso / two-macro model where re-goaling macro A moves its rows and macro B's
+    stay byte-identical (short-circuit), plus "every row under the re-goaled macro
+    moves regardless of exercise or week."
+  - **Meso config** moves rows per microcycle: a 3-week ramp where re-tuning ONLY
+    week 2's RIR moves week-2 rows (and the edited week now aliases the week sharing
+    its RIR — fingerprint is a pure function of resolved config), the deload toggle
+    moves that week's rows, and cross-meso isolation is structural + non-colliding.
+- **Recompute-output tie (`regeneration.test.ts`).** A `recomputeRow` test ties a
+  macro-goal change to an actually-repriced prescription: with a strength anchor
+  present, re-goaling hypertrophy→strength moves the prescribed reps into the goal's
+  rep window (doc 13). The existing week-RIR overlay test already covers meso config
+  at the recompute level generically.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (474/474, +9), `npm run build`
+all green. The fingerprint scoping is the load-bearing proof (which rows go stale);
+the write/check projection parity it relies on is the §3 golden test from phase 1.
+
+### Deviations / notes
+
+- **Scope verification is at the fingerprint level** (pure, like the phase-3 override
+  test), not a DB-backed `reconcilePrescriptions` integration test — consistent with
+  the codebase's no-DB-mock approach, and the read-path resolution is already
+  golden-tested for write/check parity (§3). The reconcile resolves each dimension
+  exactly as the tests model (profile per `userId`, goal via `resolveMesoGoal`, week
+  per microcycle — see `regeneration.ts`).
+- **Cross-user / cross-meso isolation is asserted as non-collision and noted as
+  structurally enforced** by the reconcile's `userId` / `mesoId` scoping, since at the
+  pure-hash level a different scope is just an independent input (a `fp(x) === fp(x)`
+  assertion would be vacuous, so it was avoided).
+- **The recompute-output tie is shown for macro goal** (clearly behavioral via the
+  rep window); a units/experience recompute-output assertion was omitted as brittle
+  (rounding-dependent) — the fingerprint divergence is the proof that profile rows go
+  stale, and the engine reflecting the new profile is already exercised generically.
+- **Phase 5 (optional) remains**: a history token / Tier-0 epoch, only if a real need
+  or profiling appears. Doc 14's framework is otherwise fully built (phases 1–4).
+
+## 2026-06-20 — Prescription freshness: first per-user override, editable increment (doc 14 phase 3)
 
 Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
 **phase 3** (§7): the first **per-user × exercise** engine override — the editable
