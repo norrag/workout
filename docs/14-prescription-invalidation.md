@@ -301,13 +301,90 @@ whole meso.
 
 ---
 
-## 10. Build phases
+## 10. Mechanisms to retire on cutover
+
+Once freshness is automatic, self-correcting, and runs on the read path, several
+mechanisms that exist *only* to paper over the old "prescriptions silently go stale"
+gap become dead weight. Removing them is part of the work, not a follow-up — a
+half-migrated state (both the old manual machinery and the new framework live) is
+the worst of both. Each line below is **remove** unless marked otherwise.
+
+**MCP tools** (`src/lib/mcp/tools/admin.ts` + its registry/tests):
+
+- `regenerate_planned_prescriptions` — **remove.** Its entire job is "after
+  `activate_engine_params`, manually re-run the engine on planned rows behind the
+  active version and write them back." The read-path reconcile now does this for
+  every input change, automatically, with no manual step. The two-step
+  `plan_token`/`confirm_token` dry-run→apply dance and its `regenPlanToken` machinery
+  go with it.
+- `catch_up_generation` — **remove the manual tool, keep the underlying gap-heal.**
+  Important distinction: this heals **missing days** (a *generation* gap), which is a
+  **separate concern** the freshness framework does **not** cover — do not delete the
+  on-load `catchUpMesoGeneration` auto-heal. The MCP tool is only a redundant manual
+  trigger for that auto-heal (already redundant before this design); retire the tool,
+  leave the auto-heal in the read path alongside the freshness check.
+- `replay_decisions` — **keep.** Read-only pure replay/inspection for engine
+  debugging; writes nothing. It complements the framework (the recompute is, in
+  effect, an audited replay) and is the right tool to preview what a recompute would
+  produce.
+- `simulate_prescriptions` — **keep.** Read-only what-if; an inspection surface, not a
+  correctness mechanism.
+- `activate_engine_params` / `propose_engine_params` / `discard_engine_params` /
+  `list_engine_params` / `get_engine_params` — **keep.** These are the *source* of the
+  global change; activation simply moves the `engine_params` token that feeds the
+  fingerprint. No manual "now go regenerate" follow-up is needed anymore — note that
+  in `activate_engine_params`' description (drop the "then run
+  regenerate_planned_prescriptions" guidance).
+
+**Internal query code** (`src/lib/queries/regeneration.ts`, `progression.ts`,
+`generation.ts`, `app/(app)/workout/page.tsx`):
+
+- `reconcileMesoPlan` (the Workout-tab-only reconcile) — **replace** with the
+  read-path `reconcilePrescriptions`; remove the page-level call in
+  `workout/page.tsx` in favor of the shared read-path integration (§5).
+- `getRegenerablePlannedDecisions` (candidate gathering keyed off
+  `decision.params_version < active`) — **remove**; superseded by fingerprint-keyed
+  selection.
+- `regenPlanToken`, `withRecomputedAnchors`, `anchorKey` — **remove / absorb.** The
+  token gating dies with the admin apply tool; anchor re-resolution folds into the
+  unified recompute's derived-input refresh (§6.1 step 2).
+- `planRegeneration` / `applyRegeneration` — **reshape, don't delete.** Their core —
+  replay stored inputs through the engine, classify changed vs unchanged, write back
+  + append an audited decision — is exactly the recompute; keep the logic, re-home it
+  under the fingerprint-driven `reconcilePrescriptions`, drop the version-diff framing.
+- The branch's `workout_exercises.params_version` **gate logic** (and the
+  `getPlannedWorkoutIds`/stale-scan/bulk-stamp helpers added with it) — **remove**;
+  `dep_fingerprint` replaces it.
+
+**Schema** (new append-only migrations — never edit applied ones, #2):
+
+- `workout_exercises.params_version` column — **drop** (the audit trail lives on
+  `engine_decisions.params_version`, which stays). Keeping an unused column only
+  invites confusion; if a debugging reason surfaces, keep it but stop reading it.
+- `engine_decisions.params_version` / `params_hash` — **keep** (audit), now joined by
+  the dependency-component provenance (§4).
+
+**Tests/docs:** drop the `regenerate_planned_prescriptions` / `catch_up_generation`
+admin-tool tests and the `regenPlanToken` tests; reshape `regeneration.test.ts`
+around the fingerprint recompute; prune the matching PROGRESS.md / doc references so
+the record shows one mechanism, not two.
+
+> Sequencing note: tools and code are removed in the **same** phase that lands their
+> replacement (§11), so `main` never carries both the manual machinery and the
+> framework at once.
+
+---
+
+## 11. Build phases
 
 1. **Framework, params-only (no behavior change).** Add `dep_fingerprint`;
    factor `resolveConfigInputs` + `configProjection` + `computeDepFingerprint`
    (pure, golden-tested); stamp it at every write; `reconcilePrescriptions` uses the
-   fingerprint; backfill migration; retire the `params_version` gate. Equivalent
-   behavior to today, but now general. *(Replaces the current branch's gate.)*
+   fingerprint on the read path; backfill migration. **Same PR retires:** the
+   `params_version` gate + its helpers, `getRegenerablePlannedDecisions` /
+   `regenPlanToken`, the `regenerate_planned_prescriptions` and `catch_up_generation`
+   MCP tools (keep the gap-heal), and the dropped column (§10). Equivalent behavior
+   to today, but general — and with no leftover manual machinery.
 2. **Normalize decisions** (§6.2): record seed/user-add decisions with `kind`;
    unify the recompute dispatcher.
 3. **First per-user override — editable increment.** Override table (RLS + tests),
