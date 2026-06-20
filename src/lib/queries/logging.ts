@@ -957,6 +957,10 @@ export async function addWorkoutExercises(
     .single();
   if (mErr) throw mErr;
 
+  // a user-added slot carries no engine decision; stamp it with the active version
+  // so it reads as current and never trips the on-load reconcile's staleness gate
+  const { version: paramsVersion } = await getActiveEngineParams(supabase);
+
   const [{ data: links, error: linkErr }, { data: prs, error: prErr }] =
     await Promise.all([
       supabase
@@ -988,6 +992,7 @@ export async function addWorkoutExercises(
       target_rir: micro.target_rir,
       status: "pending" as const,
       notes: "Added during the workout",
+      params_version: paramsVersion,
     };
   });
   const { error } = await supabase.from("workout_exercises").insert(rows);

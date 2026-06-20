@@ -13,6 +13,8 @@ type Defaulted =
   // has a DB default ('{}'); only workout_exercises carries these keys
   | "skipped_set_numbers"
   | "set_weights"
+  // nullable; stamped by the engine/seed/reconcile paths, optional on raw inserts
+  | "params_version"
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
@@ -251,6 +253,10 @@ export type WorkoutExerciseRow = {
   /** per-set planned weight overrides for unlogged sets (set_number → weight), doc 11 */
   set_weights: Record<string, number>;
   notes: string | null;
+  /** engine_params.version this prescription was last computed/reconciled under;
+   *  the on-load reconcile compares it against the active version to skip the
+   *  heavy regeneration unless the row is stale. */
+  params_version: number | null;
   created_at: string;
   updated_at: string;
 }

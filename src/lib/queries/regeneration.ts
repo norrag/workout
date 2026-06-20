@@ -436,6 +436,7 @@ export async function applyRegeneration(
         prescribed_sets: output.sets,
         target_rir: output.targetRir,
         notes: output.rationale,
+        params_version: activeVersion,
       })
       .eq("id", candidate.workoutExerciseId);
     if (updateError) throw updateError;
@@ -471,6 +472,32 @@ export interface ReconcileResult {
   refreshed: number;
 }
 
+/** The meso's planned, not-yet-started workout ids — the reconcile's write scope
+ *  and the rows the staleness gate reads. Two indexed lookups, no engine work. */
+async function getPlannedWorkoutIds(
+  service: Client,
+  userId: string,
+  mesoId: string,
+): Promise<string[]> {
+  const { data: micros, error: microsError } = await service
+    .from("microcycles")
+    .select("id")
+    .eq("mesocycle_id", mesoId)
+    .eq("user_id", userId);
+  if (microsError) throw microsError;
+  const microIds = (micros ?? []).map((m) => m.id);
+  if (microIds.length === 0) return [];
+
+  const { data: workouts, error: workoutsError } = await service
+    .from("workouts")
+    .select("id")
+    .in("microcycle_id", microIds)
+    .eq("user_id", userId)
+    .eq("status", "planned");
+  if (workoutsError) throw workoutsError;
+  return (workouts ?? []).map((w) => w.id);
+}
+
 /**
  * Make a user's meso match the ACTIVE engine_params, transparently and on demand
  * — the single "keep it correct" operation. Two halves of one job:
@@ -480,10 +507,19 @@ export interface ReconcileResult {
  *     decision predates the active version (regeneration, anchor-rebuilt).
  *
  * Idempotent and additive-or-in-place only: never touches started/completed
- * workouts, logged sets, or manual `set_weights` overrides. Cheap when there is
- * nothing to do (steady state finds no gaps and no stale rows). Called on load
- * so activating a new version propagates to every user on their next open — no
+ * workouts, logged sets, or manual `set_weights` overrides. Called on load so
+ * activating a new version propagates to every user on their next open — no
  * manual regenerate/catch-up step required. Returns what changed.
+ *
+ * Fast path: each prescription carries the `params_version` it was last written
+ * under, so the common "nothing changed" case settles with one indexed read
+ * (`workout_exercises` behind the active version) and skips the heavy replay
+ * entirely — no per-decision lookup, no anchor recompute. The expensive
+ * regeneration only runs when a planned row is actually behind the active
+ * version. After a refresh, every open row is stamped current so the gate stays
+ * closed until the next activation — including seeds and any row the engine
+ * couldn't replay (no recorded inputs / invalid source), which the reconcile
+ * leaves as-is by design and must not re-scan on every subsequent load.
  */
 export async function reconcileMesoPlan(
   service: Client,
@@ -495,12 +531,40 @@ export async function reconcileMesoPlan(
   const generated = await catchUpMesoGeneration(service, userId, mesoId);
 
   const { version, params } = await getActiveEngineParams(service);
+
+  const plannedWorkoutIds = await getPlannedWorkoutIds(service, userId, mesoId);
+  if (plannedWorkoutIds.length === 0) return { generated, refreshed: 0 };
+
+  // staleness gate: is any open prescription behind the active version (or never
+  // stamped)? When none, there is nothing to refresh — this is the steady state
+  // and the whole heavy path is skipped.
+  const staleFilter = `params_version.is.null,params_version.lt.${version}`;
+  const { data: stale, error: staleError } = await service
+    .from("workout_exercises")
+    .select("id")
+    .in("workout_id", plannedWorkoutIds)
+    .or(staleFilter)
+    .limit(1);
+  if (staleError) throw staleError;
+  if (!stale || stale.length === 0) return { generated, refreshed: 0 };
+
+  // something is behind — run the anchor-rebuilt replay over the stale rows
   const candidates = await getRegenerablePlannedDecisions(service, version, params, {
     mesocycleId: mesoId,
     userId,
   });
   const plan = planRegeneration(candidates, params);
   const applied = await applyRegeneration(service, plan.items, version, params);
+
+  // close the gate: stamp every still-behind open row current. Regenerated rows
+  // are already at `version`; this also covers unchanged/invalid/seed rows the
+  // replay left untouched, so the next load short-circuits at the gate.
+  const { error: stampError } = await service
+    .from("workout_exercises")
+    .update({ params_version: version })
+    .in("workout_id", plannedWorkoutIds)
+    .or(staleFilter);
+  if (stampError) throw stampError;
 
   return { generated, refreshed: applied.updatedExercises };
 }
