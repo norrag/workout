@@ -1,246 +1,320 @@
-# 14 — Prescription Invalidation & Represcribe (design)
+# 14 — Prescription Freshness: dependency tracking & recompute (design)
 
-Status: **design, not yet built (2026-06-20).** It changes no behavior by itself —
-it is the artifact to build the editable-increment feature (and future per-user
-tunables) against. Builds on the on-load reconcile
-([PROGRESS.md](PROGRESS.md), `reconcileMesoPlan`) and the regeneration machinery
-in `src/lib/queries/regeneration.ts`. Engine intent lives in
-[04-feedback-engine.md](04-feedback-engine.md),
+Status: **design, not yet built (2026-06-20).** Authoritative design for how stored
+prescriptions stay correct when any of their inputs change. It supersedes the
+narrower "invalidate on increment edit" sketch and **redesigns the
+`params_version` staleness gate** (PR on branch `…version-check…`) into one
+general framework; that gate becomes a single special case (§9). Engine intent
+lives in [04-feedback-engine.md](04-feedback-engine.md),
 [10-metrics-spec.md](10-metrics-spec.md), and
 [13-reps-prescription-unification.md](13-reps-prescription-unification.md). When a
-slice lands, fold the relevant amendment into those and update PROGRESS.md.
+slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 
-## 1. Problem
+---
 
-Prescriptions are **precomputed and stored** on `workout_exercises`
-(`prescribed_weight/reps/sets`, `target_rir`). The engine only (re)writes them at
-two moments: meso seed (`startMeso`) and the week N→N+1 advance (`generateDay`).
-A stored prescription therefore goes **stale** whenever any input that fed
-`prescribe()` drifts from what produced it. The inputs are:
+## 1. The problem, stated correctly
 
-1. **Global `engine_params`** — the active tuning row. Changes via admin
-   activation; affects every user.
-2. **The user's logged history → strength anchors** — refreshed automatically by
-   the recompute itself (`getExerciseE1rmAnchors`), so it needs no separate
-   signal.
-3. **Per-user, per-exercise parameter overrides** *(new — the motivating case)* —
-   e.g. an editable **weight increment** the user sets per exercise (kept unique
-   to the user, like a pinned note). Future siblings: a custom rep window, an RIR
-   cap, a loadable rounding step, a per-exercise progression style.
+A prescription (`workout_exercises.prescribed_weight/reps/sets`, `target_rir`) is a
+**cached derived value**: the output of the pure engine `prescribe(inputs, params)`
+(and `seedMeso` for cold starts). It is computed and frozen at one moment — meso
+seed, or the week N→N+1 advance — and then displayed for days.
 
-The on-load reconcile already keeps (1) and (2) correct cheaply: each prescription
-stamps the `engine_params.version` it was computed under
-(`workout_exercises.params_version`), and `reconcileMesoPlan` recomputes any
-planned, not-yet-started row whose stamp is behind the active version, then stamps
-it current — so steady-state loads are instant and a new version propagates on the
-next open.
+It becomes **wrong** the instant any input that fed it changes and is not
+recomputed. The inputs come from many places, at many scopes:
 
-**The gap (3):** a per-user override edit does **not** move the global version, so
-the `params_version`-vs-active gate can never detect it. A row computed under the
-old increment stays stamped at the *current* active version and reads as "current"
-forever. We need a staleness signal that is **per-user, per-exercise**, not just
-global — and it must be robust and reusable, because the increment is only the
-first of several per-user tunables.
+| Source of change | Scope it affects | Examples |
+|---|---|---|
+| `engine_params` activation | **global** (all users) | tuning, rep windows, increments, deload |
+| Exercise param override | **user × exercise** | editable weight increment (future: rep window, rounding, RIR cap) |
+| Profile edit | **user** | experience level, units |
+| Macrocycle goal change | **macrocycle** (its mesos) | hypertrophy ↔ strength ↔ cut ↔ maintain |
+| Mesocycle config edit | **mesocycle** | RIR ramp, weeks, deload flag |
+| Logged history / feedback | **user × exercise** | (today: handled by the generation flow, §6.4) |
 
-> This is the limitation flagged when the version gate shipped: the reconcile
-> stamps even un-recomputed rows (seeds, "unchanged", invalid-source) to the active
-> version to keep the gate closed, so `params_version < active` cannot, by itself,
-> rediscover a row whose *non-global* input later changed. §4 resolves it.
+This is the classic **cache-invalidation problem**, and it is foundational: the app
+will keep growing inputs (preferences, goals, profile facts), and each new one must
+not require re-solving correctness from scratch. The wrong fix is to bolt a bespoke
+"flag the affected rows" path onto each new source — that is N fragile contracts,
+each of which can forget a case and silently show stale numbers. We want **one
+framework** where:
 
-## 2. Goals & non-goals
+1. a stored prescription **declares what it depends on**,
+2. staleness is **derived from the actual current inputs** (so it cannot be
+   "forgotten"),
+3. only the **precisely affected** prescriptions recompute, **lazily** and as
+   **lightly** as possible.
 
-**Goals**
-- One **invalidation primitive** any feature can call to mark the right
-  prescriptions stale — hard to misuse, scoped, and audited.
-- The recompute reuses the existing reconcile/regeneration path (no second engine
-  entry point), keeps the engine **pure**, and never touches started/logged work.
-- Steady-state loads stay **instant** (the cheap gate is unchanged for the common
-  case).
-- Generalizes beyond increment to any per-user/per-exercise engine tunable.
+---
 
-**Non-goals**
-- Building the increment editor UI or its storage in this doc (that is the first
-  consuming slice; §6 lists the steps).
-- Retuning the engine's progression behavior — only *which params* it sees per
-  (user, exercise) changes; the math is unchanged.
-- Offline/admin surfaces (out of scope per CLAUDE.md).
+## 2. Principles
 
-## 3. Two kinds of staleness, one gate
+- **Pull, not push.** Don't make each source hunt down and flag affected rows.
+  Instead, each prescription carries a **signature of the inputs that produced it**;
+  on read we compare it to the inputs as they are *now*. A mismatch means stale.
+  This is self-correcting: a source literally cannot forget to invalidate, because
+  staleness is computed from the live inputs, not from anyone remembering to mark a
+  flag.
+- **The signature is derived from the engine's own inputs**, so it can never drift
+  from what the engine actually consumes (§3). Adding an input the engine reads
+  automatically extends the signature — you can't have a dependency the framework
+  doesn't see.
+- **Cheap to check, precise to recompute.** The check is a hash compare over a few
+  cheap reads; the expensive `prescribe()` replay runs only for rows that actually
+  diverged.
+- **Lazy.** Recompute happens when prescriptions are read for display, not eagerly
+  on every mutation. Nothing recomputes until someone looks.
+- **Immutable history is sacred** (hard rule #5). Only `planned`, not-yet-started
+  prescriptions with no logged set are ever rewritten. Logged sets, manual
+  `set_weights`, and started/completed workouts are never touched.
+- **Engine stays pure** (hard rule #3). All resolution and hashing live in the
+  query layer; the engine still takes one resolved `EngineInputs` + `EngineParams`.
 
-Generalize the gate's meaning rather than adding a parallel one. A planned,
-not-yet-started prescription is **current** iff
+---
+
+## 3. Model: inputs split into *config* and *derived*
+
+`EngineInputs` (see `src/lib/engine/types.ts`) divides cleanly:
+
+- **Config inputs** — cheap to re-resolve, and the things a *source* changes:
+  `exercise.equipmentType`, `user.{experienceLevel,units}`, `goalType`,
+  `week.{targetRir,isDeload}`, `previous` (the prior week's prescription),
+  `initial` (plan cold-start defaults), and the **engine_params token** (its
+  `version` / `params_hash`). Plus per-user/per-exercise **overrides** (the new
+  increment, etc.) resolved into *effective params*.
+- **Derived inputs** — require reading logged history, so they are *expensive* and
+  are **excluded from the cheap check**: `actualSets`, `exerciseFeedback`,
+  `workoutFeedback`, `muscleGroupWeeklySets`, `weekPeak`, `strengthAnchor`.
+
+The freshness **signature (fingerprint)** is a canonical hash of the **config
+projection** of the inputs:
 
 ```
-params_version IS NOT NULL  AND  params_version >= active_version
+dep_fingerprint = sha(canonical({ ...configProjection(inputs), paramsToken }))
 ```
 
-Everything else needs represcribe. The reconcile gate already shipped as exactly
-`params_version IS NULL OR params_version < active`, so:
+`configProjection` is a **denylist** (everything in `EngineInputs` *except* the
+known derived fields). Denylist, not allowlist, on purpose: a newly added config
+input is included by default, so the failure mode is "we recompute a bit too
+eagerly," never "we silently miss a change." (See §6.4 for why derived inputs are
+safe to omit.)
 
-- **Global change** (engine_params activation) — handled as today: every row's
-  stamp falls behind the new active version.
-- **Targeted change** (a per-user override edit) — the mutation **explicitly sets
-  `params_version = NULL`** on the affected planned rows. `NULL` becomes the
-  universal *"invalidate me"* marker, independent of the global version, and the
-  next reconcile picks it up.
+> **One resolver, used at both write and check.** The only correctness requirement
+> is that the config projection is built the *same way* when a prescription is
+> written and when its freshness is checked. So factor a single pure
+> `resolveConfigInputs(scope) → ConfigInputs` (a refactor of today's
+> `buildEngineInputs`); generation builds `EngineInputs = resolveConfigInputs(...) +
+> deriveHistory(...)`, and the freshness check calls `resolveConfigInputs(...)`
+> alone. A golden test asserts `configProjection(buildEngineInputs(x)) ===
+> resolveConfigInputs(x)` so the two routes can never drift.
 
-No new column, no new scan, no second gate. `NULL` is the precise "these specific
-rows" signal; the global version stays the coarse "everyone" signal.
+---
 
-## 4. The mechanism
+## 4. Storage
 
-### 4.1 Invalidation primitive (reusable)
-
-A single query-layer function — the canonical, documented, tested way to mark
-prescriptions stale. Every feature that changes an engine input calls it; nothing
-else writes `params_version = NULL`.
-
-```ts
-// src/lib/queries/regeneration.ts (or a sibling represcribe.ts)
-/**
- * Mark a user's OPEN prescriptions (planned, not-yet-started, no logged set) for
- * represcribe on the next reconcile, by clearing their params_version stamp.
- * The universal invalidation primitive: any per-user input change the engine
- * consumes (an exercise increment edit, a future per-user tunable) calls this for
- * the affected scope. Scoped to the owner; never touches in-progress / completed /
- * skipped work, logged sets, or manual set_weights. Returns rows invalidated.
- */
-export async function invalidatePlannedPrescriptions(
-  service: Client,
-  userId: string,
-  scope: { exerciseId?: string; mesocycleId?: string } = {},
-): Promise<number>;
-```
-
-It updates `workout_exercises.params_version = NULL` where the row is owned by
-`userId`, sits on a `planned` workout, matches the optional `exerciseId` /
-`mesocycleId` scope, and has no logged set. For the increment feature:
-`invalidatePlannedPrescriptions(service, userId, { exerciseId })` right after the
-override is saved.
-
-### 4.2 Per-user override resolution (keeps the engine pure)
-
-Overrides live in their own per-user, per-exercise table, mirroring
-`exercise_notes` (RLS `user_id = auth.uid()`, index on `(user_id, exercise_id)`):
+`workout_exercises` gains one column:
 
 ```sql
--- shape to pin down with the first consuming slice
-create table public.exercise_param_overrides (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  exercise_id uuid not null references public.exercises (id) on delete cascade,
-  weight_increment numeric,        -- null = use the engine default
-  -- room for future per-exercise tunables (rep window, rir cap, rounding step…)
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (user_id, exercise_id)
-);
+alter table public.workout_exercises
+  add column dep_fingerprint text;   -- null = never stamped → always recompute
 ```
 
-The engine stays a pure function of one resolved `EngineParams` (hard rule #3).
-Resolution is a **pure** query-layer merge:
+That single column **replaces** the `params_version` gate (§9). The engine_params
+version is folded into the fingerprint via `paramsToken`. (Keep `params_version`
+only if useful for human-readable audit; it is no longer the gate.)
+
+The audit trail stays in `engine_decisions`. Generalize it so **seeds record a
+decision too** (today only advances do), giving a uniform replay source for
+recompute (§6.2). Store the resolved dependency component values in the decision's
+`provenance` jsonb — so `explain_prescription` can show *why* a number was chosen
+and *what input changed* on a recompute.
+
+No new bookkeeping table is needed for the common case: the fingerprint hashes
+input **values**, read from the rows that already own them
+(`profiles`, the override table, `macrocycles`, `mesocycles`/`microcycles`,
+`engine_params`). There is no separate "revision registry" to keep in sync, and no
+trigger discipline to forget.
+
+---
+
+## 5. The freshness check (read path)
+
+A single function, called wherever prescriptions are read for display (the Workout
+tab, the planned Day View, the meso planner) — not bolted to one page:
 
 ```ts
-// src/lib/engine/params.ts (pure) — global params + one override → effective params
-export function resolveEffectiveParams(
-  global: EngineParams,
-  override: ExerciseParamOverride | null,
-  equipment: EngineEquipment,
-): EngineParams;
+// reconcilePrescriptions(service, userId, { mesocycleId }) → { recomputed: number }
 ```
 
-The increment override maps onto the engine tunable(s) it represents — the legacy
-`params.increment[equipment]` and/or the rep-window loadable `params.rounding[equipment]`
-(decide and document which when the slice lands; see `src/lib/engine/index.ts`
-§3). Every site that calls `prescribe()` for a user's exercise — `generateDay`,
-the seed builders, and the regeneration replay — resolves effective params first;
-all other call sites are unaffected because no override means
-`resolveEffectiveParams` returns `global` unchanged.
+Steady-state cost for one meso:
 
-### 4.3 Recompute path — candidates keyed off the row marker
+1. resolve the cheap config dimensions once, batched: active `engine_params`
+   version (cached), the user's `profile`, the meso's `macro` goal, the meso's
+   microcycle RIR ramp (already loaded for the page), and the **override rows for
+   this user × the meso's exercises** (one indexed read).
+2. for each open prescription, build its `ConfigInputs` from that batch and hash →
+   **expected** fingerprint. (Pure, in-memory.)
+3. compare to the stored `dep_fingerprint`.
+   - **all match → done.** No decision lookup, no anchor recompute, instant.
+   - **some differ → recompute exactly those** (§6), in **week order** so a changed
+     `previous` propagates to the next week within the one pass.
 
-This is the **one substantive change** the mechanism requires, and it must land
-**with** the first feature that uses overrides — never before (see §5).
+That is one extra indexed read (overrides) over what the page already loads, plus
+in-memory hashing — the lightest check that is still complete.
 
-`getRegenerablePlannedDecisions` today gathers candidates as planned rows whose
-**latest decision** `params_version < activeVersion`, then replays the stored
-decision inputs through `prescribe(inputs, activeGlobalParams)`. Two changes:
+> **Optional Tier-0 fast path (only if profiling demands it).** Maintain a scalar
+> `prescription_epoch` per user (bumped by DB triggers on the source tables) and a
+> global epoch (bumped on `engine_params` activation); store `(global,user)` epoch
+> on each prescription. If both match the current epochs, skip step 1 entirely.
+> This trades trigger machinery for removing ~one read; **not recommended for v1** —
+> the fingerprint check is already cheap, and triggers reintroduce a discipline the
+> pull model exists to avoid. Documented so the option is on record.
 
-1. **A row with `params_version IS NULL` is always a candidate**, regardless of its
-   decision's version. So the gathering predicate becomes "the *row* is behind"
-   (`we.params_version IS NULL OR we.params_version < active`), not "the *decision*
-   is behind." This is what lets a targeted, no-global-bump invalidation actually
-   recompute. (The stored decision inputs — logged sets, feedback — are still the
-   replay source; only the resolved *params* differ.)
-2. **Replay under effective params**, anchor- *and* override-rebuilt:
-   `prescribe(inputs, resolveEffectiveParams(activeGlobal, override, equipment))`.
-   The new increment flows in through the effective params, so the replay produces
-   the new numbers and `planRegeneration` classifies the row `changed`.
+---
 
-After applying, the reconcile stamps every still-behind open row
-`params_version = active` exactly as today (a `NULL` row recomputed under an
-unchanged global version still lands at `active` — correct, it is now consistent
-with the active version *and* current overrides). The audit `engine_decisions` row
-is appended as today, with the override value recorded in `provenance` (§4.4).
+## 6. Recompute
 
-### 4.4 Provenance & a future fingerprint backstop
+### 6.1 What recompute does
 
-Explicit invalidation (push) is cheap but relies on every mutation calling the
-primitive. To keep the system auditable and drift detectable:
+For each diverged prescription, in week order:
 
-- **Provenance (do now, with the slice):** record the override values used in the
-  decision's `provenance` jsonb (the column already exists) so
-  `explain_prescription` and audits show *why* a number was chosen and under which
-  override.
-- **Fingerprint (future hardening, optional):** store a cheap
-  `inputs_fingerprint` (hash of the override-relevant params slice) on the row as a
-  backstop the reconcile could verify lazily, or admin tooling could scan to catch
-  a missed invalidation. Documented as a later option, not required for v1 — the
-  primitive + tests are the v1 guarantee.
+1. **Resolve effective params** = global active params **+** the user×exercise
+   override merged in (pure `resolveEffectiveParams`; the engine stays pure).
+2. **Rebuild inputs**: config from `resolveConfigInputs` (current), derived from
+   live history (`getExerciseE1rmAnchors`, logged sets of the source week, etc.) —
+   so a config-triggered recompute also picks up the latest anchors for free.
+3. **Run the engine** (`prescribe`, or `seedMeso` for a week-1/cold row — dispatch
+   on the decision `kind`, §6.2).
+4. **Write back** `prescribed_*`, `target_rir`, `notes`, and the **new
+   `dep_fingerprint`**; append an `engine_decisions` row stamped with the params
+   version/hash, the dependency component values, and a "recomputed: {reason}"
+   provenance.
+5. **Preserve manual intent**: per-set `set_weights` overrides are left untouched
+   (they sit on top of the prescription; "reset to prescription" clears them
+   separately). Logged sets and started/completed work are out of scope by
+   construction.
 
-## 5. Sequencing & safety
+### 6.2 Uniform replay source (normalize seeds)
 
-The pieces are **interdependent — do not ship the invalidation primitive alone.**
-With today's reconcile, nulling a row whose decision is already at the active
-version makes the recompute *skip* it (candidate gathering keys off the decision
-version) while the closing bulk-stamp still re-stamps it `active` — so the row
-would be marked current **without being recomputed under the new override**:
-silently wrong. The candidate-gathering change in §4.3 is the precondition.
+Recompute should not need bespoke logic per write origin. Record an
+`engine_decisions` row for **seeds** as well as advances, tagged `kind: "seed" |
+"advance"`, carrying the inputs that produced the prescription. Then recompute is
+always "re-run the engine of `kind` on the stored config inputs, with current
+effective params + refreshed derived inputs." User-added slots
+(`addWorkoutExercises`) likewise record a `kind: "seed"` decision. This removes the
+current special-case where seed rows have no decision and so can't be replayed.
 
-Therefore the first vertical slice ships these together:
-override table + resolution → recompute keyed off the row marker → the
-invalidation primitive → the increment editor that calls it.
+### 6.3 Self-healing for un-recomputable rows
 
-## 6. Build checklist (first slice — editable increment)
+If a row's stored inputs can't be replayed (corrupt/invalid), restamp its
+fingerprint to the **current** expected value and move on — never loop. This is
+*not* a permanent lie (the flaw of a monotonic version stamp): if any of its inputs
+change again, the expected fingerprint changes again and the row is re-attempted.
+It self-heals on the next real change.
 
-1. **Migration:** `exercise_param_overrides` (RLS `user_id = auth.uid()`,
-   default-deny, `(user_id, exercise_id)` index + RLS tests in the same PR —
-   hard rule #1). Append-only.
-2. **Engine:** pure `resolveEffectiveParams(global, override, equipment)` +
-   golden/unit test that an override changes only the increment-driven output.
-3. **Queries:** resolve effective params in `generateDay`, the seed builders
-   (`buildDayExerciseRows`), and the regeneration replay; change
-   `getRegenerablePlannedDecisions` to gather on the **row** marker and replay
-   under effective params; record override provenance.
-4. **Primitive:** `invalidatePlannedPrescriptions(service, userId, scope)`; call
-   it from the override-save action.
-5. **UI:** increment editor on the Exercise page (per CLAUDE.md, transcribe the
-   mockup before building); default shown, edit persists per-user, "reset to
-   default" clears the override and invalidates.
-6. **Tests:** primitive scope (planned/no-logged only, owner-scoped); reconcile
-   recomputes a `NULL`-marked row with no global bump; idempotent re-run is a
-   no-op; started/completed/logged rows untouched.
+### 6.4 Why derived (history) inputs are omitted from the check
 
-## 7. Invariants (carried from the hard rules)
+Future prescriptions are (re)generated from a **completed** source week; an open
+prescription's `previous` and derived inputs come from immutable, completed work,
+so they don't drift under the user mid-view. Live history therefore doesn't need to
+*trigger* a freshness check — the generation flow already owns "new history → next
+week's numbers." And because recompute (§6.1 step 2) always refreshes anchors,
+whenever a *config* change does trigger a recompute, it incorporates the latest
+history anyway. If we ever want history edits to invalidate already-generated
+weeks, add a cheap `history_token` (e.g. max `updated_at` of the source week's
+logged sets) as one more config dimension — the framework extends without
+redesign.
 
-- **No edits to logged history** (#5): invalidation and recompute touch only
-  `planned`, not-yet-started rows with no logged set; `set_weights` overrides and
-  all logged sets are never touched.
-- **Engine stays pure** (#3): override resolution is query-layer; the engine sees
-  one resolved `EngineParams`. Every behavior change keeps a unit/golden test.
+---
+
+## 7. Adding a new source — the reusable contract
+
+This is the whole point: a new input must be a **small, mechanical** addition, not a
+correctness redesign. To add any source of change:
+
+1. **Make the value part of the engine's resolved inputs** — either an
+   `EngineInputs` field or an *effective-params* override. (You were going to do
+   this anyway; the engine can't use what it can't see.)
+2. **Resolve it in `resolveConfigInputs`** (and, if it's an override,
+   `resolveEffectiveParams`). Because the fingerprint is the config projection of
+   the inputs, this **automatically** puts it in the signature — no separate
+   "invalidate" wiring.
+3. **Done.** On the source's next mutation, the live value differs from what the
+   stored fingerprints encode, the read-path check sees the mismatch, and exactly
+   the affected prescriptions recompute on next view.
+
+Worked mappings:
+
+| Source | Step 1–2 | What gets recomputed |
+|---|---|---|
+| **Engine params** activation | already a fingerprint token (`version`/hash) | every user's open prescriptions (global) |
+| **Increment override** (user×exercise) | new override table → `resolveEffectiveParams` | that user's open rows **for that exercise** |
+| **Profile** (experience/units) | already in `user` inputs | that user's open rows (all exercises) |
+| **Macro goal** | already in `goalType` | open rows under that macro's mesos |
+| **Meso config** (RIR ramp/weeks) | already in `week.*` + `previous` | that meso's open rows |
+
+No source needs to know what a `workout_exercise` is. **Scope falls out of the
+fingerprint automatically** — an increment edit only changes the fingerprint of
+rows for that exercise, so only those recompute, even though the check ran over the
+whole meso.
+
+> **Eager option (optional, per source).** Pure-lazy refresh-on-view is correct and
+> lightest. If a particular change should feel instant *before* the user navigates
+> (rare), the source may additionally call `reconcilePrescriptions(userId,
+> { mesocycleId })` right after its mutation — the *same* function, just invoked
+> early. It is an optimization, never a correctness requirement, and it cannot
+> diverge from the lazy path because it is the lazy path.
+
+---
+
+## 8. Invariants (carried from the hard rules)
+
+- **No edits to logged history** (#5): only `planned`, not-yet-started rows with no
+  logged set are rewritten; `set_weights` and logged sets untouched.
+- **Engine pure** (#3): resolution + hashing are query-layer; every behavior change
+  keeps a unit/golden test (incl. the projection-equivalence test in §3).
 - **RLS, default deny** (#1): the override table is `user_id = auth.uid()`; the
-  primitive runs service-side scoped to `userId`.
-- **Audit trail intact:** every recompute appends an `engine_decisions` row, now
-  carrying the override provenance — one definition of progress.
-- **Idempotent & cheap:** after a represcribe the rows are stamped current, so the
-  next reconcile short-circuits at the gate; steady-state loads stay instant.
+  reconcile runs service-side, scoped to the owner.
+- **Audit intact:** every recompute appends an `engine_decisions` row (now incl.
+  seeds) with dependency provenance — one definition of progress, shared with MCP.
+- **Idempotent & cheap:** after a recompute the rows carry the current fingerprint,
+  so the next check matches and short-circuits; steady-state reads stay instant.
+- **Append-only migrations** (#2): the column add, the override table, and the
+  `engine_decisions.kind` addition ship as new migrations with RLS tests.
+
+---
+
+## 9. What this replaces / transition
+
+- **`params_version` gate → `dep_fingerprint`.** The single-scalar gate modeled
+  exactly one input (global params) and could not see per-user/per-exercise change;
+  it also had to "stamp even un-recomputed rows current" to avoid re-scanning,
+  which made non-global changes undiscoverable. The fingerprint subsumes it
+  (params version is one component) and self-heals (§6.3), so that wart is gone.
+  Migration: add `dep_fingerprint`, backfill by computing it from each open row's
+  latest decision inputs; retire the `params_version` read-gate (keep the column
+  for audit only, or drop it).
+- **Workout-tab-only reconcile → read-path reconcile.** Move the check into the
+  prescription read/query layer so every surface that displays prescriptions gets
+  fresh numbers, not just the Workout tab.
+- **Seed rows with no decision → uniform decisions** (§6.2), so recompute has one
+  replay path.
+
+---
+
+## 10. Build phases
+
+1. **Framework, params-only (no behavior change).** Add `dep_fingerprint`;
+   factor `resolveConfigInputs` + `configProjection` + `computeDepFingerprint`
+   (pure, golden-tested); stamp it at every write; `reconcilePrescriptions` uses the
+   fingerprint; backfill migration; retire the `params_version` gate. Equivalent
+   behavior to today, but now general. *(Replaces the current branch's gate.)*
+2. **Normalize decisions** (§6.2): record seed/user-add decisions with `kind`;
+   unify the recompute dispatcher.
+3. **First per-user override — editable increment.** Override table (RLS + tests),
+   `resolveEffectiveParams`, increment editor on the Exercise page (transcribe the
+   mockup first — CLAUDE.md #8). Recompute scopes to the exercise automatically.
+4. **Backfill the rest into the contract** as they arise (profile already flows;
+   macro goal already flows; meso config already flows) — verify each with a test
+   that a change recomputes the right rows and nothing else.
+5. **(Optional) history token / Tier-0 epoch** only if a real need or profiling
+   appears.
