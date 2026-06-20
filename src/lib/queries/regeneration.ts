@@ -2,11 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   engineInputsSchema,
   prescribe,
+  type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
   type Prescription,
 } from "@/lib/engine";
 import type { Database } from "@/lib/types/database";
+import { getExerciseE1rmAnchors } from "./logging";
 import { engineCodeSha, hashParams } from "./params-provenance";
 
 /**
@@ -161,14 +163,55 @@ export function planRegeneration(
   return { items, counts };
 }
 
+/** Key a recomputed anchor by its owner + exercise (anchors are per-user). */
+export function anchorKey(userId: string, exerciseId: string): string {
+  return `${userId}:${exerciseId}`;
+}
+
+/**
+ * Overwrite each candidate's recorded `inputs.strengthAnchor` with a freshly
+ * recomputed anchor (keyed by `anchorKey`). Pure.
+ *
+ * Why this is required: a decision recorded under v8 or earlier predates the
+ * `strengthAnchor` input (doc 13), so its stored inputs carry none. The v9
+ * rep-window weight selection is gated on a non-null anchor — replaying those
+ * anchor-less inputs always falls through to the legacy increment branch and
+ * reports "unchanged". Recomputing the anchor from the user's logged history
+ * (the same `getExerciseE1rmAnchors` the live week-advance uses) is what lets a
+ * backfill actually pick up the new model. A null anchor (no usable history) is
+ * left in place so the engine keeps its plan-based cold-start fallback.
+ */
+export function withRecomputedAnchors(
+  candidates: PlannedDecisionCandidate[],
+  anchorByKey: Map<string, E1rmAnchor>,
+): PlannedDecisionCandidate[] {
+  return candidates.map((candidate) => {
+    if (
+      typeof candidate.inputs !== "object" ||
+      candidate.inputs === null ||
+      Array.isArray(candidate.inputs)
+    ) {
+      return candidate;
+    }
+    const anchor = anchorByKey.get(anchorKey(candidate.userId, candidate.exerciseId)) ?? null;
+    return { ...candidate, inputs: { ...candidate.inputs, strengthAnchor: anchor } };
+  });
+}
+
 /**
  * Gather the not-yet-started prescriptions whose latest decision predates the
  * active params version. Service-role, cross-user; optionally scoped to one
  * mesocycle. Returns at most `limit` candidates, oldest-coordinate first.
+ *
+ * Each candidate's `inputs.strengthAnchor` is recomputed from the owner's
+ * logged history against `params` (`withRecomputedAnchors`) so a backfill can
+ * exercise the active model's anchor-driven path rather than replaying a stale,
+ * anchor-less input verbatim.
  */
 export async function getRegenerablePlannedDecisions(
   service: Client,
   activeVersion: number,
+  params: EngineParams,
   opts: { mesocycleId?: string; limit?: number } = {},
 ): Promise<PlannedDecisionCandidate[]> {
   // optional mesocycle scoping → its microcycle ids
@@ -275,7 +318,26 @@ export async function getRegenerablePlannedDecisions(
   }
 
   candidates.sort((a, b) => (a.coordinate ?? "").localeCompare(b.coordinate ?? ""));
-  return opts.limit != null ? candidates.slice(0, opts.limit) : candidates;
+  const limited =
+    opts.limit != null ? candidates.slice(0, opts.limit) : candidates;
+
+  // recompute the strength anchor per (owner, exercise) from logged history so
+  // the active model's anchor-driven path can engage on the backfill. Anchors
+  // are per-user, so batch the exercise ids by owner.
+  const exerciseIdsByUser = new Map<string, Set<string>>();
+  for (const c of limited) {
+    const set = exerciseIdsByUser.get(c.userId) ?? new Set<string>();
+    set.add(c.exerciseId);
+    exerciseIdsByUser.set(c.userId, set);
+  }
+  const anchorByKey = new Map<string, E1rmAnchor>();
+  for (const [uid, exIds] of exerciseIdsByUser) {
+    const anchors = await getExerciseE1rmAnchors(service, uid, [...exIds], params);
+    for (const [exId, anchor] of anchors) {
+      anchorByKey.set(anchorKey(uid, exId), anchor);
+    }
+  }
+  return withRecomputedAnchors(limited, anchorByKey);
 }
 
 /** Provenance for a regenerated decision — the doc-11 RIR-fallback record plus a
