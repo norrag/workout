@@ -1,8 +1,17 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CopyField } from "./CopyField";
+
+/**
+ * Stable, canonical production origin for the connector endpoint. The copyable
+ * MCP URL must be the one durable domain a user pastes into their AI client —
+ * never a deployment-specific or preview host (those rotate and break the
+ * saved connector). `NEXT_PUBLIC_APP_URL` overrides this (e.g. localhost in
+ * dev, or a future custom domain); otherwise we fall back to the canonical
+ * production alias rather than the request host.
+ */
+const CANONICAL_APP_URL = "https://workout-zeta-murex.vercel.app";
 
 /**
  * AI connector detail (off the More tab, fig 4.4 row). Surfaces the MCP
@@ -19,13 +28,7 @@ export default async function ConnectorPage() {
   if (!user) redirect("/sign-in");
 
   const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  let origin = configured;
-  if (!origin) {
-    const h = await headers();
-    const host = h.get("x-forwarded-host") ?? h.get("host");
-    const proto = h.get("x-forwarded-proto") ?? "https";
-    origin = host ? `${proto}://${host}` : "";
-  }
+  const origin = configured || CANONICAL_APP_URL;
   const endpoint = `${origin}/api/mcp`;
 
   return (
