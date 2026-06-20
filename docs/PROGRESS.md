@@ -87,6 +87,75 @@ calls are auditable.
 - **DayView reps/LOG tap ordering** (`log/[workoutId]/DayView.tsx`) — not a bug
   under React 18/19: discrete events (blur, click) flush synchronously between
   native dispatches, so the LOG handler reads the post-blur predicted reps.
+## 2026-06-20 (latest) — Security audit (Phase 7 hardening slice 2)
+
+Full state-of-the-art security audit of the whole surface (MCP OAuth resource
+server + tools, Supabase Auth/consent flow, middleware + server actions + route
+handlers, RLS schema, service-role usage, data-lifecycle flows, client XSS
+sinks, service worker, CI, dependencies). Findings + status recorded in
+[14-security-audit.md](14-security-audit.md). `main` deployable; no schema
+change. Existing 396 tests + 17 new = 413 passing; typecheck/lint/build green.
+
+### Fixed
+
+- **MCP rate-limiter memory-exhaustion DoS (HIGH).** The limiter runs pre-auth
+  keyed by `sha256(bearer_token)` and its `prune()` was never called, so a
+  unique-token spray grew the `windows` map without bound. `RateLimiter` now
+  prunes opportunistically (once/window) and enforces a hard `maxKeys` cap
+  (`DEFAULT_MAX_KEYS = 20_000`, override `MCP_RATE_LIMIT_MAX_KEYS`), rejecting
+  new keys fail-closed when full. `src/lib/mcp/rate-limit.ts` + `/api/mcp/route.ts`
+  (+4 tests).
+- **OAuth consent-decision CSRF (HIGH).** `POST /api/oauth/decision` is a
+  cookie-authenticated, state-changing route handler and does **not** get Server
+  Actions' built-in Origin check. Added `isSameOrigin()`
+  (`src/lib/http/same-origin.ts`) — cross-site posts get `403` via
+  `Sec-Fetch-Site` / `Origin`-vs-host (+6 tests).
+- **MCP token verification hardening (MEDIUM).** `verifyMcpToken` now pins
+  algorithms to `["RS256","ES256","EdDSA"]` (RFC 8725), rejects `anon` /
+  `service_role` project keys, and enforces `aud` when `MCP_JWT_AUDIENCE` is set
+  (RFC 8707, opt-in). `src/lib/mcp/auth.ts` (+8 tests).
+
+### Remaining / external
+
+- **Migrations don't apply to a clean DB (HIGH — human, rule #2).** The
+  `rls-tests` CI job has been red on every run: migration `20260611000001`
+  aborts because `is_admin()` is defined before `public.profiles` exists
+  (`check_function_bodies` validates the body), and `rls_auto_enable()` is
+  `revoke`d but never `CREATE`d (out-of-band hosted schema). This disables the
+  automated RLS guardrail for hard rule #1. Fixing safely means editing applied
+  migrations + reconciling the hosted function body — see
+  [deployment/manual-operations.md](deployment/manual-operations.md).
+- **Enable `MCP_JWT_AUDIENCE`** once the deployed OAuth token's `aud` is confirmed.
+- Audit gaps (rejected destructive ops + admin inspection), cross-user
+  regeneration scoping test, `import-history.py` anon-grant rework, redeem
+  throttle / share expiry, nonce CSP — all catalogued in 14-security-audit.md.
+## 2026-06-20 (latest) — Connector endpoint: ignore misconfigured Vercel alias overrides
+
+Follow-up to the connector-URL fix below. Production still showed a brittle,
+deployment-specific endpoint (`https://workout-garron-duprees-projects.vercel.app/api/mcp`)
+on `/more/connector` because `NEXT_PUBLIC_APP_URL` is set in Vercel to an
+auto-generated `*.vercel.app` alias, and an explicit env value overrode the
+canonical fallback. The copyable MCP URL must always be the one durable domain.
+
+### Done
+
+- `src/app/(app)/more/connector/page.tsx`: replaced the raw
+  `NEXT_PUBLIC_APP_URL || CANONICAL_APP_URL` resolution with a `resolveOrigin`
+  helper. It honors the env override only for durable origins — localhost (dev)
+  or a non-`vercel.app` custom domain — and **ignores** any auto-generated
+  `*.vercel.app` alias (anything other than the canonical host), falling back to
+  `https://workout-zeta-murex.vercel.app`. Unparseable values fall back too. The
+  page is now self-correcting regardless of the Vercel env value, so the copied
+  endpoint is `https://workout-zeta-murex.vercel.app/api/mcp` on every alias.
+- Updated [deployment/mcp-connector-setup.md](deployment/mcp-connector-setup.md)
+  env table + troubleshooting row to describe the new alias-ignoring behavior.
+
+### Remaining / external
+
+- **Vercel (human, optional):** correcting `NEXT_PUBLIC_APP_URL` to the canonical
+  domain (or unsetting it) is no longer required for the link to be correct, but
+  remains the tidy configuration. See
+  [manual-operations.md](manual-operations.md).
 
 ## 2026-06-20 — Phase 7 hardening slice 1: security pass + data lifecycle
 
@@ -2797,20 +2866,71 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
   version, replay its stored inputs against the active params and write the
   refreshed weight/reps/sets/RIR back, plus a fresh `engine_decisions` row
   (`provenance.regenerated`) so the audit chain stays intact.
-  - **Safety:** dry-run by default (returns diffs, writes nothing); `confirm="apply"`
-    to write. Never touches in-progress/completed workouts, logged sets, or manual
+  - **Safety:** two-step and dry-run by default. The first call (omit `confirm`)
+    writes nothing and returns the diffs plus a `plan_token` (a stable hash of the
+    active version + every changed exercise's target prescription). A write needs
+    BOTH `confirm="apply"` and `confirm_token` echoing that token; a missing or
+    **stale** token (the plan changed since the preview) returns the current dry
+    run instead of writing — so an over-eager MCP client cannot apply in one blind
+    call (the original `confirm="apply"`-only gate let ChatGPT do exactly that).
+    Never touches in-progress/completed workouts, logged sets, or manual
     `set_weights` overrides (which compose on top — clear them with "Reset to
     prescription"). Pairs with `activate_engine_params`.
   - **Scope:** all users (admin-gated; service-role client with per-row,
     server-derived user scoping — hard rule #4; **no `user_id` argument** —
     hard rule #5, covered by the existing admin-tool test). Optional `mesocycle_id`
     filter; `limit` cap.
-  - **Caveat (documented):** replays each prescription's stored inputs, so the
-    strength anchor is as-computed-at-generation — exactly right for the tunables
-    consumed inside `prescribe()` (rep windows, increments, grading,
-    weight-selection); only anchor-shaping params (`e1rm.anchor_method`, halflife)
-    would be slightly stale, and the dry-run diff shows it before applying.
+  - **Anchor rebuild (fix).** Originally the tool replayed each prescription's
+    stored inputs *verbatim*. That silently defeated a v8→v9 backfill: decisions
+    recorded before doc 13 carry **no `strengthAnchor`**, and v9's rep-window
+    weight selection is gated on a non-null anchor — so replaying them always fell
+    through to the legacy increment branch and reported "unchanged" (the same blind
+    spot as `replay_decisions`). `getRegenerablePlannedDecisions` now recomputes the
+    anchor per `(user, exercise)` from logged history via the same
+    `getExerciseE1rmAnchors` the live week-advance uses and injects it into each
+    candidate's inputs (`withRecomputedAnchors`, pure). A null anchor (no usable
+    history) is left in place so the engine keeps its plan-based cold-start
+    fallback. The anchor reflects current strength (recency-weighted), exactly as a
+    fresh generation would compute it; the dry-run diff shows the result before
+    applying.
   - **Tests.** Pure `planRegeneration` (changed / unchanged / invalid-source /
-    mixed-batch classification); tool added to the admin registration / no-`user_id`
-    / unauthenticated coverage. 386 pass, typecheck + lint clean. No schema change
-    (reuses existing columns; append-only respected).
+    mixed-batch classification) + `withRecomputedAnchors` (injects anchor, null
+    when none, flips a backfill from unchanged→changed once the anchor engages the
+    rep window); tool added to the admin registration / no-`user_id` /
+    unauthenticated coverage. Typecheck + lint clean; full suite green. No schema
+    change (reuses existing columns; append-only respected).
+- **Generation-gap self-heal (`catchUpMesoGeneration` + `catch_up_generation`).**
+  Prescriptions are generated *per completed workout* (`advanceWeekAfterWorkout`).
+  Any day whose completion never ran the job — seeded/imported history, a failed
+  or raced completion — leaves a permanent hole the per-completion path can't
+  reach (a locked day can't be re-completed), and the existing `catchUpProgression`
+  only fires when the whole active week is closed (`!nextWorkout`), so a mid-week
+  hole (e.g. W4·D1 when W3·D1 was seeded complete while W3·D4 is still planned)
+  never heals. New pure `planCatchUp(weeks, workouts)` finds every closed
+  (completed/skipped) day whose next-week same-day counterpart is missing;
+  `catchUpMesoGeneration` runs the normal `advanceWeekAfterWorkout` on each
+  (idempotent, additive — only CREATES missing days, never touches started/logged
+  work or existing prescriptions; a freshly created day is generated under the
+  active params, so it lands on v9).
+  - **Auto-heal:** the Workout tab calls it on load for the active meso (cheap
+    when there are no gaps), so a missing day appears without any manual step.
+  - **Manual trigger:** `catch_up_generation` admin MCP tool (caller-scoped;
+    optional `mesocycle_id`, default the active meso). Dry-run by default (lists
+    the days it would create); `confirm="apply"` generates them.
+  - **Tests.** `planCatchUp` (single mid-week gap, ignores planned/last-week,
+    skipped counts as closed, none when counterparts exist, week→day ordering);
+    tool added to the admin registry / no-`user_id` coverage. Full suite green,
+    typecheck + lint clean. No schema change.
+- **Unified on-load reconcile (`reconcileMesoPlan`).** The "keep the plan correct"
+  job is one thing, not three tools to invoke: activating a new `engine_params`
+  version should just propagate to every user. `reconcileMesoPlan(service, userId,
+  mesoId)` does both halves in one call — (1) `catchUpMesoGeneration` to create any
+  missing day, then (2) the anchor-rebuilt regeneration to refresh any
+  not-yet-started prescription whose decision predates the active version
+  (`getRegenerablePlannedDecisions` gained a `userId` scope for the per-user load
+  path). The **Workout tab runs it on load** for the active meso, so activation is
+  the only manual step — correctness then appears transparently on each user's next
+  open (idempotent; cheap when nothing is stale; never touches started/completed
+  work, logged sets, or manual `set_weights`). The `regenerate_planned_prescriptions`
+  / `catch_up_generation` MCP tools remain as optional ops/preview triggers but are
+  no longer required for correctness. Full suite green, typecheck + lint clean.

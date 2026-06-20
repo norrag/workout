@@ -41,4 +41,37 @@ describe("RateLimiter", () => {
     rl.prune(1001);
     expect(rl.size).toBe(0);
   });
+
+  it("opportunistically prunes expired keys on later checks (bounds memory)", () => {
+    const rl = new RateLimiter(5, 1000);
+    for (let i = 0; i < 50; i++) rl.check(`k${i}`, 0);
+    expect(rl.size).toBe(50);
+    // A check a full window later triggers the once-per-window prune, dropping
+    // all the now-expired keys before recording the new one.
+    rl.check("fresh", 1001);
+    expect(rl.size).toBe(1);
+  });
+
+  it("caps the number of distinct keys (fail-closed against unique-key sprays)", () => {
+    const rl = new RateLimiter(5, 1000, 3); // maxKeys = 3
+    expect(rl.check("a", 0).allowed).toBe(true);
+    expect(rl.check("b", 0).allowed).toBe(true);
+    expect(rl.check("c", 0).allowed).toBe(true);
+    // Map is full of live entries; a brand-new key is rejected rather than
+    // growing the map without bound.
+    const overflow = rl.check("d", 0);
+    expect(overflow.allowed).toBe(false);
+    expect(rl.size).toBe(3);
+    // Existing keys are still served from their live windows.
+    expect(rl.check("a", 1).allowed).toBe(true);
+  });
+
+  it("admits new keys again once capacity frees up", () => {
+    const rl = new RateLimiter(5, 1000, 2);
+    rl.check("a", 0);
+    rl.check("b", 0);
+    expect(rl.check("c", 0).allowed).toBe(false); // full
+    // After the window lapses, the cap check prunes the expired keys and admits.
+    expect(rl.check("c", 1001).allowed).toBe(true);
+  });
 });

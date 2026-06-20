@@ -6,9 +6,13 @@ import {
   type EngineParams,
 } from "@/lib/engine";
 import {
+  anchorKey,
   planRegeneration,
+  regenPlanToken,
+  withRecomputedAnchors,
   type PlannedDecisionCandidate,
 } from "../regeneration";
+import type { E1rmAnchor } from "@/lib/engine";
 
 const PARAMS = DEFAULT_ENGINE_PARAMS as EngineParams;
 
@@ -137,5 +141,111 @@ describe("planRegeneration", () => {
     expect(item.inputs).toBeDefined(); // parsed, ready to re-record
     expect(item.output).toBeDefined();
     expect(item.changedFields!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("withRecomputedAnchors", () => {
+  // a hypertrophy lift logged above its window — without an anchor the engine
+  // takes the legacy increment branch; with one it takes v9's rep-window path
+  function repWindowInputs(): Record<string, unknown> {
+    return {
+      exercise: { equipmentType: "dumbbell" },
+      user: { experienceLevel: "intermediate", units: "lb" },
+      goalType: "hypertrophy",
+      week: { targetRir: 0, isDeload: false },
+      previous: { weight: 25, reps: 11, sets: 3, targetRir: 1 },
+      actualSets: [
+        { setNumber: 1, weight: 25, reps: 15, rirReported: null, isWarmup: false },
+        { setNumber: 2, weight: 25, reps: 15, rirReported: null, isWarmup: false },
+        { setNumber: 3, weight: 25, reps: 15, rirReported: null, isWarmup: false },
+      ],
+      exerciseFeedback: { jointPain: 0, pump: 8, workload: 6 },
+      workoutFeedback: null,
+      muscleGroupWeeklySets: 9,
+      weekPeak: null,
+      initial: null,
+    };
+  }
+
+  it("injects the recomputed anchor into each candidate's inputs", () => {
+    const c = candidate(repWindowInputs(), { weight: 0, reps: 0, sets: 0, targetRir: 0 });
+    const anchor: E1rmAnchor = { value: 40, confidence: "high" };
+    const [injected] = withRecomputedAnchors(
+      [c],
+      new Map([[anchorKey(c.userId, c.exerciseId), anchor]]),
+    );
+    expect((injected.inputs as Record<string, unknown>).strengthAnchor).toEqual(anchor);
+  });
+
+  it("sets a null anchor when none was recomputed (no usable history)", () => {
+    const c = candidate(repWindowInputs(), { weight: 0, reps: 0, sets: 0, targetRir: 0 });
+    const [injected] = withRecomputedAnchors([c], new Map());
+    expect((injected.inputs as Record<string, unknown>).strengthAnchor).toBeNull();
+  });
+
+  it("flips a backfill from unchanged to changed once the anchor is recomputed", () => {
+    // the stored output is the legacy (anchor-less) prescription, so replaying
+    // verbatim — as the tool did before the fix — reports no change
+    const inputs = repWindowInputs();
+    const legacyOut = prescribe(inputs as unknown as EngineInputs, PARAMS);
+    const c = candidate(inputs, legacyOut as unknown as Record<string, unknown>);
+    expect(planRegeneration([c], PARAMS).counts.changed).toBe(0);
+
+    // recompute the anchor → v9's rep-window path engages and diverges
+    const anchor: E1rmAnchor = { value: 40, confidence: "high" };
+    const injected = withRecomputedAnchors(
+      [c],
+      new Map([[anchorKey(c.userId, c.exerciseId), anchor]]),
+    );
+    const plan = planRegeneration(injected, PARAMS);
+    expect(plan.counts.changed).toBe(1);
+    // the refreshed reps land inside the goal's window (hypertrophy 6–15)
+    const out = plan.items[0].output!;
+    const win = PARAMS.rep_window.hypertrophy!;
+    expect(out.reps).toBeGreaterThanOrEqual(win.min);
+    expect(out.reps).toBeLessThanOrEqual(win.max);
+  });
+});
+
+describe("regenPlanToken", () => {
+  const stale = () =>
+    candidate(sampleInputs(), { weight: 999, reps: 8, sets: 3, targetRir: 2 });
+
+  it("is stable for the same plan + version", () => {
+    const a = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
+    const b = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
+    expect(a).toBe(b);
+  });
+
+  it("changes when the active version changes", () => {
+    const plan = planRegeneration([stale()], PARAMS);
+    expect(regenPlanToken(plan, 9)).not.toBe(regenPlanToken(plan, 8));
+  });
+
+  it("changes when a target prescription changes", () => {
+    const base = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
+    // a different stored output for the same inputs is still recomputed to the
+    // same engine result, so to shift the token the *engine output* must differ:
+    // drive that with a different target RIR in the inputs
+    const other = candidate(
+      { ...sampleInputs(), week: { targetRir: 0, isDeload: false } },
+      { weight: 999, reps: 8, sets: 3, targetRir: 2 },
+    );
+    expect(regenPlanToken(planRegeneration([other], PARAMS), 9)).not.toBe(base);
+  });
+
+  it("ignores unchanged and invalid items", () => {
+    const inputs = sampleInputs();
+    const current = candidate(
+      inputs,
+      prescribe(inputs as unknown as EngineInputs, PARAMS) as unknown as Record<string, unknown>,
+    );
+    const bad = candidate({ not: "valid" }, { weight: 1, reps: 1, sets: 1, targetRir: 1 });
+    const onlyChanged = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
+    const withNoise = regenPlanToken(
+      planRegeneration([stale(), current, bad], PARAMS),
+      9,
+    );
+    expect(withNoise).toBe(onlyChanged);
   });
 });

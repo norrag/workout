@@ -8,6 +8,7 @@ import {
   buildEngineInputs,
   engineGoal,
   peakByExercise,
+  planCatchUp,
   weeklySetsByGroup,
 } from "../progression";
 import type {
@@ -194,5 +195,68 @@ describe("buildEngineInputs", () => {
       pump: null,
       workload: null,
     });
+  });
+});
+
+describe("planCatchUp", () => {
+  const weeks = [
+    { id: "m1", week_number: 1 },
+    { id: "m2", week_number: 2 },
+    { id: "m3", week_number: 3 },
+    { id: "m4", week_number: 4 },
+  ];
+
+  // mirrors the real data: W3 D1 completed (seeded) but its W4·D1 counterpart
+  // was never generated; D2/D3 completions did generate theirs; D4 still planned.
+  const workouts = [
+    { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+    { id: "w3d2", microcycle_id: "m3", day_number: 2, status: "completed" },
+    { id: "w3d3", microcycle_id: "m3", day_number: 3, status: "completed" },
+    { id: "w3d4", microcycle_id: "m3", day_number: 4, status: "planned" },
+    { id: "w4d2", microcycle_id: "m4", day_number: 2, status: "planned" },
+    { id: "w4d3", microcycle_id: "m4", day_number: 3, status: "planned" },
+  ];
+
+  it("flags only the closed day whose next-week counterpart is missing", () => {
+    const gaps = planCatchUp(weeks, workouts);
+    expect(gaps).toEqual([{ workoutId: "w3d1", week: 3, day: 1 }]);
+  });
+
+  it("ignores a planned source (W3·D4 is not yet completed)", () => {
+    const gaps = planCatchUp(weeks, workouts);
+    expect(gaps.some((g) => g.day === 4)).toBe(false);
+  });
+
+  it("never flags the final week (no next week to generate into)", () => {
+    const lastWeekOnly = [{ id: "m4", week_number: 4 }];
+    const gaps = planCatchUp(lastWeekOnly, [
+      { id: "w4d1", microcycle_id: "m4", day_number: 1, status: "completed" },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+
+  it("treats a skipped day as a closed source", () => {
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "skipped" },
+    ]);
+    expect(gaps).toEqual([{ workoutId: "w3d1", week: 3, day: 1 }]);
+  });
+
+  it("returns nothing when every counterpart already exists", () => {
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+      { id: "w4d1", microcycle_id: "m4", day_number: 1, status: "planned" },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+
+  it("orders gaps by week then day", () => {
+    // each source's counterpart is absent (different days), so all are gaps
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d3", microcycle_id: "m3", day_number: 3, status: "completed" },
+      { id: "w2d2", microcycle_id: "m2", day_number: 2, status: "completed" },
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+    ]);
+    expect(gaps.map((g) => `${g.week}.${g.day}`)).toEqual(["2.2", "3.1", "3.3"]);
   });
 });

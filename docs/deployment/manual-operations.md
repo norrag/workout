@@ -60,6 +60,22 @@ domain, or an Auth-config change** is a human step.
 | Run the local Supabase stack | `supabase start`; needed for `npm run test:rls` and Playwright e2e (the sandbox has no local stack). |
 | Apply OAuth config locally | Add `[auth.oauth_server]` to `supabase/config.toml` (see connector setup doc). |
 
+### Migration reconciliation — clean-DB apply is broken (security audit 2026-06-20)
+
+The `rls-tests` CI job (and any fresh `supabase db reset`) **fails to apply the
+migrations**, which means the RLS regression guardrail for hard rule #1 does not
+run. Two causes, both needing a human because the safe fix edits **applied**
+migrations (hard rule #2) and/or depends on the **hosted** function body that a
+Claude session can't read. See [../14-security-audit.md](../14-security-audit.md)
+findings 3 & 4.
+
+| Problem | Where | Fix (human) |
+|---|---|---|
+| `is_admin()` defined before `public.profiles` → `relation "public.profiles" does not exist` aborts the first migration | `supabase/migrations/20260611000001_initial_schema.sql` | Move the `is_admin()` `create` to **after** `create table public.profiles` (or wrap so its body isn't validated early). End-state is identical; the hosted DB already has it, so hosted is unaffected. |
+| `rls_auto_enable()` is `revoke`d but never `CREATE`d in any migration (lives only in the hosted DB — out-of-band, rule-#2 violation) | `supabase/migrations/20260620000001_*`, `20260620000002_*` | Capture the hosted function in a committed migration **before** `0620` with `SECURITY DEFINER … SET search_path = ''`, **or** drop the dangling `revoke` lines if the function is abandoned. Reconcile hosted ↔ version control. |
+
+Until reconciled, `npm run test:rls` cannot pass in CI or locally.
+
 ---
 
 ## How Claude flags these

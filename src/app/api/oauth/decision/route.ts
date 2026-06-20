@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { isSameOrigin } from "@/lib/http/same-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +13,15 @@ export const dynamic = "force-dynamic";
  * Runs as the signed-in user (cookie session) — no `user_id` is trusted.
  */
 export async function POST(request: Request): Promise<Response> {
+  // CSRF defense: this state-changing, cookie-authenticated route handler does
+  // not get Server Actions' built-in Origin check, so reject cross-site posts.
+  const hdrs = await headers();
+  if (
+    !isSameOrigin(request, hdrs.get("x-forwarded-host") ?? hdrs.get("host"))
+  ) {
+    return NextResponse.json({ error: "Cross-origin request" }, { status: 403 });
+  }
+
   const formData = await request.formData();
   const decision = formData.get("decision");
   const authorizationId = formData.get("authorization_id");

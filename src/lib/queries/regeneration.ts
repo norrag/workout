@@ -2,11 +2,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   engineInputsSchema,
   prescribe,
+  type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
   type Prescription,
 } from "@/lib/engine";
 import type { Database } from "@/lib/types/database";
+import { getExerciseE1rmAnchors } from "./logging";
+import { getActiveEngineParams } from "./generation";
+import { catchUpMesoGeneration } from "./progression";
 import { engineCodeSha, hashParams } from "./params-provenance";
 
 /**
@@ -162,14 +166,82 @@ export function planRegeneration(
 }
 
 /**
+ * A stable token identifying exactly the set of writes a dry run would make
+ * (the active version + each changed exercise's target prescription). The apply
+ * path requires the caller to echo this token, so a write is only ever the
+ * second half of a preview→apply pair: an over-eager client cannot apply in one
+ * blind call, and a token computed against a now-stale plan (the underlying
+ * prescriptions changed since the preview) no longer matches and is rejected.
+ * Pure — only the `changed` items contribute, so unchanged/invalid rows never
+ * shift it.
+ */
+export function regenPlanToken(plan: RegenPlan, activeVersion: number): string {
+  const changes = plan.items
+    .filter(
+      (i): i is RegenItem & { output: Prescription } =>
+        i.status === "changed" && i.output != null,
+    )
+    .map((i) => ({
+      we: i.candidate.workoutExerciseId,
+      weight: i.output.weight,
+      reps: i.output.reps,
+      sets: i.output.sets,
+      targetRir: i.output.targetRir,
+    }))
+    .sort((a, b) => a.we.localeCompare(b.we));
+  return hashParams({ version: activeVersion, changes }).slice(0, 16);
+}
+
+/** Key a recomputed anchor by its owner + exercise (anchors are per-user). */
+export function anchorKey(userId: string, exerciseId: string): string {
+  return `${userId}:${exerciseId}`;
+}
+
+/**
+ * Overwrite each candidate's recorded `inputs.strengthAnchor` with a freshly
+ * recomputed anchor (keyed by `anchorKey`). Pure.
+ *
+ * Why this is required: a decision recorded under v8 or earlier predates the
+ * `strengthAnchor` input (doc 13), so its stored inputs carry none. The v9
+ * rep-window weight selection is gated on a non-null anchor — replaying those
+ * anchor-less inputs always falls through to the legacy increment branch and
+ * reports "unchanged". Recomputing the anchor from the user's logged history
+ * (the same `getExerciseE1rmAnchors` the live week-advance uses) is what lets a
+ * backfill actually pick up the new model. A null anchor (no usable history) is
+ * left in place so the engine keeps its plan-based cold-start fallback.
+ */
+export function withRecomputedAnchors(
+  candidates: PlannedDecisionCandidate[],
+  anchorByKey: Map<string, E1rmAnchor>,
+): PlannedDecisionCandidate[] {
+  return candidates.map((candidate) => {
+    if (
+      typeof candidate.inputs !== "object" ||
+      candidate.inputs === null ||
+      Array.isArray(candidate.inputs)
+    ) {
+      return candidate;
+    }
+    const anchor = anchorByKey.get(anchorKey(candidate.userId, candidate.exerciseId)) ?? null;
+    return { ...candidate, inputs: { ...candidate.inputs, strengthAnchor: anchor } };
+  });
+}
+
+/**
  * Gather the not-yet-started prescriptions whose latest decision predates the
  * active params version. Service-role, cross-user; optionally scoped to one
  * mesocycle. Returns at most `limit` candidates, oldest-coordinate first.
+ *
+ * Each candidate's `inputs.strengthAnchor` is recomputed from the owner's
+ * logged history against `params` (`withRecomputedAnchors`) so a backfill can
+ * exercise the active model's anchor-driven path rather than replaying a stale,
+ * anchor-less input verbatim.
  */
 export async function getRegenerablePlannedDecisions(
   service: Client,
   activeVersion: number,
-  opts: { mesocycleId?: string; limit?: number } = {},
+  params: EngineParams,
+  opts: { mesocycleId?: string; userId?: string; limit?: number } = {},
 ): Promise<PlannedDecisionCandidate[]> {
   // optional mesocycle scoping → its microcycle ids
   let microFilter: string[] | null = null;
@@ -189,6 +261,7 @@ export async function getRegenerablePlannedDecisions(
     .select("id, user_id, microcycle_id, day_number")
     .eq("status", "planned");
   if (microFilter) workoutQuery = workoutQuery.in("microcycle_id", microFilter);
+  if (opts.userId) workoutQuery = workoutQuery.eq("user_id", opts.userId);
   const { data: workouts, error: workoutsError } = await workoutQuery;
   if (workoutsError) throw workoutsError;
   if (!workouts || workouts.length === 0) return [];
@@ -275,7 +348,26 @@ export async function getRegenerablePlannedDecisions(
   }
 
   candidates.sort((a, b) => (a.coordinate ?? "").localeCompare(b.coordinate ?? ""));
-  return opts.limit != null ? candidates.slice(0, opts.limit) : candidates;
+  const limited =
+    opts.limit != null ? candidates.slice(0, opts.limit) : candidates;
+
+  // recompute the strength anchor per (owner, exercise) from logged history so
+  // the active model's anchor-driven path can engage on the backfill. Anchors
+  // are per-user, so batch the exercise ids by owner.
+  const exerciseIdsByUser = new Map<string, Set<string>>();
+  for (const c of limited) {
+    const set = exerciseIdsByUser.get(c.userId) ?? new Set<string>();
+    set.add(c.exerciseId);
+    exerciseIdsByUser.set(c.userId, set);
+  }
+  const anchorByKey = new Map<string, E1rmAnchor>();
+  for (const [uid, exIds] of exerciseIdsByUser) {
+    const anchors = await getExerciseE1rmAnchors(service, uid, [...exIds], params);
+    for (const [exId, anchor] of anchors) {
+      anchorByKey.set(anchorKey(uid, exId), anchor);
+    }
+  }
+  return withRecomputedAnchors(limited, anchorByKey);
 }
 
 /** Provenance for a regenerated decision — the doc-11 RIR-fallback record plus a
@@ -370,4 +462,45 @@ export async function applyRegeneration(
   if (insertError) throw insertError;
 
   return { updatedExercises, insertedDecisions: changed.length };
+}
+
+export interface ReconcileResult {
+  /** missing days created from a completed previous-week counterpart */
+  generated: number;
+  /** existing planned prescriptions refreshed to the active params version */
+  refreshed: number;
+}
+
+/**
+ * Make a user's meso match the ACTIVE engine_params, transparently and on demand
+ * — the single "keep it correct" operation. Two halves of one job:
+ *  1. generate any missing day whose previous-week counterpart is complete
+ *     (`catchUpMesoGeneration`) — new days are written under the active params;
+ *  2. refresh any already-planned, not-yet-started prescription whose last
+ *     decision predates the active version (regeneration, anchor-rebuilt).
+ *
+ * Idempotent and additive-or-in-place only: never touches started/completed
+ * workouts, logged sets, or manual `set_weights` overrides. Cheap when there is
+ * nothing to do (steady state finds no gaps and no stale rows). Called on load
+ * so activating a new version propagates to every user on their next open — no
+ * manual regenerate/catch-up step required. Returns what changed.
+ */
+export async function reconcileMesoPlan(
+  service: Client,
+  userId: string,
+  mesoId: string,
+): Promise<ReconcileResult> {
+  // create missing days first; freshly generated days already carry the active
+  // version, so the refresh pass below skips them
+  const generated = await catchUpMesoGeneration(service, userId, mesoId);
+
+  const { version, params } = await getActiveEngineParams(service);
+  const candidates = await getRegenerablePlannedDecisions(service, version, params, {
+    mesocycleId: mesoId,
+    userId,
+  });
+  const plan = planRegeneration(candidates, params);
+  const applied = await applyRegeneration(service, plan.items, version, params);
+
+  return { generated, refreshed: applied.updatedExercises };
 }
