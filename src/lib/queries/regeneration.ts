@@ -2,21 +2,25 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   engineInputsSchema,
   prescribe,
+  seedMeso,
   type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
   type Prescription,
 } from "@/lib/engine";
-import type { Database } from "@/lib/types/database";
+import type { Database, EngineDecisionKind } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "./logging";
 import { getActiveEngineParams } from "./generation";
-import { catchUpMesoGeneration, engineGoal } from "./progression";
+import { catchUpMesoGeneration } from "./progression";
+import { engineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
 import {
   buildConfigInputs,
   computeDepFingerprint,
+  seedEngineInputs,
   type ConfigInputs,
   type ParamsToken,
+  type SeedPeak,
 } from "./fingerprint";
 import type { MacroGoalType } from "@/lib/types/database";
 
@@ -60,11 +64,13 @@ type Client = SupabaseClient<Database>;
 export type RecomputeStatus = "changed" | "unchanged" | "invalid_source";
 
 export interface RecomputeArgs {
+  /** which engine produced the row — selects the replay entry (doc 14 §6.2) */
+  kind: EngineDecisionKind;
   /** the diverged row's latest decision inputs (source of the derived history) */
   storedInputs: Record<string, unknown>;
   /** the freshly-resolved config inputs (live equipment/profile/goal/week/previous) */
   liveConfig: ConfigInputs;
-  /** the strength anchor recomputed from current logged history (or null) */
+  /** the strength anchor recomputed from current logged history (advance only) */
   anchor: E1rmAnchor | null;
   /** the row's current stored prescription, for diffing */
   currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
@@ -91,18 +97,33 @@ function prescriptionChanged(
 }
 
 /**
- * Pure: rebuild a diverged row's engine inputs from its immutable derived history
- * (`storedInputs`) + the live config + a fresh anchor, run the engine, and report
- * whether the prescription changed. No I/O — same inputs + params ⇒ same plan, so
- * it is unit-tested directly (hard rule #3).
- *
- * Reusing the stored derived inputs is correct (doc 14 §6.4): an open
- * prescription's `previous` and derived inputs come from immutable, completed work
- * that doesn't drift mid-view. Overlaying the live config is what makes a profile /
- * goal / meso / params / upstream-week change take effect; refreshing the anchor is
- * what makes a config-triggered recompute also pick up the latest history.
+ * Pure: recompute a diverged row by replaying the engine of its `kind` (doc 14
+ * §6.2) with the live config overlaid, and report whether the prescription
+ * changed. No I/O — same inputs + params ⇒ same plan, so it is unit-tested
+ * directly (hard rule #3). Dispatches on `kind`:
+ *   - "advance" → `prescribe`, with the row's immutable stored derived history
+ *     (`storedInputs`) and a freshly refreshed strength anchor.
+ *   - "seed"    → `seedMeso`, with the row's frozen cold-start basis (its prior
+ *     peak, stored in `weekPeak`) and the live config (initial defaults, week RIR).
  */
 export function recomputeRow(
+  args: RecomputeArgs,
+  params: EngineParams,
+): RecomputeResult {
+  return args.kind === "seed"
+    ? recomputeSeed(args, params)
+    : recomputeAdvance(args, params);
+}
+
+/**
+ * Advance replay. Reusing the stored derived inputs is correct (doc 14 §6.4): an
+ * open prescription's `previous` and derived inputs come from immutable, completed
+ * work that doesn't drift mid-view. Overlaying the live config is what makes a
+ * profile / goal / meso / params / upstream-week change take effect; refreshing
+ * the anchor is what makes a config-triggered recompute also pick up the latest
+ * history.
+ */
+function recomputeAdvance(
   args: RecomputeArgs,
   params: EngineParams,
 ): RecomputeResult {
@@ -126,6 +147,49 @@ export function recomputeRow(
       ? "changed"
       : "unchanged",
     inputs: parsed.data,
+    output,
+  };
+}
+
+/**
+ * Seed replay (doc 14 §6.2). A cold start has no completed source week to refresh
+ * from, so we overlay the LIVE config (equipment / profile / goal / week RIR /
+ * plan initial defaults / params) onto the row's FROZEN derived basis — its prior
+ * peak, captured in `weekPeak` at seed time — and re-run `seedMeso`. This makes a
+ * units / params / RIR / equipment change take effect on a not-yet-started seed
+ * while leaving its prior-peak basis stable (it predates the meso; doc 14 §6.4).
+ */
+function recomputeSeed(
+  args: RecomputeArgs,
+  params: EngineParams,
+): RecomputeResult {
+  const cfg = args.liveConfig;
+  const storedPeak = (args.storedInputs.weekPeak ?? null) as
+    | { weight: number | null; reps: number | null; sets: number }
+    | null;
+  const priorPeak: SeedPeak | null = storedPeak
+    ? { weight: storedPeak.weight, reps: storedPeak.reps, sets: storedPeak.sets }
+    : null;
+
+  let output: Prescription;
+  try {
+    output = seedMeso(
+      priorPeak,
+      cfg.initial,
+      cfg.exercise,
+      cfg.user,
+      cfg.week.targetRir,
+      params,
+    );
+  } catch {
+    return { status: "invalid_source" };
+  }
+
+  return {
+    status: prescriptionChanged(args.currentOutput, output)
+      ? "changed"
+      : "unchanged",
+    inputs: seedEngineInputs(cfg, priorPeak),
     output,
   };
 }
@@ -157,6 +221,7 @@ interface OpenRow {
 
 interface LatestDecision {
   id: string;
+  kind: EngineDecisionKind;
   sourceWorkoutExerciseId: string | null;
   inputs: Record<string, unknown>;
 }
@@ -215,9 +280,11 @@ function recomputeProvenance(
  * matches and short-circuits. Never touches started/completed workouts, logged
  * sets, or manual `set_weights` overrides.
  *
- * Seed / user-added rows carry no decision (the engine only records one at a week
- * advance); they are skipped here until doc 14 phase 2 normalizes them with a
- * kind:"seed" decision.
+ * Both advance and seed rows participate (doc 14 §6.2): each carries a decision
+ * tagged with its `kind`, and recompute replays the matching engine (`prescribe`
+ * for an advance, `seedMeso` for a seed). A row that still has no decision (a seed
+ * written before phase 2, or whose best-effort decision write failed) is skipped,
+ * exactly as before.
  */
 export async function reconcilePrescriptions(
   service: Client,
@@ -296,11 +363,11 @@ export async function reconcilePrescriptions(
   if (loggedError) throw loggedError;
   const loggedWeIds = new Set((logged ?? []).map((s) => s.workout_exercise_id));
 
-  // 6. latest decision per open row (source pointer + stored derived inputs).
-  //    A row with none is a seed / user-add → skip (doc 14 phase 1).
+  // 6. latest decision per open row (kind + source pointer + stored inputs).
+  //    A row with none is a pre-phase-2 seed → skip (doc 14 §6.2).
   const { data: decisions, error: decisionsError } = await service
     .from("engine_decisions")
-    .select("id, workout_exercise_id, source_workout_exercise_id, inputs, created_at")
+    .select("id, workout_exercise_id, source_workout_exercise_id, kind, inputs, created_at")
     .in("workout_exercise_id", openWeIds)
     .order("created_at", { ascending: false });
   if (decisionsError) throw decisionsError;
@@ -309,6 +376,7 @@ export async function reconcilePrescriptions(
     if (d.workout_exercise_id && !latestByWe.has(d.workout_exercise_id)) {
       latestByWe.set(d.workout_exercise_id, {
         id: d.id,
+        kind: d.kind,
         sourceWorkoutExerciseId: d.source_workout_exercise_id,
         inputs: d.inputs,
       });
@@ -388,15 +456,22 @@ export async function reconcilePrescriptions(
     const expected = computeDepFingerprint(liveConfig, token);
     if (expected === row.depFingerprint) continue; // fresh — short-circuit
 
-    // diverged → fetch anchors once, then rebuild + recompute
-    if (!anchors) {
-      anchors = await getExerciseE1rmAnchors(service, userId, exerciseIds, params);
+    // diverged → recompute the row's engine of `kind`. Anchors feed only the
+    // advance replay (a seed's cold-start basis is its frozen prior peak); fetch
+    // them once, lazily, and only when an advance actually diverges.
+    let anchor: E1rmAnchor | null = null;
+    if (decision.kind === "advance") {
+      if (!anchors) {
+        anchors = await getExerciseE1rmAnchors(service, userId, exerciseIds, params);
+      }
+      anchor = anchors.get(row.exerciseId) ?? null;
     }
     const result = recomputeRow(
       {
+        kind: decision.kind,
         storedInputs: decision.inputs,
         liveConfig,
-        anchor: anchors.get(row.exerciseId) ?? null,
+        anchor,
         currentOutput: row.currentOutput,
       },
       params,
@@ -453,6 +528,9 @@ export async function reconcilePrescriptions(
         row.depFingerprint,
         expected,
       ),
+      // a recompute preserves the row's origin kind, so a re-seeded row stays a
+      // seed (and replays through seedMeso) on its next divergence.
+      kind: decision.kind,
     });
     if (insertError) throw insertError;
 

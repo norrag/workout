@@ -2,12 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_ENGINE_PARAMS,
   prescribe,
+  seedMeso,
   type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
 } from "@/lib/engine";
 import { recomputeRow, type RecomputeArgs } from "../regeneration";
-import { buildConfigInputs, type ConfigInputs } from "../fingerprint";
+import { buildConfigInputs, buildSeedInputs, type ConfigInputs } from "../fingerprint";
 
 const PARAMS = DEFAULT_ENGINE_PARAMS as EngineParams;
 
@@ -52,6 +53,7 @@ function args(over: Partial<RecomputeArgs> = {}): RecomputeArgs {
   const storedInputs = sampleInputs();
   const output = prescribe(storedInputs as unknown as EngineInputs, PARAMS);
   return {
+    kind: "advance",
     storedInputs,
     liveConfig: sampleConfig(),
     anchor: null,
@@ -126,7 +128,7 @@ describe("recomputeRow", () => {
 
     // anchor-less recompute reproduces the legacy prescription → unchanged
     const before = recomputeRow(
-      { storedInputs, liveConfig, anchor: null, currentOutput: legacyOut },
+      { kind: "advance", storedInputs, liveConfig, anchor: null, currentOutput: legacyOut },
       PARAMS,
     );
     expect(before.status).toBe("unchanged");
@@ -134,12 +136,144 @@ describe("recomputeRow", () => {
     // overlay a high-confidence anchor → rep-window path engages and diverges
     const anchor: E1rmAnchor = { value: 40, confidence: "high" };
     const after = recomputeRow(
-      { storedInputs, liveConfig, anchor, currentOutput: legacyOut },
+      { kind: "advance", storedInputs, liveConfig, anchor, currentOutput: legacyOut },
       PARAMS,
     );
     expect(after.status).toBe("changed");
     const win = PARAMS.rep_window.hypertrophy!;
     expect(after.output!.reps).toBeGreaterThanOrEqual(win.min);
     expect(after.output!.reps).toBeLessThanOrEqual(win.max);
+  });
+});
+
+describe("recomputeRow — seed (doc 14 §6.2)", () => {
+  const profile = { experience_level: "intermediate" as const, units: "lb" as const };
+  const peak = { weight: 200, reps: 5, sets: 3 };
+  const initial = { weight: 100, reps: 8, sets: 3 };
+
+  /** a stored seed decision (its inputs + the seedMeso output it produced) */
+  function storedSeed(
+    priorPeak: { weight: number | null; reps: number | null; sets: number } | null,
+    init: { weight: number | null; reps: number | null; sets: number } | null,
+    startRir = 3,
+  ) {
+    const stored = buildSeedInputs({
+      equipmentType: "barbell",
+      profile,
+      goal: "hypertrophy",
+      startRir,
+      isDeload: false,
+      initial: init,
+      priorPeak,
+    });
+    const output = seedMeso(
+      priorPeak,
+      init,
+      { equipmentType: "barbell" },
+      { experienceLevel: "intermediate", units: "lb" },
+      startRir,
+      DEFAULT_ENGINE_PARAMS as EngineParams,
+    );
+    return { stored: stored as unknown as Record<string, unknown>, output };
+  }
+
+  function liveCfg(over: Partial<Parameters<typeof buildConfigInputs>[0]> = {}): ConfigInputs {
+    return buildConfigInputs({
+      equipmentType: "barbell",
+      profile,
+      goal: "hypertrophy",
+      week: { targetRir: 3, isDeload: false },
+      previous: null,
+      initial,
+      ...over,
+    });
+  }
+
+  it("replays through seedMeso and reports unchanged when nothing changed", () => {
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      { kind: "seed", storedInputs: stored, liveConfig: liveCfg(), anchor: null, currentOutput: output },
+      PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    expect(res.output!.weight).toBe(output.weight);
+  });
+
+  it("overlays a live week-RIR change → changed (new targetRir)", () => {
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg({ week: { targetRir: 1, isDeload: false } }),
+        anchor: null,
+        currentOutput: output,
+      },
+      PARAMS,
+    );
+    expect(res.status).toBe("changed");
+    expect(res.output!.targetRir).toBe(1);
+  });
+
+  it("backs off the FROZEN prior peak, so a changed plan initial does not move it", () => {
+    // a meso seed with a prior peak: seedMeso uses the peak branch, ignoring
+    // `initial`, so bumping the live initial recomputes but yields the same number.
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg({ initial: { weight: 999, reps: 8, sets: 3 } }),
+        anchor: null,
+        currentOutput: output,
+      },
+      PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    expect(res.output!.weight).toBe(output.weight);
+  });
+
+  it("seeds from the live plan initial when there is no prior peak (user-add shape)", () => {
+    // priorPeak null ⇒ seedMeso uses `initial`; a live initial change takes effect
+    const noPeak = storedSeed(null, { weight: 150, reps: 8, sets: 3 });
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: noPeak.stored,
+        liveConfig: liveCfg({ initial: { weight: 160, reps: 8, sets: 3 } }),
+        anchor: null,
+        currentOutput: noPeak.output,
+      },
+      PARAMS,
+    );
+    expect(res.status).toBe("changed");
+    expect(res.output!.weight).not.toBe(noPeak.output.weight);
+    expect(res.output!.weight).toBe(
+      seedMeso(
+        null,
+        { weight: 160, reps: 8, sets: 3 },
+        { equipmentType: "barbell" },
+        { experienceLevel: "intermediate", units: "lb" },
+        3,
+        PARAMS,
+      ).weight,
+    );
+  });
+
+  it("ignores the strength anchor on the seed path (cold start has no anchor)", () => {
+    // an anchor is an advance-only input; passing one must not change a seed
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg(),
+        anchor: { value: 500, confidence: "high" },
+        currentOutput: output,
+      },
+      PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    expect(res.output!.weight).toBe(output.weight);
   });
 });

@@ -2,7 +2,86 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Prescription freshness framework (doc 14 phase 1)
+## 2026-06-20 (latest) — Prescription freshness: normalize seed decisions (doc 14 phase 2)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 2** (§6.2): **seed** prescriptions now participate in the same read-path
+freshness reconcile as week→week **advances**, instead of being silently skipped.
+A seed (`seedMeso`: meso activation, open-workout regeneration on a plan edit, or a
+slot added mid-workout) is a cached derived value that goes stale exactly like an
+advance; phase 1 only recorded a decision for advances, so seed rows had no replay
+source. Phase 2 records a `kind`-tagged decision for seeds too and dispatches the
+recompute on `kind`. One append-only migration (additive column; existing RLS
+covers it; 60 existing rows backfilled to `advance`). `main` deployable; 453 tests
+(+16) pass; typecheck / lint / build green.
+
+### Done
+
+- **`engine_decisions.kind` (`'seed' | 'advance'`, migration `20260620000005`,
+  applied to hosted).** Default `'advance'` backfills the 60 existing rows (all
+  advances). RLS unchanged — additive column, no access change.
+- **Seed builders (`fingerprint.ts`).** `seedEngineInputs(config, priorPeak)` wraps
+  a resolved `ConfigInputs` into a full seed `EngineInputs` (empty derived shell;
+  the prior peak rides in the EXCLUDED `weekPeak` slot, so it is omitted from the
+  fingerprint per §6.4). `buildSeedInputs(args)` is the write-side convenience
+  (config half through the shared `buildConfigInputs`, so the stamp matches the
+  check). A **golden test** asserts `configProjection(buildSeedInputs(x)) ===
+  buildConfigInputs(its config half)`, that the fingerprint is invariant to the
+  prior peak, and that it moves on each seed config dimension.
+- **Seed-decision writer (`seed-decisions.ts`).** `recordSeedDecisions` (pure
+  `buildSeedDecisionRows` + a service-client insert; `server-only`) writes the
+  `kind:"seed"` audit row. `engine_decisions` has no user-INSERT policy and the seed
+  sites run on the user client, so the decision write uses a service client scoped
+  to the passed `userId` (hard rule #4). **Best-effort:** a failed write leaves the
+  row with its stamped fingerprint but no decision — i.e. skipped by the reconcile,
+  exactly the pre-phase-2 behavior — so it never breaks meso start / plan save /
+  add-exercise.
+- **Stamp + record at every seed site.** `generation.ts` factors `seedExerciseRow`
+  (seed one fill → row + fingerprint + inputs/output) and `persistSeededRows`
+  (insert, then record decisions by returned id); `startMeso` and
+  `regenerateOpenWorkouts` (new days + newly-added exercises) route through it.
+  `addWorkoutExercises` (`logging.ts`) does the same inline, modeling the user's
+  best as the cold-start `initial` so the prescribed number is unchanged (now
+  on-step + replayable).
+- **Recompute dispatches on `kind` (`regeneration.ts`).** `recomputeRow` →
+  `recomputeAdvance` (`prescribe`, refreshed strength anchor) or `recomputeSeed`
+  (`seedMeso`, live config overlaid on the frozen prior-peak basis). The reconcile
+  loop reads each decision's `kind`, fetches anchors lazily only for a diverged
+  advance, and a recomputed row keeps its origin `kind` on the new decision.
+- **Replay honesty (`admin.ts`).** `replay_decisions` re-runs a seed through
+  `seedMeso` (not `prescribe`), so a seed no longer diffs spuriously against its
+  stored output; `get_engine_decisions` surfaces `kind`. `engineGoal` moved to a
+  leaf (`engine-goal.ts`) so generation, the check, and the advance path resolve
+  `goalType` identically (the value feeds the fingerprint).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (453/453, +16), `npm run build`
+all green. Migration applied to hosted and re-checked (`kind` present; 60 rows →
+`advance`). The write/check parity for seeds is the golden test; against live data,
+63 planned open rows (48 advances with a decision, 15 pre-phase-2 seeds) — the 15
+stay skipped as before, new seeds participate.
+
+### Deviations / notes
+
+- **Seed recompute overlays live *config* but keeps its prior-peak basis frozen.**
+  A cold start has no completed source week to refresh from (unlike the advance
+  path, which refreshes the anchor), and the prior peak predates the meso, so it is
+  immutable relative to a mid-meso config change (§6.4). A units/params/RIR/
+  equipment change therefore takes effect on a not-yet-started seed; a brand-new
+  same-meso PR does not (it would only matter for a week-1 seed and is an edge case).
+- **`addWorkoutExercises` now seeds through `seedMeso`** (best modeled as the
+  cold-start `initial`, so **no** peak-backoff). The starting number is the same as
+  before, now rounded on-step and replayable; a later recompute may replace the
+  "Added during the workout" note with the engine rationale (notes aren't compared).
+- **Pre-phase-2 seed rows (15 on hosted) stay skipped** — they carry no decision and
+  are not retroactively backfilled; they age out as their mesos complete. New seeds
+  participate from creation.
+- **Phases 3–5 remain** (per-user editable-increment override + `resolveEffectiveParams`;
+  verify profile/macro/meso recompute scoping with targeted tests; optional history
+  token / Tier-0 epoch).
+
+## 2026-06-20 — Prescription freshness framework (doc 14 phase 1)
 
 Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
 **phase 1**: stored prescriptions now stay correct when ANY of their inputs change

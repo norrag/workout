@@ -1,6 +1,6 @@
 # 14 — Prescription Freshness: dependency tracking & recompute (design)
 
-Status: **phase 1 built (2026-06-20); phases 2–5 designed, not yet built.**
+Status: **phases 1–2 built (2026-06-20); phases 3–5 designed, not yet built.**
 Authoritative design for how stored prescriptions stay correct when any of their
 inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
 **redesigns the `params_version` staleness gate** into one general framework; that
@@ -22,12 +22,34 @@ slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 > retired in the same slice; the generation gap-heal (`catchUpMesoGeneration`)
 > stays. The `params_version` migration was orphaned (never applied to the hosted
 > DB), so its file was removed rather than "dropped." **Deviations from this
-> design as built:** seeds/user-adds stay unstamped + skipped (no decision to
-> replay — normalized in phase 2, §6.2); the read-path check loads the latest
+> design as built:** the read-path check loads the latest
 > decision per open row (for the `previous` source pointer + the stored derived
 > history), so the steady-state "no decision lookup" of §5 is a phase-2+
 > optimization; existing rows backfill lazily via the §6.3 self-heal (null →
 > recompute on first view) rather than an eager migration backfill.
+
+> **Phase 2 landed (normalize decisions, §6.2).** `engine_decisions.kind`
+> (`'seed' | 'advance'`, default `'advance'`; migration `20260620000005`, applied
+> to hosted — existing 60 rows backfilled to `advance`). Every seed site now stamps
+> a `dep_fingerprint` AND records a `kind:"seed"` decision: meso activation +
+> open-workout regeneration (`startMeso` / `regenerateOpenWorkouts`, via the shared
+> `seedExerciseRow` / `persistSeededRows`) and slots added mid-workout
+> (`addWorkoutExercises`). The recompute dispatches on `kind` — `recomputeRow` runs
+> `prescribe` for an advance, `seedMeso` for a seed (overlaying the live config onto
+> the seed's frozen prior-peak basis) — and `replay_decisions` dispatches the same
+> way so seeds don't diff spuriously. Pure builders (`buildSeedInputs` /
+> `seedEngineInputs`) live in `fingerprint.ts` with a write/check golden test;
+> `recordSeedDecisions` (`seed-decisions.ts`) writes the audit row via a service
+> client (best-effort — a failed write leaves the row skipped, never breaks the
+> seed). `engineGoal` moved to a leaf (`engine-goal.ts`) so generation and the check
+> resolve `goalType` identically. **Deviations as built:** (a) a seed recompute
+> overlays live *config* but keeps its prior-peak basis frozen — a cold start has no
+> completed source week to refresh from (unlike the advance path's anchor refresh),
+> and the peak predates the meso (§6.4); (b) `addWorkoutExercises` models the user's
+> best as the cold-start `initial` (no peak-backoff), so the prescribed number is
+> unchanged but now on-step + replayable; (c) seed rows written before this phase
+> carry no decision and stay skipped (no retroactive backfill — they age out as
+> mesos complete).
 
 ---
 
@@ -406,8 +428,15 @@ the record shows one mechanism, not two.
    `catch_up_generation` MCP tools (kept the gap-heal). Existing rows self-heal
    lazily (null → recompute on first view) instead of an eager backfill; seeds stay
    skipped pending phase 2. See the status note at the top for as-built deviations.
-2. **Normalize decisions** (§6.2): record seed/user-add decisions with `kind`;
-   unify the recompute dispatcher.
+2. **✅ DONE (2026-06-20) — Normalize decisions** (§6.2). Added
+   `engine_decisions.kind` (`seed`/`advance`; migration `20260620000005`). Every
+   seed site (`startMeso`, `regenerateOpenWorkouts`, `addWorkoutExercises`) now
+   stamps a fingerprint and records a `kind:"seed"` decision via the shared
+   `seedExerciseRow`/`persistSeededRows`/`recordSeedDecisions`; `recomputeRow`
+   dispatches on `kind` (`prescribe` for advance, `seedMeso` for seed) and
+   `replay_decisions` does the same. Pure `buildSeedInputs`/`seedEngineInputs` +
+   write/check golden test. See the phase-2 status note up top for as-built
+   deviations.
 3. **First per-user override — editable increment.** Override table (RLS + tests),
    `resolveEffectiveParams`, increment editor on the Exercise page (transcribe the
    mockup first — CLAUDE.md #8). Recompute scopes to the exercise automatically.

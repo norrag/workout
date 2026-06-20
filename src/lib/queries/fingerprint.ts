@@ -95,6 +95,78 @@ export function buildConfigInputs(args: ConfigInputArgs): ConfigInputs {
 }
 
 /**
+ * A cold-start prior peak (the user's best weight×reps for the lift) — the
+ * derived basis `seedMeso` backs off from. Weight/reps are history-derived (so
+ * they live in the EXCLUDED `weekPeak` slot, doc 14 §6.4); `sets` is the plan's
+ * configured set count.
+ */
+export interface SeedPeak {
+  weight: number | null;
+  reps: number | null;
+  sets: number;
+}
+
+/**
+ * Wrap a resolved `ConfigInputs` into a full `EngineInputs` for a SEED row
+ * (doc 14 §6.2): a cold start has no logged history, so every derived field is
+ * empty except `weekPeak`, which carries the prior-peak basis `seedMeso` used.
+ * Because `weekPeak` is a derived key (doc 14 §3 denylist), it is excluded from
+ * the fingerprint — so `configProjection(seedEngineInputs(c, peak)) === c` for any
+ * peak, exactly like an advance's history is excluded. One construction path used
+ * at both write (generation/seed) and replay (recompute), so they cannot drift.
+ */
+export function seedEngineInputs(
+  config: ConfigInputs,
+  priorPeak: SeedPeak | null,
+): EngineInputs {
+  return {
+    ...config,
+    actualSets: [],
+    exerciseFeedback: null,
+    workoutFeedback: null,
+    muscleGroupWeeklySets: null,
+    weekPeak: priorPeak
+      ? {
+          weight: priorPeak.weight,
+          reps: priorPeak.reps,
+          sets: priorPeak.sets,
+          targetRir: config.week.targetRir,
+        }
+      : null,
+    strengthAnchor: null,
+  };
+}
+
+export interface SeedInputArgs {
+  equipmentType: string;
+  profile: Pick<ProfileRow, "experience_level" | "units">;
+  goal: EngineInputs["goalType"];
+  startRir: number;
+  isDeload: boolean;
+  /** plan cold-start defaults (meso_exercises.initial_*); null for a bare add */
+  initial: EngineInputs["initial"];
+  /** the user's prior peak for the lift, when one exists (else seed from initial) */
+  priorPeak: SeedPeak | null;
+}
+
+/**
+ * Build the full seed `EngineInputs` from raw scope values (the write side):
+ * resolves the config half through the shared `buildConfigInputs` (so the
+ * fingerprint matches the check) and attaches the cold-start derived shell.
+ */
+export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
+  const config = buildConfigInputs({
+    equipmentType: args.equipmentType,
+    profile: args.profile,
+    goal: args.goal,
+    week: { targetRir: args.startRir, isDeload: args.isDeload },
+    previous: null,
+    initial: args.initial,
+  });
+  return seedEngineInputs(config, args.priorPeak);
+}
+
+/**
  * Identifies the engine params a prescription was (or will be) computed under.
  * Today this is just the active `engine_params.version` (an activated version's
  * content is immutable — a change proposes a NEW version). Doc 14 phase 3 extends

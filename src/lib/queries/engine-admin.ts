@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { engineParamsSchema, type EngineParams } from "@/lib/engine";
-import type { Database } from "@/lib/types/database";
+import type { Database, EngineDecisionKind } from "@/lib/types/database";
 import {
   CURRENT_PARAMS_SCHEMA_VERSION,
   engineCodeSha,
@@ -205,6 +205,7 @@ export async function deleteEngineParamsVersion(
 
 export interface DecisionRecord {
   id: string;
+  kind: EngineDecisionKind;
   workout_exercise_id: string | null;
   source_workout_exercise_id: string | null;
   exercise_id: string | null;
@@ -293,6 +294,7 @@ export async function getEngineDecisions(
 
   return decisions.map((d) => ({
     id: d.id,
+    kind: d.kind,
     workout_exercise_id: d.workout_exercise_id,
     source_workout_exercise_id: d.source_workout_exercise_id,
     exercise_id: d.exercise_id,
