@@ -289,6 +289,7 @@ async function generateDay(
       target_rir: output.targetRir,
       status: "pending" as const,
       notes: output.rationale,
+      params_version: ctx.paramsVersion,
     };
   });
 

@@ -2807,3 +2807,23 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
   work, logged sets, or manual `set_weights`). The `regenerate_planned_prescriptions`
   / `catch_up_generation` MCP tools remain as optional ops/preview triggers but are
   no longer required for correctness. Full suite green, typecheck + lint clean.
+- **`params_version` staleness gate on the reconcile.** The on-load reconcile's
+  refresh half (above) was paying its full cost on *every* Workout-tab open — to
+  decide whether anything was stale it joined `workout_exercises → engine_decisions`
+  and recomputed strength anchors from logged history, even though a new
+  `engine_params` version is rare. Now each prescription stamps the
+  `params_version` it was last computed/reconciled under
+  (`workout_exercises.params_version`, migration
+  `20260620000003`; stamped by `generateDay`, the seed builders in `startMeso` /
+  `regenerateOpenWorkouts`, user-added slots in `addWorkoutExercises`, and
+  `applyRegeneration`). `reconcileMesoPlan` settles staleness with **one indexed
+  read** — "is any planned, not-yet-started row in this meso behind the active
+  version (or unstamped)?" — and short-circuits when none is, so the steady-state
+  open is instant. Only when a row is genuinely behind does the heavy
+  anchor-rebuilt replay run; afterwards every open row is stamped current (covering
+  unchanged/invalid/seed rows the replay leaves as-is by design) so the gate stays
+  closed until the next activation. Migration backfills existing rows from each
+  prescription's latest decision (stale generated rows stay detectable; decision-less
+  seeds are marked current). Behavior is unchanged — same rows refreshed, same
+  numbers; only the steady-state cost drops from a multi-query + anchor recompute to
+  a single read. Full suite green (416), typecheck + lint clean.
