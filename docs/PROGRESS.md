@@ -2,7 +2,23 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Prescription freshness: first per-user override, editable increment (doc 14 phase 3)
+## 2026-06-20 (latest) — Prescription freshness phase 3 closeout: migration applied to hosted
+
+Closed the one outstanding external item from the phase-3 slice below: the
+`20260620000006_exercise_param_overrides` migration **is now applied to the hosted
+DB** (version `20260620230102`). Verified against the live project:
+`exercise_param_overrides` exists with RLS enabled; all six columns (`id`, `user_id`,
+`exercise_id`, `weight_increment`, `created_at`, `updated_at`) are `not null`; the
+owner-only policy `exercise_param_overrides_all_own` is `ALL` with
+`user_id = auth.uid()` on both `using` and `with check`; the unique
+`(user_id, exercise_id)` constraint and the `user_exercise_idx` lookup index are
+present. The override reads (`exercise-overrides.ts`) now resolve against the live
+table, so the editable-increment editor and the read-path reconcile work end-to-end
+on hosted. Re-verified the suite on this branch: `npm run test` (465/465),
+`npm run typecheck`, `npm run lint` all green. **Phase 3 is complete — nothing
+external remains.** (Phases 4–5 of doc 14 are still open per their own scope.)
+
+## 2026-06-20 — Prescription freshness: first per-user override, editable increment (doc 14 phase 3)
 
 Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
 **phase 3** (§7): the first **per-user × exercise** engine override — the editable
@@ -70,11 +86,10 @@ fingerprint test mirroring the reconcile's per-row computation.
 
 ### Remaining / external
 
-- **Apply `20260620000006_exercise_param_overrides.sql` to the hosted DB.** It was
-  NOT applied from this session (the remote `apply_migration` was blocked as an
-  unauthorized production action). The override reads query this table, so they error
-  until it exists on hosted — apply it on deploy (CLI `supabase db push`, dashboard
-  SQL editor, or MCP). See [deployment/manual-operations.md](deployment/manual-operations.md).
+- ~~**Apply `20260620000006_exercise_param_overrides.sql` to the hosted DB.**~~
+  **Done (2026-06-20)** — applied as hosted migration version `20260620230102` and
+  verified live (table + RLS + columns + indexes; see the closeout note at the top
+  of this file). Nothing external remains for phase 3.
 
 ## 2026-06-20 — Prescription freshness: normalize seed decisions (doc 14 phase 2)
 

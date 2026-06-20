@@ -80,9 +80,11 @@ slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 > participates in (and re-stamps through) the reconcile; (c) the recompute decision
 > records the GLOBAL `params_hash` (the `engine_params` row identity) with the
 > override carried in provenance, rather than an effective-params hash; (d) **the
-> migration was NOT applied to the hosted DB from this session** (the apply was
-> blocked) — it must be applied on deploy before the override reads resolve (see the
-> manual-operations runbook + PROGRESS "Remaining / external").
+> migration is now applied to hosted** (version `20260620230102`) — verified
+> 2026-06-20: table present, all six columns `not null`, owner-only `ALL` policy
+> `user_id = auth.uid()` on both `using`/`with check`, RLS enabled, all three
+> indexes (pkey, `unique (user_id, exercise_id)`, lookup). The override reads
+> resolve against the live table; nothing external remains for this phase.
 
 ---
 
