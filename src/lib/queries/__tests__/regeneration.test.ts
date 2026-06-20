@@ -6,9 +6,12 @@ import {
   type EngineParams,
 } from "@/lib/engine";
 import {
+  anchorKey,
   planRegeneration,
+  withRecomputedAnchors,
   type PlannedDecisionCandidate,
 } from "../regeneration";
+import type { E1rmAnchor } from "@/lib/engine";
 
 const PARAMS = DEFAULT_ENGINE_PARAMS as EngineParams;
 
@@ -137,5 +140,68 @@ describe("planRegeneration", () => {
     expect(item.inputs).toBeDefined(); // parsed, ready to re-record
     expect(item.output).toBeDefined();
     expect(item.changedFields!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("withRecomputedAnchors", () => {
+  // a hypertrophy lift logged above its window — without an anchor the engine
+  // takes the legacy increment branch; with one it takes v9's rep-window path
+  function repWindowInputs(): Record<string, unknown> {
+    return {
+      exercise: { equipmentType: "dumbbell" },
+      user: { experienceLevel: "intermediate", units: "lb" },
+      goalType: "hypertrophy",
+      week: { targetRir: 0, isDeload: false },
+      previous: { weight: 25, reps: 11, sets: 3, targetRir: 1 },
+      actualSets: [
+        { setNumber: 1, weight: 25, reps: 15, rirReported: null, isWarmup: false },
+        { setNumber: 2, weight: 25, reps: 15, rirReported: null, isWarmup: false },
+        { setNumber: 3, weight: 25, reps: 15, rirReported: null, isWarmup: false },
+      ],
+      exerciseFeedback: { jointPain: 0, pump: 8, workload: 6 },
+      workoutFeedback: null,
+      muscleGroupWeeklySets: 9,
+      weekPeak: null,
+      initial: null,
+    };
+  }
+
+  it("injects the recomputed anchor into each candidate's inputs", () => {
+    const c = candidate(repWindowInputs(), { weight: 0, reps: 0, sets: 0, targetRir: 0 });
+    const anchor: E1rmAnchor = { value: 40, confidence: "high" };
+    const [injected] = withRecomputedAnchors(
+      [c],
+      new Map([[anchorKey(c.userId, c.exerciseId), anchor]]),
+    );
+    expect((injected.inputs as Record<string, unknown>).strengthAnchor).toEqual(anchor);
+  });
+
+  it("sets a null anchor when none was recomputed (no usable history)", () => {
+    const c = candidate(repWindowInputs(), { weight: 0, reps: 0, sets: 0, targetRir: 0 });
+    const [injected] = withRecomputedAnchors([c], new Map());
+    expect((injected.inputs as Record<string, unknown>).strengthAnchor).toBeNull();
+  });
+
+  it("flips a backfill from unchanged to changed once the anchor is recomputed", () => {
+    // the stored output is the legacy (anchor-less) prescription, so replaying
+    // verbatim — as the tool did before the fix — reports no change
+    const inputs = repWindowInputs();
+    const legacyOut = prescribe(inputs as unknown as EngineInputs, PARAMS);
+    const c = candidate(inputs, legacyOut as unknown as Record<string, unknown>);
+    expect(planRegeneration([c], PARAMS).counts.changed).toBe(0);
+
+    // recompute the anchor → v9's rep-window path engages and diverges
+    const anchor: E1rmAnchor = { value: 40, confidence: "high" };
+    const injected = withRecomputedAnchors(
+      [c],
+      new Map([[anchorKey(c.userId, c.exerciseId), anchor]]),
+    );
+    const plan = planRegeneration(injected, PARAMS);
+    expect(plan.counts.changed).toBe(1);
+    // the refreshed reps land inside the goal's window (hypertrophy 6–15)
+    const out = plan.items[0].output!;
+    const win = PARAMS.rep_window.hypertrophy!;
+    expect(out.reps).toBeGreaterThanOrEqual(win.min);
+    expect(out.reps).toBeLessThanOrEqual(win.max);
   });
 });

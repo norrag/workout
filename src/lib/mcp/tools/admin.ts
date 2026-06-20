@@ -708,7 +708,7 @@ function registerRegeneratePlannedPrescriptions(server: McpServer) {
       const { userId } = await resolveAdmin(extra);
       const service = createServiceClient();
       const { version, params } = await getActiveEngineParams(service);
-      const candidates = await getRegenerablePlannedDecisions(service, version, {
+      const candidates = await getRegenerablePlannedDecisions(service, version, params, {
         mesocycleId: args.mesocycle_id,
         limit: args.limit ?? 200,
       });

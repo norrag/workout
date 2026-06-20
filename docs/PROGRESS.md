@@ -2747,12 +2747,22 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
     server-derived user scoping — hard rule #4; **no `user_id` argument** —
     hard rule #5, covered by the existing admin-tool test). Optional `mesocycle_id`
     filter; `limit` cap.
-  - **Caveat (documented):** replays each prescription's stored inputs, so the
-    strength anchor is as-computed-at-generation — exactly right for the tunables
-    consumed inside `prescribe()` (rep windows, increments, grading,
-    weight-selection); only anchor-shaping params (`e1rm.anchor_method`, halflife)
-    would be slightly stale, and the dry-run diff shows it before applying.
+  - **Anchor rebuild (fix).** Originally the tool replayed each prescription's
+    stored inputs *verbatim*. That silently defeated a v8→v9 backfill: decisions
+    recorded before doc 13 carry **no `strengthAnchor`**, and v9's rep-window
+    weight selection is gated on a non-null anchor — so replaying them always fell
+    through to the legacy increment branch and reported "unchanged" (the same blind
+    spot as `replay_decisions`). `getRegenerablePlannedDecisions` now recomputes the
+    anchor per `(user, exercise)` from logged history via the same
+    `getExerciseE1rmAnchors` the live week-advance uses and injects it into each
+    candidate's inputs (`withRecomputedAnchors`, pure). A null anchor (no usable
+    history) is left in place so the engine keeps its plan-based cold-start
+    fallback. The anchor reflects current strength (recency-weighted), exactly as a
+    fresh generation would compute it; the dry-run diff shows the result before
+    applying.
   - **Tests.** Pure `planRegeneration` (changed / unchanged / invalid-source /
-    mixed-batch classification); tool added to the admin registration / no-`user_id`
-    / unauthenticated coverage. 386 pass, typecheck + lint clean. No schema change
-    (reuses existing columns; append-only respected).
+    mixed-batch classification) + `withRecomputedAnchors` (injects anchor, null
+    when none, flips a backfill from unchanged→changed once the anchor engages the
+    rep window); tool added to the admin registration / no-`user_id` /
+    unauthenticated coverage. Typecheck + lint clean; full suite green. No schema
+    change (reuses existing columns; append-only respected).
