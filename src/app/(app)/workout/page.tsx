@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
-import { catchUpProgression } from "@/lib/queries/progression";
+import {
+  catchUpProgression,
+  catchUpMesoGeneration,
+} from "@/lib/queries/progression";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -26,6 +29,24 @@ export default async function WorkoutPage() {
   if (profile && !profile.onboarded_at) redirect("/onboarding");
 
   let state = await getCurrentState(supabase, user.id);
+
+  // self-heal generation gaps: any closed day whose next-week counterpart was
+  // never generated (seeded/imported history, a failed or raced completion)
+  // leaves a hole the per-completion path can't reach. Fill them on open so a
+  // missing day (e.g. W4·D1 when W3·D1 was seeded complete) appears without a
+  // manual step. Idempotent + additive; cheap when there is nothing to do.
+  if (state.mesocycle) {
+    try {
+      const generated = await catchUpMesoGeneration(
+        createServiceClient(),
+        user.id,
+        state.mesocycle.id,
+      );
+      if (generated > 0) state = await getCurrentState(supabase, user.id);
+    } catch (error) {
+      console.error("generation gap catch-up failed", error);
+    }
+  }
 
   // first-open-of-new-week fallback (07 Phase 4): if the active week closed
   // but generation didn't run (e.g. completion raced or failed), run the

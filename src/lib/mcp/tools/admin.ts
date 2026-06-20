@@ -25,6 +25,10 @@ import {
   applyRegeneration,
   regenPlanToken,
 } from "@/lib/queries/regeneration";
+import {
+  getCatchUpSources,
+  catchUpMesoGeneration,
+} from "@/lib/queries/progression";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveSession, type McpExtra, type McpClient } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
@@ -790,6 +794,97 @@ function registerRegeneratePlannedPrescriptions(server: McpServer) {
   );
 }
 
+// --- catch_up_generation ---------------------------------------------------
+
+export const CATCH_UP_GENERATION = "catch_up_generation";
+function registerCatchUpGeneration(server: McpServer) {
+  server.registerTool(
+    CATCH_UP_GENERATION,
+    {
+      title: "Catch up generation gaps",
+      description:
+        "Admin only. Generate any MISSING future day whose previous-week " +
+        "same-day workout is already completed/skipped — healing holes the " +
+        "per-completion engine job never filled (seeded/imported history, a " +
+        "failed or raced completion). Runs on the caller's own data; defaults to " +
+        "the active mesocycle (or pass mesocycle_id). Additive and idempotent: " +
+        "it only CREATES missing days via the normal engine path, never touches " +
+        "started/completed workouts, logged sets, or existing prescriptions. DRY " +
+        'RUN by default — lists the days it would create; pass confirm="apply" to '+
+        "generate them.",
+      inputSchema: {
+        mesocycle_id: z.string().uuid().optional(),
+        confirm: z
+          .string()
+          .optional()
+          .describe('pass "apply" to generate the missing days; omit for a dry run'),
+      },
+    },
+    async (
+      args: { mesocycle_id?: string; confirm?: string },
+      extra: McpExtra,
+    ) => {
+      const { userId } = await resolveAdmin(extra);
+      const service = createServiceClient();
+
+      let mesoId = args.mesocycle_id ?? null;
+      if (!mesoId) {
+        const { data: active, error } = await service
+          .from("mesocycles")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .maybeSingle();
+        if (error) return jsonResult({ ok: false, error: error.message });
+        mesoId = active?.id ?? null;
+      }
+      if (!mesoId)
+        return jsonResult({
+          ok: false,
+          error:
+            "no active mesocycle — pass mesocycle_id to catch up a specific block.",
+        });
+
+      const gaps = await getCatchUpSources(service, userId, mesoId);
+      const days = gaps.map((g) => ({
+        generate: `W${g.week + 1}·D${g.day}`,
+        from_completed: `W${g.week}·D${g.day}`,
+      }));
+
+      if (args.confirm !== "apply") {
+        return jsonResult({
+          ok: true,
+          dry_run: true,
+          mesocycle_id: mesoId,
+          missing: days.length,
+          days,
+          note:
+            days.length > 0
+              ? `Dry run — nothing written. Re-run with confirm="apply" to generate these ${days.length} day(s).`
+              : "No gaps — every day whose previous-week counterpart is complete already exists.",
+        });
+      }
+
+      const generated = await catchUpMesoGeneration(service, userId, mesoId);
+      const summary = `generated ${generated} missing day(s) in mesocycle ${mesoId}`;
+      await recordMcpWrite(
+        userId,
+        CATCH_UP_GENERATION,
+        { mesocycle_id: mesoId },
+        summary,
+      );
+      return jsonResult({
+        ok: true,
+        dry_run: false,
+        mesocycle_id: mesoId,
+        generated,
+        days,
+        summary,
+      });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 
 export function registerAdminTools(server: McpServer) {
@@ -802,4 +897,5 @@ export function registerAdminTools(server: McpServer) {
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
   registerRegeneratePlannedPrescriptions(server);
+  registerCatchUpGeneration(server);
 }

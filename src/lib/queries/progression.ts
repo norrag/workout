@@ -386,6 +386,103 @@ export async function catchUpProgression(
   return true;
 }
 
+/** One closed day whose next-week same-day counterpart is missing. */
+export interface CatchUpSource {
+  workoutId: string;
+  week: number;
+  day: number;
+}
+
+/**
+ * Pure: find every CLOSED (completed/skipped) day whose next-week counterpart
+ * does not exist yet, in week→day order. These are the source days to re-run the
+ * advance job on. A day is only a source when the following week actually exists
+ * in the meso (so the final week never qualifies). Exported for unit tests.
+ */
+export function planCatchUp(
+  weeks: { id: string; week_number: number }[],
+  workouts: {
+    id: string;
+    microcycle_id: string;
+    day_number: number;
+    status: string;
+  }[],
+): CatchUpSource[] {
+  const weekByMicro = new Map(weeks.map((m) => [m.id, m.week_number]));
+  const weekNumbers = new Set(weeks.map((m) => m.week_number));
+  const existing = new Set<string>();
+  for (const w of workouts) {
+    const wk = weekByMicro.get(w.microcycle_id);
+    if (wk != null) existing.add(`${wk}:${w.day_number}`);
+  }
+  const gaps: CatchUpSource[] = [];
+  for (const w of workouts) {
+    if (w.status !== "completed" && w.status !== "skipped") continue;
+    const wk = weekByMicro.get(w.microcycle_id);
+    if (wk == null) continue;
+    if (!weekNumbers.has(wk + 1)) continue; // no next week to generate into
+    if (existing.has(`${wk + 1}:${w.day_number}`)) continue; // already generated
+    gaps.push({ workoutId: w.id, week: wk, day: w.day_number });
+  }
+  return gaps.sort((a, b) => a.week - b.week || a.day - b.day);
+}
+
+/**
+ * Fill generation gaps across a meso: for every closed day whose next-week
+ * counterpart is missing, run the normal advance job to create it. Reuses
+ * `advanceWeekAfterWorkout` (idempotent), so it composes with the per-completion
+ * path and never touches started/completed workouts or logged sets.
+ *
+ * Why this exists: prescriptions are generated *per completed workout*. Any day
+ * whose completion didn't run the job — seeded/imported history, a failed or
+ * raced completion, a missed run — leaves a permanent hole the per-completion
+ * path can't reach (a locked day can't be re-completed). This scan heals them,
+ * idempotently, and is cheap when there is nothing to do.
+ *
+ * Returns the number of source days advanced.
+ */
+export async function getCatchUpSources(
+  service: Client,
+  userId: string,
+  mesoId: string,
+): Promise<CatchUpSource[]> {
+  const { data: micros, error: microsError } = await service
+    .from("microcycles")
+    .select("id, week_number")
+    .eq("mesocycle_id", mesoId)
+    .eq("user_id", userId)
+    .order("week_number");
+  if (microsError) throw microsError;
+  const weeks = micros ?? [];
+  if (weeks.length < 2) return [];
+
+  const { data: workouts, error: workoutsError } = await service
+    .from("workouts")
+    .select("id, microcycle_id, day_number, status")
+    .in(
+      "microcycle_id",
+      weeks.map((m) => m.id),
+    )
+    .eq("user_id", userId);
+  if (workoutsError) throw workoutsError;
+
+  return planCatchUp(weeks, workouts ?? []);
+}
+
+export async function catchUpMesoGeneration(
+  service: Client,
+  userId: string,
+  mesoId: string,
+): Promise<number> {
+  const gaps = await getCatchUpSources(service, userId, mesoId);
+  // advance is idempotent: a closed-week advance backfills its siblings, so a
+  // later gap whose counterpart got backfilled is a safe no-op on its turn.
+  for (const gap of gaps) {
+    await advanceWeekAfterWorkout(service, userId, gap.workoutId);
+  }
+  return gaps.length;
+}
+
 export async function advanceWeekAfterWorkout(
   service: Client,
   userId: string,

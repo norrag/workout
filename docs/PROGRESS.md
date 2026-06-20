@@ -2772,3 +2772,25 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
     rep window); tool added to the admin registration / no-`user_id` /
     unauthenticated coverage. Typecheck + lint clean; full suite green. No schema
     change (reuses existing columns; append-only respected).
+- **Generation-gap self-heal (`catchUpMesoGeneration` + `catch_up_generation`).**
+  Prescriptions are generated *per completed workout* (`advanceWeekAfterWorkout`).
+  Any day whose completion never ran the job — seeded/imported history, a failed
+  or raced completion — leaves a permanent hole the per-completion path can't
+  reach (a locked day can't be re-completed), and the existing `catchUpProgression`
+  only fires when the whole active week is closed (`!nextWorkout`), so a mid-week
+  hole (e.g. W4·D1 when W3·D1 was seeded complete while W3·D4 is still planned)
+  never heals. New pure `planCatchUp(weeks, workouts)` finds every closed
+  (completed/skipped) day whose next-week same-day counterpart is missing;
+  `catchUpMesoGeneration` runs the normal `advanceWeekAfterWorkout` on each
+  (idempotent, additive — only CREATES missing days, never touches started/logged
+  work or existing prescriptions; a freshly created day is generated under the
+  active params, so it lands on v9).
+  - **Auto-heal:** the Workout tab calls it on load for the active meso (cheap
+    when there are no gaps), so a missing day appears without any manual step.
+  - **Manual trigger:** `catch_up_generation` admin MCP tool (caller-scoped;
+    optional `mesocycle_id`, default the active meso). Dry-run by default (lists
+    the days it would create); `confirm="apply"` generates them.
+  - **Tests.** `planCatchUp` (single mid-week gap, ignores planned/last-week,
+    skipped counts as closed, none when counterparts exist, week→day ordering);
+    tool added to the admin registry / no-`user_id` coverage. Full suite green,
+    typecheck + lint clean. No schema change.
