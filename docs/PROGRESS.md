@@ -2,7 +2,301 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Security audit (Phase 7 hardening slice 2)
+## 2026-06-20 (latest) — Prescription freshness: backfill the already-flowing sources into the contract (doc 14 phase 4)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 4** (§7): the verification slice that closes the dependency-fingerprint
+framework over its remaining inputs. The sources phase 4 names — **profile**
+(experience/units), **macro goal**, and **meso config** (RIR ramp + deload) —
+already flow as resolved config dimensions (`user.*`, `goalType`, `week.*`), so the
+fingerprint already sees them; nothing new had to be wired. What phase 4 owns is the
+**proof** that "scope falls out of the fingerprint" — a change to one source goes
+stale for **exactly** its in-scope rows and is byte-identical for every row outside
+it. **No schema change, no new code wiring** — tests only. `main` deployable; 474
+tests (+9) pass; typecheck / lint / build green.
+
+### Done
+
+- **Source-scoping tests (`fingerprint.test.ts`).** A new `describe` modelling the
+  reconcile's per-row check (it resolves the profile once per user, the goal once per
+  meso, the week per microcycle, then hashes each open row) — the same shape as the
+  phase-3 increment-override scoping test:
+  - **Profile** is a UNIVERSAL dimension: an experience-level or units edit moves
+    every one of the user's rows across exercises / goals / weeks. Cross-user
+    isolation is structural (the reconcile is scoped to one `userId`), reinforced by
+    a no-cross-user-collision assertion.
+  - **Macro goal** moves only the rows whose goal resolves from that macro: a
+    two-meso / two-macro model where re-goaling macro A moves its rows and macro B's
+    stay byte-identical (short-circuit), plus "every row under the re-goaled macro
+    moves regardless of exercise or week."
+  - **Meso config** moves rows per microcycle: a 3-week ramp where re-tuning ONLY
+    week 2's RIR moves week-2 rows (and the edited week now aliases the week sharing
+    its RIR — fingerprint is a pure function of resolved config), the deload toggle
+    moves that week's rows, and cross-meso isolation is structural + non-colliding.
+- **Recompute-output tie (`regeneration.test.ts`).** A `recomputeRow` test ties a
+  macro-goal change to an actually-repriced prescription: with a strength anchor
+  present, re-goaling hypertrophy→strength moves the prescribed reps into the goal's
+  rep window (doc 13). The existing week-RIR overlay test already covers meso config
+  at the recompute level generically.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (474/474, +9), `npm run build`
+all green. The fingerprint scoping is the load-bearing proof (which rows go stale);
+the write/check projection parity it relies on is the §3 golden test from phase 1.
+
+### Deviations / notes
+
+- **Scope verification is at the fingerprint level** (pure, like the phase-3 override
+  test), not a DB-backed `reconcilePrescriptions` integration test — consistent with
+  the codebase's no-DB-mock approach, and the read-path resolution is already
+  golden-tested for write/check parity (§3). The reconcile resolves each dimension
+  exactly as the tests model (profile per `userId`, goal via `resolveMesoGoal`, week
+  per microcycle — see `regeneration.ts`).
+- **Cross-user / cross-meso isolation is asserted as non-collision and noted as
+  structurally enforced** by the reconcile's `userId` / `mesoId` scoping, since at the
+  pure-hash level a different scope is just an independent input (a `fp(x) === fp(x)`
+  assertion would be vacuous, so it was avoided).
+- **The recompute-output tie is shown for macro goal** (clearly behavioral via the
+  rep window); a units/experience recompute-output assertion was omitted as brittle
+  (rounding-dependent) — the fingerprint divergence is the proof that profile rows go
+  stale, and the engine reflecting the new profile is already exercised generically.
+- **Phase 5 (optional) remains**: a history token / Tier-0 epoch, only if a real need
+  or profiling appears. Doc 14's framework is otherwise fully built (phases 1–4).
+
+## 2026-06-20 — Prescription freshness: first per-user override, editable increment (doc 14 phase 3)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 3** (§7): the first **per-user × exercise** engine override — the editable
+weight increment (the per-set load jump for one lift). This proves out the doc-14
+"reusable contract": a new input becomes a small, mechanical addition, not a
+correctness redesign. The value is resolved into **effective params** at every
+generation/recompute site and folded into the prescription's **dependency
+fingerprint**, so an increment edit makes exactly that exercise's open rows go stale
+on the read path — **scope falls out of the hash**, no bespoke "invalidate" wiring.
+One append-only migration (new table + owner-only RLS). `main` deployable; 465 tests
+(+12) pass; typecheck / lint / build green.
+
+### Done
+
+- **`exercise_param_overrides` table (migration `20260620000006`).** `user_id ×
+  exercise_id → weight_increment` (numeric, `> 0`), `unique (user_id, exercise_id)`,
+  owner-only RLS (`user_id = auth.uid()` for all ops), index on `(user_id,
+  exercise_id)`, `set_updated_at` trigger. RLS test added (owner-only read + unspoofable
+  insert) alongside the exclusions/notes cases.
+- **Pure `resolveEffectiveParams` (`engine/effective-params.ts`).** Merges an
+  override into the global params' per-equipment increment (in the user's units),
+  producing the EFFECTIVE params the engine runs under; the engine signature stays
+  `prescribe(EngineInputs, EngineParams)` (hard rule #3). A null/absent override
+  returns the params **referentially unchanged** (so a no-override row hashes
+  identically to before). Unit-tested incl. the legacy-path number change + no-mutation.
+- **Fingerprint token folds the override (`fingerprint.ts`).** `ParamsToken` gained
+  optional `incrementOverride`; `paramsTokenFor(version, override?)` OMITS it when
+  absent, so existing fingerprints are byte-identical (zero churn) and present it
+  moves only that exercise's rows. Golden tests: no-override parity, an override
+  moves the hash, two-exercise scoping (only the overridden one diverges).
+- **Wired at every write/recompute site.** `seedExerciseRow` (+ `startMeso` /
+  `regenerateOpenWorkouts`) and `addWorkoutExercises` resolve the override into
+  effective params for `seedMeso` and stamp the override-aware token; `generateDay`
+  (advance) and `projectNextPrescription` do the same for `prescribe`; the read-path
+  `reconcilePrescriptions` batches the override read with the other config dimensions,
+  computes the per-exercise expected fingerprint, and recomputes diverged rows under
+  effective params. The recompute decision records `provenance.dependencies.incrementOverride`.
+- **Editor on the Exercise page (fig 3.1a `⋯`).** The mockup's header overflow now
+  opens a "Load step" bottom sheet — step chips (unit-aware) + "USE DEFAULT" — backed
+  by `setIncrementOverrideAction` (zod-validated, revalidates the exercise + workout
+  paths). Query layer: `exercise-overrides.ts` (`get*`/`set*`/`clear*`).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (465/465, +12), `npm run build`
+all green. The zero-churn guarantee is the `paramsTokenFor` parity test; the scoping
+("only the overridden exercise recomputes, nothing else") is the two-exercise
+fingerprint test mirroring the reconcile's per-row computation.
+
+### Deviations / notes
+
+- **The override is the BASE increment** (the level `engine_params.increment` sits
+  at), so `experience_increment_scale` still composes on top — at the default
+  intermediate scale (1.0) the override is the literal step.
+- **Under the active v9 params (`weight_selection: "rep_window"`) the engine prices
+  loads off the strength anchor, not the increment.** So this override moves a
+  prescribed NUMBER only on the legacy increment path (cold-start / no-or-low-
+  confidence-anchor fallback, or an `increment` params row). It **always** moves the
+  fingerprint, so the row always participates in (and re-stamps through) the reconcile.
+- **The recompute decision records the GLOBAL `params_hash`** (the `engine_params` row
+  identity) with the override in provenance, not an effective-params hash.
+- **Phases 4–5 remain** (backfill the already-flowing sources — profile / macro /
+  meso — with targeted recompute-scoping tests; the optional history token / Tier-0
+  epoch).
+
+### Remaining / external
+
+- **Apply `20260620000006_exercise_param_overrides.sql` to the hosted DB.** It was
+  NOT applied from this session (the remote `apply_migration` was blocked as an
+  unauthorized production action). The override reads query this table, so they error
+  until it exists on hosted — apply it on deploy (CLI `supabase db push`, dashboard
+  SQL editor, or MCP). See [deployment/manual-operations.md](deployment/manual-operations.md).
+
+## 2026-06-20 — Prescription freshness: normalize seed decisions (doc 14 phase 2)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 2** (§6.2): **seed** prescriptions now participate in the same read-path
+freshness reconcile as week→week **advances**, instead of being silently skipped.
+A seed (`seedMeso`: meso activation, open-workout regeneration on a plan edit, or a
+slot added mid-workout) is a cached derived value that goes stale exactly like an
+advance; phase 1 only recorded a decision for advances, so seed rows had no replay
+source. Phase 2 records a `kind`-tagged decision for seeds too and dispatches the
+recompute on `kind`. One append-only migration (additive column; existing RLS
+covers it; 60 existing rows backfilled to `advance`). `main` deployable; 453 tests
+(+16) pass; typecheck / lint / build green.
+
+### Done
+
+- **`engine_decisions.kind` (`'seed' | 'advance'`, migration `20260620000005`,
+  applied to hosted).** Default `'advance'` backfills the 60 existing rows (all
+  advances). RLS unchanged — additive column, no access change.
+- **Seed builders (`fingerprint.ts`).** `seedEngineInputs(config, priorPeak)` wraps
+  a resolved `ConfigInputs` into a full seed `EngineInputs` (empty derived shell;
+  the prior peak rides in the EXCLUDED `weekPeak` slot, so it is omitted from the
+  fingerprint per §6.4). `buildSeedInputs(args)` is the write-side convenience
+  (config half through the shared `buildConfigInputs`, so the stamp matches the
+  check). A **golden test** asserts `configProjection(buildSeedInputs(x)) ===
+  buildConfigInputs(its config half)`, that the fingerprint is invariant to the
+  prior peak, and that it moves on each seed config dimension.
+- **Seed-decision writer (`seed-decisions.ts`).** `recordSeedDecisions` (pure
+  `buildSeedDecisionRows` + a service-client insert; `server-only`) writes the
+  `kind:"seed"` audit row. `engine_decisions` has no user-INSERT policy and the seed
+  sites run on the user client, so the decision write uses a service client scoped
+  to the passed `userId` (hard rule #4). **Best-effort:** a failed write leaves the
+  row with its stamped fingerprint but no decision — i.e. skipped by the reconcile,
+  exactly the pre-phase-2 behavior — so it never breaks meso start / plan save /
+  add-exercise.
+- **Stamp + record at every seed site.** `generation.ts` factors `seedExerciseRow`
+  (seed one fill → row + fingerprint + inputs/output) and `persistSeededRows`
+  (insert, then record decisions by returned id); `startMeso` and
+  `regenerateOpenWorkouts` (new days + newly-added exercises) route through it.
+  `addWorkoutExercises` (`logging.ts`) does the same inline, modeling the user's
+  best as the cold-start `initial` so the prescribed number is unchanged (now
+  on-step + replayable).
+- **Recompute dispatches on `kind` (`regeneration.ts`).** `recomputeRow` →
+  `recomputeAdvance` (`prescribe`, refreshed strength anchor) or `recomputeSeed`
+  (`seedMeso`, live config overlaid on the frozen prior-peak basis). The reconcile
+  loop reads each decision's `kind`, fetches anchors lazily only for a diverged
+  advance, and a recomputed row keeps its origin `kind` on the new decision.
+- **Replay honesty (`admin.ts`).** `replay_decisions` re-runs a seed through
+  `seedMeso` (not `prescribe`), so a seed no longer diffs spuriously against its
+  stored output; `get_engine_decisions` surfaces `kind`. `engineGoal` moved to a
+  leaf (`engine-goal.ts`) so generation, the check, and the advance path resolve
+  `goalType` identically (the value feeds the fingerprint).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (453/453, +16), `npm run build`
+all green. Migration applied to hosted and re-checked (`kind` present; 60 rows →
+`advance`). The write/check parity for seeds is the golden test; against live data,
+63 planned open rows (48 advances with a decision, 15 pre-phase-2 seeds) — the 15
+stay skipped as before, new seeds participate.
+
+### Deviations / notes
+
+- **Seed recompute overlays live *config* but keeps its prior-peak basis frozen.**
+  A cold start has no completed source week to refresh from (unlike the advance
+  path, which refreshes the anchor), and the prior peak predates the meso, so it is
+  immutable relative to a mid-meso config change (§6.4). A units/params/RIR/
+  equipment change therefore takes effect on a not-yet-started seed; a brand-new
+  same-meso PR does not (it would only matter for a week-1 seed and is an edge case).
+- **`addWorkoutExercises` now seeds through `seedMeso`** (best modeled as the
+  cold-start `initial`, so **no** peak-backoff). The starting number is the same as
+  before, now rounded on-step and replayable; a later recompute may replace the
+  "Added during the workout" note with the engine rationale (notes aren't compared).
+- **Pre-phase-2 seed rows (15 on hosted) stay skipped** — they carry no decision and
+  are not retroactively backfilled; they age out as their mesos complete. New seeds
+  participate from creation.
+- **Phases 3–5 remain** (per-user editable-increment override + `resolveEffectiveParams`;
+  verify profile/macro/meso recompute scoping with targeted tests; optional history
+  token / Tier-0 epoch).
+
+## 2026-06-20 — Prescription freshness framework (doc 14 phase 1)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 1**: stored prescriptions now stay correct when ANY of their inputs change
+(engine params, profile, macro goal, meso config, the upstream week), via a
+per-prescription **dependency fingerprint** checked on the read path. This
+**replaces** the single-scalar `params_version` staleness gate (doc 14 §9) — which
+modeled only global params and, critically, was defined in a migration that was
+**never applied to the hosted DB** (so the old `reconcileMesoPlan` gate had been
+silently throwing on prod, caught by the Workout page's try/catch). One append-only
+migration (additive column; existing RLS covers it). `main` deployable; 437 tests
+(+24) pass; typecheck / lint / build green.
+
+### Done
+
+- **Pure framework (`src/lib/queries/fingerprint.ts`).** `configProjection`
+  (denylist of the six derived/history fields → the config half of `EngineInputs`),
+  `buildConfigInputs` (the single resolver used at BOTH write and check, so the
+  projection can never drift), `computeDepFingerprint` (canonical sha256 over the
+  config projection + the active-params token). All pure (hard rule #3); hashing
+  reuses `params-provenance`. A **golden test** asserts
+  `configProjection(buildEngineInputs(x)) === buildConfigInputs(configArgsOf(x))`,
+  plus the fingerprint changes on each config dimension (goal / week / previous /
+  equipment / profile / params version) and is INVARIANT to derived history (§6.4).
+- **Storage (`migration 20260620000004`).** `workout_exercises.dep_fingerprint
+  text` (null = never stamped → recompute on next view, self-healing §6.3). Applied
+  to hosted. The orphaned, never-applied `..._params_version` migration was removed
+  (its column didn't exist anywhere, so this aligns the repo with hosted rather than
+  carrying a dead column).
+- **Stamp at write (`progression.ts`).** `generateDay` stamps the fingerprint from
+  `configProjection(inputs)` + the active version; `buildEngineInputs` now routes
+  its config half through the shared `buildConfigInputs` (no behavior change).
+- **Read-path reconcile (`reconcilePrescriptions`, `regeneration.ts`).** Replaces
+  `reconcileMesoPlan`. Heals generation gaps first (kept `catchUpMesoGeneration`),
+  then for each open row WITH a decision re-resolves its config from live state,
+  hashes, and compares to the stored fingerprint; diverged rows recompute in **week
+  order** (a changed `previous` propagates to the next week in one pass). Recompute
+  overlays the live config + a refreshed anchor onto the row's immutable stored
+  derived history, runs the pure engine, and writes back the prescription +
+  fingerprint + an audited `engine_decisions` row carrying the fingerprint
+  transition and the resolved dependency component values; unchanged-but-stale rows
+  just re-stamp; un-replayable rows self-heal (§6.3). Pure `recomputeRow` classifier
+  unit-tested. Wired into `app/(app)/workout/page.tsx`.
+- **Retirement (doc 14 §10).** Removed the `params_version` gate + column (code,
+  types, fixtures), `getRegenerablePlannedDecisions` / `regenPlanToken` /
+  `withRecomputedAnchors` / `anchorKey` / `planRegeneration` / `applyRegeneration`,
+  and the `regenerate_planned_prescriptions` + `catch_up_generation` **MCP tools**
+  (the generation gap-heal they fronted survives as the on-load auto-heal;
+  `replay_decisions` / `simulate_prescriptions` kept as read-only inspection).
+  `activate_engine_params`'s description updated: no manual regenerate step — the
+  read-path reconcile propagates a new version automatically.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (437/437), `npm run build` all
+green. The write/check equivalence was validated against the **live hosted data**:
+for sampled open rows the stored config projection equals the check-time resolution
+exactly (the `previous` resolved via the decision's source pointer matches the
+stored `previous` byte-for-byte), so the first on-load reconcile stamps fingerprints
+without spuriously rewriting prescriptions. Active meso scope: 19 planned rows, 9
+checked (have a decision), 10 seeds skipped.
+
+### Deviations / notes
+
+- **Seeds / user-added slots stay unstamped and are skipped** by the check (they
+  carry no decision to replay) — exactly today's behavior. Phase 2 (§6.2) normalizes
+  them with a `kind:"seed"` decision so they participate.
+- **The check loads the latest decision per open row** (for the `previous` source
+  pointer + the stored derived history). §5's "no decision lookup in the steady
+  state" is left as a phase-2+ optimization; correctness (handles substitutions /
+  reorders) was preferred over the extra read.
+- **Backfill is lazy** (null → §6.3 self-heal on first view), not an eager migration
+  backfill — the live-data check above confirms the first heal stamps rather than
+  churns. The §9 decision-inputs backfill remains an available optimization if a
+  zero-churn deploy is ever wanted.
+- **Phases 2–5 remain** (normalize seed/user-add decisions; the per-user editable
+  increment override + `resolveEffectiveParams`; verify profile/macro/meso recompute
+  scoping with tests; the optional history token / Tier-0 epoch).
+
+## 2026-06-20 — Security audit (Phase 7 hardening slice 2)
 
 Full state-of-the-art security audit of the whole surface (MCP OAuth resource
 server + tools, Supabase Auth/consent flow, middleware + server actions + route

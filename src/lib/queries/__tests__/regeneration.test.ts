@@ -2,27 +2,24 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_ENGINE_PARAMS,
   prescribe,
+  seedMeso,
+  type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
 } from "@/lib/engine";
-import {
-  anchorKey,
-  planRegeneration,
-  regenPlanToken,
-  withRecomputedAnchors,
-  type PlannedDecisionCandidate,
-} from "../regeneration";
-import type { E1rmAnchor } from "@/lib/engine";
+import { recomputeRow, type RecomputeArgs } from "../regeneration";
+import { buildConfigInputs, buildSeedInputs, type ConfigInputs } from "../fingerprint";
 
 const PARAMS = DEFAULT_ENGINE_PARAMS as EngineParams;
 
-// a minimal valid EngineInputs that yields a deterministic prescription
-// (mirrors the admin-tools replay fixture)
-function sampleInputs(): Record<string, unknown> {
+// a minimal valid EngineInputs (the immutable derived history a decision stored)
+function sampleInputs(
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     exercise: { equipmentType: "barbell" },
     user: { experienceLevel: "intermediate", units: "lb" },
-    goalType: "gain",
+    goalType: "hypertrophy",
     week: { targetRir: 2, isDeload: false },
     previous: { weight: 185, reps: 8, sets: 3, targetRir: 2 },
     actualSets: [
@@ -34,123 +31,102 @@ function sampleInputs(): Record<string, unknown> {
     muscleGroupWeeklySets: null,
     weekPeak: null,
     initial: null,
-  };
-}
-
-function candidate(
-  inputs: Record<string, unknown>,
-  output: Record<string, unknown>,
-  over: Partial<PlannedDecisionCandidate> = {},
-): PlannedDecisionCandidate {
-  return {
-    decisionId: "d1",
-    userId: "u1",
-    workoutExerciseId: "we1",
-    exerciseId: "e1",
-    exerciseName: "Bench Press",
-    workoutId: "w1",
-    microcycleId: "mc1",
-    mesocycleId: "m1",
-    coordinate: "W2·D1",
-    sourceWorkoutExerciseId: "we0",
-    fromParamsVersion: 8,
-    inputs,
-    output,
+    strengthAnchor: null,
     ...over,
   };
 }
 
-describe("planRegeneration", () => {
-  it("flags a stale prescription the active params would change", () => {
-    // store an output that differs from what the engine now produces
-    const c = candidate(sampleInputs(), {
-      weight: 999,
-      reps: 8,
-      sets: 3,
-      targetRir: 2,
-    });
-    const plan = planRegeneration([c], PARAMS);
-    expect(plan.counts.total).toBe(1);
-    expect(plan.counts.changed).toBe(1);
-    const item = plan.items[0];
-    expect(item.status).toBe("changed");
-    // the new output is the engine's, not the stale stored one
-    expect(item.output).toBeDefined();
-    expect(item.output!.weight).not.toBe(999);
-    expect(item.changedFields?.some((f) => f.field === "weight")).toBe(true);
+/** the config inputs that match `sampleInputs()`, optionally overridden */
+function sampleConfig(over: Partial<Parameters<typeof buildConfigInputs>[0]> = {}): ConfigInputs {
+  return buildConfigInputs({
+    equipmentType: "barbell",
+    profile: { experience_level: "intermediate", units: "lb" },
+    goal: "hypertrophy",
+    week: { targetRir: 2, isDeload: false },
+    previous: { weight: 185, reps: 8, sets: 3, targetRir: 2 },
+    initial: null,
+    ...over,
+  });
+}
+
+function args(over: Partial<RecomputeArgs> = {}): RecomputeArgs {
+  const storedInputs = sampleInputs();
+  const output = prescribe(storedInputs as unknown as EngineInputs, PARAMS);
+  return {
+    kind: "advance",
+    storedInputs,
+    liveConfig: sampleConfig(),
+    anchor: null,
+    currentOutput: output,
+    ...over,
+  };
+}
+
+describe("recomputeRow", () => {
+  it("reports unchanged when the live config reproduces the stored prescription", () => {
+    // liveConfig equals the stored config and the stored output is the engine's →
+    // recompute yields the same numbers
+    const res = recomputeRow(args(), PARAMS);
+    expect(res.status).toBe("unchanged");
+    expect(res.output).toBeDefined();
   });
 
-  it("leaves a prescription that already matches the engine untouched", () => {
-    const inputs = sampleInputs();
-    const engineOut = prescribe(inputs as unknown as EngineInputs, PARAMS);
-    const c = candidate(inputs, engineOut as unknown as Record<string, unknown>);
-    const plan = planRegeneration([c], PARAMS);
-    expect(plan.counts.changed).toBe(0);
-    expect(plan.counts.unchanged).toBe(1);
-    expect(plan.items[0].status).toBe("unchanged");
-  });
-
-  it("classifies a source whose inputs no longer validate as invalid_source", () => {
-    const c = candidate(
-      { not: "valid inputs" },
-      { weight: 1, reps: 1, sets: 1, targetRir: 1 },
+  it("reports changed when the stored prescription is stale", () => {
+    const res = recomputeRow(
+      args({ currentOutput: { weight: 999, reps: 8, sets: 3, targetRir: 2 } }),
+      PARAMS,
     );
-    const plan = planRegeneration([c], PARAMS);
-    expect(plan.counts.invalid_source).toBe(1);
-    expect(plan.counts.changed).toBe(0);
-    expect(plan.items[0].status).toBe("invalid_source");
-    // nothing to write for an unparseable source
-    expect(plan.items[0].output).toBeUndefined();
+    expect(res.status).toBe("changed");
+    expect(res.output!.weight).not.toBe(999);
   });
 
-  it("aggregates a mixed batch", () => {
-    const stale = candidate(sampleInputs(), {
-      weight: 999,
-      reps: 8,
-      sets: 3,
-      targetRir: 2,
-    });
-    const bad = candidate(
-      { not: "valid" },
-      { weight: 1, reps: 1, sets: 1, targetRir: 1 },
+  it("overlays the live config so a config change takes effect (doc 14 §6.1)", () => {
+    // the stored inputs targeted RIR 2; the live week now targets RIR 0. The
+    // recompute must reflect the LIVE config, not replay the stale stored one.
+    const res = recomputeRow(
+      args({ liveConfig: sampleConfig({ week: { targetRir: 0, isDeload: false } }) }),
+      PARAMS,
     );
-    const inputs = sampleInputs();
-    const engineOut = prescribe(inputs as unknown as EngineInputs, PARAMS);
-    const current = candidate(
-      inputs,
-      engineOut as unknown as Record<string, unknown>,
+    expect(res.status).toBe("changed");
+    expect(res.output!.targetRir).toBe(0);
+  });
+
+  it("overlays a live macro-goal change so a re-goaled meso reprices the row (doc 14 phase 4)", () => {
+    // macro goal flows into the engine as `goalType`; with a strength anchor present
+    // the engine prices reps into the goal's rep window (doc 13), so re-goaling a
+    // meso hypertrophy→strength produces a different prescription on its open rows.
+    const anchor: E1rmAnchor = { value: 230, confidence: "high" };
+    const hyper = recomputeRow(
+      { ...args({ anchor }), liveConfig: sampleConfig({ goal: "hypertrophy" }) },
+      PARAMS,
     );
-    const plan = planRegeneration([stale, bad, current], PARAMS);
-    expect(plan.counts).toEqual({
-      total: 3,
-      changed: 1,
-      unchanged: 1,
-      invalid_source: 1,
-      execution_error: 0,
-    });
+    const strength = recomputeRow(
+      { ...args({ anchor }), liveConfig: sampleConfig({ goal: "strength" }) },
+      PARAMS,
+    );
+    expect(hyper.output).toBeDefined();
+    expect(strength.output).toBeDefined();
+    // the goal moved the prescription into a different rep window
+    expect(strength.output!.reps).not.toBe(hyper.output!.reps);
   });
 
-  it("hands the writer everything it needs for a changed item", () => {
-    const stale = candidate(sampleInputs(), {
-      weight: 999,
-      reps: 8,
-      sets: 3,
-      targetRir: 2,
-    });
-    const item = planRegeneration([stale], PARAMS).items[0];
-    expect(item.inputs).toBeDefined(); // parsed, ready to re-record
-    expect(item.output).toBeDefined();
-    expect(item.changedFields!.length).toBeGreaterThan(0);
+  it("classifies a corrupt stored decision as invalid_source (self-heal path)", () => {
+    // the live config is always validly built; only corruption in the row's stored
+    // DERIVED history (here actualSets) makes the rebuilt inputs un-replayable, and
+    // the reconcile then self-heals by stamping the fingerprint (doc 14 §6.3).
+    const res = recomputeRow(
+      { ...args(), storedInputs: sampleInputs({ actualSets: "corrupt-not-an-array" }) },
+      PARAMS,
+    );
+    expect(res.status).toBe("invalid_source");
+    expect(res.output).toBeUndefined();
   });
-});
 
-describe("withRecomputedAnchors", () => {
-  // a hypertrophy lift logged above its window — without an anchor the engine
-  // takes the legacy increment branch; with one it takes v9's rep-window path
-  function repWindowInputs(): Record<string, unknown> {
-    return {
+  it("engages the rep-window path once a strength anchor is overlaid (doc 13)", () => {
+    // a hypertrophy lift logged above its window: anchor-less it takes the legacy
+    // increment branch; overlaying a fresh anchor flips it to the rep-window path
+    const storedInputs = sampleInputs({
       exercise: { equipmentType: "dumbbell" },
-      user: { experienceLevel: "intermediate", units: "lb" },
       goalType: "hypertrophy",
       week: { targetRir: 0, isDeload: false },
       previous: { weight: 25, reps: 11, sets: 3, targetRir: 1 },
@@ -160,92 +136,163 @@ describe("withRecomputedAnchors", () => {
         { setNumber: 3, weight: 25, reps: 15, rirReported: null, isWarmup: false },
       ],
       exerciseFeedback: { jointPain: 0, pump: 8, workload: 6 },
-      workoutFeedback: null,
       muscleGroupWeeklySets: 9,
-      weekPeak: null,
-      initial: null,
-    };
-  }
+    });
+    const liveConfig = sampleConfig({
+      equipmentType: "dumbbell",
+      week: { targetRir: 0, isDeload: false },
+      previous: { weight: 25, reps: 11, sets: 3, targetRir: 1 },
+    });
+    const legacyOut = prescribe(storedInputs as unknown as EngineInputs, PARAMS);
 
-  it("injects the recomputed anchor into each candidate's inputs", () => {
-    const c = candidate(repWindowInputs(), { weight: 0, reps: 0, sets: 0, targetRir: 0 });
-    const anchor: E1rmAnchor = { value: 40, confidence: "high" };
-    const [injected] = withRecomputedAnchors(
-      [c],
-      new Map([[anchorKey(c.userId, c.exerciseId), anchor]]),
+    // anchor-less recompute reproduces the legacy prescription → unchanged
+    const before = recomputeRow(
+      { kind: "advance", storedInputs, liveConfig, anchor: null, currentOutput: legacyOut },
+      PARAMS,
     );
-    expect((injected.inputs as Record<string, unknown>).strengthAnchor).toEqual(anchor);
-  });
+    expect(before.status).toBe("unchanged");
 
-  it("sets a null anchor when none was recomputed (no usable history)", () => {
-    const c = candidate(repWindowInputs(), { weight: 0, reps: 0, sets: 0, targetRir: 0 });
-    const [injected] = withRecomputedAnchors([c], new Map());
-    expect((injected.inputs as Record<string, unknown>).strengthAnchor).toBeNull();
-  });
-
-  it("flips a backfill from unchanged to changed once the anchor is recomputed", () => {
-    // the stored output is the legacy (anchor-less) prescription, so replaying
-    // verbatim — as the tool did before the fix — reports no change
-    const inputs = repWindowInputs();
-    const legacyOut = prescribe(inputs as unknown as EngineInputs, PARAMS);
-    const c = candidate(inputs, legacyOut as unknown as Record<string, unknown>);
-    expect(planRegeneration([c], PARAMS).counts.changed).toBe(0);
-
-    // recompute the anchor → v9's rep-window path engages and diverges
+    // overlay a high-confidence anchor → rep-window path engages and diverges
     const anchor: E1rmAnchor = { value: 40, confidence: "high" };
-    const injected = withRecomputedAnchors(
-      [c],
-      new Map([[anchorKey(c.userId, c.exerciseId), anchor]]),
+    const after = recomputeRow(
+      { kind: "advance", storedInputs, liveConfig, anchor, currentOutput: legacyOut },
+      PARAMS,
     );
-    const plan = planRegeneration(injected, PARAMS);
-    expect(plan.counts.changed).toBe(1);
-    // the refreshed reps land inside the goal's window (hypertrophy 6–15)
-    const out = plan.items[0].output!;
+    expect(after.status).toBe("changed");
     const win = PARAMS.rep_window.hypertrophy!;
-    expect(out.reps).toBeGreaterThanOrEqual(win.min);
-    expect(out.reps).toBeLessThanOrEqual(win.max);
+    expect(after.output!.reps).toBeGreaterThanOrEqual(win.min);
+    expect(after.output!.reps).toBeLessThanOrEqual(win.max);
   });
 });
 
-describe("regenPlanToken", () => {
-  const stale = () =>
-    candidate(sampleInputs(), { weight: 999, reps: 8, sets: 3, targetRir: 2 });
+describe("recomputeRow — seed (doc 14 §6.2)", () => {
+  const profile = { experience_level: "intermediate" as const, units: "lb" as const };
+  const peak = { weight: 200, reps: 5, sets: 3 };
+  const initial = { weight: 100, reps: 8, sets: 3 };
 
-  it("is stable for the same plan + version", () => {
-    const a = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
-    const b = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
-    expect(a).toBe(b);
+  /** a stored seed decision (its inputs + the seedMeso output it produced) */
+  function storedSeed(
+    priorPeak: { weight: number | null; reps: number | null; sets: number } | null,
+    init: { weight: number | null; reps: number | null; sets: number } | null,
+    startRir = 3,
+  ) {
+    const stored = buildSeedInputs({
+      equipmentType: "barbell",
+      profile,
+      goal: "hypertrophy",
+      startRir,
+      isDeload: false,
+      initial: init,
+      priorPeak,
+    });
+    const output = seedMeso(
+      priorPeak,
+      init,
+      { equipmentType: "barbell" },
+      { experienceLevel: "intermediate", units: "lb" },
+      startRir,
+      DEFAULT_ENGINE_PARAMS as EngineParams,
+    );
+    return { stored: stored as unknown as Record<string, unknown>, output };
+  }
+
+  function liveCfg(over: Partial<Parameters<typeof buildConfigInputs>[0]> = {}): ConfigInputs {
+    return buildConfigInputs({
+      equipmentType: "barbell",
+      profile,
+      goal: "hypertrophy",
+      week: { targetRir: 3, isDeload: false },
+      previous: null,
+      initial,
+      ...over,
+    });
+  }
+
+  it("replays through seedMeso and reports unchanged when nothing changed", () => {
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      { kind: "seed", storedInputs: stored, liveConfig: liveCfg(), anchor: null, currentOutput: output },
+      PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    expect(res.output!.weight).toBe(output.weight);
   });
 
-  it("changes when the active version changes", () => {
-    const plan = planRegeneration([stale()], PARAMS);
-    expect(regenPlanToken(plan, 9)).not.toBe(regenPlanToken(plan, 8));
+  it("overlays a live week-RIR change → changed (new targetRir)", () => {
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg({ week: { targetRir: 1, isDeload: false } }),
+        anchor: null,
+        currentOutput: output,
+      },
+      PARAMS,
+    );
+    expect(res.status).toBe("changed");
+    expect(res.output!.targetRir).toBe(1);
   });
 
-  it("changes when a target prescription changes", () => {
-    const base = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
-    // a different stored output for the same inputs is still recomputed to the
-    // same engine result, so to shift the token the *engine output* must differ:
-    // drive that with a different target RIR in the inputs
-    const other = candidate(
-      { ...sampleInputs(), week: { targetRir: 0, isDeload: false } },
-      { weight: 999, reps: 8, sets: 3, targetRir: 2 },
+  it("backs off the FROZEN prior peak, so a changed plan initial does not move it", () => {
+    // a meso seed with a prior peak: seedMeso uses the peak branch, ignoring
+    // `initial`, so bumping the live initial recomputes but yields the same number.
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg({ initial: { weight: 999, reps: 8, sets: 3 } }),
+        anchor: null,
+        currentOutput: output,
+      },
+      PARAMS,
     );
-    expect(regenPlanToken(planRegeneration([other], PARAMS), 9)).not.toBe(base);
+    expect(res.status).toBe("unchanged");
+    expect(res.output!.weight).toBe(output.weight);
   });
 
-  it("ignores unchanged and invalid items", () => {
-    const inputs = sampleInputs();
-    const current = candidate(
-      inputs,
-      prescribe(inputs as unknown as EngineInputs, PARAMS) as unknown as Record<string, unknown>,
+  it("seeds from the live plan initial when there is no prior peak (user-add shape)", () => {
+    // priorPeak null ⇒ seedMeso uses `initial`; a live initial change takes effect
+    const noPeak = storedSeed(null, { weight: 150, reps: 8, sets: 3 });
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: noPeak.stored,
+        liveConfig: liveCfg({ initial: { weight: 160, reps: 8, sets: 3 } }),
+        anchor: null,
+        currentOutput: noPeak.output,
+      },
+      PARAMS,
     );
-    const bad = candidate({ not: "valid" }, { weight: 1, reps: 1, sets: 1, targetRir: 1 });
-    const onlyChanged = regenPlanToken(planRegeneration([stale()], PARAMS), 9);
-    const withNoise = regenPlanToken(
-      planRegeneration([stale(), current, bad], PARAMS),
-      9,
+    expect(res.status).toBe("changed");
+    expect(res.output!.weight).not.toBe(noPeak.output.weight);
+    expect(res.output!.weight).toBe(
+      seedMeso(
+        null,
+        { weight: 160, reps: 8, sets: 3 },
+        { equipmentType: "barbell" },
+        { experienceLevel: "intermediate", units: "lb" },
+        3,
+        PARAMS,
+      ).weight,
     );
-    expect(withNoise).toBe(onlyChanged);
+  });
+
+  it("ignores the strength anchor on the seed path (cold start has no anchor)", () => {
+    // an anchor is an advance-only input; passing one must not change a seed
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg(),
+        anchor: { value: 500, confidence: "high" },
+        currentOutput: output,
+      },
+      PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    expect(res.output!.weight).toBe(output.weight);
   });
 });

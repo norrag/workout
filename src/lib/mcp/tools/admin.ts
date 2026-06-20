@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   engineInputsSchema,
   prescribe,
+  seedMeso,
   type EngineParams,
   type Prescription,
 } from "@/lib/engine";
@@ -18,18 +19,6 @@ import {
   getEngineDecisions,
   type DecisionRecord,
 } from "@/lib/queries/engine-admin";
-import { getActiveEngineParams } from "@/lib/queries/generation";
-import {
-  getRegenerablePlannedDecisions,
-  planRegeneration,
-  applyRegeneration,
-  regenPlanToken,
-} from "@/lib/queries/regeneration";
-import {
-  getCatchUpSources,
-  catchUpMesoGeneration,
-} from "@/lib/queries/progression";
-import { createServiceClient } from "@/lib/supabase/service";
 import { resolveSession, type McpExtra, type McpClient } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
@@ -192,7 +181,26 @@ export function replayDecisions(
 
     let replayed: Prescription;
     try {
-      replayed = prescribe(parsed.data, candidateParams);
+      // replay the engine of the decision's kind (doc 14 §6.2) so a seed is
+      // re-run through seedMeso, not prescribe — otherwise every seed would
+      // diff spuriously against its stored output.
+      replayed =
+        d.kind === "seed"
+          ? seedMeso(
+              parsed.data.weekPeak
+                ? {
+                    weight: parsed.data.weekPeak.weight,
+                    reps: parsed.data.weekPeak.reps,
+                    sets: parsed.data.weekPeak.sets,
+                  }
+                : null,
+              parsed.data.initial,
+              parsed.data.exercise,
+              parsed.data.user,
+              parsed.data.week.targetRir,
+              candidateParams,
+            )
+          : prescribe(parsed.data, candidateParams);
     } catch {
       outcomes.execution_error += 1;
       continue;
@@ -365,7 +373,10 @@ function registerActivateEngineParams(server: McpServer) {
       description:
         "Admin only. Make an engine-params version the single active set. " +
         "Requires confirm_version to equal version (an explicit echo) — this " +
-        "changes the live engine for all users' future generation.",
+        "changes the live engine for all users' future generation. No manual " +
+        "regenerate step is needed: already-planned, not-yet-started prescriptions " +
+        "refresh automatically on each user's next view (the read-path freshness " +
+        "reconcile detects the changed engine_params token and recomputes them).",
       inputSchema: {
         version: z.number().int().positive(),
         confirm_version: z.number().int().positive(),
@@ -400,6 +411,8 @@ function shapeDecisions(decisions: DecisionRecord[]): Record<string, unknown> {
     count: decisions.length,
     decisions: decisions.map((d) => ({
       decision_id: d.id,
+      // which engine produced it: "advance" (prescribe) or "seed" (seedMeso)
+      kind: d.kind,
       // linkage so a decision chains into get_exercise_history /
       // explain_prescription / exercise-filtered tools without a re-lookup
       exercise_id: d.exercise_id,
@@ -676,216 +689,15 @@ function registerDiscardEngineParams(server: McpServer) {
   );
 }
 
-// --- regenerate_planned_prescriptions --------------------------------------
-
-export const REGENERATE_PLANNED_PRESCRIPTIONS = "regenerate_planned_prescriptions";
-function registerRegeneratePlannedPrescriptions(server: McpServer) {
-  server.registerTool(
-    REGENERATE_PLANNED_PRESCRIPTIONS,
-    {
-      title: "Regenerate planned prescriptions",
-      description:
-        "Admin only. Re-run the engine on not-yet-started PLANNED prescriptions " +
-        "whose last decision predates the ACTIVE engine_params version, and write " +
-        "the refreshed weight / reps / sets / RIR back (with a fresh audited " +
-        "decision). Run this after activate_engine_params so already-planned " +
-        "future workouts pick up the change. TWO-STEP and DRY RUN by default: the " +
-        "first call (omit confirm) writes nothing and returns the diffs plus a " +
-        "plan_token. To actually write, call again with BOTH confirm=\"apply\" and " +
-        "confirm_token set to that exact plan_token — always show the user the " +
-        "dry-run diffs first. A missing or stale token never writes; it returns " +
-        "the current dry run instead. Never touches in-progress / completed " +
-        "workouts, logged sets, or manual per-set weight overrides. Operates " +
-        "across all users (no user_id argument); optionally scope to one " +
-        "mesocycle_id.",
-      inputSchema: {
-        mesocycle_id: z.string().uuid().optional(),
-        confirm: z
-          .string()
-          .optional()
-          .describe('pass "apply" (with confirm_token) to write; omit for a dry run'),
-        confirm_token: z
-          .string()
-          .optional()
-          .describe("the plan_token returned by a prior dry run; required to write"),
-        limit: z.number().int().min(1).max(500).optional(),
-      },
-    },
-    async (
-      args: {
-        mesocycle_id?: string;
-        confirm?: string;
-        confirm_token?: string;
-        limit?: number;
-      },
-      extra: McpExtra,
-    ) => {
-      // authorize with the caller's (RLS) client, then switch to the service
-      // client for the privileged, per-user-scoped cross-user writes (hard rule
-      // #4). No user_id is ever taken from input (hard rule #5).
-      const { userId } = await resolveAdmin(extra);
-      const service = createServiceClient();
-      const { version, params } = await getActiveEngineParams(service);
-      const candidates = await getRegenerablePlannedDecisions(service, version, params, {
-        mesocycleId: args.mesocycle_id,
-        limit: args.limit ?? 200,
-      });
-      const plan = planRegeneration(candidates, params);
-      const planToken = regenPlanToken(plan, version);
-
-      const diffs = plan.items
-        .filter((i) => i.status === "changed")
-        .map((i) => ({
-          exercise_name: i.candidate.exerciseName,
-          coordinate: i.candidate.coordinate,
-          from_params_version: i.candidate.fromParamsVersion,
-          fields: Object.fromEntries(
-            (i.changedFields ?? []).map((f) => [f.field, { from: f.from, to: f.to }]),
-          ),
-        }));
-
-      // write only as the second half of a preview→apply pair: confirm="apply"
-      // AND a confirm_token that echoes the current plan. A missing/stale token
-      // returns the dry run instead of writing, so an over-eager client can't
-      // apply in one blind call.
-      const wantsApply = args.confirm === "apply";
-      const tokenMatches =
-        args.confirm_token != null && args.confirm_token === planToken;
-      if (!wantsApply || !tokenMatches || plan.counts.changed === 0) {
-        let note: string;
-        if (plan.counts.changed === 0) {
-          note =
-            "Nothing to apply — every planned prescription is already current (or the active params leave it unchanged).";
-        } else if (!wantsApply) {
-          note = `Dry run — nothing written. Review these ${plan.counts.changed} change(s), then re-run with confirm="apply" and confirm_token="${planToken}" to write them.`;
-        } else {
-          note = `Refused to write: confirm_token ${args.confirm_token ? "is stale (the plan changed since your last preview)" : "is missing"}. Review the current diffs and re-run with confirm_token="${planToken}".`;
-        }
-        return jsonResult({
-          ok: true,
-          dry_run: true,
-          active_version: version,
-          plan_token: planToken,
-          ...plan.counts,
-          diffs,
-          note,
-        });
-      }
-
-      const applied = await applyRegeneration(service, plan.items, version, params);
-      const summary = `regenerated ${applied.updatedExercises} planned prescription(s) to engine_params v${version}`;
-      await recordMcpWrite(
-        userId,
-        REGENERATE_PLANNED_PRESCRIPTIONS,
-        { mesocycle_id: args.mesocycle_id, version, limit: args.limit },
-        summary,
-      );
-      return jsonResult({
-        ok: true,
-        dry_run: false,
-        active_version: version,
-        plan_token: planToken,
-        ...plan.counts,
-        applied,
-        diffs,
-        summary,
-      });
-    },
-  );
-}
-
-// --- catch_up_generation ---------------------------------------------------
-
-export const CATCH_UP_GENERATION = "catch_up_generation";
-function registerCatchUpGeneration(server: McpServer) {
-  server.registerTool(
-    CATCH_UP_GENERATION,
-    {
-      title: "Catch up generation gaps",
-      description:
-        "Admin only. Generate any MISSING future day whose previous-week " +
-        "same-day workout is already completed/skipped — healing holes the " +
-        "per-completion engine job never filled (seeded/imported history, a " +
-        "failed or raced completion). Runs on the caller's own data; defaults to " +
-        "the active mesocycle (or pass mesocycle_id). Additive and idempotent: " +
-        "it only CREATES missing days via the normal engine path, never touches " +
-        "started/completed workouts, logged sets, or existing prescriptions. DRY " +
-        'RUN by default — lists the days it would create; pass confirm="apply" to '+
-        "generate them.",
-      inputSchema: {
-        mesocycle_id: z.string().uuid().optional(),
-        confirm: z
-          .string()
-          .optional()
-          .describe('pass "apply" to generate the missing days; omit for a dry run'),
-      },
-    },
-    async (
-      args: { mesocycle_id?: string; confirm?: string },
-      extra: McpExtra,
-    ) => {
-      const { userId } = await resolveAdmin(extra);
-      const service = createServiceClient();
-
-      let mesoId = args.mesocycle_id ?? null;
-      if (!mesoId) {
-        const { data: active, error } = await service
-          .from("mesocycles")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("status", "active")
-          .maybeSingle();
-        if (error) return jsonResult({ ok: false, error: error.message });
-        mesoId = active?.id ?? null;
-      }
-      if (!mesoId)
-        return jsonResult({
-          ok: false,
-          error:
-            "no active mesocycle — pass mesocycle_id to catch up a specific block.",
-        });
-
-      const gaps = await getCatchUpSources(service, userId, mesoId);
-      const days = gaps.map((g) => ({
-        generate: `W${g.week + 1}·D${g.day}`,
-        from_completed: `W${g.week}·D${g.day}`,
-      }));
-
-      if (args.confirm !== "apply") {
-        return jsonResult({
-          ok: true,
-          dry_run: true,
-          mesocycle_id: mesoId,
-          missing: days.length,
-          days,
-          note:
-            days.length > 0
-              ? `Dry run — nothing written. Re-run with confirm="apply" to generate these ${days.length} day(s).`
-              : "No gaps — every day whose previous-week counterpart is complete already exists.",
-        });
-      }
-
-      const generated = await catchUpMesoGeneration(service, userId, mesoId);
-      const summary = `generated ${generated} missing day(s) in mesocycle ${mesoId}`;
-      await recordMcpWrite(
-        userId,
-        CATCH_UP_GENERATION,
-        { mesocycle_id: mesoId },
-        summary,
-      );
-      return jsonResult({
-        ok: true,
-        dry_run: false,
-        mesocycle_id: mesoId,
-        generated,
-        days,
-        summary,
-      });
-    },
-  );
-}
-
 // --- registry --------------------------------------------------------------
+//
+// Note (doc 14 §10): the `regenerate_planned_prescriptions` and
+// `catch_up_generation` MCP tools were RETIRED here. The read-path freshness
+// reconcile (`reconcilePrescriptions`) now keeps every input change propagated
+// automatically — no manual "re-run the engine on planned rows" step. The
+// generation gap-heal those tools fronted survives as the on-load
+// `catchUpMesoGeneration` auto-heal. `replay_decisions` / `simulate_prescriptions`
+// stay as read-only inspection (preview what a recompute would produce).
 
 export function registerAdminTools(server: McpServer) {
   registerListEngineParams(server);
@@ -896,6 +708,4 @@ export function registerAdminTools(server: McpServer) {
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
-  registerRegeneratePlannedPrescriptions(server);
-  registerCatchUpGeneration(server);
 }

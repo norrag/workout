@@ -3,14 +3,26 @@ import {
   composeAutoregulationSummary,
   composeMesoCompleteSummary,
   prescribe,
+  resolveEffectiveParams,
   toEngineEquipment,
   type EngineInputs,
   type EngineParams,
   type E1rmAnchor,
+  type ExerciseParamOverride,
   type Prescription,
   type SummaryDelta,
 } from "@/lib/engine";
 import { getExerciseE1rmAnchors } from "./logging";
+import {
+  buildConfigInputs,
+  computeDepFingerprint,
+  configProjection,
+  paramsTokenFor,
+} from "./fingerprint";
+import {
+  getExerciseIncrementOverride,
+  getExerciseParamOverrides,
+} from "./exercise-overrides";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -24,7 +36,13 @@ import type {
   WorkoutRow,
 } from "@/lib/types/database";
 import { getActiveEngineParams } from "./generation";
+import { engineGoal, type EngineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
+
+// re-export so existing importers (regeneration.ts, callers) keep working while
+// the canonical definition lives in the leaf module (avoids a generation.ts ↔
+// progression.ts import cycle now that generation needs it for seed inputs).
+export { engineGoal, type EngineGoal } from "./engine-goal";
 
 /**
  * Week N → N+1 generation (07 Phase 4). Runs after a workout completes,
@@ -67,28 +85,6 @@ export interface AdvanceResult {
   nextLabel: string | null;
 }
 
-type EngineGoal = "cut" | "strength" | "hypertrophy" | "maintain";
-
-/**
- * Map the macrocycle goal onto a progression-engine goal. Strength and
- * hypertrophy are now kept distinct (doc 13 §9.1) so the engine can pick a rep
- * window per goal; both still drive progressive overload, cut/maintain pass
- * through. Standalone mesos (no macro goal) default to the hypertrophy window.
- */
-export function engineGoal(macroGoal: MacroGoalType | null): EngineGoal {
-  switch (macroGoal) {
-    case "cut":
-      return "cut";
-    case "maintain":
-      return "maintain";
-    case "strength":
-      return "strength";
-    case "hypertrophy":
-    default:
-      return "hypertrophy";
-  }
-}
-
 /** Assemble pure engine inputs for one exercise from week-N rows. */
 export function buildEngineInputs(args: {
   we: WorkoutExerciseRow;
@@ -106,22 +102,24 @@ export function buildEngineInputs(args: {
   strengthAnchor: EngineInputs["strengthAnchor"];
 }): EngineInputs {
   const { we } = args;
+  // config half resolved through the single shared resolver (doc 14 §3) so the
+  // freshness fingerprint is built the same way at write and at check; the
+  // derived half (logged history) is assembled below.
+  const previous = {
+    weight: we.prescribed_weight,
+    reps: we.prescribed_reps,
+    sets: we.prescribed_sets ?? 1,
+    targetRir: we.target_rir ?? args.microTargetRir,
+  };
   return {
-    exercise: {
-      equipmentType: toEngineEquipment(args.equipmentType),
-    },
-    user: {
-      experienceLevel: args.profile.experience_level ?? "beginner",
-      units: args.profile.units,
-    },
-    goalType: args.goal,
-    week: args.nextWeek,
-    previous: {
-      weight: we.prescribed_weight,
-      reps: we.prescribed_reps,
-      sets: we.prescribed_sets ?? 1,
-      targetRir: we.target_rir ?? args.microTargetRir,
-    },
+    ...buildConfigInputs({
+      equipmentType: args.equipmentType,
+      profile: args.profile,
+      goal: args.goal,
+      week: args.nextWeek,
+      previous,
+      initial: null,
+    }),
     actualSets: args.sets.map((s, index) => ({
       setNumber: s.set_number,
       weight: s.weight,
@@ -148,7 +146,6 @@ export function buildEngineInputs(args: {
       : null,
     muscleGroupWeeklySets: args.muscleGroupWeeklySets,
     weekPeak: args.weekPeak,
-    initial: null,
     strengthAnchor: args.strengthAnchor,
   };
 }
@@ -208,6 +205,8 @@ interface WeekContext {
   anchorsByExercise: Map<string, E1rmAnchor>;
   equipmentByExercise: Map<string, string>;
   nameByExercise: Map<string, string>;
+  /** per-user×exercise increment overrides (doc 14 phase 3); absent ⇒ default */
+  overrideByExercise: Map<string, ExerciseParamOverride>;
 }
 
 /**
@@ -246,6 +245,7 @@ async function generateDay(
   }[] = [];
   const deltas: SummaryDelta[] = [];
   const rows = dayWes.map((we, index) => {
+    const equipment = ctx.equipmentByExercise.get(we.exercise_id) ?? "other";
     const inputs = buildEngineInputs({
       we,
       sets: ctx.setsByWe.get(we.id) ?? [],
@@ -260,7 +260,7 @@ async function generateDay(
         isDeload: ctx.nextMicro.is_deload,
       },
       goal: ctx.goal,
-      equipmentType: ctx.equipmentByExercise.get(we.exercise_id) ?? "other",
+      equipmentType: equipment,
       profile: ctx.profile,
       muscleGroupWeeklySets: we.muscle_group_id
         ? (ctx.mgWeeklySets.get(we.muscle_group_id) ?? null)
@@ -268,7 +268,18 @@ async function generateDay(
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
       strengthAnchor: ctx.anchorsByExercise.get(we.exercise_id) ?? null,
     });
-    const output = prescribe(inputs, ctx.params);
+    // effective params = global active + this user×exercise increment override
+    // (doc 14 §6.1); the override also feeds the row's fingerprint token below.
+    const override = ctx.overrideByExercise.get(we.exercise_id) ?? null;
+    const output = prescribe(
+      inputs,
+      resolveEffectiveParams(
+        ctx.params,
+        override,
+        toEngineEquipment(equipment),
+        ctx.profile.units,
+      ),
+    );
     decisions.push({ inputs, output, sourceWeId: we.id, exerciseId: we.exercise_id });
     deltas.push({
       exerciseName: ctx.nameByExercise.get(we.exercise_id) ?? "Exercise",
@@ -289,7 +300,13 @@ async function generateDay(
       target_rir: output.targetRir,
       status: "pending" as const,
       notes: output.rationale,
-      params_version: ctx.paramsVersion,
+      // freshness fingerprint over the config projection (doc 14): lets the
+      // read-path reconcile detect when an input changed without re-running the
+      // engine, and recompute only the rows that diverged.
+      dep_fingerprint: computeDepFingerprint(
+        configProjection(inputs),
+        paramsTokenFor(ctx.paramsVersion, override?.weightIncrement),
+      ),
     };
   });
 
@@ -339,6 +356,9 @@ async function generateDay(
           params_version: ctx.paramsVersion,
           params_hash: paramsHash,
           provenance: decisionProvenance(d.inputs, codeSha),
+          // week N→N+1 progression (doc 14 §6.2); the read-path recompute replays
+          // these through prescribe().
+          kind: "advance" as const,
         })),
       );
     if (decisionError) throw decisionError;
@@ -663,6 +683,11 @@ export async function advanceWeekAfterWorkout(
     exerciseIds,
     params,
   );
+  const overrideByExercise = await getExerciseParamOverrides(
+    service,
+    userId,
+    exerciseIds,
+  );
 
   const setsByWe = new Map<string, LoggedSetRow[]>();
   for (const s of sets ?? []) {
@@ -696,6 +721,7 @@ export async function advanceWeekAfterWorkout(
       (exercises ?? []).map((e) => [e.id, e.equipment_type]),
     ),
     nameByExercise: new Map((exercises ?? []).map((e) => [e.id, e.name])),
+    overrideByExercise,
   };
 
   // -------------------------------------------------------------------------
@@ -1095,7 +1121,16 @@ export async function projectNextPrescription(
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,
   });
-  const output = prescribe(inputs, params);
+  const override = await getExerciseIncrementOverride(supabase, userId, exerciseId);
+  const output = prescribe(
+    inputs,
+    resolveEffectiveParams(
+      params,
+      override == null ? null : { weightIncrement: override },
+      toEngineEquipment(exercise.equipment_type),
+      profile.units,
+    ),
+  );
 
   return {
     exercise_id: exerciseId,

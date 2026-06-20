@@ -2,13 +2,35 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import {
   engineParamsSchema,
+  resolveEffectiveParams,
   rirRamp,
   seedMeso,
   toEngineEquipment,
+  type EngineInputs,
   type EngineParams,
+  type ExerciseParamOverride,
+  type Prescription,
 } from "@/lib/engine";
-import type { Database, ExerciseRow, ProfileRow } from "@/lib/types/database";
-import { getMesoPlan, type PlannedDay } from "./cycles";
+import type {
+  Database,
+  ExerciseRow,
+  MacroGoalType,
+  ProfileRow,
+} from "@/lib/types/database";
+import { getMesoPlan, type PlannedDay, type SlotFill } from "./cycles";
+import {
+  buildSeedInputs,
+  computeDepFingerprint,
+  configProjection,
+  paramsTokenFor,
+} from "./fingerprint";
+import { getExerciseParamOverrides } from "./exercise-overrides";
+import { engineGoal, type EngineGoal } from "./engine-goal";
+import {
+  recordSeedDecisions,
+  type SeededDecision,
+  type SeedDecisionCoords,
+} from "./seed-decisions";
 
 type Client = SupabaseClient<Database>;
 
@@ -18,15 +40,117 @@ interface SeedCtx {
   experienceLevel: ProfileRow["experience_level"];
   units: ProfileRow["units"];
   targetRir: number;
+  isDeload: boolean;
+  goal: EngineGoal;
   params: EngineParams;
-  /** active engine_params version, stamped onto each seeded row for the reconcile
-   *  staleness gate (a fresh seed is current by definition). */
   paramsVersion: number;
+  /** per-user×exercise increment overrides (doc 14 phase 3); absent ⇒ default */
+  overrideByExerciseId: Map<string, ExerciseParamOverride>;
 }
 
-/** Build the seeded `workout_exercises` rows for one planned day's groups/fills
+/** A seeded prescription row plus the engine I/O that produced it, so the caller
+ *  can stamp the freshness fingerprint AND record a kind:"seed" decision (doc 14
+ *  §6.2) once the inserted row's id is known. */
+interface SeededExercise {
+  row: {
+    workout_id: string;
+    exercise_id: string;
+    muscle_group_id: string | null;
+    position: number;
+    prescribed_weight: number | null;
+    prescribed_reps: number | null;
+    prescribed_sets: number;
+    target_rir: number;
+    status: "pending";
+    notes: string;
+    dep_fingerprint: string;
+  };
+  exerciseId: string;
+  inputs: EngineInputs;
+  output: Prescription;
+}
+
+/** Seed one fill into a prescription + its engine inputs/output (doc 14 §6.2).
+ *  The fingerprint over the config projection lets the read-path reconcile detect
+ *  an input change without re-running the engine; the inputs/output back the
+ *  recorded seed decision so the row can be replayed through seedMeso on recompute. */
+function seedExerciseRow(
+  workoutId: string,
+  fill: Pick<
+    SlotFill,
+    "exercise_id" | "initial_weight" | "initial_reps" | "initial_sets"
+  >,
+  muscleGroupId: string | null,
+  position: number,
+  ctx: SeedCtx,
+): SeededExercise {
+  const equipment = ctx.equipmentById.get(fill.exercise_id) ?? "other";
+  const engineEquipment = toEngineEquipment(equipment);
+  const pr = ctx.prById.get(fill.exercise_id);
+  const priorPeak =
+    pr?.best_weight != null
+      ? { weight: pr.best_weight, reps: pr.best_reps, sets: fill.initial_sets }
+      : null;
+  const initial = {
+    weight: fill.initial_weight,
+    reps: fill.initial_reps,
+    sets: fill.initial_sets,
+  };
+  // effective params = global active + this user×exercise override (doc 14 §6.1)
+  const override = ctx.overrideByExerciseId.get(fill.exercise_id) ?? null;
+  const effectiveParams = resolveEffectiveParams(
+    ctx.params,
+    override,
+    engineEquipment,
+    ctx.units,
+  );
+  const output = seedMeso(
+    priorPeak,
+    initial,
+    { equipmentType: engineEquipment },
+    { experienceLevel: ctx.experienceLevel ?? "beginner", units: ctx.units },
+    ctx.targetRir,
+    effectiveParams,
+  );
+  const inputs = buildSeedInputs({
+    equipmentType: equipment,
+    profile: { experience_level: ctx.experienceLevel, units: ctx.units },
+    goal: ctx.goal,
+    startRir: ctx.targetRir,
+    isDeload: ctx.isDeload,
+    initial,
+    priorPeak,
+  });
+  return {
+    row: {
+      workout_id: workoutId,
+      exercise_id: fill.exercise_id,
+      muscle_group_id: muscleGroupId,
+      position,
+      prescribed_weight: output.weight,
+      prescribed_reps: output.reps,
+      prescribed_sets: output.sets,
+      target_rir: output.targetRir,
+      status: "pending" as const,
+      notes: output.rationale,
+      dep_fingerprint: computeDepFingerprint(
+        configProjection(inputs),
+        paramsTokenFor(ctx.paramsVersion, override?.weightIncrement),
+      ),
+    },
+    exerciseId: fill.exercise_id,
+    inputs,
+    output,
+  };
+}
+
+/** Build the seeded rows for one planned day's groups/fills, in flat day order
  *  (shared by meso start and the open-workout regeneration on a plan edit). */
-function buildDayExerciseRows(workoutId: string, day: PlannedDay, ctx: SeedCtx) {
+function buildDayExerciseRows(
+  workoutId: string,
+  day: PlannedDay,
+  ctx: SeedCtx,
+): SeededExercise[] {
   let position = 1;
   // flat day order (across groups, #2): meso_exercises.position is the day-level
   // order; group.position + slot_number break ties for legacy/clustered rows.
@@ -38,42 +162,62 @@ function buildDayExerciseRows(workoutId: string, day: PlannedDay, ctx: SeedCtx) 
         a.group.position - b.group.position ||
         (a.fill.slot_number ?? 0) - (b.fill.slot_number ?? 0),
     );
-  return ordered.map(({ group, fill }) => {
-    const equipment = toEngineEquipment(
-      ctx.equipmentById.get(fill.exercise_id) ?? "other",
-    );
-    const pr = ctx.prById.get(fill.exercise_id);
-    const seeded = seedMeso(
-      pr?.best_weight != null
-        ? { weight: pr.best_weight, reps: pr.best_reps, sets: fill.initial_sets }
-        : null,
-      {
-        weight: fill.initial_weight,
-        reps: fill.initial_reps,
-        sets: fill.initial_sets,
-      },
-      { equipmentType: equipment },
-      {
-        experienceLevel: ctx.experienceLevel ?? "beginner",
-        units: ctx.units,
-      },
-      ctx.targetRir,
-      ctx.params,
-    );
-    return {
-      workout_id: workoutId,
-      exercise_id: fill.exercise_id,
-      muscle_group_id: group.muscle_group_id,
-      position: position++,
-      prescribed_weight: seeded.weight,
-      prescribed_reps: seeded.reps,
-      prescribed_sets: seeded.sets,
-      target_rir: seeded.targetRir,
-      status: "pending" as const,
-      notes: seeded.rationale,
-      params_version: ctx.paramsVersion,
-    };
-  });
+  return ordered.map(({ group, fill }) =>
+    seedExerciseRow(workoutId, fill, group.muscle_group_id, position++, ctx),
+  );
+}
+
+/**
+ * Insert a batch of seeded rows (user client — it owns workout_exercises),
+ * stamping each `dep_fingerprint`, then record their kind:"seed" engine_decisions
+ * via a service client (doc 14 §6.2). The decision write is best-effort
+ * (`recordSeedDecisions`): on failure the row keeps its fingerprint but no
+ * decision, so the reconcile skips it — never breaking the seed itself.
+ */
+async function persistSeededRows(
+  supabase: Client,
+  userId: string,
+  seeded: SeededExercise[],
+  coords: SeedDecisionCoords,
+  params: EngineParams,
+  paramsVersion: number,
+): Promise<void> {
+  if (seeded.length === 0) return;
+  const { data: newWes, error } = await supabase
+    .from("workout_exercises")
+    .insert(seeded.map((s) => s.row))
+    .select("id, position");
+  if (error) throw error;
+  const idByPosition = new Map((newWes ?? []).map((w) => [w.position, w.id]));
+  const decisions: SeededDecision[] = seeded
+    .map((s): SeededDecision | null => {
+      const id = idByPosition.get(s.row.position);
+      return id
+        ? {
+            workoutExerciseId: id,
+            exerciseId: s.exerciseId,
+            inputs: s.inputs,
+            output: s.output,
+          }
+        : null;
+    })
+    .filter((d): d is SeededDecision => d !== null);
+  await recordSeedDecisions(userId, decisions, coords, params, paramsVersion);
+}
+
+/** The meso's progression goal (macrocycle goal → standalone hypertrophy default). */
+async function resolveMesoGoal(
+  supabase: Client,
+  macrocycleId: string | null,
+): Promise<EngineGoal> {
+  if (!macrocycleId) return engineGoal(null);
+  const { data: macro, error } = await supabase
+    .from("macrocycles")
+    .select("goal_type")
+    .eq("id", macrocycleId)
+    .maybeSingle();
+  if (error) throw error;
+  return engineGoal((macro?.goal_type as MacroGoalType | null) ?? null);
 }
 
 export interface ActiveEngineParams {
@@ -119,6 +263,7 @@ export async function startMeso(
     return { error: "Fill at least one exercise slot before starting." };
 
   const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
+  const goal = await resolveMesoGoal(supabase, meso.macrocycle_id);
   const ramp = rirRamp(
     meso.weeks,
     meso.includes_deload,
@@ -131,10 +276,11 @@ export async function startMeso(
   const exerciseIds = [
     ...new Set(days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id)))),
   ];
-  const [{ data: exercises, error: exError }, { data: prs, error: prError }] =
+  const [{ data: exercises, error: exError }, { data: prs, error: prError }, overrideByExerciseId] =
     await Promise.all([
       supabase.from("exercises").select("id, equipment_type").in("id", exerciseIds),
       supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+      getExerciseParamOverrides(supabase, userId, exerciseIds),
     ]);
   if (exError) throw exError;
   if (prError) throw prError;
@@ -170,8 +316,11 @@ export async function startMeso(
     experienceLevel: profile.experience_level,
     units: profile.units,
     targetRir: meso.rir_start,
+    isDeload: week1.is_deload,
+    goal,
     params,
     paramsVersion,
+    overrideByExerciseId,
   };
 
   // week-1 workouts in planner order, seeded per exercise
@@ -191,13 +340,14 @@ export async function startMeso(
       .single();
     if (workoutError) throw workoutError;
 
-    const rows = buildDayExerciseRows(workout.id, day, seedCtx);
-    if (rows.length > 0) {
-      const { error: weError } = await supabase
-        .from("workout_exercises")
-        .insert(rows);
-      if (weError) throw weError;
-    }
+    await persistSeededRows(
+      supabase,
+      userId,
+      buildDayExerciseRows(workout.id, day, seedCtx),
+      { workoutId: workout.id, microcycleId: week1.id, mesocycleId: meso.id },
+      params,
+      paramsVersion,
+    );
   }
 
   const { error: activateError } = await supabase
@@ -229,12 +379,13 @@ export async function regenerateOpenWorkouts(
   const { days } = plan;
 
   const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
+  const goal = await resolveMesoGoal(supabase, plan.meso.macrocycle_id);
   const exerciseIds = [
     ...new Set(
       days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id))),
     ),
   ];
-  const [{ data: exercises, error: exError }, { data: prs, error: prError }] =
+  const [{ data: exercises, error: exError }, { data: prs, error: prError }, overrideByExerciseId] =
     await Promise.all([
       exerciseIds.length > 0
         ? supabase
@@ -243,6 +394,7 @@ export async function regenerateOpenWorkouts(
             .in("id", exerciseIds)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+      getExerciseParamOverrides(supabase, userId, exerciseIds),
     ]);
   if (exError) throw exError;
   if (prError) throw prError;
@@ -276,8 +428,11 @@ export async function regenerateOpenWorkouts(
       experienceLevel: profile.experience_level,
       units: profile.units,
       targetRir: micro.target_rir,
+      isDeload: micro.is_deload,
+      goal,
       params,
       paramsVersion,
+      overrideByExerciseId,
     };
 
     // 1. drop planned workouts whose day was removed from the plan
@@ -321,11 +476,14 @@ export async function regenerateOpenWorkouts(
           .select()
           .single();
         if (cErr) throw cErr;
-        const rows = buildDayExerciseRows(created.id, day, ctx);
-        if (rows.length > 0) {
-          const { error } = await supabase.from("workout_exercises").insert(rows);
-          if (error) throw error;
-        }
+        await persistSeededRows(
+          supabase,
+          userId,
+          buildDayExerciseRows(created.id, day, ctx),
+          { workoutId: created.id, microcycleId: micro.id, mesocycleId: mesoId },
+          params,
+          paramsVersion,
+        );
         continue;
       }
 
@@ -351,54 +509,25 @@ export async function regenerateOpenWorkouts(
         if (error) throw error;
       }
 
-      // add exercises new to the plan, seeded, appended after the max position
+      // add exercises new to the plan, seeded, appended after the max position.
+      // Each carries a stamped fingerprint + a recorded kind:"seed" decision
+      // (doc 14 §6.2) so the read-path reconcile keeps it fresh thereafter.
       let position = Math.max(0, ...(wes ?? []).map((w) => w.position));
-      const newRows = day.groups.flatMap((group) =>
+      const seededNew = day.groups.flatMap((group) =>
         group.fills
           .filter((f) => !haveIds.has(f.exercise_id))
-          .map((fill) => {
-            const equipment = toEngineEquipment(
-              equipmentById.get(fill.exercise_id) ?? "other",
-            );
-            const pr = prById.get(fill.exercise_id);
-            const seeded = seedMeso(
-              pr?.best_weight != null
-                ? { weight: pr.best_weight, reps: pr.best_reps, sets: fill.initial_sets }
-                : null,
-              {
-                weight: fill.initial_weight,
-                reps: fill.initial_reps,
-                sets: fill.initial_sets,
-              },
-              { equipmentType: equipment },
-              {
-                experienceLevel: profile.experience_level ?? "beginner",
-                units: profile.units,
-              },
-              micro.target_rir,
-              params,
-            );
-            return {
-              workout_id: existing.id,
-              exercise_id: fill.exercise_id,
-              muscle_group_id: group.muscle_group_id,
-              position: ++position,
-              prescribed_weight: seeded.weight,
-              prescribed_reps: seeded.reps,
-              prescribed_sets: seeded.sets,
-              target_rir: seeded.targetRir,
-              status: "pending" as const,
-              notes: seeded.rationale,
-              params_version: paramsVersion,
-            };
-          }),
+          .map((fill) =>
+            seedExerciseRow(existing.id, fill, group.muscle_group_id, ++position, ctx),
+          ),
       );
-      if (newRows.length > 0) {
-        const { error } = await supabase
-          .from("workout_exercises")
-          .insert(newRows);
-        if (error) throw error;
-      }
+      await persistSeededRows(
+        supabase,
+        userId,
+        seededNew,
+        { workoutId: existing.id, microcycleId: micro.id, mesocycleId: mesoId },
+        params,
+        paramsVersion,
+      );
     }
   }
 }

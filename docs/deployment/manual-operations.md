@@ -76,6 +76,19 @@ findings 3 & 4.
 
 Until reconciled, `npm run test:rls` cannot pass in CI or locally.
 
+### Apply `20260620000006_exercise_param_overrides` to hosted (doc 14 phase 3)
+
+The phase-3 migration that creates `public.exercise_param_overrides` was **not
+applied to the hosted DB from the Claude session that wrote it** (the remote
+`apply_migration` was blocked as an unauthorized production action). The app's
+override reads (`getExerciseParamOverrides` / `getExerciseIncrementOverride`,
+called on the workout/generation/exercise paths) query this table, so they will
+**error until the table exists on hosted**.
+
+| Operation | Notes |
+|---|---|
+| Apply the override-table migration to hosted | Run `supabase/migrations/20260620000006_exercise_param_overrides.sql` against the hosted project (CLI `supabase db push`, dashboard SQL editor, or MCP `apply_migration`). Additive (new table + owner-only RLS + index + `set_updated_at` trigger); no existing data touched. |
+
 ---
 
 ## How Claude flags these

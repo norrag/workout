@@ -5,6 +5,7 @@ import type {
   ExerciseFeedbackRow,
   ExerciseNoteRow,
   LoggedSetRow,
+  MacroGoalType,
   MesocycleRow,
   MicrocycleRow,
   SetType,
@@ -14,11 +15,23 @@ import type {
 } from "@/lib/types/database";
 import {
   recencyWeightedE1rm,
+  resolveEffectiveParams,
+  seedMeso,
+  toEngineEquipment,
   type EngineParams,
   type E1rmSample,
   type E1rmAnchor,
 } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
+import {
+  buildSeedInputs,
+  computeDepFingerprint,
+  configProjection,
+  paramsTokenFor,
+} from "./fingerprint";
+import { getExerciseParamOverrides } from "./exercise-overrides";
+import { engineGoal } from "./engine-goal";
+import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
 
 type Client = SupabaseClient<Database>;
 
@@ -925,7 +938,14 @@ export async function propagateSubstitution(
 /** Add exercises to a live workout (workout-page editing). Each lands at the
  *  bottom of the list (max position + 1), tagged with its primary muscle group,
  *  prescription seeded from the user's all-time best — the user reorders as
- *  normal. Logged history is untouched (these are new pending slots). */
+ *  normal. Logged history is untouched (these are new pending slots).
+ *
+ *  Doc 14 §6.2: an added slot is a cold-start seed, so it is run through the pure
+ *  `seedMeso` (modeling the user's best as the cold-start `initial` defaults, so
+ *  there is no peak-backoff — same starting number as before, now on-step), its
+ *  `dep_fingerprint` is stamped, and a kind:"seed" decision is recorded. That
+ *  lets the read-path reconcile keep it fresh when an input changes, instead of
+ *  silently skipping it. */
 export async function addWorkoutExercises(
   supabase: Client,
   userId: string,
@@ -952,51 +972,154 @@ export async function addWorkoutExercises(
   if (wErr) throw wErr;
   const { data: micro, error: mErr } = await supabase
     .from("microcycles")
-    .select("target_rir")
+    .select("id, target_rir, is_deload, mesocycle_id")
     .eq("id", workout.microcycle_id)
     .single();
   if (mErr) throw mErr;
 
-  // a user-added slot carries no engine decision; stamp it with the active version
-  // so it reads as current and never trips the on-load reconcile's staleness gate
-  const { version: paramsVersion } = await getActiveEngineParams(supabase);
-
-  const [{ data: links, error: linkErr }, { data: prs, error: prErr }] =
-    await Promise.all([
-      supabase
-        .from("exercise_muscle_groups")
-        .select("exercise_id, muscle_group_id")
-        .in("exercise_id", exerciseIds)
-        .eq("role", "primary"),
-      supabase
-        .from("v_exercise_prs")
-        .select("exercise_id, best_weight, best_reps")
-        .eq("user_id", userId)
-        .in("exercise_id", exerciseIds),
-    ]);
+  // config dimensions the seed depends on (doc 14): equipment, profile, goal.
+  const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
+  const [
+    { data: links, error: linkErr },
+    { data: prs, error: prErr },
+    { data: exercises, error: exErr },
+    { data: profile, error: pErr },
+    goal,
+    overrideByEx,
+  ] = await Promise.all([
+    supabase
+      .from("exercise_muscle_groups")
+      .select("exercise_id, muscle_group_id")
+      .in("exercise_id", exerciseIds)
+      .eq("role", "primary"),
+    supabase
+      .from("v_exercise_prs")
+      .select("exercise_id, best_weight, best_reps")
+      .eq("user_id", userId)
+      .in("exercise_id", exerciseIds),
+    supabase
+      .from("exercises")
+      .select("id, equipment_type")
+      .in("id", exerciseIds),
+    supabase
+      .from("profiles")
+      .select("experience_level, units")
+      .eq("id", userId)
+      .single(),
+    resolveAddGoal(supabase, micro.mesocycle_id),
+    getExerciseParamOverrides(supabase, userId, exerciseIds),
+  ]);
   if (linkErr) throw linkErr;
   if (prErr) throw prErr;
+  if (exErr) throw exErr;
+  if (pErr) throw pErr;
   const mgByEx = new Map((links ?? []).map((l) => [l.exercise_id, l.muscle_group_id]));
   const prByEx = new Map((prs ?? []).map((p) => [p.exercise_id, p]));
+  const equipmentByEx = new Map((exercises ?? []).map((e) => [e.id, e.equipment_type]));
 
-  const rows = exerciseIds.map((id) => {
+  const seeded = exerciseIds.map((id) => {
     const pr = prByEx.get(id);
+    const equipment = equipmentByEx.get(id) ?? "other";
+    const override = overrideByEx.get(id) ?? null;
+    const effectiveParams = resolveEffectiveParams(
+      params,
+      override,
+      toEngineEquipment(equipment),
+      profile.units,
+    );
+    // model the user's best as the cold-start `initial` (no prior-meso peak ⇒ no
+    // backoff), so the prescribed number matches the prior behavior while becoming
+    // replayable through seedMeso on recompute.
+    const initial = {
+      weight: pr?.best_weight ?? null,
+      reps: pr?.best_reps ?? null,
+      sets: 3,
+    };
+    const output = seedMeso(
+      null,
+      initial,
+      { equipmentType: toEngineEquipment(equipment) },
+      { experienceLevel: profile.experience_level ?? "beginner", units: profile.units },
+      micro.target_rir,
+      effectiveParams,
+    );
+    const inputs = buildSeedInputs({
+      equipmentType: equipment,
+      profile,
+      goal,
+      startRir: micro.target_rir,
+      isDeload: micro.is_deload,
+      initial,
+      priorPeak: null,
+    });
     return {
-      workout_id: workoutId,
-      exercise_id: id,
-      muscle_group_id: mgByEx.get(id) ?? null,
-      position: ++pos,
-      prescribed_weight: pr?.best_weight ?? null,
-      prescribed_reps: pr?.best_reps ?? null,
-      prescribed_sets: 3,
-      target_rir: micro.target_rir,
-      status: "pending" as const,
-      notes: "Added during the workout",
-      params_version: paramsVersion,
+      row: {
+        workout_id: workoutId,
+        exercise_id: id,
+        muscle_group_id: mgByEx.get(id) ?? null,
+        position: ++pos,
+        prescribed_weight: output.weight,
+        prescribed_reps: output.reps,
+        prescribed_sets: output.sets,
+        target_rir: output.targetRir,
+        status: "pending" as const,
+        notes: "Added during the workout",
+        dep_fingerprint: computeDepFingerprint(
+          configProjection(inputs),
+          paramsTokenFor(paramsVersion, override?.weightIncrement),
+        ),
+      },
+      exerciseId: id,
+      inputs,
+      output,
     };
   });
-  const { error } = await supabase.from("workout_exercises").insert(rows);
+
+  const { data: newWes, error } = await supabase
+    .from("workout_exercises")
+    .insert(seeded.map((s) => s.row))
+    .select("id, position");
   if (error) throw error;
+
+  // record a kind:"seed" decision per added slot (service-role; best-effort) so
+  // the row participates in the freshness reconcile (doc 14 §6.2).
+  const idByPosition = new Map((newWes ?? []).map((w) => [w.position, w.id]));
+  const decisions: SeededDecision[] = seeded
+    .map((s): SeededDecision | null => {
+      const id = idByPosition.get(s.row.position);
+      return id
+        ? { workoutExerciseId: id, exerciseId: s.exerciseId, inputs: s.inputs, output: s.output }
+        : null;
+    })
+    .filter((d): d is SeededDecision => d !== null);
+  await recordSeedDecisions(
+    userId,
+    decisions,
+    { workoutId, microcycleId: micro.id, mesocycleId: micro.mesocycle_id },
+    params,
+    paramsVersion,
+  );
+}
+
+/** The meso's progression goal for a freshly added slot (macro goal → default). */
+async function resolveAddGoal(
+  supabase: Client,
+  mesocycleId: string,
+): Promise<ReturnType<typeof engineGoal>> {
+  const { data: meso, error } = await supabase
+    .from("mesocycles")
+    .select("macrocycle_id")
+    .eq("id", mesocycleId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!meso?.macrocycle_id) return engineGoal(null);
+  const { data: macro, error: macroErr } = await supabase
+    .from("macrocycles")
+    .select("goal_type")
+    .eq("id", meso.macrocycle_id)
+    .maybeSingle();
+  if (macroErr) throw macroErr;
+  return engineGoal((macro?.goal_type as MacroGoalType | null) ?? null);
 }
 
 /** Add the same exercises to each target workout's bottom (workout-page

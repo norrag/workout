@@ -5,7 +5,7 @@ import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
 import { catchUpProgression } from "@/lib/queries/progression";
-import { reconcileMesoPlan } from "@/lib/queries/regeneration";
+import { reconcilePrescriptions } from "@/lib/queries/regeneration";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -29,13 +29,15 @@ export default async function WorkoutPage() {
   let state = await getCurrentState(supabase, user.id);
 
   // keep the plan correct on open: generate any missing day whose previous-week
-  // counterpart is complete, and refresh any not-yet-started prescription that
-  // predates the ACTIVE engine_params version. This makes activating a new
-  // version propagate to every user transparently on their next open — no manual
-  // regenerate/catch-up step. Idempotent + additive; cheap when nothing changed.
+  // counterpart is complete, and refresh any not-yet-started prescription whose
+  // inputs have changed since it was computed (engine params, profile, macro goal,
+  // meso config, the upstream week). Staleness is derived from a per-prescription
+  // dependency fingerprint (doc 14), so a change to ANY input propagates to every
+  // user transparently on their next open — no manual regenerate step. Idempotent
+  // + additive; a hash compare when nothing changed.
   if (state.mesocycle) {
     try {
-      const { generated, refreshed } = await reconcileMesoPlan(
+      const { generated, refreshed } = await reconcilePrescriptions(
         createServiceClient(),
         user.id,
         state.mesocycle.id,

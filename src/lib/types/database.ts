@@ -13,8 +13,10 @@ type Defaulted =
   // has a DB default ('{}'); only workout_exercises carries these keys
   | "skipped_set_numbers"
   | "set_weights"
-  // nullable; stamped by the engine/seed/reconcile paths, optional on raw inserts
-  | "params_version"
+  // nullable freshness fingerprint; stamped by the engine/reconcile paths only
+  | "dep_fingerprint"
+  // engine_decisions.kind defaults to 'advance' in the DB; seed writers pass it
+  | "kind"
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
@@ -111,6 +113,17 @@ export type ExerciseNoteRow = {
   exercise_id: string;
   body: string;
   is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Per-user × exercise engine override (doc 14 phase 3). First tunable: the
+ *  editable weight increment, in the user's units. */
+export type ExerciseParamOverrideRow = {
+  id: string;
+  user_id: string;
+  exercise_id: string;
+  weight_increment: number;
   created_at: string;
   updated_at: string;
 }
@@ -253,10 +266,11 @@ export type WorkoutExerciseRow = {
   /** per-set planned weight overrides for unlogged sets (set_number → weight), doc 11 */
   set_weights: Record<string, number>;
   notes: string | null;
-  /** engine_params.version this prescription was last computed/reconciled under;
-   *  the on-load reconcile compares it against the active version to skip the
-   *  heavy regeneration unless the row is stale. */
-  params_version: number | null;
+  /** Freshness fingerprint (doc 14): sha256 of the config projection of this
+   *  prescription's engine inputs + the engine_params token. The read-path
+   *  reconcile compares it against the freshly-resolved inputs and recomputes only
+   *  the rows that diverged. null = never stamped (recompute on next view). */
+  dep_fingerprint: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -382,6 +396,10 @@ export type EngineParamsRow = {
   updated_at: string;
 }
 
+/** which engine entry produced a decision (doc 14 §6.2): a week N→N+1 advance
+ *  (prescribe) or a cold-start seed (seedMeso). */
+export type EngineDecisionKind = "seed" | "advance";
+
 export type EngineDecisionRow = {
   id: string;
   user_id: string;
@@ -396,6 +414,7 @@ export type EngineDecisionRow = {
   params_version: number;
   params_hash: string | null;
   provenance: Record<string, unknown> | null;
+  kind: EngineDecisionKind;
   created_at: string;
 }
 
@@ -524,6 +543,7 @@ export type Database = {
       exercise_muscle_groups: Table<ExerciseMuscleGroupRow>;
       excluded_exercises: Table<ExcludedExerciseRow>;
       exercise_notes: Table<ExerciseNoteRow>;
+      exercise_param_overrides: Table<ExerciseParamOverrideRow>;
       macrocycles: Table<MacrocycleRow>;
       mesocycles: Table<MesocycleRow>;
       meso_days: Table<MesoDayRow>;
