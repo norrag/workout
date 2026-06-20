@@ -15,6 +15,7 @@ import type {
 } from "@/lib/types/database";
 import {
   recencyWeightedE1rm,
+  resolveEffectiveParams,
   seedMeso,
   toEngineEquipment,
   type EngineParams,
@@ -26,7 +27,9 @@ import {
   buildSeedInputs,
   computeDepFingerprint,
   configProjection,
+  paramsTokenFor,
 } from "./fingerprint";
+import { getExerciseParamOverrides } from "./exercise-overrides";
 import { engineGoal } from "./engine-goal";
 import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
 
@@ -982,6 +985,7 @@ export async function addWorkoutExercises(
     { data: exercises, error: exErr },
     { data: profile, error: pErr },
     goal,
+    overrideByEx,
   ] = await Promise.all([
     supabase
       .from("exercise_muscle_groups")
@@ -1003,6 +1007,7 @@ export async function addWorkoutExercises(
       .eq("id", userId)
       .single(),
     resolveAddGoal(supabase, micro.mesocycle_id),
+    getExerciseParamOverrides(supabase, userId, exerciseIds),
   ]);
   if (linkErr) throw linkErr;
   if (prErr) throw prErr;
@@ -1015,6 +1020,13 @@ export async function addWorkoutExercises(
   const seeded = exerciseIds.map((id) => {
     const pr = prByEx.get(id);
     const equipment = equipmentByEx.get(id) ?? "other";
+    const override = overrideByEx.get(id) ?? null;
+    const effectiveParams = resolveEffectiveParams(
+      params,
+      override,
+      toEngineEquipment(equipment),
+      profile.units,
+    );
     // model the user's best as the cold-start `initial` (no prior-meso peak ⇒ no
     // backoff), so the prescribed number matches the prior behavior while becoming
     // replayable through seedMeso on recompute.
@@ -1029,7 +1041,7 @@ export async function addWorkoutExercises(
       { equipmentType: toEngineEquipment(equipment) },
       { experienceLevel: profile.experience_level ?? "beginner", units: profile.units },
       micro.target_rir,
-      params,
+      effectiveParams,
     );
     const inputs = buildSeedInputs({
       equipmentType: equipment,
@@ -1052,9 +1064,10 @@ export async function addWorkoutExercises(
         target_rir: output.targetRir,
         status: "pending" as const,
         notes: "Added during the workout",
-        dep_fingerprint: computeDepFingerprint(configProjection(inputs), {
-          version: paramsVersion,
-        }),
+        dep_fingerprint: computeDepFingerprint(
+          configProjection(inputs),
+          paramsTokenFor(paramsVersion, override?.weightIncrement),
+        ),
       },
       exerciseId: id,
       inputs,

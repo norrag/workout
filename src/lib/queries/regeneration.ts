@@ -2,24 +2,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   engineInputsSchema,
   prescribe,
+  resolveEffectiveParams,
   seedMeso,
+  toEngineEquipment,
   type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
+  type ExerciseParamOverride,
   type Prescription,
 } from "@/lib/engine";
 import type { Database, EngineDecisionKind } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "./logging";
 import { getActiveEngineParams } from "./generation";
+import { getExerciseParamOverrides } from "./exercise-overrides";
 import { catchUpMesoGeneration } from "./progression";
 import { engineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
 import {
   buildConfigInputs,
   computeDepFingerprint,
+  paramsTokenFor,
   seedEngineInputs,
   type ConfigInputs,
-  type ParamsToken,
   type SeedPeak,
 } from "./fingerprint";
 import type { MacroGoalType } from "@/lib/types/database";
@@ -235,6 +239,7 @@ function recomputeProvenance(
   codeSha: string | null,
   fromFingerprint: string | null,
   toFingerprint: string,
+  incrementOverride: number | null,
 ): Record<string, unknown> {
   const working = inputs.actualSets.filter((s) => !s.isWarmup);
   const assumed = working.filter((s) => s.rirReported == null).length;
@@ -259,6 +264,9 @@ function recomputeProvenance(
         goalType: liveConfig.goalType,
         week: liveConfig.week,
         previous: liveConfig.previous,
+        // per-user×exercise increment override folded into effective params
+        // (doc 14 phase 3); null = engine default
+        incrementOverride,
       },
     },
   };
@@ -296,7 +304,6 @@ export async function reconcilePrescriptions(
   const generated = await catchUpMesoGeneration(service, userId, mesoId);
 
   const { version, params } = await getActiveEngineParams(service);
-  const token: ParamsToken = { version };
 
   // 2. the meso's weeks (target RIR / deload per week)
   const { data: micros, error: microsError } = await service
@@ -392,10 +399,15 @@ export async function reconcilePrescriptions(
   const goal = engineGoal(mesoGoal);
 
   const exerciseIds = [...new Set(openWes.map((we) => we.exercise_id))];
-  const { data: exercises, error: exError } =
+  const [{ data: exercises, error: exError }, overrideByExercise] = await Promise.all([
     exerciseIds.length > 0
-      ? await service.from("exercises").select("id, equipment_type").in("id", exerciseIds)
-      : { data: [] as { id: string; equipment_type: string }[], error: null };
+      ? service.from("exercises").select("id, equipment_type").in("id", exerciseIds)
+      : Promise.resolve({ data: [] as { id: string; equipment_type: string }[], error: null }),
+    // per-user×exercise increment overrides (doc 14 phase 3): one indexed read,
+    // folded into each row's fingerprint token so an increment edit goes stale
+    // for exactly that exercise's open rows (the scope falls out of the hash, §7).
+    getExerciseParamOverrides(service, userId, exerciseIds),
+  ]);
   if (exError) throw exError;
   const equipmentById = new Map(
     (exercises ?? []).map((e) => [e.id, e.equipment_type]),
@@ -445,16 +457,34 @@ export async function reconcilePrescriptions(
     const initial =
       (decision.inputs.initial as ConfigInputs["initial"]) ?? null;
 
+    const equipmentType = equipmentById.get(row.exerciseId) ?? "other";
+    const override: ExerciseParamOverride | null =
+      overrideByExercise.get(row.exerciseId) ?? null;
     const liveConfig = buildConfigInputs({
-      equipmentType: equipmentById.get(row.exerciseId) ?? "other",
+      equipmentType,
       profile,
       goal,
       week: { targetRir: row.targetRir, isDeload: row.isDeload },
       previous,
       initial,
     });
-    const expected = computeDepFingerprint(liveConfig, token);
+    // the params token folds in this exercise's increment override (doc 14 §3), so
+    // an override change moves the expected fingerprint for ONLY that exercise's
+    // rows; rows for other exercises stay byte-identical and short-circuit.
+    const expected = computeDepFingerprint(
+      liveConfig,
+      paramsTokenFor(version, override?.weightIncrement),
+    );
     if (expected === row.depFingerprint) continue; // fresh — short-circuit
+
+    // recompute under EFFECTIVE params (global active + this exercise's override),
+    // so a recomputed number actually reflects the override (doc 14 §6.1).
+    const effectiveParams = resolveEffectiveParams(
+      params,
+      override,
+      toEngineEquipment(equipmentType),
+      profile.units,
+    );
 
     // diverged → recompute the row's engine of `kind`. Anchors feed only the
     // advance replay (a seed's cold-start basis is its frozen prior peak); fetch
@@ -474,7 +504,7 @@ export async function reconcilePrescriptions(
         anchor,
         currentOutput: row.currentOutput,
       },
-      params,
+      effectiveParams,
     );
 
     if (result.status === "invalid_source") {
@@ -527,6 +557,7 @@ export async function reconcilePrescriptions(
         codeSha,
         row.depFingerprint,
         expected,
+        override?.weightIncrement ?? null,
       ),
       // a recompute preserves the row's origin kind, so a re-seeded row stays a
       // seed (and replays through seedMeso) on its next divergence.

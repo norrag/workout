@@ -331,6 +331,36 @@ describe("design-pivot tables (0002)", () => {
     expect(error).not.toBeNull();
   });
 
+  it("exercise param overrides are owner-only and unspoofable (doc 14 phase 3)", async () => {
+    const { data: stock } = await alice
+      .from("exercises")
+      .select("id")
+      .is("user_id", null)
+      .limit(1)
+      .single();
+
+    const { data: override, error: overrideError } = await alice
+      .from("exercise_param_overrides")
+      .insert({ user_id: aliceId, exercise_id: stock!.id, weight_increment: 10 })
+      .select()
+      .single();
+    expect(overrideError).toBeNull();
+    expect(override!.weight_increment).toBe(10);
+
+    // bob cannot read alice's override…
+    const { data: bobView } = await bob
+      .from("exercise_param_overrides")
+      .select("*")
+      .eq("id", override!.id);
+    expect(bobView).toEqual([]);
+
+    // …nor write one into her account
+    const { error: spoofError } = await bob
+      .from("exercise_param_overrides")
+      .insert({ user_id: aliceId, exercise_id: stock!.id, weight_increment: 5 });
+    expect(spoofError).not.toBeNull();
+  });
+
   it("positioned macro mesos and groups-first plan rows are gated through their parents", async () => {
     // an unplanned, phased placeholder inside alice's macro (replaces slots)
     const { data: placeholder, error: phError } = await alice

@@ -1,6 +1,6 @@
 # 14 — Prescription Freshness: dependency tracking & recompute (design)
 
-Status: **phases 1–2 built (2026-06-20); phases 3–5 designed, not yet built.**
+Status: **phases 1–3 built (2026-06-20); phases 4–5 designed, not yet built.**
 Authoritative design for how stored prescriptions stay correct when any of their
 inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
 **redesigns the `params_version` staleness gate** into one general framework; that
@@ -50,6 +50,39 @@ slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 > unchanged but now on-step + replayable; (c) seed rows written before this phase
 > carry no decision and stay skipped (no retroactive backfill — they age out as
 > mesos complete).
+
+> **Phase 3 landed (first per-user override — editable increment, §7).** New
+> `exercise_param_overrides` table (`user_id × exercise_id → weight_increment`,
+> migration `20260620000006`; owner-only RLS + RLS test). Pure
+> `resolveEffectiveParams(params, override, equipment, units)` (`engine/effective-params.ts`)
+> merges the override into the global params' per-equipment increment, producing the
+> EFFECTIVE params the engine runs under; the engine signature is unchanged (hard
+> rule #3). The freshness token gained an optional `incrementOverride` folded by
+> `paramsTokenFor(version, override?)` — OMITTED when there is no override, so every
+> existing row's fingerprint is byte-identical and nothing churns; present, it makes
+> exactly that exercise's open rows go stale (scope falls out of the hash, §7). Wired
+> at every generation/recompute site: `seedExerciseRow`/`startMeso`/`regenerateOpenWorkouts`
+> (generation), `generateDay` + `projectNextPrescription` (progression),
+> `addWorkoutExercises` (logging), and the read-path `reconcilePrescriptions` (which
+> now batches the override read alongside the other config dimensions, computes the
+> per-exercise token, and recomputes diverged rows under effective params). The
+> recompute decision's `provenance.dependencies.incrementOverride` records the value
+> for `explain_prescription`. Editor on the Exercise page behind the mockup's header
+> `⋯` (fig 3.1a): a "Load step" sheet of step chips + "USE DEFAULT", server action
+> `setIncrementOverrideAction`. **Deviations as built:** (a) the override is the BASE
+> increment (the same level `engine_params.increment` sits at), so
+> `experience_increment_scale` still composes on top — at the default intermediate
+> scale (1.0) the override is the literal step; (b) under the active v9 params
+> (`weight_selection: "rep_window"`) the engine prices loads off the strength anchor,
+> not the increment, so this override moves a prescribed NUMBER only on the legacy
+> increment path (cold-start / no-or-low-confidence-anchor fallback, or an
+> `increment` params row) — it always moves the fingerprint, so the row always
+> participates in (and re-stamps through) the reconcile; (c) the recompute decision
+> records the GLOBAL `params_hash` (the `engine_params` row identity) with the
+> override carried in provenance, rather than an effective-params hash; (d) **the
+> migration was NOT applied to the hosted DB from this session** (the apply was
+> blocked) — it must be applied on deploy before the override reads resolve (see the
+> manual-operations runbook + PROGRESS "Remaining / external").
 
 ---
 
@@ -437,9 +470,17 @@ the record shows one mechanism, not two.
    `replay_decisions` does the same. Pure `buildSeedInputs`/`seedEngineInputs` +
    write/check golden test. See the phase-2 status note up top for as-built
    deviations.
-3. **First per-user override — editable increment.** Override table (RLS + tests),
-   `resolveEffectiveParams`, increment editor on the Exercise page (transcribe the
-   mockup first — CLAUDE.md #8). Recompute scopes to the exercise automatically.
+3. **✅ DONE (2026-06-20) — First per-user override — editable increment** (§7).
+   `exercise_param_overrides` table (owner-only RLS + RLS test; migration
+   `20260620000006`), pure `resolveEffectiveParams`, the increment editor on the
+   Exercise page behind the header `⋯` (fig 3.1a). The fingerprint token folds in the
+   per-exercise override (`paramsTokenFor`, omitted when absent → zero churn), so the
+   read-path reconcile recomputes exactly that exercise's open rows under effective
+   params — scope falls out of the hash, no bespoke invalidation. Wired at every
+   generation/recompute site. See the phase-3 status note up top for as-built
+   deviations (notably: under the active rep-window params the increment moves the
+   fingerprint always but a prescribed number only on the legacy increment path; and
+   the migration still needs applying to hosted).
 4. **Backfill the rest into the contract** as they arise (profile already flows;
    macro goal already flows; meso config already flows) — verify each with a test
    that a change recomputes the right rows and nothing else.

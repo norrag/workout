@@ -167,15 +167,33 @@ export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
 }
 
 /**
- * Identifies the engine params a prescription was (or will be) computed under.
- * Today this is just the active `engine_params.version` (an activated version's
- * content is immutable — a change proposes a NEW version). Doc 14 phase 3 extends
- * it to fold a per-user×exercise override hash in, so the fingerprint reflects the
- * EFFECTIVE params; adding a field here simply re-hashes (a one-time recompute),
- * never a redesign.
+ * Identifies the EFFECTIVE engine params a prescription was (or will be) computed
+ * under. `version` is the active `engine_params.version` (an activated version's
+ * content is immutable — a change proposes a NEW version). Doc 14 phase 3 folds the
+ * per-user×exercise increment override in as `incrementOverride`, so the fingerprint
+ * reflects the effective params and a change to an exercise's increment makes
+ * exactly that exercise's open rows go stale (the scope falls out of the
+ * fingerprint, §7).
+ *
+ * `incrementOverride` is OMITTED when the exercise has no override, so a row with no
+ * override hashes identically to its phase-1/2 fingerprint — the override surface
+ * churns nothing for the (vast) majority of rows that don't have one.
  */
 export interface ParamsToken {
   version: number;
+  incrementOverride?: number;
+}
+
+/**
+ * Build the params token for an exercise, folding in its increment override when
+ * one exists (doc 14 phase 3). No override ⇒ `{ version }`, byte-identical to the
+ * pre-phase-3 token, so existing fingerprints are preserved.
+ */
+export function paramsTokenFor(
+  version: number,
+  incrementOverride?: number | null,
+): ParamsToken {
+  return incrementOverride == null ? { version } : { version, incrementOverride };
 }
 
 /**

@@ -74,6 +74,12 @@ export {
   type DayClassification,
   type DayEmphasis,
 } from "./classification";
+export {
+  resolveEffectiveParams,
+  type ExerciseParamOverride,
+} from "./effective-params";
+export { incrementFor } from "./rules/rounding";
+export type { EquipmentType } from "./params";
 export type { EngineInputs, Prescription, EngineParams };
 
 export function prescribe(

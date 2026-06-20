@@ -117,6 +117,17 @@ export type ExerciseNoteRow = {
   updated_at: string;
 }
 
+/** Per-user × exercise engine override (doc 14 phase 3). First tunable: the
+ *  editable weight increment, in the user's units. */
+export type ExerciseParamOverrideRow = {
+  id: string;
+  user_id: string;
+  exercise_id: string;
+  weight_increment: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ExerciseMuscleGroupRow = {
   id: string;
   exercise_id: string;
@@ -532,6 +543,7 @@ export type Database = {
       exercise_muscle_groups: Table<ExerciseMuscleGroupRow>;
       excluded_exercises: Table<ExcludedExerciseRow>;
       exercise_notes: Table<ExerciseNoteRow>;
+      exercise_param_overrides: Table<ExerciseParamOverrideRow>;
       macrocycles: Table<MacrocycleRow>;
       mesocycles: Table<MesocycleRow>;
       meso_days: Table<MesoDayRow>;
