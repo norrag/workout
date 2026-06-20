@@ -108,12 +108,25 @@ export default async function MorePage() {
           SET UP ›
         </div>
       </Link>
-      <div className="flex items-center justify-between border-b border-ink/15 py-3.5">
+      <a
+        href="/more/export"
+        download
+        className="flex items-center justify-between border-b border-ink/15 py-3.5"
+      >
         <div className="text-sm font-semibold">Export training data</div>
         <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
           CSV ›
         </div>
-      </div>
+      </a>
+      <Link
+        href="/more/delete-account"
+        className="flex items-center justify-between border-b border-ink/15 py-3.5"
+      >
+        <div className="text-sm font-semibold">Delete account</div>
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-accent">
+          DELETE ›
+        </div>
+      </Link>
 
       <form action={signOut} className="mt-6">
         <button
