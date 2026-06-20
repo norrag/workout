@@ -2739,8 +2739,14 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
   version, replay its stored inputs against the active params and write the
   refreshed weight/reps/sets/RIR back, plus a fresh `engine_decisions` row
   (`provenance.regenerated`) so the audit chain stays intact.
-  - **Safety:** dry-run by default (returns diffs, writes nothing); `confirm="apply"`
-    to write. Never touches in-progress/completed workouts, logged sets, or manual
+  - **Safety:** two-step and dry-run by default. The first call (omit `confirm`)
+    writes nothing and returns the diffs plus a `plan_token` (a stable hash of the
+    active version + every changed exercise's target prescription). A write needs
+    BOTH `confirm="apply"` and `confirm_token` echoing that token; a missing or
+    **stale** token (the plan changed since the preview) returns the current dry
+    run instead of writing — so an over-eager MCP client cannot apply in one blind
+    call (the original `confirm="apply"`-only gate let ChatGPT do exactly that).
+    Never touches in-progress/completed workouts, logged sets, or manual
     `set_weights` overrides (which compose on top — clear them with "Reset to
     prescription"). Pairs with `activate_engine_params`.
   - **Scope:** all users (admin-gated; service-role client with per-row,

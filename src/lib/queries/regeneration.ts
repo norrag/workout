@@ -163,6 +163,33 @@ export function planRegeneration(
   return { items, counts };
 }
 
+/**
+ * A stable token identifying exactly the set of writes a dry run would make
+ * (the active version + each changed exercise's target prescription). The apply
+ * path requires the caller to echo this token, so a write is only ever the
+ * second half of a preview→apply pair: an over-eager client cannot apply in one
+ * blind call, and a token computed against a now-stale plan (the underlying
+ * prescriptions changed since the preview) no longer matches and is rejected.
+ * Pure — only the `changed` items contribute, so unchanged/invalid rows never
+ * shift it.
+ */
+export function regenPlanToken(plan: RegenPlan, activeVersion: number): string {
+  const changes = plan.items
+    .filter(
+      (i): i is RegenItem & { output: Prescription } =>
+        i.status === "changed" && i.output != null,
+    )
+    .map((i) => ({
+      we: i.candidate.workoutExerciseId,
+      weight: i.output.weight,
+      reps: i.output.reps,
+      sets: i.output.sets,
+      targetRir: i.output.targetRir,
+    }))
+    .sort((a, b) => a.we.localeCompare(b.we));
+  return hashParams({ version: activeVersion, changes }).slice(0, 16);
+}
+
 /** Key a recomputed anchor by its owner + exercise (anchors are per-user). */
 export function anchorKey(userId: string, exerciseId: string): string {
   return `${userId}:${exerciseId}`;
