@@ -15,7 +15,11 @@ import type {
   WorkoutDetail,
 } from "@/lib/queries/logging";
 import type { Units } from "@/lib/types/database";
-import { predictRepsAtWeight, type EngineParams } from "@/lib/engine";
+// Leaf imports (not the @/lib/engine barrel) keep the macro planner, volume,
+// summary, classification and rules modules out of this client chunk — DayView
+// only needs the rep-prediction math on the Workout tab.
+import { predictRepsAtWeight } from "@/lib/engine/reps";
+import type { EngineParams } from "@/lib/engine/params";
 import {
   addSetAction,
   addWorkoutExercisesAction,

@@ -502,11 +502,18 @@ export async function deleteLoggedSet(
     .gt("set_number", target.set_number)
     .order("set_number");
   if (remError) throw remError;
-  for (const s of remaining ?? []) {
-    const { error } = await supabase
-      .from("logged_sets")
-      .update({ set_number: s.set_number - 1 })
-      .eq("id", s.id);
+  // Pull later sets down by one. Each update targets a distinct row id and
+  // there's no unique (workout_exercise_id, set_number) constraint, so the
+  // renumbering is order-independent and can run concurrently.
+  const renumbered = await Promise.all(
+    (remaining ?? []).map((s) =>
+      supabase
+        .from("logged_sets")
+        .update({ set_number: s.set_number - 1 })
+        .eq("id", s.id),
+    ),
+  );
+  for (const { error } of renumbered) {
     if (error) throw error;
   }
 
@@ -1233,13 +1240,24 @@ export async function completeWorkout(
     if (setsError) throw setsError;
     loggedWeIds = new Set((sets ?? []).map((s) => s.workout_exercise_id));
   }
-  for (const we of wes ?? []) {
-    if (we.status !== "skipped") {
-      await supabase
-        .from("workout_exercises")
-        .update({ status: loggedWeIds.has(we.id) ? "completed" : "skipped" })
-        .eq("id", we.id);
-    }
+  // Batch the status writes: two set-based updates instead of one round-trip
+  // per exercise. Already-skipped exercises are left untouched, as before.
+  const active = (wes ?? []).filter((we) => we.status !== "skipped");
+  const completedIds = active.filter((we) => loggedWeIds.has(we.id)).map((we) => we.id);
+  const skippedIds = active.filter((we) => !loggedWeIds.has(we.id)).map((we) => we.id);
+  const statusWrites = [];
+  if (completedIds.length > 0) {
+    statusWrites.push(
+      supabase.from("workout_exercises").update({ status: "completed" }).in("id", completedIds),
+    );
+  }
+  if (skippedIds.length > 0) {
+    statusWrites.push(
+      supabase.from("workout_exercises").update({ status: "skipped" }).in("id", skippedIds),
+    );
+  }
+  for (const { error } of await Promise.all(statusWrites)) {
+    if (error) throw error;
   }
 
   const { data: workout, error: workoutError } = await supabase
@@ -1296,9 +1314,8 @@ export async function endWorkout(
     .select("id")
     .eq("workout_id", workoutId);
   if (weError) throw weError;
-  for (const we of wes ?? []) {
-    await skipRemainingSets(supabase, we.id);
-  }
+  // Each call touches a distinct workout_exercise row, so they're independent.
+  await Promise.all((wes ?? []).map((we) => skipRemainingSets(supabase, we.id)));
   await completeWorkout(supabase, userId, workoutId, null);
 }
 
@@ -1339,10 +1356,9 @@ export async function endMesocycle(
       const weIds = (wes ?? []).map((x) => x.id);
 
       // skip the open slots while the workout is still in_progress, before the
-      // status flip (logged_sets/feedback lock on completion, not these)
-      for (const id of weIds) {
-        await skipRemainingSets(supabase, id);
-      }
+      // status flip (logged_sets/feedback lock on completion, not these).
+      // Distinct rows per call, so run them concurrently.
+      await Promise.all(weIds.map((id) => skipRemainingSets(supabase, id)));
 
       let loggedWeIds = new Set<string>();
       if (weIds.length > 0) {
@@ -1353,11 +1369,20 @@ export async function endMesocycle(
         if (setsError) throw setsError;
         loggedWeIds = new Set((sets ?? []).map((s) => s.workout_exercise_id));
       }
-      for (const id of weIds) {
-        const { error } = await supabase
-          .from("workout_exercises")
-          .update({ status: loggedWeIds.has(id) ? "completed" : "skipped" })
-          .eq("id", id);
+      const completedIds = weIds.filter((id) => loggedWeIds.has(id));
+      const skippedIds = weIds.filter((id) => !loggedWeIds.has(id));
+      const statusWrites = [];
+      if (completedIds.length > 0) {
+        statusWrites.push(
+          supabase.from("workout_exercises").update({ status: "completed" }).in("id", completedIds),
+        );
+      }
+      if (skippedIds.length > 0) {
+        statusWrites.push(
+          supabase.from("workout_exercises").update({ status: "skipped" }).in("id", skippedIds),
+        );
+      }
+      for (const { error } of await Promise.all(statusWrites)) {
         if (error) throw error;
       }
 

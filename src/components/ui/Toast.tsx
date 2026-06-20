@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -27,13 +28,25 @@ export function useToast(): (message: string) => void {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
+  const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   const show = useCallback((message: string) => {
     const id = (nextId.current += 1);
     setToasts((t) => [...t, { id, message }]);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setToasts((t) => t.filter((x) => x.id !== id));
+      timers.current.delete(id);
     }, 4000);
+    timers.current.set(id, timer);
+  }, []);
+
+  // Clear any pending auto-dismiss timers if the provider unmounts.
+  useEffect(() => {
+    const map = timers.current;
+    return () => {
+      map.forEach(clearTimeout);
+      map.clear();
+    };
   }, []);
 
   return (

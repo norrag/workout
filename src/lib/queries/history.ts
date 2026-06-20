@@ -53,7 +53,9 @@ export async function getExerciseHistory(
 ): Promise<HistoryEntry[]> {
   const { data: sets, error } = await supabase
     .from("logged_sets")
-    .select("*")
+    .select(
+      "mesocycle_id, microcycle_id, workout_id, workout_exercise_id, weight, reps, set_number, performed_at",
+    )
     .eq("user_id", userId)
     .eq("exercise_id", exerciseId)
     .eq("is_warmup", false)

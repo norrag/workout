@@ -334,21 +334,26 @@ export async function applyRegeneration(
   // overwrite each planned exercise's prescription (update by id; the table has
   // no user_id column — ownership is the parent workout's, already resolved
   // server-side into candidate.userId)
-  let updatedExercises = 0;
-  for (const { candidate, output } of changed) {
-    const { error: updateError } = await service
-      .from("workout_exercises")
-      .update({
-        prescribed_weight: output.weight,
-        prescribed_reps: output.reps,
-        prescribed_sets: output.sets,
-        target_rir: output.targetRir,
-        notes: output.rationale,
-      })
-      .eq("id", candidate.workoutExerciseId);
+  // Distinct rows with per-row values — can't collapse to one statement, but
+  // the independent updates can run concurrently instead of serially.
+  const exerciseUpdates = await Promise.all(
+    changed.map(({ candidate, output }) =>
+      service
+        .from("workout_exercises")
+        .update({
+          prescribed_weight: output.weight,
+          prescribed_reps: output.reps,
+          prescribed_sets: output.sets,
+          target_rir: output.targetRir,
+          notes: output.rationale,
+        })
+        .eq("id", candidate.workoutExerciseId),
+    ),
+  );
+  for (const { error: updateError } of exerciseUpdates) {
     if (updateError) throw updateError;
-    updatedExercises += 1;
   }
+  const updatedExercises = changed.length;
 
   // append the fresh audit decisions (one batch insert, mirrors generateDay)
   const { error: insertError } = await service.from("engine_decisions").insert(

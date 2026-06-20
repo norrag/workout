@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 export function NumberStepper({
   value,
@@ -20,6 +20,10 @@ export function NumberStepper({
   format?: (v: number) => string;
 }) {
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track the latest value in a ref so a held repeat accumulates from the most
+  // recent step instead of the value captured when the interval was created.
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   const clamp = useCallback(
     (v: number) =>
@@ -28,19 +32,30 @@ export function NumberStepper({
   );
 
   const bump = useCallback(
-    (dir: 1 | -1) => onChange(clamp(Math.round((value + dir * step) * 100) / 100)),
-    [clamp, onChange, step, value],
+    (dir: 1 | -1) => {
+      const next = clamp(Math.round((valueRef.current + dir * step) * 100) / 100);
+      valueRef.current = next;
+      onChange(next);
+    },
+    [clamp, onChange, step],
   );
 
-  // long-press to accelerate
-  const startHold = (dir: 1 | -1) => {
-    stopHold();
-    holdTimer.current = setInterval(() => bump(dir), 120);
-  };
-  const stopHold = () => {
+  const stopHold = useCallback(() => {
     if (holdTimer.current) clearInterval(holdTimer.current);
     holdTimer.current = null;
-  };
+  }, []);
+
+  // long-press to accelerate
+  const startHold = useCallback(
+    (dir: 1 | -1) => {
+      stopHold();
+      holdTimer.current = setInterval(() => bump(dir), 120);
+    },
+    [bump, stopHold],
+  );
+
+  // Guarantee the repeat timer is cleared if the stepper unmounts mid-press.
+  useEffect(() => stopHold, [stopHold]);
 
   const btn =
     "flex h-11 w-11 items-center justify-center border border-ink/35 bg-paper text-lg text-ink active:border-ink select-none";

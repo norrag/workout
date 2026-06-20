@@ -207,9 +207,14 @@ export function PlannerBoard({
   // optimistic bridge for the draft (live) path — see withPending
   const [pendingDay, setPendingDay] = useState<ViewDay | null>(null);
 
-  const days: ViewDay[] = editing
-    ? workDays
-    : withPending(toWorkDays(plan.days), pendingDay);
+  // In the draft path this re-derives the whole board (flatMap + sort + Map
+  // rebuild) from props; memoize so it only recomputes when an input changes
+  // rather than on every keystroke/sheet toggle.
+  const days: ViewDay[] = useMemo(
+    () =>
+      editing ? workDays : withPending(toWorkDays(plan.days), pendingDay),
+    [editing, workDays, plan.days, pendingDay],
+  );
 
   const [activeDayId, setActiveDayId] = useState<string | null>(
     (initialDayNumber != null

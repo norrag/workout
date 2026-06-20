@@ -22,13 +22,25 @@ export function HistorySheet({
 }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
 
+  // Key the fetch on the exercise id (a primitive), not the `target` object —
+  // the day view rebuilds that object on every render, which would otherwise
+  // refetch the whole history on each unrelated re-render while the sheet is
+  // open. The cancel flag drops a stale response if the target changes mid-flight.
+  const exerciseId = target?.exercise_id ?? null;
   useEffect(() => {
-    if (!target) {
+    if (!exerciseId) {
       setEntries(null);
       return;
     }
-    getExerciseHistoryAction(target.exercise_id).then(setEntries);
-  }, [target]);
+    let cancelled = false;
+    setEntries(null);
+    getExerciseHistoryAction(exerciseId).then((rows) => {
+      if (!cancelled) setEntries(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [exerciseId]);
 
   if (!target) return null;
 

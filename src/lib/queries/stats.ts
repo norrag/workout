@@ -454,7 +454,7 @@ export async function getMesoStats(
   const microWeek = new Map((micros ?? []).map((m) => [m.id, m.week_number]));
   const { data: sets, error: setsError } = await supabase
     .from("logged_sets")
-    .select("*")
+    .select("exercise_id, microcycle_id, workout_id, weight, reps")
     .eq("user_id", userId)
     .eq("mesocycle_id", mesoId)
     .eq("is_warmup", false);

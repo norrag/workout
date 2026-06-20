@@ -2,7 +2,116 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Phase 7 hardening slice 1: security pass + data lifecycle
+## 2026-06-20 (latest) — Phase 7 hardening slice 2: performance pass
+
+A whole-stack performance/efficiency/stability audit (DB → queries → React →
+PWA). One append-only DDL migration (RLS-policy rewrites + indexes only, no
+table/column change, so no type regen). `main` deployable; all gates green
+(typecheck, lint, 396 unit tests, production build). DB migration applied to
+hosted and re-verified against the advisor.
+
+### Database — the biggest win (migration `20260620000003_perf_rls_initplan_and_fk_indexes`)
+
+Driven by the Supabase **performance advisor** (was 63 WARN / 24 INFO):
+
+- **RLS InitPlan optimization (53 policies, the headline fix).** Every policy
+  called `auth.uid()` / `auth.role()` / `is_admin()` *bare*, so Postgres
+  re-evaluated it **once per row scanned**. Wrapped each in a scalar subquery
+  `(select auth.uid())` so it's evaluated **once per query** (InitPlan). The
+  rewrite was generated mechanically from `pg_policies` (logic preserved
+  verbatim, incl. the `profiles` role-lock guard), so it's behavior-preserving.
+  Biggest beneficiaries: `logged_sets` (~10.5k rows) and `workout_exercises`
+  (~4.5k rows). **Verified** isolation is intact by simulating two real users'
+  JWT contexts and asserting each sees exactly their own rows and zero of the
+  other's (6774 / 3763 / 0).
+- **23 covering indexes for unindexed foreign keys.** Joins and `ON DELETE`
+  cascades on these FK columns (across `logged_sets`, `engine_decisions`,
+  `workout_exercises`, `template_*`, `meso_*`, …) were falling back to
+  sequential scans. The advisor now reports them as `unused_index` INFO only
+  because no query has *exercised* them since creation — they exist to keep FK
+  maintenance fast and must stay.
+- Net advisor result: **WARN 63 → 10**, and all 53 per-row auth re-evaluations
+  + 23 unindexed FKs cleared.
+
+Intentionally **not** changed (documented in the migration header):
+
+- `exercises_source_idx` ("unused_index" INFO) covers the
+  `exercises.source_exercise_id` self-FK (`ON DELETE SET NULL`) — dropping it
+  would re-introduce an unindexed-FK finding and slow that cascade.
+- The 10 remaining `multiple_permissive_policies` WARNs are all on `shares`
+  (a 2-row-per-user table). Merging the owner/grantee SELECT+UPDATE policies
+  would change authorization semantics (owner vs grantee `WITH CHECK` clauses
+  differ) for negligible gain, so the policies stay split (still InitPlan-wrapped).
+
+### Application — data-fetching efficiency
+
+- **N+1 / per-row write loops collapsed** in the hot logging paths
+  (`src/lib/queries/logging.ts`): `completeWorkout` and `endMesocycle` now do
+  two set-based `.in('id', …)` status updates instead of one round-trip per
+  exercise; `endWorkout`/`endMesocycle` run their independent
+  `skipRemainingSets` calls with `Promise.all`; `deleteLoggedSet`'s set
+  renumbering is parallelized (safe — confirmed there's no
+  `(workout_exercise_id, set_number)` unique constraint, so order is not
+  load-bearing). `applyRegeneration` (`regeneration.ts`) parallelizes its
+  per-candidate updates. All behavior-preserving.
+- **Over-fetch trimmed**: `getExerciseHistory` (`history.ts`) and `getMesoStats`
+  (`stats.ts`) replaced `select('*')` on `logged_sets` (up to thousands of rows)
+  with the 4–5 columns actually read. Typecheck enforces the projection is
+  complete.
+
+### Application — React / client / PWA
+
+- **Service worker (`src/app/sw.ts`) is now static-assets-only.** Serwist's
+  `defaultCache` was applying `NetworkFirst` to authenticated RSC/HTML
+  navigations and GET `/api/*` for 24h — in an RLS-per-user, online-only app
+  (hard rule #9) that risks serving a *previous account's* cached pages after a
+  re-login and serving 24h-stale workout state, for zero offline benefit.
+  Replaced with `CacheFirst` for `/_next/static`, `StaleWhileRevalidate` for
+  fonts/images, and `NetworkOnly` for navigations; `/api/*` (incl. `/api/mcp`
+  and `/.well-known/*`) falls through to the network uncached.
+- **Workout-tab bundle slimmed**: `DayView` now leaf-imports
+  `predictRepsAtWeight` from `@/lib/engine/reps` instead of the `@/lib/engine`
+  barrel, keeping the macro planner, volume, summary, classification and rules
+  modules out of the client chunk. (Did **not** add `"sideEffects": false` to
+  `package.json` — it would risk webpack dropping the bare `import "server-only"`
+  guards in `src/lib` and global CSS.)
+- **Timer leaks fixed**: `NumberStepper` (hold-to-repeat `setInterval` now
+  cleared on unmount, and the repeat accumulates from the latest value instead
+  of a stale closure), `Toast` (auto-dismiss timers tracked + cleared on
+  unmount), `CopyField` (copy-reset timeout cleared on unmount).
+- **Re-render / refetch fixes**: `PlannerBoard` memoizes the draft-mode board
+  derivation (`toWorkDays`) so it doesn't rebuild on every keystroke;
+  `HistorySheet`'s fetch effect keys on the primitive `exercise_id` (not the
+  inline `target` object the day view rebuilds each render) and adds a
+  cancellation guard, so it fetches once on open instead of on every parent
+  re-render.
+
+### Identified but deferred (need runtime verification or are invasive)
+
+Tracked here so they aren't lost; none block deploy:
+
+- **`DayView` re-render storm** (M4): wrapping `ExerciseBlock`/`SetRow` in
+  `React.memo` + `useCallback`-stabilizing the handlers, and memoizing the
+  in-render `predictReps`/e1RM math (M2). Real win on the app's hottest screen,
+  but threading memo through an ~1.8k-line interactive component needs manual
+  runtime verification of the logging flow (not possible from this session), so
+  deferred rather than risk a stale-closure regression.
+- **`copyMesocycle`/`copyTemplate` bulk insert** (`sharing.ts`): the share-accept
+  path is a triple-nested per-fill `copyExercise` + single-row insert N+1
+  (250+ round-trips for a large meso). Biggest absolute query win, but it's a
+  rare path and the bulk-insert rewrite (dedupe exercises, batch each table
+  level, re-wire FKs from returned ids) is invasive enough to want integration
+  testing first.
+- `getWorkoutDetail` `select('*')` narrowing + hoisting the macro-context query
+  into the existing parallel wave; `getExerciseAffinity` pre-filtering the
+  feedback scan; `getExerciseOverview` waterfall (3 hops → 2). Lower-risk but
+  unverified column-by-column here.
+- Font fallback CLS (`adjustFontFallback` on the local font); middleware
+  `getUser()` per navigation (kept — `getUser` revalidates the JWT with the auth
+  server, which is the documented Supabase SSR security posture; downgrading to
+  `getSession` would trade security for latency).
+
+## 2026-06-20 — Phase 7 hardening slice 1: security pass + data lifecycle
 
 First slice of [07 Phase 7](07-implementation-plan.md) (production hardening).
 Covers the parts doable from a Claude session: the security pass (DB advisor
