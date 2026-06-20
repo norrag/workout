@@ -2,7 +2,35 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Phase 7 hardening slice 1: security pass + data lifecycle
+## 2026-06-20 (latest) — Connector endpoint: ignore misconfigured Vercel alias overrides
+
+Follow-up to the connector-URL fix below. Production still showed a brittle,
+deployment-specific endpoint (`https://workout-garron-duprees-projects.vercel.app/api/mcp`)
+on `/more/connector` because `NEXT_PUBLIC_APP_URL` is set in Vercel to an
+auto-generated `*.vercel.app` alias, and an explicit env value overrode the
+canonical fallback. The copyable MCP URL must always be the one durable domain.
+
+### Done
+
+- `src/app/(app)/more/connector/page.tsx`: replaced the raw
+  `NEXT_PUBLIC_APP_URL || CANONICAL_APP_URL` resolution with a `resolveOrigin`
+  helper. It honors the env override only for durable origins — localhost (dev)
+  or a non-`vercel.app` custom domain — and **ignores** any auto-generated
+  `*.vercel.app` alias (anything other than the canonical host), falling back to
+  `https://workout-zeta-murex.vercel.app`. Unparseable values fall back too. The
+  page is now self-correcting regardless of the Vercel env value, so the copied
+  endpoint is `https://workout-zeta-murex.vercel.app/api/mcp` on every alias.
+- Updated [deployment/mcp-connector-setup.md](deployment/mcp-connector-setup.md)
+  env table + troubleshooting row to describe the new alias-ignoring behavior.
+
+### Remaining / external
+
+- **Vercel (human, optional):** correcting `NEXT_PUBLIC_APP_URL` to the canonical
+  domain (or unsetting it) is no longer required for the link to be correct, but
+  remains the tidy configuration. See
+  [manual-operations.md](manual-operations.md).
+
+## 2026-06-20 — Phase 7 hardening slice 1: security pass + data lifecycle
 
 First slice of [07 Phase 7](07-implementation-plan.md) (production hardening).
 Covers the parts doable from a Claude session: the security pass (DB advisor
