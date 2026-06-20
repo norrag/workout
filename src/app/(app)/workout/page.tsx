@@ -5,6 +5,7 @@ import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
 import { catchUpProgression } from "@/lib/queries/progression";
+import { reconcileMesoPlan } from "@/lib/queries/regeneration";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -26,6 +27,26 @@ export default async function WorkoutPage() {
   if (profile && !profile.onboarded_at) redirect("/onboarding");
 
   let state = await getCurrentState(supabase, user.id);
+
+  // keep the plan correct on open: generate any missing day whose previous-week
+  // counterpart is complete, and refresh any not-yet-started prescription that
+  // predates the ACTIVE engine_params version. This makes activating a new
+  // version propagate to every user transparently on their next open — no manual
+  // regenerate/catch-up step. Idempotent + additive; cheap when nothing changed.
+  if (state.mesocycle) {
+    try {
+      const { generated, refreshed } = await reconcileMesoPlan(
+        createServiceClient(),
+        user.id,
+        state.mesocycle.id,
+      );
+      if (generated > 0 || refreshed > 0) {
+        state = await getCurrentState(supabase, user.id);
+      }
+    } catch (error) {
+      console.error("meso plan reconcile failed", error);
+    }
+  }
 
   // first-open-of-new-week fallback (07 Phase 4): if the active week closed
   // but generation didn't run (e.g. completion raced or failed), run the

@@ -2739,8 +2739,14 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
   version, replay its stored inputs against the active params and write the
   refreshed weight/reps/sets/RIR back, plus a fresh `engine_decisions` row
   (`provenance.regenerated`) so the audit chain stays intact.
-  - **Safety:** dry-run by default (returns diffs, writes nothing); `confirm="apply"`
-    to write. Never touches in-progress/completed workouts, logged sets, or manual
+  - **Safety:** two-step and dry-run by default. The first call (omit `confirm`)
+    writes nothing and returns the diffs plus a `plan_token` (a stable hash of the
+    active version + every changed exercise's target prescription). A write needs
+    BOTH `confirm="apply"` and `confirm_token` echoing that token; a missing or
+    **stale** token (the plan changed since the preview) returns the current dry
+    run instead of writing — so an over-eager MCP client cannot apply in one blind
+    call (the original `confirm="apply"`-only gate let ChatGPT do exactly that).
+    Never touches in-progress/completed workouts, logged sets, or manual
     `set_weights` overrides (which compose on top — clear them with "Reset to
     prescription"). Pairs with `activate_engine_params`.
   - **Scope:** all users (admin-gated; service-role client with per-row,
@@ -2766,3 +2772,38 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
     rep window); tool added to the admin registration / no-`user_id` /
     unauthenticated coverage. Typecheck + lint clean; full suite green. No schema
     change (reuses existing columns; append-only respected).
+- **Generation-gap self-heal (`catchUpMesoGeneration` + `catch_up_generation`).**
+  Prescriptions are generated *per completed workout* (`advanceWeekAfterWorkout`).
+  Any day whose completion never ran the job — seeded/imported history, a failed
+  or raced completion — leaves a permanent hole the per-completion path can't
+  reach (a locked day can't be re-completed), and the existing `catchUpProgression`
+  only fires when the whole active week is closed (`!nextWorkout`), so a mid-week
+  hole (e.g. W4·D1 when W3·D1 was seeded complete while W3·D4 is still planned)
+  never heals. New pure `planCatchUp(weeks, workouts)` finds every closed
+  (completed/skipped) day whose next-week same-day counterpart is missing;
+  `catchUpMesoGeneration` runs the normal `advanceWeekAfterWorkout` on each
+  (idempotent, additive — only CREATES missing days, never touches started/logged
+  work or existing prescriptions; a freshly created day is generated under the
+  active params, so it lands on v9).
+  - **Auto-heal:** the Workout tab calls it on load for the active meso (cheap
+    when there are no gaps), so a missing day appears without any manual step.
+  - **Manual trigger:** `catch_up_generation` admin MCP tool (caller-scoped;
+    optional `mesocycle_id`, default the active meso). Dry-run by default (lists
+    the days it would create); `confirm="apply"` generates them.
+  - **Tests.** `planCatchUp` (single mid-week gap, ignores planned/last-week,
+    skipped counts as closed, none when counterparts exist, week→day ordering);
+    tool added to the admin registry / no-`user_id` coverage. Full suite green,
+    typecheck + lint clean. No schema change.
+- **Unified on-load reconcile (`reconcileMesoPlan`).** The "keep the plan correct"
+  job is one thing, not three tools to invoke: activating a new `engine_params`
+  version should just propagate to every user. `reconcileMesoPlan(service, userId,
+  mesoId)` does both halves in one call — (1) `catchUpMesoGeneration` to create any
+  missing day, then (2) the anchor-rebuilt regeneration to refresh any
+  not-yet-started prescription whose decision predates the active version
+  (`getRegenerablePlannedDecisions` gained a `userId` scope for the per-user load
+  path). The **Workout tab runs it on load** for the active meso, so activation is
+  the only manual step — correctness then appears transparently on each user's next
+  open (idempotent; cheap when nothing is stale; never touches started/completed
+  work, logged sets, or manual `set_weights`). The `regenerate_planned_prescriptions`
+  / `catch_up_generation` MCP tools remain as optional ops/preview triggers but are
+  no longer required for correctness. Full suite green, typecheck + lint clean.
