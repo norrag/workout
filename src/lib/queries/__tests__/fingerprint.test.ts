@@ -214,6 +214,145 @@ describe("paramsTokenFor — increment override (doc 14 phase 3)", () => {
   });
 });
 
+describe("source scoping (doc 14 §7, phase 4) — a change recomputes the right rows and nothing else", () => {
+  // Phase 4 backfills the already-flowing sources (profile / macro goal / meso
+  // config) into the reusable contract. They need no new wiring: each is already a
+  // resolved config dimension (`user.*`, `goalType`, `week.*`), so the fingerprint
+  // already sees them. What phase 4 owns is the proof that "scope falls out of the
+  // fingerprint" (§7) — that a change to one source moves the fingerprint of EXACTLY
+  // the rows in its scope and is byte-identical for every row outside it. These
+  // tests model the reconcile's per-row check (it resolves the profile once per
+  // user, the goal once per meso, the week per microcycle, then hashes each open
+  // row) the same way the increment-override scoping test above does.
+  const token = paramsTokenFor(9);
+
+  /** a row's stamped/expected fingerprint = hash of its resolved config + token */
+  function fp(args: ConfigInputArgs): string {
+    return computeDepFingerprint(buildConfigInputs(args), token);
+  }
+
+  const baseProfile = {
+    experience_level: "intermediate" as const,
+    units: "lb" as const,
+  };
+
+  /** one open prescription's resolved config, varying the per-row dimensions */
+  function row(over: Partial<ConfigInputArgs> = {}): ConfigInputArgs {
+    return {
+      equipmentType: "barbell",
+      profile: baseProfile,
+      goal: "hypertrophy",
+      week: { targetRir: 2, isDeload: false },
+      previous: { weight: 185, reps: 8, sets: 3, targetRir: 2 },
+      initial: null,
+      ...over,
+    };
+  }
+
+  describe("profile (experience / units) → that user's open rows, all exercises (§7)", () => {
+    it("an experience-level edit moves every one of the user's rows, across exercises / goals / weeks", () => {
+      // the profile is resolved once per user and applied to every row, so it is a
+      // UNIVERSAL config dimension: three rows that otherwise differ in the per-row
+      // dimensions (a different exercise, a different meso goal, a different week)
+      // all go stale together when experience changes.
+      const rows = [
+        row({ equipmentType: "barbell" }),
+        row({ equipmentType: "dumbbell", goal: "strength" }),
+        row({ week: { targetRir: 0, isDeload: true } }),
+      ];
+      const edited = { experience_level: "advanced" as const, units: "lb" as const };
+      for (const r of rows) {
+        expect(fp({ ...r, profile: edited }), `${r.equipmentType}/${r.goal}`).not.toBe(
+          fp(r),
+        );
+      }
+    });
+
+    it("a units edit moves every one of the user's rows the same way", () => {
+      const rows = [row({ equipmentType: "barbell" }), row({ equipmentType: "machine" })];
+      const edited = { experience_level: "intermediate" as const, units: "kg" as const };
+      for (const r of rows) {
+        expect(fp({ ...r, profile: edited })).not.toBe(fp(r));
+      }
+    });
+
+    it("another user's rows do not collide — cross-user isolation (scope is the user)", () => {
+      // the reconcile resolves the profile per `userId` and runs scoped to one
+      // owner, so cross-user isolation is structural — user A's edit never even
+      // visits user B's rows. The fingerprint reinforces it: a row resolved under a
+      // different profile hashes differently, so there is no cross-user collision
+      // that could let one user's edit be mistaken for fresh against another's stamp.
+      const userBRow = row({ profile: { experience_level: "beginner", units: "kg" } });
+      expect(fp(userBRow)).not.toBe(fp(row()));
+    });
+  });
+
+  describe("macro goal → open rows under that macro's mesos, and no others (§7)", () => {
+    it("changing a macro's goal moves only the rows whose goal resolves from it", () => {
+      // model two mesos under two macros: meso A's rows resolve goal "hypertrophy"
+      // (from macro A), meso B's rows resolve "strength" (from macro B). Editing
+      // macro A hypertrophy → cut moves only the rows under macro A; macro B's rows
+      // are byte-identical (their goal didn't change).
+      const macroARow = row({ goal: "hypertrophy", equipmentType: "barbell" });
+      const macroBRow = row({ goal: "strength", equipmentType: "barbell" });
+      const stampedA = fp(macroARow);
+      const stampedB = fp(macroBRow);
+
+      const expectedA = fp({ ...macroARow, goal: "cut" }); // macro A re-goaled
+      const expectedB = fp(macroBRow); // macro B untouched
+
+      expect(expectedA).not.toBe(stampedA); // under macro A → recompute
+      expect(expectedB).toBe(stampedB); // under macro B → short-circuit
+    });
+
+    it("every row under the re-goaled macro moves, regardless of exercise or week", () => {
+      const rows = [
+        row({ goal: "hypertrophy", equipmentType: "barbell" }),
+        row({ goal: "hypertrophy", equipmentType: "dumbbell" }),
+        row({ goal: "hypertrophy", week: { targetRir: 0, isDeload: true } }),
+      ];
+      for (const r of rows) {
+        expect(fp({ ...r, goal: "maintain" })).not.toBe(fp(r));
+      }
+    });
+  });
+
+  describe("meso config (RIR ramp / deload) → that meso's open rows by week (§7)", () => {
+    it("editing one week's target RIR moves only that week's rows", () => {
+      // a 3-week ramp 3 → 2 → 1. The reconcile resolves `week.targetRir` per
+      // microcycle, so each week's rows are tracked independently.
+      const week1 = row({ week: { targetRir: 3, isDeload: false } });
+      const week2 = row({ week: { targetRir: 2, isDeload: false } });
+      const week3 = row({ week: { targetRir: 1, isDeload: false } });
+      expect(new Set([fp(week1), fp(week2), fp(week3)]).size).toBe(3); // independent
+
+      // the user re-tunes ONLY week 2, to RIR 1. Week 2's rows go stale (its
+      // fingerprint moves); weeks 1 and 3 — whose microcycles weren't touched —
+      // re-resolve to the exact config they were stamped under, so they short-circuit.
+      const week2Edited = row({ week: { targetRir: 1, isDeload: false } });
+      expect(fp(week2Edited)).not.toBe(fp(week2)); // week 2 → recompute
+      // and the fingerprint is purely a function of resolved config: week 2 now at
+      // RIR 1 aliases week 3 (same resolved week), proving no hidden week identity.
+      expect(fp(week2Edited)).toBe(fp(week3));
+    });
+
+    it("toggling a week's deload flag moves that week's rows", () => {
+      const before = row({ week: { targetRir: 1, isDeload: false } });
+      const after = row({ week: { targetRir: 1, isDeload: true } });
+      expect(fp(after)).not.toBe(fp(before));
+    });
+
+    it("another meso's rows do not collide — cross-meso isolation (scope is the meso)", () => {
+      // the reconcile runs scoped to one `mesoId` and each meso owns its own
+      // microcycles, so a RIR-ramp edit on one meso never visits another meso's
+      // rows — cross-meso isolation is structural. A row at a different meso's week
+      // also hashes differently, so there is no collision across mesos.
+      const otherMesoRow = row({ week: { targetRir: 4, isDeload: false } });
+      expect(fp(otherMesoRow)).not.toBe(fp(row()));
+    });
+  });
+});
+
 describe("seed inputs (doc 14 §6.2)", () => {
   const token = { version: 9 };
   const seedBase = {
