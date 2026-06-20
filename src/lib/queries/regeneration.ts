@@ -9,6 +9,8 @@ import {
 } from "@/lib/engine";
 import type { Database } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "./logging";
+import { getActiveEngineParams } from "./generation";
+import { catchUpMesoGeneration } from "./progression";
 import { engineCodeSha, hashParams } from "./params-provenance";
 
 /**
@@ -239,7 +241,7 @@ export async function getRegenerablePlannedDecisions(
   service: Client,
   activeVersion: number,
   params: EngineParams,
-  opts: { mesocycleId?: string; limit?: number } = {},
+  opts: { mesocycleId?: string; userId?: string; limit?: number } = {},
 ): Promise<PlannedDecisionCandidate[]> {
   // optional mesocycle scoping → its microcycle ids
   let microFilter: string[] | null = null;
@@ -259,6 +261,7 @@ export async function getRegenerablePlannedDecisions(
     .select("id, user_id, microcycle_id, day_number")
     .eq("status", "planned");
   if (microFilter) workoutQuery = workoutQuery.in("microcycle_id", microFilter);
+  if (opts.userId) workoutQuery = workoutQuery.eq("user_id", opts.userId);
   const { data: workouts, error: workoutsError } = await workoutQuery;
   if (workoutsError) throw workoutsError;
   if (!workouts || workouts.length === 0) return [];
@@ -459,4 +462,45 @@ export async function applyRegeneration(
   if (insertError) throw insertError;
 
   return { updatedExercises, insertedDecisions: changed.length };
+}
+
+export interface ReconcileResult {
+  /** missing days created from a completed previous-week counterpart */
+  generated: number;
+  /** existing planned prescriptions refreshed to the active params version */
+  refreshed: number;
+}
+
+/**
+ * Make a user's meso match the ACTIVE engine_params, transparently and on demand
+ * — the single "keep it correct" operation. Two halves of one job:
+ *  1. generate any missing day whose previous-week counterpart is complete
+ *     (`catchUpMesoGeneration`) — new days are written under the active params;
+ *  2. refresh any already-planned, not-yet-started prescription whose last
+ *     decision predates the active version (regeneration, anchor-rebuilt).
+ *
+ * Idempotent and additive-or-in-place only: never touches started/completed
+ * workouts, logged sets, or manual `set_weights` overrides. Cheap when there is
+ * nothing to do (steady state finds no gaps and no stale rows). Called on load
+ * so activating a new version propagates to every user on their next open — no
+ * manual regenerate/catch-up step required. Returns what changed.
+ */
+export async function reconcileMesoPlan(
+  service: Client,
+  userId: string,
+  mesoId: string,
+): Promise<ReconcileResult> {
+  // create missing days first; freshly generated days already carry the active
+  // version, so the refresh pass below skips them
+  const generated = await catchUpMesoGeneration(service, userId, mesoId);
+
+  const { version, params } = await getActiveEngineParams(service);
+  const candidates = await getRegenerablePlannedDecisions(service, version, params, {
+    mesocycleId: mesoId,
+    userId,
+  });
+  const plan = planRegeneration(candidates, params);
+  const applied = await applyRegeneration(service, plan.items, version, params);
+
+  return { generated, refreshed: applied.updatedExercises };
 }

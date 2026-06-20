@@ -2794,3 +2794,16 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
     skipped counts as closed, none when counterparts exist, week→day ordering);
     tool added to the admin registry / no-`user_id` coverage. Full suite green,
     typecheck + lint clean. No schema change.
+- **Unified on-load reconcile (`reconcileMesoPlan`).** The "keep the plan correct"
+  job is one thing, not three tools to invoke: activating a new `engine_params`
+  version should just propagate to every user. `reconcileMesoPlan(service, userId,
+  mesoId)` does both halves in one call — (1) `catchUpMesoGeneration` to create any
+  missing day, then (2) the anchor-rebuilt regeneration to refresh any
+  not-yet-started prescription whose decision predates the active version
+  (`getRegenerablePlannedDecisions` gained a `userId` scope for the per-user load
+  path). The **Workout tab runs it on load** for the active meso, so activation is
+  the only manual step — correctness then appears transparently on each user's next
+  open (idempotent; cheap when nothing is stale; never touches started/completed
+  work, logged sets, or manual `set_weights`). The `regenerate_planned_prescriptions`
+  / `catch_up_generation` MCP tools remain as optional ops/preview triggers but are
+  no longer required for correctness. Full suite green, typecheck + lint clean.

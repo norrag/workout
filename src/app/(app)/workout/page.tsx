@@ -4,10 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
-import {
-  catchUpProgression,
-  catchUpMesoGeneration,
-} from "@/lib/queries/progression";
+import { catchUpProgression } from "@/lib/queries/progression";
+import { reconcileMesoPlan } from "@/lib/queries/regeneration";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -30,21 +28,23 @@ export default async function WorkoutPage() {
 
   let state = await getCurrentState(supabase, user.id);
 
-  // self-heal generation gaps: any closed day whose next-week counterpart was
-  // never generated (seeded/imported history, a failed or raced completion)
-  // leaves a hole the per-completion path can't reach. Fill them on open so a
-  // missing day (e.g. W4·D1 when W3·D1 was seeded complete) appears without a
-  // manual step. Idempotent + additive; cheap when there is nothing to do.
+  // keep the plan correct on open: generate any missing day whose previous-week
+  // counterpart is complete, and refresh any not-yet-started prescription that
+  // predates the ACTIVE engine_params version. This makes activating a new
+  // version propagate to every user transparently on their next open — no manual
+  // regenerate/catch-up step. Idempotent + additive; cheap when nothing changed.
   if (state.mesocycle) {
     try {
-      const generated = await catchUpMesoGeneration(
+      const { generated, refreshed } = await reconcileMesoPlan(
         createServiceClient(),
         user.id,
         state.mesocycle.id,
       );
-      if (generated > 0) state = await getCurrentState(supabase, user.id);
+      if (generated > 0 || refreshed > 0) {
+        state = await getCurrentState(supabase, user.id);
+      }
     } catch (error) {
-      console.error("generation gap catch-up failed", error);
+      console.error("meso plan reconcile failed", error);
     }
   }
 
