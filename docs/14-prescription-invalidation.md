@@ -1,14 +1,33 @@
 # 14 — Prescription Freshness: dependency tracking & recompute (design)
 
-Status: **design, not yet built (2026-06-20).** Authoritative design for how stored
-prescriptions stay correct when any of their inputs change. It supersedes the
-narrower "invalidate on increment edit" sketch and **redesigns the
-`params_version` staleness gate** (PR on branch `…version-check…`) into one
-general framework; that gate becomes a single special case (§9). Engine intent
-lives in [04-feedback-engine.md](04-feedback-engine.md),
+Status: **phase 1 built (2026-06-20); phases 2–5 designed, not yet built.**
+Authoritative design for how stored prescriptions stay correct when any of their
+inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
+**redesigns the `params_version` staleness gate** into one general framework; that
+gate becomes a single special case (§9). Engine intent lives in
+[04-feedback-engine.md](04-feedback-engine.md),
 [10-metrics-spec.md](10-metrics-spec.md), and
 [13-reps-prescription-unification.md](13-reps-prescription-unification.md). When a
 slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
+
+> **Phase 1 landed (the framework + retirement, §11.1).** `dep_fingerprint`
+> column on `workout_exercises` (migration `20260620000004`); pure framework
+> `src/lib/queries/fingerprint.ts` (`configProjection` / `buildConfigInputs` /
+> `computeDepFingerprint`) golden-tested against `buildEngineInputs`; the
+> fingerprint is stamped at generation and checked on the read path by
+> `reconcilePrescriptions` (replacing `reconcileMesoPlan`), recomputing only the
+> diverged rows in week order. The `params_version` gate, its helpers
+> (`getRegenerablePlannedDecisions` / `regenPlanToken` / `withRecomputedAnchors`),
+> and the `regenerate_planned_prescriptions` + `catch_up_generation` MCP tools were
+> retired in the same slice; the generation gap-heal (`catchUpMesoGeneration`)
+> stays. The `params_version` migration was orphaned (never applied to the hosted
+> DB), so its file was removed rather than "dropped." **Deviations from this
+> design as built:** seeds/user-adds stay unstamped + skipped (no decision to
+> replay — normalized in phase 2, §6.2); the read-path check loads the latest
+> decision per open row (for the `previous` source pointer + the stored derived
+> history), so the steady-state "no decision lookup" of §5 is a phase-2+
+> optimization; existing rows backfill lazily via the §6.3 self-heal (null →
+> recompute on first view) rather than an eager migration backfill.
 
 ---
 
@@ -377,14 +396,16 @@ the record shows one mechanism, not two.
 
 ## 11. Build phases
 
-1. **Framework, params-only (no behavior change).** Add `dep_fingerprint`;
-   factor `resolveConfigInputs` + `configProjection` + `computeDepFingerprint`
-   (pure, golden-tested); stamp it at every write; `reconcilePrescriptions` uses the
-   fingerprint on the read path; backfill migration. **Same PR retires:** the
-   `params_version` gate + its helpers, `getRegenerablePlannedDecisions` /
-   `regenPlanToken`, the `regenerate_planned_prescriptions` and `catch_up_generation`
-   MCP tools (keep the gap-heal), and the dropped column (§10). Equivalent behavior
-   to today, but general — and with no leftover manual machinery.
+1. **✅ DONE (2026-06-20) — Framework + retirement.** Added `dep_fingerprint`;
+   factored `buildConfigInputs` (the shared resolver) + `configProjection` +
+   `computeDepFingerprint` (pure, golden-tested); stamp it at generation;
+   `reconcilePrescriptions` uses the fingerprint on the read path and recomputes
+   diverged rows in week order. Retired in the same slice: the `params_version`
+   gate + its helpers, `getRegenerablePlannedDecisions` / `regenPlanToken` /
+   `withRecomputedAnchors`, and the `regenerate_planned_prescriptions` +
+   `catch_up_generation` MCP tools (kept the gap-heal). Existing rows self-heal
+   lazily (null → recompute on first view) instead of an eager backfill; seeds stay
+   skipped pending phase 2. See the status note at the top for as-built deviations.
 2. **Normalize decisions** (§6.2): record seed/user-add decisions with `kind`;
    unify the recompute dispatcher.
 3. **First per-user override — editable increment.** Override table (RLS + tests),

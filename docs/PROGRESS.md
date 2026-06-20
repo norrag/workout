@@ -2,7 +2,86 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Security audit (Phase 7 hardening slice 2)
+## 2026-06-20 (latest) — Prescription freshness framework (doc 14 phase 1)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 1**: stored prescriptions now stay correct when ANY of their inputs change
+(engine params, profile, macro goal, meso config, the upstream week), via a
+per-prescription **dependency fingerprint** checked on the read path. This
+**replaces** the single-scalar `params_version` staleness gate (doc 14 §9) — which
+modeled only global params and, critically, was defined in a migration that was
+**never applied to the hosted DB** (so the old `reconcileMesoPlan` gate had been
+silently throwing on prod, caught by the Workout page's try/catch). One append-only
+migration (additive column; existing RLS covers it). `main` deployable; 437 tests
+(+24) pass; typecheck / lint / build green.
+
+### Done
+
+- **Pure framework (`src/lib/queries/fingerprint.ts`).** `configProjection`
+  (denylist of the six derived/history fields → the config half of `EngineInputs`),
+  `buildConfigInputs` (the single resolver used at BOTH write and check, so the
+  projection can never drift), `computeDepFingerprint` (canonical sha256 over the
+  config projection + the active-params token). All pure (hard rule #3); hashing
+  reuses `params-provenance`. A **golden test** asserts
+  `configProjection(buildEngineInputs(x)) === buildConfigInputs(configArgsOf(x))`,
+  plus the fingerprint changes on each config dimension (goal / week / previous /
+  equipment / profile / params version) and is INVARIANT to derived history (§6.4).
+- **Storage (`migration 20260620000004`).** `workout_exercises.dep_fingerprint
+  text` (null = never stamped → recompute on next view, self-healing §6.3). Applied
+  to hosted. The orphaned, never-applied `..._params_version` migration was removed
+  (its column didn't exist anywhere, so this aligns the repo with hosted rather than
+  carrying a dead column).
+- **Stamp at write (`progression.ts`).** `generateDay` stamps the fingerprint from
+  `configProjection(inputs)` + the active version; `buildEngineInputs` now routes
+  its config half through the shared `buildConfigInputs` (no behavior change).
+- **Read-path reconcile (`reconcilePrescriptions`, `regeneration.ts`).** Replaces
+  `reconcileMesoPlan`. Heals generation gaps first (kept `catchUpMesoGeneration`),
+  then for each open row WITH a decision re-resolves its config from live state,
+  hashes, and compares to the stored fingerprint; diverged rows recompute in **week
+  order** (a changed `previous` propagates to the next week in one pass). Recompute
+  overlays the live config + a refreshed anchor onto the row's immutable stored
+  derived history, runs the pure engine, and writes back the prescription +
+  fingerprint + an audited `engine_decisions` row carrying the fingerprint
+  transition and the resolved dependency component values; unchanged-but-stale rows
+  just re-stamp; un-replayable rows self-heal (§6.3). Pure `recomputeRow` classifier
+  unit-tested. Wired into `app/(app)/workout/page.tsx`.
+- **Retirement (doc 14 §10).** Removed the `params_version` gate + column (code,
+  types, fixtures), `getRegenerablePlannedDecisions` / `regenPlanToken` /
+  `withRecomputedAnchors` / `anchorKey` / `planRegeneration` / `applyRegeneration`,
+  and the `regenerate_planned_prescriptions` + `catch_up_generation` **MCP tools**
+  (the generation gap-heal they fronted survives as the on-load auto-heal;
+  `replay_decisions` / `simulate_prescriptions` kept as read-only inspection).
+  `activate_engine_params`'s description updated: no manual regenerate step — the
+  read-path reconcile propagates a new version automatically.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (437/437), `npm run build` all
+green. The write/check equivalence was validated against the **live hosted data**:
+for sampled open rows the stored config projection equals the check-time resolution
+exactly (the `previous` resolved via the decision's source pointer matches the
+stored `previous` byte-for-byte), so the first on-load reconcile stamps fingerprints
+without spuriously rewriting prescriptions. Active meso scope: 19 planned rows, 9
+checked (have a decision), 10 seeds skipped.
+
+### Deviations / notes
+
+- **Seeds / user-added slots stay unstamped and are skipped** by the check (they
+  carry no decision to replay) — exactly today's behavior. Phase 2 (§6.2) normalizes
+  them with a `kind:"seed"` decision so they participate.
+- **The check loads the latest decision per open row** (for the `previous` source
+  pointer + the stored derived history). §5's "no decision lookup in the steady
+  state" is left as a phase-2+ optimization; correctness (handles substitutions /
+  reorders) was preferred over the extra read.
+- **Backfill is lazy** (null → §6.3 self-heal on first view), not an eager migration
+  backfill — the live-data check above confirms the first heal stamps rather than
+  churns. The §9 decision-inputs backfill remains an available optimization if a
+  zero-churn deploy is ever wanted.
+- **Phases 2–5 remain** (normalize seed/user-add decisions; the per-user editable
+  increment override + `resolveEffectiveParams`; verify profile/macro/meso recompute
+  scoping with tests; the optional history token / Tier-0 epoch).
+
+## 2026-06-20 — Security audit (Phase 7 hardening slice 2)
 
 Full state-of-the-art security audit of the whole surface (MCP OAuth resource
 server + tools, Supabase Auth/consent flow, middleware + server actions + route

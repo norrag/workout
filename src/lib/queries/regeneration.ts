@@ -10,372 +10,166 @@ import {
 import type { Database } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "./logging";
 import { getActiveEngineParams } from "./generation";
-import { catchUpMesoGeneration } from "./progression";
+import { catchUpMesoGeneration, engineGoal } from "./progression";
 import { engineCodeSha, hashParams } from "./params-provenance";
+import {
+  buildConfigInputs,
+  computeDepFingerprint,
+  type ConfigInputs,
+  type ParamsToken,
+} from "./fingerprint";
+import type { MacroGoalType } from "@/lib/types/database";
 
 /**
- * Regenerate already-planned prescriptions against the active engine params
- * (doc 13 fast-follow). The engine only writes a prescription at week N→N+1
- * generation, so activating a new `engine_params` version (or otherwise changing
- * a tunable) leaves *already generated, not-yet-performed* workouts holding stale
- * numbers — nothing re-fires `prescribe()` for them.
+ * Prescription freshness reconcile (doc 14) — the single "keep stored
+ * prescriptions correct" operation, run on the read path.
  *
- * This module re-runs the engine on those planned prescriptions and writes the
- * refreshed weight/reps/sets/RIR back, with a fresh `engine_decisions` row so the
- * audit trail stays intact. It is the write-back counterpart of `replayDecisions`
- * (admin.ts): same pure replay, but the result is persisted.
+ * A prescription is a cached derived value: the output of the pure engine, frozen
+ * at a meso seed or a week N→N+1 advance, then displayed for days. It goes stale
+ * the instant any input that fed it changes (engine params, profile, macro goal,
+ * meso config, the upstream week's prescription). Rather than make each source
+ * hunt down and flag the rows it affects, every prescription carries a fingerprint
+ * of the CONFIG projection of its inputs (doc 14 §3); on read we re-resolve those
+ * inputs as they are NOW and compare. A mismatch means stale, and exactly the
+ * diverged rows recompute — lazily, in week order, lightly (a hash compare).
  *
- * Scope rules (CLAUDE.md hard rule #5 — no deletes/edits of logged history):
- *   - only `planned` workouts, and only `workout_exercises` with NO logged set;
- *   - never `in_progress` / `completed` workouts;
- *   - manual per-set weight overrides (`set_weights`) are left untouched — they
- *     sit on top of the prescription in the UI and are cleared separately by the
- *     "Reset to prescription" menu item.
+ * This supersedes the single-scalar `params_version` staleness gate (doc 14 §9):
+ * the params version is now just one component of the fingerprint, and the
+ * fingerprint additionally sees every other config input the engine consumes.
  *
- * Cross-user: the caller (an admin MCP tool) passes a service-role client. Every
- * write is scoped to the row's own server-derived owner (hard rule #4); no
- * `user_id` ever comes from a tool argument (hard rule #5).
+ * Scope / invariants (CLAUDE.md hard rules):
+ *   - #5 immutable history: only `planned` workouts, only `workout_exercises`
+ *     with NO logged set, are ever rewritten; logged sets and manual `set_weights`
+ *     overrides are untouched.
+ *   - #4 service-role scoping: the caller passes a service client; every read and
+ *     write is scoped to the row's own server-derived owner, never a tool arg.
+ *   - #3 engine purity: all resolution + hashing live here; the engine still takes
+ *     one resolved `EngineInputs` + `EngineParams`.
  */
 
 type Client = SupabaseClient<Database>;
 
-/** One stale, not-yet-started prescription that can be re-run by the engine. */
-export interface PlannedDecisionCandidate {
-  /** the source (stale) decision being superseded */
-  decisionId: string;
-  /** owner of the planned workout, derived server-side (never from input) */
-  userId: string;
-  /** the planned `workout_exercises` row to refresh (= the decision's target) */
-  workoutExerciseId: string;
-  exerciseId: string;
-  exerciseName: string | null;
-  workoutId: string;
-  microcycleId: string;
-  mesocycleId: string | null;
-  /** W·D label for display, when resolvable */
-  coordinate: string | null;
-  /** carried forward onto the new decision so the chain stays intact */
-  sourceWorkoutExerciseId: string | null;
-  /** the params version the stale prescription was made under */
-  fromParamsVersion: number;
-  /** the exact inputs the stale decision recorded (replayed verbatim) */
-  inputs: Record<string, unknown>;
-  /** the stale prescription, for diffing */
-  output: Record<string, unknown>;
+// ---------------------------------------------------------------------------
+// pure recompute core (unit-tested; doc 14 §6.1) — replay the row's stored
+// derived inputs through the engine with the LIVE config overlaid + a refreshed
+// strength anchor, then classify the outcome. This is the reshaped core of the
+// old plan/applyRegeneration (doc 14 §10): same replay→classify→write, now keyed
+// on the dependency fingerprint instead of a params-version diff.
+// ---------------------------------------------------------------------------
+
+export type RecomputeStatus = "changed" | "unchanged" | "invalid_source";
+
+export interface RecomputeArgs {
+  /** the diverged row's latest decision inputs (source of the derived history) */
+  storedInputs: Record<string, unknown>;
+  /** the freshly-resolved config inputs (live equipment/profile/goal/week/previous) */
+  liveConfig: ConfigInputs;
+  /** the strength anchor recomputed from current logged history (or null) */
+  anchor: E1rmAnchor | null;
+  /** the row's current stored prescription, for diffing */
+  currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
 }
 
-export type RegenStatus =
-  | "changed"
-  | "unchanged"
-  | "invalid_source"
-  | "execution_error";
-
-export interface RegenChangedField {
-  field: "weight" | "reps" | "sets" | "targetRir";
-  from: unknown;
-  to: unknown;
-}
-
-export interface RegenItem {
-  candidate: PlannedDecisionCandidate;
-  status: RegenStatus;
-  /** parsed inputs, present when the source validated */
+export interface RecomputeResult {
+  status: RecomputeStatus;
+  /** the rebuilt inputs that produced `output` (present unless invalid_source) */
   inputs?: EngineInputs;
-  /** the freshly computed prescription, present when the engine ran */
+  /** the freshly computed prescription (present unless invalid_source) */
   output?: Prescription;
-  /** the prescription fields the active params would change */
-  changedFields?: RegenChangedField[];
-}
-
-export interface RegenCounts {
-  total: number;
-  changed: number;
-  unchanged: number;
-  invalid_source: number;
-  execution_error: number;
-}
-
-export interface RegenPlan {
-  items: RegenItem[];
-  counts: RegenCounts;
 }
 
 const PRESCRIPTION_FIELDS = ["weight", "reps", "sets", "targetRir"] as const;
 
-/**
- * Pure: replay each candidate's stored inputs against the active params and
- * classify the outcome. No I/O — same inputs + params ⇒ same plan, so it is
- * unit-tested directly (hard rule #3) and the MCP tool's dry run is exactly what
- * gets applied.
- */
-export function planRegeneration(
-  candidates: PlannedDecisionCandidate[],
-  activeParams: EngineParams,
-): RegenPlan {
-  const items: RegenItem[] = [];
-  const counts: RegenCounts = {
-    total: candidates.length,
-    changed: 0,
-    unchanged: 0,
-    invalid_source: 0,
-    execution_error: 0,
-  };
-
-  for (const candidate of candidates) {
-    const parsed = engineInputsSchema.safeParse(candidate.inputs);
-    if (!parsed.success) {
-      counts.invalid_source += 1;
-      items.push({ candidate, status: "invalid_source" });
-      continue;
-    }
-
-    let output: Prescription;
-    try {
-      output = prescribe(parsed.data, activeParams);
-    } catch {
-      counts.execution_error += 1;
-      items.push({ candidate, status: "execution_error", inputs: parsed.data });
-      continue;
-    }
-
-    const changedFields: RegenChangedField[] = [];
-    for (const field of PRESCRIPTION_FIELDS) {
-      const from = candidate.output[field];
-      const to = output[field];
-      if (JSON.stringify(from) !== JSON.stringify(to)) {
-        changedFields.push({ field, from, to });
-      }
-    }
-
-    if (changedFields.length > 0) {
-      counts.changed += 1;
-      items.push({
-        candidate,
-        status: "changed",
-        inputs: parsed.data,
-        output,
-        changedFields,
-      });
-    } else {
-      counts.unchanged += 1;
-      items.push({ candidate, status: "unchanged", inputs: parsed.data, output });
-    }
-  }
-
-  return { items, counts };
+/** Did the engine output diverge from the stored prescription? (ignores prose) */
+function prescriptionChanged(
+  stored: RecomputeArgs["currentOutput"],
+  fresh: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">,
+): boolean {
+  return PRESCRIPTION_FIELDS.some(
+    (f) => JSON.stringify(stored[f]) !== JSON.stringify(fresh[f]),
+  );
 }
 
 /**
- * A stable token identifying exactly the set of writes a dry run would make
- * (the active version + each changed exercise's target prescription). The apply
- * path requires the caller to echo this token, so a write is only ever the
- * second half of a preview→apply pair: an over-eager client cannot apply in one
- * blind call, and a token computed against a now-stale plan (the underlying
- * prescriptions changed since the preview) no longer matches and is rejected.
- * Pure — only the `changed` items contribute, so unchanged/invalid rows never
- * shift it.
- */
-export function regenPlanToken(plan: RegenPlan, activeVersion: number): string {
-  const changes = plan.items
-    .filter(
-      (i): i is RegenItem & { output: Prescription } =>
-        i.status === "changed" && i.output != null,
-    )
-    .map((i) => ({
-      we: i.candidate.workoutExerciseId,
-      weight: i.output.weight,
-      reps: i.output.reps,
-      sets: i.output.sets,
-      targetRir: i.output.targetRir,
-    }))
-    .sort((a, b) => a.we.localeCompare(b.we));
-  return hashParams({ version: activeVersion, changes }).slice(0, 16);
-}
-
-/** Key a recomputed anchor by its owner + exercise (anchors are per-user). */
-export function anchorKey(userId: string, exerciseId: string): string {
-  return `${userId}:${exerciseId}`;
-}
-
-/**
- * Overwrite each candidate's recorded `inputs.strengthAnchor` with a freshly
- * recomputed anchor (keyed by `anchorKey`). Pure.
+ * Pure: rebuild a diverged row's engine inputs from its immutable derived history
+ * (`storedInputs`) + the live config + a fresh anchor, run the engine, and report
+ * whether the prescription changed. No I/O — same inputs + params ⇒ same plan, so
+ * it is unit-tested directly (hard rule #3).
  *
- * Why this is required: a decision recorded under v8 or earlier predates the
- * `strengthAnchor` input (doc 13), so its stored inputs carry none. The v9
- * rep-window weight selection is gated on a non-null anchor — replaying those
- * anchor-less inputs always falls through to the legacy increment branch and
- * reports "unchanged". Recomputing the anchor from the user's logged history
- * (the same `getExerciseE1rmAnchors` the live week-advance uses) is what lets a
- * backfill actually pick up the new model. A null anchor (no usable history) is
- * left in place so the engine keeps its plan-based cold-start fallback.
+ * Reusing the stored derived inputs is correct (doc 14 §6.4): an open
+ * prescription's `previous` and derived inputs come from immutable, completed work
+ * that doesn't drift mid-view. Overlaying the live config is what makes a profile /
+ * goal / meso / params / upstream-week change take effect; refreshing the anchor is
+ * what makes a config-triggered recompute also pick up the latest history.
  */
-export function withRecomputedAnchors(
-  candidates: PlannedDecisionCandidate[],
-  anchorByKey: Map<string, E1rmAnchor>,
-): PlannedDecisionCandidate[] {
-  return candidates.map((candidate) => {
-    if (
-      typeof candidate.inputs !== "object" ||
-      candidate.inputs === null ||
-      Array.isArray(candidate.inputs)
-    ) {
-      return candidate;
-    }
-    const anchor = anchorByKey.get(anchorKey(candidate.userId, candidate.exerciseId)) ?? null;
-    return { ...candidate, inputs: { ...candidate.inputs, strengthAnchor: anchor } };
-  });
-}
-
-/**
- * Gather the not-yet-started prescriptions whose latest decision predates the
- * active params version. Service-role, cross-user; optionally scoped to one
- * mesocycle. Returns at most `limit` candidates, oldest-coordinate first.
- *
- * Each candidate's `inputs.strengthAnchor` is recomputed from the owner's
- * logged history against `params` (`withRecomputedAnchors`) so a backfill can
- * exercise the active model's anchor-driven path rather than replaying a stale,
- * anchor-less input verbatim.
- */
-export async function getRegenerablePlannedDecisions(
-  service: Client,
-  activeVersion: number,
+export function recomputeRow(
+  args: RecomputeArgs,
   params: EngineParams,
-  opts: { mesocycleId?: string; userId?: string; limit?: number } = {},
-): Promise<PlannedDecisionCandidate[]> {
-  // optional mesocycle scoping → its microcycle ids
-  let microFilter: string[] | null = null;
-  if (opts.mesocycleId) {
-    const { data, error } = await service
-      .from("microcycles")
-      .select("id")
-      .eq("mesocycle_id", opts.mesocycleId);
-    if (error) throw error;
-    microFilter = (data ?? []).map((m) => m.id);
-    if (microFilter.length === 0) return [];
+): RecomputeResult {
+  const rebuilt = {
+    ...args.storedInputs,
+    ...args.liveConfig,
+    strengthAnchor: args.anchor,
+  };
+  const parsed = engineInputsSchema.safeParse(rebuilt);
+  if (!parsed.success) return { status: "invalid_source" };
+
+  let output: Prescription;
+  try {
+    output = prescribe(parsed.data, params);
+  } catch {
+    return { status: "invalid_source" };
   }
 
-  // planned workouts (all users, or just the scoped meso's weeks)
-  let workoutQuery = service
-    .from("workouts")
-    .select("id, user_id, microcycle_id, day_number")
-    .eq("status", "planned");
-  if (microFilter) workoutQuery = workoutQuery.in("microcycle_id", microFilter);
-  if (opts.userId) workoutQuery = workoutQuery.eq("user_id", opts.userId);
-  const { data: workouts, error: workoutsError } = await workoutQuery;
-  if (workoutsError) throw workoutsError;
-  if (!workouts || workouts.length === 0) return [];
-  const workoutById = new Map(workouts.map((w) => [w.id, w]));
-  const workoutIds = workouts.map((w) => w.id);
-
-  // microcycle → (week, meso) for the coordinate label + decision linkage
-  const microIds = [...new Set(workouts.map((w) => w.microcycle_id))];
-  const { data: micros, error: microsError } = await service
-    .from("microcycles")
-    .select("id, week_number, mesocycle_id")
-    .in("id", microIds);
-  if (microsError) throw microsError;
-  const microById = new Map((micros ?? []).map((m) => [m.id, m]));
-
-  // exercises planned on those workouts
-  const { data: wes, error: wesError } = await service
-    .from("workout_exercises")
-    .select("id, workout_id, exercise_id")
-    .in("workout_id", workoutIds);
-  if (wesError) throw wesError;
-  if (!wes || wes.length === 0) return [];
-  const weIds = wes.map((we) => we.id);
-
-  // exclude any exercise that already has a logged set — a `planned` workout
-  // should have none, but never re-prescribe over started work (hard rule #5)
-  const { data: logged, error: loggedError } = await service
-    .from("logged_sets")
-    .select("workout_exercise_id")
-    .in("workout_exercise_id", weIds);
-  if (loggedError) throw loggedError;
-  const loggedWeIds = new Set((logged ?? []).map((s) => s.workout_exercise_id));
-
-  // the latest decision per planned exercise (newest first → first seen wins)
-  const { data: decisions, error: decisionsError } = await service
-    .from("engine_decisions")
-    .select(
-      "id, user_id, workout_exercise_id, source_workout_exercise_id, params_version, inputs, output, created_at",
-    )
-    .in("workout_exercise_id", weIds)
-    .order("created_at", { ascending: false });
-  if (decisionsError) throw decisionsError;
-  const latestByWe = new Map<string, (typeof decisions)[number]>();
-  for (const d of decisions ?? []) {
-    if (d.workout_exercise_id && !latestByWe.has(d.workout_exercise_id)) {
-      latestByWe.set(d.workout_exercise_id, d);
-    }
-  }
-
-  // exercise names for the dry-run report
-  const exerciseIds = [...new Set(wes.map((we) => we.exercise_id))];
-  const { data: exercises } =
-    exerciseIds.length > 0
-      ? await service.from("exercises").select("id, name").in("id", exerciseIds)
-      : { data: [] as { id: string; name: string }[] };
-  const nameById = new Map((exercises ?? []).map((e) => [e.id, e.name]));
-
-  const candidates: PlannedDecisionCandidate[] = [];
-  for (const we of wes) {
-    if (loggedWeIds.has(we.id)) continue;
-    const decision = latestByWe.get(we.id);
-    // no decision = a seed (e.g. week-1) the engine never prescribed → nothing
-    // to replay; skip rather than invent inputs
-    if (!decision) continue;
-    if (decision.params_version >= activeVersion) continue; // already current
-    const workout = workoutById.get(we.workout_id);
-    if (!workout) continue;
-    const micro = microById.get(workout.microcycle_id);
-    candidates.push({
-      decisionId: decision.id,
-      userId: workout.user_id,
-      workoutExerciseId: we.id,
-      exerciseId: we.exercise_id,
-      exerciseName: nameById.get(we.exercise_id) ?? null,
-      workoutId: we.workout_id,
-      microcycleId: workout.microcycle_id,
-      mesocycleId: micro?.mesocycle_id ?? null,
-      coordinate: micro ? `W${micro.week_number}·D${workout.day_number}` : null,
-      sourceWorkoutExerciseId: decision.source_workout_exercise_id,
-      fromParamsVersion: decision.params_version,
-      inputs: decision.inputs,
-      output: decision.output,
-    });
-  }
-
-  candidates.sort((a, b) => (a.coordinate ?? "").localeCompare(b.coordinate ?? ""));
-  const limited =
-    opts.limit != null ? candidates.slice(0, opts.limit) : candidates;
-
-  // recompute the strength anchor per (owner, exercise) from logged history so
-  // the active model's anchor-driven path can engage on the backfill. Anchors
-  // are per-user, so batch the exercise ids by owner.
-  const exerciseIdsByUser = new Map<string, Set<string>>();
-  for (const c of limited) {
-    const set = exerciseIdsByUser.get(c.userId) ?? new Set<string>();
-    set.add(c.exerciseId);
-    exerciseIdsByUser.set(c.userId, set);
-  }
-  const anchorByKey = new Map<string, E1rmAnchor>();
-  for (const [uid, exIds] of exerciseIdsByUser) {
-    const anchors = await getExerciseE1rmAnchors(service, uid, [...exIds], params);
-    for (const [exId, anchor] of anchors) {
-      anchorByKey.set(anchorKey(uid, exId), anchor);
-    }
-  }
-  return withRecomputedAnchors(limited, anchorByKey);
+  return {
+    status: prescriptionChanged(args.currentOutput, output)
+      ? "changed"
+      : "unchanged",
+    inputs: parsed.data,
+    output,
+  };
 }
 
-/** Provenance for a regenerated decision — the doc-11 RIR-fallback record plus a
- *  marker that this decision came from a regeneration (not a week advance). */
-function regenProvenance(
+// ---------------------------------------------------------------------------
+// read-path reconcile
+// ---------------------------------------------------------------------------
+
+export interface ReconcileResult {
+  /** missing days created from a completed previous-week counterpart */
+  generated: number;
+  /** stale prescriptions whose recompute changed the prescribed numbers */
+  refreshed: number;
+}
+
+/** A planned, not-yet-started prescription row + the cycle context to check it. */
+interface OpenRow {
+  id: string;
+  workoutId: string;
+  exerciseId: string;
+  microcycleId: string;
+  weekNumber: number;
+  dayNumber: number;
+  targetRir: number;
+  isDeload: boolean;
+  currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
+  depFingerprint: string | null;
+}
+
+interface LatestDecision {
+  id: string;
+  sourceWorkoutExerciseId: string | null;
+  inputs: Record<string, unknown>;
+}
+
+/** Recording-time provenance for a recomputed decision (doc 14 §6.1 step 4): the
+ *  doc-11 RIR-fallback record, the engine build, and WHY the row recomputed —
+ *  the fingerprint transition plus the resolved dependency component values. */
+function recomputeProvenance(
   inputs: EngineInputs,
+  liveConfig: ConfigInputs,
   codeSha: string | null,
-  fromParamsVersion: number,
+  fromFingerprint: string | null,
+  toFingerprint: string,
 ): Record<string, unknown> {
   const working = inputs.actualSets.filter((s) => !s.isWarmup);
   const assumed = working.filter((s) => s.rirReported == null).length;
@@ -387,47 +181,246 @@ function regenProvenance(
       sets_assumed: assumed,
       applied: assumed > 0,
     },
-    regenerated: {
-      tool: "regenerate_planned_prescriptions",
-      from_params_version: fromParamsVersion,
+    recomputed: {
+      reason: "dependency fingerprint changed",
+      from_fingerprint: fromFingerprint,
+      to_fingerprint: toFingerprint,
+      // the resolved dependency component values that fed the new fingerprint, so
+      // explain_prescription can show what input changed on a recompute (doc 14 §4)
+      dependencies: {
+        equipmentType: liveConfig.exercise.equipmentType,
+        experienceLevel: liveConfig.user.experienceLevel,
+        units: liveConfig.user.units,
+        goalType: liveConfig.goalType,
+        week: liveConfig.week,
+        previous: liveConfig.previous,
+      },
     },
   };
 }
 
-export interface RegenApplyResult {
-  updatedExercises: number;
-  insertedDecisions: number;
-}
-
 /**
- * Persist the changed items: overwrite each planned exercise's prescription and
- * append a fresh `engine_decisions` row stamped with the active version. Only
- * `status === "changed"` items are written. Idempotent in effect — re-running
- * after a successful apply finds nothing stale (the new decisions carry the
- * active version).
+ * Bring a user's meso's stored prescriptions in line with their current inputs,
+ * transparently and on demand. Two halves of one read-path job (doc 14 §10):
+ *   1. heal generation gaps — create any missing day whose previous-week
+ *      counterpart is complete (`catchUpMesoGeneration`); a SEPARATE concern the
+ *      freshness framework does not cover, kept here.
+ *   2. refresh freshness — for each open prescription with a recorded decision,
+ *      re-resolve its config inputs, hash, and compare to the stored fingerprint;
+ *      recompute exactly the rows that diverged, in week order so a changed
+ *      `previous` propagates to the next week within the one pass.
+ *
+ * Lazy + idempotent: nothing recomputes until a row's inputs actually differ;
+ * after a recompute the row carries the current fingerprint, so the next read
+ * matches and short-circuits. Never touches started/completed workouts, logged
+ * sets, or manual `set_weights` overrides.
+ *
+ * Seed / user-added rows carry no decision (the engine only records one at a week
+ * advance); they are skipped here until doc 14 phase 2 normalizes them with a
+ * kind:"seed" decision.
  */
-export async function applyRegeneration(
+export async function reconcilePrescriptions(
   service: Client,
-  items: RegenItem[],
-  activeVersion: number,
-  activeParams: EngineParams,
-): Promise<RegenApplyResult> {
-  const changed = items.filter(
-    (i): i is RegenItem & { output: Prescription; inputs: EngineInputs } =>
-      i.status === "changed" && i.output != null && i.inputs != null,
-  );
-  if (changed.length === 0) return { updatedExercises: 0, insertedDecisions: 0 };
+  userId: string,
+  mesoId: string,
+): Promise<ReconcileResult> {
+  // 1. heal generation gaps first; freshly generated days are stamped current, so
+  //    the freshness pass below sees them as fresh.
+  const generated = await catchUpMesoGeneration(service, userId, mesoId);
 
-  const paramsHash = hashParams(
-    activeParams as unknown as Record<string, unknown>,
+  const { version, params } = await getActiveEngineParams(service);
+  const token: ParamsToken = { version };
+
+  // 2. the meso's weeks (target RIR / deload per week)
+  const { data: micros, error: microsError } = await service
+    .from("microcycles")
+    .select("id, week_number, target_rir, is_deload")
+    .eq("mesocycle_id", mesoId)
+    .eq("user_id", userId);
+  if (microsError) throw microsError;
+  if (!micros || micros.length === 0) return { generated, refreshed: 0 };
+  const microById = new Map(micros.map((m) => [m.id, m]));
+  const microIds = micros.map((m) => m.id);
+
+  // 3. ALL the meso's workouts (planned + completed — completed rows are the
+  //    `previous` sources for later weeks)
+  const { data: workouts, error: workoutsError } = await service
+    .from("workouts")
+    .select("id, microcycle_id, day_number, status")
+    .in("microcycle_id", microIds)
+    .eq("user_id", userId);
+  if (workoutsError) throw workoutsError;
+  if (!workouts || workouts.length === 0) return { generated, refreshed: 0 };
+  const workoutById = new Map(workouts.map((w) => [w.id, w]));
+  const plannedWorkoutIds = new Set(
+    workouts.filter((w) => w.status === "planned").map((w) => w.id),
   );
+
+  // 4. ALL the meso's workout_exercises (need completed sources for `previous`)
+  const { data: wes, error: wesError } = await service
+    .from("workout_exercises")
+    .select(
+      "id, workout_id, exercise_id, prescribed_weight, prescribed_reps, prescribed_sets, target_rir, dep_fingerprint",
+    )
+    .in("workout_id", [...workoutById.keys()]);
+  if (wesError) throw wesError;
+  if (!wes || wes.length === 0) return { generated, refreshed: 0 };
+
+  // live prescribed map for `previous` resolution + week-order propagation
+  const livePrescribed = new Map<
+    string,
+    Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">
+  >();
+  for (const we of wes) {
+    const workout = workoutById.get(we.workout_id);
+    const micro = workout ? microById.get(workout.microcycle_id) : undefined;
+    livePrescribed.set(we.id, {
+      weight: we.prescribed_weight,
+      reps: we.prescribed_reps,
+      sets: we.prescribed_sets ?? 1,
+      targetRir: we.target_rir ?? micro?.target_rir ?? 0,
+    });
+  }
+
+  // the open (planned) rows we may rewrite
+  const openWes = wes.filter((we) => plannedWorkoutIds.has(we.workout_id));
+  if (openWes.length === 0) return { generated, refreshed: 0 };
+  const openWeIds = openWes.map((we) => we.id);
+
+  // 5. exclude any open row that already has a logged set (defensive — a planned
+  //    workout should have none, but never re-prescribe over started work)
+  const { data: logged, error: loggedError } = await service
+    .from("logged_sets")
+    .select("workout_exercise_id")
+    .in("workout_exercise_id", openWeIds);
+  if (loggedError) throw loggedError;
+  const loggedWeIds = new Set((logged ?? []).map((s) => s.workout_exercise_id));
+
+  // 6. latest decision per open row (source pointer + stored derived inputs).
+  //    A row with none is a seed / user-add → skip (doc 14 phase 1).
+  const { data: decisions, error: decisionsError } = await service
+    .from("engine_decisions")
+    .select("id, workout_exercise_id, source_workout_exercise_id, inputs, created_at")
+    .in("workout_exercise_id", openWeIds)
+    .order("created_at", { ascending: false });
+  if (decisionsError) throw decisionsError;
+  const latestByWe = new Map<string, LatestDecision>();
+  for (const d of decisions ?? []) {
+    if (d.workout_exercise_id && !latestByWe.has(d.workout_exercise_id)) {
+      latestByWe.set(d.workout_exercise_id, {
+        id: d.id,
+        sourceWorkoutExerciseId: d.source_workout_exercise_id,
+        inputs: d.inputs,
+      });
+    }
+  }
+
+  // 7. config dimensions resolved once: profile, macro goal, equipment per exercise
+  const [{ data: profile, error: profileError }, mesoGoal] = await Promise.all([
+    service.from("profiles").select("*").eq("id", userId).single(),
+    resolveMesoGoal(service, mesoId),
+  ]);
+  if (profileError) throw profileError;
+  const goal = engineGoal(mesoGoal);
+
+  const exerciseIds = [...new Set(openWes.map((we) => we.exercise_id))];
+  const { data: exercises, error: exError } =
+    exerciseIds.length > 0
+      ? await service.from("exercises").select("id, equipment_type").in("id", exerciseIds)
+      : { data: [] as { id: string; equipment_type: string }[], error: null };
+  if (exError) throw exError;
+  const equipmentById = new Map(
+    (exercises ?? []).map((e) => [e.id, e.equipment_type]),
+  );
+
+  // assemble the open rows with their cycle context, in week → day → position order
+  const rows: OpenRow[] = openWes
+    .filter((we) => !loggedWeIds.has(we.id) && latestByWe.has(we.id))
+    .map((we) => {
+      const workout = workoutById.get(we.workout_id)!;
+      const micro = microById.get(workout.microcycle_id)!;
+      return {
+        id: we.id,
+        workoutId: we.workout_id,
+        exerciseId: we.exercise_id,
+        microcycleId: workout.microcycle_id,
+        weekNumber: micro.week_number,
+        dayNumber: workout.day_number,
+        targetRir: micro.target_rir,
+        isDeload: micro.is_deload,
+        currentOutput: {
+          weight: we.prescribed_weight,
+          reps: we.prescribed_reps,
+          sets: we.prescribed_sets ?? 1,
+          targetRir: we.target_rir ?? micro.target_rir,
+        },
+        depFingerprint: we.dep_fingerprint,
+      };
+    })
+    .sort((a, b) => a.weekNumber - b.weekNumber || a.dayNumber - b.dayNumber);
+
+  if (rows.length === 0) return { generated, refreshed: 0 };
+
+  // 8. week-order pass: detect divergence, recompute, write back. Anchors are
+  //    fetched once, only if at least one row actually diverged.
+  let anchors: Map<string, E1rmAnchor> | null = null;
+  let refreshed = 0;
+  const paramsHash = hashParams(params as unknown as Record<string, unknown>);
   const codeSha = engineCodeSha();
 
-  // overwrite each planned exercise's prescription (update by id; the table has
-  // no user_id column — ownership is the parent workout's, already resolved
-  // server-side into candidate.userId)
-  let updatedExercises = 0;
-  for (const { candidate, output } of changed) {
+  for (const row of rows) {
+    const decision = latestByWe.get(row.id)!;
+    const sourceId = decision.sourceWorkoutExerciseId;
+    const previous =
+      (sourceId ? livePrescribed.get(sourceId) : undefined) ??
+      ((decision.inputs.previous as ConfigInputs["previous"]) ?? null);
+    const initial =
+      (decision.inputs.initial as ConfigInputs["initial"]) ?? null;
+
+    const liveConfig = buildConfigInputs({
+      equipmentType: equipmentById.get(row.exerciseId) ?? "other",
+      profile,
+      goal,
+      week: { targetRir: row.targetRir, isDeload: row.isDeload },
+      previous,
+      initial,
+    });
+    const expected = computeDepFingerprint(liveConfig, token);
+    if (expected === row.depFingerprint) continue; // fresh — short-circuit
+
+    // diverged → fetch anchors once, then rebuild + recompute
+    if (!anchors) {
+      anchors = await getExerciseE1rmAnchors(service, userId, exerciseIds, params);
+    }
+    const result = recomputeRow(
+      {
+        storedInputs: decision.inputs,
+        liveConfig,
+        anchor: anchors.get(row.exerciseId) ?? null,
+        currentOutput: row.currentOutput,
+      },
+      params,
+    );
+
+    if (result.status === "invalid_source") {
+      // self-heal (doc 14 §6.3): can't replay → stamp the current expected
+      // fingerprint and move on. Not a permanent lie: if any input changes again,
+      // the expected fingerprint changes again and the row is re-attempted.
+      await stampFingerprint(service, row.id, expected);
+      continue;
+    }
+
+    if (result.status === "unchanged") {
+      // the change didn't move THIS row's prescription; stamp it current so the
+      // next read short-circuits (the fingerprint, not the numbers, was stale).
+      await stampFingerprint(service, row.id, expected);
+      continue;
+    }
+
+    // changed → write the refreshed prescription + fingerprint, append an audited
+    // decision, and propagate the new value to downstream weeks in this pass.
+    const output = result.output!;
+    const inputs = result.inputs!;
     const { error: updateError } = await service
       .from("workout_exercises")
       .update({
@@ -436,135 +429,70 @@ export async function applyRegeneration(
         prescribed_sets: output.sets,
         target_rir: output.targetRir,
         notes: output.rationale,
-        params_version: activeVersion,
+        dep_fingerprint: expected,
       })
-      .eq("id", candidate.workoutExerciseId);
+      .eq("id", row.id);
     if (updateError) throw updateError;
-    updatedExercises += 1;
+
+    const { error: insertError } = await service.from("engine_decisions").insert({
+      user_id: userId,
+      workout_exercise_id: row.id,
+      exercise_id: row.exerciseId,
+      source_workout_exercise_id: sourceId,
+      workout_id: row.workoutId,
+      microcycle_id: row.microcycleId,
+      mesocycle_id: mesoId,
+      inputs: inputs as unknown as Record<string, unknown>,
+      output: output as unknown as Record<string, unknown>,
+      params_version: version,
+      params_hash: paramsHash,
+      provenance: recomputeProvenance(
+        inputs,
+        liveConfig,
+        codeSha,
+        row.depFingerprint,
+        expected,
+      ),
+    });
+    if (insertError) throw insertError;
+
+    livePrescribed.set(row.id, output);
+    refreshed += 1;
   }
 
-  // append the fresh audit decisions (one batch insert, mirrors generateDay)
-  const { error: insertError } = await service.from("engine_decisions").insert(
-    changed.map(({ candidate, output, inputs }) => ({
-      user_id: candidate.userId,
-      workout_exercise_id: candidate.workoutExerciseId,
-      exercise_id: candidate.exerciseId,
-      source_workout_exercise_id: candidate.sourceWorkoutExerciseId,
-      workout_id: candidate.workoutId,
-      microcycle_id: candidate.microcycleId,
-      mesocycle_id: candidate.mesocycleId,
-      inputs: candidate.inputs as unknown as Record<string, unknown>,
-      output: output as unknown as Record<string, unknown>,
-      params_version: activeVersion,
-      params_hash: paramsHash,
-      provenance: regenProvenance(inputs, codeSha, candidate.fromParamsVersion),
-    })),
-  );
-  if (insertError) throw insertError;
-
-  return { updatedExercises, insertedDecisions: changed.length };
+  return { generated, refreshed };
 }
 
-export interface ReconcileResult {
-  /** missing days created from a completed previous-week counterpart */
-  generated: number;
-  /** existing planned prescriptions refreshed to the active params version */
-  refreshed: number;
-}
-
-/** The meso's planned, not-yet-started workout ids — the reconcile's write scope
- *  and the rows the staleness gate reads. Two indexed lookups, no engine work. */
-async function getPlannedWorkoutIds(
+/** Stamp a single open row's freshness fingerprint current (no prescription change). */
+async function stampFingerprint(
   service: Client,
-  userId: string,
-  mesoId: string,
-): Promise<string[]> {
-  const { data: micros, error: microsError } = await service
-    .from("microcycles")
-    .select("id")
-    .eq("mesocycle_id", mesoId)
-    .eq("user_id", userId);
-  if (microsError) throw microsError;
-  const microIds = (micros ?? []).map((m) => m.id);
-  if (microIds.length === 0) return [];
-
-  const { data: workouts, error: workoutsError } = await service
-    .from("workouts")
-    .select("id")
-    .in("microcycle_id", microIds)
-    .eq("user_id", userId)
-    .eq("status", "planned");
-  if (workoutsError) throw workoutsError;
-  return (workouts ?? []).map((w) => w.id);
+  workoutExerciseId: string,
+  fingerprint: string,
+): Promise<void> {
+  const { error } = await service
+    .from("workout_exercises")
+    .update({ dep_fingerprint: fingerprint })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
 }
 
-/**
- * Make a user's meso match the ACTIVE engine_params, transparently and on demand
- * — the single "keep it correct" operation. Two halves of one job:
- *  1. generate any missing day whose previous-week counterpart is complete
- *     (`catchUpMesoGeneration`) — new days are written under the active params;
- *  2. refresh any already-planned, not-yet-started prescription whose last
- *     decision predates the active version (regeneration, anchor-rebuilt).
- *
- * Idempotent and additive-or-in-place only: never touches started/completed
- * workouts, logged sets, or manual `set_weights` overrides. Called on load so
- * activating a new version propagates to every user on their next open — no
- * manual regenerate/catch-up step required. Returns what changed.
- *
- * Fast path: each prescription carries the `params_version` it was last written
- * under, so the common "nothing changed" case settles with one indexed read
- * (`workout_exercises` behind the active version) and skips the heavy replay
- * entirely — no per-decision lookup, no anchor recompute. The expensive
- * regeneration only runs when a planned row is actually behind the active
- * version. After a refresh, every open row is stamped current so the gate stays
- * closed until the next activation — including seeds and any row the engine
- * couldn't replay (no recorded inputs / invalid source), which the reconcile
- * leaves as-is by design and must not re-scan on every subsequent load.
- */
-export async function reconcileMesoPlan(
+/** The meso's progression goal (macro goal → standalone default). */
+async function resolveMesoGoal(
   service: Client,
-  userId: string,
   mesoId: string,
-): Promise<ReconcileResult> {
-  // create missing days first; freshly generated days already carry the active
-  // version, so the refresh pass below skips them
-  const generated = await catchUpMesoGeneration(service, userId, mesoId);
-
-  const { version, params } = await getActiveEngineParams(service);
-
-  const plannedWorkoutIds = await getPlannedWorkoutIds(service, userId, mesoId);
-  if (plannedWorkoutIds.length === 0) return { generated, refreshed: 0 };
-
-  // staleness gate: is any open prescription behind the active version (or never
-  // stamped)? When none, there is nothing to refresh — this is the steady state
-  // and the whole heavy path is skipped.
-  const staleFilter = `params_version.is.null,params_version.lt.${version}`;
-  const { data: stale, error: staleError } = await service
-    .from("workout_exercises")
-    .select("id")
-    .in("workout_id", plannedWorkoutIds)
-    .or(staleFilter)
-    .limit(1);
-  if (staleError) throw staleError;
-  if (!stale || stale.length === 0) return { generated, refreshed: 0 };
-
-  // something is behind — run the anchor-rebuilt replay over the stale rows
-  const candidates = await getRegenerablePlannedDecisions(service, version, params, {
-    mesocycleId: mesoId,
-    userId,
-  });
-  const plan = planRegeneration(candidates, params);
-  const applied = await applyRegeneration(service, plan.items, version, params);
-
-  // close the gate: stamp every still-behind open row current. Regenerated rows
-  // are already at `version`; this also covers unchanged/invalid/seed rows the
-  // replay left untouched, so the next load short-circuits at the gate.
-  const { error: stampError } = await service
-    .from("workout_exercises")
-    .update({ params_version: version })
-    .in("workout_id", plannedWorkoutIds)
-    .or(staleFilter);
-  if (stampError) throw stampError;
-
-  return { generated, refreshed: applied.updatedExercises };
+): Promise<MacroGoalType | null> {
+  const { data: meso, error } = await service
+    .from("mesocycles")
+    .select("macrocycle_id")
+    .eq("id", mesoId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!meso?.macrocycle_id) return null;
+  const { data: macro, error: macroError } = await service
+    .from("macrocycles")
+    .select("goal_type")
+    .eq("id", meso.macrocycle_id)
+    .maybeSingle();
+  if (macroError) throw macroError;
+  return macro?.goal_type ?? null;
 }

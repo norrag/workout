@@ -19,9 +19,6 @@ interface SeedCtx {
   units: ProfileRow["units"];
   targetRir: number;
   params: EngineParams;
-  /** active engine_params version, stamped onto each seeded row for the reconcile
-   *  staleness gate (a fresh seed is current by definition). */
-  paramsVersion: number;
 }
 
 /** Build the seeded `workout_exercises` rows for one planned day's groups/fills
@@ -71,7 +68,9 @@ function buildDayExerciseRows(workoutId: string, day: PlannedDay, ctx: SeedCtx) 
       target_rir: seeded.targetRir,
       status: "pending" as const,
       notes: seeded.rationale,
-      params_version: ctx.paramsVersion,
+      // seed rows carry no engine decision and no dep_fingerprint yet; the
+      // read-path reconcile skips rows without a decision (doc 14 phase 1). Phase 2
+      // normalizes seeds with a kind:"seed" decision so they participate too.
     };
   });
 }
@@ -118,7 +117,7 @@ export async function startMeso(
   if (!hasExercise)
     return { error: "Fill at least one exercise slot before starting." };
 
-  const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
+  const { params } = await getActiveEngineParams(supabase);
   const ramp = rirRamp(
     meso.weeks,
     meso.includes_deload,
@@ -171,7 +170,6 @@ export async function startMeso(
     units: profile.units,
     targetRir: meso.rir_start,
     params,
-    paramsVersion,
   };
 
   // week-1 workouts in planner order, seeded per exercise
@@ -228,7 +226,7 @@ export async function regenerateOpenWorkouts(
   if (!plan || plan.meso.status !== "active") return;
   const { days } = plan;
 
-  const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
+  const { params } = await getActiveEngineParams(supabase);
   const exerciseIds = [
     ...new Set(
       days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id))),
@@ -277,7 +275,6 @@ export async function regenerateOpenWorkouts(
       units: profile.units,
       targetRir: micro.target_rir,
       params,
-      paramsVersion,
     };
 
     // 1. drop planned workouts whose day was removed from the plan
@@ -389,7 +386,8 @@ export async function regenerateOpenWorkouts(
               target_rir: seeded.targetRir,
               status: "pending" as const,
               notes: seeded.rationale,
-              params_version: paramsVersion,
+              // newly-added slot on an active meso: a seed with no decision, left
+              // unstamped (skipped by the read-path reconcile until phase 2).
             };
           }),
       );

@@ -3,7 +3,6 @@ import {
   composeAutoregulationSummary,
   composeMesoCompleteSummary,
   prescribe,
-  toEngineEquipment,
   type EngineInputs,
   type EngineParams,
   type E1rmAnchor,
@@ -11,6 +10,11 @@ import {
   type SummaryDelta,
 } from "@/lib/engine";
 import { getExerciseE1rmAnchors } from "./logging";
+import {
+  buildConfigInputs,
+  computeDepFingerprint,
+  configProjection,
+} from "./fingerprint";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -106,22 +110,24 @@ export function buildEngineInputs(args: {
   strengthAnchor: EngineInputs["strengthAnchor"];
 }): EngineInputs {
   const { we } = args;
+  // config half resolved through the single shared resolver (doc 14 §3) so the
+  // freshness fingerprint is built the same way at write and at check; the
+  // derived half (logged history) is assembled below.
+  const previous = {
+    weight: we.prescribed_weight,
+    reps: we.prescribed_reps,
+    sets: we.prescribed_sets ?? 1,
+    targetRir: we.target_rir ?? args.microTargetRir,
+  };
   return {
-    exercise: {
-      equipmentType: toEngineEquipment(args.equipmentType),
-    },
-    user: {
-      experienceLevel: args.profile.experience_level ?? "beginner",
-      units: args.profile.units,
-    },
-    goalType: args.goal,
-    week: args.nextWeek,
-    previous: {
-      weight: we.prescribed_weight,
-      reps: we.prescribed_reps,
-      sets: we.prescribed_sets ?? 1,
-      targetRir: we.target_rir ?? args.microTargetRir,
-    },
+    ...buildConfigInputs({
+      equipmentType: args.equipmentType,
+      profile: args.profile,
+      goal: args.goal,
+      week: args.nextWeek,
+      previous,
+      initial: null,
+    }),
     actualSets: args.sets.map((s, index) => ({
       setNumber: s.set_number,
       weight: s.weight,
@@ -148,7 +154,6 @@ export function buildEngineInputs(args: {
       : null,
     muscleGroupWeeklySets: args.muscleGroupWeeklySets,
     weekPeak: args.weekPeak,
-    initial: null,
     strengthAnchor: args.strengthAnchor,
   };
 }
@@ -289,7 +294,12 @@ async function generateDay(
       target_rir: output.targetRir,
       status: "pending" as const,
       notes: output.rationale,
-      params_version: ctx.paramsVersion,
+      // freshness fingerprint over the config projection (doc 14): lets the
+      // read-path reconcile detect when an input changed without re-running the
+      // engine, and recompute only the rows that diverged.
+      dep_fingerprint: computeDepFingerprint(configProjection(inputs), {
+        version: ctx.paramsVersion,
+      }),
     };
   });
 
