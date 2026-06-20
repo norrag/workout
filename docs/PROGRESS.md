@@ -2,7 +2,37 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-18 (latest) — Connector coaching roadmap Stage 5: session-order / fatigue-position normalization
+## 2026-06-20 (latest) — Fix the copyable MCP link on `/more/connector`
+
+The AI-connector setup page (`src/app/(app)/more/connector/page.tsx`) showed the
+wrong endpoint to copy. It derived the origin from `NEXT_PUBLIC_APP_URL` and,
+when that was unset, fell back to the **request host** — so visiting prod via a
+deployment-specific or preview alias (`workout-bcohv3it8-…`,
+`workout-git-main-…`) surfaced a non-canonical, brittle URL that breaks the
+saved connector when that deployment is superseded.
+
+### Done
+
+- Replaced the request-host fallback with a `CANONICAL_APP_URL` constant
+  (`https://workout-zeta-murex.vercel.app`). Resolution is now
+  `NEXT_PUBLIC_APP_URL` (override for local dev / a future custom domain) ‖ the
+  canonical production alias — never the serving host. The copyable endpoint is
+  therefore `https://workout-zeta-murex.vercel.app/api/mcp` on every prod alias.
+- Dropped the now-unused `next/headers` import; lint + typecheck clean.
+- Updated [deployment/mcp-connector-setup.md](deployment/mcp-connector-setup.md):
+  concrete canonical domain in Project facts, the env table, the redirect-URL
+  step, the test snippets, and the connect step; troubleshooting row reworded
+  (deployment-host symptom → correct `NEXT_PUBLIC_APP_URL`).
+
+### Remaining / external
+
+- **Vercel (human):** if `NEXT_PUBLIC_APP_URL` is currently set to a
+  non-canonical value for Production/Preview, correct it to
+  `https://workout-zeta-murex.vercel.app` (an explicit env value still overrides
+  the code fallback). If it's unset, no action needed — the fallback now covers
+  it. See [manual-operations.md](deployment/manual-operations.md).
+
+## 2026-06-18 — Connector coaching roadmap Stage 5: session-order / fatigue-position normalization
 
 Fifth and final stage of [12-connector-coaching-roadmap.md](12-connector-coaching-roadmap.md).
 Makes single-exercise analysis fair to **where a movement sits** — splitting a
