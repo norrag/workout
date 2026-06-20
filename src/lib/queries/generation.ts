@@ -2,11 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import {
   engineParamsSchema,
+  resolveEffectiveParams,
   rirRamp,
   seedMeso,
   toEngineEquipment,
   type EngineInputs,
   type EngineParams,
+  type ExerciseParamOverride,
   type Prescription,
 } from "@/lib/engine";
 import type {
@@ -20,7 +22,9 @@ import {
   buildSeedInputs,
   computeDepFingerprint,
   configProjection,
+  paramsTokenFor,
 } from "./fingerprint";
+import { getExerciseParamOverrides } from "./exercise-overrides";
 import { engineGoal, type EngineGoal } from "./engine-goal";
 import {
   recordSeedDecisions,
@@ -40,6 +44,8 @@ interface SeedCtx {
   goal: EngineGoal;
   params: EngineParams;
   paramsVersion: number;
+  /** per-user×exercise increment overrides (doc 14 phase 3); absent ⇒ default */
+  overrideByExerciseId: Map<string, ExerciseParamOverride>;
 }
 
 /** A seeded prescription row plus the engine I/O that produced it, so the caller
@@ -79,6 +85,7 @@ function seedExerciseRow(
   ctx: SeedCtx,
 ): SeededExercise {
   const equipment = ctx.equipmentById.get(fill.exercise_id) ?? "other";
+  const engineEquipment = toEngineEquipment(equipment);
   const pr = ctx.prById.get(fill.exercise_id);
   const priorPeak =
     pr?.best_weight != null
@@ -89,13 +96,21 @@ function seedExerciseRow(
     reps: fill.initial_reps,
     sets: fill.initial_sets,
   };
+  // effective params = global active + this user×exercise override (doc 14 §6.1)
+  const override = ctx.overrideByExerciseId.get(fill.exercise_id) ?? null;
+  const effectiveParams = resolveEffectiveParams(
+    ctx.params,
+    override,
+    engineEquipment,
+    ctx.units,
+  );
   const output = seedMeso(
     priorPeak,
     initial,
-    { equipmentType: toEngineEquipment(equipment) },
+    { equipmentType: engineEquipment },
     { experienceLevel: ctx.experienceLevel ?? "beginner", units: ctx.units },
     ctx.targetRir,
-    ctx.params,
+    effectiveParams,
   );
   const inputs = buildSeedInputs({
     equipmentType: equipment,
@@ -118,9 +133,10 @@ function seedExerciseRow(
       target_rir: output.targetRir,
       status: "pending" as const,
       notes: output.rationale,
-      dep_fingerprint: computeDepFingerprint(configProjection(inputs), {
-        version: ctx.paramsVersion,
-      }),
+      dep_fingerprint: computeDepFingerprint(
+        configProjection(inputs),
+        paramsTokenFor(ctx.paramsVersion, override?.weightIncrement),
+      ),
     },
     exerciseId: fill.exercise_id,
     inputs,
@@ -260,10 +276,11 @@ export async function startMeso(
   const exerciseIds = [
     ...new Set(days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id)))),
   ];
-  const [{ data: exercises, error: exError }, { data: prs, error: prError }] =
+  const [{ data: exercises, error: exError }, { data: prs, error: prError }, overrideByExerciseId] =
     await Promise.all([
       supabase.from("exercises").select("id, equipment_type").in("id", exerciseIds),
       supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+      getExerciseParamOverrides(supabase, userId, exerciseIds),
     ]);
   if (exError) throw exError;
   if (prError) throw prError;
@@ -303,6 +320,7 @@ export async function startMeso(
     goal,
     params,
     paramsVersion,
+    overrideByExerciseId,
   };
 
   // week-1 workouts in planner order, seeded per exercise
@@ -367,7 +385,7 @@ export async function regenerateOpenWorkouts(
       days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id))),
     ),
   ];
-  const [{ data: exercises, error: exError }, { data: prs, error: prError }] =
+  const [{ data: exercises, error: exError }, { data: prs, error: prError }, overrideByExerciseId] =
     await Promise.all([
       exerciseIds.length > 0
         ? supabase
@@ -376,6 +394,7 @@ export async function regenerateOpenWorkouts(
             .in("id", exerciseIds)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+      getExerciseParamOverrides(supabase, userId, exerciseIds),
     ]);
   if (exError) throw exError;
   if (prError) throw prError;
@@ -413,6 +432,7 @@ export async function regenerateOpenWorkouts(
       goal,
       params,
       paramsVersion,
+      overrideByExerciseId,
     };
 
     // 1. drop planned workouts whose day was removed from the plan

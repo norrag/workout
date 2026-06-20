@@ -2,7 +2,81 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Prescription freshness: normalize seed decisions (doc 14 phase 2)
+## 2026-06-20 (latest) — Prescription freshness: first per-user override, editable increment (doc 14 phase 3)
+
+Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
+**phase 3** (§7): the first **per-user × exercise** engine override — the editable
+weight increment (the per-set load jump for one lift). This proves out the doc-14
+"reusable contract": a new input becomes a small, mechanical addition, not a
+correctness redesign. The value is resolved into **effective params** at every
+generation/recompute site and folded into the prescription's **dependency
+fingerprint**, so an increment edit makes exactly that exercise's open rows go stale
+on the read path — **scope falls out of the hash**, no bespoke "invalidate" wiring.
+One append-only migration (new table + owner-only RLS). `main` deployable; 465 tests
+(+12) pass; typecheck / lint / build green.
+
+### Done
+
+- **`exercise_param_overrides` table (migration `20260620000006`).** `user_id ×
+  exercise_id → weight_increment` (numeric, `> 0`), `unique (user_id, exercise_id)`,
+  owner-only RLS (`user_id = auth.uid()` for all ops), index on `(user_id,
+  exercise_id)`, `set_updated_at` trigger. RLS test added (owner-only read + unspoofable
+  insert) alongside the exclusions/notes cases.
+- **Pure `resolveEffectiveParams` (`engine/effective-params.ts`).** Merges an
+  override into the global params' per-equipment increment (in the user's units),
+  producing the EFFECTIVE params the engine runs under; the engine signature stays
+  `prescribe(EngineInputs, EngineParams)` (hard rule #3). A null/absent override
+  returns the params **referentially unchanged** (so a no-override row hashes
+  identically to before). Unit-tested incl. the legacy-path number change + no-mutation.
+- **Fingerprint token folds the override (`fingerprint.ts`).** `ParamsToken` gained
+  optional `incrementOverride`; `paramsTokenFor(version, override?)` OMITS it when
+  absent, so existing fingerprints are byte-identical (zero churn) and present it
+  moves only that exercise's rows. Golden tests: no-override parity, an override
+  moves the hash, two-exercise scoping (only the overridden one diverges).
+- **Wired at every write/recompute site.** `seedExerciseRow` (+ `startMeso` /
+  `regenerateOpenWorkouts`) and `addWorkoutExercises` resolve the override into
+  effective params for `seedMeso` and stamp the override-aware token; `generateDay`
+  (advance) and `projectNextPrescription` do the same for `prescribe`; the read-path
+  `reconcilePrescriptions` batches the override read with the other config dimensions,
+  computes the per-exercise expected fingerprint, and recomputes diverged rows under
+  effective params. The recompute decision records `provenance.dependencies.incrementOverride`.
+- **Editor on the Exercise page (fig 3.1a `⋯`).** The mockup's header overflow now
+  opens a "Load step" bottom sheet — step chips (unit-aware) + "USE DEFAULT" — backed
+  by `setIncrementOverrideAction` (zod-validated, revalidates the exercise + workout
+  paths). Query layer: `exercise-overrides.ts` (`get*`/`set*`/`clear*`).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (465/465, +12), `npm run build`
+all green. The zero-churn guarantee is the `paramsTokenFor` parity test; the scoping
+("only the overridden exercise recomputes, nothing else") is the two-exercise
+fingerprint test mirroring the reconcile's per-row computation.
+
+### Deviations / notes
+
+- **The override is the BASE increment** (the level `engine_params.increment` sits
+  at), so `experience_increment_scale` still composes on top — at the default
+  intermediate scale (1.0) the override is the literal step.
+- **Under the active v9 params (`weight_selection: "rep_window"`) the engine prices
+  loads off the strength anchor, not the increment.** So this override moves a
+  prescribed NUMBER only on the legacy increment path (cold-start / no-or-low-
+  confidence-anchor fallback, or an `increment` params row). It **always** moves the
+  fingerprint, so the row always participates in (and re-stamps through) the reconcile.
+- **The recompute decision records the GLOBAL `params_hash`** (the `engine_params` row
+  identity) with the override in provenance, not an effective-params hash.
+- **Phases 4–5 remain** (backfill the already-flowing sources — profile / macro /
+  meso — with targeted recompute-scoping tests; the optional history token / Tier-0
+  epoch).
+
+### Remaining / external
+
+- **Apply `20260620000006_exercise_param_overrides.sql` to the hosted DB.** It was
+  NOT applied from this session (the remote `apply_migration` was blocked as an
+  unauthorized production action). The override reads query this table, so they error
+  until it exists on hosted — apply it on deploy (CLI `supabase db push`, dashboard
+  SQL editor, or MCP). See [deployment/manual-operations.md](deployment/manual-operations.md).
+
+## 2026-06-20 — Prescription freshness: normalize seed decisions (doc 14 phase 2)
 
 Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
 **phase 2** (§6.2): **seed** prescriptions now participate in the same read-path

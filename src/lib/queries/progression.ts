@@ -3,9 +3,12 @@ import {
   composeAutoregulationSummary,
   composeMesoCompleteSummary,
   prescribe,
+  resolveEffectiveParams,
+  toEngineEquipment,
   type EngineInputs,
   type EngineParams,
   type E1rmAnchor,
+  type ExerciseParamOverride,
   type Prescription,
   type SummaryDelta,
 } from "@/lib/engine";
@@ -14,7 +17,12 @@ import {
   buildConfigInputs,
   computeDepFingerprint,
   configProjection,
+  paramsTokenFor,
 } from "./fingerprint";
+import {
+  getExerciseIncrementOverride,
+  getExerciseParamOverrides,
+} from "./exercise-overrides";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -197,6 +205,8 @@ interface WeekContext {
   anchorsByExercise: Map<string, E1rmAnchor>;
   equipmentByExercise: Map<string, string>;
   nameByExercise: Map<string, string>;
+  /** per-user×exercise increment overrides (doc 14 phase 3); absent ⇒ default */
+  overrideByExercise: Map<string, ExerciseParamOverride>;
 }
 
 /**
@@ -235,6 +245,7 @@ async function generateDay(
   }[] = [];
   const deltas: SummaryDelta[] = [];
   const rows = dayWes.map((we, index) => {
+    const equipment = ctx.equipmentByExercise.get(we.exercise_id) ?? "other";
     const inputs = buildEngineInputs({
       we,
       sets: ctx.setsByWe.get(we.id) ?? [],
@@ -249,7 +260,7 @@ async function generateDay(
         isDeload: ctx.nextMicro.is_deload,
       },
       goal: ctx.goal,
-      equipmentType: ctx.equipmentByExercise.get(we.exercise_id) ?? "other",
+      equipmentType: equipment,
       profile: ctx.profile,
       muscleGroupWeeklySets: we.muscle_group_id
         ? (ctx.mgWeeklySets.get(we.muscle_group_id) ?? null)
@@ -257,7 +268,18 @@ async function generateDay(
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
       strengthAnchor: ctx.anchorsByExercise.get(we.exercise_id) ?? null,
     });
-    const output = prescribe(inputs, ctx.params);
+    // effective params = global active + this user×exercise increment override
+    // (doc 14 §6.1); the override also feeds the row's fingerprint token below.
+    const override = ctx.overrideByExercise.get(we.exercise_id) ?? null;
+    const output = prescribe(
+      inputs,
+      resolveEffectiveParams(
+        ctx.params,
+        override,
+        toEngineEquipment(equipment),
+        ctx.profile.units,
+      ),
+    );
     decisions.push({ inputs, output, sourceWeId: we.id, exerciseId: we.exercise_id });
     deltas.push({
       exerciseName: ctx.nameByExercise.get(we.exercise_id) ?? "Exercise",
@@ -281,9 +303,10 @@ async function generateDay(
       // freshness fingerprint over the config projection (doc 14): lets the
       // read-path reconcile detect when an input changed without re-running the
       // engine, and recompute only the rows that diverged.
-      dep_fingerprint: computeDepFingerprint(configProjection(inputs), {
-        version: ctx.paramsVersion,
-      }),
+      dep_fingerprint: computeDepFingerprint(
+        configProjection(inputs),
+        paramsTokenFor(ctx.paramsVersion, override?.weightIncrement),
+      ),
     };
   });
 
@@ -660,6 +683,11 @@ export async function advanceWeekAfterWorkout(
     exerciseIds,
     params,
   );
+  const overrideByExercise = await getExerciseParamOverrides(
+    service,
+    userId,
+    exerciseIds,
+  );
 
   const setsByWe = new Map<string, LoggedSetRow[]>();
   for (const s of sets ?? []) {
@@ -693,6 +721,7 @@ export async function advanceWeekAfterWorkout(
       (exercises ?? []).map((e) => [e.id, e.equipment_type]),
     ),
     nameByExercise: new Map((exercises ?? []).map((e) => [e.id, e.name])),
+    overrideByExercise,
   };
 
   // -------------------------------------------------------------------------
@@ -1092,7 +1121,16 @@ export async function projectNextPrescription(
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,
   });
-  const output = prescribe(inputs, params);
+  const override = await getExerciseIncrementOverride(supabase, userId, exerciseId);
+  const output = prescribe(
+    inputs,
+    resolveEffectiveParams(
+      params,
+      override == null ? null : { weightIncrement: override },
+      toEngineEquipment(exercise.equipment_type),
+      profile.units,
+    ),
+  );
 
   return {
     exercise_id: exerciseId,

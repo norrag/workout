@@ -6,6 +6,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createCustomExercise } from "@/lib/queries/exercises";
 import { clearPinnedNote, savePinnedNote } from "@/lib/queries/logging";
+import {
+  clearExerciseIncrementOverride,
+  setExerciseIncrementOverride,
+} from "@/lib/queries/exercise-overrides";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -37,6 +41,41 @@ export async function setPinnedNoteAction(input: {
   if (body) await savePinnedNote(supabase, user.id, parsed.exercise_id, body);
   else await clearPinnedNote(supabase, user.id, parsed.exercise_id);
   revalidatePath(`/exercises/${parsed.exercise_id}`);
+}
+
+const incrementOverrideSchema = z.object({
+  exercise_id: z.string().uuid(),
+  // the per-set load step in the user's units; null clears the override (default).
+  // capped well above any sane plate jump so a fat-fingered value can't poison the
+  // engine; the engine clamps/rounds regardless.
+  weight_increment: z.number().positive().max(1000).nullable(),
+});
+
+/**
+ * Set or clear this user's editable weight increment for one exercise (doc 14
+ * phase 3). The new value differs from the fingerprint the stored prescriptions
+ * carry, so the read-path reconcile recomputes exactly this exercise's open rows
+ * on the next view — no eager invalidation needed. Revalidates the exercise page
+ * and the workout surface where prescriptions are shown.
+ */
+export async function setIncrementOverrideAction(input: {
+  exercise_id: string;
+  weight_increment: number | null;
+}): Promise<void> {
+  const parsed = incrementOverrideSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  if (parsed.weight_increment == null) {
+    await clearExerciseIncrementOverride(supabase, user.id, parsed.exercise_id);
+  } else {
+    await setExerciseIncrementOverride(
+      supabase,
+      user.id,
+      parsed.exercise_id,
+      parsed.weight_increment,
+    );
+  }
+  revalidatePath(`/exercises/${parsed.exercise_id}`);
+  revalidatePath("/workout");
 }
 
 const customExerciseSchema = z.object({

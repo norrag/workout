@@ -3,9 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getExerciseHistory } from "@/lib/queries/history";
 import { getExerciseOverview } from "@/lib/queries/exercises";
+import { getActiveEngineParams } from "@/lib/queries/generation";
+import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
+import { incrementFor, toEngineEquipment } from "@/lib/engine";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
+import { ExerciseSettingsMenu } from "./ExerciseSettingsMenu";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -70,8 +74,11 @@ export default async function ExerciseDetailPage({
     { data: links, error: linkError },
     { data: groups, error: groupError },
     { data: pinned, error: pinnedError },
+    { data: profile, error: profileError },
     overview,
     history,
+    activeParams,
+    incrementOverride,
   ] = await Promise.all([
     supabase.from("exercise_muscle_groups").select("*").eq("exercise_id", exercise.id),
     supabase.from("muscle_groups").select("*"),
@@ -84,12 +91,28 @@ export default async function ExerciseDetailPage({
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("experience_level, units")
+      .eq("id", user.id)
+      .single(),
     getExerciseOverview(supabase, user.id, exercise.id),
     getExerciseHistory(supabase, user.id, exercise.id),
+    getActiveEngineParams(supabase),
+    getExerciseIncrementOverride(supabase, user.id, exercise.id),
   ]);
   if (linkError) throw linkError;
   if (groupError) throw groupError;
   if (pinnedError) throw pinnedError;
+  if (profileError) throw profileError;
+
+  // engine default load step for this exercise/user, for the settings editor
+  const defaultStep = incrementFor(
+    toEngineEquipment(exercise.equipment_type),
+    profile.experience_level ?? "beginner",
+    profile.units,
+    activeParams.params,
+  );
 
   const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]));
   const primary = (links ?? []).find((l) => l.role === "primary");
@@ -115,12 +138,20 @@ export default async function ExerciseDetailPage({
 
   return (
     <div>
-      <Link
-        href="/exercises"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
-      >
-        ‹ EXERCISES
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          href="/exercises"
+          className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        >
+          ‹ EXERCISES
+        </Link>
+        <ExerciseSettingsMenu
+          exerciseId={exercise.id}
+          units={profile.units}
+          defaultStep={defaultStep}
+          override={incrementOverride}
+        />
+      </div>
       <div className="mt-3 flex items-end justify-between">
         <h1 className="text-[28px] font-extrabold leading-none tracking-[-0.02em]">
           {exercise.name}

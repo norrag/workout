@@ -9,6 +9,7 @@ import {
   buildSeedInputs,
   computeDepFingerprint,
   configProjection,
+  paramsTokenFor,
   DERIVED_INPUT_KEYS,
   type ConfigInputArgs,
 } from "../fingerprint";
@@ -161,6 +162,55 @@ describe("computeDepFingerprint", () => {
     expect(computeDepFingerprint(configProjection(a), token)).toBe(
       computeDepFingerprint(configProjection(b), token),
     );
+  });
+});
+
+describe("paramsTokenFor — increment override (doc 14 phase 3)", () => {
+  const c = buildConfigInputs(configArgs());
+
+  it("no override ⇒ token is byte-identical to the bare { version } (no churn)", () => {
+    // the central guarantee: adding the override surface must not move the
+    // fingerprint of the (vast) majority of rows that have no override.
+    expect(paramsTokenFor(9)).toEqual({ version: 9 });
+    expect(paramsTokenFor(9, null)).toEqual({ version: 9 });
+    expect(paramsTokenFor(9, undefined)).toEqual({ version: 9 });
+    expect(computeDepFingerprint(c, paramsTokenFor(9, null))).toBe(
+      computeDepFingerprint(c, { version: 9 }),
+    );
+  });
+
+  it("an override moves the fingerprint, and a different override moves it again", () => {
+    const base = computeDepFingerprint(c, paramsTokenFor(9, null));
+    const o5 = computeDepFingerprint(c, paramsTokenFor(9, 5));
+    const o10 = computeDepFingerprint(c, paramsTokenFor(9, 10));
+    expect(o5).not.toBe(base);
+    expect(o10).not.toBe(base);
+    expect(o5).not.toBe(o10);
+  });
+
+  it("clearing an override (back to null) restores the original fingerprint", () => {
+    const base = computeDepFingerprint(c, paramsTokenFor(9, null));
+    const cleared = computeDepFingerprint(c, paramsTokenFor(9, null));
+    expect(cleared).toBe(base);
+  });
+
+  it("scope falls out of the fingerprint: only the overridden exercise diverges (doc 14 §7)", () => {
+    // model the reconcile's per-row check: two open rows for two exercises, both
+    // stamped under no override. Editing exercise A's increment moves ONLY A's
+    // expected fingerprint; B (no override) still matches its stamp and is skipped.
+    const version = 9;
+    const configA = buildConfigInputs({ ...configArgs(), equipmentType: "barbell" });
+    const configB = buildConfigInputs({ ...configArgs(), equipmentType: "dumbbell" });
+    // stamped at generation, neither overridden
+    const stampedA = computeDepFingerprint(configA, paramsTokenFor(version, null));
+    const stampedB = computeDepFingerprint(configB, paramsTokenFor(version, null));
+
+    // user sets a +10 increment override on exercise A only
+    const expectedA = computeDepFingerprint(configA, paramsTokenFor(version, 10));
+    const expectedB = computeDepFingerprint(configB, paramsTokenFor(version, null));
+
+    expect(expectedA).not.toBe(stampedA); // A diverges → recompute
+    expect(expectedB).toBe(stampedB); // B unchanged → short-circuit
   });
 });
 
