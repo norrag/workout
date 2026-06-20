@@ -7,7 +7,7 @@ import {
   MCP_SERVER_VERSION,
 } from "@/lib/mcp/server";
 import { verifyMcpToken } from "@/lib/mcp/auth";
-import { RateLimiter } from "@/lib/mcp/rate-limit";
+import { RateLimiter, DEFAULT_MAX_KEYS } from "@/lib/mcp/rate-limit";
 
 // The connector talks to the LLM and Supabase; it must run on Node (not Edge).
 export const runtime = "nodejs";
@@ -38,11 +38,14 @@ const authedHandler = withMcpAuth(handler, verifyMcpToken, { required: true });
 
 // Per-token rate limit (05 §Safeguards). Keyed by a hash of the bearer token so
 // one client can't exhaust the connector; unauthenticated requests are keyed by
-// IP. Defaults to 120 req/min, overridable via MCP_RATE_LIMIT. See
+// IP. Defaults to 120 req/min, overridable via MCP_RATE_LIMIT. The key map is
+// bounded (DEFAULT_MAX_KEYS, override via MCP_RATE_LIMIT_MAX_KEYS) so a spray of
+// unique bearer tokens can't exhaust instance memory. See
 // src/lib/mcp/rate-limit.ts for the per-instance caveat.
 const limiter = new RateLimiter(
   Number(process.env.MCP_RATE_LIMIT) || 120,
   60_000,
+  Number(process.env.MCP_RATE_LIMIT_MAX_KEYS) || DEFAULT_MAX_KEYS,
 );
 
 function clientKey(req: Request): string {

@@ -77,9 +77,25 @@ export async function verifyMcpToken(
   try {
     const { payload } = await jwtVerify(bearerToken, keySet(), {
       issuer: issuer(),
+      // Pin to the asymmetric algorithms Supabase's JWKS publishes (RFC 8725).
+      // Forbids `alg: none` and HS* signature-confusion against the public keys.
+      algorithms: ["RS256", "ES256", "EdDSA"],
+      // Audience binding (RFC 8707 / MCP resource-server requirement) is opt-in:
+      // set MCP_JWT_AUDIENCE to the resource identifier once the deployed token's
+      // `aud` is confirmed. Left unset, verification falls back to issuer-only.
+      ...(process.env.MCP_JWT_AUDIENCE
+        ? { audience: process.env.MCP_JWT_AUDIENCE }
+        : {}),
     });
     const sub = payload.sub;
     if (!sub) return undefined;
+
+    // Only genuine end-user access tokens are valid bearer credentials. Reject
+    // the project API keys (`anon` / `service_role`), which must never reach a
+    // user-scoped resource server even if they share the issuer/JWKS.
+    if (payload.role === "anon" || payload.role === "service_role") {
+      return undefined;
+    }
 
     const scope = typeof payload.scope === "string" ? payload.scope : "";
     const clientId =

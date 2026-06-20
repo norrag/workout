@@ -2,6 +2,48 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-20 (latest) — Security audit (Phase 7 hardening slice 2)
+
+Full state-of-the-art security audit of the whole surface (MCP OAuth resource
+server + tools, Supabase Auth/consent flow, middleware + server actions + route
+handlers, RLS schema, service-role usage, data-lifecycle flows, client XSS
+sinks, service worker, CI, dependencies). Findings + status recorded in
+[14-security-audit.md](14-security-audit.md). `main` deployable; no schema
+change. Existing 396 tests + 17 new = 413 passing; typecheck/lint/build green.
+
+### Fixed
+
+- **MCP rate-limiter memory-exhaustion DoS (HIGH).** The limiter runs pre-auth
+  keyed by `sha256(bearer_token)` and its `prune()` was never called, so a
+  unique-token spray grew the `windows` map without bound. `RateLimiter` now
+  prunes opportunistically (once/window) and enforces a hard `maxKeys` cap
+  (`DEFAULT_MAX_KEYS = 20_000`, override `MCP_RATE_LIMIT_MAX_KEYS`), rejecting
+  new keys fail-closed when full. `src/lib/mcp/rate-limit.ts` + `/api/mcp/route.ts`
+  (+4 tests).
+- **OAuth consent-decision CSRF (HIGH).** `POST /api/oauth/decision` is a
+  cookie-authenticated, state-changing route handler and does **not** get Server
+  Actions' built-in Origin check. Added `isSameOrigin()`
+  (`src/lib/http/same-origin.ts`) — cross-site posts get `403` via
+  `Sec-Fetch-Site` / `Origin`-vs-host (+6 tests).
+- **MCP token verification hardening (MEDIUM).** `verifyMcpToken` now pins
+  algorithms to `["RS256","ES256","EdDSA"]` (RFC 8725), rejects `anon` /
+  `service_role` project keys, and enforces `aud` when `MCP_JWT_AUDIENCE` is set
+  (RFC 8707, opt-in). `src/lib/mcp/auth.ts` (+8 tests).
+
+### Remaining / external
+
+- **Migrations don't apply to a clean DB (HIGH — human, rule #2).** The
+  `rls-tests` CI job has been red on every run: migration `20260611000001`
+  aborts because `is_admin()` is defined before `public.profiles` exists
+  (`check_function_bodies` validates the body), and `rls_auto_enable()` is
+  `revoke`d but never `CREATE`d (out-of-band hosted schema). This disables the
+  automated RLS guardrail for hard rule #1. Fixing safely means editing applied
+  migrations + reconciling the hosted function body — see
+  [deployment/manual-operations.md](deployment/manual-operations.md).
+- **Enable `MCP_JWT_AUDIENCE`** once the deployed OAuth token's `aud` is confirmed.
+- Audit gaps (rejected destructive ops + admin inspection), cross-user
+  regeneration scoping test, `import-history.py` anon-grant rework, redeem
+  throttle / share expiry, nonce CSP — all catalogued in 14-security-audit.md.
 ## 2026-06-20 (latest) — Connector endpoint: ignore misconfigured Vercel alias overrides
 
 Follow-up to the connector-URL fix below. Production still showed a brittle,
