@@ -20,7 +20,21 @@ alter function public.set_updated_at() set search_path = '';
 -- be invoked directly via /rest/v1/rpc/*.
 revoke execute on function public.set_updated_at() from public;
 revoke execute on function public.handle_new_user() from public;
-revoke execute on function public.rls_auto_enable() from public;
+-- rls_auto_enable() is referenced here but was never created by a migration, so
+-- an unguarded REVOKE aborts a clean `supabase db reset` ("function does not
+-- exist"). Guard it: a no-op where the function is absent, an identical revoke
+-- where it exists — drift-free either way.
+do $$
+begin
+  if exists (
+    select 1 from pg_proc
+    where proname = 'rls_auto_enable'
+      and pronamespace = 'public'::regnamespace
+  ) then
+    revoke execute on function public.rls_auto_enable() from public;
+  end if;
+end
+$$;
 revoke execute on function public.is_admin() from public;
 
 -- RLS policies call is_admin() as the authenticated role; keep it callable there.

@@ -158,7 +158,7 @@ export function segmentPhases(sessions: ExerciseSession[]): PhaseSegment[] {
     segments.push({
       goal_type: run[0].goal_type,
       sessions: run.length,
-      first_e1rm: e1rms[0] ?? null,
+      first_e1rm: e1rms.length > 0 ? Math.round(e1rms[0]) : null,
       best_e1rm: e1rms.length > 0 ? Math.round(Math.max(...e1rms)) : null,
       latest_e1rm: e1rms.length > 0 ? Math.round(e1rms[e1rms.length - 1]) : null,
       span: { from: run[0].performed_on, to: run[run.length - 1].performed_on },
@@ -416,7 +416,10 @@ export function analyzeByDaySlot(
   }
   const out: DaySlotProgress[] = [];
   for (const [day_number, group] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
-    const estimable = group.filter((s) => s.e1rm != null);
+    // gate on the same predicate analyzeComparableProgress uses internally
+    // (e1rm AND confidence), so the reported `sessions` count can't disagree
+    // with progress.sessions for the same slot.
+    const estimable = group.filter((s) => s.e1rm != null && s.confidence != null);
     if (estimable.length < minSessions) continue;
     const positions = group
       .map((s) => s.session_position)

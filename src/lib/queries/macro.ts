@@ -461,6 +461,7 @@ export async function getMacroOverview(
     userId,
     (mesos ?? []).map((m) => m.id),
     summary ?? null,
+    params,
   );
 
   return {
@@ -547,6 +548,7 @@ async function buildMacroStats(
   userId: string,
   mesoIds: string[],
   summary: VMacroSummaryRow | null,
+  params: EngineParams,
 ): Promise<MacroStats> {
   const totalVolume = summary?.total_volume ?? 0;
   const sessionsLogged = summary?.sessions_logged ?? 0;
@@ -585,10 +587,11 @@ async function buildMacroStats(
       byExercise.set(row.exercise_id, cur);
     }
 
-    // key lifts = the three most-logged exercises (10 §7 frequency rule)
+    // key lifts = the most-logged exercises (10 §6 frequency rule); the count is
+    // the tunable params.key_lifts.n (default 5), not a hardcoded value
     const keyLifts = [...byExercise.entries()]
       .sort((a, b) => b[1].sessions - a[1].sessions)
-      .slice(0, 3);
+      .slice(0, params.key_lifts.n);
     const scores = keyLifts
       .map(([, v]) => scoreProgress(v.first, v.last))
       .filter((s): s is number => s != null);
