@@ -129,7 +129,7 @@ config the app already uses. Confirm these exist for **Production and Preview**
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL; also derives the JWT issuer + JWKS. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Used by the token-bound RLS client. |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service-role (audit writes, admin reads) — server-only. |
-| `NEXT_PUBLIC_APP_URL` | ⚠️ recommended | Shown as the endpoint on `/more/connector`; resource-URL fallback. Set to the prod domain `https://workout-zeta-murex.vercel.app`. When unset, `/more/connector` now falls back to that canonical domain in code (not the request host), so the copyable link is correct on any deployment alias. |
+| `NEXT_PUBLIC_APP_URL` | ⚠️ recommended | Shown as the endpoint on `/more/connector`; resource-URL fallback. Set to the prod domain `https://workout-zeta-murex.vercel.app`. When unset, `/more/connector` falls back to that canonical domain in code (not the request host). The page also **ignores** a value that is an auto-generated `*.vercel.app` deployment alias (only localhost / a real custom domain override is honored), so the copyable link stays canonical even if this is misconfigured. |
 | `MCP_AUTH_ISSUER` | optional | Override only if the AS issuer differs from `<url>/auth/v1`. Leave unset. |
 
 ## Step 4 — Deploy
@@ -199,4 +199,4 @@ curl -s -X POST $APP/api/mcp \
 | Client gets to a blank/404 page after "Authorize" | Consent UI not built (Step 2) or Authorization Path ≠ `/oauth/consent`. |
 | Redirect loop / "redirect not allowed" | App origin missing from Site URL / Redirect URLs (Step 1.4). |
 | `401 invalid_token` with a real token | Token issuer ≠ `<url>/auth/v1`, expired token, or `NEXT_PUBLIC_SUPABASE_URL` unset on the deployment. |
-| Endpoint shows a deployment-specific / preview host on `/more/connector` | `NEXT_PUBLIC_APP_URL` is set to a non-canonical value in Vercel; correct it to `https://workout-zeta-murex.vercel.app` (Step 3). When unset, the page falls back to the canonical domain in code. |
+| Endpoint shows a deployment-specific / preview host on `/more/connector` | `NEXT_PUBLIC_APP_URL` is set to a non-canonical custom-domain value in Vercel; correct it to `https://workout-zeta-murex.vercel.app` (Step 3). The page now ignores `*.vercel.app` alias overrides and falls back to the canonical domain in code, so this only surfaces if the override is a non-`vercel.app` host. |
