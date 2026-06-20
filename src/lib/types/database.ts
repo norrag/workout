@@ -15,6 +15,8 @@ type Defaulted =
   | "set_weights"
   // nullable freshness fingerprint; stamped by the engine/reconcile paths only
   | "dep_fingerprint"
+  // engine_decisions.kind defaults to 'advance' in the DB; seed writers pass it
+  | "kind"
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
@@ -383,6 +385,10 @@ export type EngineParamsRow = {
   updated_at: string;
 }
 
+/** which engine entry produced a decision (doc 14 §6.2): a week N→N+1 advance
+ *  (prescribe) or a cold-start seed (seedMeso). */
+export type EngineDecisionKind = "seed" | "advance";
+
 export type EngineDecisionRow = {
   id: string;
   user_id: string;
@@ -397,6 +403,7 @@ export type EngineDecisionRow = {
   params_version: number;
   params_hash: string | null;
   provenance: Record<string, unknown> | null;
+  kind: EngineDecisionKind;
   created_at: string;
 }
 

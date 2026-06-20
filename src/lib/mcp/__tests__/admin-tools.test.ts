@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_ENGINE_PARAMS,
   prescribe,
+  seedMeso,
   type EngineInputs,
   type EngineParams,
 } from "@/lib/engine";
+import { buildSeedInputs } from "@/lib/queries/fingerprint";
 import type { DecisionRecord } from "@/lib/queries/engine-admin";
 import {
   deepMerge,
@@ -89,9 +91,14 @@ describe("diffPrescription", () => {
 
 // --- replayDecisions -------------------------------------------------------
 
-function decision(inputs: Record<string, unknown>, output: Record<string, unknown>): DecisionRecord {
+function decision(
+  inputs: Record<string, unknown>,
+  output: Record<string, unknown>,
+  kind: DecisionRecord["kind"] = "advance",
+): DecisionRecord {
   return {
     id: "d1",
+    kind,
     workout_exercise_id: "we1",
     source_workout_exercise_id: "we0",
     exercise_id: "e1",
@@ -179,6 +186,43 @@ describe("replayDecisions", () => {
     const sampled = replayDecisions([stored], DEFAULT_ENGINE_PARAMS as EngineParams, 5);
     expect(sampled.unchanged_sample).toHaveLength(1);
     expect(sampled.outcomes.unchanged).toBe(1);
+  });
+
+  it("replays a seed decision through seedMeso, not prescribe (doc 14 §6.2)", () => {
+    // a meso seed with a prior peak: its stored output is the peak-backoff number.
+    const seedIn = buildSeedInputs({
+      equipmentType: "barbell",
+      profile: { experience_level: "intermediate", units: "lb" },
+      goal: "hypertrophy",
+      startRir: 3,
+      isDeload: false,
+      initial: { weight: 100, reps: 8, sets: 3 },
+      priorPeak: { weight: 200, reps: 5, sets: 3 },
+    });
+    const seedOut = seedMeso(
+      { weight: 200, reps: 5, sets: 3 },
+      { weight: 100, reps: 8, sets: 3 },
+      { equipmentType: "barbell" },
+      { experienceLevel: "intermediate", units: "lb" },
+      3,
+      DEFAULT_ENGINE_PARAMS,
+    );
+    const stored = decision(
+      seedIn as unknown as Record<string, unknown>,
+      seedOut as unknown as Record<string, unknown>,
+      "seed",
+    );
+    // dispatched to seedMeso → reproduces the stored output (unchanged). If it had
+    // wrongly run prescribe (cold start from `initial`, no backoff), it would diff.
+    const outcome = replayDecisions([stored], DEFAULT_ENGINE_PARAMS as EngineParams);
+    expect(outcome.changed).toBe(0);
+    expect(outcome.outcomes.unchanged).toBe(1);
+    expect(outcome.errors).toBe(0);
+
+    // sanity: the prescribe cold-start path would NOT match the seed output, so the
+    // dispatch genuinely mattered
+    const asAdvance = prescribe(seedIn as unknown as EngineInputs, DEFAULT_ENGINE_PARAMS);
+    expect(asAdvance.weight).not.toBe(seedOut.weight);
   });
 });
 

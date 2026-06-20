@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types/database";
 import {
   buildConfigInputs,
+  buildSeedInputs,
   computeDepFingerprint,
   configProjection,
   DERIVED_INPUT_KEYS,
@@ -160,5 +161,74 @@ describe("computeDepFingerprint", () => {
     expect(computeDepFingerprint(configProjection(a), token)).toBe(
       computeDepFingerprint(configProjection(b), token),
     );
+  });
+});
+
+describe("seed inputs (doc 14 §6.2)", () => {
+  const token = { version: 9 };
+  const seedBase = {
+    equipmentType: "barbell",
+    profile: { experience_level: "intermediate" as const, units: "lb" as const },
+    goal: "hypertrophy" as const,
+    startRir: 3,
+    isDeload: false,
+    initial: { weight: 100, reps: 8, sets: 3 },
+    priorPeak: { weight: 200, reps: 5, sets: 3 },
+  };
+
+  it("write/check parity: configProjection(buildSeedInputs(x)) === buildConfigInputs(its config half)", () => {
+    // a seed is stamped at write via configProjection(buildSeedInputs(...)) and
+    // checked via buildConfigInputs(...) in the reconcile — they must agree
+    const projected = configProjection(buildSeedInputs(seedBase));
+    const direct = buildConfigInputs({
+      equipmentType: seedBase.equipmentType,
+      profile: seedBase.profile,
+      goal: seedBase.goal,
+      week: { targetRir: seedBase.startRir, isDeload: seedBase.isDeload },
+      previous: null,
+      initial: seedBase.initial,
+    });
+    expect(projected).toEqual(direct);
+  });
+
+  it("fingerprint is INVARIANT to the prior peak (a derived field, doc 14 §6.4)", () => {
+    const withPeak = computeDepFingerprint(configProjection(buildSeedInputs(seedBase)), token);
+    const noPeak = computeDepFingerprint(
+      configProjection(buildSeedInputs({ ...seedBase, priorPeak: null })),
+      token,
+    );
+    const otherPeak = computeDepFingerprint(
+      configProjection(buildSeedInputs({ ...seedBase, priorPeak: { weight: 999, reps: 1, sets: 9 } })),
+      token,
+    );
+    expect(withPeak).toBe(noPeak);
+    expect(withPeak).toBe(otherPeak);
+  });
+
+  it.each([
+    ["initial", { initial: { weight: 105, reps: 8, sets: 3 } }],
+    ["startRir", { startRir: 1 }],
+    ["goal", { goal: "strength" as const }],
+    ["equipment", { equipmentType: "dumbbell" }],
+  ])("fingerprint changes when the %s config dimension changes", (_label, over) => {
+    const a = computeDepFingerprint(configProjection(buildSeedInputs(seedBase)), token);
+    const b = computeDepFingerprint(configProjection(buildSeedInputs({ ...seedBase, ...over })), token);
+    expect(a).not.toBe(b);
+  });
+
+  it("a seed (previous=null) is not confusable with an advance at the same scope", () => {
+    const seed = computeDepFingerprint(configProjection(buildSeedInputs(seedBase)), token);
+    const advance = computeDepFingerprint(
+      buildConfigInputs({
+        equipmentType: seedBase.equipmentType,
+        profile: seedBase.profile,
+        goal: seedBase.goal,
+        week: { targetRir: seedBase.startRir, isDeload: seedBase.isDeload },
+        previous: { weight: 185, reps: 5, sets: 3, targetRir: 3 },
+        initial: seedBase.initial,
+      }),
+      token,
+    );
+    expect(seed).not.toBe(advance);
   });
 });

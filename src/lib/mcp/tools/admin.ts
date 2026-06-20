@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   engineInputsSchema,
   prescribe,
+  seedMeso,
   type EngineParams,
   type Prescription,
 } from "@/lib/engine";
@@ -180,7 +181,26 @@ export function replayDecisions(
 
     let replayed: Prescription;
     try {
-      replayed = prescribe(parsed.data, candidateParams);
+      // replay the engine of the decision's kind (doc 14 §6.2) so a seed is
+      // re-run through seedMeso, not prescribe — otherwise every seed would
+      // diff spuriously against its stored output.
+      replayed =
+        d.kind === "seed"
+          ? seedMeso(
+              parsed.data.weekPeak
+                ? {
+                    weight: parsed.data.weekPeak.weight,
+                    reps: parsed.data.weekPeak.reps,
+                    sets: parsed.data.weekPeak.sets,
+                  }
+                : null,
+              parsed.data.initial,
+              parsed.data.exercise,
+              parsed.data.user,
+              parsed.data.week.targetRir,
+              candidateParams,
+            )
+          : prescribe(parsed.data, candidateParams);
     } catch {
       outcomes.execution_error += 1;
       continue;
@@ -391,6 +411,8 @@ function shapeDecisions(decisions: DecisionRecord[]): Record<string, unknown> {
     count: decisions.length,
     decisions: decisions.map((d) => ({
       decision_id: d.id,
+      // which engine produced it: "advance" (prescribe) or "seed" (seedMeso)
+      kind: d.kind,
       // linkage so a decision chains into get_exercise_history /
       // explain_prescription / exercise-filtered tools without a re-lookup
       exercise_id: d.exercise_id,

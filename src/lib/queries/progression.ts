@@ -28,7 +28,13 @@ import type {
   WorkoutRow,
 } from "@/lib/types/database";
 import { getActiveEngineParams } from "./generation";
+import { engineGoal, type EngineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
+
+// re-export so existing importers (regeneration.ts, callers) keep working while
+// the canonical definition lives in the leaf module (avoids a generation.ts ↔
+// progression.ts import cycle now that generation needs it for seed inputs).
+export { engineGoal, type EngineGoal } from "./engine-goal";
 
 /**
  * Week N → N+1 generation (07 Phase 4). Runs after a workout completes,
@@ -69,28 +75,6 @@ export interface AdvanceResult {
   /** where the NEXT button should land, when a workout exists to go to */
   nextWorkoutId: string | null;
   nextLabel: string | null;
-}
-
-type EngineGoal = "cut" | "strength" | "hypertrophy" | "maintain";
-
-/**
- * Map the macrocycle goal onto a progression-engine goal. Strength and
- * hypertrophy are now kept distinct (doc 13 §9.1) so the engine can pick a rep
- * window per goal; both still drive progressive overload, cut/maintain pass
- * through. Standalone mesos (no macro goal) default to the hypertrophy window.
- */
-export function engineGoal(macroGoal: MacroGoalType | null): EngineGoal {
-  switch (macroGoal) {
-    case "cut":
-      return "cut";
-    case "maintain":
-      return "maintain";
-    case "strength":
-      return "strength";
-    case "hypertrophy":
-    default:
-      return "hypertrophy";
-  }
 }
 
 /** Assemble pure engine inputs for one exercise from week-N rows. */
@@ -349,6 +333,9 @@ async function generateDay(
           params_version: ctx.paramsVersion,
           params_hash: paramsHash,
           provenance: decisionProvenance(d.inputs, codeSha),
+          // week N→N+1 progression (doc 14 §6.2); the read-path recompute replays
+          // these through prescribe().
+          kind: "advance" as const,
         })),
       );
     if (decisionError) throw decisionError;
