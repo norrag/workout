@@ -14,4 +14,17 @@
 -- status — no data leak). Its remaining advisor WARN is accepted as intentional.
 
 revoke execute on function public.handle_new_user() from anon, authenticated;
-revoke execute on function public.rls_auto_enable() from anon, authenticated;
+-- rls_auto_enable() was never created by a migration; guard the revoke so a
+-- clean rebuild doesn't abort on a missing function (drift-free — see
+-- 20260620000001).
+do $$
+begin
+  if exists (
+    select 1 from pg_proc
+    where proname = 'rls_auto_enable'
+      and pronamespace = 'public'::regnamespace
+  ) then
+    revoke execute on function public.rls_auto_enable() from anon, authenticated;
+  end if;
+end
+$$;

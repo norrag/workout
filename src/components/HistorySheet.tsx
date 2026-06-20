@@ -22,13 +22,29 @@ export function HistorySheet({
 }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
 
+  // `target` is a fresh object literal from the parent on every render, so key
+  // the fetch off the stable exercise id — not the object identity — to avoid a
+  // refetch on every parent re-render. Guard against stale/late responses (fast
+  // exercise switches) and a thrown action leaving the sheet stuck on "Loading…".
+  const targetId = target?.exercise_id ?? null;
   useEffect(() => {
-    if (!target) {
+    if (!targetId) {
       setEntries(null);
       return;
     }
-    getExerciseHistoryAction(target.exercise_id).then(setEntries);
-  }, [target]);
+    let ignore = false;
+    setEntries(null);
+    getExerciseHistoryAction(targetId)
+      .then((d) => {
+        if (!ignore) setEntries(d);
+      })
+      .catch(() => {
+        if (!ignore) setEntries([]);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [targetId]);
 
   if (!target) return null;
 
@@ -42,7 +58,7 @@ export function HistorySheet({
       {entries === null ? (
         <p className="py-4 text-sm text-ink/45">Loading…</p>
       ) : (
-        <ExerciseHistoryList entries={entries} />
+        <ExerciseHistoryList key={target.exercise_id} entries={entries} />
       )}
     </BottomSheet>
   );

@@ -2,7 +2,93 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Phase 7 hardening slice 1: security pass + data lifecycle
+## 2026-06-20 (latest) — Bug-hunt pass
+
+A focused defect sweep across the engine, queries, MCP layer, React/route layer,
+and SQL migrations (existing suite green at the outset — 396 tests, typecheck,
+lint — so these are logic/edge-case bugs the suite didn't cover). Six fixes
+landed; the rest of the sweep is recorded under **Reviewed, not changed** so the
+calls are auditable.
+
+### Fixed
+
+- **[CRITICAL] Broken migration chain — phantom `rls_auto_enable()`
+  (`supabase/migrations/20260620000001_*.sql`, `…0002_*.sql`).** Both security
+  migrations `revoke execute on function public.rls_auto_enable()`, but that
+  function is **never created by any migration** (the only DB functions are
+  `set_updated_at`, `is_admin`, `handle_new_user`; there are no event triggers
+  anywhere). Postgres errors on `REVOKE` against a missing function, so a clean
+  `supabase db reset` / fresh-project apply **aborts** at that statement — `main`
+  was not rebuildable from migrations. Guarded each revoke with a
+  `pg_proc` existence check so it's a no-op where the function is absent and an
+  identical revoke where it exists. **Deviation from hard rule #2 (append-only):**
+  these two migrations were edited rather than fixed-forward because the failing
+  `REVOKE` runs *before* any later migration could create the function, so
+  fix-forward cannot restore a clean rebuild. The edit is **drift-free** — every
+  database ends in the identical grant state; only "abort with error" becomes
+  "succeed."
+- **[HIGH] History sheet refetch storm + stale-response race + stuck spinner
+  (`src/components/HistorySheet.tsx`).** The fetch effect depended on the
+  `target` *object*, which both call sites (DayView, PlannerBoard) build as a
+  fresh literal every render — so it refetched on every parent re-render, never
+  cancelled in-flight requests (a slow response for exercise A could overwrite
+  B's after a quick switch), and had no `.catch` (a thrown server action — the
+  query throws on error — left the sheet on "Loading…" forever + an unhandled
+  rejection). Now keyed off the stable `exercise_id`, resets to the loading state
+  on switch, ignores stale responses, and surfaces errors as an empty list.
+- **[MEDIUM] History note state bleed across exercises
+  (`src/components/HistorySheet.tsx` → `ExerciseHistoryList`).** `openNote` is
+  keyed by positional index (`gi-ri`); because the sheet reuses the list instance
+  while swapping `entries` between exercises, an expanded note at a position
+  carried over to whichever exercise next occupied that position. Fixed by
+  remounting per exercise (`key={target.exercise_id}`).
+- **[LOW] Macro "Est. strength" ignored the key-lift tunable
+  (`src/lib/queries/macro.ts`).** `buildMacroStats` hard-coded the **3** most-
+  logged lifts; doc 10 §6 defines the count as `params.key_lifts.n` (**default
+  5**) and the param was never read. Threaded the active params through (already
+  in scope at the caller) and used `params.key_lifts.n`. (The §6 "best e1RM vs
+  start" wording vs the code's first/last-session endpoints is genuinely
+  ambiguous, so that computation was left as-is — see below.)
+- **[LOW] Inconsistent e1RM rounding in a phase segment
+  (`src/lib/analysis/comparability.ts`).** `segmentPhases` rounded `best_e1rm`
+  and `latest_e1rm` but passed `first_e1rm` through raw, so a single segment could
+  mix `100.4` with `103`; any first→latest delta computed off it was off by a
+  fraction. Now rounds `first_e1rm` to match its siblings.
+- **[LOW] Day-slot session count could disagree with its own trend
+  (`src/lib/analysis/comparability.ts`).** `analyzeByDaySlot` gated/reported
+  `sessions` on `e1rm != null`, but the `analyzeComparableProgress` it delegates
+  to filters on `e1rm != null && confidence != null`; a slot whose sessions had
+  an e1RM but null confidence reported e.g. `sessions: 2` next to
+  `progress: insufficient_data`. Aligned the gate to the same predicate.
+
+### Reviewed, not changed (calls recorded for audit)
+
+- **SQL e1RM is Epley-only on raw reps**, vs the engine's averaged
+  Epley/Brzycki on effective reps (doc 10 §1). Left as-is: per doc 11 the app
+  does **not** capture per-set RIR (`rir_reported` is logged `null`), so the only
+  live divergence is the Brzycki-averaging term (~1–2 % on a *trend* metric), and
+  the formula is **internally consistent** across the SQL views, `stats.ts`, and
+  MCP by deliberate design. Changing four shared views moves every user's
+  displayed number and needs product sign-off + golden updates — a spec decision,
+  not a bug fix.
+- **`best_e1rm` views take an unconditional `max`** (no high/moderate-confidence
+  filter, doc 10 §1/§6). Same reasoning — consistent across the stack, behavioural
+  change, deferred to a deliberate metrics pass.
+- **`v_meso_week_sets` / `v_muscle_group_volume` credit only the primary muscle**
+  (no 0.5 secondary, doc 10 §2). Consistent across the SQL+TS path;
+  `v_muscle_group_volume` currently has no live consumer. A fractional-volume
+  redesign is a metrics decision, not a drive-by fix.
+- **MCP issuer env-var split** — `.well-known/oauth-protected-resource` advertises
+  `MCP_AUTH_ISSUER || issuer()` while `auth.ts` validates `iss` against
+  `SUPABASE_JWT_ISSUER || <supabase-url>/auth/v1`. A latent misconfiguration
+  footgun (set only `MCP_AUTH_ISSUER` ⇒ advertised auth server ≠ validated
+  issuer ⇒ 401s). Left untouched: the "right" single-source depends on deployment
+  intent, and editing token validation blindly risks breaking a working connector.
+- **DayView reps/LOG tap ordering** (`log/[workoutId]/DayView.tsx`) — not a bug
+  under React 18/19: discrete events (blur, click) flush synchronously between
+  native dispatches, so the LOG handler reads the post-blur predicted reps.
+
+## 2026-06-20 — Phase 7 hardening slice 1: security pass + data lifecycle
 
 First slice of [07 Phase 7](07-implementation-plan.md) (production hardening).
 Covers the parts doable from a Claude session: the security pass (DB advisor
