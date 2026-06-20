@@ -2,7 +2,81 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Fix the copyable MCP link on `/more/connector`
+## 2026-06-20 (latest) — Phase 7 hardening slice 1: security pass + data lifecycle
+
+First slice of [07 Phase 7](07-implementation-plan.md) (production hardening).
+Covers the parts doable from a Claude session: the security pass (DB advisor
+findings, headers, MCP rate limiting, service-role audit) and the data-lifecycle
+More-tab rows (CSV export + account deletion). `main` deployable; two
+append-only DDL migrations (grants/search_path only — no table/column/RLS-policy
+change, so no type regen).
+
+### Done
+
+- **Security headers (`next.config.ts`).** `headers()` now sets
+  `Strict-Transport-Security` (2y, preload), `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+  strict-origin-when-cross-origin`, a `Permissions-Policy` denying
+  camera/mic/geolocation/FLoC, and `Content-Security-Policy: frame-ancestors
+  'none'` on every route. No full CSP yet — Next's inline runtime needs nonces to
+  avoid breakage; clickjacking is covered by frame-ancestors + X-Frame-Options.
+- **DB function hardening (migrations `20260620000001` + `...0002`, applied to
+  hosted).** Cleared the Supabase **security advisor** WARNs: pinned
+  `set_updated_at()`'s `search_path` (the one mutable-path finding), and revoked
+  the direct PostgREST-RPC `EXECUTE` grant on the pure trigger / event-trigger
+  helpers `handle_new_user()` and `rls_auto_enable()` from `anon` +
+  `authenticated` (triggers fire regardless of grants — behaviour-preserving).
+  Advisor security findings went **8 → 3**. The remaining three are intentional /
+  external: `is_admin()` (anon+authenticated) is kept executable because RLS
+  policies on `engine_params`/`engine_decisions`/`mcp_write_audit` call it as the
+  querying role and it leaks only the caller's own admin status; the
+  leaked-password toggle is a dashboard step (see manual-operations). Verified
+  `is_admin()` still executable by `authenticated` (admin RLS intact) and the two
+  helpers no longer callable by anon/authenticated.
+- **MCP rate limiting (`src/lib/mcp/rate-limit.ts` + `/api/mcp/route.ts`).**
+  Fixed-window limiter (default 120 req/min, `MCP_RATE_LIMIT` override) keyed by a
+  sha256 of the bearer token (IP fallback when unauthenticated); over-limit
+  requests get a JSON-RPC `429` with `Retry-After`. Pure `RateLimiter` class with
+  an injected clock (+5 tests). Documented caveat: per-instance on serverless (no
+  Redis — SSE/Redis is intentionally off per 05 §Transport); caps a single client
+  hammering one warm instance, a global limiter would need a shared store later.
+- **Service-role usage audit.** Reviewed every `createServiceClient` call site
+  (`audit.ts`, `admin.ts` regeneration, `workout`/`log`/`share` actions, and the
+  new `deleteAccount`): each derives the user id from the **server session /
+  verified token** and passes it explicitly to scoped queries — never from input.
+  The one cross-user path (`applyRegeneration`) is the admin-gated tuning tool by
+  design. Compliant with hard rule #4.
+- **Data lifecycle — CSV export.** The More-tab "Export training data" row is now
+  a working `/more/export` download: `buildTrainingExportCsv` streams the user's
+  full logged-set history (paginated past the PostgREST 1000-row cap, RLS-scoped,
+  no service role) as a flat denormalized CSV (date · meso · week · deload ·
+  target RIR · day · exercise · set · type · warmup · weight · unit · reps ·
+  reported RIR · notes). Pure RFC-4180 `buildCsv`/`csvEscape` (`src/lib/csv.ts`,
+  +5 tests).
+- **Data lifecycle — account deletion.** New `/more/delete-account` danger-zone
+  page with a **type-DELETE-to-confirm** gate. The server action deletes the auth
+  user via the service client (scoped to the caller's own id), which **cascades**
+  to every user-owned table (verified against the live FK graph: all reference
+  `auth.users` `on delete cascade`), then signs out and redirects to sign-in.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (396/396, +10), `npm run
+build` all green. Both migrations applied to hosted and re-checked with
+`get_advisors` (8 → 3) and `has_function_privilege`. New routes build
+(`/more/delete-account`, `/more/export`). On-device walkthroughs (download the
+CSV; delete a throwaway account) are the owner's check.
+
+### Remaining Phase 7 (external / on-device — see manual-operations.md)
+
+- **Enable Supabase leaked-password protection** (Auth dashboard toggle).
+- **Observability:** wire Sentry (needs a DSN env var) + structured logging review.
+- **Performance/Lighthouse PWA ≥ 90** and the **accessibility audit** on the
+  logging flow — both want a real device/CI Lighthouse run, not a sandbox.
+- **Production deploy, custom domain, smoke checklist.**
+- Final design QA pass against 08 + mockups for empty/edge states.
+
+## 2026-06-20 — Fix the copyable MCP link on `/more/connector`
 
 The AI-connector setup page (`src/app/(app)/more/connector/page.tsx`) showed the
 wrong endpoint to copy. It derived the origin from `NEXT_PUBLIC_APP_URL` and,

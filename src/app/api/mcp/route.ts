@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import {
   initializeMcpServer,
@@ -6,6 +7,7 @@ import {
   MCP_SERVER_VERSION,
 } from "@/lib/mcp/server";
 import { verifyMcpToken } from "@/lib/mcp/auth";
+import { RateLimiter } from "@/lib/mcp/rate-limit";
 
 // The connector talks to the LLM and Supabase; it must run on Node (not Edge).
 export const runtime = "nodejs";
@@ -34,4 +36,51 @@ const handler = createMcpHandler(
 // client follows to discover the Supabase OAuth authorization server.
 const authedHandler = withMcpAuth(handler, verifyMcpToken, { required: true });
 
-export { authedHandler as GET, authedHandler as POST };
+// Per-token rate limit (05 §Safeguards). Keyed by a hash of the bearer token so
+// one client can't exhaust the connector; unauthenticated requests are keyed by
+// IP. Defaults to 120 req/min, overridable via MCP_RATE_LIMIT. See
+// src/lib/mcp/rate-limit.ts for the per-instance caveat.
+const limiter = new RateLimiter(
+  Number(process.env.MCP_RATE_LIMIT) || 120,
+  60_000,
+);
+
+function clientKey(req: Request): string {
+  const auth = req.headers.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    return "t:" + createHash("sha256").update(auth.slice(7)).digest("hex");
+  }
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return "ip:" + ip;
+}
+
+async function withRateLimit(
+  req: Request,
+  next: (req: Request) => Promise<Response> | Response,
+): Promise<Response> {
+  const now = Date.now();
+  const result = limiter.check(clientKey(req), now);
+  if (!result.allowed) {
+    return new Response(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        error: { code: -32029, message: "Rate limit exceeded" },
+        id: null,
+      }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.ceil(result.retryAfterMs / 1000)),
+        },
+      },
+    );
+  }
+  return next(req);
+}
+
+const GET = (req: Request) => withRateLimit(req, authedHandler);
+const POST = (req: Request) => withRateLimit(req, authedHandler);
+
+export { GET, POST };

@@ -41,6 +41,7 @@ domain, or an Auth-config change** is a human step.
 | Set **Site URL** / **Redirect URLs** | Authentication → URL Configuration | Must include the deployed app origin (and `http://localhost:3000` for local). |
 | **JWT signing keys** (asymmetric ES256) | Authentication → Signing Keys | Already enabled (ES256 JWKS is live). Required for OAuth/JWKS validation. |
 | Rotate **service-role / anon keys** | Project Settings → API | Never exposed to Claude; update Vercel + local `.env` after rotation. |
+| Enable **leaked-password protection** | Authentication → Policies (Password security) | Phase 7 security pass: checks new passwords against HaveIBeenPwned. The last open Supabase security-advisor WARN that needs a dashboard toggle (the function-grant findings were fixed in migrations `20260620000001/0002`). |
 
 ### Vercel (dashboard: project `workout`, team `garron-duprees-projects`)
 
@@ -48,7 +49,9 @@ domain, or an Auth-config change** is a human step.
 |---|---|---|
 | Set/edit **Environment Variables** | Project → Settings → Environment Variables | See the env table in [mcp-connector-setup.md](mcp-connector-setup.md). Set for Production **and** Preview. |
 | **Git integration** (prod = `main`, preview = PRs) | Project → Settings → Git | Already connected. |
-| **Custom domain** | Project → Settings → Domains | Affects the connector endpoint URL + Supabase Site URL. |
+| **Custom domain** | Project → Settings → Domains | Affects the connector endpoint URL + Supabase Site URL. Phase 7 launch step. |
+| Set **`SENTRY_DSN`** (observability) | Project → Settings → Environment Variables | Phase 7 observability: required before the Sentry wiring reports. Optional `MCP_RATE_LIMIT` overrides the 120 req/min connector default. |
+| Run **Lighthouse PWA** + **a11y** audit | A real device / CI, not the sandbox | Phase 7 performance + accessibility pass (target PWA ≥ 90, logging-flow a11y). |
 
 ### Local machine (for `supabase start` / e2e / RLS tests)
 

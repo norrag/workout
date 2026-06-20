@@ -185,13 +185,13 @@ replays a real meso against it, sees the diff, and activates — all via MCP, no
 
 **Goal:** production quality, end to end.
 
-- [ ] Security pass: RLS audit (Supabase advisors), service-role usage audit, MCP rate limiting, headers
-- [ ] Performance pass: bundle, query plans on hot paths, Lighthouse PWA ≥ 90 (installability + fast shell; offline support not required beyond a clean "no connection" state)
-- [ ] Error handling/observability: structured logging, Sentry (or equivalent), Supabase log review
-- [ ] Accessibility audit on the logging flow (≥44px targets, one-thumb reach, slider keyboard support)
-- [ ] Data lifecycle: account deletion + CSV export (the More-tab row)
+- [x] Security pass: RLS audit (Supabase advisors), service-role usage audit, MCP rate limiting, headers. *(2026-06-20: security headers in `next.config.ts`; DB function-hardening migrations `20260620000001`/`...0002` cleared the advisor function WARNs (8 → 3 — remaining `is_admin` is intentional, leaked-password is a dashboard toggle); per-token MCP rate limiter (`src/lib/mcp/rate-limit.ts`, 429 + Retry-After); service-role call-site audit clean (every site server-derives + scopes the user id). **External:** enable Supabase leaked-password protection.)*
+- [ ] Performance pass: bundle, query plans on hot paths, Lighthouse PWA ≥ 90 (installability + fast shell; offline support not required beyond a clean "no connection" state). *(Responsiveness slices 1–2 already shipped — set-logging hot path, nav skeletons, request dedup. On-device Lighthouse run remains.)*
+- [ ] Error handling/observability: structured logging, Sentry (or equivalent), Supabase log review. *(Sentry needs a DSN env var — external; see manual-operations.)*
+- [ ] Accessibility audit on the logging flow (≥44px targets, one-thumb reach, slider keyboard support). *(Wants a real-device pass.)*
+- [x] Data lifecycle: account deletion + CSV export (the More-tab row). *(2026-06-20: `/more/export` CSV download via `buildTrainingExportCsv` (RLS-scoped, paginated); `/more/delete-account` type-to-confirm → service-role `deleteUser`, cascades all user data.)*
 - [ ] Final design QA against 08 + mockups; empty/edge states (no active meso, all-complete resting state)
-- [ ] Production deploy, custom domain, smoke checklist
+- [ ] Production deploy, custom domain, smoke checklist. *(Human steps — see manual-operations.)*
 
 **Accept:** real users can be onboarded; the daily loop, engine, and MCP connector all work in production with monitoring in place.
 
