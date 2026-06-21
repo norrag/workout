@@ -115,8 +115,9 @@ slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 > per-exercise token, and recomputes diverged rows under effective params). The
 > recompute decision's `provenance.dependencies.incrementOverride` records the value
 > for `explain_prescription`. Editor on the Exercise page behind the mockup's header
-> `⋯` (fig 3.1a): a "Load step" sheet of step chips + "USE DEFAULT", server action
-> `setIncrementOverrideAction`. **Deviations as built:** (a) the override is the BASE
+> `⋯` (fig 3.1a): a "Load step" sheet of step chips + a CUSTOM free-typed step (any
+> positive value up to the action cap, for exercises whose jump the presets don't
+> cover) + "USE DEFAULT", server action `setIncrementOverrideAction`. **Deviations as built:** (a) the override is the BASE
 > increment (the same level `engine_params.increment` sits at), so
 > `experience_increment_scale` still composes on top — at the default intermediate
 > scale (1.0) the override is the literal step; (b) under the active v9 params

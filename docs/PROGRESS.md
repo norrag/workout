@@ -2,7 +2,45 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-21 (latest) — Prescription freshness: close the two gaps that left rows stale (doc 14 §5/§6.2/§6.3/§10)
+## 2026-06-21 (latest) — Custom weight increment: free-typed load step on the Exercise page
+
+The editable weight increment (doc 14 phase 3) shipped as a fixed chip picker —
+presets (lb: 2.5/5/10/15/25, kg: 1/2.5/5/7.5/10) ∪ the engine default ∪ the
+current override. Exercises with an unusual jump the presets don't cover (an odd
+machine stack, a 1.25 lb micro-plate pair, a 3.75 kg loadable) had no way in: you
+could only pick a preset. This adds a **CUSTOM** affordance to the "Load step"
+sheet so any positive step can be entered directly.
+
+This is a **UI-only** change — the persistence path already accepted arbitrary
+values end to end. `setIncrementOverrideAction` validates
+`z.number().positive().max(1000)`, the `exercise_param_overrides.weight_increment`
+column is `numeric check (> 0)`, and `resolveEffectiveParams` folds whatever value
+is stored into `params.rounding`/`params.increment`. The picker was the only thing
+restricting the input to presets.
+
+### Done
+
+- **CUSTOM chip + inline number field (`ExerciseSettingsMenu.tsx`).** A dashed
+  CUSTOM chip (planned/empty affordance per hard rule #7) sits after the preset
+  chips; selecting it reveals a `+ [number] {unit}` field (mirrors the
+  CreateMacroForm custom-duration pattern). The chips list is now presets ∪ default
+  only — a custom override no longer masquerades as a preset chip; instead, opening
+  the sheet on an exercise whose override isn't a preset seeds CUSTOM mode with the
+  field prefilled. `parseStep` accepts a finite value in `(0, 1000]` (matching the
+  action cap); an out-of-range entry shows an inline note and disables SAVE.
+  "USE DEFAULT" still clears the override.
+- **No schema, query, action, or engine change.** The value flows through the
+  existing `setIncrementOverrideAction` → `setExerciseIncrementOverride` →
+  fingerprint/reconcile path unchanged, so a custom step makes exactly that
+  exercise's open rows go stale on the next read, same as a preset.
+
+### Verified
+
+`npm run typecheck`, `npm run lint` green. No engine/query tests touched (behavior
+unchanged below the UI); the existing `exercise-overrides`/`effective-params`/
+`fingerprint` suites already cover non-preset increment values.
+
+## 2026-06-21 — Prescription freshness: close the two gaps that left rows stale (doc 14 §5/§6.2/§6.3/§10)
 
 Fixes the regression where a stale prescription could never be brought current.
 Two real gaps remained after phases 1–4, both surfaced by a concrete case: **W3·D4**,
