@@ -3241,3 +3241,28 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
   seeds are marked current). Behavior is unchanged — same rows refreshed, same
   numbers; only the steady-state cost drops from a multi-query + anchor recompute to
   a single read. Full suite green (416), typecheck + lint clean.
+
+- **Freshness gap: a decision-less planned day in the middle of imported history
+  was re-seeded instead of advanced (the "W3·D4" bug).** Importing a meso's
+  completed history while leaving one mid-stream day `planned` (the next workout to
+  do) produced a `workout_exercises` row with no `engine_decisions` row. The
+  generation gap-heal (`planCatchUp`) skips it — the day already exists, so nothing
+  is "missing" — and the per-completion advance never reached it either (its
+  prior-week sibling pre-existed). The read-path reconcile then backfilled it as a
+  **seed** (doc 14 §6.3, `kind = decision?.kind ?? "seed"`), repricing it off the
+  prior-*meso* peak and discarding the in-meso week N-1 → N progression: a week-3
+  leg day showed week-1 seed loads instead of numbers progressed from the completed
+  week-2 same day. Fix (doc 14 §7c): `reconcilePrescriptions` now detects a
+  decision-less open row in week N>1 whose week-(N-1) same-day, same-exercise
+  counterpart is completed and backfills it as an **advance** — rebuilding the
+  engine's derived history from that counterpart's logged sets + feedback via the
+  same `buildEngineInputs` / `weeklySetsByGroup` / `peakByExercise` the generation
+  path uses, then running the advance recompute (refreshes the anchor, overlays live
+  config). Only a row with no completed prior-week counterpart stays a cold-start
+  seed. The routing boundary is the pure, unit-tested `advanceSourceKey` (week 1 →
+  seed; week N → its prior-week source key). The extra source-history reads run only
+  when such a row exists (rare). One verified instance (a hosted W3·D4 leg day) was
+  also corrected in place: its five planned, unlogged prescriptions were rewritten
+  to the engine's W2·D4 → W3·D4 advance with matching `advance` decisions + fresh
+  `dep_fingerprint`s (validated against the same anchors the already-generated W4
+  days recorded). Full suite green (481), typecheck + lint clean.
