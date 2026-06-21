@@ -15,11 +15,22 @@ import type { Database, EngineDecisionKind } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "./logging";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseParamOverrides } from "./exercise-overrides";
-import { catchUpMesoGeneration } from "./progression";
+import {
+  catchUpMesoGeneration,
+  buildEngineInputs,
+  weeklySetsByGroup,
+  peakByExercise,
+} from "./progression";
 import { getMesoPlan } from "./cycles";
 import { createServiceClient } from "@/lib/supabase/service";
 import { engineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
+import type {
+  ExerciseFeedbackRow,
+  LoggedSetRow,
+  WorkoutExerciseRow,
+  WorkoutFeedbackRow,
+} from "@/lib/types/database";
 import {
   buildConfigInputs,
   computeDepFingerprint,
@@ -66,6 +77,21 @@ type Client = SupabaseClient<Database>;
 // old plan/applyRegeneration (doc 14 §10): same replay→classify→write, now keyed
 // on the dependency fingerprint instead of a params-version diff.
 // ---------------------------------------------------------------------------
+
+/**
+ * Pure: the lookup key for a decision-less open row's advance source — its
+ * week-(N-1) same-day, same-exercise counterpart (doc 14 §7c). Returns null in
+ * week 1, which has no prior week to advance from and so is a genuine cold-start
+ * seed. The format matches the `${week}:${day}:${exerciseId}` index built over
+ * the meso's completed workout_exercises, so a hit there IS the source row.
+ */
+export function advanceSourceKey(
+  weekNumber: number,
+  dayNumber: number,
+  exerciseId: string,
+): string | null {
+  return weekNumber <= 1 ? null : `${weekNumber - 1}:${dayNumber}:${exerciseId}`;
+}
 
 export type RecomputeStatus = "changed" | "unchanged" | "invalid_source";
 
@@ -336,7 +362,7 @@ export async function reconcilePrescriptions(
   const { data: wes, error: wesError } = await service
     .from("workout_exercises")
     .select(
-      "id, workout_id, exercise_id, prescribed_weight, prescribed_reps, prescribed_sets, target_rir, dep_fingerprint",
+      "id, workout_id, exercise_id, muscle_group_id, status, prescribed_weight, prescribed_reps, prescribed_sets, target_rir, dep_fingerprint",
     )
     .in("workout_id", [...workoutById.keys()]);
   if (wesError) throw wesError;
@@ -495,6 +521,154 @@ export async function reconcilePrescriptions(
     );
   }
 
+  // 7c. advance-backfill basis. A decision-less open row in week N (>1) whose
+  //     week-(N-1) same-day, same-exercise counterpart is COMPLETED is NOT a cold
+  //     start: it is an advance the generation flow never recorded — e.g. a
+  //     planned day imported into the MIDDLE of imported history, which the
+  //     generation gap-heal skips (the day already exists) and per-completion
+  //     advance never reaches (its prior-week sibling pre-existed, so no day was
+  //     "missing"). Seeding such a row (§7b) reprices it off the prior-MESO peak
+  //     and discards the in-meso week N-1 → N progression. Instead we rebuild its
+  //     ADVANCE inputs from the completed counterpart's logged work, exactly like
+  //     `generateDay`, so the recompute progresses the real prior week. Resolved
+  //     once, only when at least one decision-less row has such a counterpart.
+  const completedWeByKey = new Map<string, (typeof wes)[number]>();
+  for (const we of wes) {
+    const w = workoutById.get(we.workout_id);
+    const mc = w ? microById.get(w.microcycle_id) : undefined;
+    if (!w || !mc) continue;
+    if (w.status === "completed" || w.status === "skipped") {
+      completedWeByKey.set(`${mc.week_number}:${w.day_number}:${we.exercise_id}`, we);
+    }
+  }
+  const advanceSourceByRow = new Map<string, (typeof wes)[number]>();
+  for (const r of decisionlessRows) {
+    const key = advanceSourceKey(r.weekNumber, r.dayNumber, r.exerciseId);
+    const src = key ? completedWeByKey.get(key) : undefined;
+    if (src) advanceSourceByRow.set(r.id, src);
+  }
+
+  // pre-build the advance inputs (the engine's derived history) for those rows,
+  // mirroring generateDay's per-exercise assembly: the counterpart's logged sets,
+  // its joint-pain feedback + the group-closing pump/workload, the source
+  // workout's session feedback, the source week's planned weekly sets, and the
+  // heaviest meso prescription so far. The strength anchor is left null here and
+  // applied by the recompute (it refreshes anchors itself, doc 14 §6.1) — and it
+  // is a derived input, excluded from the fingerprint, so this never desyncs the
+  // freshness check.
+  const advanceInputsByRow = new Map<string, EngineInputs>();
+  if (advanceSourceByRow.size > 0) {
+    const sourceWorkoutIds = new Set(
+      [...advanceSourceByRow.values()].map((s) => s.workout_id),
+    );
+    const sourceWes = wes.filter((we) => sourceWorkoutIds.has(we.workout_id));
+    const sourceWeIds = sourceWes.map((we) => we.id);
+    const [
+      { data: srcSets, error: srcSetsError },
+      { data: srcFb, error: srcFbError },
+      { data: srcWf, error: srcWfError },
+    ] = await Promise.all([
+      service
+        .from("logged_sets")
+        .select("*")
+        .in("workout_exercise_id", sourceWeIds)
+        .eq("user_id", userId)
+        .order("set_number"),
+      service
+        .from("exercise_feedback")
+        .select("*")
+        .in("workout_exercise_id", sourceWeIds)
+        .eq("user_id", userId),
+      service
+        .from("workout_feedback")
+        .select("*")
+        .in("workout_id", [...sourceWorkoutIds])
+        .eq("user_id", userId),
+    ]);
+    if (srcSetsError) throw srcSetsError;
+    if (srcFbError) throw srcFbError;
+    if (srcWfError) throw srcWfError;
+
+    const setsByWe = new Map<string, LoggedSetRow[]>();
+    for (const s of srcSets ?? []) {
+      const cur = setsByWe.get(s.workout_exercise_id) ?? [];
+      cur.push(s);
+      setsByWe.set(s.workout_exercise_id, cur);
+    }
+    const fbByWe = new Map(
+      (srcFb ?? []).map((f) => [f.workout_exercise_id, f as ExerciseFeedbackRow]),
+    );
+    const wfByWorkout = new Map(
+      (srcWf ?? []).map((f) => [f.workout_id, f as WorkoutFeedbackRow]),
+    );
+    // group-scoped pump/workload lives on whichever exercise closed each group,
+    // resolved per source workout (matches generateDay).
+    const groupFbByWorkout = new Map<
+      string,
+      Map<string, { pump: number | null; workload: number | null }>
+    >();
+    for (const we of sourceWes) {
+      const fb = fbByWe.get(we.id);
+      if (we.muscle_group_id && fb && (fb.pump != null || fb.workload != null)) {
+        const m = groupFbByWorkout.get(we.workout_id) ?? new Map();
+        m.set(we.muscle_group_id, { pump: fb.pump, workload: fb.workload });
+        groupFbByWorkout.set(we.workout_id, m);
+      }
+    }
+    // planned weekly sets per group, and heaviest meso prescription so far, both
+    // keyed off the SOURCE week (week N-1) like generateDay.
+    const wesByWeek = new Map<number, (typeof wes)[number][]>();
+    for (const we of wes) {
+      const w = workoutById.get(we.workout_id);
+      const mc = w ? microById.get(w.microcycle_id) : undefined;
+      if (!mc) continue;
+      const cur = wesByWeek.get(mc.week_number) ?? [];
+      cur.push(we);
+      wesByWeek.set(mc.week_number, cur);
+    }
+
+    for (const [rowId, src] of advanceSourceByRow) {
+      const row = rows.find((r) => r.id === rowId)!;
+      const srcWorkout = workoutById.get(src.workout_id)!;
+      const srcMicro = microById.get(srcWorkout.microcycle_id)!;
+      const equipmentType = equipmentById.get(row.exerciseId) ?? "other";
+      const priorWeekWes = wes.filter((we) => {
+        const w = workoutById.get(we.workout_id);
+        const mc = w ? microById.get(w.microcycle_id) : undefined;
+        return mc != null && mc.week_number <= srcMicro.week_number;
+      });
+      const mgWeekly = weeklySetsByGroup(
+        (wesByWeek.get(srcMicro.week_number) ?? []) as unknown as WorkoutExerciseRow[],
+      );
+      const peaks = peakByExercise(
+        priorWeekWes as unknown as WorkoutExerciseRow[],
+        srcMicro.target_rir,
+      );
+      advanceInputsByRow.set(
+        rowId,
+        buildEngineInputs({
+          we: src as unknown as WorkoutExerciseRow,
+          sets: setsByWe.get(src.id) ?? [],
+          feedback: fbByWe.get(src.id) ?? null,
+          groupFeedback: src.muscle_group_id
+            ? (groupFbByWorkout.get(src.workout_id)?.get(src.muscle_group_id) ?? null)
+            : null,
+          workoutFeedback: wfByWorkout.get(src.workout_id) ?? null,
+          microTargetRir: srcMicro.target_rir,
+          nextWeek: { targetRir: row.targetRir, isDeload: row.isDeload },
+          goal,
+          equipmentType,
+          profile,
+          muscleGroupWeeklySets: src.muscle_group_id
+            ? (mgWeekly.get(src.muscle_group_id) ?? null)
+            : null,
+          weekPeak: peaks.get(row.exerciseId) ?? null,
+          strengthAnchor: null,
+        }),
+      );
+    }
+  }
+
   // 8. week-order pass: detect divergence, recompute, write back. Anchors are
   //    fetched once, only if at least one row actually diverged.
   let anchors: Map<string, E1rmAnchor> | null = null;
@@ -505,9 +679,13 @@ export async function reconcilePrescriptions(
   for (const row of rows) {
     const decision = latestByWe.get(row.id) ?? null;
     // a decision-bearing row replays its recorded kind; a decision-less row is
-    // backfilled as a seed (doc 14 §6.2/§6.3) so it can never stay stale.
-    const kind: EngineDecisionKind = decision?.kind ?? "seed";
-    const sourceId = decision?.sourceWorkoutExerciseId ?? null;
+    // backfilled as an ADVANCE when its completed prior-week counterpart is known
+    // (§7c), else as a seed (§7b) — either way it can never stay stale.
+    const advanceSource = advanceSourceByRow.get(row.id) ?? null;
+    const kind: EngineDecisionKind =
+      decision?.kind ?? (advanceSource ? "advance" : "seed");
+    const sourceId =
+      decision?.sourceWorkoutExerciseId ?? advanceSource?.id ?? null;
 
     const equipmentType = equipmentById.get(row.exerciseId) ?? "other";
     const override: ExerciseParamOverride | null =
@@ -523,6 +701,24 @@ export async function reconcilePrescriptions(
         ((decision.inputs.previous as ConfigInputs["previous"]) ?? null);
       initial = (decision.inputs.initial as ConfigInputs["initial"]) ?? null;
       storedInputs = decision.inputs;
+    } else if (advanceSource) {
+      // advance backfill (§7c): progress the completed prior-week counterpart.
+      // `previous` is its live prescription; the derived history is the inputs
+      // pre-built above (its logged sets + feedback). The recompute overlays the
+      // live config + a refreshed anchor and runs `prescribe`, exactly like a
+      // recorded advance.
+      previous =
+        livePrescribed.get(advanceSource.id) ?? {
+          weight: advanceSource.prescribed_weight,
+          reps: advanceSource.prescribed_reps,
+          sets: advanceSource.prescribed_sets ?? 1,
+          targetRir: advanceSource.target_rir ?? row.targetRir,
+        };
+      initial = null;
+      storedInputs = advanceInputsByRow.get(row.id) as unknown as Record<
+        string,
+        unknown
+      >;
     } else {
       // backfill: a seed has no upstream week; its basis is the prior peak.
       previous = null;

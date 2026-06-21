@@ -7,7 +7,11 @@ import {
   type EngineInputs,
   type EngineParams,
 } from "@/lib/engine";
-import { recomputeRow, type RecomputeArgs } from "../regeneration";
+import {
+  recomputeRow,
+  advanceSourceKey,
+  type RecomputeArgs,
+} from "../regeneration";
 import {
   buildConfigInputs,
   buildSeedInputs,
@@ -388,5 +392,29 @@ describe("reconcile backfill — decision-less open rows (doc 14 §6.2/§6.3)", 
       token,
     );
     expect(reconcileFp).toBe(generationFp);
+  });
+});
+
+// Regression (doc 14 §7c): a decision-less open row in week N>1 whose prior-week
+// same-day counterpart is completed must advance from that counterpart, not seed
+// from the prior-meso peak. The W3·D4 bug was an imported planned day stuck in
+// the middle of imported history: the generation gap-heal skipped it (the day
+// existed) and the reconcile re-seeded it (decision-less), discarding the in-meso
+// progression. `advanceSourceKey` is the boundary that routes such a row to the
+// advance path; week 1 stays a genuine cold start.
+describe("advanceSourceKey (decision-less backfill routing)", () => {
+  it("returns null in week 1 (cold start → seed)", () => {
+    expect(advanceSourceKey(1, 4, "ex-1")).toBeNull();
+  });
+
+  it("points a week-N row at its week-(N-1) same-day, same-exercise source", () => {
+    // the W3·D4 shape: a week-3 day-4 row advances from the completed week-2 day-4
+    expect(advanceSourceKey(3, 4, "ex-deadlift")).toBe("2:4:ex-deadlift");
+    expect(advanceSourceKey(4, 1, "ex-bench")).toBe("3:1:ex-bench");
+  });
+
+  it("keys by day and exercise so a different slot is not mistaken for the source", () => {
+    expect(advanceSourceKey(3, 4, "ex-a")).not.toBe(advanceSourceKey(3, 2, "ex-a"));
+    expect(advanceSourceKey(3, 4, "ex-a")).not.toBe(advanceSourceKey(3, 4, "ex-b"));
   });
 });

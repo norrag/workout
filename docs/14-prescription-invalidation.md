@@ -31,6 +31,23 @@ Status: **phases 1–4 built (2026-06-20); two freshness gaps closed (2026-06-21
 > sets `params.rounding` (and keeps `params.increment` in sync), so updating an
 > exercise's increment — even mid-cycle — re-rounds its open prescriptions to the new
 > step on the next read, for seeds and advances alike. See PROGRESS.md (2026-06-21).
+> **Freshness gap fix (2026-06-21, §7c — advance the imported mid-stream day).** A
+> decision-less open row in week N>1 was always backfilled as a **seed** (§6.3),
+> even when its week-(N-1) same-day, same-exercise counterpart was already
+> completed — repricing it off the prior-*meso* peak and discarding the in-meso
+> progression. This is the failure mode of an imported meso whose history is
+> complete except one mid-stream `planned` day (the next workout): generation's
+> gap-heal skips it (the day exists, nothing is "missing") and the per-completion
+> advance never reaches it (its prior-week sibling pre-existed). The reconcile now
+> detects such a row and backfills it as an **advance** from the completed
+> counterpart — rebuilding the derived history (logged sets + feedback) via the
+> generation path's own `buildEngineInputs` / `weeklySetsByGroup` /
+> `peakByExercise`, then running the advance recompute (refreshes the anchor,
+> overlays live config). The pure, unit-tested `advanceSourceKey` is the boundary:
+> null in week 1 (genuine cold-start seed), the prior-week source key otherwise.
+> Only rows with no completed prior-week counterpart still seed; the extra
+> source-history reads run only when such a row exists.
+
 Authoritative design for how stored prescriptions stay correct when any of their
 inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
 **redesigns the `params_version` staleness gate** into one general framework; that
