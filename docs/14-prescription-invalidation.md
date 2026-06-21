@@ -1,6 +1,36 @@
 # 14 — Prescription Freshness: dependency tracking & recompute (design)
 
-Status: **phases 1–4 built (2026-06-20); phase 5 (optional) designed, not yet built.**
+Status: **phases 1–4 built (2026-06-20); two freshness gaps closed (2026-06-21, see below); phase 5 (optional) designed, not yet built.**
+
+> **Freshness gap fixes (2026-06-21).** Two gaps left a stored prescription able to
+> stay stale despite the framework, both fixed so the read-path guarantee holds on
+> every surface. (1) **Decision-less open rows were skipped forever** — the reconcile
+> only considered rows with a recorded `engine_decisions` row, so a pre-phase-2 seed
+> (or any row whose best-effort decision write failed) was never fingerprinted or
+> recomputed. The phase-2 "they age out as mesos complete" assumption (§6.2/§11.2)
+> fails for a **bypassed, un-logged planned day in a still-active meso** — it never
+> completes. The reconcile now includes every open, unlogged row and **backfills a
+> decision-less one as a seed** (§6.2/§6.3): it reconstructs the cold-start basis from
+> the live plan defaults (`meso_exercises.initial_*`) + the user's prior peak
+> (`v_exercise_prs`) — what generation seeds from — runs `recomputeRow(kind:"seed")`,
+> writes the prescription + `dep_fingerprint`, and records a `kind:"seed"` decision so
+> the row is normalized and replays normally thereafter. This is the true lazy
+> backfill the §11.1 phase-1 note promised "null → recompute on first view"; that
+> backfill only ever worked for rows that already had a decision. (2) **Freshness ran
+> only on the Workout tab** — contrary to §5/§10, the `log/[workoutId]` deep link
+> (and any other prescription surface) read raw. Extracted `ensureFreshPrescriptions`
+> as the single read-path entry point and call it on both DayView surfaces. (3) **The
+> increment override was wired to the wrong parameter.** The weight increment is an
+> exercise's *loadable step* — the granularity EVERY prescribed weight rounds to
+> (`roundToStep` reads `params.rounding`, in the seed, anchor cold-start, rep-window
+> advance, and legacy advance paths alike). `resolveEffectiveParams` had folded the
+> override only into `params.increment` — the legacy +step progression jump, read
+> *only* on the no-anchor fallback — so under the active v9 `rep_window` params it
+> changed no prescribed number at all (this retracts the phase-3 "honest scope" /
+> deviation (b) note, which mistakenly treated that as by-design). The override now
+> sets `params.rounding` (and keeps `params.increment` in sync), so updating an
+> exercise's increment — even mid-cycle — re-rounds its open prescriptions to the new
+> step on the next read, for seeds and advances alike. See PROGRESS.md (2026-06-21).
 Authoritative design for how stored prescriptions stay correct when any of their
 inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
 **redesigns the `params_version` staleness gate** into one general framework; that
