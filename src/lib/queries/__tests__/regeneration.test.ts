@@ -8,7 +8,15 @@ import {
   type EngineParams,
 } from "@/lib/engine";
 import { recomputeRow, type RecomputeArgs } from "../regeneration";
-import { buildConfigInputs, buildSeedInputs, type ConfigInputs } from "../fingerprint";
+import {
+  buildConfigInputs,
+  buildSeedInputs,
+  computeDepFingerprint,
+  configProjection,
+  paramsTokenFor,
+  seedEngineInputs,
+  type ConfigInputs,
+} from "../fingerprint";
 
 const PARAMS = DEFAULT_ENGINE_PARAMS as EngineParams;
 
@@ -294,5 +302,91 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
     );
     expect(res.status).toBe("unchanged");
     expect(res.output!.weight).toBe(output.weight);
+  });
+});
+
+// A decision-less open row (a pre-phase-2 seed, or one whose best-effort decision
+// write failed) used to be skipped by the reconcile FOREVER, so a bypassed
+// un-logged planned day could never be brought current by any input change. The
+// reconcile now backfills it as a seed reconstructed from the LIVE plan defaults +
+// the user's prior peak — exactly what generation seeds from. These tests model
+// that reconstruction at the pure level (the reconcile's I/O resolves the same
+// values from `meso_exercises` + `v_exercise_prs`).
+describe("reconcile backfill — decision-less open rows (doc 14 §6.2/§6.3)", () => {
+  const profile = { experience_level: "intermediate" as const, units: "lb" as const };
+  const equipmentType = "barbell";
+  const goal = "hypertrophy" as const;
+  const week = { targetRir: 1, isDeload: false };
+  // the plan's cold-start defaults (meso_exercises.initial_*)
+  const planInitial = { weight: 135, reps: 8, sets: 3 };
+  // the user's prior peak (v_exercise_prs), with `sets` taken from the plan
+  const pr = { best_weight: 315, best_reps: 5 };
+
+  /** the inputs the reconcile reconstructs for a decision-less row */
+  function reconstruct() {
+    const liveConfig = buildConfigInputs({
+      equipmentType,
+      profile,
+      goal,
+      week,
+      previous: null, // a seed has no upstream week
+      initial: planInitial,
+    });
+    const priorPeak = {
+      weight: pr.best_weight,
+      reps: pr.best_reps,
+      sets: planInitial.sets,
+    };
+    const storedInputs = seedEngineInputs(liveConfig, priorPeak) as unknown as Record<
+      string,
+      unknown
+    >;
+    return { liveConfig, priorPeak, storedInputs };
+  }
+
+  it("recomputes a stale decision-less row to the correct seed number", () => {
+    const { liveConfig, priorPeak, storedInputs } = reconstruct();
+    // the row carries some old, now-wrong prescribed value (null fingerprint)
+    const staleOutput = { weight: 999, reps: 8, sets: 3, targetRir: 3 };
+    const res = recomputeRow(
+      { kind: "seed", storedInputs, liveConfig, anchor: null, currentOutput: staleOutput },
+      PARAMS,
+    );
+    expect(res.status).toBe("changed");
+    // it matches exactly what generation's seedMeso would have produced
+    const expected = seedMeso(
+      priorPeak,
+      planInitial,
+      { equipmentType },
+      { experienceLevel: "intermediate", units: "lb" },
+      week.targetRir,
+      PARAMS,
+    );
+    expect(res.output!.weight).toBe(expected.weight);
+    expect(res.output!.targetRir).toBe(week.targetRir);
+  });
+
+  it("stamps a fingerprint that matches generation's, so the backfilled row is then stable", () => {
+    // write/check parity: the fingerprint the reconcile stamps for the backfilled
+    // row must equal the one generation would have stamped, so the very next read
+    // short-circuits instead of recomputing again.
+    const { liveConfig } = reconstruct();
+    const token = paramsTokenFor(9);
+    const reconcileFp = computeDepFingerprint(liveConfig, token);
+
+    const generationInputs = buildSeedInputs({
+      equipmentType,
+      profile,
+      goal,
+      startRir: week.targetRir,
+      isDeload: week.isDeload,
+      initial: planInitial,
+      priorPeak: { weight: pr.best_weight, reps: pr.best_reps, sets: planInitial.sets },
+    });
+    const generationFp = computeDepFingerprint(
+      configProjection(generationInputs),
+      token,
+    );
+    expect(reconcileFp).toBe(generationFp);
   });
 });

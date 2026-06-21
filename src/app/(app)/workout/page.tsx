@@ -5,7 +5,7 @@ import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
 import { catchUpProgression } from "@/lib/queries/progression";
-import { reconcilePrescriptions } from "@/lib/queries/regeneration";
+import { ensureFreshPrescriptions } from "@/lib/queries/regeneration";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -36,17 +36,9 @@ export default async function WorkoutPage() {
   // user transparently on their next open — no manual regenerate step. Idempotent
   // + additive; a hash compare when nothing changed.
   if (state.mesocycle) {
-    try {
-      const { generated, refreshed } = await reconcilePrescriptions(
-        createServiceClient(),
-        user.id,
-        state.mesocycle.id,
-      );
-      if (generated > 0 || refreshed > 0) {
-        state = await getCurrentState(supabase, user.id);
-      }
-    } catch (error) {
-      console.error("meso plan reconcile failed", error);
+    const result = await ensureFreshPrescriptions(user.id, state.mesocycle.id);
+    if (result && (result.generated > 0 || result.refreshed > 0)) {
+      state = await getCurrentState(supabase, user.id);
     }
   }
 

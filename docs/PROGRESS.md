@@ -2,7 +2,71 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-20 (latest) — Prescription freshness: backfill the already-flowing sources into the contract (doc 14 phase 4)
+## 2026-06-21 (latest) — Prescription freshness: close the two gaps that left rows stale (doc 14 §5/§6.2/§6.3/§10)
+
+Fixes the regression where a stale prescription could never be brought current.
+Two real gaps remained after phases 1–4, both surfaced by a concrete case: **W3·D4**,
+a bypassed (never-logged) planned day in an active meso, whose Deadlift increment
+edit — and in fact *any* input change — did nothing. Root cause was twofold and the
+fix closes both, so the invariant the framework promises ("a stored prescription is
+ALWAYS accurate, on every surface, after any change to an input that feeds it") now
+actually holds.
+
+### Done
+
+- **Decision-less open rows are no longer skipped — they backfill as seeds
+  (`regeneration.ts`, doc 14 §6.2/§6.3).** The read-path reconcile filtered open
+  rows to those with a recorded `engine_decisions` row (`latestByWe.has(we.id)`), so
+  a pre-phase-2 seed (or any row whose best-effort decision write failed) was skipped
+  **forever** — never fingerprinted, never recomputed, permanently frozen. The
+  phase-2 assumption that such rows "age out as mesos complete" fails for a
+  skipped/bypassed planned day inside a still-active meso (it never completes). The
+  reconcile now includes every open, unlogged row; for one with no decision it
+  reconstructs a cold-start **seed** from the LIVE plan defaults
+  (`meso_exercises.initial_*`, via `getMesoPlan`) + the user's prior peak
+  (`v_exercise_prs`) — exactly what generation seeds from — runs the existing
+  `recomputeRow(kind:"seed")`, writes the refreshed prescription + `dep_fingerprint`,
+  and records a `kind:"seed"` decision so the row is normalized into the framework and
+  replays cleanly thereafter. (Because `seedMeso` rounds the backed-off load via
+  `roundToStep`, the editable increment override now visibly moves a seeded number,
+  which is what the W3·D4 Deadlift case needed.)
+- **Freshness runs on EVERY surface that shows prescriptions, not just the Workout
+  tab (doc 14 §5/§10).** Extracted `ensureFreshPrescriptions(userId, mesoId)` — the
+  single read-path entry point that owns the service client and never throws — and
+  call it from both DayView surfaces: the Workout tab (`workout/page.tsx`, refactored
+  onto the helper) **and** the `log/[workoutId]` deep link (previously read raw, so a
+  day reached by direct navigation never refreshed). The meso-detail / planner /
+  planned-day pages render plan structure + RIR, not engine loads, so they need no
+  reconcile.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (476/476, +2), `npm run build`
+all green. New tests (`regeneration.test.ts`) model the backfill reconstruction at
+the pure level: a stale decision-less row recomputes to the exact `seedMeso` number,
+and the fingerprint the reconcile stamps for it equals the one generation would have
+stamped (write/check parity → the backfilled row short-circuits on the next read).
+Live-DB diagnosis confirmed the cause: W3·D4's five planned rows all carried
+`dep_fingerprint = null` and `decisions = 0`, while every other open day had both.
+
+### Deviations / notes
+
+- **Backfill recompute uses the SEED engine, not advance.** A decision-less row has
+  no stored source pointer or derived history to replay an advance from, so it is
+  seeded from the prior peak (the always-correct cold-start basis). Once backfilled it
+  carries a seed decision and follows the normal seed recompute path forever after.
+- **No DB-backed reconcile integration test** (consistent with the codebase's
+  no-DB-mock approach): the new logic reuses the already-tested pure `recomputeRow`
+  seed path, and the added tests assert the reconstruction + fingerprint parity the
+  I/O depends on.
+- **Separate engine-semantics point (unchanged here):** under the active v9
+  `rep_window` params the increment override does not move an *advance* row's load
+  (priced off the strength anchor, phase-3 deviation b); it does move a *seed* row's
+  load (rounding step). Either way the reconcile recomputes the row, so the stored
+  prescription is correct — freshness is satisfied regardless of whether a given input
+  numerically moves a given row.
+
+## 2026-06-20 — Prescription freshness: backfill the already-flowing sources into the contract (doc 14 phase 4)
 
 Implemented [14-prescription-invalidation.md](14-prescription-invalidation.md)
 **phase 4** (§7): the verification slice that closes the dependency-fingerprint

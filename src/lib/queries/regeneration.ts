@@ -16,6 +16,8 @@ import { getExerciseE1rmAnchors } from "./logging";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseParamOverrides } from "./exercise-overrides";
 import { catchUpMesoGeneration } from "./progression";
+import { getMesoPlan } from "./cycles";
+import { createServiceClient } from "@/lib/supabase/service";
 import { engineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
 import {
@@ -413,9 +415,15 @@ export async function reconcilePrescriptions(
     (exercises ?? []).map((e) => [e.id, e.equipment_type]),
   );
 
-  // assemble the open rows with their cycle context, in week → day → position order
+  // assemble the open rows with their cycle context, in week → day → position
+  // order. A row WITHOUT a decision is no longer dropped (doc 14 §6.2/§6.3): a
+  // pre-phase-2 seed, or one whose best-effort decision write failed, used to be
+  // skipped forever — so a bypassed/un-logged planned day (e.g. a week the user
+  // jumped over) could never be brought current by ANY input change. It is now
+  // backfilled as a seed below from the live plan + prior peak, then participates
+  // exactly like every other row. (Logged rows are still excluded, hard rule #5.)
   const rows: OpenRow[] = openWes
-    .filter((we) => !loggedWeIds.has(we.id) && latestByWe.has(we.id))
+    .filter((we) => !loggedWeIds.has(we.id))
     .map((we) => {
       const workout = workoutById.get(we.workout_id)!;
       const micro = microById.get(workout.microcycle_id)!;
@@ -441,6 +449,52 @@ export async function reconcilePrescriptions(
 
   if (rows.length === 0) return { generated, refreshed: 0 };
 
+  // 7b. seed-backfill basis for any open row with NO decision (a pre-phase-2 seed,
+  //     or one whose best-effort decision write failed). Such a row can't replay a
+  //     stored decision, so we reconstruct a cold-start seed from the LIVE plan
+  //     defaults (`meso_exercises.initial_*`) + the user's prior peak
+  //     (`v_exercise_prs`) — exactly what generation seeds from — and run it
+  //     through `seedMeso` (doc 14 §6.2/§6.3). Resolved once, only when needed.
+  const decisionlessRows = rows.filter((r) => !latestByWe.has(r.id));
+  let initialByDayExercise: Map<string, ConfigInputs["initial"]> | null = null;
+  let prByExercise: Map<
+    string,
+    { best_weight: number | null; best_reps: number | null }
+  > | null = null;
+  if (decisionlessRows.length > 0) {
+    const [plan, { data: prs, error: prError }] = await Promise.all([
+      getMesoPlan(service, mesoId),
+      service
+        .from("v_exercise_prs")
+        .select("exercise_id, best_weight, best_reps")
+        .eq("user_id", userId),
+    ]);
+    if (prError) throw prError;
+    initialByDayExercise = new Map();
+    for (const day of plan?.days ?? []) {
+      for (const group of day.groups) {
+        for (const fill of group.fills) {
+          const key = `${day.day_number}::${fill.exercise_id}`;
+          // first fill wins for a duplicated exercise in a day (cold-start
+          // defaults match); the prior peak, not `initial`, drives the number.
+          if (!initialByDayExercise.has(key)) {
+            initialByDayExercise.set(key, {
+              weight: fill.initial_weight,
+              reps: fill.initial_reps,
+              sets: fill.initial_sets,
+            });
+          }
+        }
+      }
+    }
+    prByExercise = new Map(
+      (prs ?? []).map((p) => [
+        p.exercise_id,
+        { best_weight: p.best_weight, best_reps: p.best_reps },
+      ]),
+    );
+  }
+
   // 8. week-order pass: detect divergence, recompute, write back. Anchors are
   //    fetched once, only if at least one row actually diverged.
   let anchors: Map<string, E1rmAnchor> | null = null;
@@ -449,17 +503,53 @@ export async function reconcilePrescriptions(
   const codeSha = engineCodeSha();
 
   for (const row of rows) {
-    const decision = latestByWe.get(row.id)!;
-    const sourceId = decision.sourceWorkoutExerciseId;
-    const previous =
-      (sourceId ? livePrescribed.get(sourceId) : undefined) ??
-      ((decision.inputs.previous as ConfigInputs["previous"]) ?? null);
-    const initial =
-      (decision.inputs.initial as ConfigInputs["initial"]) ?? null;
+    const decision = latestByWe.get(row.id) ?? null;
+    // a decision-bearing row replays its recorded kind; a decision-less row is
+    // backfilled as a seed (doc 14 §6.2/§6.3) so it can never stay stale.
+    const kind: EngineDecisionKind = decision?.kind ?? "seed";
+    const sourceId = decision?.sourceWorkoutExerciseId ?? null;
 
     const equipmentType = equipmentById.get(row.exerciseId) ?? "other";
     const override: ExerciseParamOverride | null =
       overrideByExercise.get(row.exerciseId) ?? null;
+
+    // resolve the config inputs + the stored derived basis the recompute replays.
+    let previous: ConfigInputs["previous"];
+    let initial: ConfigInputs["initial"];
+    let storedInputs: Record<string, unknown>;
+    if (decision) {
+      previous =
+        (sourceId ? livePrescribed.get(sourceId) : undefined) ??
+        ((decision.inputs.previous as ConfigInputs["previous"]) ?? null);
+      initial = (decision.inputs.initial as ConfigInputs["initial"]) ?? null;
+      storedInputs = decision.inputs;
+    } else {
+      // backfill: a seed has no upstream week; its basis is the prior peak.
+      previous = null;
+      initial =
+        initialByDayExercise?.get(`${row.dayNumber}::${row.exerciseId}`) ?? null;
+      const pr = prByExercise?.get(row.exerciseId);
+      const priorPeak: SeedPeak | null =
+        pr?.best_weight != null
+          ? {
+              weight: pr.best_weight,
+              reps: pr.best_reps,
+              sets: initial?.sets ?? row.currentOutput.sets,
+            }
+          : null;
+      storedInputs = seedEngineInputs(
+        buildConfigInputs({
+          equipmentType,
+          profile,
+          goal,
+          week: { targetRir: row.targetRir, isDeload: row.isDeload },
+          previous,
+          initial,
+        }),
+        priorPeak,
+      ) as unknown as Record<string, unknown>;
+    }
+
     const liveConfig = buildConfigInputs({
       equipmentType,
       profile,
@@ -490,20 +580,14 @@ export async function reconcilePrescriptions(
     // advance replay (a seed's cold-start basis is its frozen prior peak); fetch
     // them once, lazily, and only when an advance actually diverges.
     let anchor: E1rmAnchor | null = null;
-    if (decision.kind === "advance") {
+    if (kind === "advance") {
       if (!anchors) {
         anchors = await getExerciseE1rmAnchors(service, userId, exerciseIds, params);
       }
       anchor = anchors.get(row.exerciseId) ?? null;
     }
     const result = recomputeRow(
-      {
-        kind: decision.kind,
-        storedInputs: decision.inputs,
-        liveConfig,
-        anchor,
-        currentOutput: row.currentOutput,
-      },
+      { kind, storedInputs, liveConfig, anchor, currentOutput: row.currentOutput },
       effectiveParams,
     );
 
@@ -515,29 +599,37 @@ export async function reconcilePrescriptions(
       continue;
     }
 
-    if (result.status === "unchanged") {
+    const isBackfill = !decision;
+    if (result.status === "unchanged" && !isBackfill) {
       // the change didn't move THIS row's prescription; stamp it current so the
       // next read short-circuits (the fingerprint, not the numbers, was stale).
       await stampFingerprint(service, row.id, expected);
       continue;
     }
 
-    // changed → write the refreshed prescription + fingerprint, append an audited
-    // decision, and propagate the new value to downstream weeks in this pass.
+    // Either the prescription changed, OR this is a decision-less row we're
+    // normalizing into the framework for the first time (record its seed decision
+    // now so it replays cleanly forever after — even if the numbers matched).
     const output = result.output!;
     const inputs = result.inputs!;
-    const { error: updateError } = await service
-      .from("workout_exercises")
-      .update({
-        prescribed_weight: output.weight,
-        prescribed_reps: output.reps,
-        prescribed_sets: output.sets,
-        target_rir: output.targetRir,
-        notes: output.rationale,
-        dep_fingerprint: expected,
-      })
-      .eq("id", row.id);
-    if (updateError) throw updateError;
+    const changed = result.status === "changed";
+    if (changed) {
+      const { error: updateError } = await service
+        .from("workout_exercises")
+        .update({
+          prescribed_weight: output.weight,
+          prescribed_reps: output.reps,
+          prescribed_sets: output.sets,
+          target_rir: output.targetRir,
+          notes: output.rationale,
+          dep_fingerprint: expected,
+        })
+        .eq("id", row.id);
+      if (updateError) throw updateError;
+    } else {
+      // backfill with unchanged numbers: only the fingerprint needs stamping.
+      await stampFingerprint(service, row.id, expected);
+    }
 
     const { error: insertError } = await service.from("engine_decisions").insert({
       user_id: userId,
@@ -561,15 +653,40 @@ export async function reconcilePrescriptions(
       ),
       // a recompute preserves the row's origin kind, so a re-seeded row stays a
       // seed (and replays through seedMeso) on its next divergence.
-      kind: decision.kind,
+      kind,
     });
     if (insertError) throw insertError;
 
-    livePrescribed.set(row.id, output);
-    refreshed += 1;
+    if (changed) {
+      livePrescribed.set(row.id, output);
+      refreshed += 1;
+    }
   }
 
   return { generated, refreshed };
+}
+
+/**
+ * Read-path freshness entry point (doc 14 §5): the single function EVERY surface
+ * that displays prescriptions calls before reading them, so stored numbers are
+ * brought in line with the user's current inputs no matter which screen they open
+ * — not just the Workout tab (doc 14 §10). It owns the service client the
+ * reconcile needs (the recompute writes the audit trail, hard rule #4) and never
+ * throws: a freshness hiccup must degrade to showing the last numbers, never take
+ * down a page render. Returns the reconcile result (or null on failure) so a
+ * caller that already loaded the prescriptions can cheaply re-read when something
+ * actually changed.
+ */
+export async function ensureFreshPrescriptions(
+  userId: string,
+  mesoId: string,
+): Promise<ReconcileResult | null> {
+  try {
+    return await reconcilePrescriptions(createServiceClient(), userId, mesoId);
+  } catch (error) {
+    console.error("prescription freshness reconcile failed", error);
+    return null;
+  }
 }
 
 /** Stamp a single open row's freshness fingerprint current (no prescription change). */
