@@ -38,6 +38,20 @@ actually holds.
   day reached by direct navigation never refreshed). The meso-detail / planner /
   planned-day pages render plan structure + RIR, not engine loads, so they need no
   reconcile.
+- **The increment override now drives the loadable step (`effective-params.ts`).** The
+  weight increment is an exercise's loadable step — the granularity EVERY prescribed
+  weight rounds to (`roundToStep` reads `params.rounding`, in the seed, anchor
+  cold-start, rep-window advance, and legacy advance paths). `resolveEffectiveParams`
+  had folded the override only into `params.increment` (the legacy +step jump, read
+  only on the no-anchor fallback), so under the active v9 `rep_window` params it moved
+  no prescribed number — it only shifted the fingerprint. This retracts the phase-3
+  deviation-(b) "honest scope" claim (it was a bug, not by design). The override now
+  sets `params.rounding` (keeping `params.increment` in sync for legacy mode), so
+  updating an exercise's increment — even mid-cycle — re-rounds its open prescriptions
+  to the new step on the next read, **for seeds and advances alike**. Tests assert an
+  anchored rep_window advance and a meso seed both round to the override step
+  (`effective-params.test.ts`). `rounding` is used literally (a physical step, no
+  `experience_increment_scale`); the legacy `increment` still composes the scale.
 
 ### Verified
 

@@ -19,8 +19,18 @@ Status: **phases 1–4 built (2026-06-20); two freshness gaps closed (2026-06-21
 > backfill only ever worked for rows that already had a decision. (2) **Freshness ran
 > only on the Workout tab** — contrary to §5/§10, the `log/[workoutId]` deep link
 > (and any other prescription surface) read raw. Extracted `ensureFreshPrescriptions`
-> as the single read-path entry point and call it on both DayView surfaces. See
-> PROGRESS.md (2026-06-21) for the as-built detail.
+> as the single read-path entry point and call it on both DayView surfaces. (3) **The
+> increment override was wired to the wrong parameter.** The weight increment is an
+> exercise's *loadable step* — the granularity EVERY prescribed weight rounds to
+> (`roundToStep` reads `params.rounding`, in the seed, anchor cold-start, rep-window
+> advance, and legacy advance paths alike). `resolveEffectiveParams` had folded the
+> override only into `params.increment` — the legacy +step progression jump, read
+> *only* on the no-anchor fallback — so under the active v9 `rep_window` params it
+> changed no prescribed number at all (this retracts the phase-3 "honest scope" /
+> deviation (b) note, which mistakenly treated that as by-design). The override now
+> sets `params.rounding` (and keeps `params.increment` in sync), so updating an
+> exercise's increment — even mid-cycle — re-rounds its open prescriptions to the new
+> step on the next read, for seeds and advances alike. See PROGRESS.md (2026-06-21).
 Authoritative design for how stored prescriptions stay correct when any of their
 inputs change. It supersedes the narrower "invalidate on increment edit" sketch and
 **redesigns the `params_version` staleness gate** into one general framework; that
