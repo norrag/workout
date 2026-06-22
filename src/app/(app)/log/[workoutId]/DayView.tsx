@@ -1242,7 +1242,10 @@ function SetRow({
   // it to just this set or every unlogged set per the auto-match setting
   const persistPlannedWeight = (w: number) => {
     if (w === (plannedWeight ?? prescribedWeight)) return;
-    commit(() =>
+    // Route through runLog (not commit) so a failed write — e.g. the auto-match
+    // fan-out across sets — surfaces a toast and rolls the row back instead of
+    // throwing inside the transition and tripping the app-error page.
+    runLog(() =>
       updateSetWeightAction({
         workout_id: we.workout_id,
         workout_exercise_id: we.id,
