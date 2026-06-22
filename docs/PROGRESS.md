@@ -37,10 +37,12 @@ unit tests).
   in the user's system (ft/in for lb, cm for kg) in `ProfileEditor` and
   onboarding; storage stays canonical `height_cm`. More "Units" row gained a
   measurement-system subtitle.
-- **PH42 — note pencil (slice 1).** Replaced the bare `✎` glyph (illegible
-  `text-ink/40`) with a legible inline SVG `PencilGlyph`, ~20% larger, matching
-  the icon-row SVGs, on both the pinned- and session-note edit affordances. (This
-  is the I15 item — the icon existed but wasn't legible.)
+- **PH42 — note pencil (slice 1).** Replaced **every** bare `✎` glyph (illegible
+  `text-ink/40`, ~11px) with a shared legible inline SVG `PencilGlyph`
+  (`components/ui/PencilGlyph.tsx`, 15–16px, matching the icon-row SVGs): exercise
+  **history** rows (the one actually visible in the field screenshot), day-view
+  pinned/session notes, the exercise-page pinned note, and the planner's
+  "EDIT DAY". (This is the I15 item — the icon existed but wasn't legible.)
 - **P20 — live exercise search (slice 1).** `exercises/page.tsx` now loads the
   library and renders a client `ExercisesBrowser` that filters by search text **as
   you type** plus both MUSCLE/EQUIP axes instantly (no navigation round-trip).

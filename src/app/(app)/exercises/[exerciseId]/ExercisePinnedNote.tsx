@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { setPinnedNoteAction } from "@/app/(app)/exercises/actions";
 
 /**
@@ -43,9 +44,9 @@ export function ExercisePinnedNote({
               setNote(initial);
               setOpen(true);
             }}
-            className="-my-1 shrink-0 px-1.5 py-1 text-[12px] text-ink/45"
+            className="-my-1 shrink-0 px-1.5 py-1 text-ink/55"
           >
-            ✎
+            <PencilGlyph />
           </button>
         </div>
       ) : (

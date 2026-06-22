@@ -7,6 +7,7 @@ import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { useScrollLock } from "@/components/ui/useScrollLock";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
+import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
@@ -63,28 +64,6 @@ type Commit = (fn: () => Promise<void>) => void;
 /** Which note bucket the unified note sheet (09 §8) opened from. "menu" defaults
  * to the session note; "pinned"/"session" edit that specific existing note. */
 type NoteOrigin = "menu" | "pinned" | "session";
-
-/** Edit-note pencil (PH42): a legible inline pencil replacing the bare `✎`
- * glyph, sized ~20% larger than the note text and matching the icon-row SVGs. */
-function PencilGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
-      <path
-        d="M11.3 2.3 13.7 4.7 5.4 13 2.2 13.8 3 10.6Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 3.6 12.4 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-      />
-    </svg>
-  );
-}
 
 /** Planned slot count, widened to cover any logged/skipped beyond it. */
 function plannedSetCount(we: LoggedExercise): number {
