@@ -2,34 +2,53 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-22 (latest) — Triage slice: auto-match crash guard + set-marker, template tray, unit-aware height
+## 2026-06-22 (latest) — Triage slices 1 + 2 + the real PH35 fix (profiles RLS recursion)
 
-Field-notes triage slice (see `docs/triage/`): one bug fix and three feature
-items, all green (typecheck, lint, 486 tests).
+Field-notes triage (see `docs/triage/`): the genuine PH35 root cause plus slice 1
+(PH42, P20, PH26) and slice 2 (P19, PH27, PH28). All green (typecheck, lint, 486
+unit tests).
 
 ### Done
-- **PH35 — auto-match-weights crash, real fix.** PR #61 hardened the
-  `setPlannedSetWeight` data path, but the crash persisted because there was **no
-  error boundary in the app segment**: any rejection from an optimistic toggle's
-  `startTransition` (e.g. `setAutoMatchWeights`) bubbled to Next's raw
-  "application error" fallback. Added `src/app/(app)/error.tsx` (recoverable
-  ledger card + retry) and hardened both settings toggles
-  (`AutoMatchToggle`, `UnitsToggle`) to catch a failed write, revert the
-  optimistic state, and surface a quiet Toast — the documented online-only
-  pattern. No-op clicks (selecting the current value) are now ignored.
+- **PH35 — auto-match crash, REAL root cause: `profiles` RLS recursion.** PR #61
+  guarded the `setPlannedSetWeight` data path and this PR first added an error
+  boundary, but the setting still couldn't be saved — confirmed against the live
+  DB: **every regular-user UPDATE to `profiles` failed with
+  `42P17 infinite recursion detected in policy`**. `profiles_update_own`'s
+  WITH CHECK guarded role self-escalation with a subquery on `profiles` *inside* a
+  `profiles` policy (present since the initial schema; surfaced once Postgres
+  enforced recursion detection). Fix: migration
+  `20260622220627_fix_profiles_update_recursion.sql` reads the caller's role via a
+  SECURITY DEFINER helper (`current_profile_role()`, bypasses RLS), keeping the
+  anti-escalation guard without recursion. **Applied to the live project** and
+  verified (normal update OK; role escalation BLOCKED 42501). This broke not just
+  auto-match but units, profile edits, and onboarding.
+  - Defense-in-depth kept from the first pass: `src/app/(app)/error.tsx`
+    (recoverable card; the app had no error boundary) + `AutoMatchToggle` /
+    `UnitsToggle` revert-and-toast on a failed write, ignore no-op clicks.
 - **P19 — over/under-prescription marker.** Logged sets in `DayView` `SetRow` get
-  a small `▲`/`▼` at the reps cell when the set landed above/below its
-  prescription, compared **by e1RM** (so it accounts for both reps hit and RIR in
-  reserve). On-target within a ±1.5% band shows no marker; null when there's no
-  prescription.
-- **PH27 — template "+ NEW" tray.** New `NewTemplateButton` opens a chooser sheet
-  (mirrors the create-cycle tray): *blank template* → planner draft, or *add from
-  a share code*. The redeem form moved off the page list into the tray.
+  a small caret, compared **by e1RM** (accounts for reps hit and RIR in reserve),
+  ±1.5% on-target band, none without a prescription. Over = `▲` at the top corner,
+  under = `▼` at the bottom corner of the reps cell.
+- **PH27 — template "+ NEW" tray.** New `NewTemplateButton` chooser sheet (mirrors
+  the create-cycle tray): blank template → planner draft, or add from a share
+  code. Redeem form moved off the page list into the tray.
 - **PH28 — unit-aware height.** New `src/lib/units.ts` consolidates the two
-  duplicated `formatHeight` copies and adds cm↔ft/in conversions. Height now
-  enters/displays in the user's measurement system (ft/in for lb, cm for kg) in
-  both `ProfileEditor` and onboarding; storage stays canonical `height_cm`. The
-  More "Units" row gained a subtitle noting it's the measurement system.
+  duplicated `formatHeight` copies + cm↔ft/in conversions. Height enters/displays
+  in the user's system (ft/in for lb, cm for kg) in `ProfileEditor` and
+  onboarding; storage stays canonical `height_cm`. More "Units" row gained a
+  measurement-system subtitle.
+- **PH42 — note pencil (slice 1).** Replaced the bare `✎` glyph (illegible
+  `text-ink/40`) with a legible inline SVG `PencilGlyph`, ~20% larger, matching
+  the icon-row SVGs, on both the pinned- and session-note edit affordances. (This
+  is the I15 item — the icon existed but wasn't legible.)
+- **P20 — live exercise search (slice 1).** `exercises/page.tsx` now loads the
+  library and renders a client `ExercisesBrowser` that filters by search text **as
+  you type** plus both MUSCLE/EQUIP axes instantly (no navigation round-trip).
+  Replaces the server `?q=` submit-to-search; filter state is now client-only
+  (URL deep-linking of filters dropped — acceptable for instant filtering).
+- **PH26 — settings cleanup (slice 1).** New `/more/account` sub-page houses Match
+  weight / Export / Delete account; the main More list shows a single
+  "Account & data" link in their place.
 
 ### Deviations / notes
 - **Onboarding step reorder (rule #8).** 08 §4 lists units **last**

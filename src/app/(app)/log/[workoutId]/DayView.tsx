@@ -64,6 +64,28 @@ type Commit = (fn: () => Promise<void>) => void;
  * to the session note; "pinned"/"session" edit that specific existing note. */
 type NoteOrigin = "menu" | "pinned" | "session";
 
+/** Edit-note pencil (PH42): a legible inline pencil replacing the bare `✎`
+ * glyph, sized ~20% larger than the note text and matching the icon-row SVGs. */
+function PencilGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+      <path
+        d="M11.3 2.3 13.7 4.7 5.4 13 2.2 13.8 3 10.6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 3.6 12.4 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+    </svg>
+  );
+}
+
 /** Planned slot count, widened to cover any logged/skipped beyond it. */
 function plannedSetCount(we: LoggedExercise): number {
   const maxLogged = we.sets.length
@@ -785,9 +807,9 @@ function ExerciseBlock({
               type="button"
               aria-label="edit pinned note"
               onClick={() => onNote("pinned")}
-              className="-my-1 shrink-0 px-1.5 py-1 text-[12px] text-ink/45"
+              className="-my-1 shrink-0 px-1.5 py-1 text-ink/55"
             >
-              ✎
+              <PencilGlyph />
             </button>
           )}
         </div>
@@ -802,8 +824,8 @@ function ExerciseBlock({
         >
           <span>NOTE — {we.feedback.notes}</span>
           {!readOnly && (
-            <span aria-hidden className="shrink-0 px-1.5 text-[12px] text-ink/40">
-              ✎
+            <span aria-hidden className="shrink-0 px-1.5 text-ink/50">
+              <PencilGlyph />
             </span>
           )}
         </button>
@@ -1409,7 +1431,9 @@ function SetRow({
                     ? "above prescription"
                     : "below prescription"
                 }
-                className="pointer-events-none absolute -right-1 -top-1 text-[8px] leading-none text-ink/50"
+                className={`pointer-events-none absolute -right-1 text-[8px] leading-none text-ink/50 ${
+                  performance === "over" ? "-top-1" : "-bottom-1"
+                }`}
               >
                 {performance === "over" ? "▲" : "▼"}
               </span>

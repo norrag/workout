@@ -99,6 +99,19 @@ describe("profiles", () => {
     expect(data?.auto_match_weights).toBe(true);
   });
 
+  it("owners can update a benign field without policy recursion", async () => {
+    // guards the profiles_update_own recursion fix (42P17): the WITH CHECK must
+    // not re-query profiles, or every owner update errors out.
+    const { data, error } = await alice
+      .from("profiles")
+      .update({ units: "kg" })
+      .eq("id", aliceId)
+      .select("units")
+      .maybeSingle();
+    expect(error).toBeNull();
+    expect(data?.units).toBe("kg");
+  });
+
   it("other users cannot change someone else's settings", async () => {
     const { data } = await bob
       .from("profiles")

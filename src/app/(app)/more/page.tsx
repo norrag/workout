@@ -5,7 +5,6 @@ import { getProfile } from "@/lib/queries/profiles";
 import { signOut } from "@/app/(auth)/actions";
 import { UnitsToggle } from "./UnitsToggle";
 import { ThemeToggle } from "./ThemeToggle";
-import { AutoMatchToggle } from "./AutoMatchToggle";
 import { formatHeight } from "@/lib/units";
 
 /** More tab (fig 4.4): profile card + inline settings. */
@@ -89,15 +88,6 @@ export default async function MorePage() {
         <div className="text-sm font-semibold">Theme</div>
         <ThemeToggle />
       </div>
-      <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
-        <div className="pr-3">
-          <div className="text-sm font-semibold">Match weight across sets</div>
-          <div className="mt-0.5 text-[10px] font-medium tracking-[0.04em] text-ink/55">
-            CHANGING A SET&apos;S WEIGHT UPDATES THE REST
-          </div>
-        </div>
-        <AutoMatchToggle enabled={profile?.auto_match_weights ?? false} />
-      </div>
       <Link
         href="/more/connector"
         className="flex items-center justify-between border-b border-ink/15 py-3.5"
@@ -107,23 +97,13 @@ export default async function MorePage() {
           SET UP ›
         </div>
       </Link>
-      <a
-        href="/more/export"
-        download
-        className="flex items-center justify-between border-b border-ink/15 py-3.5"
-      >
-        <div className="text-sm font-semibold">Export training data</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
-          CSV ›
-        </div>
-      </a>
       <Link
-        href="/more/delete-account"
+        href="/more/account"
         className="flex items-center justify-between border-b border-ink/15 py-3.5"
       >
-        <div className="text-sm font-semibold">Delete account</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-accent">
-          DELETE ›
+        <div className="text-sm font-semibold">Account &amp; data</div>
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+          MATCH WEIGHT · EXPORT · DELETE ›
         </div>
       </Link>
 

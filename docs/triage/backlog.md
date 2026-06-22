@@ -39,14 +39,14 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | needs-input |
 | P18 | Remove the set-type option from the set menu | UX | LOW | E | needs-input (spec conflict) |
 | P19 | Logged sets get a small over/under-prescription icon | F | LOW | E | done (rule = e1RM; PR pending) |
-| P20 | Exercise search list should live-filter as you type | UX | LOW | F | triaged (near-ready) |
+| P20 | Exercise search list should live-filter as you type | UX | LOW | F | done (client ExercisesBrowser; PR pending) |
 | P21 | Should soreness be recorded when user reports 0 days sore? | D | LOW | H | needs-input |
 | PR22 | RIR ramp: how is starting weight seeded? does it catch over-performance and re-baseline a new 0-RIR high-water-mark? | Q→F | — | A | resolved (removed in v2) → T-A6 |
 | PR23 | How is baseline weight & reps set (last vs best vs combo; recency/goal/averages)? | Q | — | A | resolved (removed in v2) |
 | PR24 | Mid-cycle add/sub of an exercise with history but none in the current meso — behavior? | Q | — | A | resolved (removed in v2) |
 | PR25 | Behavior when no history is present at all? | Q | — | A | resolved (removed in v2) |
 | PR26 | Retire the legacy increment path; understand its remaining use (likely bodyweight) and fold cleanly into a v9 engine model | F | HIGH | I | scoped (see `I-engine-v9.md`; spawns T-I1–T-I4) |
-| PH26 | Clean up settings page: move match-weight/export/delete-acct to a dedicated page | UX | LOW | F | triaged (near-ready) |
+| PH26 | Clean up settings page: move match-weight/export/delete-acct to a dedicated page | UX | LOW | F | done (/more/account; PR pending) |
 | PH27 | Move template share-code into the New Template button (tray: blank or enter code) | F | LOW | F | done (PR pending) |
 | PH28 | Profile height input behaves in cm→ft, ignores chosen units | B | HIGH | G | done (imply system from units; onboarding reordered; PR pending) |
 | PH29 | Page switches slow + double-layer label/loading glitch; want instant switch w/ placeholders | B | HIGH | G | triaged (needs repro) |
@@ -55,14 +55,14 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | PH32 | Tap a set in history to flip sets/reps ↔ e1RM view (fade anim, default sets/reps) | F | HIGH | B | inbox |
 | PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | LOW | H | needs-input (likely low/wontfix) |
 | PH34 | Meso-stats "planned sets" review — what counts as "planned"? completed + remaining prescribed | Q→B | — | C | triaged |
-| PH35 | BUG: application error on auto match weights | B | HIGH | G | done (PR #61 guarded the data path; this PR adds the missing error boundary + toggle revert — the real cause) |
+| PH35 | BUG: application error on auto match weights | B | HIGH | G | done — REAL cause was `profiles` RLS recursion (42P17); migration applied live + error boundary/toggle guards (PR pending) |
 | PH36 | Check model & weight-increment settings for bodyweight-only exercises | B/Q | MED | F | triaged (needs repro) |
 | PH37 | Aggregate strength gains per muscle group over macro/meso/all-time | F | — | C | inbox |
 | PH38 | First sets/reps wrong when you switch exercise (correct after reset to prescription) | B | HIGH | G | triaged (needs repro) |
 | PH39 | How fast does e1RM recency decay? (Pulldown e1RM 110.1 but did 115×11 on May 22) | Q | — | A | answered → T-A1 |
 | PH40 | Sets reprice as you log — recalculating after each set; should it only use prior sets? | Q→B | — | A | answered → T-A7 |
 | PH41 | History includes the current (incomplete) workout — expected it to be excluded until complete | Q→B | — | A | answered → T-A8 |
-| PH42 | Note pencil icon hard to recognize | UX | MED | E | ready (slice 1; absorbs I15 "icon present but illegible") |
+| PH42 | Note pencil icon hard to recognize | UX | MED | E | done (legible SVG PencilGlyph, +20%; absorbs I15) — PR pending |
 
 ## Open follow-up tasks (spawned during triage)
 
