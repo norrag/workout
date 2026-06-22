@@ -5,6 +5,12 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { ProfileRow } from "@/lib/types/database";
 import type { ExclusionWithExercise } from "@/lib/queries/exercises";
 import {
+  formatHeight,
+  isImperial,
+  cmToFeetInches,
+  feetInchesToCm,
+} from "@/lib/units";
+import {
   addExclusionAction,
   clearBodyFatAction,
   removeExclusionAction,
@@ -42,7 +48,7 @@ const FIELD_META: Record<
 > = {
   display_name: { label: "NAME", type: "text" },
   age: { label: "AGE", type: "number" },
-  height_cm: { label: "HEIGHT", type: "number", hint: "Centimeters" },
+  height_cm: { label: "HEIGHT", type: "number" },
   bodyweight: { label: "BODYWEIGHT", type: "number" },
   training_since: { label: "TRAINING SINCE", type: "date" },
 };
@@ -57,13 +63,6 @@ const BODY_FAT_BANDS = [
   { mid: 29, label: "~29%" },
   { mid: 35, label: "35%+" },
 ] as const;
-
-function formatHeight(heightCm: number | null, units: string): string {
-  if (heightCm == null) return "—";
-  if (units === "kg") return `${heightCm} CM`;
-  const totalIn = Math.round(heightCm / 2.54);
-  return `${Math.floor(totalIn / 12)}′${totalIn % 12}″`;
-}
 
 function shortDate(iso: string): string {
   const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -84,6 +83,9 @@ export function ProfileEditor({
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState<EditableField | null>(null);
   const [editValue, setEditValue] = useState("");
+  // imperial height edits in feet + inches (PH28); the canonical cm is derived
+  const [heightFeet, setHeightFeet] = useState("");
+  const [heightInches, setHeightInches] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [experience, setExperienceLocal] = useState(
     profile.experience_level ?? "beginner",
@@ -102,6 +104,7 @@ export function ProfileEditor({
   const [gender, setGenderLocal] = useState(profile.gender ?? "undisclosed");
 
   const units = profile.units;
+  const imperial = isImperial(units);
 
   const rows: { field: EditableField; value: React.ReactNode; raw: string }[] = [
     {
@@ -116,7 +119,7 @@ export function ProfileEditor({
     },
     {
       field: "height_cm",
-      value: formatHeight(profile.height_cm, units),
+      value: formatHeight(profile.height_cm, units) ?? "—",
       raw: profile.height_cm != null ? String(profile.height_cm) : "",
     },
     {
@@ -169,6 +172,16 @@ export function ProfileEditor({
             onClick={() => {
               setEditing(row.field);
               setEditValue(row.raw);
+              if (row.field === "height_cm" && imperial) {
+                if (profile.height_cm != null) {
+                  const { feet, inches } = cmToFeetInches(profile.height_cm);
+                  setHeightFeet(String(feet));
+                  setHeightInches(String(inches));
+                } else {
+                  setHeightFeet("");
+                  setHeightInches("");
+                }
+              }
               setEditError(null);
             }}
             className="flex w-full items-baseline justify-between border-b border-ink/15 py-3 text-left"
@@ -346,51 +359,106 @@ export function ProfileEditor({
       </p>
 
       {/* single-field edit sheet */}
-      {editing && (
-        <BottomSheet
-          open
-          onClose={() => setEditing(null)}
-          title={FIELD_META[editing].label.toLowerCase()}
-          subtitle={
-            editing === "height_cm"
-              ? "CENTIMETERS"
-              : editing === "bodyweight"
-                ? units.toUpperCase()
-                : undefined
-          }
-        >
-          <input
-            type={FIELD_META[editing].type}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            autoFocus
-            className="h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink focus:outline-none"
-          />
-          {editError && <p className="mt-2 text-sm text-accent">{editError}</p>}
-          <div className="mt-4 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => setEditing(null)}
-              className="px-4 py-3 text-[13px] font-semibold text-ink/60"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await updateProfileField(editing, editValue);
-                  if (result.error) setEditError(result.error);
-                  else setEditing(null);
-                })
+      {editing &&
+        (() => {
+          const imperialHeight = editing === "height_cm" && imperial;
+          const inputClass =
+            "h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink focus:outline-none";
+          const save = () =>
+            startTransition(async () => {
+              // imperial height is captured as feet + inches; persist canonical cm
+              const value = imperialHeight
+                ? String(
+                    feetInchesToCm(
+                      Number(heightFeet || 0),
+                      Number(heightInches || 0),
+                    ),
+                  )
+                : editValue;
+              const result = await updateProfileField(editing, value);
+              if (result.error) setEditError(result.error);
+              else setEditing(null);
+            });
+          return (
+            <BottomSheet
+              open
+              onClose={() => setEditing(null)}
+              title={FIELD_META[editing].label.toLowerCase()}
+              subtitle={
+                editing === "height_cm"
+                  ? imperial
+                    ? "FEET / INCHES"
+                    : "CENTIMETERS"
+                  : editing === "bodyweight"
+                    ? units.toUpperCase()
+                    : undefined
               }
-              className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
             >
-              SAVE
-            </button>
-          </div>
-        </BottomSheet>
-      )}
+              {imperialHeight ? (
+                <div className="flex gap-2">
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={2}
+                      max={8}
+                      value={heightFeet}
+                      onChange={(e) => setHeightFeet(e.target.value)}
+                      aria-label="height feet"
+                      autoFocus
+                      className={inputClass}
+                    />
+                    <span className="text-[13px] font-semibold text-ink/55">
+                      ft
+                    </span>
+                  </div>
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={11}
+                      value={heightInches}
+                      onChange={(e) => setHeightInches(e.target.value)}
+                      aria-label="height inches"
+                      className={inputClass}
+                    />
+                    <span className="text-[13px] font-semibold text-ink/55">
+                      in
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <input
+                  type={FIELD_META[editing].type}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  autoFocus
+                  className={inputClass}
+                />
+              )}
+              {editError && (
+                <p className="mt-2 text-sm text-accent">{editError}</p>
+              )}
+              <div className="mt-4 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditing(null)}
+                  className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={save}
+                  className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+                >
+                  SAVE
+                </button>
+              </div>
+            </BottomSheet>
+          );
+        })()}
 
       {/* exclusion picker */}
       <BottomSheet

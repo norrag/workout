@@ -2,7 +2,47 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-21 (latest) — Custom weight increment: free-typed load step on the Exercise page
+## 2026-06-22 (latest) — Triage slice: auto-match crash guard + set-marker, template tray, unit-aware height
+
+Field-notes triage slice (see `docs/triage/`): one bug fix and three feature
+items, all green (typecheck, lint, 486 tests).
+
+### Done
+- **PH35 — auto-match-weights crash, real fix.** PR #61 hardened the
+  `setPlannedSetWeight` data path, but the crash persisted because there was **no
+  error boundary in the app segment**: any rejection from an optimistic toggle's
+  `startTransition` (e.g. `setAutoMatchWeights`) bubbled to Next's raw
+  "application error" fallback. Added `src/app/(app)/error.tsx` (recoverable
+  ledger card + retry) and hardened both settings toggles
+  (`AutoMatchToggle`, `UnitsToggle`) to catch a failed write, revert the
+  optimistic state, and surface a quiet Toast — the documented online-only
+  pattern. No-op clicks (selecting the current value) are now ignored.
+- **P19 — over/under-prescription marker.** Logged sets in `DayView` `SetRow` get
+  a small `▲`/`▼` at the reps cell when the set landed above/below its
+  prescription, compared **by e1RM** (so it accounts for both reps hit and RIR in
+  reserve). On-target within a ±1.5% band shows no marker; null when there's no
+  prescription.
+- **PH27 — template "+ NEW" tray.** New `NewTemplateButton` opens a chooser sheet
+  (mirrors the create-cycle tray): *blank template* → planner draft, or *add from
+  a share code*. The redeem form moved off the page list into the tray.
+- **PH28 — unit-aware height.** New `src/lib/units.ts` consolidates the two
+  duplicated `formatHeight` copies and adds cm↔ft/in conversions. Height now
+  enters/displays in the user's measurement system (ft/in for lb, cm for kg) in
+  both `ProfileEditor` and onboarding; storage stays canonical `height_cm`. The
+  More "Units" row gained a subtitle noting it's the measurement system.
+
+### Deviations / notes
+- **Onboarding step reorder (rule #8).** 08 §4 lists units **last**
+  (`name/age/height/bodyweight → experience → equipment → units`). PH28 requires
+  the measurement system to be chosen **before** height/bodyweight so those fields
+  render in the right system, so the UNITS panel now comes first
+  (`units → about you → experience → equipment`). Step count (4) and all panel
+  copy are unchanged; only order. Recorded here per rule #8.
+- **P19 marker glyph** is house-style (no mockup figure exists for it); kept to a
+  small ink `▲`/`▼` per the ledger system (no accent — orange stays reserved for
+  position/selection).
+
+## 2026-06-21 — Custom weight increment: free-typed load step on the Exercise page
 
 The editable weight increment (doc 14 phase 3) shipped as a fixed chip picker —
 presets (lb: 2.5/5/10/15/25, kg: 1/2.5/5/7.5/10) ∪ the engine default ∪ the

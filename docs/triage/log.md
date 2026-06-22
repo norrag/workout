@@ -2,6 +2,32 @@
 
 Append a dated entry whenever a session moves work. Newest first.
 
+## 2026-06-22 — Session 3: identify the clean slices; ship PH35 (real fix) + slice 2
+
+- **Identified the independent (no open-question / no-larger-dependency) items.**
+  Slice 1 (build-now, clean): **PH42**, **P20**, **PH26**. Slice 2 (one small
+  decision away, now answered by owner): **P19**, **PH28**, **PH27**. Owner
+  corrections folded in: **PR #61 is merged but PH35 still crashes**; **I13**
+  confirmed merged (close); **I15** is the same icon as PH42 (illegible, not
+  missing) → folds into PH42; **M8** meso est-strength is present but the owner
+  wants its *meaning* clarified and has a broader meso/macro stats redesign in
+  mind → back to needs-input.
+- **Shipped PH35 + slice 2 in one PR** (branch `claude/nifty-darwin-xiwnxe`),
+  typecheck + lint green, **486 tests** passing (+5 new `units` tests):
+  - **PH35** — found the real cause: there was **no error boundary** in the
+    `(app)` segment, so any rejected server action inside an optimistic toggle's
+    transition rendered Next's raw "application error". Added
+    `src/app/(app)/error.tsx` and made `AutoMatchToggle` / `UnitsToggle` revert +
+    toast on failure (and ignore no-op clicks). PR #61's data-path guard stays.
+  - **P19** — `▲`/`▼` over/under marker on logged sets in `SetRow`, compared by
+    **e1RM** (per owner), ±1.5% on-target band, no marker without a prescription.
+  - **PH27** — `NewTemplateButton` tray (blank template → planner, or add from a
+    share code); redeem form moved off the page into the tray.
+  - **PH28** — new `src/lib/units.ts` (consolidates `formatHeight` + cm↔ft/in);
+    unit-aware height in `ProfileEditor` and onboarding; **onboarding reordered**
+    so units is chosen first (deviation from 08 §4 recorded in PROGRESS.md).
+- **Next:** slice 1 (PH42, P20, PH26) is still queued and fully clean.
+
 ## 2026-06-22 — Session 2: reconcile Notes v2, scope the v9 cleanup, ship two bug fixes
 
 - **Reconciled the backlog with Notes v2.** Owner pruned items session 1 resolved

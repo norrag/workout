@@ -6,13 +6,7 @@ import { signOut } from "@/app/(auth)/actions";
 import { UnitsToggle } from "./UnitsToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { AutoMatchToggle } from "./AutoMatchToggle";
-
-function formatHeight(heightCm: number | null, units: string): string | null {
-  if (heightCm == null) return null;
-  if (units === "kg") return `${heightCm} CM`;
-  const totalIn = Math.round(heightCm / 2.54);
-  return `${Math.floor(totalIn / 12)}′${totalIn % 12}″`;
-}
+import { formatHeight } from "@/lib/units";
 
 /** More tab (fig 4.4): profile card + inline settings. */
 export default async function MorePage() {
@@ -83,7 +77,12 @@ export default async function MorePage() {
         SETTINGS
       </div>
       <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
-        <div className="text-sm font-semibold">Units</div>
+        <div className="pr-3">
+          <div className="text-sm font-semibold">Units</div>
+          <div className="mt-0.5 text-[10px] font-medium tracking-[0.04em] text-ink/55">
+            MEASUREMENT SYSTEM — HEIGHT FOLLOWS THIS
+          </div>
+        </div>
         <UnitsToggle units={units} />
       </div>
       <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
