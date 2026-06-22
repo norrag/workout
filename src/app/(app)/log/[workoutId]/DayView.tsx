@@ -7,6 +7,7 @@ import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { useScrollLock } from "@/components/ui/useScrollLock";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
+import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
 import { HistorySheet } from "@/components/HistorySheet";
 import type {
@@ -15,7 +16,11 @@ import type {
   WorkoutDetail,
 } from "@/lib/queries/logging";
 import type { Units } from "@/lib/types/database";
-import { predictRepsAtWeight, type EngineParams } from "@/lib/engine";
+import {
+  predictRepsAtWeight,
+  estimateE1rm,
+  type EngineParams,
+} from "@/lib/engine";
 import {
   addSetAction,
   addWorkoutExercisesAction,
@@ -781,9 +786,9 @@ function ExerciseBlock({
               type="button"
               aria-label="edit pinned note"
               onClick={() => onNote("pinned")}
-              className="-my-1 shrink-0 px-1.5 py-1 text-[12px] text-ink/45"
+              className="-my-1 shrink-0 px-1.5 py-1 text-ink/55"
             >
-              ✎
+              <PencilGlyph />
             </button>
           )}
         </div>
@@ -798,8 +803,8 @@ function ExerciseBlock({
         >
           <span>NOTE — {we.feedback.notes}</span>
           {!readOnly && (
-            <span aria-hidden className="shrink-0 px-1.5 text-[12px] text-ink/40">
-              ✎
+            <span aria-hidden className="shrink-0 px-1.5 text-ink/50">
+              <PencilGlyph />
             </span>
           )}
         </button>
@@ -1296,6 +1301,30 @@ function SetRow({
 
   const staticCells = state === "future" || state === "skipped";
 
+  // P19: a logged set gets a small marker for whether it landed above or below
+  // its prescription, compared by e1RM so it accounts for both the reps hit and
+  // the RIR left in reserve (more reps OR closer to failure => above). Null when
+  // there's no prescription or the set isn't logged; on-target (within a small
+  // band) shows no marker to keep the row quiet.
+  const prescriptionE1rm =
+    prescribedWeight != null && prescribedReps != null
+      ? (estimateE1rm(prescribedWeight, prescribedReps, targetRir, params)
+          ?.value ?? null)
+      : null;
+  const loggedE1rm =
+    state === "logged" && logged
+      ? (estimateE1rm(logged.weight, logged.reps, logged.rir_reported, params)
+          ?.value ?? null)
+      : null;
+  const performance: "over" | "under" | null =
+    prescriptionE1rm != null && loggedE1rm != null && prescriptionE1rm > 0
+      ? loggedE1rm > prescriptionE1rm * 1.015
+        ? "over"
+        : loggedE1rm < prescriptionE1rm * 0.985
+          ? "under"
+          : null
+      : null;
+
   return (
     <div
       className={`relative grid grid-cols-[20px_1fr_1fr_44px] items-center gap-2.5 py-[4px] ${
@@ -1355,19 +1384,40 @@ function SetRow({
             }}
             className={cell}
           />
-          <input
-            type="text"
-            inputMode="numeric"
-            aria-label={`set ${setNumber} reps`}
-            value={reps}
-            onChange={(e) => {
-              setReps(e.target.value);
-              edited.current = true;
-              repsManual.current = true;
-            }}
-            onBlur={() => state === "logged" && save()}
-            className={cell}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label={`set ${setNumber} reps`}
+              value={reps}
+              onChange={(e) => {
+                setReps(e.target.value);
+                edited.current = true;
+                repsManual.current = true;
+              }}
+              onBlur={() => state === "logged" && save()}
+              className={cell}
+            />
+            {performance ? (
+              <span
+                aria-label={
+                  performance === "over"
+                    ? "above prescription"
+                    : "below prescription"
+                }
+                title={
+                  performance === "over"
+                    ? "above prescription"
+                    : "below prescription"
+                }
+                className={`pointer-events-none absolute -right-1 text-[8px] leading-none text-ink/50 ${
+                  performance === "over" ? "-top-1" : "-bottom-1"
+                }`}
+              >
+                {performance === "over" ? "▲" : "▼"}
+              </span>
+            ) : null}
+          </div>
         </>
       )}
       {/* LOG column — ≥44px-wide tap target around the 21px visual box */}

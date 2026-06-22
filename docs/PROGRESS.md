@@ -2,7 +2,68 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-21 (latest) — Custom weight increment: free-typed load step on the Exercise page
+## 2026-06-22 (latest) — Triage slices 1 + 2 + the real PH35 fix (profiles RLS recursion)
+
+Field-notes triage (see `docs/triage/`): the genuine PH35 root cause plus slice 1
+(PH42, P20, PH26) and slice 2 (P19, PH27, PH28). All green (typecheck, lint, 486
+unit tests).
+
+### Done
+- **PH35 — auto-match crash, REAL root cause: `profiles` RLS recursion.** PR #61
+  guarded the `setPlannedSetWeight` data path and this PR first added an error
+  boundary, but the setting still couldn't be saved — confirmed against the live
+  DB: **every regular-user UPDATE to `profiles` failed with
+  `42P17 infinite recursion detected in policy`**. `profiles_update_own`'s
+  WITH CHECK guarded role self-escalation with a subquery on `profiles` *inside* a
+  `profiles` policy (present since the initial schema; surfaced once Postgres
+  enforced recursion detection). Fix: migration
+  `20260622220627_fix_profiles_update_recursion.sql` reads the caller's role via a
+  SECURITY DEFINER helper (`current_profile_role()`, bypasses RLS), keeping the
+  anti-escalation guard without recursion. **Applied to the live project** and
+  verified (normal update OK; role escalation BLOCKED 42501). This broke not just
+  auto-match but units, profile edits, and onboarding.
+  - Defense-in-depth kept from the first pass: `src/app/(app)/error.tsx`
+    (recoverable card; the app had no error boundary) + `AutoMatchToggle` /
+    `UnitsToggle` revert-and-toast on a failed write, ignore no-op clicks.
+- **P19 — over/under-prescription marker.** Logged sets in `DayView` `SetRow` get
+  a small caret, compared **by e1RM** (accounts for reps hit and RIR in reserve),
+  ±1.5% on-target band, none without a prescription. Over = `▲` at the top corner,
+  under = `▼` at the bottom corner of the reps cell.
+- **PH27 — template "+ NEW" tray.** New `NewTemplateButton` chooser sheet (mirrors
+  the create-cycle tray): blank template → planner draft, or add from a share
+  code. Redeem form moved off the page list into the tray.
+- **PH28 — unit-aware height.** New `src/lib/units.ts` consolidates the two
+  duplicated `formatHeight` copies + cm↔ft/in conversions. Height enters/displays
+  in the user's system (ft/in for lb, cm for kg) in `ProfileEditor` and
+  onboarding; storage stays canonical `height_cm`. More "Units" row gained a
+  measurement-system subtitle.
+- **PH42 — note pencil (slice 1).** Replaced **every** bare `✎` glyph (illegible
+  `text-ink/40`, ~11px) with a shared legible inline SVG `PencilGlyph`
+  (`components/ui/PencilGlyph.tsx`, 15–16px, matching the icon-row SVGs): exercise
+  **history** rows (the one actually visible in the field screenshot), day-view
+  pinned/session notes, the exercise-page pinned note, and the planner's
+  "EDIT DAY". (This is the I15 item — the icon existed but wasn't legible.)
+- **P20 — live exercise search (slice 1).** `exercises/page.tsx` now loads the
+  library and renders a client `ExercisesBrowser` that filters by search text **as
+  you type** plus both MUSCLE/EQUIP axes instantly (no navigation round-trip).
+  Replaces the server `?q=` submit-to-search; filter state is now client-only
+  (URL deep-linking of filters dropped — acceptable for instant filtering).
+- **PH26 — settings cleanup (slice 1).** New `/more/account` sub-page houses Match
+  weight / Export / Delete account; the main More list shows a single
+  "Account & data" link in their place.
+
+### Deviations / notes
+- **Onboarding step reorder (rule #8).** 08 §4 lists units **last**
+  (`name/age/height/bodyweight → experience → equipment → units`). PH28 requires
+  the measurement system to be chosen **before** height/bodyweight so those fields
+  render in the right system, so the UNITS panel now comes first
+  (`units → about you → experience → equipment`). Step count (4) and all panel
+  copy are unchanged; only order. Recorded here per rule #8.
+- **P19 marker glyph** is house-style (no mockup figure exists for it); kept to a
+  small ink `▲`/`▼` per the ledger system (no accent — orange stays reserved for
+  position/selection).
+
+## 2026-06-21 — Custom weight increment: free-typed load step on the Exercise page
 
 The editable weight increment (doc 14 phase 3) shipped as a fixed chip picker —
 presets (lb: 2.5/5/10/15/25, kg: 1/2.5/5/7.5/10) ∪ the engine default ∪ the

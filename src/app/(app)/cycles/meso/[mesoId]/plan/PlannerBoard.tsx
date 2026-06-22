@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { HistorySheet } from "@/components/HistorySheet";
 import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
@@ -690,9 +691,10 @@ export function PlannerBoard({
             <button
               type="button"
               onClick={() => setDaySetupId(activeDay.id)}
-              className="font-bold text-ink underline underline-offset-2"
+              className="inline-flex items-center gap-1 font-bold text-ink"
             >
-              ✎ EDIT DAY
+              <PencilGlyph size={13} />
+              <span className="underline underline-offset-2">EDIT DAY</span>
             </button>
           </div>
 

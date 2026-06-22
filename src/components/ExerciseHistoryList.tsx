@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import type { HistoryEntry } from "@/lib/queries/history";
 
 function shortDate(iso: string): string {
@@ -65,9 +66,9 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
                     {hasNote && (
                       <span
                         aria-label="has a session note"
-                        className={`translate-y-[1px] text-[11px] ${noteOpen ? "text-accent" : "text-ink/45"}`}
+                        className={`self-center ${noteOpen ? "text-accent" : "text-ink/45"}`}
                       >
-                        ✎
+                        <PencilGlyph size={15} />
                       </span>
                     )}
                     <span>

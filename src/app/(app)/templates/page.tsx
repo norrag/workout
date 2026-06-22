@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
-import { RedeemForm } from "@/components/RedeemForm";
-import { startScratchDraftAction } from "../cycles/actions";
+import { NewTemplateButton } from "./NewTemplateButton";
 import { TemplateFilters } from "./TemplateFilters";
 
 /** Templates tab (fig 3.3): stock + own templates, search, filters, start-from-template. */
@@ -35,16 +34,9 @@ export default async function TemplatesPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="title-display text-[32px]">templates</h1>
-        {/* New template = open the planner board (a fresh draft); build the
-            split there, then SAVE AS TEMPLATE. (#7 — redirect to the planner.) */}
-        <form action={startScratchDraftAction}>
-          <button
-            type="submit"
-            className="border-[1.5px] border-ink px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em]"
-          >
-            + NEW
-          </button>
-        </form>
+        {/* New template = a tray (PH27): blank planner draft, or add from a
+            share code. */}
+        <NewTemplateButton />
       </div>
 
       <form method="get">
@@ -61,7 +53,6 @@ export default async function TemplatesPage({
         />
       </form>
       <TemplateFilters days={days} emphasis={emphasis} gender={gender} />
-      <RedeemForm />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         {templates.length === 0 && (
