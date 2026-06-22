@@ -683,8 +683,11 @@ export async function setPlannedSetWeight(
     .from("workout_exercises")
     .select("prescribed_sets, set_weights")
     .eq("id", workoutExerciseId)
-    .single();
+    .maybeSingle();
   if (weError) throw weError;
+  // Row absent or RLS-hidden: nothing to seed a planned weight onto. No-op
+  // rather than throw, so auto-match never escalates a benign miss to a crash.
+  if (!we) return;
 
   const next: Record<string, number> = { ...(we.set_weights ?? {}) };
 

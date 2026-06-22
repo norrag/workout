@@ -66,13 +66,20 @@ export function CreateMacroForm({
   const router = useRouter();
   const [goal, setGoal] = useState<MacroGoal>("hypertrophy");
   const [duration, setDuration] = useState<number | "custom">(6);
-  const [customMonths, setCustomMonths] = useState(8);
+  // Held as a string so the field can be momentarily empty while the user
+  // backspaces to retype; the clamped numeric value below feeds every consumer,
+  // and the input is normalized on blur.
+  const [customMonths, setCustomMonths] = useState("8");
+  const customMonthsNum = Math.max(
+    1,
+    Math.min(60, Math.floor(Number(customMonths)) || 1),
+  );
   // auto-suggest the block length that divides the macro most evenly, until
   // the user overrides it (then their choice sticks).
   const [mesoLength, setMesoLength] = useState(() => suggestMesoLength(6));
   const [mesoTouched, setMesoTouched] = useState(false);
 
-  const durationMonths = duration === "custom" ? customMonths : duration;
+  const durationMonths = duration === "custom" ? customMonthsNum : duration;
 
   useEffect(() => {
     if (!mesoTouched) setMesoLength(suggestMesoLength(durationMonths));
@@ -84,12 +91,12 @@ export function CreateMacroForm({
         {
           goal,
           profile,
-          durationMonths: duration === "custom" ? customMonths : duration,
+          durationMonths,
           mesoLengthWeeks: mesoLength,
         },
         params,
       ),
-    [goal, duration, customMonths, mesoLength, profile, params],
+    [goal, durationMonths, mesoLength, profile, params],
   );
 
   const noun = GOAL_NOUN[goal];
@@ -170,14 +177,14 @@ export function CreateMacroForm({
         <div className="mt-2 flex items-center gap-2.5">
           <input
             type="number"
+            inputMode="numeric"
             min={1}
             max={60}
             value={customMonths}
             onChange={(e) =>
-              setCustomMonths(
-                Math.max(1, Math.min(60, Number(e.target.value) || 1)),
-              )
+              setCustomMonths(e.target.value.replace(/[^0-9]/g, ""))
             }
+            onBlur={() => setCustomMonths(String(customMonthsNum))}
             className="numeral h-10 w-20 border-[1.5px] border-ink bg-paper px-3 text-center text-[15px] font-bold focus:outline-none"
           />
           <span className="text-[11px] font-medium tracking-[0.08em] text-ink/55">

@@ -7,35 +7,45 @@ Verbatim source text for each item is preserved in the [appendix](#appendix-verb
 Type: `Q` question · `B` bug · `F` feature · `UX` polish · `D` needs-decision.
 Status legend and workstreams: see [`README.md`](./README.md).
 
+> **Reconciled with Notes v2 (2026-06-22).** The owner pruned items that session 1
+> resolved and added two. Removed as stale/resolved: **S4**, **S5** (answered in
+> `A-engine-metrics.md`), **I13** (shipped), **I15** (already exists),
+> **PR22–PR25** (answered). Added: **S8** (engine add/remove sets/reps — answered
+> by the existing S7/S4 research) and **PR26** (retire the legacy increment path →
+> v9, the new substantive engine task). Removed items are kept here with status
+> `resolved (removed in v2)` rather than deleted, so the history is intact.
+
 ## Index
 
 | ID | Title | Type | Pri | WS | Status |
 |----|-------|------|-----|----|--------|
 | S1 | How is estimated strength (e1RM) calculated? | Q | — | A | answered |
-| S2 | How is strength increase calculated? | Q | — | A | answered |
+| S2 | How is strength increase calculated? (e.g. Est. Strength Key Lifts) | Q | — | A | answered |
 | S3 | How are deload weeks handled in stats? | Q | — | A | answered → T-A2 |
-| S4 | Progression: add sets vs reps vs weight; is "weight every week" right? double-progression? | Q→F | — | A | answered → T-A3 |
-| S5 | How are misses defined and handled? | Q | — | A | answered → T-A4 |
+| S4 | Progression: add sets vs reps vs weight; double-progression? | Q | — | A | resolved (removed in v2) → T-A3 |
+| S5 | How are misses defined and handled? | Q | — | A | resolved (removed in v2) → T-A4 |
 | S6 | Does adding a set manually transfer to future plans? | Q | — | A | answered |
 | S7 | How is the number of sets planned? | Q | — | A | answered → T-A5 |
+| S8 | When/why/how does the engine add or remove sets/reps? | Q | — | A | answered (see S7 + S4) |
 | M8 | Stats unification: meso gets est-strength under performance; macro gets balance+performance via 3-way toggle | F | — | C | triaged (meso part done; macro part needs-input) |
-| M9 | Macrocycle custom-duration field won't allow momentary empty cell (can't backspace to re-enter) | B | MED | D | ready |
+| M9 | Macrocycle custom-duration field won't allow momentary empty cell (can't backspace to re-enter) | B | MED | D | done (PR #61) |
 | M10 | Show only *unplanned* mesocycles on the macrocycle overview page | UX | — | D | needs-input |
 | I11 | Meso stats rework — include strength increases for all exercises | F | HIGH | C | triaged |
 | I12 | Address mesocycle management under a macrocycle | F | HIGH | D | triaged (needs design pass) |
-| I13 | Per-exercise, per-user weight increment | F | HIGH | F | verify-done |
+| I13 | Per-exercise, per-user weight increment | F | HIGH | F | done (confirmed — removed in v2) |
 | I14 | Raise complete-workout feedback slider resolution to match per-exercise feedback | F | HIGH | E | needs-input (scope) |
-| I15 | Add exercise-note icon left of the history icon in day view | F | HIGH | E | superseded (already exists → see PH42) |
+| I15 | Add exercise-note icon left of the history icon in day view | F | HIGH | E | done (already exists — removed in v2; see PH42) |
 | P16 | Meso overview buttons monotonous/ugly → overview↔stats page toggle | UX | LOW | C | needs-input |
 | P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | needs-input |
 | P18 | Remove the set-type option from the set menu | UX | LOW | E | needs-input (spec conflict) |
 | P19 | Logged sets get a small over/under-prescription icon | F | LOW | E | triaged (near-ready) |
 | P20 | Exercise search list should live-filter as you type | UX | LOW | F | triaged (near-ready) |
 | P21 | Should soreness be recorded when user reports 0 days sore? | D | LOW | H | needs-input |
-| PR22 | RIR ramp: how is starting weight seeded? does it catch over-performance and re-baseline a new 0-RIR high-water-mark? | Q→F | — | A | answered → T-A6 |
-| PR23 | How is baseline weight & reps set (last vs best vs combo; recency/goal/averages)? | Q | — | A | answered |
-| PR24 | Mid-cycle add/sub of an exercise with history but none in the current meso — behavior? | Q | — | A | answered |
-| PR25 | Behavior when no history is present at all? | Q | — | A | answered |
+| PR22 | RIR ramp: how is starting weight seeded? does it catch over-performance and re-baseline a new 0-RIR high-water-mark? | Q→F | — | A | resolved (removed in v2) → T-A6 |
+| PR23 | How is baseline weight & reps set (last vs best vs combo; recency/goal/averages)? | Q | — | A | resolved (removed in v2) |
+| PR24 | Mid-cycle add/sub of an exercise with history but none in the current meso — behavior? | Q | — | A | resolved (removed in v2) |
+| PR25 | Behavior when no history is present at all? | Q | — | A | resolved (removed in v2) |
+| PR26 | Retire the legacy increment path; understand its remaining use (likely bodyweight) and fold cleanly into a v9 engine model | F | HIGH | I | scoped (see `I-engine-v9.md`; spawns T-I1–T-I4) |
 | PH26 | Clean up settings page: move match-weight/export/delete-acct to a dedicated page | UX | LOW | F | triaged (near-ready) |
 | PH27 | Move template share-code into the New Template button (tray: blank or enter code) | F | LOW | F | triaged (near-ready) |
 | PH28 | Profile height input behaves in cm→ft, ignores chosen units | B | HIGH | G | triaged (needs-input if separate pref) |
@@ -45,7 +55,7 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | PH32 | Tap a set in history to flip sets/reps ↔ e1RM view (fade anim, default sets/reps) | F | HIGH | B | inbox |
 | PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | LOW | H | needs-input (likely low/wontfix) |
 | PH34 | Meso-stats "planned sets" review — what counts as "planned"? completed + remaining prescribed | Q→B | — | C | triaged |
-| PH35 | BUG: application error on auto match weights | B | HIGH | G | ready |
+| PH35 | BUG: application error on auto match weights | B | HIGH | G | fix applied (PR #61) — needs device verify |
 | PH36 | Check model & weight-increment settings for bodyweight-only exercises | B/Q | MED | F | triaged (needs repro) |
 | PH37 | Aggregate strength gains per muscle group over macro/meso/all-time | F | — | C | inbox |
 | PH38 | First sets/reps wrong when you switch exercise (correct after reset to prescription) | B | HIGH | G | triaged (needs repro) |
@@ -63,12 +73,16 @@ and rationale in [`A-engine-metrics.md`](./A-engine-metrics.md#spawned-follow-up
 |----|------|-------|------|--------|
 | T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley stats view); decide what screens show | D→F | needs-input |
 | T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores` | D→B | needs-input |
-| T-A3 | S4 | Confirm active `weight_selection`; surface/log the low-confidence fallback to legacy increment path | Q→B | triaged |
-| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | needs-input |
-| T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input |
+| T-A3 | S4 | Confirm active `weight_selection`; surface the legacy fallback | Q→B | resolved (fallback moot under v9; folded into WS I) |
+| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | needs-input (see also T-I3) |
+| T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input (sequenced in WS I) |
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
 | T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D | needs-input |
 | T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D | needs-input |
+| T-I1 | PR26 | Decide bodyweight data model (flag vs split buckets; loadable anchoring; store bodyweight-in-set?) | D | needs-input |
+| T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 |
+| T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | needs-input |
+| T-I4 | PR26 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | blocked on T-I2 |
 
 ---
 
@@ -85,6 +99,9 @@ never lost.
 - **S5** — How does the progression algorithm handle misses, and what's the definition of misses? What does it do in response?
 - **S6** — Does adding a set manually transfer to future workout plans?
 - **S7** — How are number of sets planned?
+- **S8** — When/why/how does the engine add or remove sets/reps? *(added v2)*
+
+> _v2 removed S4 ("Progression algorithm tuning: when to add sets, reps, or weight? It seems like it's preferring to add weight each week… [double-progression description]") and S5 ("How does the progression algorithm handle misses…") as resolved — answers retained in `A-engine-metrics.md`._
 
 ### Macrocycles
 - **M8** — "I'm thinking there should be a bit of stats unification between meso stats and macro stats. Stats that should be in both: Meso stats should get estimated strength under performance. Macro stats should get the same balance and performance tabs, probably via a three way page toggle; overview, balance, performance."
@@ -107,6 +124,10 @@ never lost.
 - **P21** — "Should muscle soreness be recorded when the user states they were sore for 0 days?"
 
 ### Progression model
+- **PR26** *(added v2)* — "From what I understand the legacy increment path that it's keeping as a fall back. This legacy model probably shouldn't be present at all, however we need to understand where and how it's still used if at all to ensure it's done correctly. I think the only remaining use case might be how bodyweight only and bodyweight loadable exercises are handled. We should consider these and any other use cases and probably roll them into the v9 model so that everything is handled cleanly."
+
+> _v2 removed PR22–PR25 (RIR-ramp seeding, baselining, mid-cycle swap-in, no-history) as resolved — answers retained in `A-engine-metrics.md`. Kept below for the record:_
+
 - **PR22** — "how does it seed the starting weight? does it catch progression that might exceed the rir prescription, and if so what does it do with it? … on occasion most of us will hit a 0 rir week … and realize we've got more in the tank. [leg press 190×3×8 @1RIR, next week @0RIR hit 12 then 20 reps] … Will it catch that and landmark that high water mark as my new 0 rir going forward, and keep the user appropriately honest going forward? This would be the goal, but accomplishing it may be nuanced."
 - **PR23** — "How is the baseline weight and reps set? I.e. does it go off last recorded only, best historical, some combination of both? Does macrocycle goal, recency, averages, or anything else play a part in determining the baseline which the ramp is based on?"
 - **PR24** — "What does it do if I add or sub in an exercise mid-cycle which has exercise history, but no history in the current meso?"

@@ -113,7 +113,8 @@ prior meso's bumped count. There's no "one-off" flag. **Status: answered.**
 
 Initial count = planner board `meso_exercises.initial_sets` (clamped to
 `[min_sets, max_sets]` via `seedMeso`). Week-to-week autoregulation
-(`modulateFromFeedback`, `src/lib/engine/rules/feedback.ts:18-62`): workload slider
+(`modulateFromFeedback`, `src/lib/engine/rules/feedback.ts:18-62`; the active params
+are **v9**, `20260619000001_engine_params_v9_rep_window.sql`): workload slider
 ≥ `workload_high` (8) ⇒ −1 set; ≤ `workload_low` (3) **and** pump ≥
 `set_add_pump_min` (6) **and** goal is gain/hypertrophy **and** muscle-group weekly
 sets < `mg_set_ceiling` (20) ⇒ +1 set; joint pain ≥ `pain_gate` (2) gates load
@@ -223,7 +224,7 @@ workout is completed — interacts with PH40). **Status: answered → spawns T-A
 |----|------|------|------|
 | T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley view) — document the divergence and decide whether stats screens should show the anchor. | D→F |
 | T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores`. | D→B |
-| T-A3 | S4 | Confirm active `weight_selection`; surface/log the low-confidence fallback to the legacy increment path. | Q→B |
+| T-A3 | S4 | ~~Surface/log the low-confidence fallback~~ — **resolved by the PR26 investigation:** active `weight_selection` is `rep_window` with `min_confidence: low`, so the confidence fallback never fires; the legacy path is reached via **no anchor** (bodyweight/cold-start). Folded into workstream **I** (`I-engine-v9.md`). | Q→B |
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode, or document the anchor as sole mechanism. | D |
 | T-A5 | S7 | Implement graded MEV→MAV→MRV volume ramp + MRV-stop auto-deload, or amend doc 10 to the ±1 model. | D→F |
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep-based high-water-mark, not just the top-weight PR (the honesty mechanism the leg-press note wants). | F |

@@ -76,6 +76,7 @@ is picked up.
 | **F** | Settings, profile & search | _tbd_ | Settings page cleanup, template-code flow, profile height units, live search filter, bodyweight-exercise settings. |
 | **G** | Bugs | _tbd_ | Discrete defects to reproduce + fix (match-weights crash, page-switch flicker, switch-exercise prescription, height units). |
 | **H** | Needs product decision | _tbd_ | Items blocked on an owner call (LLM prescription analysis, admin-tool privacy, soreness rule). |
+| **I** | Engine v9 cleanup | [`I-engine-v9.md`](./I-engine-v9.md) | Retire the legacy increment path and fold genuinely-needed behavior (bodyweight-only / -loadable, cold start, big-miss back-off) into a clean v9 model. Pulls in T-A3, T-A5, PH36. |
 
 ## Resuming across sessions
 

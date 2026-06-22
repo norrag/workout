@@ -2,6 +2,36 @@
 
 Append a dated entry whenever a session moves work. Newest first.
 
+## 2026-06-22 — Session 2: reconcile Notes v2, scope the v9 cleanup, ship two bug fixes
+
+- **Reconciled the backlog with Notes v2.** Owner pruned items session 1 resolved
+  and added two. Removed as resolved: S4, S5, I13, I15, PR22–PR25 (kept with
+  `resolved (removed in v2)`). Added **S8** (engine add/remove sets/reps — answered
+  by existing S7/S4 research) and **PR26** (retire the legacy increment path → v9).
+- **Corrected a session-1 error:** the active engine is **already v9**
+  (`weight_selection: rep_window`, `min_confidence: low`), not v8. This makes the
+  T-A3 "silent confidence fallback" essentially moot in production — the legacy
+  path is reached via **no anchor** (bodyweight-only + cold start), not confidence.
+- **Scoped PR26** into [`I-engine-v9.md`](./I-engine-v9.md) via a code investigation:
+  the legacy path is the de-facto bodyweight/cold-start path; bodyweight needs a
+  real data-model change (no `is_bodyweight` flag today; `weight=0` makes the
+  rep-window math null; both bodyweight equipment buckets collapse to one). Spawned
+  T-I1–T-I4.
+- **Shipped two bug fixes** (the queued first slice), with `typecheck` + `lint`
+  green and all **481 tests passing**:
+  - **M9** — `CreateMacroForm` custom-duration field now holds a string and clamps
+    on blur, so it can be emptied and retyped.
+  - **PH35** — `setPlannedSetWeight` uses `.maybeSingle()` + no-ops on a missing
+    row; `persistPlannedWeight` routes through `runLog` (try/catch + toast) instead
+    of the unguarded `commit`, so an auto-match write failure can't trip the
+    app-error page. (Exact on-device trigger unconfirmed; this removes the crash
+    surface + the most likely cause — flagged for device verify.)
+
+### Next session — suggested starting point
+- The big open cluster is **needs-input decisions** (T-A1/2/4/6/7/8, T-I1/3, plus
+  M10/P16/P17/P18/PH28/PH30/PH33). Walking these with the owner unblocks the most
+  work. The v9 cleanup (WS I) is the largest engine effort and starts with T-I1.
+
 ## 2026-06-22 — Session 1: set up the triage system, parse + first-pass triage
 
 - Imported the Notes doc (2026-06-22) and parsed **42 distinct items** across 6
