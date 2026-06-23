@@ -2,6 +2,40 @@
 
 Append a dated entry whenever a session moves work. Newest first.
 
+## 2026-06-23 — Session 5: Workstream B — e1RM audit & exposure (PH31 + PH32)
+
+Owner picked the next slice = **Workstream B** and made the two scoping calls:
+store the **RIR-aware engine e1RM** per set (not raw Epley), and ship **PH31 + PH32
+together**. Existing stats screens/views were left on their current raw-Epley
+numbers — this slice only *adds* the engine value (keeps us out of the broader
+T-A1 reconciliation).
+
+- **PH31 — store + expose per-set e1RM.**
+  - Migration `20260623130000_logged_set_e1rm.sql`: nullable `logged_sets.e1rm`,
+    column comment, **backfill** of all historical working sets via the same
+    formula (rir_offset read from the active engine_params row). RLS unchanged
+    (policies are column-agnostic, owner-scoped).
+  - Write path: `logSetAction`/`amendSetAction` compute the value with the
+    engine's `estimateE1rm` (effective reps = reps + rir·offset) from active
+    params and store it; amend recomputes. `logSet` input + `amendSet` patch
+    gained `e1rm`; `LoggedSetRow` + the insert `Defaulted` set updated.
+  - MCP: `get_exercise_history` now returns a per-session `e1rm` (session best),
+    with an honesty caveat in the dataQuality note (estimate/trend, null on
+    bodyweight, distinct from the view's raw-Epley e1RM).
+- **PH32 — tap-to-flip history view.** `ExerciseHistoryList` gained a list-wide
+  `flipped` state: tap any row to flip every row between `weight × reps` and the
+  session-best `e1RM`, with a quick `metric-fade` (reduced-motion → instant);
+  default on load is sets/reps. The session-note reveal moved onto its own note
+  icon button so the row tap is unambiguously the flip. Bodyweight/null → "—".
+- **Pure helper + tests:** extracted `sessionBestE1rm` (max over non-null,
+  null-if-none) and unit-tested it; updated the three `HistoryEntry` fixtures and
+  added an `e1rm` assertion to the MCP formatter test. Engine `estimateE1rm`
+  already covers the bodyweight=0→null and Epley-fallback cases the backfill
+  relies on. Green: typecheck, lint, **489 tests** (+3).
+- **Deploy note:** the migration must be applied to the live DB **with** the code
+  deploy — inserts write `e1rm`, so deploying code ahead of the column would break
+  set logging. Not applied to live in this session (feature branch only).
+
 ## 2026-06-22 — Session 4: real PH35 cause (RLS recursion) + slices 1 & 2 in one PR
 
 Owner asked to ship slice 1 + slice 2 + PH35 together, and flagged that PH35 was

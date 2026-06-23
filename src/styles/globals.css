@@ -119,12 +119,33 @@ body {
   }
 }
 
+/*
+ * Quick crossfade for the history metric when it flips between weight×reps and
+ * e1RM (PH32). Keyed remount re-triggers the fade on each flip.
+ */
+.metric-fade {
+  animation: metric-fade 0.18s ease-out;
+}
+
+@keyframes metric-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* No travelling gap — pulse the static outline instead. */
   .log-checkbox-gap {
     animation: log-checkbox-pulse 1.1s ease-in-out infinite;
   }
   .log-checkbox-shake {
+    animation: none;
+  }
+  /* No fade — swap the metric instantly. */
+  .metric-fade {
     animation: none;
   }
 }

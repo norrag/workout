@@ -51,8 +51,8 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | PH28 | Profile height input behaves in cm→ft, ignores chosen units | B | HIGH | G | done (imply system from units; onboarding reordered; PR pending) |
 | PH29 | Page switches slow + double-layer label/loading glitch; want instant switch w/ placeholders | B | HIGH | G | triaged (needs repro) |
 | PH30 | Expanded weekly prescription explanation — LLM API for brief analysis? | D | — | H | needs-input |
-| PH31 | Store calculated e1RM per set; expose to public MCP tools (audit) | F | HIGH | B | inbox |
-| PH32 | Tap a set in history to flip sets/reps ↔ e1RM view (fade anim, default sets/reps) | F | HIGH | B | inbox |
+| PH31 | Store calculated e1RM per set; expose to public MCP tools (audit) | F | HIGH | B | done (logged_sets.e1rm + backfill; RIR-aware engine formula; MCP history; PR pending) |
+| PH32 | Tap a set in history to flip sets/reps ↔ e1RM view (fade anim, default sets/reps) | F | HIGH | B | done (list-wide flip in ExerciseHistoryList, session-best e1rm, metric-fade; PR pending) |
 | PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | LOW | H | needs-input (likely low/wontfix) |
 | PH34 | Meso-stats "planned sets" review — what counts as "planned"? completed + remaining prescribed | Q→B | — | C | triaged |
 | PH35 | BUG: application error on auto match weights | B | HIGH | G | done — REAL cause was `profiles` RLS recursion (42P17); migration applied live + error boundary/toggle guards (PR pending) |

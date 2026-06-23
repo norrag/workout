@@ -17,6 +17,8 @@ type Defaulted =
   | "dep_fingerprint"
   // engine_decisions.kind defaults to 'advance' in the DB; seed writers pass it
   | "kind"
+  // nullable per-set e1RM (PH31); computed at log/amend time, optional on insert
+  | "e1rm"
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
@@ -289,6 +291,8 @@ export type LoggedSetRow = {
   reps: number;
   set_type: SetType;
   rir_reported: number | null;
+  /** engine per-set e1RM estimate (PH31); null for bodyweight/non-working sets */
+  e1rm: number | null;
   is_warmup: boolean;
   notes: string | null;
   created_at: string;

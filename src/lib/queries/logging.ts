@@ -417,6 +417,8 @@ export async function logSet(
     reps: number;
     rir_reported: number | null;
     set_type: SetType;
+    /** engine per-set e1RM (PH31), computed by the caller from active params */
+    e1rm: number | null;
   },
 ): Promise<LoggedSetRow> {
   // denormalized cycle stamps come from the workout chain
@@ -461,6 +463,7 @@ export async function logSet(
       reps: input.reps,
       set_type: input.set_type,
       rir_reported: input.rir_reported,
+      e1rm: input.e1rm,
       is_warmup: false,
       notes: null,
     })
@@ -628,7 +631,9 @@ export async function amendSet(
   supabase: Client,
   userId: string,
   setId: string,
-  patch: Partial<Pick<LoggedSetRow, "weight" | "reps" | "rir_reported" | "set_type">>,
+  patch: Partial<
+    Pick<LoggedSetRow, "weight" | "reps" | "rir_reported" | "set_type" | "e1rm">
+  >,
 ): Promise<void> {
   const { error } = await supabase
     .from("logged_sets")

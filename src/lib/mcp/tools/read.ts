@@ -516,6 +516,10 @@ export function formatExerciseHistory(
       is_deload: s.is_deload,
       top_weight: s.top_weight,
       reps_at_top: s.reps,
+      // engine per-set e1RM (PH31): the session's best stored estimate (averaged
+      // Epley/Brzycki over effective reps). Null on bodyweight sessions. This is
+      // the engine's value, distinct from the raw-Epley e1RM in v_exercise_*.
+      e1rm: s.e1rm,
       session_note: s.session_note,
     })),
     note: truncated
@@ -532,8 +536,9 @@ function registerGetExerciseHistory(server: McpServer) {
       title: "Get exercise history",
       description:
         "Session-by-session history for one exercise (newest first): top weight " +
-        "with reps, the W·D coordinate and mesocycle, deload flags, plus both " +
-        "note kinds — the exercise's pinned note and per-session log notes.",
+        "with reps, the session's best engine e1RM estimate, the W·D coordinate " +
+        "and mesocycle, deload flags, plus both note kinds — the exercise's " +
+        "pinned note and per-session log notes.",
       inputSchema: { exercise_id: z.string().uuid() },
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
@@ -563,7 +568,7 @@ function registerGetExerciseHistory(server: McpServer) {
               lifetime_sessions: overview.data?.times_trained ?? null,
             },
             estimates:
-              "top_weight × reps drive Epley e1RM elsewhere; per-session rows here are logged actuals, not estimates",
+              "top_weight × reps are logged actuals; e1rm is the engine's per-set estimate (averaged Epley/Brzycki over effective reps = reps + RIR·offset), the session's best — an estimate/trend, not a tested 1RM. Null on bodyweight sessions. Differs from the raw-Epley e1RM in the stats views (v_exercise_*).",
           },
         },
       );
