@@ -4,6 +4,8 @@ import {
   formatHeight,
   cmToFeetInches,
   feetInchesToCm,
+  roundWeight,
+  formatWeight,
 } from "../units";
 
 describe("units (PH28)", () => {
@@ -36,6 +38,29 @@ describe("units (PH28)", () => {
     for (const cm of [150, 165, 178, 190, 200]) {
       const { feet, inches } = cmToFeetInches(cm);
       expect(Math.abs(feetInchesToCm(feet, inches) - cm)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("snaps weights to the nearest 0.5", () => {
+    expect(roundWeight(19.92)).toBe(20);
+    expect(roundWeight(22.4)).toBe(22.5);
+    expect(roundWeight(6.8)).toBe(7);
+    expect(roundWeight(45.36)).toBe(45.5);
+  });
+
+  it("formats a weight without a trailing .0", () => {
+    expect(formatWeight(20.0)).toBe("20");
+    expect(formatWeight(22.5)).toBe("22.5");
+    expect(formatWeight(19.92)).toBe("20");
+  });
+
+  it("displays a clean lb↔kg↔lb toggle (stored stays finer than display)", () => {
+    // mirrors the migration's round-to-0.1 storage + 0.5 display snap
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    for (const lb of [15, 20, 22.5, 25, 100, 135]) {
+      const kg = r1(lb * 0.45359237);
+      const back = r1(kg * 2.20462262);
+      expect(formatWeight(back)).toBe(formatWeight(lb));
     }
   });
 });

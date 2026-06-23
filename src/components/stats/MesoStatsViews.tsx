@@ -1,3 +1,4 @@
+import { formatWeight } from "@/lib/units";
 import type { MesoStats } from "@/lib/queries/stats";
 
 // Shared renderers for the meso-stats views (figs 4.1–4.3) — used by the
@@ -230,7 +231,7 @@ export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: strin
                         : "border border-ink/30 py-[7px] font-semibold"
                     }`}
                   >
-                    {cell.weight} × {cell.reps}
+                    {formatWeight(cell.weight)} × {cell.reps}
                   </div>
                 ) : (
                   <div
@@ -274,7 +275,7 @@ export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: strin
                         : "font-medium text-ink/40"
                   }`}
                 >
-                  {bar.e1rm ?? "—"}
+                  {bar.e1rm != null ? formatWeight(bar.e1rm) : "—"}
                 </div>
                 <div className="flex h-12 items-end">
                   {bar.state === "future" || bar.e1rm == null ? (

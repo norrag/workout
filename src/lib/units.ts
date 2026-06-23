@@ -37,3 +37,19 @@ export function cmToFeetInches(heightCm: number): {
 export function feetInchesToCm(feet: number, inches: number): number {
   return Math.round((feet * IN_PER_FT + inches) * CM_PER_IN);
 }
+
+/**
+ * Weights are never shown or entered finer than half a unit (0.5 lb / 0.5 kg).
+ * Snapping at the display boundary keeps engine outputs and unit-converted
+ * values clean (no 19.92 lb) and makes lb↔kg toggles round-trip to the same
+ * value — the stored numbers keep finer precision, the UI just shows the step.
+ */
+export function roundWeight(value: number): number {
+  return Math.round(value * 2) / 2;
+}
+
+/** A weight snapped to 0.5 and stringified without a trailing ".0" (20, 22.5). */
+export function formatWeight(value: number): string {
+  const r = roundWeight(value);
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}

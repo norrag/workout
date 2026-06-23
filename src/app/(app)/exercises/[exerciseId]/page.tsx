@@ -6,6 +6,7 @@ import { getExerciseOverview } from "@/lib/queries/exercises";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
 import { incrementFor, toEngineEquipment } from "@/lib/engine";
+import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
@@ -204,25 +205,27 @@ export default async function ExerciseDetailPage({
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-px border-[1.5px] border-ink bg-ink">
             <BestCell
-              value={ov?.weight_pr != null ? comma(ov.weight_pr) : "—"}
+              value={ov?.weight_pr != null ? formatWeight(ov.weight_pr) : "—"}
               suffix={ov?.weight_pr_reps != null ? `× ${ov.weight_pr_reps}` : null}
-              label="WEIGHT PR · LB"
+              label={`WEIGHT PR · ${profile.units.toUpperCase()}`}
             />
             <BestCell
-              value={ov?.best_e1rm != null ? comma(ov.best_e1rm) : "—"}
-              suffix="lb"
+              value={ov?.best_e1rm != null ? formatWeight(ov.best_e1rm) : "—"}
+              suffix={profile.units}
               label="EST. 1RM"
             />
             <BestCell
-              value={ov?.volume_pr_weight != null ? comma(ov.volume_pr_weight) : "—"}
+              value={ov?.volume_pr_weight != null ? formatWeight(ov.volume_pr_weight) : "—"}
               suffix={ov?.volume_pr_reps != null ? `× ${ov.volume_pr_reps}` : null}
               label={
-                ov?.volume_pr != null ? `VOLUME PR · ${comma(ov.volume_pr)} LB` : "VOLUME PR"
+                ov?.volume_pr != null
+                  ? `VOLUME PR · ${comma(ov.volume_pr)} ${profile.units.toUpperCase()}`
+                  : "VOLUME PR"
               }
             />
             <BestCell
               value={ov?.best_session_volume != null ? compact(ov.best_session_volume) : "—"}
-              suffix="lb"
+              suffix={profile.units}
               label="BEST SESSION VOL"
             />
           </div>
@@ -249,7 +252,7 @@ export default async function ExerciseDetailPage({
                             : "font-medium text-ink/40"
                       }`}
                     >
-                      {bar.e1rm ?? "—"}
+                      {bar.e1rm != null ? formatWeight(bar.e1rm) : "—"}
                     </div>
                     <div className="flex h-11 items-end">
                       {bar.state === "current" ? (

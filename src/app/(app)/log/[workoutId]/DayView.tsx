@@ -21,6 +21,7 @@ import {
   estimateE1rm,
   type EngineParams,
 } from "@/lib/engine";
+import { formatWeight } from "@/lib/units";
 import {
   addSetAction,
   addWorkoutExercisesAction,
@@ -1193,7 +1194,8 @@ function SetRow({
     8;
   // the planned weight shown on static (future) rows
   const futureWeight = plannedWeight ?? prescribedWeight;
-  const [weight, setWeight] = useState(String(initialWeight));
+  // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
+  const [weight, setWeight] = useState(formatWeight(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
@@ -1224,7 +1226,7 @@ function SetRow({
   // re-sync when the server state for this row changes (incl. an auto-match or
   // edited planned weight landing via set_weights)
   useEffect(() => {
-    setWeight(String(initialWeight));
+    setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     edited.current = false;
     repsManual.current = false;
@@ -1343,7 +1345,7 @@ function SetRow({
       {staticCells ? (
         <>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {futureWeight ?? "—"}
+            {futureWeight != null ? formatWeight(futureWeight) : "—"}
           </div>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
             {/* future rows show the reps that hit target RIR at the planned

@@ -23,6 +23,13 @@ Follow-ups from field testing the PH28/units work. All green (typecheck, lint,
   (owner's profile flipped to kg with un-converted lb data). The engine math is
   correct (`toKg(bodyweight, unit)`); converting on switch prevents recurrence.
   Owner profile was corrected back to lb out-of-band.
+- **Weights display snapped to 0.5.** New `units.roundWeight`/`formatWeight` snap
+  every shown/entered loadable weight to the nearest 0.5 (lb or kg). This kills
+  fine decimals (a prescription read 19.92) and — because conversion stores finer
+  (0.1) than the display step — makes lb↔kg↔lb toggles round-trip to the same
+  value. Applied in the day view inputs/prescriptions, exercise history, exercise
+  bests + e1RM bars (also de-hardcoding "LB"→the user's unit there), meso-stats
+  cells/bars, and macrocycle target/rate ranges.
 - **History weight unit no longer hardcoded.** `ExerciseHistoryList` showed
   ` lb` literally; now uses the set's stored unit (carried through `HistoryEntry`).
 - **Measurement-system labels.** The units toggle (More + onboarding) reads
