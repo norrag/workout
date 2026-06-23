@@ -26,23 +26,27 @@ comment on column public.logged_sets.e1rm is
 
 -- Backfill every historical working set with the same formula, reading rir_offset
 -- from the currently-active engine_params row so stored values match what the app
--- writes going forward.
+-- writes going forward. (effReps is computed in a derived subquery joined by id —
+-- UPDATE...FROM can't reference the target table from a LATERAL item.)
 update public.logged_sets ls
 set e1rm = round(
   case
-    when eff >= 36 then ls.weight * (1 + eff / 30.0)
-    else (ls.weight * (1 + eff / 30.0) + (ls.weight * 36.0) / (37 - eff)) / 2.0
+    when sub.eff >= 36 then ls.weight * (1 + sub.eff / 30.0)
+    else (ls.weight * (1 + sub.eff / 30.0) + (ls.weight * 36.0) / (37 - sub.eff)) / 2.0
   end::numeric,
   1
 )
 from (
-  select coalesce((params -> 'e1rm' ->> 'rir_offset')::numeric, 1) as rir_offset
-  from public.engine_params
-  where is_active = true
-  limit 1
-) p,
-lateral (
-  select (ls.reps + coalesce(ls.rir_reported, 0) * p.rir_offset)::numeric as eff
-) e
-where ls.weight > 0
-  and ls.reps > 0;
+  select s.id,
+         (s.reps + coalesce(s.rir_reported, 0) * p.rir_offset)::numeric as eff
+  from public.logged_sets s
+  cross join (
+    select coalesce((params -> 'e1rm' ->> 'rir_offset')::numeric, 1) as rir_offset
+    from public.engine_params
+    where is_active = true
+    limit 1
+  ) p
+  where s.weight > 0
+    and s.reps > 0
+) sub
+where ls.id = sub.id;
