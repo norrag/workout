@@ -477,6 +477,7 @@ describe("formatExerciseHistory", () => {
         performed_on: "2026-06-10",
         top_weight: 225,
         reps: "8, 8",
+        e1rm: 281.3,
         is_deload: false,
         session_note: "elbow cranky",
       },
@@ -487,6 +488,7 @@ describe("formatExerciseHistory", () => {
     expect(out.session_count).toBe(1);
     expect((out.sessions as Record<string, unknown>[])[0]).toMatchObject({
       reps_at_top: "8, 8",
+      e1rm: 281.3,
       session_note: "elbow cranky",
     });
   });
@@ -506,6 +508,7 @@ describe("formatExerciseHistory", () => {
         performed_on: "2026-06-10",
         top_weight: 225,
         reps: "8",
+        e1rm: 281.3,
         is_deload: false,
         session_note: null,
       },

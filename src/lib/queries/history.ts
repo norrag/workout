@@ -10,6 +10,9 @@ export interface HistoryEntry {
   performed_on: string;
   top_weight: number | null;
   reps: string;
+  /** session-best stored per-set e1RM (PH31/PH32 flip view); null if none stored
+   * (e.g. a bodyweight session, where weight 0 yields no estimate) */
+  e1rm: number | null;
   is_deload: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
   session_note: string | null;
@@ -19,6 +22,17 @@ export interface HistoryMesoGroup {
   mesocycle_id: string;
   meso_name: string;
   entries: HistoryEntry[];
+}
+
+/**
+ * The session's best stored per-set e1RM (PH32 flip view): the strongest engine
+ * estimate among the session's working sets, mirroring how top_weight is the
+ * session's heaviest set. Null when no set carries an estimate — e.g. a
+ * bodyweight session, where weight 0 yields no e1RM (the flip view shows "—").
+ */
+export function sessionBestE1rm(e1rms: (number | null)[]): number | null {
+  const present = e1rms.filter((v): v is number => v != null);
+  return present.length > 0 ? Math.max(...present) : null;
 }
 
 /**
@@ -110,6 +124,7 @@ export async function getExerciseHistory(
       .sort((a, b) => a.set_number - b.set_number)
       .map((s) => s.reps)
       .join(", ");
+    const e1rm = sessionBestE1rm(group.map((s) => s.e1rm));
     const micro = microById.get(group[0].microcycle_id);
     const workout = workoutById.get(workoutId);
     return {
@@ -119,6 +134,7 @@ export async function getExerciseHistory(
       performed_on: group[0].performed_at.slice(0, 10),
       top_weight: top,
       reps,
+      e1rm,
       is_deload: micro?.is_deload ?? false,
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };

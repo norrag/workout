@@ -38,6 +38,9 @@ import {
 } from "@/lib/queries/logging";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
 import { getProfile } from "@/lib/queries/profiles";
+import { getActiveEngineParams } from "@/lib/queries/generation";
+import { estimateE1rm } from "@/lib/engine";
+import type { EngineParams } from "@/lib/engine/params";
 import {
   advanceWeekAfterWorkout,
   type AdvanceResult,
@@ -51,6 +54,20 @@ async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
   return { supabase, user };
+}
+
+/**
+ * The engine's per-set e1RM (PH31), stored with the set so it's auditable and
+ * can be surfaced (history flip, MCP) without recomputing. Null for bodyweight
+ * (weight 0) / non-working input — `estimateE1rm` returns null there.
+ */
+function computeSetE1rm(
+  params: EngineParams,
+  weight: number,
+  reps: number,
+  rir: number | null,
+): number | null {
+  return estimateE1rm(weight, reps, rir, params)?.value ?? null;
 }
 
 const logSetSchema = z.object({
@@ -74,7 +91,10 @@ export async function logSetAction(input: {
 }): Promise<void> {
   const parsed = logSetSchema.parse(input);
   const { supabase, user } = await requireUser();
-  const profile = await getProfile(supabase, user.id);
+  const [profile, { params }] = await Promise.all([
+    getProfile(supabase, user.id),
+    getActiveEngineParams(supabase),
+  ]);
   await logSet(supabase, user.id, {
     workout_exercise_id: parsed.workout_exercise_id,
     set_number: parsed.set_number,
@@ -82,6 +102,7 @@ export async function logSetAction(input: {
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
     set_type: parsed.set_type,
+    e1rm: computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
   });
   // auto-match (doc 11): carry the logged weight onto the remaining unlogged
   // sets. Done here (after the insert excludes this set) to avoid a client race.
@@ -115,10 +136,13 @@ export async function amendSetAction(input: {
 }): Promise<void> {
   const parsed = amendSchema.parse(input);
   const { supabase, user } = await requireUser();
+  const { params } = await getActiveEngineParams(supabase);
   await amendSet(supabase, user.id, parsed.set_id, {
     weight: parsed.weight,
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
+    // recompute the stored e1RM since weight/reps/RIR all changed
+    e1rm: computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");

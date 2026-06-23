@@ -2,7 +2,42 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-23 (latest) — Removed unit conversion; imperial-only
+## 2026-06-23 (latest) — Per-set e1RM stored & exposed; tap-to-flip history (PH31 + PH32)
+
+Triage Workstream B. Per-set e1RM was only ever computed on read (stats views use
+raw single-formula Epley; the engine uses an averaged Epley/Brzycki over effective
+reps). PH31 persists the **engine's RIR-aware estimate** with each set for
+auditability; PH32 surfaces it via a tap-to-flip history view. The stats views and
+their raw-Epley `e1rm` are deliberately left untouched (the two-systems
+reconciliation is triage T-A1) — this slice only *adds* the engine value.
+
+- **Schema (`20260623130000_logged_set_e1rm.sql`):** nullable `logged_sets.e1rm`,
+  documented column, and a **backfill** of every historical working set using the
+  same formula (`effReps = reps + coalesce(rir,0)·rir_offset`; mean of Epley &
+  Brzycki, Epley-only ≥36 effReps; `rir_offset` read from the active engine_params
+  row). Null for `weight ≤ 0` (bodyweight) / non-working input, matching
+  `estimateE1rm`. RLS unchanged — `logged_sets` policies are column-agnostic,
+  owner-scoped. **Deploy ordering:** the column must exist before the new code runs
+  (inserts write `e1rm`), so the migration applies with the deploy.
+- **Write path:** `logSetAction` / `amendSetAction` compute the value from active
+  params via the engine's `estimateE1rm` and store it (amend recomputes since
+  weight/reps/RIR change). `logSet` input + `amendSet` patch gained `e1rm`;
+  `LoggedSetRow` + the insert `Defaulted` set updated in `database.ts`.
+- **MCP:** `get_exercise_history` returns a per-session `e1rm` (session best) with
+  an honesty caveat in the dataQuality note — an estimate/trend, null on bodyweight,
+  distinct from the view's raw-Epley e1RM.
+- **UI (`ExerciseHistoryList`):** a list-wide `flipped` state — tap any row to flip
+  every row between `weight × reps` and the session-best `e1RM`, quick `metric-fade`
+  (reduced-motion → instant), default sets/reps on load. The session-note reveal
+  moved onto its own icon button so the row tap is unambiguously the flip;
+  bodyweight/null renders "—".
+- **Tests:** extracted + unit-tested the pure `sessionBestE1rm` helper (max over
+  non-null, null-if-none); updated three `HistoryEntry` fixtures and asserted `e1rm`
+  in the MCP formatter test. Engine `estimateE1rm` already covers bodyweight=0→null
+  and the Epley fallback the backfill depends on. Green: typecheck, lint, **489
+  tests** (+3).
+
+## 2026-06-23 — Removed unit conversion; imperial-only
 
 The imperial/metric unit-conversion work (PH28 + the same-day follow-ups below)
 proved trickier than it earned. Reverted the whole feature: the app now records

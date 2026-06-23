@@ -5,7 +5,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildExerciseMacroBars } from "../exercises";
-import { groupHistoryByMeso, type HistoryEntry } from "../history";
+import {
+  groupHistoryByMeso,
+  sessionBestE1rm,
+  type HistoryEntry,
+} from "../history";
 
 describe("buildExerciseMacroBars", () => {
   const ids = ["m1", "m2", "m3", "m4"];
@@ -45,6 +49,21 @@ describe("buildExerciseMacroBars", () => {
   });
 });
 
+describe("sessionBestE1rm", () => {
+  it("takes the strongest stored per-set estimate in the session", () => {
+    expect(sessionBestE1rm([220.5, 281.3, 250])).toBe(281.3);
+  });
+
+  it("ignores sets without a stored estimate", () => {
+    expect(sessionBestE1rm([null, 200, null])).toBe(200);
+  });
+
+  it("returns null when no set carries an estimate (bodyweight session)", () => {
+    expect(sessionBestE1rm([null, null])).toBeNull();
+    expect(sessionBestE1rm([])).toBeNull();
+  });
+});
+
 describe("groupHistoryByMeso", () => {
   const entry = (mesocycle_id: string, meso_name: string, coordinate: string): HistoryEntry => ({
     mesocycle_id,
@@ -53,6 +72,7 @@ describe("groupHistoryByMeso", () => {
     performed_on: "2026-06-10",
     top_weight: 200,
     reps: "10, 10",
+    e1rm: 266.7,
     is_deload: false,
     session_note: null,
   });
