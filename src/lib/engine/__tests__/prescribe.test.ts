@@ -7,11 +7,11 @@ const params = DEFAULT_ENGINE_PARAMS;
 describe("prescribe — performance delta (§3)", () => {
   it("met reps at target RIR with gain goal: load increases by equipment increment", () => {
     const out = prescribe(baseInputs(), params);
-    // barbell 2.5kg × intermediate 1.0
-    expect(out.weight).toBe(102.5);
+    // barbell 5 lb × intermediate 1.0
+    expect(out.weight).toBe(105);
     expect(out.sets).toBe(3);
     expect(out.targetRir).toBe(2);
-    expect(out.rationale).toMatch(/\+2\.5 kg/);
+    expect(out.rationale).toMatch(/\+5 lb/);
   });
 
   it("emits a structured trace the rationale is composed from (P0-4)", () => {
@@ -22,7 +22,7 @@ describe("prescribe — performance delta (§3)", () => {
       expect(typeof step.rule).toBe("string");
       expect(step.detail.length).toBeGreaterThan(0);
     }
-    // the load step is what drove the +2.5 kg increase
+    // the load step is what drove the +5 lb increase
     expect(out.trace.some((s) => s.rule === "load")).toBe(true);
     // rationale === the trace details joined, capitalized, terminated
     const composed =
@@ -33,16 +33,16 @@ describe("prescribe — performance delta (§3)", () => {
 
   it("scales the increment by experience level", () => {
     const out = prescribe(
-      baseInputs({ user: { experienceLevel: "beginner", units: "kg" } }),
+      baseInputs({ user: { experienceLevel: "beginner" } }),
       params,
     );
-    // 2.5 × 1.5 = +3.75, rounded to the 2.5kg barbell step
-    expect(out.weight).toBe(105);
+    // 5 × 1.5 = +7.5 ⇒ 107.5, rounded to the 5 lb barbell step ⇒ 110
+    expect(out.weight).toBe(110);
   });
 
   it("uses per-equipment lb increments for lb users", () => {
     const out = prescribe(
-      baseInputs({ user: { experienceLevel: "intermediate", units: "lb" } }),
+      baseInputs({ user: { experienceLevel: "intermediate" } }),
       params,
     );
     // barbell lb increment is 5
@@ -54,7 +54,7 @@ describe("prescribe — performance delta (§3)", () => {
     const out = prescribe(
       baseInputs({
         exercise: { equipmentType: "kettlebell" },
-        user: { experienceLevel: "intermediate", units: "kg" },
+        user: { experienceLevel: "intermediate" },
         previous: { weight: 16, reps: 10, sets: 3, targetRir: 3 },
         actualSets: [
           { setNumber: 1, weight: 16, reps: 10, rirReported: 3, isWarmup: false },
@@ -62,15 +62,15 @@ describe("prescribe — performance delta (§3)", () => {
       }),
       params,
     );
-    // 16 + 4 kg kettlebell jump
-    expect(out.weight).toBe(20);
+    // 16 + 9 lb kettlebell jump ⇒ 25, rounded to the 9 lb kettlebell step ⇒ 27
+    expect(out.weight).toBe(27);
   });
 
   it("bands progress in coarse band steps", () => {
     const out = prescribe(
       baseInputs({
         exercise: { equipmentType: "bands" },
-        user: { experienceLevel: "intermediate", units: "lb" },
+        user: { experienceLevel: "intermediate" },
         previous: { weight: 30, reps: 12, sets: 3, targetRir: 3 },
         actualSets: [
           { setNumber: 1, weight: 30, reps: 12, rirReported: 3, isWarmup: false },
@@ -133,7 +133,7 @@ describe("prescribe — performance delta (§3)", () => {
       }),
       params,
     );
-    expect(out.weight).toBe(102.5);
+    expect(out.weight).toBe(105);
   });
 
   it("no history and no previous: falls back to plan initials", () => {
@@ -166,7 +166,7 @@ describe("prescribe — goal bias (§5)", () => {
       }),
       params,
     );
-    expect(out.weight).toBe(102.5);
+    expect(out.weight).toBe(105);
   });
 
   it("maintain goal holds prescriptions stable", () => {
@@ -240,7 +240,7 @@ describe("prescribe — feedback modulation (§4, pump/workload 0–10)", () => 
       params,
     );
     expect(out.sets).toBe(3);
-    expect(out.weight).toBe(102.5);
+    expect(out.weight).toBe(105);
     expect(out.rationale).toMatch(/different exercise/);
   });
 

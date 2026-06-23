@@ -33,7 +33,6 @@ function randomInputs(r: () => number): EngineInputs {
     },
     user: {
       experienceLevel: pick(["beginner", "intermediate", "advanced"] as const),
-      units: pick(["kg", "lb"] as const),
     },
     goalType: pick(["cut", "gain", "maintain"] as const),
     week: { targetRir: int(0, 4), isDeload: r() < 0.15 },

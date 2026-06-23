@@ -14,7 +14,7 @@ import {
 
 describe("envelope", () => {
   it("wraps data with schema_version, generated_at, units, data_quality", () => {
-    const e = envelope({ a: 1 }, { units: "lb" });
+    const e = envelope({ a: 1 });
     expect(e.schema_version).toBe(MCP_SCHEMA_VERSION);
     expect(e.units).toBe("lb");
     expect(e.data).toEqual({ a: 1 });
@@ -23,20 +23,20 @@ describe("envelope", () => {
     expect(Number.isNaN(Date.parse(e.generated_at))).toBe(false);
   });
 
-  it("defaults units and data_quality to null", () => {
+  it("always reports units as lb and defaults data_quality to null", () => {
     const e = envelope({});
-    expect(e.units).toBeNull();
+    expect(e.units).toBe("lb");
     expect(e.data_quality).toBeNull();
   });
 });
 
 describe("toolResult", () => {
   it("returns text + structuredContent that both carry the envelope", () => {
-    const r = toolResult({ ok: true }, { units: "kg" });
+    const r = toolResult({ ok: true });
     expect(r.structuredContent.schema_version).toBe(MCP_SCHEMA_VERSION);
     expect((r.structuredContent.data as Record<string, unknown>).ok).toBe(true);
     const parsed = JSON.parse(r.content[0].text);
-    expect(parsed.units).toBe("kg");
+    expect(parsed.units).toBe("lb");
     expect(parsed.data.ok).toBe(true);
   });
 });

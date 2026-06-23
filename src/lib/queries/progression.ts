@@ -96,7 +96,7 @@ export function buildEngineInputs(args: {
   nextWeek: { targetRir: number; isDeload: boolean };
   goal: EngineGoal;
   equipmentType: string;
-  profile: Pick<ProfileRow, "experience_level" | "units">;
+  profile: Pick<ProfileRow, "experience_level">;
   muscleGroupWeeklySets: number | null;
   weekPeak: EngineInputs["weekPeak"];
   strengthAnchor: EngineInputs["strengthAnchor"];
@@ -277,7 +277,6 @@ async function generateDay(
         ctx.params,
         override,
         toEngineEquipment(equipment),
-        ctx.profile.units,
       ),
     );
     decisions.push({ inputs, output, sourceWeId: we.id, exerciseId: we.exercise_id });
@@ -798,7 +797,6 @@ export async function advanceWeekAfterWorkout(
       nextTargetRir: nextMicro.target_rir,
       nextIsDeload: nextMicro.is_deload,
       currentTargetRir: micro.target_rir,
-      units: profile.units,
       deltas,
     }),
     nextWorkoutId,
@@ -1128,7 +1126,6 @@ export async function projectNextPrescription(
       params,
       override == null ? null : { weightIncrement: override },
       toEngineEquipment(exercise.equipment_type),
-      profile.units,
     ),
   );
 

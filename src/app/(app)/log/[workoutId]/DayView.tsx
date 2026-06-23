@@ -15,12 +15,12 @@ import type {
   NavWeek,
   WorkoutDetail,
 } from "@/lib/queries/logging";
-import type { Units } from "@/lib/types/database";
 import {
   predictRepsAtWeight,
   estimateE1rm,
   type EngineParams,
 } from "@/lib/engine";
+import { formatWeight } from "@/lib/units";
 import {
   addSetAction,
   addWorkoutExercisesAction,
@@ -95,11 +95,9 @@ function exerciseDone(we: LoggedExercise): boolean {
  */
 export function DayView({
   detail,
-  units,
   params,
 }: {
   detail: WorkoutDetail;
-  units: Units;
   params: EngineParams;
 }) {
   const { workout, microcycle, mesocycle, exercises } = detail;
@@ -172,7 +170,6 @@ export function DayView({
           key={we.id}
           we={we}
           index={i}
-          units={units}
           readOnly={readOnly}
           params={params}
           microTargetRir={microcycle.target_rir}
@@ -660,7 +657,6 @@ function WorkoutOptionsMenu({
 function ExerciseBlock({
   we,
   index,
-  units,
   readOnly,
   params,
   microTargetRir,
@@ -682,7 +678,6 @@ function ExerciseBlock({
 }: {
   we: LoggedExercise;
   index: number;
-  units: Units;
   readOnly: boolean;
   params: EngineParams;
   microTargetRir: number;
@@ -815,7 +810,7 @@ function ExerciseBlock({
           {/* grid header (denser rows, 09 §5) */}
           <div className="mt-2.5 grid grid-cols-[20px_1fr_1fr_44px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink/50">
             <div />
-            <div className="text-center">{units.toUpperCase()}</div>
+            <div className="text-center">LB</div>
             <div className="text-center">REPS</div>
             <div className="text-center">LOG</div>
           </div>
@@ -1193,7 +1188,8 @@ function SetRow({
     8;
   // the planned weight shown on static (future) rows
   const futureWeight = plannedWeight ?? prescribedWeight;
-  const [weight, setWeight] = useState(String(initialWeight));
+  // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
+  const [weight, setWeight] = useState(formatWeight(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
@@ -1224,7 +1220,7 @@ function SetRow({
   // re-sync when the server state for this row changes (incl. an auto-match or
   // edited planned weight landing via set_weights)
   useEffect(() => {
-    setWeight(String(initialWeight));
+    setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     edited.current = false;
     repsManual.current = false;
@@ -1343,7 +1339,7 @@ function SetRow({
       {staticCells ? (
         <>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {futureWeight ?? "—"}
+            {futureWeight != null ? formatWeight(futureWeight) : "—"}
           </div>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
             {/* future rows show the reps that hit target RIR at the planned

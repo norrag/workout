@@ -2,7 +2,7 @@
 
 /**
  * Filled-ink segmented control: 1.5px ink frame, the active segment
- * inverts to cream-on-ink (08 §1 — VOLUME/BALANCE/PERFORMANCE, LB/KG).
+ * inverts to cream-on-ink (08 §1 — e.g. VOLUME/BALANCE/PERFORMANCE).
  */
 export function SegmentedControl<T extends string>({
   options,

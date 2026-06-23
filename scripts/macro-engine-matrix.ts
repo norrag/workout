@@ -25,31 +25,31 @@ function range(r: MacroRange): string {
 const profiles: { name: string; p: MacroProfile }[] = [
   {
     name: "Beginner M 180lb, 25yo, 0.5yr",
-    p: { sex: "male", age: 25, bodyweight: 180, bodyweightUnit: "lb", heightCm: 178, experienceLevel: "beginner", trainingYears: 0.5, bodyFatPct: null },
+    p: { sex: "male", age: 25, bodyweight: 180, heightIn: 70, experienceLevel: "beginner", trainingYears: 0.5, bodyFatPct: null },
   },
   {
     name: "Intermediate M 198lb, 34yo, 2.5yr",
-    p: { sex: "male", age: 34, bodyweight: 198, bodyweightUnit: "lb", heightCm: 180, experienceLevel: "intermediate", trainingYears: 2.5, bodyFatPct: null },
+    p: { sex: "male", age: 34, bodyweight: 198, heightIn: 71, experienceLevel: "intermediate", trainingYears: 2.5, bodyFatPct: null },
   },
   {
     name: "Intermediate M 198lb, 34yo, 4yr (mockup)",
-    p: { sex: "male", age: 34, bodyweight: 198, bodyweightUnit: "lb", heightCm: 180, experienceLevel: "intermediate", trainingYears: 4, bodyFatPct: null },
+    p: { sex: "male", age: 34, bodyweight: 198, heightIn: 71, experienceLevel: "intermediate", trainingYears: 4, bodyFatPct: null },
   },
   {
     name: "Advanced M 200lb, 30yo, 7yr",
-    p: { sex: "male", age: 30, bodyweight: 200, bodyweightUnit: "lb", heightCm: 180, experienceLevel: "advanced", trainingYears: 7, bodyFatPct: null },
+    p: { sex: "male", age: 30, bodyweight: 200, heightIn: 71, experienceLevel: "advanced", trainingYears: 7, bodyFatPct: null },
   },
   {
     name: "Elite M 198lb, 40yo, 13yr (user)",
-    p: { sex: "male", age: 40, bodyweight: 198, bodyweightUnit: "lb", heightCm: 180, experienceLevel: "intermediate", trainingYears: 13, bodyFatPct: null },
+    p: { sex: "male", age: 40, bodyweight: 198, heightIn: 71, experienceLevel: "intermediate", trainingYears: 13, bodyFatPct: null },
   },
   {
     name: "Intermediate F 140lb, 30yo, 3yr",
-    p: { sex: "female", age: 30, bodyweight: 140, bodyweightUnit: "lb", heightCm: 165, experienceLevel: "intermediate", trainingYears: 3, bodyFatPct: null },
+    p: { sex: "female", age: 30, bodyweight: 140, heightIn: 65, experienceLevel: "intermediate", trainingYears: 3, bodyFatPct: null },
   },
   {
     name: "Older M 210lb, 55yo, 6yr",
-    p: { sex: "male", age: 55, bodyweight: 210, bodyweightUnit: "lb", heightCm: 178, experienceLevel: "advanced", trainingYears: 6, bodyFatPct: null },
+    p: { sex: "male", age: 55, bodyweight: 210, heightIn: 70, experienceLevel: "advanced", trainingYears: 6, bodyFatPct: null },
   },
 ];
 

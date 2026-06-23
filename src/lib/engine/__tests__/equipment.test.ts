@@ -36,29 +36,25 @@ describe("toEngineEquipment", () => {
       ["machine assistance", "machine"],
       ["freemotion", "cable"],
     ];
-    for (const units of ["kg", "lb"] as const) {
-      for (const [raw, bucket] of cases) {
-        expect(
-          incrementFor(
-            toEngineEquipment(raw),
-            "intermediate",
-            units,
-            DEFAULT_ENGINE_PARAMS,
-          ),
-        ).toBe(
-          incrementFor(
-            toEngineEquipment(bucket),
-            "intermediate",
-            units,
-            DEFAULT_ENGINE_PARAMS,
-          ),
-        );
-        expect(
-          roundToStep(123.4, toEngineEquipment(raw), units, DEFAULT_ENGINE_PARAMS),
-        ).toBe(
-          roundToStep(123.4, toEngineEquipment(bucket), units, DEFAULT_ENGINE_PARAMS),
-        );
-      }
+    for (const [raw, bucket] of cases) {
+      expect(
+        incrementFor(
+          toEngineEquipment(raw),
+          "intermediate",
+          DEFAULT_ENGINE_PARAMS,
+        ),
+      ).toBe(
+        incrementFor(
+          toEngineEquipment(bucket),
+          "intermediate",
+          DEFAULT_ENGINE_PARAMS,
+        ),
+      );
+      expect(
+        roundToStep(123.4, toEngineEquipment(raw), DEFAULT_ENGINE_PARAMS),
+      ).toBe(
+        roundToStep(123.4, toEngineEquipment(bucket), DEFAULT_ENGINE_PARAMS),
+      );
     }
   });
 });

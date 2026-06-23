@@ -11,7 +11,7 @@ import type { EngineInputs } from "../types";
 import { baseInputs } from "./helpers";
 
 const params = DEFAULT_ENGINE_PARAMS;
-// anchor that lands 100 kg ≈ 8 reps at 3 RIR — i.e. flat strength for the start
+// anchor that lands 100 lb ≈ 8 reps at 3 RIR — i.e. flat strength for the start
 const flatAnchor = {
   value: estimateE1rm(100, 8, 3, params)!.value,
   confidence: "moderate" as const,
@@ -25,7 +25,7 @@ describe("rep-window — Option-A schedule (reps climb, load held at flat streng
   it("holds the weight and steps reps up as the RIR ramp descends", () => {
     // week 2 (target 2 RIR) off a clean 100×8 @3
     const w2 = prescribe(repWeek({ week: { targetRir: 2, isDeload: false } }), params);
-    expect(w2.weight).toBe(100); // load held, not +2.5
+    expect(w2.weight).toBe(100); // load held, not +5
     expect(w2.reps).toBe(9); // reps climb 8 → 9
     expect(w2.targetRir).toBe(2);
 
@@ -47,14 +47,14 @@ describe("rep-window — Option-A schedule (reps climb, load held at flat streng
 
   it("reads as a held-load / rep-climb rationale, not a +increment", () => {
     const out = prescribe(repWeek({ week: { targetRir: 2, isDeload: false } }), params);
-    expect(out.rationale).toMatch(/hold 100 kg/i);
+    expect(out.rationale).toMatch(/hold 100 lb/i);
     expect(out.rationale).toMatch(/anchor e1RM/);
   });
 });
 
 describe("rep-window — anchor catches overperformance", () => {
   it("reprices the load up when the strength anchor sits above the held weight", () => {
-    // a sandbagger whose true e1RM is much higher than 100 kg × 8 implies
+    // a sandbagger whose true e1RM is much higher than 100 lb × 8 implies
     const strong = { value: 165, confidence: "high" as const };
     const out = prescribe(
       repWeek({ strengthAnchor: strong, week: { targetRir: 2, isDeload: false } }),
@@ -146,9 +146,9 @@ describe("rep-window — seeding & fallback", () => {
   });
 
   it("with no anchor, falls back to the legacy increment path", () => {
-    // identical to the parity case in prescribe.test.ts: +2.5 kg
+    // identical to the parity case in prescribe.test.ts: +5 lb
     const out = prescribe(baseInputs(), params); // no strengthAnchor
-    expect(out.weight).toBe(102.5);
+    expect(out.weight).toBe(105);
   });
 
   it("below min_confidence, holds the plan via the increment path", () => {
@@ -157,6 +157,6 @@ describe("rep-window — seeding & fallback", () => {
       repWeek({ strengthAnchor: { value: 160, confidence: "moderate" } }),
       strict,
     );
-    expect(out.weight).toBe(102.5); // shaky anchor ignored → increment path
+    expect(out.weight).toBe(105); // shaky anchor ignored → increment path
   });
 });

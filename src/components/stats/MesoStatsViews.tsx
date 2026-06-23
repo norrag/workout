@@ -1,3 +1,4 @@
+import { formatWeight } from "@/lib/units";
 import type { MesoStats } from "@/lib/queries/stats";
 
 // Shared renderers for the meso-stats views (figs 4.1–4.3) — used by the
@@ -192,7 +193,7 @@ export function BalanceView({ stats }: { stats: MesoStats }) {
 // 4.3 — performance: top set by week, e1RM across macro, PRs this meso
 // ---------------------------------------------------------------------------
 
-export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: string }) {
+export function PerformanceView({ stats }: { stats: MesoStats }) {
   const { weeks, performance } = stats;
   const liftGrid = { gridTemplateColumns: `repeat(${weeks.length}, 1fr)` };
   const chartMax = Math.max(
@@ -204,7 +205,7 @@ export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: strin
     <div>
       <div className="mt-[18px] border-t-[1.5px] border-ink pt-[9px]">
         <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/50">
-          TOP SET BY WEEK — KEY LIFTS · {unit.toUpperCase()}
+          TOP SET BY WEEK — KEY LIFTS · LB
         </div>
         {performance.keyLifts.map((lift) => (
           <div
@@ -230,7 +231,7 @@ export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: strin
                         : "border border-ink/30 py-[7px] font-semibold"
                     }`}
                   >
-                    {cell.weight} × {cell.reps}
+                    {formatWeight(cell.weight)} × {cell.reps}
                   </div>
                 ) : (
                   <div
@@ -274,7 +275,7 @@ export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: strin
                         : "font-medium text-ink/40"
                   }`}
                 >
-                  {bar.e1rm ?? "—"}
+                  {bar.e1rm != null ? formatWeight(bar.e1rm) : "—"}
                 </div>
                 <div className="flex h-12 items-end">
                   {bar.state === "future" || bar.e1rm == null ? (

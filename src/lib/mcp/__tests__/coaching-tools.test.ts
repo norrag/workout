@@ -85,7 +85,6 @@ describe("formatTrainingOverview", () => {
       profile: {
         display_name: "Garron",
         experience_level: "advanced",
-        units: "lb",
         bodyweight: 198,
       } as never,
       currentState: { macrocycle: null, mesocycle: null, microcycle: null, nextWorkout: null },

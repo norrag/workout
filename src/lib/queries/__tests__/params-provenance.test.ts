@@ -44,13 +44,13 @@ describe("resolveProvenance", () => {
     );
   });
 
-  it("matches the v9 migration hash (code + migration stay in lockstep)", () => {
-    // the active engine_params v9 row hard-codes this sha256; if DEFAULT changes
+  it("matches the v10 migration hash (code + migration stay in lockstep)", () => {
+    // the active engine_params v10 row hard-codes this sha256; if DEFAULT changes
     // without re-seeding the migration, this fails loudly rather than silently
     // shipping an unreplayable active row.
     expect(
       hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
-    ).toBe("1e9b0579f4283816c786f92702b0eec56ce45cbab81ef0e24f1140eed397a841");
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
   });
 
   it("flags a partial (defaults-needed) version as not replayable", () => {

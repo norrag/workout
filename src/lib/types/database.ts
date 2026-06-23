@@ -51,7 +51,6 @@ export type EquipmentType =
   | "machine assistance"
   | "freemotion";
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
-export type Units = "kg" | "lb";
 export type SetType = "straight" | "drop";
 
 export type ProfileRow = {
@@ -59,7 +58,8 @@ export type ProfileRow = {
   display_name: string | null;
   age: number | null;
   gender: "female" | "male" | "other" | "undisclosed" | null;
-  height_cm: number | null;
+  /** height in whole inches (imperial-only) */
+  height_in: number | null;
   bodyweight: number | null;
   bodyweight_updated_at: string | null;
   /** estimated body-fat % (optional) — feeds the FFMI proximity target model */
@@ -67,7 +67,6 @@ export type ProfileRow = {
   training_since: string | null;
   experience_level: ExperienceLevel | null;
   preferred_equipment: string[];
-  units: Units;
   week_starts_on: number;
   /** auto-match a changed set weight across the exercise's unlogged sets (doc 11) */
   auto_match_weights: boolean;
@@ -118,7 +117,7 @@ export type ExerciseNoteRow = {
 }
 
 /** Per-user × exercise engine override (doc 14 phase 3). First tunable: the
- *  editable weight increment, in the user's units. */
+ *  editable weight increment, in pounds. */
 export type ExerciseParamOverrideRow = {
   id: string;
   user_id: string;
@@ -287,7 +286,6 @@ export type LoggedSetRow = {
   performed_at: string;
   set_number: number;
   weight: number;
-  unit: Units;
   reps: number;
   set_type: SetType;
   rir_reported: number | null;

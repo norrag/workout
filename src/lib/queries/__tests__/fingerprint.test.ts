@@ -58,7 +58,7 @@ function engineArgs() {
     nextWeek: { targetRir: 1, isDeload: false },
     goal: "hypertrophy" as const,
     equipmentType: "barbell",
-    profile: { experience_level: "intermediate" as const, units: "lb" as const },
+    profile: { experience_level: "intermediate" as const },
     muscleGroupWeeklySets: 12,
     weekPeak: null,
     strengthAnchor: { value: 230, confidence: "high" as const },
@@ -141,7 +141,7 @@ describe("computeDepFingerprint", () => {
     const changed = computeDepFingerprint(
       buildConfigInputs({
         ...configArgs(),
-        profile: { experience_level: "advanced", units: "lb" },
+        profile: { experience_level: "advanced" },
       }),
       token,
     );
@@ -233,7 +233,6 @@ describe("source scoping (doc 14 §7, phase 4) — a change recomputes the right
 
   const baseProfile = {
     experience_level: "intermediate" as const,
-    units: "lb" as const,
   };
 
   /** one open prescription's resolved config, varying the per-row dimensions */
@@ -249,7 +248,7 @@ describe("source scoping (doc 14 §7, phase 4) — a change recomputes the right
     };
   }
 
-  describe("profile (experience / units) → that user's open rows, all exercises (§7)", () => {
+  describe("profile (experience) → that user's open rows, all exercises (§7)", () => {
     it("an experience-level edit moves every one of the user's rows, across exercises / goals / weeks", () => {
       // the profile is resolved once per user and applied to every row, so it is a
       // UNIVERSAL config dimension: three rows that otherwise differ in the per-row
@@ -260,19 +259,11 @@ describe("source scoping (doc 14 §7, phase 4) — a change recomputes the right
         row({ equipmentType: "dumbbell", goal: "strength" }),
         row({ week: { targetRir: 0, isDeload: true } }),
       ];
-      const edited = { experience_level: "advanced" as const, units: "lb" as const };
+      const edited = { experience_level: "advanced" as const };
       for (const r of rows) {
         expect(fp({ ...r, profile: edited }), `${r.equipmentType}/${r.goal}`).not.toBe(
           fp(r),
         );
-      }
-    });
-
-    it("a units edit moves every one of the user's rows the same way", () => {
-      const rows = [row({ equipmentType: "barbell" }), row({ equipmentType: "machine" })];
-      const edited = { experience_level: "intermediate" as const, units: "kg" as const };
-      for (const r of rows) {
-        expect(fp({ ...r, profile: edited })).not.toBe(fp(r));
       }
     });
 
@@ -282,7 +273,7 @@ describe("source scoping (doc 14 §7, phase 4) — a change recomputes the right
       // visits user B's rows. The fingerprint reinforces it: a row resolved under a
       // different profile hashes differently, so there is no cross-user collision
       // that could let one user's edit be mistaken for fresh against another's stamp.
-      const userBRow = row({ profile: { experience_level: "beginner", units: "kg" } });
+      const userBRow = row({ profile: { experience_level: "beginner" } });
       expect(fp(userBRow)).not.toBe(fp(row()));
     });
   });
@@ -357,7 +348,7 @@ describe("seed inputs (doc 14 §6.2)", () => {
   const token = { version: 9 };
   const seedBase = {
     equipmentType: "barbell",
-    profile: { experience_level: "intermediate" as const, units: "lb" as const },
+    profile: { experience_level: "intermediate" as const },
     goal: "hypertrophy" as const,
     startRir: 3,
     isDeload: false,

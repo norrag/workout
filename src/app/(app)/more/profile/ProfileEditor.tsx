@@ -6,9 +6,8 @@ import type { ProfileRow } from "@/lib/types/database";
 import type { ExclusionWithExercise } from "@/lib/queries/exercises";
 import {
   formatHeight,
-  isImperial,
-  cmToFeetInches,
-  feetInchesToCm,
+  inchesToFeetInches,
+  feetInchesToInches,
 } from "@/lib/units";
 import {
   addExclusionAction,
@@ -40,7 +39,7 @@ const EQUIPMENT = [
 
 const KNOWN_EQUIPMENT = new Set<string>(EQUIPMENT);
 
-type EditableField = "display_name" | "age" | "height_cm" | "bodyweight" | "training_since";
+type EditableField = "display_name" | "age" | "height_in" | "bodyweight" | "training_since";
 
 const FIELD_META: Record<
   EditableField,
@@ -48,7 +47,7 @@ const FIELD_META: Record<
 > = {
   display_name: { label: "NAME", type: "text" },
   age: { label: "AGE", type: "number" },
-  height_cm: { label: "HEIGHT", type: "number" },
+  height_in: { label: "HEIGHT", type: "number" },
   bodyweight: { label: "BODYWEIGHT", type: "number" },
   training_since: { label: "TRAINING SINCE", type: "date" },
 };
@@ -83,7 +82,7 @@ export function ProfileEditor({
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState<EditableField | null>(null);
   const [editValue, setEditValue] = useState("");
-  // imperial height edits in feet + inches (PH28); the canonical cm is derived
+  // height edits in feet + inches; the canonical inches value is derived on save
   const [heightFeet, setHeightFeet] = useState("");
   const [heightInches, setHeightInches] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -103,9 +102,6 @@ export function ProfileEditor({
   );
   const [gender, setGenderLocal] = useState(profile.gender ?? "undisclosed");
 
-  const units = profile.units;
-  const imperial = isImperial(units);
-
   const rows: { field: EditableField; value: React.ReactNode; raw: string }[] = [
     {
       field: "display_name",
@@ -118,17 +114,15 @@ export function ProfileEditor({
       raw: profile.age != null ? String(profile.age) : "",
     },
     {
-      field: "height_cm",
-      value: formatHeight(profile.height_cm, units) ?? "—",
-      raw: profile.height_cm != null ? String(profile.height_cm) : "",
+      field: "height_in",
+      value: formatHeight(profile.height_in) ?? "—",
+      raw: profile.height_in != null ? String(profile.height_in) : "",
     },
     {
       field: "bodyweight",
       value: (
         <span className="numeral">
-          {profile.bodyweight != null
-            ? `${profile.bodyweight} ${units.toUpperCase()}`
-            : "—"}{" "}
+          {profile.bodyweight != null ? `${profile.bodyweight} LB` : "—"}{" "}
           {profile.bodyweight_updated_at && (
             <span className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
               UPDATED {shortDate(profile.bodyweight_updated_at)}
@@ -172,9 +166,9 @@ export function ProfileEditor({
             onClick={() => {
               setEditing(row.field);
               setEditValue(row.raw);
-              if (row.field === "height_cm" && imperial) {
-                if (profile.height_cm != null) {
-                  const { feet, inches } = cmToFeetInches(profile.height_cm);
+              if (row.field === "height_in") {
+                if (profile.height_in != null) {
+                  const { feet, inches } = inchesToFeetInches(profile.height_in);
                   setHeightFeet(String(feet));
                   setHeightInches(String(inches));
                 } else {
@@ -361,15 +355,15 @@ export function ProfileEditor({
       {/* single-field edit sheet */}
       {editing &&
         (() => {
-          const imperialHeight = editing === "height_cm" && imperial;
+          const imperialHeight = editing === "height_in";
           const inputClass =
             "h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink focus:outline-none";
           const save = () =>
             startTransition(async () => {
-              // imperial height is captured as feet + inches; persist canonical cm
+              // height is captured as feet + inches; persist canonical inches
               const value = imperialHeight
                 ? String(
-                    feetInchesToCm(
+                    feetInchesToInches(
                       Number(heightFeet || 0),
                       Number(heightInches || 0),
                     ),
@@ -385,12 +379,10 @@ export function ProfileEditor({
               onClose={() => setEditing(null)}
               title={FIELD_META[editing].label.toLowerCase()}
               subtitle={
-                editing === "height_cm"
-                  ? imperial
-                    ? "FEET / INCHES"
-                    : "CENTIMETERS"
+                editing === "height_in"
+                  ? "FEET / INCHES"
                   : editing === "bodyweight"
-                    ? units.toUpperCase()
+                    ? "LB"
                     : undefined
               }
             >

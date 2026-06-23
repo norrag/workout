@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile } from "@/lib/queries/profiles";
 import { getMesoStats } from "@/lib/queries/stats";
 import {
   BalanceView,
@@ -33,12 +32,8 @@ export default async function MesoStatsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [stats, profile] = await Promise.all([
-    getMesoStats(supabase, user.id, mesoId),
-    getProfile(supabase, user.id),
-  ]);
+  const stats = await getMesoStats(supabase, user.id, mesoId);
   if (!stats) notFound();
-  const unit = profile?.units ?? "lb";
 
   return (
     <div>
@@ -87,7 +82,7 @@ export default async function MesoStatsPage({
       </div>
 
       {view === "balance" && <BalanceView stats={stats} />}
-      {view === "performance" && <PerformanceView stats={stats} unit={unit} />}
+      {view === "performance" && <PerformanceView stats={stats} />}
     </div>
   );
 }

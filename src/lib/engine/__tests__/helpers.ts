@@ -5,7 +5,7 @@ export function baseInputs(
 ): EngineInputs {
   return {
     exercise: { equipmentType: "barbell" },
-    user: { experienceLevel: "intermediate", units: "kg" },
+    user: { experienceLevel: "intermediate" },
     goalType: "gain",
     week: { targetRir: 2, isDeload: false },
     previous: { weight: 100, reps: 8, sets: 3, targetRir: 3 },

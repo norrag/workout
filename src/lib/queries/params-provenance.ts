@@ -30,7 +30,9 @@ import { engineParamsSchema, type EngineParams } from "@/lib/engine";
 // v3 adds the §5.4 `volume` block (MEV/MAV/MRV landmarks + experience scale).
 // v4 adds the doc 13 rep-window block (weight_selection, grading, rep_window,
 // rir_tolerance/rir_regress_gap, reps_predict, e1rm.anchor_method).
-export const CURRENT_PARAMS_SCHEMA_VERSION = 4;
+// v5 flattens `increment`/`rounding` from per-unit {kg,lb} objects to a single
+// pound value — the app records exclusively in imperial units.
+export const CURRENT_PARAMS_SCHEMA_VERSION = 5;
 
 /** Deterministic JSON with recursively sorted object keys. Pure. */
 export function canonicalize(value: unknown): string {

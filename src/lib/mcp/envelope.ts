@@ -72,11 +72,7 @@ export function roundTo(n: number | null | undefined, dp = 1): number | null {
 /** Round to one decimal place, null-safe — the connector's default precision. */
 export const round1 = (n: number | null | undefined): number | null => roundTo(n, 1);
 
-export type Units = "kg" | "lb";
-
 export interface EnvelopeOpts {
-  /** the user's weight unit when the payload reports loads; else null */
-  units?: Units | null;
   /** sample sizes / coverage / caveats that qualify the numbers */
   dataQuality?: Record<string, unknown> | null;
 }
@@ -84,7 +80,8 @@ export interface EnvelopeOpts {
 export interface Envelope<T = unknown> {
   schema_version: number;
   generated_at: string;
-  units: Units | null;
+  /** the app records weight exclusively in pounds */
+  units: "lb";
   data_quality: Record<string, unknown> | null;
   data: T;
 }
@@ -93,7 +90,7 @@ export function envelope<T>(data: T, opts: EnvelopeOpts = {}): Envelope<T> {
   return {
     schema_version: MCP_SCHEMA_VERSION,
     generated_at: new Date().toISOString(),
-    units: opts.units ?? null,
+    units: "lb",
     data_quality: opts.dataQuality ?? null,
     data,
   };

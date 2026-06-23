@@ -9,7 +9,6 @@ import type {
   MesocycleRow,
   MicrocycleRow,
   SetType,
-  Units,
   WorkoutExerciseRow,
   WorkoutRow,
 } from "@/lib/types/database";
@@ -418,7 +417,6 @@ export async function logSet(
     reps: number;
     rir_reported: number | null;
     set_type: SetType;
-    unit: Units;
   },
 ): Promise<LoggedSetRow> {
   // denormalized cycle stamps come from the workout chain
@@ -460,7 +458,6 @@ export async function logSet(
       performed_at: new Date().toISOString(),
       set_number: input.set_number,
       weight: input.weight,
-      unit: input.unit,
       reps: input.reps,
       set_type: input.set_type,
       rir_reported: input.rir_reported,
@@ -1006,7 +1003,7 @@ export async function addWorkoutExercises(
       .in("id", exerciseIds),
     supabase
       .from("profiles")
-      .select("experience_level, units")
+      .select("experience_level")
       .eq("id", userId)
       .single(),
     resolveAddGoal(supabase, micro.mesocycle_id),
@@ -1028,7 +1025,6 @@ export async function addWorkoutExercises(
       params,
       override,
       toEngineEquipment(equipment),
-      profile.units,
     );
     // model the user's best as the cold-start `initial` (no prior-meso peak ⇒ no
     // backoff), so the prescribed number matches the prior behavior while becoming
@@ -1042,7 +1038,7 @@ export async function addWorkoutExercises(
       null,
       initial,
       { equipmentType: toEngineEquipment(equipment) },
-      { experienceLevel: profile.experience_level ?? "beginner", units: profile.units },
+      { experienceLevel: profile.experience_level ?? "beginner" },
       micro.target_rir,
       effectiveParams,
     );

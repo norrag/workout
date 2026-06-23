@@ -9,7 +9,7 @@ import type { EngineInputs, Prescription } from "../types";
 
 const params = DEFAULT_ENGINE_PARAMS;
 const exercise = { equipmentType: "barbell" as const };
-const user = { experienceLevel: "intermediate" as const, units: "kg" as const };
+const user = { experienceLevel: "intermediate" as const };
 
 function simulateCleanWeek(prev: Prescription): EngineInputs["actualSets"] {
   return Array.from({ length: prev.sets }, (_, i) => ({
@@ -21,10 +21,10 @@ function simulateCleanWeek(prev: Prescription): EngineInputs["actualSets"] {
   }));
 }
 
-describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100kg start", () => {
+describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100lb start", () => {
   const ramp = rirRamp(5, true, 3, 0, params);
 
-  it("progresses 100 → 102.5 → 105 → 107.5 then deloads to 60", () => {
+  it("progresses 100 → 105 → 110 → 115 then deloads to 65", () => {
     const prescriptions: Prescription[] = [];
     let prev: Prescription = seedMeso(
       null,
@@ -65,11 +65,11 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100kg start"
       prescriptions.map((p) => ({ weight: p.weight, rir: p.targetRir, sets: p.sets })),
     ).toEqual([
       { weight: 100, rir: 3, sets: 3 },
-      { weight: 102.5, rir: 2, sets: 3 },
-      { weight: 105, rir: 1, sets: 3 },
-      { weight: 107.5, rir: 0, sets: 3 },
-      // deload: 55% of 107.5 = 59.1, rounded to barbell 2.5 step = 60; half sets
-      { weight: 60, rir: 4, sets: 2 },
+      { weight: 105, rir: 2, sets: 3 },
+      { weight: 110, rir: 1, sets: 3 },
+      { weight: 115, rir: 0, sets: 3 },
+      // deload: 55% of 115 = 63.25, rounded to barbell 5 step = 65; half sets
+      { weight: 65, rir: 4, sets: 2 },
     ]);
 
     // every prescription explains itself

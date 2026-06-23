@@ -10,7 +10,7 @@ import { addExclusion, removeExclusion } from "@/lib/queries/exercises";
 const detailsSchema = z.object({
   display_name: z.string().min(1, "Name is required").max(60),
   age: z.coerce.number().int().min(13).max(120).nullable(),
-  height_cm: z.coerce.number().min(90).max(250).nullable(),
+  height_in: z.coerce.number().min(36).max(96).nullable(),
   bodyweight: z.coerce.number().positive().max(1000).nullable(),
   training_since: z
     .string()
@@ -58,7 +58,7 @@ export async function saveProfileDetails(
   const parsed = detailsSchema.safeParse({
     display_name: formData.get("display_name"),
     age: formData.get("age") || null,
-    height_cm: formData.get("height_cm") || null,
+    height_in: formData.get("height_in") || null,
     bodyweight: formData.get("bodyweight") || null,
     training_since: formData.get("training_since") || null,
   });
@@ -81,7 +81,7 @@ export async function saveProfileDetails(
 const fieldSchemas = {
   display_name: z.string().min(1).max(60),
   age: z.coerce.number().int().min(13).max(120),
-  height_cm: z.coerce.number().min(90).max(250),
+  height_in: z.coerce.number().min(36).max(96),
   bodyweight: z.coerce.number().positive().max(1000),
   training_since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   body_fat_pct: z.coerce.number().min(2).max(70),

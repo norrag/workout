@@ -72,15 +72,13 @@ export function formatProfile(profile: ProfileRow | null): Record<string, unknow
     display_name: profile.display_name,
     age: profile.age,
     gender: profile.gender,
-    height_cm: profile.height_cm,
+    height_in: profile.height_in,
     bodyweight: profile.bodyweight,
-    bodyweight_unit: profile.units,
     body_fat_pct: profile.body_fat_pct,
     experience_level: profile.experience_level,
     training_since: profile.training_since,
     training_age_years: trainingYears,
     preferred_equipment: profile.preferred_equipment,
-    units: profile.units,
     is_admin: profile.role === "admin",
   };
 }
@@ -93,14 +91,14 @@ function registerGetProfile(server: McpServer) {
       title: "Get profile",
       description:
         "The user's profile: name, age, sex, height, bodyweight, body-fat, " +
-        "experience level, training age, preferred equipment, and units. " +
-        "Use it to personalize coaching. Takes no arguments.",
+        "experience level, training age, and preferred equipment. " +
+        "Weights are in pounds. Use it to personalize coaching. Takes no arguments.",
       inputSchema: {},
     },
     async (_args: Record<string, never>, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
       const profile = await getProfile(client, userId);
-      return jsonResult(formatProfile(profile), { units: profile?.units ?? null });
+      return jsonResult(formatProfile(profile));
     },
   );
 }
@@ -392,7 +390,7 @@ function registerGetMesoSummary(server: McpServer) {
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data: row, error }, scores, profile] = await Promise.all([
+      const [{ data: row, error }, scores] = await Promise.all([
         client
           .from("v_meso_summary")
           .select("*")
@@ -400,7 +398,6 @@ function registerGetMesoSummary(server: McpServer) {
           .eq("mesocycle_id", mesocycle_id)
           .maybeSingle(),
         getMesoProgressScores(client, userId, mesocycle_id),
-        getProfile(client, userId),
       ]);
       if (error) throw error;
       const dataQuality = row
@@ -415,7 +412,6 @@ function registerGetMesoSummary(server: McpServer) {
           )
         : null;
       return jsonResult(formatMesoSummary(row, scores), {
-        units: profile?.units ?? null,
         dataQuality,
       });
     },
@@ -542,7 +538,7 @@ function registerGetExerciseHistory(server: McpServer) {
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [sessions, pinned, overview, profile] = await Promise.all([
+      const [sessions, pinned, overview] = await Promise.all([
         getExerciseHistory(client, userId, exercise_id),
         listPinnedNotes(client, userId, [exercise_id]),
         client
@@ -551,7 +547,6 @@ function registerGetExerciseHistory(server: McpServer) {
           .eq("user_id", userId)
           .eq("exercise_id", exercise_id)
           .maybeSingle(),
-        getProfile(client, userId),
       ]);
       if (overview.error) throw overview.error;
       return jsonResult(
@@ -562,7 +557,6 @@ function registerGetExerciseHistory(server: McpServer) {
           overview.data?.times_trained ?? null,
         ),
         {
-          units: profile?.units ?? null,
           dataQuality: {
             samples: {
               sessions_shown: sessions.length,

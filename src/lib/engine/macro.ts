@@ -19,12 +19,14 @@ import {
 } from "./params";
 
 const LB_PER_KG = 2.2046226218;
+const M_PER_IN = 0.0254;
 const WEEKS_PER_MONTH = 4.33;
 
 export type MacroGoal = (typeof macroGoalTypes)[number];
 export type PhaseName = (typeof phaseNames)[number];
 export type TargetDirection = "gain" | "loss" | "none";
-export type WeightUnit = "kg" | "lb";
+/** The app records weight exclusively in pounds; "%" covers strength targets. */
+export type WeightUnit = "lb";
 
 export const macroProfileSchema = z.object({
   sex: z
@@ -32,10 +34,10 @@ export const macroProfileSchema = z.object({
     .nullable()
     .default(null),
   age: z.number().positive().nullable().default(null),
-  /** bodyweight in `bodyweightUnit` */
+  /** bodyweight in pounds */
   bodyweight: z.number().positive().nullable().default(null),
-  bodyweightUnit: z.enum(["kg", "lb"]).default("lb"),
-  heightCm: z.number().positive().nullable().default(null),
+  /** height in inches */
+  heightIn: z.number().positive().nullable().default(null),
   experienceLevel: z.enum(experienceLevels).nullable().default(null),
   /** years since `training_since`; weak fallback proxy when body comp is unknown */
   trainingYears: z.number().min(0).nullable().default(null),
@@ -114,16 +116,14 @@ function ageMultiplier(
   );
 }
 
-function toKg(weight: number, unit: WeightUnit): number {
-  return unit === "lb" ? weight / LB_PER_KG : weight;
+/** pounds → kilograms, for the FFMI/BMI physics computed in metric. */
+function lbToKg(lb: number): number {
+  return lb / LB_PER_KG;
 }
 
-function lbToUnit(lb: number, unit: WeightUnit): number {
-  return unit === "lb" ? lb : lb / LB_PER_KG;
-}
-
-function kgToUnit(kg: number, unit: WeightUnit): number {
-  return unit === "lb" ? kg * LB_PER_KG : kg;
+/** kilograms → pounds, back to the app's recording unit. */
+function kgToLb(kg: number): number {
+  return kg * LB_PER_KG;
 }
 
 type Sex = "male" | "female";
@@ -143,14 +143,14 @@ function muscularDevelopment(
 ): { fraction: number; remainingLb: number } | null {
   if (
     profile.bodyFatPct == null ||
-    profile.heightCm == null ||
+    profile.heightIn == null ||
     profile.bodyweight == null
   ) {
     return null;
   }
-  const hM = profile.heightCm / 100;
+  const hM = profile.heightIn * M_PER_IN;
   if (hM <= 0) return null;
-  const bwKg = toKg(profile.bodyweight, profile.bodyweightUnit);
+  const bwKg = lbToKg(profile.bodyweight);
   const ffmKg = bwKg * (1 - profile.bodyFatPct / 100);
   const ffmi = ffmKg / (hM * hM);
   // normalize to 1.83 m so the ceiling/baseline are height-independent
@@ -162,13 +162,13 @@ function muscularDevelopment(
   // remaining FFM to the ceiling, de-normalized back to the user's actual height
   const ceilingActual = ceiling - 6.1 * (1.83 - hM);
   const remainingKg = Math.max(0, ceilingActual * hM * hM - ffmKg);
-  return { fraction, remainingLb: kgToUnit(remainingKg, profile.bodyweightUnit) };
+  return { fraction, remainingLb: kgToLb(remainingKg) };
 }
 
 function bmiOf(profile: MacroProfile): number | null {
-  if (profile.bodyweight == null || profile.heightCm == null) return null;
-  const kg = toKg(profile.bodyweight, profile.bodyweightUnit);
-  const m = profile.heightCm / 100;
+  if (profile.bodyweight == null || profile.heightIn == null) return null;
+  const kg = lbToKg(profile.bodyweight);
+  const m = profile.heightIn * M_PER_IN;
   if (m <= 0) return null;
   return kg / (m * m);
 }
@@ -267,9 +267,8 @@ export function planMacrocycle(
   };
 }
 
-function unitOf(profile: MacroProfile): WeightUnit {
-  return profile.bodyweightUnit;
-}
+/** The app records weight exclusively in pounds. */
+const unit: WeightUnit = "lb";
 
 function computeTarget(
   goal: MacroGoal,
@@ -278,8 +277,6 @@ function computeTarget(
   months: number,
   mt: EngineParams["macro_target"],
 ): Computed {
-  const unit = unitOf(profile);
-
   if (goal === "maintain") {
     const zero: MacroRange = { low: 0, high: 0, unit, direction: "none" };
     return { target: zero, perMonthRate: zero, recommendedDurationMonths: months };
@@ -453,8 +450,7 @@ function recommendDuration(
   const am = ageMultiplier(profile.age, mt);
   const monthlyMid = bw * ((rate.low + rate.high) / 2 / 100) * sf * am;
   if (monthlyMid <= 0) return clamp(6, lo, hi);
-  const targetLb = profile.sex === "female" ? mt.recommend_target_lb.female : mt.recommend_target_lb.male;
-  const target = lbToUnit(targetLb, unitOf(profile));
+  const target = profile.sex === "female" ? mt.recommend_target_lb.female : mt.recommend_target_lb.male;
   return clamp(Math.round(target / monthlyMid), lo, hi);
 }
 

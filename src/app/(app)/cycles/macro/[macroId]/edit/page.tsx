@@ -52,7 +52,7 @@ export default async function EditMacroPage({
     }
   }
   if (profile.bodyweight)
-    chips.push(`${Math.round(profile.bodyweight)} ${profile.units.toUpperCase()}`);
+    chips.push(`${Math.round(profile.bodyweight)} LB`);
   if (profile.experience_level)
     chips.push(profile.experience_level.toUpperCase());
 

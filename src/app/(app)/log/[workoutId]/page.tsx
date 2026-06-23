@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkoutDetail } from "@/lib/queries/logging";
-import { getProfile } from "@/lib/queries/profiles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { ensureFreshPrescriptions } from "@/lib/queries/regeneration";
 import { DayView } from "./DayView";
@@ -20,9 +19,8 @@ export default async function LogWorkoutPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [initialDetail, profile, { params: engineParams }] = await Promise.all([
+  const [initialDetail, { params: engineParams }] = await Promise.all([
     getWorkoutDetail(supabase, user.id, workoutId),
-    getProfile(supabase, user.id),
     getActiveEngineParams(supabase),
   ]);
   let detail = initialDetail;
@@ -48,11 +46,7 @@ export default async function LogWorkoutPage({
       >
         ‹ WORKOUT
       </Link>
-      <DayView
-        detail={detail}
-        units={profile?.units ?? "lb"}
-        params={engineParams}
-      />
+      <DayView detail={detail} params={engineParams} />
     </div>
   );
 }

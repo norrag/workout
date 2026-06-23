@@ -6,6 +6,7 @@ import { getMacroOverview, phaseLabel } from "@/lib/queries/macro";
 import { getProfile } from "@/lib/queries/profiles";
 import type { MacroRange } from "@/lib/engine";
 import type { MacroGoalType, MesocycleRow } from "@/lib/types/database";
+import { formatWeight } from "@/lib/units";
 import { planMesoAction } from "../../actions";
 
 const MONTHS = [
@@ -29,19 +30,28 @@ const TARGET_NOUN: Record<MacroGoalType, string> = {
   maintain: "RECOMPOSITION",
 };
 
+// weight ranges snap to 0.5 for display; percent goals pass through
+function fmtNum(value: number, isPct: boolean): string {
+  return isPct ? String(value) : formatWeight(value);
+}
+
 function fmtRange(r: MacroRange): string {
-  const unit = r.unit === "%" ? "%" : ` ${r.unit}`;
+  const isPct = r.unit === "%";
+  const unit = isPct ? "%" : ` ${r.unit}`;
   const sign = r.direction === "loss" ? "−" : "+";
   return r.low === r.high
-    ? `${sign}${r.low}${unit}`
-    : `${sign}${r.low}–${r.high}${unit}`;
+    ? `${sign}${fmtNum(r.low, isPct)}${unit}`
+    : `${sign}${fmtNum(r.low, isPct)}–${fmtNum(r.high, isPct)}${unit}`;
 }
 
 function fmtRate(r: MacroRange): string {
-  const unit = r.unit === "%" ? "%" : ` ${r.unit}`;
+  const isPct = r.unit === "%";
+  const unit = isPct ? "%" : ` ${r.unit}`;
   const sign = r.direction === "loss" ? "−" : "+";
   const body =
-    r.low === r.high ? `${r.low}${unit}` : `${r.low}–${r.high}${unit}`;
+    r.low === r.high
+      ? `${fmtNum(r.low, isPct)}${unit}`
+      : `${fmtNum(r.low, isPct)}–${fmtNum(r.high, isPct)}${unit}`;
   return `≈ ${sign}${body} / month`;
 }
 
@@ -175,9 +185,7 @@ export default async function MacroOverviewPage({
             <Chip>{trainingAge < 1 ? "<1" : Math.round(trainingAge)} YR TRAINING AGE</Chip>
           )}
           {profile.bodyweight && (
-            <Chip>
-              {Math.round(profile.bodyweight)} {profile.units.toUpperCase()}
-            </Chip>
+            <Chip>{Math.round(profile.bodyweight)} LB</Chip>
           )}
           {profile.experience_level && (
             <Chip>{profile.experience_level.toUpperCase()}</Chip>
@@ -278,7 +286,7 @@ export default async function MacroOverviewPage({
             value={stats.estStrengthPct == null ? "—" : `${stats.estStrengthPct > 0 ? "+" : ""}${stats.estStrengthPct}%`}
             label="EST. STRENGTH · KEY LIFTS"
           />
-          <Stat value={fmtVolume(stats.totalVolume)} label={`TOTAL VOLUME · ${profile.units.toUpperCase()}`} />
+          <Stat value={fmtVolume(stats.totalVolume)} label="TOTAL VOLUME · LB" />
           <Stat value={String(stats.sessionsLogged)} label="SESSIONS LOGGED" />
           <Stat
             value={stats.adherencePct == null ? "—" : `${stats.adherencePct}%`}

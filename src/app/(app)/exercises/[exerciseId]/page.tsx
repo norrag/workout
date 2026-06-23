@@ -6,6 +6,7 @@ import { getExerciseOverview } from "@/lib/queries/exercises";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
 import { incrementFor, toEngineEquipment } from "@/lib/engine";
+import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
@@ -93,7 +94,7 @@ export default async function ExerciseDetailPage({
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("experience_level, units")
+      .select("experience_level")
       .eq("id", user.id)
       .single(),
     getExerciseOverview(supabase, user.id, exercise.id),
@@ -110,7 +111,6 @@ export default async function ExerciseDetailPage({
   const defaultStep = incrementFor(
     toEngineEquipment(exercise.equipment_type),
     profile.experience_level ?? "beginner",
-    profile.units,
     activeParams.params,
   );
 
@@ -147,7 +147,6 @@ export default async function ExerciseDetailPage({
         </Link>
         <ExerciseSettingsMenu
           exerciseId={exercise.id}
-          units={profile.units}
           defaultStep={defaultStep}
           override={incrementOverride}
         />
@@ -204,20 +203,22 @@ export default async function ExerciseDetailPage({
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-px border-[1.5px] border-ink bg-ink">
             <BestCell
-              value={ov?.weight_pr != null ? comma(ov.weight_pr) : "—"}
+              value={ov?.weight_pr != null ? formatWeight(ov.weight_pr) : "—"}
               suffix={ov?.weight_pr_reps != null ? `× ${ov.weight_pr_reps}` : null}
               label="WEIGHT PR · LB"
             />
             <BestCell
-              value={ov?.best_e1rm != null ? comma(ov.best_e1rm) : "—"}
+              value={ov?.best_e1rm != null ? formatWeight(ov.best_e1rm) : "—"}
               suffix="lb"
               label="EST. 1RM"
             />
             <BestCell
-              value={ov?.volume_pr_weight != null ? comma(ov.volume_pr_weight) : "—"}
+              value={ov?.volume_pr_weight != null ? formatWeight(ov.volume_pr_weight) : "—"}
               suffix={ov?.volume_pr_reps != null ? `× ${ov.volume_pr_reps}` : null}
               label={
-                ov?.volume_pr != null ? `VOLUME PR · ${comma(ov.volume_pr)} LB` : "VOLUME PR"
+                ov?.volume_pr != null
+                  ? `VOLUME PR · ${comma(ov.volume_pr)} LB`
+                  : "VOLUME PR"
               }
             />
             <BestCell
@@ -249,7 +250,7 @@ export default async function ExerciseDetailPage({
                             : "font-medium text-ink/40"
                       }`}
                     >
-                      {bar.e1rm ?? "—"}
+                      {bar.e1rm != null ? formatWeight(bar.e1rm) : "—"}
                     </div>
                     <div className="flex h-11 items-end">
                       {bar.state === "current" ? (

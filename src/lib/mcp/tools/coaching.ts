@@ -154,7 +154,6 @@ export function formatTrainingOverview(parts: TrainingOverviewParts): Record<str
       ? {
           display_name: profile.display_name,
           experience_level: profile.experience_level,
-          units: profile.units,
           bodyweight: profile.bodyweight,
         }
       : null,
@@ -215,7 +214,6 @@ function registerGetTrainingOverview(server: McpServer) {
       return jsonResult(
         formatTrainingOverview({ profile, currentState, activeSummary, topLifts }),
         {
-          units: profile?.units ?? null,
           dataQuality: {
             scales: scaleLegend("overall_fatigue", "rir"),
             samples: { active_meso_fatigue_sessions: activeSummary?.n_overall_fatigue ?? 0 },
@@ -411,14 +409,12 @@ function registerAnalyzeExerciseProgress(server: McpServer) {
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
       const { params } = await getActiveEngineParams(client);
-      const [overview, sessions, profile] = await Promise.all([
+      const [overview, sessions] = await Promise.all([
         getExerciseOverview(client, userId, exercise_id),
         getExerciseSessions(client, userId, exercise_id, params),
-        getProfile(client, userId),
       ]);
       const estimable = sessions.filter((s) => s.e1rm != null);
       return jsonResult(formatExerciseAnalysis(exercise_id, overview, sessions), {
-        units: profile?.units ?? null,
         dataQuality: {
           scales: scaleLegend("rir"),
           samples: {
@@ -506,14 +502,11 @@ function registerCompareMesocycles(server: McpServer) {
     },
     async ({ mesocycle_ids }: { mesocycle_ids: string[] }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data, error }, profile] = await Promise.all([
-        client
-          .from("v_meso_summary")
-          .select("*")
-          .eq("user_id", userId)
-          .in("mesocycle_id", mesocycle_ids),
-        getProfile(client, userId),
-      ]);
+      const { data, error } = await client
+        .from("v_meso_summary")
+        .select("*")
+        .eq("user_id", userId)
+        .in("mesocycle_id", mesocycle_ids);
       if (error) throw error;
       // preserve the caller's order
       const byId = new Map((data ?? []).map((r) => [r.mesocycle_id, r]));
@@ -521,7 +514,6 @@ function registerCompareMesocycles(server: McpServer) {
         .map((id) => byId.get(id))
         .filter((r): r is VMesoSummaryRow => r != null);
       return jsonResult(formatCompareMesos(ordered), {
-        units: profile?.units ?? null,
         dataQuality: {
           scales: scaleLegend("overall_fatigue", "performance_rating"),
           // feedback sample sizes vary per block — surface them so a low-n
@@ -707,15 +699,11 @@ function registerGetExerciseAffinity(server: McpServer) {
       extra: McpExtra,
     ) => {
       const { client, userId } = resolveSession(extra);
-      const [list, profile] = await Promise.all([
-        getExerciseAffinity(client, userId, {
-          muscleGroupId: args.muscle_group_id,
-          equipment: args.equipment,
-        }),
-        getProfile(client, userId),
-      ]);
+      const list = await getExerciseAffinity(client, userId, {
+        muscleGroupId: args.muscle_group_id,
+        equipment: args.equipment,
+      });
       return jsonResult(formatAffinity(list.slice(0, 60)), {
-        units: profile?.units ?? null,
         dataQuality: {
           scales: scaleLegend("joint_pain", "workload", "pump"),
           // each exercise's feedback means are over its own feedback.sessions

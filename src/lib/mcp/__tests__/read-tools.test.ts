@@ -58,14 +58,13 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     display_name: "Garron",
     age: 34,
     gender: "male",
-    height_cm: 180,
+    height_in: 71,
     bodyweight: 198,
     bodyweight_updated_at: null,
     body_fat_pct: 15,
     training_since: null,
     experience_level: "advanced",
     preferred_equipment: ["barbell", "dumbbell"],
-    units: "lb",
     week_starts_on: 1,
     auto_match_weights: false,
     role: "user",
@@ -88,7 +87,6 @@ describe("formatProfile", () => {
     expect(out).toMatchObject({
       display_name: "Garron",
       bodyweight: 198,
-      units: "lb",
       is_admin: false,
     });
     expect(out).not.toHaveProperty("id");

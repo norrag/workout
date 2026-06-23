@@ -138,7 +138,7 @@ describe("buildEngineInputs", () => {
     nextWeek: { targetRir: 1, isDeload: false },
     goal: "hypertrophy" as const,
     equipmentType: "barbell",
-    profile: { experience_level: "intermediate" as const, units: "lb" as const },
+    profile: { experience_level: "intermediate" as const },
     muscleGroupWeeklySets: 12,
     weekPeak: null,
     strengthAnchor: null,
@@ -160,7 +160,7 @@ describe("buildEngineInputs", () => {
       workload: 6,
     });
     expect(inputs.week).toEqual({ targetRir: 1, isDeload: false });
-    expect(inputs.user).toEqual({ experienceLevel: "intermediate", units: "lb" });
+    expect(inputs.user).toEqual({ experienceLevel: "intermediate" });
   });
 
   it("joint pain stays per-exercise while pump/workload come from the group scope", () => {

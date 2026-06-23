@@ -67,11 +67,7 @@ export default async function WorkoutPage() {
     if (detail) {
       const { params: engineParams } = await getActiveEngineParams(supabase);
       return (
-        <DayView
-          detail={detail}
-          units={profile?.units ?? "lb"}
-          params={engineParams}
-        />
+        <DayView detail={detail} params={engineParams} />
       );
     }
   }
