@@ -55,7 +55,7 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
                 >
                   <div className="numeral text-base font-bold">
                     {row.top_weight != null ? formatWeight(row.top_weight) : "—"}{" "}
-                    {row.unit}{" "}
+                    lb{" "}
                     <span className="text-[13px] font-normal text-ink/50">×</span>{" "}
                     {row.reps}
                     {row.is_deload && (

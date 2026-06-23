@@ -95,8 +95,8 @@ Contreras 2013.)*
 **Double progression + increments [principle EVIDENCED; sizes HEURISTIC].**
 Advance reps within the prescribed range; when the top of the range is hit for
 all sets at target RIR, add one increment and reset to the bottom. Increments
-scale by lift class (large lower compound > upper compound > isolation) and the
-user's unit. A marginal miss regresses ~5%, a clear/failed session ~10%.
+(in pounds) scale by lift class (large lower compound > upper compound >
+isolation). A marginal miss regresses ~5%, a clear/failed session ~10%.
 *(Plotkin 2022.)*
 
 **Deload [HEURISTIC — fatigue management, NOT a proven booster].** Default

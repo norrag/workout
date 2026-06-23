@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { feetInchesToCm } from "@/lib/units";
+import { feetInchesToInches } from "@/lib/units";
 
 const initialState: OnboardingState = { error: null };
 
@@ -22,15 +22,12 @@ const EQUIPMENT = [
   { value: "kettlebell", label: "KETTLEBELL" },
 ] as const;
 
-// Units first (PH28): the measurement system has to be chosen before height /
-// bodyweight so those fields can be entered in the right system. Deviates from
-// the 08 §4 ordering (units last) — recorded in docs/PROGRESS.md.
-const STEPS = ["UNITS", "ABOUT YOU", "EXPERIENCE", "EQUIPMENT"] as const;
+const STEPS = ["ABOUT YOU", "EXPERIENCE", "EQUIPMENT"] as const;
 
 /**
- * Onboarding: units → name/age/height/bodyweight → experience level →
- * equipment access. One form, four panels; everything submits together at the
- * end. Picking units first lets height/bodyweight render in the user's system.
+ * Onboarding: name/age/height/bodyweight → experience level → equipment access.
+ * One form, three panels; everything submits together at the end. The app
+ * records exclusively in imperial units (pounds + feet/inches).
  */
 export default function OnboardingPage() {
   const [state, formAction, pending] = useActionState(
@@ -50,25 +47,21 @@ export default function OnboardingPage() {
     "machine",
     "cable",
   ]);
-  const [units, setUnits] = useState<"lb" | "kg">("lb");
-  // height is captured in the chosen system but always submitted as canonical cm
-  const [heightCm, setHeightCm] = useState("");
+  // height is captured as feet + inches and submitted as canonical inches
   const [heightFeet, setHeightFeet] = useState("");
   const [heightInches, setHeightInches] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  const imperial = units === "lb";
-  const computedHeightCm = imperial
-    ? heightFeet === "" && heightInches === ""
+  const computedHeightIn =
+    heightFeet === "" && heightInches === ""
       ? ""
       : String(
-          feetInchesToCm(Number(heightFeet || 0), Number(heightInches || 0)),
-        )
-    : heightCm;
+          feetInchesToInches(Number(heightFeet || 0), Number(heightInches || 0)),
+        );
 
   const next = () => {
-    // validate the ABOUT YOU panel (step 1) before leaving it
-    if (step === 1 && !formRef.current?.reportValidity()) return;
+    // validate the ABOUT YOU panel (step 0) before leaving it
+    if (step === 0 && !formRef.current?.reportValidity()) return;
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
@@ -102,10 +95,9 @@ export default function OnboardingPage() {
       {equipment.map((v) => (
         <input key={v} type="hidden" name="preferred_equipment" value={v} />
       ))}
-      <input type="hidden" name="units" value={units} />
-      <input type="hidden" name="height_cm" value={computedHeightCm} />
+      <input type="hidden" name="height_in" value={computedHeightIn} />
 
-      <div className={step === 1 ? "flex flex-col gap-5" : "hidden"}>
+      <div className={step === 0 ? "flex flex-col gap-5" : "hidden"}>
         <p className="text-sm text-ink/55">
           A few details to calibrate your starting prescriptions.
         </p>
@@ -126,51 +118,39 @@ export default function OnboardingPage() {
             onChange={setGender}
           />
         </div>
-        {imperial ? (
-          <div className="flex flex-col gap-1.5">
-            <span className="label-caps text-[10px] font-semibold text-ink/55">
-              Height — ft / in
-            </span>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  aria-label="Height feet"
-                  type="number"
-                  min={2}
-                  max={8}
-                  inputMode="numeric"
-                  placeholder="ft"
-                  value={heightFeet}
-                  onChange={(e) => setHeightFeet(e.target.value)}
-                />
-              </div>
-              <div className="flex-1">
-                <Input
-                  aria-label="Height inches"
-                  type="number"
-                  min={0}
-                  max={11}
-                  inputMode="numeric"
-                  placeholder="in"
-                  value={heightInches}
-                  onChange={(e) => setHeightInches(e.target.value)}
-                />
-              </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="label-caps text-[10px] font-semibold text-ink/55">
+            Height — ft / in
+          </span>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                aria-label="Height feet"
+                type="number"
+                min={2}
+                max={8}
+                inputMode="numeric"
+                placeholder="ft"
+                value={heightFeet}
+                onChange={(e) => setHeightFeet(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                aria-label="Height inches"
+                type="number"
+                min={0}
+                max={11}
+                inputMode="numeric"
+                placeholder="in"
+                value={heightInches}
+                onChange={(e) => setHeightInches(e.target.value)}
+              />
             </div>
           </div>
-        ) : (
-          <Input
-            label="Height — cm"
-            type="number"
-            min={90}
-            max={250}
-            inputMode="numeric"
-            value={heightCm}
-            onChange={(e) => setHeightCm(e.target.value)}
-          />
-        )}
+        </div>
         <Input
-          label={`Bodyweight — ${units}`}
+          label="Bodyweight — lb"
           name="bodyweight"
           type="number"
           min={1}
@@ -180,7 +160,7 @@ export default function OnboardingPage() {
         />
       </div>
 
-      <div className={step === 2 ? "flex flex-col gap-5" : "hidden"}>
+      <div className={step === 1 ? "flex flex-col gap-5" : "hidden"}>
         <p className="text-sm text-ink/55">
           Experience sets your starting volumes and how aggressively loads
           ramp.
@@ -203,7 +183,7 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      <div className={step === 3 ? "flex flex-col gap-5" : "hidden"}>
+      <div className={step === 2 ? "flex flex-col gap-5" : "hidden"}>
         <p className="text-sm text-ink/55">
           What you train with. Pickers favor what you have access to.
         </p>
@@ -218,22 +198,6 @@ export default function OnboardingPage() {
             </Chip>
           ))}
         </div>
-      </div>
-
-      <div className={step === 0 ? "flex flex-col gap-5" : "hidden"}>
-        <p className="text-sm text-ink/55">
-          Your measurement system. Loads, increments, and history show in this
-          unit; height in feet/inches for LB or centimeters for KG. Change it
-          any time in More.
-        </p>
-        <SegmentedControl
-          options={[
-            { value: "lb", label: "IMPERIAL" },
-            { value: "kg", label: "METRIC" },
-          ]}
-          value={units}
-          onChange={setUnits}
-        />
       </div>
 
       {state.error && <p className="text-sm text-accent">{state.error}</p>}

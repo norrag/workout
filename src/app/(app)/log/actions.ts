@@ -82,7 +82,6 @@ export async function logSetAction(input: {
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
     set_type: parsed.set_type,
-    unit: profile?.units ?? "lb",
   });
   // auto-match (doc 11): carry the logged weight onto the remaining unlogged
   // sets. Done here (after the insert excludes this set) to avoid a client race.

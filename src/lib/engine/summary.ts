@@ -24,7 +24,6 @@ export interface SummaryContext {
   nextIsDeload: boolean;
   /** the completed week's target RIR, for the ramp line */
   currentTargetRir: number;
-  units: "kg" | "lb";
   deltas: SummaryDelta[];
 }
 
@@ -51,7 +50,7 @@ export function composeAutoregulationSummary(ctx: SummaryContext): string {
         : 0;
     if (weightDelta !== 0) {
       clauses.push(
-        `${d.exerciseName} ${signed(weightDelta)} ${ctx.units}`,
+        `${d.exerciseName} ${signed(weightDelta)} lb`,
       );
     } else if (repDelta !== 0) {
       // load held, reps walk the window (Option-A week)

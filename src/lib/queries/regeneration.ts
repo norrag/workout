@@ -288,7 +288,6 @@ function recomputeProvenance(
       dependencies: {
         equipmentType: liveConfig.exercise.equipmentType,
         experienceLevel: liveConfig.user.experienceLevel,
-        units: liveConfig.user.units,
         goalType: liveConfig.goalType,
         week: liveConfig.week,
         previous: liveConfig.previous,
@@ -769,7 +768,6 @@ export async function reconcilePrescriptions(
       params,
       override,
       toEngineEquipment(equipmentType),
-      profile.units,
     );
 
     // diverged → recompute the row's engine of `kind`. Anchors feed only the

@@ -20,7 +20,7 @@ export function registerResources(server: McpServer) {
       title: "Profile",
       description:
         "The authenticated user's profile (name, age, sex, body data, " +
-        "experience, units) — the same shape as get_profile.",
+        "experience) — the same shape as get_profile.",
       mimeType: "application/json",
     },
     async (uri: URL, extra: McpExtra) => {

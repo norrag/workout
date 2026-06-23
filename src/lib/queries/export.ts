@@ -23,7 +23,6 @@ const EXPORT_COLUMNS = [
   "set_type",
   "is_warmup",
   "weight",
-  "unit",
   "reps",
   "rir_reported",
   "notes",
@@ -31,7 +30,7 @@ const EXPORT_COLUMNS = [
 
 // PostgREST embeds the FK-related rows; logged_sets references each of these.
 const SELECT = `
-  performed_at, set_number, set_type, is_warmup, weight, unit, reps, rir_reported, notes,
+  performed_at, set_number, set_type, is_warmup, weight, reps, rir_reported, notes,
   exercises ( name ),
   workouts ( day_number ),
   microcycles ( week_number, is_deload, target_rir ),
@@ -44,7 +43,6 @@ type ExportRow = {
   set_type: string;
   is_warmup: boolean;
   weight: number;
-  unit: string;
   reps: number;
   rir_reported: number | null;
   notes: string | null;
@@ -97,7 +95,6 @@ export async function buildTrainingExportCsv(
     r.set_type,
     r.is_warmup,
     r.weight,
-    r.unit,
     r.reps,
     r.rir_reported,
     r.notes,

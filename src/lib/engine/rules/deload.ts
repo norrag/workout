@@ -18,7 +18,6 @@ export function prescribeDeload(
       : roundToStep(
           baseWeight * params.deload.load_pct,
           inputs.exercise.equipmentType,
-          inputs.user.units,
           params,
         );
   const sets = Math.max(

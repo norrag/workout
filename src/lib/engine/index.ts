@@ -122,7 +122,6 @@ export function prescribe(
         const fw = roundToStep(
           raw,
           inputs.exercise.equipmentType,
-          inputs.user.units,
           params,
         );
         const predicted = predictRepsAtWeight(
@@ -135,7 +134,7 @@ export function prescribe(
           predicted == null
             ? winCS.target_low
             : Math.min(winCS.max, Math.max(winCS.min, predicted));
-        const detail = `seeded from strength anchor (e1RM ${anchorCS.value} ${inputs.user.units}): ${fw} ${inputs.user.units} for ${reps} reps at ${inputs.week.targetRir} RIR`;
+        const detail = `seeded from strength anchor (e1RM ${anchorCS.value} lb): ${fw} lb for ${reps} reps at ${inputs.week.targetRir} RIR`;
         return {
           weight: fw,
           reps,
@@ -163,7 +162,6 @@ export function prescribe(
           : roundToStep(
               base.weight,
               inputs.exercise.equipmentType,
-              inputs.user.units,
               params,
             ),
       reps: base.reps,
@@ -239,7 +237,6 @@ export function prescribe(
     const increment = incrementFor(
       inputs.exercise.equipmentType,
       inputs.user.experienceLevel,
-      inputs.user.units,
       params,
     );
 
@@ -249,7 +246,7 @@ export function prescribe(
         weight = baseWeight + increment;
         reasons.unshift({
           rule: "load",
-          detail: `+${increment} ${inputs.user.units}: ${perf.detail}`,
+          detail: `+${increment} lb: ${perf.detail}`,
         });
         if (rirStepped) {
           reasons.push({
@@ -265,7 +262,7 @@ export function prescribe(
         if (mod.painGated || mod.sessionDampened) {
           reasons.unshift({
             rule: "load",
-            detail: `hold ${baseWeight} ${inputs.user.units}: ${perf.detail}`,
+            detail: `hold ${baseWeight} lb: ${perf.detail}`,
           });
         } else {
           reasons.unshift({
@@ -308,7 +305,6 @@ export function prescribe(
   let finalWeight = roundToStep(
     weight,
     inputs.exercise.equipmentType,
-    inputs.user.units,
     params,
   );
   // rounding must never lift a gated/held weight above what was handled
@@ -342,11 +338,11 @@ export function prescribe(
     const move = finalWeight - baseWeight;
     const moveDetail =
       Math.abs(move) < 1e-9
-        ? `hold ${finalWeight} ${inputs.user.units}, reps to ${reps} of ${repWindow.win.target_low}–${repWindow.win.target_high}`
-        : `${move > 0 ? "+" : "−"}${round2(Math.abs(move))} ${inputs.user.units} to ${reps} reps at ${inputs.week.targetRir} RIR`;
+        ? `hold ${finalWeight} lb, reps to ${reps} of ${repWindow.win.target_low}–${repWindow.win.target_high}`
+        : `${move > 0 ? "+" : "−"}${round2(Math.abs(move))} lb to ${reps} reps at ${inputs.week.targetRir} RIR`;
     reasons.unshift({
       rule: "load",
-      detail: `${moveDetail} (anchor e1RM ${repWindow.anchorValue} ${inputs.user.units})`,
+      detail: `${moveDetail} (anchor e1RM ${repWindow.anchorValue} lb)`,
     });
     if (repWindow.gradeDetail) {
       reasons.push({ rule: "grade", detail: repWindow.gradeDetail });
@@ -408,13 +404,13 @@ function boundRepsToWindow(
     params,
   );
   if (predicted == null) return weight;
-  const step = params.rounding[inputs.exercise.equipmentType]?.[inputs.user.units] ?? 0;
+  const step = params.rounding[inputs.exercise.equipmentType] ?? 0;
   if (step <= 0) return weight;
   if (predicted > win.max) {
-    return roundToStep(weight + step, inputs.exercise.equipmentType, inputs.user.units, params);
+    return roundToStep(weight + step, inputs.exercise.equipmentType, params);
   }
   if (predicted < win.min) {
-    return roundToStep(weight - step, inputs.exercise.equipmentType, inputs.user.units, params);
+    return roundToStep(weight - step, inputs.exercise.equipmentType, params);
   }
   return weight;
 }
@@ -438,7 +434,6 @@ export function seedMeso(
       weight: roundToStep(
         priorPeak.weight * params.meso_seed_backoff_pct,
         exercise.equipmentType,
-        user.units,
         params,
       ),
       reps: priorPeak.reps,
@@ -457,7 +452,7 @@ export function seedMeso(
     weight:
       initial?.weight == null
         ? null
-        : roundToStep(initial.weight, exercise.equipmentType, user.units, params),
+        : roundToStep(initial.weight, exercise.equipmentType, params),
     reps: initial?.reps ?? null,
     sets: clampSets(initial?.sets ?? params.min_sets, params),
     targetRir: startRir,

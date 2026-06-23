@@ -193,7 +193,7 @@ export function BalanceView({ stats }: { stats: MesoStats }) {
 // 4.3 — performance: top set by week, e1RM across macro, PRs this meso
 // ---------------------------------------------------------------------------
 
-export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: string }) {
+export function PerformanceView({ stats }: { stats: MesoStats }) {
   const { weeks, performance } = stats;
   const liftGrid = { gridTemplateColumns: `repeat(${weeks.length}, 1fr)` };
   const chartMax = Math.max(
@@ -205,7 +205,7 @@ export function PerformanceView({ stats, unit }: { stats: MesoStats; unit: strin
     <div>
       <div className="mt-[18px] border-t-[1.5px] border-ink pt-[9px]">
         <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/50">
-          TOP SET BY WEEK — KEY LIFTS · {unit.toUpperCase()}
+          TOP SET BY WEEK — KEY LIFTS · LB
         </div>
         {performance.keyLifts.map((lift) => (
           <div

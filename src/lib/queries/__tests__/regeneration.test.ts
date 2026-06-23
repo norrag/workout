@@ -30,7 +30,7 @@ function sampleInputs(
 ): Record<string, unknown> {
   return {
     exercise: { equipmentType: "barbell" },
-    user: { experienceLevel: "intermediate", units: "lb" },
+    user: { experienceLevel: "intermediate" },
     goalType: "hypertrophy",
     week: { targetRir: 2, isDeload: false },
     previous: { weight: 185, reps: 8, sets: 3, targetRir: 2 },
@@ -52,7 +52,7 @@ function sampleInputs(
 function sampleConfig(over: Partial<Parameters<typeof buildConfigInputs>[0]> = {}): ConfigInputs {
   return buildConfigInputs({
     equipmentType: "barbell",
-    profile: { experience_level: "intermediate", units: "lb" },
+    profile: { experience_level: "intermediate" },
     goal: "hypertrophy",
     week: { targetRir: 2, isDeload: false },
     previous: { weight: 185, reps: 8, sets: 3, targetRir: 2 },
@@ -178,7 +178,7 @@ describe("recomputeRow", () => {
 });
 
 describe("recomputeRow — seed (doc 14 §6.2)", () => {
-  const profile = { experience_level: "intermediate" as const, units: "lb" as const };
+  const profile = { experience_level: "intermediate" as const };
   const peak = { weight: 200, reps: 5, sets: 3 };
   const initial = { weight: 100, reps: 8, sets: 3 };
 
@@ -201,7 +201,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
       priorPeak,
       init,
       { equipmentType: "barbell" },
-      { experienceLevel: "intermediate", units: "lb" },
+      { experienceLevel: "intermediate" },
       startRir,
       DEFAULT_ENGINE_PARAMS as EngineParams,
     );
@@ -284,7 +284,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         null,
         { weight: 160, reps: 8, sets: 3 },
         { equipmentType: "barbell" },
-        { experienceLevel: "intermediate", units: "lb" },
+        { experienceLevel: "intermediate" },
         3,
         PARAMS,
       ).weight,
@@ -317,7 +317,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
 // that reconstruction at the pure level (the reconcile's I/O resolves the same
 // values from `meso_exercises` + `v_exercise_prs`).
 describe("reconcile backfill — decision-less open rows (doc 14 §6.2/§6.3)", () => {
-  const profile = { experience_level: "intermediate" as const, units: "lb" as const };
+  const profile = { experience_level: "intermediate" as const };
   const equipmentType = "barbell";
   const goal = "hypertrophy" as const;
   const week = { targetRir: 1, isDeload: false };
@@ -362,7 +362,7 @@ describe("reconcile backfill — decision-less open rows (doc 14 §6.2/§6.3)", 
       priorPeak,
       planInitial,
       { equipmentType },
-      { experienceLevel: "intermediate", units: "lb" },
+      { experienceLevel: "intermediate" },
       week.targetRir,
       PARAMS,
     );

@@ -39,7 +39,7 @@ export async function getExerciseParamOverrides(
   );
 }
 
-/** The increment override (in the user's units) for one exercise, or null. */
+/** The increment override (in pounds) for one exercise, or null. */
 export async function getExerciseIncrementOverride(
   client: Client,
   userId: string,

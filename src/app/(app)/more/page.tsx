@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/queries/profiles";
 import { signOut } from "@/app/(auth)/actions";
-import { UnitsToggle } from "./UnitsToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { formatHeight } from "@/lib/units";
 
@@ -23,14 +22,11 @@ export default async function MorePage() {
     .eq("status", "completed");
   if (countError) throw countError;
 
-  const units = profile?.units ?? "lb";
   const meta = [
     profile?.age != null ? String(profile.age) : null,
     profile?.experience_level?.toUpperCase() ?? null,
-    profile?.bodyweight != null
-      ? `${profile.bodyweight} ${units.toUpperCase()}`
-      : null,
-    formatHeight(profile?.height_cm ?? null, units),
+    profile?.bodyweight != null ? `${profile.bodyweight} LB` : null,
+    formatHeight(profile?.height_in ?? null),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -74,10 +70,6 @@ export default async function MorePage() {
 
       <div className="mt-6 border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
         SETTINGS
-      </div>
-      <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
-        <div className="text-sm font-semibold">Units</div>
-        <UnitsToggle units={units} />
       </div>
       <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
         <div className="text-sm font-semibold">Theme</div>

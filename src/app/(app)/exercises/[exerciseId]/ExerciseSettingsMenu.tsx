@@ -4,12 +4,9 @@ import { useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { setIncrementOverrideAction } from "@/app/(app)/exercises/actions";
 
-/** lb plate-math jumps / kg micro-load jumps; the union with the engine default
- *  + any current override is what the user chooses from. */
-const PRESETS: Record<"kg" | "lb", number[]> = {
-  lb: [2.5, 5, 10, 15, 25],
-  kg: [1, 2.5, 5, 7.5, 10],
-};
+/** lb plate-math jumps; the union with the engine default + any current
+ *  override is what the user chooses from. */
+const PRESETS = [2.5, 5, 10, 15, 25];
 
 /** trim a step to a clean label: 5 → "5", 2.5 → "2.5". */
 function fmt(n: number): string {
@@ -38,12 +35,10 @@ function parseStep(text: string): number | null {
  */
 export function ExerciseSettingsMenu({
   exerciseId,
-  units,
   defaultStep,
   override,
 }: {
   exerciseId: string;
-  units: "kg" | "lb";
   defaultStep: number;
   override: number | null;
 }) {
@@ -56,7 +51,7 @@ export function ExerciseSettingsMenu({
 
   // chips: presets ∪ the engine default, sorted; a custom override lives in the
   // text field instead so it doesn't masquerade as a preset
-  const steps = [...new Set([...PRESETS[units], defaultStep])].sort((a, b) => a - b);
+  const steps = [...new Set([...PRESETS, defaultStep])].sort((a, b) => a - b);
 
   // open the sheet seeded from the current override: a value that isn't a chip
   // (an odd custom jump) opens in custom mode with the field prefilled.
@@ -124,7 +119,7 @@ export function ExerciseSettingsMenu({
                     : "border-ink/30 text-ink/80"
                 }`}
               >
-                +{fmt(step)} {units}
+                +{fmt(step)} lb
               </button>
             );
           })}
@@ -159,7 +154,7 @@ export function ExerciseSettingsMenu({
                 className="numeral h-10 w-24 bg-transparent px-2 text-[15px] font-bold focus:outline-none"
               />
               <span className="pr-3 text-[11px] font-medium tracking-[0.08em] text-ink/55">
-                {units}
+                lb
               </span>
             </div>
             {customInvalid && (
@@ -180,7 +175,7 @@ export function ExerciseSettingsMenu({
             !custom && selected === null ? "text-accent" : "text-ink/45"
           }`}
         >
-          {!custom && selected === null ? "■ " : ""}USE DEFAULT (+{fmt(defaultStep)} {units})
+          {!custom && selected === null ? "■ " : ""}USE DEFAULT (+{fmt(defaultStep)} lb)
         </button>
 
         <div className="mt-5 flex items-center justify-end gap-2.5">

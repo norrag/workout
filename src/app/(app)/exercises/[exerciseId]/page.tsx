@@ -94,7 +94,7 @@ export default async function ExerciseDetailPage({
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("experience_level, units")
+      .select("experience_level")
       .eq("id", user.id)
       .single(),
     getExerciseOverview(supabase, user.id, exercise.id),
@@ -111,7 +111,6 @@ export default async function ExerciseDetailPage({
   const defaultStep = incrementFor(
     toEngineEquipment(exercise.equipment_type),
     profile.experience_level ?? "beginner",
-    profile.units,
     activeParams.params,
   );
 
@@ -148,7 +147,6 @@ export default async function ExerciseDetailPage({
         </Link>
         <ExerciseSettingsMenu
           exerciseId={exercise.id}
-          units={profile.units}
           defaultStep={defaultStep}
           override={incrementOverride}
         />
@@ -207,11 +205,11 @@ export default async function ExerciseDetailPage({
             <BestCell
               value={ov?.weight_pr != null ? formatWeight(ov.weight_pr) : "—"}
               suffix={ov?.weight_pr_reps != null ? `× ${ov.weight_pr_reps}` : null}
-              label={`WEIGHT PR · ${profile.units.toUpperCase()}`}
+              label="WEIGHT PR · LB"
             />
             <BestCell
               value={ov?.best_e1rm != null ? formatWeight(ov.best_e1rm) : "—"}
-              suffix={profile.units}
+              suffix="lb"
               label="EST. 1RM"
             />
             <BestCell
@@ -219,13 +217,13 @@ export default async function ExerciseDetailPage({
               suffix={ov?.volume_pr_reps != null ? `× ${ov.volume_pr_reps}` : null}
               label={
                 ov?.volume_pr != null
-                  ? `VOLUME PR · ${comma(ov.volume_pr)} ${profile.units.toUpperCase()}`
+                  ? `VOLUME PR · ${comma(ov.volume_pr)} LB`
                   : "VOLUME PR"
               }
             />
             <BestCell
               value={ov?.best_session_volume != null ? compact(ov.best_session_volume) : "—"}
-              suffix={profile.units}
+              suffix="lb"
               label="BEST SESSION VOL"
             />
           </div>

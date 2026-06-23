@@ -77,11 +77,11 @@ export const phaseNames = [
   "peak",
 ] as const;
 
-// loadable step / progression jump per equipment, expressed per unit so lb
-// users get real plate math (lb is the app default)
+// loadable step / progression jump per equipment, in pounds — the app records
+// and prescribes exclusively in imperial units.
 const perEquipmentStep = z.record(
   z.enum(equipmentTypes),
-  z.object({ kg: z.number().min(0), lb: z.number().min(0) }),
+  z.number().min(0),
 );
 
 // a [low, high] range; low/high tunables seeded from 10-metrics-spec.md
@@ -98,7 +98,7 @@ const experienceRanges = z.object({
  * both parse with this schema.
  */
 export const engineParamsSchema = z.object({
-  // weight increment per equipment type, in each unit
+  // weight increment per equipment type, in pounds
   increment: perEquipmentStep,
   experience_increment_scale: z.record(
     z.enum(experienceLevels),
@@ -133,7 +133,7 @@ export const engineParamsSchema = z.object({
     target_rir: z.number().int().min(3).max(5),
   }),
   meso_seed_backoff_pct: z.number().min(0.7).max(1),
-  // weights are rounded to this loadable step per equipment, in each unit
+  // weights are rounded to this loadable step per equipment, in pounds
   rounding: perEquipmentStep,
 
   // ----- doc 13: rep-window prescription (param-gated, decision 8) -----------
@@ -396,15 +396,15 @@ export type EngineParams = z.infer<typeof engineParamsSchema>;
 /** v2 defaults — mirrors the active `engine_params` row (version 2). */
 export const DEFAULT_ENGINE_PARAMS: EngineParams = engineParamsSchema.parse({
   increment: {
-    barbell: { kg: 2.5, lb: 5 },
-    smith: { kg: 2.5, lb: 5 },
-    dumbbell: { kg: 2.0, lb: 5 },
-    machine: { kg: 2.5, lb: 5 },
-    cable: { kg: 2.5, lb: 5 },
-    bodyweight: { kg: 2.5, lb: 5 },
-    bands: { kg: 5.0, lb: 10 },
-    kettlebell: { kg: 4.0, lb: 9 },
-    other: { kg: 2.5, lb: 5 },
+    barbell: 5,
+    smith: 5,
+    dumbbell: 5,
+    machine: 5,
+    cable: 5,
+    bodyweight: 5,
+    bands: 10,
+    kettlebell: 9,
+    other: 5,
   },
   experience_increment_scale: {
     beginner: 1.5,
@@ -433,15 +433,15 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = engineParamsSchema.parse({
   deload: { load_pct: 0.55, set_pct: 0.5, target_rir: 4 },
   meso_seed_backoff_pct: 0.925,
   rounding: {
-    barbell: { kg: 2.5, lb: 5 },
-    smith: { kg: 2.5, lb: 5 },
-    dumbbell: { kg: 2.0, lb: 5 },
-    machine: { kg: 2.5, lb: 5 },
-    cable: { kg: 2.5, lb: 5 },
-    bodyweight: { kg: 2.5, lb: 5 },
-    bands: { kg: 5.0, lb: 10 },
-    kettlebell: { kg: 4.0, lb: 9 },
-    other: { kg: 2.5, lb: 5 },
+    barbell: 5,
+    smith: 5,
+    dumbbell: 5,
+    machine: 5,
+    cable: 5,
+    bodyweight: 5,
+    bands: 10,
+    kettlebell: 9,
+    other: 5,
   },
   // doc 13 v9: the new rep-window prescription + RIR grading + session-best
   // anchor are the active defaults; the schema keeps legacy fallbacks so older

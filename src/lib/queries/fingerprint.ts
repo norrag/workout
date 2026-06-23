@@ -65,7 +65,7 @@ export function configProjection(inputs: EngineInputs): ConfigInputs {
 
 export interface ConfigInputArgs {
   equipmentType: string;
-  profile: Pick<ProfileRow, "experience_level" | "units">;
+  profile: Pick<ProfileRow, "experience_level">;
   goal: EngineInputs["goalType"];
   week: EngineInputs["week"];
   previous: EngineInputs["previous"];
@@ -85,7 +85,6 @@ export function buildConfigInputs(args: ConfigInputArgs): ConfigInputs {
     exercise: { equipmentType: toEngineEquipment(args.equipmentType) },
     user: {
       experienceLevel: args.profile.experience_level ?? "beginner",
-      units: args.profile.units,
     },
     goalType: args.goal,
     week: args.week,
@@ -139,7 +138,7 @@ export function seedEngineInputs(
 
 export interface SeedInputArgs {
   equipmentType: string;
-  profile: Pick<ProfileRow, "experience_level" | "units">;
+  profile: Pick<ProfileRow, "experience_level">;
   goal: EngineInputs["goalType"];
   startRir: number;
   isDeload: boolean;

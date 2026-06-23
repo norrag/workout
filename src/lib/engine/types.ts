@@ -52,7 +52,6 @@ export const engineInputsSchema = z.object({
   }),
   user: z.object({
     experienceLevel: z.enum(experienceLevels),
-    units: z.enum(["kg", "lb"]),
   }),
   goalType: z.enum(goalTypes),
   // the week being generated

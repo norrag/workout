@@ -7,7 +7,7 @@ import type { EngineParams, EquipmentType } from "./params";
  * §1) extend this shape and merge the same way.
  */
 export interface ExerciseParamOverride {
-  /** per-set weight increment for this exercise, in the user's units (> 0). */
+  /** per-set weight increment for this exercise, in pounds (> 0). */
   weightIncrement: number | null;
 }
 
@@ -22,7 +22,7 @@ export interface ExerciseParamOverride {
  * can actually put on the bar/stack. That step is what the engine rounds EVERY
  * prescribed weight to, in EVERY path (`roundToStep` reads `params.rounding`): the
  * meso seed, the anchor cold-start, the rep-window advance, and the legacy advance.
- * So the override sets `params.rounding` for this exercise's equipment/units — that
+ * So the override sets `params.rounding` for this exercise's equipment — that
  * is what makes "I lift this in 25s" actually produce loads in 25s, seed or advance.
  *
  * It also sets the legacy `params.increment` (the +step progression jump used only
@@ -39,24 +39,21 @@ export function resolveEffectiveParams(
   params: EngineParams,
   override: ExerciseParamOverride | null | undefined,
   equipment: EquipmentType,
-  units: "kg" | "lb",
 ): EngineParams {
   const step = override?.weightIncrement;
   if (step == null) return params;
-  const baseIncrement = params.increment[equipment] ?? { kg: 2.5, lb: 5 };
-  const baseRounding = params.rounding[equipment] ?? { kg: 2.5, lb: 5 };
   return {
     ...params,
     // the loadable step every prescription rounds to (the one that matters under
     // the active rep_window params, where load is priced off the strength anchor)
     rounding: {
       ...params.rounding,
-      [equipment]: { ...baseRounding, [units]: step },
+      [equipment]: step,
     },
     // the legacy +step jump (no-anchor fallback / increment mode), kept in sync
     increment: {
       ...params.increment,
-      [equipment]: { ...baseIncrement, [units]: step },
+      [equipment]: step,
     },
   };
 }

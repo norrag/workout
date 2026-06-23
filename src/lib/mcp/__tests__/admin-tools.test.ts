@@ -120,7 +120,7 @@ function decision(
 function sampleInputs(): Record<string, unknown> {
   return {
     exercise: { equipmentType: "barbell" },
-    user: { experienceLevel: "intermediate", units: "lb" },
+    user: { experienceLevel: "intermediate" },
     goalType: "gain",
     week: { targetRir: 2, isDeload: false },
     previous: { weight: 185, reps: 8, sets: 3, targetRir: 2 },
@@ -192,7 +192,7 @@ describe("replayDecisions", () => {
     // a meso seed with a prior peak: its stored output is the peak-backoff number.
     const seedIn = buildSeedInputs({
       equipmentType: "barbell",
-      profile: { experience_level: "intermediate", units: "lb" },
+      profile: { experience_level: "intermediate" },
       goal: "hypertrophy",
       startRir: 3,
       isDeload: false,
@@ -203,7 +203,7 @@ describe("replayDecisions", () => {
       { weight: 200, reps: 5, sets: 3 },
       { weight: 100, reps: 8, sets: 3 },
       { equipmentType: "barbell" },
-      { experienceLevel: "intermediate", units: "lb" },
+      { experienceLevel: "intermediate" },
       3,
       DEFAULT_ENGINE_PARAMS,
     );

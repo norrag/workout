@@ -9,7 +9,6 @@ const base = {
   nextTargetRir: 1,
   nextIsDeload: false,
   currentTargetRir: 1,
-  units: "lb" as const,
 };
 
 describe("composeAutoregulationSummary (fig 1.5 copy)", () => {

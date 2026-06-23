@@ -1,48 +1,37 @@
-import type { Units } from "@/lib/types/database";
-
 /**
- * Measurement system (PH28). The user's weight unit doubles as their system:
- * `lb` ⇒ imperial (height shown/entered in feet + inches), `kg` ⇒ metric
- * (height in centimeters). Height is always stored canonically as `height_cm`;
- * these helpers convert at the display/input boundary only.
+ * Imperial unit helpers. The app records and displays weight exclusively in
+ * pounds and height in feet + inches; height is stored canonically as
+ * `height_in` (whole inches). These helpers format/parse at the display and
+ * input boundary only.
  */
-export function isImperial(units: Units | string | null | undefined): boolean {
-  return units === "lb";
-}
 
-const CM_PER_IN = 2.54;
 const IN_PER_FT = 12;
 
-/** A stored canonical height (cm) rendered in the user's system. Null ⇒ null. */
-export function formatHeight(
-  heightCm: number | null,
-  units: Units | string | null | undefined,
-): string | null {
-  if (heightCm == null) return null;
-  if (!isImperial(units)) return `${heightCm} CM`;
-  const totalIn = Math.round(heightCm / CM_PER_IN);
+/** A stored canonical height (inches) rendered as feet′inches″. Null ⇒ null. */
+export function formatHeight(heightIn: number | null): string | null {
+  if (heightIn == null) return null;
+  const totalIn = Math.round(heightIn);
   return `${Math.floor(totalIn / IN_PER_FT)}′${totalIn % IN_PER_FT}″`;
 }
 
-/** Split a canonical cm height into whole feet + inches for editing. */
-export function cmToFeetInches(heightCm: number): {
+/** Split a canonical inches height into whole feet + inches for editing. */
+export function inchesToFeetInches(heightIn: number): {
   feet: number;
   inches: number;
 } {
-  const totalIn = Math.round(heightCm / CM_PER_IN);
+  const totalIn = Math.round(heightIn);
   return { feet: Math.floor(totalIn / IN_PER_FT), inches: totalIn % IN_PER_FT };
 }
 
-/** Build a canonical cm height from feet + inches, rounded to the nearest cm. */
-export function feetInchesToCm(feet: number, inches: number): number {
-  return Math.round((feet * IN_PER_FT + inches) * CM_PER_IN);
+/** Build a canonical inches height from feet + inches. */
+export function feetInchesToInches(feet: number, inches: number): number {
+  return feet * IN_PER_FT + inches;
 }
 
 /**
- * Weights are never shown or entered finer than half a unit (0.5 lb / 0.5 kg).
- * Snapping at the display boundary keeps engine outputs and unit-converted
- * values clean (no 19.92 lb) and makes lb↔kg toggles round-trip to the same
- * value — the stored numbers keep finer precision, the UI just shows the step.
+ * Weights are never shown or entered finer than half a pound. Snapping at the
+ * display boundary keeps engine outputs clean (no 19.92 lb); the stored numbers
+ * keep finer precision, the UI just shows the step.
  */
 export function roundWeight(value: number): number {
   return Math.round(value * 2) / 2;

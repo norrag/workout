@@ -1,43 +1,33 @@
 import { describe, it, expect } from "vitest";
 import {
-  isImperial,
   formatHeight,
-  cmToFeetInches,
-  feetInchesToCm,
+  inchesToFeetInches,
+  feetInchesToInches,
   roundWeight,
   formatWeight,
 } from "../units";
 
-describe("units (PH28)", () => {
-  it("treats lb as imperial, kg as metric", () => {
-    expect(isImperial("lb")).toBe(true);
-    expect(isImperial("kg")).toBe(false);
-    expect(isImperial(null)).toBe(false);
-    expect(isImperial(undefined)).toBe(false);
+describe("units (imperial-only)", () => {
+  it("formats a stored inches height as feet′inches″", () => {
+    expect(formatHeight(70)).toBe("5′10″");
+    expect(formatHeight(72)).toBe("6′0″");
+    expect(formatHeight(null)).toBeNull();
   });
 
-  it("formats height in the chosen system", () => {
-    expect(formatHeight(178, "kg")).toBe("178 CM");
-    expect(formatHeight(178, "lb")).toBe("5′10″");
-    expect(formatHeight(null, "lb")).toBeNull();
-    expect(formatHeight(null, "kg")).toBeNull();
+  it("splits inches into whole feet + inches", () => {
+    expect(inchesToFeetInches(70)).toEqual({ feet: 5, inches: 10 });
+    expect(inchesToFeetInches(72)).toEqual({ feet: 6, inches: 0 });
   });
 
-  it("splits cm into whole feet + inches", () => {
-    expect(cmToFeetInches(178)).toEqual({ feet: 5, inches: 10 });
-    // 183cm ≈ 72in = exactly 6'0"
-    expect(cmToFeetInches(183)).toEqual({ feet: 6, inches: 0 });
+  it("builds canonical inches from feet + inches", () => {
+    expect(feetInchesToInches(5, 10)).toBe(70);
+    expect(feetInchesToInches(6, 0)).toBe(72);
   });
 
-  it("builds canonical cm from feet + inches", () => {
-    expect(feetInchesToCm(5, 10)).toBe(178);
-    expect(feetInchesToCm(6, 0)).toBe(183);
-  });
-
-  it("round-trips cm ↔ ft/in within a cm", () => {
-    for (const cm of [150, 165, 178, 190, 200]) {
-      const { feet, inches } = cmToFeetInches(cm);
-      expect(Math.abs(feetInchesToCm(feet, inches) - cm)).toBeLessThanOrEqual(1);
+  it("round-trips inches ↔ ft/in exactly", () => {
+    for (const inches of [59, 65, 70, 75, 79]) {
+      const { feet, inches: rem } = inchesToFeetInches(inches);
+      expect(feetInchesToInches(feet, rem)).toBe(inches);
     }
   });
 
@@ -52,15 +42,5 @@ describe("units (PH28)", () => {
     expect(formatWeight(20.0)).toBe("20");
     expect(formatWeight(22.5)).toBe("22.5");
     expect(formatWeight(19.92)).toBe("20");
-  });
-
-  it("displays a clean lb↔kg↔lb toggle (stored stays finer than display)", () => {
-    // mirrors the migration's round-to-0.1 storage + 0.5 display snap
-    const r1 = (x: number) => Math.round(x * 10) / 10;
-    for (const lb of [15, 20, 22.5, 25, 100, 135]) {
-      const kg = r1(lb * 0.45359237);
-      const back = r1(kg * 2.20462262);
-      expect(formatWeight(back)).toBe(formatWeight(lb));
-    }
   });
 });

@@ -9,39 +9,37 @@ const P = DEFAULT_ENGINE_PARAMS;
 
 describe("resolveEffectiveParams (doc 14 phase 3)", () => {
   it("returns the params unchanged when there is no override (referential, no churn)", () => {
-    expect(resolveEffectiveParams(P, null, "barbell", "lb")).toBe(P);
-    expect(resolveEffectiveParams(P, undefined, "barbell", "lb")).toBe(P);
+    expect(resolveEffectiveParams(P, null, "barbell")).toBe(P);
+    expect(resolveEffectiveParams(P, undefined, "barbell")).toBe(P);
     expect(
-      resolveEffectiveParams(P, { weightIncrement: null }, "barbell", "lb"),
+      resolveEffectiveParams(P, { weightIncrement: null }, "barbell"),
     ).toBe(P);
   });
 
-  it("sets the loadable step (rounding) AND the legacy increment for only the target equipment/unit", () => {
-    const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell", "lb");
+  it("sets the loadable step (rounding) AND the legacy increment for only the target equipment", () => {
+    const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell");
     // the override IS the loadable step the engine rounds every weight to
-    expect(eff.rounding.barbell!.lb).toBe(25);
-    expect(eff.increment.barbell!.lb).toBe(25);
-    // …while the OTHER unit and OTHER equipment are untouched, both maps
-    expect(eff.rounding.barbell!.kg).toBe(P.rounding.barbell!.kg);
-    expect(eff.increment.barbell!.kg).toBe(P.increment.barbell!.kg);
+    expect(eff.rounding.barbell).toBe(25);
+    expect(eff.increment.barbell).toBe(25);
+    // …while OTHER equipment is untouched, both maps
     expect(eff.rounding.dumbbell).toEqual(P.rounding.dumbbell);
     expect(eff.increment.dumbbell).toEqual(P.increment.dumbbell);
   });
 
   it("does not mutate the input params", () => {
-    const beforeRound = P.rounding.barbell!.lb;
-    const beforeInc = P.increment.barbell!.lb;
-    resolveEffectiveParams(P, { weightIncrement: 99 }, "barbell", "lb");
-    expect(P.rounding.barbell!.lb).toBe(beforeRound);
-    expect(P.increment.barbell!.lb).toBe(beforeInc);
+    const beforeRound = P.rounding.barbell;
+    const beforeInc = P.increment.barbell;
+    resolveEffectiveParams(P, { weightIncrement: 99 }, "barbell");
+    expect(P.rounding.barbell).toBe(beforeRound);
+    expect(P.increment.barbell).toBe(beforeInc);
   });
 
   it("composes the legacy increment with experience scaling exactly like the global increment", () => {
     // incrementFor multiplies the base by experience_increment_scale; an override
     // is the BASE (same level the global param sits at), so the scale still applies.
-    const eff = resolveEffectiveParams(P, { weightIncrement: 4 }, "barbell", "lb");
+    const eff = resolveEffectiveParams(P, { weightIncrement: 4 }, "barbell");
     const scale = P.experience_increment_scale.advanced!; // 0.5 in defaults
-    expect(incrementFor("barbell", "advanced", "lb", eff)).toBe(4 * scale);
+    expect(incrementFor("barbell", "advanced", eff)).toBe(4 * scale);
   });
 
   it("rounds an ANCHORED rep_window advance to the override step (the v9 path that matters)", () => {
@@ -49,7 +47,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     // to the loadable step — so the override must move the prescribed weight here.
     const inputs: EngineInputs = {
       exercise: { equipmentType: "barbell" },
-      user: { experienceLevel: "intermediate", units: "lb" },
+      user: { experienceLevel: "intermediate" },
       goalType: "hypertrophy",
       week: { targetRir: 2, isDeload: false },
       previous: { weight: 225, reps: 8, sets: 3, targetRir: 2 },
@@ -64,19 +62,19 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
       strengthAnchor: { value: 315, confidence: "high" },
       initial: null,
     };
-    const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell", "lb");
+    const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell");
     const out = prescribe(inputs, eff);
     expect(out.weight! % 25).toBe(0); // loadable in 25s
   });
 
   it("rounds a meso SEED to the override step", () => {
     // seedMeso backs off the prior peak then rounds — the override sets that step.
-    const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell", "lb");
+    const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell");
     const out = seedMeso(
       { weight: 315, reps: 5, sets: 3 },
       null,
       { equipmentType: "barbell" },
-      { experienceLevel: "intermediate", units: "lb" },
+      { experienceLevel: "intermediate" },
       2,
       eff,
     );
@@ -86,7 +84,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
       { weight: 315, reps: 5, sets: 3 },
       null,
       { equipmentType: "barbell" },
-      { experienceLevel: "intermediate", units: "lb" },
+      { experienceLevel: "intermediate" },
       2,
       P,
     );
@@ -99,7 +97,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     const legacy = { ...P, weight_selection: "increment" as const };
     const inputs: EngineInputs = {
       exercise: { equipmentType: "barbell" },
-      user: { experienceLevel: "intermediate", units: "lb" },
+      user: { experienceLevel: "intermediate" },
       goalType: "hypertrophy",
       week: { targetRir: 2, isDeload: false },
       previous: { weight: 100, reps: 8, sets: 3, targetRir: 2 },
@@ -117,7 +115,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     const base = prescribe(inputs, legacy); // intermediate scale = 1.0 ⇒ +5 default
     const overridden = prescribe(
       inputs,
-      resolveEffectiveParams(legacy, { weightIncrement: 10 }, "barbell", "lb"),
+      resolveEffectiveParams(legacy, { weightIncrement: 10 }, "barbell"),
     );
     expect(base.weight).toBe(105);
     expect(overridden.weight).toBe(110);

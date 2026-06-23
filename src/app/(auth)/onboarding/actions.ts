@@ -9,11 +9,10 @@ const onboardingSchema = z.object({
   display_name: z.string().min(1, "Name is required").max(60),
   age: z.coerce.number().int().min(13).max(120),
   gender: z.enum(["female", "male", "other", "undisclosed"]).default("undisclosed"),
-  height_cm: z.coerce.number().min(90).max(250).nullable(),
+  height_in: z.coerce.number().min(36).max(96).nullable(),
   bodyweight: z.coerce.number().positive().max(1000).nullable(),
   experience_level: z.enum(["beginner", "intermediate", "advanced"]),
   preferred_equipment: z.array(z.string()).default([]),
-  units: z.enum(["lb", "kg"]),
 });
 
 export interface OnboardingState {
@@ -28,11 +27,10 @@ export async function completeOnboarding(
     display_name: formData.get("display_name"),
     age: formData.get("age"),
     gender: formData.get("gender") || "undisclosed",
-    height_cm: formData.get("height_cm") || null,
+    height_in: formData.get("height_in") || null,
     bodyweight: formData.get("bodyweight") || null,
     experience_level: formData.get("experience_level"),
     preferred_equipment: formData.getAll("preferred_equipment"),
-    units: formData.get("units"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };

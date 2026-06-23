@@ -185,9 +185,7 @@ export default async function MacroOverviewPage({
             <Chip>{trainingAge < 1 ? "<1" : Math.round(trainingAge)} YR TRAINING AGE</Chip>
           )}
           {profile.bodyweight && (
-            <Chip>
-              {Math.round(profile.bodyweight)} {profile.units.toUpperCase()}
-            </Chip>
+            <Chip>{Math.round(profile.bodyweight)} LB</Chip>
           )}
           {profile.experience_level && (
             <Chip>{profile.experience_level.toUpperCase()}</Chip>
@@ -288,7 +286,7 @@ export default async function MacroOverviewPage({
             value={stats.estStrengthPct == null ? "—" : `${stats.estStrengthPct > 0 ? "+" : ""}${stats.estStrengthPct}%`}
             label="EST. STRENGTH · KEY LIFTS"
           />
-          <Stat value={fmtVolume(stats.totalVolume)} label={`TOTAL VOLUME · ${profile.units.toUpperCase()}`} />
+          <Stat value={fmtVolume(stats.totalVolume)} label="TOTAL VOLUME · LB" />
           <Stat value={String(stats.sessionsLogged)} label="SESSIONS LOGGED" />
           <Stat
             value={stats.adherencePct == null ? "—" : `${stats.adherencePct}%`}

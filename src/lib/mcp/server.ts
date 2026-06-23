@@ -25,8 +25,8 @@ RIR = Reps In Reserve (how many reps short of failure a set stops). Lower RIR
 means closer to failure. A mesocycle "ramps" RIR down over its weeks
 (e.g. 3 → 0) to progressively intensify, then a deload week raises it again.
 
-Units: weights are in the user's chosen unit (lb or kg). Always report weights
-in the user's unit; do not convert silently.
+Units: weights are recorded exclusively in pounds (lb) and heights in inches.
+Always report weights in pounds.
 
 Grounding: call get_current_state first to learn where the user is. Treats
 estimates (e1RM, projected targets) as estimates. The progression engine — not

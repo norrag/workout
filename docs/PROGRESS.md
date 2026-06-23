@@ -2,7 +2,46 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-23 (latest) — Unit conversion on switch + measurement-system labels
+## 2026-06-23 (latest) — Removed unit conversion; imperial-only
+
+The imperial/metric unit-conversion work (PH28 + the same-day follow-ups below)
+proved trickier than it earned. Reverted the whole feature: the app now records
+and displays weight exclusively in **pounds** and height in **inches**. All
+existing data was already stored in `lb`, so no weight values change — this is a
+structural cleanup plus a height unit conversion. All green (typecheck, lint,
+486 tests).
+
+### Done
+- **Settings/onboarding.** Dropped the units toggle (`UnitsToggle` deleted, the
+  `setUnits` action + `convert_my_weights` rpc removed) and the onboarding UNITS
+  step. Height is always entered as feet + inches; bodyweight always labelled LB.
+- **Schema (`20260623120000_imperial_units_only.sql`).** Drops `profiles.units`
+  and `logged_sets.unit` (every row was already `lb`), converts
+  `profiles.height_cm` → `profiles.height_in` (whole inches, `round(cm/2.54)`),
+  drops `convert_my_weights(to_unit)`, and rebuilds `v_exercise_overview` without
+  the now-gone `unit` column. `macrocycles.target_unit` is **kept** — it stores
+  `lb` or `%` and encodes the weight-vs-percentage distinction, not the unit
+  choice. Validated against the live DB in a rolled-back transaction (170/185/162
+  cm → 67/73/64 in). **Must be applied at deploy time, after the new code is live
+  (it drops columns the previous build reads).**
+- **Engine params flattened to imperial (`20260623120001_engine_params_v10_imperial.sql`).**
+  `increment`/`rounding` go from per-unit `{kg,lb}` objects to a single pound
+  value across `params.ts`, `rounding.ts`, `effective-params.ts`, the seed and a
+  new active **v10** params row (schema_version bumps to 5). `roundToStep` /
+  `incrementFor` / `resolveEffectiveParams` lose their `units` argument; the
+  engine inputs drop `user.units` and hard-code `lb` in every rationale string.
+  v2–v9 keep their historical `{kg,lb}` bytes and are flagged non-replayable.
+- **Display + MCP.** Every `formatWeight`/`formatHeight` call and weight/height
+  label is hard-coded to LB / feet-inches; the MCP envelope always reports
+  `units: "lb"`; `get_profile` returns `height_in` and drops `units`/
+  `bodyweight_unit`; the macro engine keeps its internal kg-based FFMI/BMI physics
+  (`lbToKg`/`kgToLb`) but takes `heightIn` and assumes pounds. The prescription
+  dependency fingerprint drops `units` (a one-time benign represcribe).
+- **units.ts.** Conversion helpers (`isImperial`, cm↔ft/in) removed; kept
+  `roundWeight`/`formatWeight` (display snapping) and added imperial `formatHeight`,
+  `inchesToFeetInches`, `feetInchesToInches`.
+
+## 2026-06-23 — Unit conversion on switch + measurement-system labels (reverted above)
 
 Follow-ups from field testing the PH28/units work. All green (typecheck, lint,
 486 tests).
