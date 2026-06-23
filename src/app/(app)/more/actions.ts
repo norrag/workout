@@ -16,7 +16,13 @@ export async function setUnits(units: string): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  await updateProfile(supabase, user.id, { units: parsed });
+  // Switching unit converts every stored weight the user owns (bodyweight,
+  // logged history, prescriptions, macro targets, increment overrides) and
+  // re-tags logged sets — a no-op beyond the setting when already on `parsed`.
+  const { error } = await supabase.rpc("convert_my_weights", {
+    to_unit: parsed,
+  });
+  if (error) throw error;
   revalidatePath("/more");
   revalidatePath("/more/profile");
 }

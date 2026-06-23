@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { setUnits } from "./actions";
 
-/** LB/KG mini toggle (fig 4.4). */
+/** Measurement-system mini toggle (fig 4.4): imperial (lb) / metric (kg). */
+const SYSTEM_LABEL = { lb: "IMPERIAL", kg: "METRIC" } as const;
+
 export function UnitsToggle({ units }: { units: "lb" | "kg" }) {
   const [value, setValue] = useState(units);
   const [, startTransition] = useTransition();
@@ -31,13 +33,13 @@ export function UnitsToggle({ units }: { units: "lb" | "kg" }) {
               }
             });
           }}
-          className={`px-4 py-[7px] text-[10px] tracking-[0.1em] ${
+          className={`px-3.5 py-[7px] text-[10px] tracking-[0.08em] ${
             value === u
               ? "bg-ink font-bold text-bg-base"
               : "font-medium text-ink/55"
           }`}
         >
-          {u.toUpperCase()}
+          {SYSTEM_LABEL[u]}
         </button>
       ))}
     </div>

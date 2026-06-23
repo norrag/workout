@@ -228,8 +228,8 @@ export default function OnboardingPage() {
         </p>
         <SegmentedControl
           options={[
-            { value: "lb", label: "LB" },
-            { value: "kg", label: "KG" },
+            { value: "lb", label: "IMPERIAL" },
+            { value: "kg", label: "METRIC" },
           ]}
           value={units}
           onChange={setUnits}

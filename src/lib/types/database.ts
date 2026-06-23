@@ -575,6 +575,7 @@ export type Database = {
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      convert_my_weights: { Args: { to_unit: string }; Returns: undefined };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -52,6 +52,7 @@ describe("groupHistoryByMeso", () => {
     coordinate,
     performed_on: "2026-06-10",
     top_weight: 200,
+    unit: "lb",
     reps: "10, 10",
     is_deload: false,
     session_note: null,

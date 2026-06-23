@@ -2,7 +2,35 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-22 (latest) — Triage slices 1 + 2 + the real PH35 fix (profiles RLS recursion)
+## 2026-06-23 (latest) — Unit conversion on switch + measurement-system labels
+
+Follow-ups from field testing the PH28/units work. All green (typecheck, lint,
+486 tests).
+
+### Done
+- **Unit switch now converts stored data.** Previously flipping `profiles.units`
+  changed only the label, so a 159 lb bodyweight read as "159 kg" — which also
+  zeroed the macrocycle gain target (FFMI blew past the ceiling). New migration
+  `20260623003334_convert_user_weights_on_unit_switch.sql` adds a SECURITY DEFINER
+  `convert_my_weights(to_unit)` that converts every weight the caller owns —
+  `logged_sets` (weight + per-row unit tag), `profiles.bodyweight`,
+  `workout_exercises.prescribed_weight` + `set_weights` jsonb,
+  `meso_exercises.initial_weight`, `macrocycles` targets/rates (+`target_unit`),
+  and `exercise_param_overrides.weight_increment` — in one transaction, then flips
+  the setting. `setUnits` calls it via rpc. Applied + tested live (rolled back):
+  159 lb → 72.1 kg, set_weights 245 → 111.1, all user-scoped.
+- **Macro gain/loss "→ 0" fixed.** Root cause was the above data inconsistency
+  (owner's profile flipped to kg with un-converted lb data). The engine math is
+  correct (`toKg(bodyweight, unit)`); converting on switch prevents recurrence.
+  Owner profile was corrected back to lb out-of-band.
+- **History weight unit no longer hardcoded.** `ExerciseHistoryList` showed
+  ` lb` literally; now uses the set's stored unit (carried through `HistoryEntry`).
+- **Measurement-system labels.** The units toggle (More + onboarding) reads
+  IMPERIAL / METRIC instead of LB / KG (weight displays elsewhere stay lb/kg).
+  Dropped the redundant "MEASUREMENT SYSTEM — HEIGHT FOLLOWS THIS" subtitle and
+  the "MATCH WEIGHT · EXPORT · DELETE" subtitle on the Account & data link.
+
+## 2026-06-22 — Triage slices 1 + 2 + the real PH35 fix (profiles RLS recursion)
 
 Field-notes triage (see `docs/triage/`): the genuine PH35 root cause plus slice 1
 (PH42, P20, PH26) and slice 2 (P19, PH27, PH28). All green (typecheck, lint, 486

@@ -53,7 +53,7 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
                   className="flex w-full items-baseline justify-between py-3 text-left disabled:cursor-default"
                 >
                   <div className="numeral text-base font-bold">
-                    {row.top_weight} lb{" "}
+                    {row.top_weight} {row.unit}{" "}
                     <span className="text-[13px] font-normal text-ink/50">×</span>{" "}
                     {row.reps}
                     {row.is_deload && (

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/types/database";
+import type { Database, Units } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
 
@@ -9,6 +9,8 @@ export interface HistoryEntry {
   coordinate: string;
   performed_on: string;
   top_weight: number | null;
+  /** the unit that weight was logged in (per-row on logged_sets) */
+  unit: Units;
   reps: string;
   is_deload: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
@@ -105,6 +107,7 @@ export async function getExerciseHistory(
   }
   return [...byWorkout.entries()].map(([workoutId, group]) => {
     const top = Math.max(...group.map((s) => s.weight));
+    const topSet = group.find((s) => s.weight === top) ?? group[0];
     const reps = group
       .filter((s) => s.weight === top)
       .sort((a, b) => a.set_number - b.set_number)
@@ -118,6 +121,7 @@ export async function getExerciseHistory(
       coordinate: `W${micro?.week_number ?? "?"}·D${workout?.day_number ?? "?"}`,
       performed_on: group[0].performed_at.slice(0, 10),
       top_weight: top,
+      unit: topSet.unit,
       reps,
       is_deload: micro?.is_deload ?? false,
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
