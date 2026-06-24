@@ -2,7 +2,74 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-23 (latest) — Per-set e1RM stored & exposed; tap-to-flip history (PH31 + PH32)
+## 2026-06-24 (latest) — Standalone-prescription fixes: runaway reps & suspect e1RM (S1/S2/S3/S5)
+
+Implements [docs/reviews/2026-06-23-standalone-prescription-investigation.md](reviews/2026-06-23-standalone-prescription-investigation.md)
+(closes triage **T-A6**; extends PR22/PR23). The investigation root-caused four
+compounding defects behind "prescribed reps in the upper teens–20s + inflated
+e1RM" on standalone mesos. All four engine/param behaviors are **param-gated** and
+ship in **one new engine_params version (v11), INACTIVE** — activation is the
+documented manual step after a replay diff (see manual-operations.md). Every gate
+is an `.optional()` param **absent on v10/earlier**, so existing rows parse
+byte-identically: v10's canonical hash, `is_replayable`, and the doc-14 freshness
+fingerprint are all untouched (asserted in `params-provenance.test.ts`).
+
+- **S3 — tame the e1RM estimator (`e1rm.ts`, `reps.ts`).** New `e1rmFactor()` is
+  the single Epley/Brzycki curve shared by the forward estimate AND the inverse
+  load-for-reps math, so they can't drift. The §S3 switch: with
+  `e1rm.brzycki_max_eff_reps` set, average Epley+Brzycki only ≤ that many effective
+  reps and use Epley alone above (Brzycki inflates 2–4× on a 20–30-rep burnout — a
+  100×30@3 set was estimating ~555 lb; v11 caps it at ~210, Epley-only). Absent ⇒
+  the exact legacy `< 36 ⇒ average` rule. Plus `session_value_confidence_weights`
+  down-weights low-confidence burnout sets in the `session_best` anchor *value*
+  (not just its label). v11 = `brzycki_max_eff_reps: 10`, weights `{1, 0.6, 0.3}`.
+- **S1 — seed week 1 from the strength anchor (`engine/index.ts seedMeso`).** Gated
+  by `seed_from_anchor`, `seedMeso` now mirrors `prescribe()`'s `seed_anchor`
+  branch: pick the load for the window's `target_low` reps at the start RIR off the
+  recency anchor and let reps follow, instead of carrying the prior peak's rep
+  count verbatim (the headline runaway: week 1 prescribed `best_reps` one-for-one,
+  16–30 reps). Falls back to the legacy peak-backoff / plan-default seed with no
+  confident anchor. Anchors are threaded through `startMeso` /
+  `regenerateOpenWorkouts` / `addWorkoutExercises` and the recompute seed replay
+  (`regeneration.ts`); the anchor query moved to a leaf `anchors.ts` (re-exported
+  from `logging.ts`) to avoid a generation↔logging cycle. `strengthAnchor` rides in
+  `buildSeedInputs`/`seedEngineInputs` so replay reproduces the seed — it's a
+  *derived* key, so the freshness fingerprint is unaffected.
+- **S2 — `v_exercise_prs` reports a coherent set (`20260624000001`).** Replaced the
+  three independent per-column `max()`es (which fabricated a heaviest-weight ×
+  most-reps pair the user never did, then handed it to the seed) with the single
+  best-e1RM set via `DISTINCT ON`, and computes `best_e1rm` with the §S3 estimator
+  reading `rir_offset` + `brzycki_max_eff_reps` from the active params (so the view
+  tracks the engine in lockstep). Validated against live data — Madeline's Seated
+  Leg Curl now returns a real 175×14, not 140×30. `security_invoker` preserved.
+  **Semantic note:** `best_weight`/`best_reps` are now the best-e1RM set's, not
+  independent maxes — still "your best", now coherent; consumers (stats, coaching
+  weight_pr fallback, exercises page, copy-meso) display/seed from it unchanged.
+- **S5 — rep-consistent hold + de-blunt dampener (`engine/index.ts`,
+  `rules/feedback.ts`).** `hold_rep_consistent`: when a gate (pain or session
+  dampener) blocks a warranted increase, hold the load AND prescribe the Option-A
+  schedule reps (the held *effective workload*), instead of clamping the anchor
+  predictor to the window ceiling — which used to emit a `weight × reps @ RIR`
+  triple whose implied RIR contradicted the target (the §2.4 `100×15 @2` with an
+  implied ~19 RIR). `session_dampen_require_both`: dampen only when BOTH high
+  fatigue AND poor performance are reported, so a fatigued-but-strong session (the
+  §2.4 fatigue 3 / performance 3) still progresses.
+- **Gating / activation.** `20260624000002_engine_params_v11_standalone_fixes.sql`
+  inserts v11 **inactive** (v10 stays active). Activate manually after a
+  `replay_decisions` / `simulate_prescriptions` diff on Madeline + a couple users
+  (doc 13 §6) — runbook step added to manual-operations.md. No logged history is
+  ever rewritten (hard rule #5); in-flight open prescriptions refresh through the
+  normal freshness/regeneration path once v11 is active.
+- **Deferred (recorded, not built):** S4 (per-slot rep ranges) per the
+  investigation. The S5 "dampen the *magnitude* of an increase (half-step) rather
+  than zeroing it" sub-idea is **not** implemented — it is ill-defined under
+  rep-window weight selection (the load comes from the anchor, not a fixed
+  increment); require-both delivers the de-blunting cleanly. Noted as a follow-up.
+- Tests: new `standalone-prescription.test.ts` (S1/S5, each asserted on AND off the
+  gate) + S3 cases in `e1rm.test.ts`/`reps.test.ts` + the v11 hash/replayability
+  guard in `params-provenance.test.ts`. Full suite green (507), typecheck + lint clean.
+
+## 2026-06-23 — Per-set e1RM stored & exposed; tap-to-flip history (PH31 + PH32)
 
 Triage Workstream B. Per-set e1RM was only ever computed on read (stats views use
 raw single-formula Epley; the engine uses an averaged Epley/Brzycki over effective

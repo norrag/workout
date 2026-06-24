@@ -51,11 +51,20 @@ export function modulateFromFeedback(
     notes.push("low pump at the right workload: consider a different exercise");
   }
 
-  const sessionDampened =
-    (wfb?.overallFatigue != null &&
-      wfb.overallFatigue >= params.session_fatigue_dampen_threshold) ||
-    (wfb?.performanceRating != null &&
-      wfb.performanceRating <= params.session_performance_dampen_threshold);
+  // §S5 (standalone-prescription investigation 2026-06-23): the legacy dampener
+  // trips on a single high-fatigue OR poor-performance signal, so a fatigued-but-
+  // strong session (fatigue 3, performance 3) fully blocks a warranted increase.
+  // When `session_dampen_require_both` is set, require BOTH signals; absent ⇒ the
+  // legacy OR (every pre-v11 row).
+  const fatigueHigh =
+    wfb?.overallFatigue != null &&
+    wfb.overallFatigue >= params.session_fatigue_dampen_threshold;
+  const performancePoor =
+    wfb?.performanceRating != null &&
+    wfb.performanceRating <= params.session_performance_dampen_threshold;
+  const sessionDampened = params.session_dampen_require_both
+    ? fatigueHigh && performancePoor
+    : fatigueHigh || performancePoor;
   if (sessionDampened) notes.push("rough session reported: increases dampened");
 
   return { painGated, setDelta, sessionDampened, notes };

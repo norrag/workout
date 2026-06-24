@@ -212,6 +212,9 @@ function recomputeSeed(
       cfg.user,
       cfg.week.targetRir,
       params,
+      // §S1: the anchor (refreshed from live history by the reconcile) drives the
+      // anchor-aware seed when seed_from_anchor is active; ignored otherwise.
+      { goalType: cfg.goalType, anchor: args.anchor },
     );
   } catch {
     return { status: "invalid_source" };
@@ -221,7 +224,7 @@ function recomputeSeed(
     status: prescriptionChanged(args.currentOutput, output)
       ? "changed"
       : "unchanged",
-    inputs: seedEngineInputs(cfg, priorPeak),
+    inputs: seedEngineInputs(cfg, priorPeak, args.anchor),
     output,
   };
 }
@@ -770,11 +773,14 @@ export async function reconcilePrescriptions(
       toEngineEquipment(equipmentType),
     );
 
-    // diverged → recompute the row's engine of `kind`. Anchors feed only the
-    // advance replay (a seed's cold-start basis is its frozen prior peak); fetch
-    // them once, lazily, and only when an advance actually diverges.
+    // diverged → recompute the row's engine of `kind`. The anchor feeds the
+    // advance replay and — with §S1 `seed_from_anchor` — the seed replay too (so a
+    // re-seeded week 1 reprices off current strength, not the frozen prior peak);
+    // fetch once, lazily, only when a row that consumes it actually diverges.
+    const needsAnchor =
+      kind === "advance" || (kind === "seed" && (params.seed_from_anchor ?? false));
     let anchor: E1rmAnchor | null = null;
-    if (kind === "advance") {
+    if (needsAnchor) {
       if (!anchors) {
         anchors = await getExerciseE1rmAnchors(service, userId, exerciseIds, params);
       }

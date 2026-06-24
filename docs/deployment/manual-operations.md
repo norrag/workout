@@ -89,6 +89,22 @@ called on the workout/generation/exercise paths) query this table, so they will
 |---|---|
 | Apply the override-table migration to hosted | Run `supabase/migrations/20260620000006_exercise_param_overrides.sql` against the hosted project (CLI `supabase db push`, dashboard SQL editor, or MCP `apply_migration`). Additive (new table + owner-only RLS + index + `set_updated_at` trigger); no existing data touched. |
 
+### Apply + activate engine_params **v11** (standalone-prescription fixes)
+
+`20260624000002_engine_params_v11_standalone_fixes.sql` ships v11 **inactive** —
+it changes the live prescription calculator and grading (S1 anchor seed, S3 e1RM
+cutoff + low-confidence down-weighting, S5 rep-consistent hold + require-both
+dampener; see `docs/reviews/2026-06-23-standalone-prescription-investigation.md`).
+Per the investigation's gating rule, **do not auto-activate**: review a replay
+diff first. The migration itself is safe to apply (it only inserts an inactive
+row; v10 stays active).
+
+| Operation | Notes |
+|---|---|
+| Apply the v11 migration to hosted | Inserts engine_params v11 with `is_active = false`. Additive; v10 remains the active row, so nothing changes for users yet. |
+| **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v11** on Madeline (`0af27789-…`) + a couple of other users; confirm week-1 seeds land in the 6–15 window, e1RM anchors are tamed (no ~555 leg-curl), and gated holds read as honest `weight × reps @ RIR` triples (doc 13 §6). |
+| **Activate v11** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 11;` (single-active invariant). Open prescriptions then refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v10. |
+
 ---
 
 ## How Claude flags these

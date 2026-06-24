@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "../params";
 import { estimateE1rm } from "../e1rm";
+import { V11_PARAMS } from "./helpers";
 
 const params = DEFAULT_ENGINE_PARAMS;
 
@@ -41,5 +42,35 @@ describe("estimateE1rm", () => {
   it("returns null for non-working input", () => {
     expect(estimateE1rm(0, 5, 0, params)).toBeNull();
     expect(estimateE1rm(100, 0, 0, params)).toBeNull();
+  });
+});
+
+describe("estimateE1rm — §S3 Brzycki ≤ cutoff / Epley above (v11)", () => {
+  it("tames the high-rep blow-up: a 100×30 @3 burnout is Epley-only, not the averaged ~555", () => {
+    // effReps 33 > brzycki_max_eff_reps(10) ⇒ Epley alone = 100×(1+33/30) = 210
+    const v11 = estimateE1rm(100, 30, 3, V11_PARAMS)!;
+    expect(v11.value).toBeCloseTo(210, 0);
+    // legacy averages in Brzycki (denominator 4) ⇒ ~555, the investigation's bug
+    const legacy = estimateE1rm(100, 30, 3, DEFAULT_ENGINE_PARAMS)!;
+    expect(legacy.value).toBeGreaterThan(500);
+    expect(v11.value).toBeLessThan(legacy.value * 0.45);
+  });
+
+  it("is unchanged from legacy at/below the cutoff (they agree there)", () => {
+    // effReps 5 ≤ 10 ⇒ still the Epley/Brzycki average, identical to legacy
+    expect(estimateE1rm(100, 5, 0, V11_PARAMS)!.value).toBeCloseTo(
+      estimateE1rm(100, 5, 0, DEFAULT_ENGINE_PARAMS)!.value,
+      1,
+    );
+    // effReps 10 (10 reps @ 0) ⇒ still averaged at the boundary
+    expect(estimateE1rm(100, 10, 0, V11_PARAMS)!.value).toBeCloseTo(
+      estimateE1rm(100, 10, 0, DEFAULT_ENGINE_PARAMS)!.value,
+      1,
+    );
+  });
+
+  it("switches to Epley alone just past the cutoff", () => {
+    // effReps 11 > 10 ⇒ Epley alone = 100×(1+11/30) = 136.7
+    expect(estimateE1rm(100, 11, 0, V11_PARAMS)!.value).toBeCloseTo(136.7, 1);
   });
 });

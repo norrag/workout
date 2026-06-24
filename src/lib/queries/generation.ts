@@ -6,11 +6,13 @@ import {
   rirRamp,
   seedMeso,
   toEngineEquipment,
+  type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
   type ExerciseParamOverride,
   type Prescription,
 } from "@/lib/engine";
+import { getExerciseE1rmAnchors } from "./anchors";
 import type {
   Database,
   ExerciseRow,
@@ -45,6 +47,8 @@ interface SeedCtx {
   paramsVersion: number;
   /** per-user×exercise increment overrides (doc 14 phase 3); absent ⇒ default */
   overrideByExerciseId: Map<string, ExerciseParamOverride>;
+  /** §S1: recency strength anchor per exercise for the anchor-aware meso seed */
+  anchorByExerciseId: Map<string, E1rmAnchor>;
 }
 
 /** A seeded prescription row plus the engine I/O that produced it, so the caller
@@ -102,6 +106,10 @@ function seedExerciseRow(
     override,
     engineEquipment,
   );
+  // §S1: anchor-aware seed (gated by seed_from_anchor in effectiveParams). The
+  // anchor is a derived input — carried into the seed decision so replay
+  // reproduces it, but excluded from the freshness fingerprint (doc 14 §3).
+  const anchor = ctx.anchorByExerciseId.get(fill.exercise_id) ?? null;
   const output = seedMeso(
     priorPeak,
     initial,
@@ -109,6 +117,7 @@ function seedExerciseRow(
     { experienceLevel: ctx.experienceLevel ?? "beginner" },
     ctx.targetRir,
     effectiveParams,
+    { goalType: ctx.goal, anchor },
   );
   const inputs = buildSeedInputs({
     equipmentType: equipment,
@@ -118,6 +127,7 @@ function seedExerciseRow(
     isDeload: ctx.isDeload,
     initial,
     priorPeak,
+    strengthAnchor: anchor,
   });
   return {
     row: {
@@ -274,12 +284,19 @@ export async function startMeso(
   const exerciseIds = [
     ...new Set(days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id)))),
   ];
-  const [{ data: exercises, error: exError }, { data: prs, error: prError }, overrideByExerciseId] =
-    await Promise.all([
-      supabase.from("exercises").select("id, equipment_type").in("id", exerciseIds),
-      supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
-      getExerciseParamOverrides(supabase, userId, exerciseIds),
-    ]);
+  const [
+    { data: exercises, error: exError },
+    { data: prs, error: prError },
+    overrideByExerciseId,
+    anchorByExerciseId,
+  ] = await Promise.all([
+    supabase.from("exercises").select("id, equipment_type").in("id", exerciseIds),
+    supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+    getExerciseParamOverrides(supabase, userId, exerciseIds),
+    // §S1: recency strength anchors for the anchor-aware seed (no-op unless
+    // seed_from_anchor is active; cheap when there's no history)
+    getExerciseE1rmAnchors(supabase, userId, exerciseIds, params),
+  ]);
   if (exError) throw exError;
   if (prError) throw prError;
   const equipmentById = new Map(
@@ -318,6 +335,7 @@ export async function startMeso(
     params,
     paramsVersion,
     overrideByExerciseId,
+    anchorByExerciseId,
   };
 
   // week-1 workouts in planner order, seeded per exercise
@@ -382,17 +400,23 @@ export async function regenerateOpenWorkouts(
       days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id))),
     ),
   ];
-  const [{ data: exercises, error: exError }, { data: prs, error: prError }, overrideByExerciseId] =
-    await Promise.all([
-      exerciseIds.length > 0
-        ? supabase
-            .from("exercises")
-            .select("id, equipment_type")
-            .in("id", exerciseIds)
-        : Promise.resolve({ data: [], error: null }),
-      supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
-      getExerciseParamOverrides(supabase, userId, exerciseIds),
-    ]);
+  const [
+    { data: exercises, error: exError },
+    { data: prs, error: prError },
+    overrideByExerciseId,
+    anchorByExerciseId,
+  ] = await Promise.all([
+    exerciseIds.length > 0
+      ? supabase
+          .from("exercises")
+          .select("id, equipment_type")
+          .in("id", exerciseIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+    getExerciseParamOverrides(supabase, userId, exerciseIds),
+    // §S1: recency strength anchors for the anchor-aware seed of added exercises
+    getExerciseE1rmAnchors(supabase, userId, exerciseIds, params),
+  ]);
   if (exError) throw exError;
   if (prError) throw prError;
   const equipmentById = new Map(
@@ -429,6 +453,7 @@ export async function regenerateOpenWorkouts(
       params,
       paramsVersion,
       overrideByExerciseId,
+      anchorByExerciseId,
     };
 
     // 1. drop planned workouts whose day was removed from the plan

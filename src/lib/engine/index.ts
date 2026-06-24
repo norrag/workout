@@ -15,7 +15,11 @@ import { modulateFromFeedback } from "./rules/feedback";
 import { prescribeDeload } from "./rules/deload";
 import { rirRamp, type WeekPlan } from "./rules/rir";
 import { incrementFor, roundToStep } from "./rules/rounding";
-import { weightForRepsAtRir, predictRepsAtWeight } from "./reps";
+import {
+  weightForRepsAtRir,
+  predictRepsAtWeight,
+  type E1rmAnchor,
+} from "./reps";
 
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
@@ -205,6 +209,10 @@ export function prescribe(
     anchorValue: number;
     win: NonNullable<typeof goalWindow>;
     gradeDetail: string | null;
+    /** the Option-A schedule reps for this week (held effective workload) */
+    targetReps: number;
+    /** a gate blocked a warranted increase: hold the load, hold the workload */
+    gateHeld: boolean;
   } | null = null;
 
   if (useRepWindow) {
@@ -217,10 +225,19 @@ export function prescribe(
       prevReps >= goalWindow!.target_high
         ? goalWindow!.target_low
         : Math.min(goalWindow!.target_high, Math.max(goalWindow!.target_low, prevReps + 1));
-    let w =
+    const repriced =
       weightForRepsAtRir(anchor!.value, targetReps, inputs.week.targetRir, params) ??
       baseWeight;
-    if ((mod.painGated || mod.sessionDampened) && w > baseWeight) w = baseWeight;
+    // §S5: a gate (pain or session dampener) blocks a warranted *increase*. The
+    // legacy path then resets the load to baseWeight but re-derives reps from the
+    // anchor predictor clamped to the window ceiling — producing a `weight × reps
+    // @ RIR` triple whose implied RIR contradicts the target. When
+    // `hold_rep_consistent` is set we instead HOLD the effective workload: keep the
+    // load and prescribe the Option-A schedule reps (which rise one step as the RIR
+    // ramp drops), so the triple stays internally consistent. Absent ⇒ legacy.
+    const gateHeld =
+      (mod.painGated || mod.sessionDampened) && repriced > baseWeight;
+    const w = gateHeld ? baseWeight : repriced;
     weight = w;
     const grade =
       params.grading === "rir"
@@ -230,6 +247,8 @@ export function prescribe(
       anchorValue: anchor!.value,
       win: goalWindow!,
       gradeDetail: grade?.detail ?? null,
+      targetReps,
+      gateHeld: gateHeld && (params.hold_rep_consistent ?? false),
     };
   } else {
     // ----- legacy increment path (unchanged — parity, doc 13 §3.8) ----------
@@ -316,24 +335,36 @@ export function prescribe(
   // = displayed (doc 13 decision 3); nudge one loadable step toward center if
   // rounding pushed predicted reps outside the hard [min,max] bounds (§4.2.3).
   if (repWindow) {
-    finalWeight = boundRepsToWindow(
-      finalWeight,
-      repWindow.anchorValue,
-      repWindow.win,
-      inputs,
-      params,
-    );
-    if ((mod.painGated || mod.sessionDampened) && finalWeight > baseWeight) {
+    if (repWindow.gateHeld) {
+      // §S5 held: keep the exact handled load and prescribe the Option-A schedule
+      // reps (the held effective workload). No boundRepsToWindow nudge (that would
+      // move the held load) and no anchor-predictor clamp (that manufactures a
+      // dishonest "@ N RIR" when the held load is far off an off-target anchor).
       finalWeight = baseWeight;
-    }
-    const predicted = predictRepsAtWeight(
-      repWindow.anchorValue,
-      finalWeight,
-      inputs.week.targetRir,
-      params,
-    );
-    if (predicted != null) {
-      reps = Math.min(repWindow.win.max, Math.max(repWindow.win.min, predicted));
+      reps = Math.min(
+        repWindow.win.max,
+        Math.max(repWindow.win.min, repWindow.targetReps),
+      );
+    } else {
+      finalWeight = boundRepsToWindow(
+        finalWeight,
+        repWindow.anchorValue,
+        repWindow.win,
+        inputs,
+        params,
+      );
+      if ((mod.painGated || mod.sessionDampened) && finalWeight > baseWeight) {
+        finalWeight = baseWeight;
+      }
+      const predicted = predictRepsAtWeight(
+        repWindow.anchorValue,
+        finalWeight,
+        inputs.week.targetRir,
+        params,
+      );
+      if (predicted != null) {
+        reps = Math.min(repWindow.win.max, Math.max(repWindow.win.min, predicted));
+      }
     }
     const move = finalWeight - baseWeight;
     const moveDetail =
@@ -419,7 +450,21 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** §7 meso seeding: start a new meso from the prior meso's peak, backed off. */
+/**
+ * §7 meso seeding: start a new meso from the prior meso's peak, backed off.
+ *
+ * §S1 (standalone-prescription investigation 2026-06-23): when `seed_from_anchor`
+ * is set (and weight_selection = rep_window with a confident anchor), seed week 1
+ * exactly the way a mid-meso swap-in already does — pick the load for the window's
+ * `target_low` reps at the start RIR off the recency strength anchor, and let the
+ * reps follow that load — instead of carrying the prior peak's rep count verbatim
+ * (which escaped the rep window entirely, the headline runaway-reps bug). Falls
+ * back to the legacy peak-backoff / plan-default seed when the flag is off or there
+ * is no confident anchor. `opts.goalType` resolves the per-goal window (seedMeso has
+ * no goal otherwise); `opts.anchor` is the caller-computed recency anchor (engine
+ * stays pure). It is a *derived* input, so it does not enter the freshness
+ * fingerprint (doc 14 §3) — see buildSeedInputs/seedEngineInputs.
+ */
 export function seedMeso(
   priorPeak: { weight: number | null; reps: number | null; sets: number } | null,
   initial: { weight: number | null; reps: number | null; sets: number } | null,
@@ -427,8 +472,43 @@ export function seedMeso(
   user: EngineInputs["user"],
   startRir: number,
   rawParams: EngineParams,
+  opts?: { goalType?: EngineInputs["goalType"]; anchor?: E1rmAnchor | null },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
+
+  // §S1 anchor seed — mirrors prescribe()'s seed_anchor branch (index.ts:103-151)
+  const anchor = opts?.anchor ?? null;
+  const win = repWindowFor(opts?.goalType ?? "hypertrophy", params);
+  if (
+    (params.seed_from_anchor ?? false) &&
+    params.weight_selection === "rep_window" &&
+    anchor != null &&
+    win != null &&
+    confidenceAtLeast(anchor.confidence, params.reps_predict.min_confidence)
+  ) {
+    const raw = weightForRepsAtRir(anchor.value, win.target_low, startRir, params);
+    if (raw != null) {
+      const fw = roundToStep(raw, exercise.equipmentType, params);
+      const predicted = predictRepsAtWeight(anchor.value, fw, startRir, params);
+      const reps =
+        predicted == null
+          ? win.target_low
+          : Math.min(win.max, Math.max(win.min, predicted));
+      const detail = `seeded from strength anchor (e1RM ${anchor.value} lb): ${fw} lb for ${reps} reps at ${startRir} RIR`;
+      return {
+        weight: fw,
+        reps,
+        sets: clampSets(
+          priorPeak?.sets ?? initial?.sets ?? params.min_sets,
+          params,
+        ),
+        targetRir: startRir,
+        rationale: capitalize(detail + "."),
+        trace: [{ rule: "seed_anchor", detail }],
+      };
+    }
+  }
+
   if (priorPeak?.weight != null) {
     return {
       weight: roundToStep(

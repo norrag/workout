@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
+import { DEFAULT_ENGINE_PARAMS, engineParamsSchema } from "@/lib/engine";
 import {
   CURRENT_PARAMS_SCHEMA_VERSION,
   canonicalize,
@@ -7,6 +7,20 @@ import {
   materializeParams,
   resolveProvenance,
 } from "../params-provenance";
+
+// the v11 deltas (standalone-prescription investigation 2026-06-23), built the
+// same way the 20260624000002 migration materialized them.
+const V11_PARAMS = engineParamsSchema.parse({
+  ...DEFAULT_ENGINE_PARAMS,
+  e1rm: {
+    ...DEFAULT_ENGINE_PARAMS.e1rm,
+    brzycki_max_eff_reps: 10,
+    session_value_confidence_weights: { high: 1, moderate: 0.6, low: 0.3 },
+  },
+  seed_from_anchor: true,
+  hold_rep_consistent: true,
+  session_dampen_require_both: true,
+});
 
 describe("canonicalize", () => {
   it("is independent of key order", () => {
@@ -51,6 +65,25 @@ describe("resolveProvenance", () => {
     expect(
       hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
     ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
+  it("v11 is a complete, replayable snapshot matching the migration hash", () => {
+    const p = resolveProvenance(V11_PARAMS as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION); // no shape bump
+    expect(p.params_hash).toBe(
+      "43102e52f88144649c0a546ea81513b7132dc6f2e4d064dd7d5ffec6fc35b8e0",
+    );
+  });
+
+  it("the optional v11 fields leave v10's canonical hash untouched", () => {
+    // the gated fields are `.optional()`, so a v10 row (without them) must still
+    // hash to the same sha256 it did before — otherwise every pre-v11 row would
+    // flip to non-replayable and the freshness fingerprint would churn.
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("brzycki_max_eff_reps");
   });
 
   it("flags a partial (defaults-needed) version as not replayable", () => {

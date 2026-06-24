@@ -10,6 +10,7 @@ import {
   recencyWeightedE1rm,
   type E1rmSample,
 } from "../reps";
+import { V11_PARAMS } from "./helpers";
 
 const params = DEFAULT_ENGINE_PARAMS; // anchor_method = session_best (v9)
 const meanParams = {
@@ -196,5 +197,41 @@ describe("weightForRepsAtRir (converse of predictRepsAtWeight)", () => {
   it("returns null without a usable anchor or reps", () => {
     expect(weightForRepsAtRir(null, 8, 2, params)).toBeNull();
     expect(weightForRepsAtRir(120, 0, 2, params)).toBeNull();
+  });
+});
+
+describe("§S3 — forward/inverse stay consistent under the Brzycki cutoff (v11)", () => {
+  it("round-trips weightForRepsAtRir ⇄ predictRepsAtWeight across the cutoff", () => {
+    const anchor = estimateE1rm(100, 8, 2, V11_PARAMS)!.value;
+    // 5 & 8 sit below the cutoff (averaged); 12 & 14 sit above it (Epley alone)
+    for (const reps of [5, 8, 12, 14]) {
+      const w = weightForRepsAtRir(anchor, reps, 2, V11_PARAMS)!;
+      expect(predictRepsAtWeight(anchor, w, 2, V11_PARAMS)).toBe(reps);
+    }
+  });
+
+  it("effectiveRepsForE1rm still round-trips the v11 forward model", () => {
+    const e = estimateE1rm(100, 14, 0, V11_PARAMS)!; // above the cutoff (Epley)
+    expect(effectiveRepsForE1rm(e.value, 100, V11_PARAMS)).toBeCloseTo(14, 1);
+  });
+});
+
+describe("§S3 — session_best down-weights low-confidence sets (v11)", () => {
+  it("a low-confidence burnout in the anchor session pulls less weight than a clean set", () => {
+    // one clean high-confidence set + one 25-rep burnout (low confidence), same
+    // session. The burnout is the recency-weighted max e1RM (so its session is
+    // chosen), but v11 weights it down in the averaged value.
+    const samples: E1rmSample[] = [
+      { weight: 100, reps: 5, targetRir: 1, ageDays: 0, sessionKey: "S" },
+      { weight: 100, reps: 25, targetRir: 3, ageDays: 0, sessionKey: "S" },
+    ];
+    // compare against the same cutoff but equal weights, to isolate the weighting
+    const v11EqualWeights = {
+      ...V11_PARAMS,
+      e1rm: { ...V11_PARAMS.e1rm, session_value_confidence_weights: undefined },
+    };
+    const weighted = recencyWeightedE1rm(samples, V11_PARAMS)!.value;
+    const equalMean = recencyWeightedE1rm(samples, v11EqualWeights)!.value;
+    expect(weighted).toBeLessThan(equalMean); // burnout contributes less
   });
 });
