@@ -305,10 +305,16 @@ Surfaced by editor note 2/§2.4. When `prescribe()` blocks a load increase
   held weight is far off-target; in that off-target case the rationale should say
   the load is below capacity rather than emit a false "@ N RIR". Never present a
   set as `@ 2 RIR` that the model thinks is ~19 RIR.
+  > I'm not sure I agree with this entirely, or at least I am not entirely sure I understand.
+  > What should really be happening when holding is that the effective workload is held. i.e.
+  > keep the workload the same during the next week. With the RIR ramp progressing the next
+  > week by one rep while the workload did not increase, this effectively reduces the prescribed
+  > e1RM of the subsiquent week/day. 
 - **Tuning (separate, same area):** the session dampener trips on a single
   `fatigue ≥ 3` with no corroborating poor performance. Consider requiring *both*
   signals, or dampening the *magnitude* of the increase (e.g. half-step) instead of
   zeroing it, so a fatigued-but-strong session still progresses sanely.
+  > Yeah, probably do both.
 - **Scope:** `engine/index.ts` rep_window hold branch + `rules/feedback.ts`
   threshold logic; table-driven tests for every hold/gate branch asserting the
   output's implied RIR stays within `rir_tolerance` of the target (or reps equal
