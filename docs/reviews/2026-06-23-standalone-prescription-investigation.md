@@ -105,6 +105,16 @@ because the inflated anchor wants far more than 15.
 Confidence on these high-rep sets is correctly `low`, but `min_confidence=low`
 lets them through, and the live predictor ignores confidence entirely.
 
+```
+Editors note:
+1.	The Brzycki becomes unreliable above 10 reps. Brzycki is slightly more conservative than Epley less than 10 reps, it agrees with Epley right around 10 reps, and becomes increasingly inflated relative to Epley above 10 reps. Frankly, there seems very narrow benefit to including Brzycki at all, but the only argument is that its slightly more conservative at heavy loads below 10 reps. If anything, we could use Brzycki <=10 reps, and move to Epley >10 reps. Even at that, the improvement is modest.
+2.	So, in this case, I get that the e1RM being fed to the prescription engine was bad – so its not precisely fair or relevant to judge the output of the engine based on bad input data which will be corrected – However, the recorded decision chain which fed W2D1 prescription was:
+a.	Input (from W1D1): 100lb x 20 reps set one and 30 reps set two, 3RIR, strength anchor of 386 lbs
+b.	Output (for W2D1): 100lb x 15 reps x 2 sets at the target 2RIR (implied e1RM via same Epley/Brzycki average: 168.3 lbs)
+3.	My issue with the above point is that the output in this case simply kept the same weight and bounded the reps at the cap of 15, which in itself did not even produce an internally-consistent output of the targeted e1RM. What the progression should have done effectively answer ‘what weight, when performed in a real rep range of 8-12 with 2RIR (next weeks target), would produce the target e1RM of 386 lbs).’ This answer would have led the engine to reprice the high-volume input work into the desired rep range and effectively reason that ‘100 lb is much lighter than the athlete’s current capacity. Let’s increase load materially to match the previous strength anchor, reduce reps back toward the lower end of target range and step up the athlete’s reps until they can complete the increased weight for at least 12 reps on all sets, and then repeat the process’.
+Effectively, even if though the strength anchor was incorrect for other reasons, the engine still would not have performed the correct actions even if the strength anchor was corrected.
+```
+
 ---
 
 ## 3. How the engine behaves *without* a macrocycle (locking it down)
@@ -129,6 +139,11 @@ Net: there is no "standalone bug" in goal handling. The defects live in the
 **meso-start seed** (`seedMeso` + `v_exercise_prs`) and the **e1RM estimator's
 high-rep behavior**, both of which a standalone-only cadence exercises constantly.
 
+```
+Editors note:
+You said “in rep_window mode, correct — re-prices load off the recency anchor and keeps reps in-window (subject to the inflated anchor in §2.3 pinning at the ceiling).” This statement seems to be conflicting – if it re-priced the load then it wouldn’t be pinned at the ceiling. We see this played out in the example above. 
+```
+
 ---
 
 ## 4. Solutions (assessed)
@@ -150,6 +165,11 @@ values when there's no confident anchor (today's null-`priorPeak` behavior).
 - **Risk:** low–medium. Changes seed numbers; covered by goldens. Behavior can
   be param-gated alongside the existing `weight_selection` flag for rollback.
 
+   ```
+   Editors note:
+   Accepted 
+   ```
+
 ### S2 — Fix `v_exercise_prs` to report a *coherent* best set. **Strongly recommended.**
 Replace the three per-column `max()`es with the single best-e1RM set's
 `(weight, reps)` (e.g. `DISTINCT ON (user,exercise) … ORDER BY e1rm DESC`), and
@@ -162,16 +182,23 @@ RLS unaffected — it reads `logged_sets`).
 - **Risk:** low. Pure read-model change; verify other consumers
   (`stats.ts`, MCP) expect a coherent set (they should).
 
+     ```
+   Editors note:
+   Accepted 
+   ```
+
 ### S3 — Tame the e1RM estimator on high-rep sets. **Recommended.**
 The Brzycki blowup is the "suspect e1RM" generator. Options (combine):
 - Lower the Brzycki cutoff far below 36 (it is only valid to ~10–12 reps); above
   it, use Epley alone or a flattened curve. A param (`e1rm.brzycki_max_eff_reps`)
   keeps it tunable per hard rule #3.
+  ```Use only Brzycki up to 10 reps, and use only Epley after that.```
 - Optionally cap effective reps contributing to the anchor, or exclude/
   down-weight `low`-confidence sets in `session_best` *value* selection (today
   confidence gates the label but not the averaged value).
 - Consider raising `reps_predict.min_confidence` above `low` so genuinely noisy
   anchors fall back to plan values.
+  ```What exactly are 'plan values'?```
 - **Effect:** anchors stop inflating; the live predictor and the rep_window stop
   pinning at 15 / showing 30. **Behavior change to the live calculator and
   grading — needs replay before activating** (admin MCP `replay_decisions` /
@@ -184,6 +211,8 @@ press ×27). The global hypertrophy window 6–15 may simply be tighter than her
 intended style. doc 13 §8 already defers "center the window on the slot's
 intended range" (needs a rep-range column on `meso_exercises`). Not required to
 fix the bug, but it is the right home for "this lift should be 15–25 reps."
+ 
+```Deferr S4 for now ```
 
 ### Recommended sequence
 **S1 + S2** fix the headline runaway reps and the fabricated PR with low risk and
