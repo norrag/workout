@@ -275,6 +275,20 @@ That single column **replaces** the `params_version` gate (§9). The engine_para
 version is folded into the fingerprint via `paramsToken`. (Keep `params_version`
 only if useful for human-readable audit; it is no longer the gate.)
 
+> **Added 2026-06-24 — `workout_exercises.params_version` as a legible stamp**
+> (`20260624000003`). The fingerprint proves freshness but is opaque, and an
+> *unchanged* recompute re-stamps the fingerprint **without** writing a new
+> `engine_decisions` row — so the only visible version label was the decision's,
+> which made fresh-but-unchanged rows look stale after a version bump. The column is
+> now populated as a human-readable "accurate as of Vx": stamped beside
+> `dep_fingerprint` at every write (generation, seed, recompute-changed,
+> recompute-unchanged, self-heal) **plus a one-time catch-up on the fresh-row
+> short-circuit** (`stampParamsVersion`), so a planned row always advertises the
+> latest version it is verified-accurate under. It is consistent-by-construction with
+> the fingerprint (the version is already a fingerprint component) and remains a label,
+> not the gate. Distinct from `engine_decisions.params_version`, which only advances on
+> an actual numeric change.
+
 The audit trail stays in `engine_decisions`. Generalize it so **seeds record a
 decision too** (today only advances do), giving a uniform replay source for
 recompute (§6.2). Store the resolved dependency component values in the decision's

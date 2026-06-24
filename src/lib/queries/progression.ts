@@ -306,6 +306,8 @@ async function generateDay(
         configProjection(inputs),
         paramsTokenFor(ctx.paramsVersion, override?.weightIncrement),
       ),
+      // legible "accurate as of Vx" stamp, written beside the fingerprint
+      params_version: ctx.paramsVersion,
     };
   });
 

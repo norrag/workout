@@ -19,6 +19,14 @@ export const V11_PARAMS: EngineParams = {
   session_dampen_require_both: true,
 };
 
+/** v12 = v11 plus the two rep-window refinements (climb on performed reps; bound
+ *  to the target window). Mirrors `20260624…_engine_params_v12`. */
+export const V12_PARAMS: EngineParams = {
+  ...V11_PARAMS,
+  climb_on_performed_reps: true,
+  bound_to_target_window: true,
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

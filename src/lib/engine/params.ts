@@ -173,6 +173,24 @@ export const engineParamsSchema = z.object({
   // high-fatigue AND a poor-performance signal before dampening, so a fatigued-but-
   // strong session still progresses.
   session_dampen_require_both: z.boolean().optional(),
+
+  // ----- standalone-prescription investigation, round 2 (v12) — all gated -------
+  // Same `.optional()` discipline (absent ⇒ prior behavior, no fingerprint churn).
+
+  // §v12 #1: drive the rep-window rep-climb off what was actually PERFORMED — the
+  // MINIMUM working-set reps (classic double progression advances only when every
+  // set reaches the top of the window) — not the previous *prescription*. ABSENT /
+  // false ⇒ legacy climb off `previous.reps` (which bumps the load even when the
+  // top set was prescribed but missed). Falls back to the prescription when there
+  // are no logged working sets.
+  climb_on_performed_reps: z.boolean().optional(),
+  // §v12 #2: when rounding the anchor-chosen load leaves predicted reps above the
+  // window's TARGET high (not just the hard max), prefer the next loadable step up
+  // — but only when it keeps reps at/above the target low; otherwise keep the
+  // lighter load (the genuine coarse-increment buffer). Symmetric below target low.
+  // ABSENT / false ⇒ legacy nudge only at the hard [min,max] bounds, so a load that
+  // predicts 13–14 is left there even when one step lands squarely in 8–12.
+  bound_to_target_window: z.boolean().optional(),
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
   // fixed −%, carries genuine regression — doc 13 §4.3).

@@ -76,6 +76,20 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v12 is a complete, replayable snapshot matching the migration hash", () => {
+    const v12 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+    });
+    const p = resolveProvenance(v12 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "0fd04a7772cf3ee4e09db97e1390a40afaf857bf0ae3e6afef4ee0c567b66268",
+    );
+  });
+
   it("the optional v11 fields leave v10's canonical hash untouched", () => {
     // the gated fields are `.optional()`, so a v10 row (without them) must still
     // hash to the same sha256 it did before — otherwise every pre-v11 row would

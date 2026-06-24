@@ -220,7 +220,19 @@ export function prescribe(
     // the bottom and let the load step when the window tops out. The anchor (not
     // a fixed increment / regression %) carries real strength change — including
     // a caught overperformance — and a falling anchor handles under-performance.
-    const prevReps = baseReps;
+    // §v12 #1: the climb advances off what was actually PERFORMED — the minimum
+    // working-set reps (double progression resets only when *every* set reached
+    // the top), not the previous *prescription* (which would bump the load even
+    // when the top set was prescribed but missed). Gated; falls back to the
+    // prescribed reps when the flag is off or there are no logged working sets.
+    const workingReps = inputs.actualSets
+      .filter((s) => !s.isWarmup && s.reps > 0)
+      .map((s) => s.reps);
+    const performedMin = workingReps.length ? Math.min(...workingReps) : null;
+    const prevReps =
+      (params.climb_on_performed_reps ?? false) && performedMin != null
+        ? performedMin
+        : baseReps;
     const targetReps =
       prevReps >= goalWindow!.target_high
         ? goalWindow!.target_low
@@ -437,6 +449,33 @@ function boundRepsToWindow(
   if (predicted == null) return weight;
   const step = params.rounding[inputs.exercise.equipmentType] ?? 0;
   if (step <= 0) return weight;
+  const predAt = (w: number) =>
+    predictRepsAtWeight(anchorValue, w, inputs.week.targetRir, params);
+
+  // §v12 #2: prefer landing in the TARGET band [target_low, target_high]. If the
+  // rounded load predicts above target_high, take one step up — but only when it
+  // keeps reps at/above target_low (else the lighter load is a genuine coarse-step
+  // buffer and we keep it). The hard [min,max] bounds are still enforced: if even
+  // the buffer would breach a hard bound, step anyway. Symmetric below target_low.
+  if (params.bound_to_target_window ?? false) {
+    if (predicted > win.target_high) {
+      const up = roundToStep(weight + step, inputs.exercise.equipmentType, params);
+      const pu = predAt(up);
+      if (pu != null && pu >= win.target_low) return up; // lands in the window
+      if (predicted > win.max) return up; // buffer breaches the hard max → must step
+      return weight;
+    }
+    if (predicted < win.target_low) {
+      const down = roundToStep(weight - step, inputs.exercise.equipmentType, params);
+      const pd = predAt(down);
+      if (pd != null && pd <= win.target_high) return down;
+      if (predicted < win.min) return down; // breaches the hard min → must step
+      return weight;
+    }
+    return weight;
+  }
+
+  // legacy: only correct when the prediction breaches the hard [min,max] bounds.
   if (predicted > win.max) {
     return roundToStep(weight + step, inputs.exercise.equipmentType, params);
   }
