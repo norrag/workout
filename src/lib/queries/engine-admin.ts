@@ -9,6 +9,7 @@ import {
   resolveProvenance,
   type ParamsProvenance,
 } from "./params-provenance";
+import { getExerciseParamOverrides } from "./exercise-overrides";
 
 type Client = SupabaseClient<Database>;
 
@@ -220,6 +221,15 @@ export interface DecisionRecord {
   created_at: string;
   inputs: Record<string, unknown>;
   output: Record<string, unknown>;
+  /**
+   * The caller's per-exercise weight-increment override for this decision's
+   * exercise (doc 14 phase 3), in pounds, or null. Replay folds it into the
+   * candidate params via `resolveEffectiveParams` exactly as the live generation /
+   * recompute path does — otherwise an override'd exercise replays at the STOCK
+   * loadable step and diffs spuriously (the override sets `rounding`, which every
+   * prescribed weight rounds to).
+   */
+  incrementOverride: number | null;
 }
 
 export interface DecisionFilters {
@@ -278,6 +288,14 @@ export async function getEngineDecisions(
       .in("id", exerciseIds);
     for (const e of exercises ?? []) exerciseNameById.set(e.id, e.name);
   }
+
+  // per-exercise increment overrides (doc 14 phase 3), scoped to the caller — so
+  // replay folds them into the candidate params exactly as the live generation /
+  // recompute path does (otherwise an override'd lift replays at the stock step).
+  const overrideByExercise =
+    exerciseIds.length > 0
+      ? await getExerciseParamOverrides(client, userId, exerciseIds)
+      : new Map();
   if (workoutIds.length > 0) {
     const { data: workouts } = await client
       .from("workouts")
@@ -309,5 +327,8 @@ export async function getEngineDecisions(
     created_at: d.created_at,
     inputs: d.inputs,
     output: d.output,
+    incrementOverride: d.exercise_id
+      ? (overrideByExercise.get(d.exercise_id)?.weightIncrement ?? null)
+      : null,
   }));
 }

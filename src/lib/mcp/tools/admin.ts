@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   engineInputsSchema,
   prescribe,
+  resolveEffectiveParams,
   seedMeso,
   type EngineParams,
   type Prescription,
@@ -179,11 +180,24 @@ export function replayDecisions(
       continue;
     }
 
+    // fold this exercise's increment override into the candidate params exactly
+    // as the live generation / recompute path does (resolveEffectiveParams) — the
+    // override sets the loadable `rounding` step every prescribed weight rounds to,
+    // so replaying without it diffs spuriously against the stock step (the
+    // per-exercise-override replay-fidelity gap).
+    const effectiveCandidate = resolveEffectiveParams(
+      candidateParams,
+      d.incrementOverride != null ? { weightIncrement: d.incrementOverride } : null,
+      parsed.data.exercise.equipmentType,
+    );
+
     let replayed: Prescription;
     try {
       // replay the engine of the decision's kind (doc 14 §6.2) so a seed is
       // re-run through seedMeso, not prescribe — otherwise every seed would
-      // diff spuriously against its stored output.
+      // diff spuriously against its stored output. Pass the seed's goal + stored
+      // anchor so the anchor-aware seed (§S1) is exercised on replay, not silently
+      // skipped (which would mask a seed_from_anchor change).
       replayed =
         d.kind === "seed"
           ? seedMeso(
@@ -198,9 +212,10 @@ export function replayDecisions(
               parsed.data.exercise,
               parsed.data.user,
               parsed.data.week.targetRir,
-              candidateParams,
+              effectiveCandidate,
+              { goalType: parsed.data.goalType, anchor: parsed.data.strengthAnchor },
             )
-          : prescribe(parsed.data, candidateParams);
+          : prescribe(parsed.data, effectiveCandidate);
     } catch {
       outcomes.execution_error += 1;
       continue;
