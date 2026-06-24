@@ -29,6 +29,42 @@ export function brzycki(weight: number, effectiveReps: number): number {
 }
 
 /**
+ * The e1RM-per-pound factor `k(effReps)` so `e1RM = weight × k`. Both Epley and
+ * Brzycki are linear in weight, so this single factor backs the forward estimate
+ * (`e1rm.ts`) AND the closed-form inverse (`reps.ts weightForRepsAtRir`) — they
+ * must share it or forward/inverse drift.
+ *
+ * The switch (§S3, standalone-prescription investigation 2026-06-23): Brzycki
+ * tracks Epley to ~10 reps then inflates increasingly above it. When
+ * `brzycki_max_eff_reps` is set we average Epley+Brzycki only up to that cutoff
+ * and use Epley alone above it (dropping the average outside the band where they
+ * agree). When it is ABSENT (every pre-v11 row) we keep the exact legacy rule —
+ * average until Brzycki is invalid (`effReps ≥ 36` ⇒ Epley alone) — so those rows
+ * estimate byte-identically.
+ */
+export function e1rmFactor(
+  effectiveReps: number,
+  cfg: Pick<EngineParams["e1rm"], "brzycki_max_eff_reps">,
+): number {
+  const epleyK = 1 + effectiveReps / 30;
+  const max = cfg.brzycki_max_eff_reps;
+  const useBrzycki =
+    max == null ? effectiveReps < 36 : effectiveReps <= max && effectiveReps < 36;
+  if (!useBrzycki) return epleyK;
+  const brzyckiK = 36 / (37 - effectiveReps);
+  return (epleyK + brzyckiK) / 2;
+}
+
+/** Forward e1RM at a given effective-rep count, applying the §S3 switch. */
+export function e1rmFromEffectiveReps(
+  weight: number,
+  effectiveReps: number,
+  cfg: Pick<EngineParams["e1rm"], "brzycki_max_eff_reps">,
+): number {
+  return weight * e1rmFactor(effectiveReps, cfg);
+}
+
+/**
  * @param rir reported reps-in-reserve, or null (unknown ⇒ low confidence)
  * @returns null for non-working input (weight or reps ≤ 0)
  */
@@ -44,11 +80,9 @@ export function estimateE1rm(
 
   const effectiveReps = reps + (rir ?? 0) * cfg.rir_offset;
 
-  // Brzycki is invalid as effectiveReps → 37; fall back to Epley alone
-  const value =
-    effectiveReps >= 36
-      ? epley(weight, effectiveReps)
-      : (epley(weight, effectiveReps) + brzycki(weight, effectiveReps)) / 2;
+  // §S3 switch (Brzycki ≤ cutoff, Epley above) — shared with reps.ts so forward
+  // and inverse stay consistent. Absent cutoff ⇒ legacy `≥36 ⇒ Epley` rule.
+  const value = e1rmFromEffectiveReps(weight, effectiveReps, cfg);
 
   return {
     value: Math.round(value * 10) / 10,

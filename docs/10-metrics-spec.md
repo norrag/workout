@@ -49,6 +49,14 @@ e1RM = average( Epley(weight, effectiveReps), Brzycki(weight, effectiveReps) )
   tables. *(Zourdos 2016; standard RPE-calculator practice.)*
 - **Why average Epley & Brzycki:** Epley drifts high and Brzycki low at higher reps; averaging
   cancels the opposing bias across the 5–15 range. *(LeSuer 1997; Mayhew 1992.)*
+- **Brzycki cutoff [AMENDED 2026-06-24, §S3].** Brzycki tracks Epley to ~10 reps then inflates
+  *increasingly* above it (its `37 − effReps` denominator goes near-zero), so a 20–30-rep burnout
+  produced a 2–4× e1RM blow-up. The rule is now: **average Epley+Brzycki only for effective reps
+  ≤ `e1rm.brzycki_max_eff_reps`, Epley alone above** (drop the average outside the band where the
+  two agree). Tunable; default **10** in engine_params v11. The legacy `< 36 ⇒ average` behavior is
+  preserved when the param is absent (every pre-v11 row). The single switch lives in `e1rmFactor()`
+  so the forward estimate and the inverse load-for-reps math stay consistent. See
+  `docs/reviews/2026-06-23-standalone-prescription-investigation.md`.
 - **Confidence weighting [EVIDENCED]:** trust is highest at low effective reps / low RIR and
   degrades fast beyond. Store a confidence with each e1RM and down-weight low-confidence points in
   "best e1RM" and trend lines:

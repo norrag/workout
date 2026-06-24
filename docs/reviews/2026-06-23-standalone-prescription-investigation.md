@@ -5,8 +5,11 @@
 prescribed reps in the upper teens to upper 20s, and e1RM values that look
 inflated. Hypothesis raised: standalone (no-macrocycle) usage may be involved.
 **Status:** investigated, root-caused against live data; solutions assessed below.
-This confirms and extends the previously-filed gap **T-A6 / PR22 / PR23**
-(`docs/triage/A-engine-metrics.md`).
+**Built 2026-06-24** — S1/S2/S3/S5 implemented param-gated and shipped in
+engine_params **v11 (INACTIVE)**; S4 deferred. Activation is the documented manual
+step after a replay diff (see `docs/deployment/manual-operations.md` and the
+checklist at the end of this file). This confirms and extends the previously-filed
+gap **T-A6 / PR22 / PR23** (`docs/triage/A-engine-metrics.md`).
 
 ---
 
@@ -348,6 +351,44 @@ S3 and S5 are complementary: S3 fixes the *input* (the anchor), S5 fixes the
 *logic* that mishandles a held weight. Do both; neither alone fully fixes §2.4.
 
 ### Implementation checklist (for the build session)
+
+**Build status (2026-06-24):** S2, S3, S1, S5 all done and param-gated; v11 shipped
+INACTIVE; no data rewrite. Activation pending the replay diff. Per-item notes below.
+
+- [x] **S2 (view):** `20260624000001_v_exercise_prs_coherent_set.sql` — `DISTINCT ON
+      (user_id, exercise_id) … ORDER BY <capped e1rm> DESC`; `best_e1rm` via the §S3
+      estimator reading `rir_offset` + `brzycki_max_eff_reps` from the active params
+      (tracks the engine). `security_invoker` preserved. Validated on live data.
+      Consumers display/seed it as "your best" — coherent now, not fabricated.
+- [x] **S3 (e1rm):** `e1rm.brzycki_max_eff_reps` (+ `session_value_confidence_weights`)
+      added `.optional()` to the schema; the switch lives in the shared `e1rmFactor()`
+      used by `e1rm.ts` (`estimateE1rm`) AND `reps.ts` (`e1rmAtEffectiveReps`, the
+      inverse `k`) so forward/inverse agree; low-confidence down-weighted in the
+      `session_best` value. Round-trip + cutoff-boundary tests added.
+- [x] **S1 (seed):** anchors threaded into `startMeso` / `regenerateOpenWorkouts` /
+      `addWorkoutExercises` (`getExerciseE1rmAnchors`, moved to a leaf `anchors.ts`);
+      `seedMeso` is anchor-aware (mirrors the `seed_anchor` branch), gated by
+      `seed_from_anchor`. `strengthAnchor` carried in `buildSeedInputs` /
+      `seedEngineInputs` (derived ⇒ fingerprint unaffected) and reproduced by the
+      seed recompute (`regeneration.ts recomputeSeed`).
+- [x] **S5 (hold path):** `hold_rep_consistent` makes the gated rep_window hold keep
+      reps on the Option-A schedule (held effective workload), not the ceiling-clamped
+      predictor; `session_dampen_require_both` de-blunts the dampener
+      (`rules/feedback.ts`). Table-driven hold/gate/dampener tests added.
+- [x] **Gating:** all four behind `.optional()` engine_params flags (absent ⇒ legacy,
+      so v10's hash/replayability/fingerprint are untouched — guarded by a
+      param-schema test); shipped as v11 INACTIVE
+      (`20260624000002_engine_params_v11_standalone_fixes.sql`). **Activate manually
+      after a `replay_decisions` diff** (manual-operations.md).
+- [x] **No data rewrite:** logged history untouched. Existing open prescriptions
+      refresh through the normal freshness/regeneration path once v11 is active (no
+      forced reconcile — the read-path reconcile is lazy + idempotent and picks them
+      up as the params version moves).
+- [ ] **S4 (per-slot rep ranges):** deferred per the assessment above.
+- [ ] **Activation:** run the replay diff on Madeline + a couple users, then flip v11
+      active (manual-operations.md).
+
+#### Original checklist (reference)
 
 - [ ] **S2 (view):** append-only migration redefining `v_exercise_prs` —
       `DISTINCT ON (user_id, exercise_id) … ORDER BY <capped e1rm> DESC` so

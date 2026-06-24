@@ -148,6 +148,31 @@ export const engineParamsSchema = z.object({
   // how performance is graded: `reps` = legacy rep-delta; `rir` = infer achieved
   // RIR and compare to target (overshooting intensity is a hold, never a regress).
   grading: z.enum(["rir", "reps"]).default("reps"),
+
+  // ----- standalone-prescription investigation (2026-06-23) — all gated --------
+  // Each is `.optional()` so every pre-v11 row parses byte-identically (no change
+  // to its canonical materialization, so `is_replayable`/`params_hash` and the
+  // freshness fingerprint are untouched) and the engine falls back to the prior
+  // behavior. v11 turns them on; activation is manual, after a replay diff.
+
+  // §S1: seed week 1 of a meso from the recency strength anchor exactly the way a
+  // mid-meso swap-in already does (rep-window weight for the window's low rep at
+  // the start RIR), instead of carrying the prior-peak rep count verbatim. ABSENT
+  // / false ⇒ legacy peak-backoff seed. Only takes effect with `weight_selection
+  // = rep_window` and a confident anchor; falls back to plan/peak values otherwise.
+  seed_from_anchor: z.boolean().optional(),
+  // §S5: when a load increase is blocked (pain gate or session dampener) in
+  // rep-window mode, keep the held prescription internally consistent — hold the
+  // load and let reps follow the Option-A schedule (the held effective workload),
+  // instead of clamping the anchor predictor to the window ceiling and emitting a
+  // `weight × reps @ RIR` triple whose implied RIR contradicts the target. ABSENT
+  // / false ⇒ legacy clamp-to-window behavior.
+  hold_rep_consistent: z.boolean().optional(),
+  // §S5: de-blunt the session dampener. ABSENT / false ⇒ legacy OR (a single
+  // fatigue ≥ threshold OR performance ≤ threshold dampens). true ⇒ require BOTH a
+  // high-fatigue AND a poor-performance signal before dampening, so a fatigued-but-
+  // strong session still progresses.
+  session_dampen_require_both: z.boolean().optional(),
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
   // fixed −%, carries genuine regression — doc 13 §4.3).
@@ -210,6 +235,25 @@ export const engineParamsSchema = z.object({
       anchor_method: z
         .enum(["session_best", "best", "mean"])
         .default("mean"),
+      // §S3 (standalone-prescription investigation 2026-06-23). Brzycki tracks
+      // Epley to ~10 reps then inflates increasingly above it, so a high-rep
+      // burnout (e.g. 100×30) drives a 2–4× e1RM blow-up. The rule: Brzycki only
+      // for effective reps ≤ this, Epley alone above it (drop the average outside
+      // the band where they agree). `.optional()` — ABSENT on every pre-v11 row,
+      // so those parse byte-identically (replayability preserved) and the engine
+      // falls back to the legacy `>= 36` Epley-only cutoff. v11 sets it to 10.
+      brzycki_max_eff_reps: z.number().positive().optional(),
+      // §S3: down-weight low-confidence sets in the `session_best` anchor *value*
+      // (not just its label). A 20–30-rep burnout should contribute little to the
+      // strength anchor. ABSENT ⇒ equal-weight session mean (legacy). v11 seeds
+      // {high:1, moderate:0.6, low:0.3} (mirrors the legacy `mean` CONF_WEIGHT).
+      session_value_confidence_weights: z
+        .object({
+          high: z.number().min(0),
+          moderate: z.number().min(0),
+          low: z.number().min(0),
+        })
+        .optional(),
     })
     .default({
       rir_offset: 1.0,

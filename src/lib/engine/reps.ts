@@ -13,17 +13,19 @@
  */
 import { engineParamsSchema, type EngineParams } from "./params";
 import {
-  epley,
-  brzycki,
+  e1rmFactor,
+  e1rmFromEffectiveReps,
   estimateE1rm,
   type E1rmConfidence,
 } from "./e1rm";
 
-/** Forward averaged Epley/Brzycki e1RM at a given effective-rep count. */
-function e1rmAtEffectiveReps(weight: number, effectiveReps: number): number {
-  return effectiveReps >= 36
-    ? epley(weight, effectiveReps)
-    : (epley(weight, effectiveReps) + brzycki(weight, effectiveReps)) / 2;
+/** Forward e1RM at a given effective-rep count (shared §S3 switch with e1rm.ts). */
+function e1rmAtEffectiveReps(
+  weight: number,
+  effectiveReps: number,
+  cfg: EngineParams["e1rm"],
+): number {
+  return e1rmFromEffectiveReps(weight, effectiveReps, cfg);
 }
 
 /**
@@ -37,16 +39,17 @@ export function effectiveRepsForE1rm(
   weight: number,
   rawParams: EngineParams,
 ): number {
-  engineParamsSchema.parse(rawParams);
+  const params = engineParamsSchema.parse(rawParams);
+  const cfg = params.e1rm;
   if (e1rm <= 0 || weight <= 0) return 0;
   if (weight >= e1rm) return 0; // at or above estimated 1RM: ≤ 1 rep
   let lo = 0;
   let hi = 35.9; // Brzycki blows up at 37; cap inside the valid band
   // e1RM grows without bound as reps→36; if even hi can't reach e1rm, return hi
-  if (e1rmAtEffectiveReps(weight, hi) < e1rm) return hi;
+  if (e1rmAtEffectiveReps(weight, hi, cfg) < e1rm) return hi;
   for (let i = 0; i < 40; i += 1) {
     const mid = (lo + hi) / 2;
-    if (e1rmAtEffectiveReps(weight, mid) < e1rm) lo = mid;
+    if (e1rmAtEffectiveReps(weight, mid, cfg) < e1rm) lo = mid;
     else hi = mid;
   }
   return (lo + hi) / 2;
@@ -87,10 +90,9 @@ export function weightForRepsAtRir(
   const params = engineParamsSchema.parse(rawParams);
   if (e1rm == null || e1rm <= 0 || reps <= 0) return null;
   const eff = reps + targetRir * params.e1rm.rir_offset;
-  // averaged Epley/Brzycki factor; past 36 effective reps Brzycki is invalid so
-  // fall back to Epley alone (mirrors e1rm.ts / effectiveRepsForE1rm)
-  const k =
-    eff >= 36 ? 1 + eff / 30 : (1 + eff / 30 + 36 / (37 - eff)) / 2;
+  // same §S3 switch as the forward estimate (e1rm.ts e1rmFactor), so choosing a
+  // load for target reps inverts exactly the curve used to score a logged set.
+  const k = e1rmFactor(eff, params.e1rm);
   if (k <= 0) return null;
   return e1rm / k;
 }
@@ -218,12 +220,31 @@ export function recencyWeightedE1rm(
     };
   }
 
-  // session_best: average every working set from the best set's session
+  // session_best: average every working set from the best set's session.
+  // §S3: when `session_value_confidence_weights` is set, weight each set's e1RM by
+  // its confidence so a low-confidence burnout (a 20–30-rep set) contributes little
+  // to the anchor *value*, not just its label. Absent ⇒ legacy equal-weight mean.
   const session =
     bestEntry.sessionKey == null
       ? [bestEntry]
       : entries.filter((e) => e.sessionKey === bestEntry.sessionKey);
-  const mean = session.reduce((acc, e) => acc + e.value, 0) / session.length;
+  const cw = params.e1rm.session_value_confidence_weights;
+  let mean: number;
+  if (cw) {
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (const e of session) {
+      const w = cw[e.confidence];
+      weightedSum += e.value * w;
+      weightTotal += w;
+    }
+    mean =
+      weightTotal > 0
+        ? weightedSum / weightTotal
+        : session.reduce((acc, e) => acc + e.value, 0) / session.length;
+  } else {
+    mean = session.reduce((acc, e) => acc + e.value, 0) / session.length;
+  }
   return {
     value: Math.round(mean * 10) / 10,
     confidence: bestConfidence(session.map((e) => e.confidence)),

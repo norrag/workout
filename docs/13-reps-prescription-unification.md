@@ -183,6 +183,24 @@ The fix turns on separating what were tangled together:
   migrations (hard rule #2).
 - No table change for reset-to-prescription (`set_weights` jsonb already exists,
   migration `20260616000003`).
+- **v11 amendment (2026-06-24, standalone-prescription investigation).** Four
+  gated, `.optional()` params (absent ⇒ legacy, so older rows are byte-identical):
+  - `seed_from_anchor` — `seedMeso` mirrors the `seed_anchor` branch (§S1): seed
+    week 1 from the recency anchor for the window's `target_low` at the start RIR,
+    not the prior peak's rep count. The seed's `strengthAnchor` is carried as a
+    *derived* input (excluded from the freshness fingerprint) so replay reproduces it.
+  - `hold_rep_consistent` — when a pain gate / session dampener blocks an increase,
+    hold the load AND keep reps on the Option-A schedule (the held *effective
+    workload*), instead of clamping the anchor predictor to the window ceiling and
+    emitting a `weight × reps @ RIR` triple whose implied RIR contradicts the target.
+  - `session_dampen_require_both` — dampen only when BOTH high fatigue AND poor
+    performance are reported (the legacy OR over-blocks a fatigued-but-strong session).
+  - `e1rm.brzycki_max_eff_reps` + `e1rm.session_value_confidence_weights` (§S3, see
+    doc 10 §1): Brzycki ≤ cutoff / Epley above, and low-confidence down-weighting in
+    the `session_best` anchor value.
+  Shipped in engine_params **v11 (inactive)**; activate after a replay diff
+  (manual-operations.md). Mirrored in `params.ts` (schema `.optional()` fields) but
+  **not** in `DEFAULT_ENGINE_PARAMS`, which stays = the active v10 row.
 
 ## 5. Tests (hard rule #3 — every behavior change covered)
 

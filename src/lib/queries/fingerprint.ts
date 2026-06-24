@@ -117,6 +117,7 @@ export interface SeedPeak {
 export function seedEngineInputs(
   config: ConfigInputs,
   priorPeak: SeedPeak | null,
+  strengthAnchor: EngineInputs["strengthAnchor"] = null,
 ): EngineInputs {
   return {
     ...config,
@@ -132,7 +133,11 @@ export function seedEngineInputs(
           targetRir: config.week.targetRir,
         }
       : null,
-    strengthAnchor: null,
+    // §S1: the seed's recency anchor (when seed_from_anchor is active). A DERIVED
+    // input (doc 14 §3 denylist) — excluded from the freshness fingerprint, so
+    // carrying it never changes a seed row's signature; it is refreshed from live
+    // history on recompute exactly like an advance's anchor.
+    strengthAnchor,
   };
 }
 
@@ -146,6 +151,8 @@ export interface SeedInputArgs {
   initial: EngineInputs["initial"];
   /** the user's prior peak for the lift, when one exists (else seed from initial) */
   priorPeak: SeedPeak | null;
+  /** §S1: the recency strength anchor the anchor-seed used (derived; null otherwise) */
+  strengthAnchor?: EngineInputs["strengthAnchor"];
 }
 
 /**
@@ -162,7 +169,7 @@ export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
     previous: null,
     initial: args.initial,
   });
-  return seedEngineInputs(config, args.priorPeak);
+  return seedEngineInputs(config, args.priorPeak, args.strengthAnchor ?? null);
 }
 
 /**

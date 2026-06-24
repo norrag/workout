@@ -13,15 +13,12 @@ import type {
   WorkoutRow,
 } from "@/lib/types/database";
 import {
-  recencyWeightedE1rm,
   resolveEffectiveParams,
   seedMeso,
   toEngineEquipment,
-  type EngineParams,
-  type E1rmSample,
-  type E1rmAnchor,
 } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
+import { getExerciseE1rmAnchors } from "./anchors";
 import {
   buildSeedInputs,
   computeDepFingerprint,
@@ -34,75 +31,10 @@ import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
 
 type Client = SupabaseClient<Database>;
 
-const DAY_MS = 1000 * 60 * 60 * 24;
-
-/**
- * Recency-weighted strength anchor (e1RM) per exercise (doc 11), powering the
- * live reps predictor. Reads the user's recent working sets, assumes each was
- * performed at its prescribed target RIR (the app's RIR premise — no separate
- * per-set RIR capture), and folds them through the pure `recencyWeightedE1rm`.
- * `ageDays` is computed here (query land); the engine stays clock-free.
- */
-export async function getExerciseE1rmAnchors(
-  supabase: Client,
-  userId: string,
-  exerciseIds: string[],
-  params: EngineParams,
-): Promise<Map<string, E1rmAnchor>> {
-  const out = new Map<string, E1rmAnchor>();
-  if (exerciseIds.length === 0) return out;
-
-  const { data: sets, error } = await supabase
-    .from("logged_sets")
-    .select(
-      "exercise_id, workout_exercise_id, weight, reps, rir_reported, performed_at",
-    )
-    .eq("user_id", userId)
-    .in("exercise_id", exerciseIds)
-    .eq("is_warmup", false)
-    .gt("weight", 0)
-    .gt("reps", 0)
-    .order("performed_at", { ascending: false })
-    .limit(600);
-  if (error) throw error;
-  if (!sets || sets.length === 0) return out;
-
-  // assumed RIR = the parent prescription's target RIR (RIR premise, doc 11),
-  // unless the set carried an explicit reported RIR
-  const weIds = [...new Set(sets.map((s) => s.workout_exercise_id))];
-  const { data: wes, error: weError } = await supabase
-    .from("workout_exercises")
-    .select("id, target_rir")
-    .in("id", weIds);
-  if (weError) throw weError;
-  const targetRirByWe = new Map((wes ?? []).map((w) => [w.id, w.target_rir]));
-
-  const now = Date.now();
-  const byExercise = new Map<string, E1rmSample[]>();
-  for (const s of sets) {
-    const ageDays = Math.max(
-      0,
-      (now - new Date(s.performed_at).getTime()) / DAY_MS,
-    );
-    const sample: E1rmSample = {
-      weight: s.weight,
-      reps: s.reps,
-      targetRir: s.rir_reported ?? targetRirByWe.get(s.workout_exercise_id) ?? null,
-      ageDays,
-      // session = one exercise on one day (doc 13 §9.3 session_best anchor)
-      sessionKey: s.workout_exercise_id,
-    };
-    const cur = byExercise.get(s.exercise_id) ?? [];
-    cur.push(sample);
-    byExercise.set(s.exercise_id, cur);
-  }
-
-  for (const [exerciseId, samples] of byExercise) {
-    const anchor = recencyWeightedE1rm(samples, params);
-    if (anchor) out.set(exerciseId, anchor);
-  }
-  return out;
-}
+// The recency-weighted strength-anchor query now lives in the leaf `anchors.ts`
+// (so `generation.ts`'s seed can use it without a generation ↔ logging cycle);
+// re-exported here for the existing importers.
+export { getExerciseE1rmAnchors } from "./anchors";
 
 // ---------------------------------------------------------------------------
 // day view detail (fig 1.1) — everything the logger needs in one shape
@@ -991,6 +923,7 @@ export async function addWorkoutExercises(
     { data: profile, error: pErr },
     goal,
     overrideByEx,
+    anchorByEx,
   ] = await Promise.all([
     supabase
       .from("exercise_muscle_groups")
@@ -1013,6 +946,8 @@ export async function addWorkoutExercises(
       .single(),
     resolveAddGoal(supabase, micro.mesocycle_id),
     getExerciseParamOverrides(supabase, userId, exerciseIds),
+    // §S1: recency strength anchors for the anchor-aware seed of added exercises
+    getExerciseE1rmAnchors(supabase, userId, exerciseIds, params),
   ]);
   if (linkErr) throw linkErr;
   if (prErr) throw prErr;
@@ -1039,6 +974,7 @@ export async function addWorkoutExercises(
       reps: pr?.best_reps ?? null,
       sets: 3,
     };
+    const anchor = anchorByEx.get(id) ?? null;
     const output = seedMeso(
       null,
       initial,
@@ -1046,6 +982,7 @@ export async function addWorkoutExercises(
       { experienceLevel: profile.experience_level ?? "beginner" },
       micro.target_rir,
       effectiveParams,
+      { goalType: goal, anchor },
     );
     const inputs = buildSeedInputs({
       equipmentType: equipment,
@@ -1055,6 +992,7 @@ export async function addWorkoutExercises(
       isDeload: micro.is_deload,
       initial,
       priorPeak: null,
+      strengthAnchor: anchor,
     });
     return {
       row: {
