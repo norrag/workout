@@ -15,6 +15,8 @@ type Defaulted =
   | "set_weights"
   // nullable freshness fingerprint; stamped by the engine/reconcile paths only
   | "dep_fingerprint"
+  // nullable verified-accurate params version; stamped by the engine/reconcile paths
+  | "params_version"
   // engine_decisions.kind defaults to 'advance' in the DB; seed writers pass it
   | "kind"
   // nullable per-set e1RM (PH31); computed at log/amend time, optional on insert
@@ -272,6 +274,12 @@ export type WorkoutExerciseRow = {
    *  reconcile compares it against the freshly-resolved inputs and recomputes only
    *  the rows that diverged. null = never stamped (recompute on next view). */
   dep_fingerprint: string | null;
+  /** The engine_params version this prescription was last COMPUTED or verified-
+   *  still-accurate under (advances on every reconcile confirmation, even when the
+   *  numbers don't change), so a row always advertises "accurate as of Vx". null =
+   *  never stamped. Distinct from a decision's params_version (which only advances
+   *  when the numbers actually change). */
+  params_version: number | null;
   created_at: string;
   updated_at: string;
 }

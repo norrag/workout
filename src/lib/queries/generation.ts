@@ -67,6 +67,7 @@ interface SeededExercise {
     status: "pending";
     notes: string;
     dep_fingerprint: string;
+    params_version: number;
   };
   exerciseId: string;
   inputs: EngineInputs;
@@ -145,6 +146,8 @@ function seedExerciseRow(
         configProjection(inputs),
         paramsTokenFor(ctx.paramsVersion, override?.weightIncrement),
       ),
+      // legible "accurate as of Vx" stamp, written beside the fingerprint
+      params_version: ctx.paramsVersion,
     },
     exerciseId: fill.exercise_id,
     inputs,

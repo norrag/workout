@@ -105,6 +105,25 @@ row; v10 stays active).
 | **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v11** on Madeline (`0af27789-…`) + a couple of other users; confirm week-1 seeds land in the 6–15 window, e1RM anchors are tamed (no ~555 leg-curl), and gated holds read as honest `weight × reps @ RIR` triples (doc 13 §6). |
 | **Activate v11** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 11;` (single-active invariant). Open prescriptions then refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v10. |
 
+### Activate engine_params **v12** (rep-window round 2)
+
+`20260624000004_engine_params_v12_rep_window_round2.sql` ships v12 **inactive** —
+two more rep-window changes to the live calculator: `climb_on_performed_reps` (the
+rep-climb advances on performed reps, not the prescription) and
+`bound_to_target_window` (prefer the loadable step that lands in 8–12 instead of
+running reps to 13–15). Same discipline as v11.
+
+| Operation | Notes |
+|---|---|
+| Apply v12 migration to hosted | Inserts engine_params v12 `is_active = false`. v11 stays active; nothing changes for users yet. (Already applied via MCP on 2026-06-24.) |
+| **Replay before activating** | `replay_decisions` for v12 on Garron + a couple of users; confirm a prescribed-but-missed top rep no longer bumps the load, and rows like the High Row land `55×10` instead of `50×14` while true coarse-step buffers (e.g. a 5 lb machine step that would undershoot) still run to 13–15. |
+| **Activate v12** | After the diff: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 12;`. Open prescriptions refresh lazily on next view; roll back by re-activating v11. |
+
+> The `workout_exercises.params_version` stamp (migration `20260624000003`) is **not**
+> gated — it's a legibility fix and applies with the deploy. After v12 activates, a
+> planned row's `params_version` advances to 12 on its next reconcile (one-time
+> catch-up), so "accurate as of Vx" stays truthful without a new decision row.
+
 ---
 
 ## How Claude flags these

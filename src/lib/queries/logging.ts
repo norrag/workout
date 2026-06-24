@@ -1010,6 +1010,7 @@ export async function addWorkoutExercises(
           configProjection(inputs),
           paramsTokenFor(paramsVersion, override?.weightIncrement),
         ),
+        params_version: paramsVersion,
       },
       exerciseId: id,
       inputs,

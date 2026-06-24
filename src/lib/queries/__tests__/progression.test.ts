@@ -33,6 +33,7 @@ function we(overrides: Partial<WorkoutExerciseRow> = {}): WorkoutExerciseRow {
     set_weights: {},
     notes: null,
     dep_fingerprint: null,
+    params_version: null,
     created_at: "",
     updated_at: "",
     ...overrides,

@@ -252,6 +252,8 @@ interface OpenRow {
   isDeload: boolean;
   currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
   depFingerprint: string | null;
+  /** the version this row currently advertises as verified-accurate (doc 14 stamp) */
+  paramsVersion: number | null;
 }
 
 interface LatestDecision {
@@ -364,7 +366,7 @@ export async function reconcilePrescriptions(
   const { data: wes, error: wesError } = await service
     .from("workout_exercises")
     .select(
-      "id, workout_id, exercise_id, muscle_group_id, status, prescribed_weight, prescribed_reps, prescribed_sets, target_rir, dep_fingerprint",
+      "id, workout_id, exercise_id, muscle_group_id, status, prescribed_weight, prescribed_reps, prescribed_sets, target_rir, dep_fingerprint, params_version",
     )
     .in("workout_id", [...workoutById.keys()]);
   if (wesError) throw wesError;
@@ -471,6 +473,7 @@ export async function reconcilePrescriptions(
           targetRir: we.target_rir ?? micro.target_rir,
         },
         depFingerprint: we.dep_fingerprint,
+        paramsVersion: we.params_version,
       };
     })
     .sort((a, b) => a.weekNumber - b.weekNumber || a.dayNumber - b.dayNumber);
@@ -763,7 +766,16 @@ export async function reconcilePrescriptions(
       liveConfig,
       paramsTokenFor(version, override?.weightIncrement),
     );
-    if (expected === row.depFingerprint) continue; // fresh — short-circuit
+    if (expected === row.depFingerprint) {
+      // fresh — the numbers are accurate under the active version. Advance the
+      // legible "accurate as of Vx" stamp if it is behind (a one-time catch-up
+      // after a version bump; a no-op once current), so a row whose recompute
+      // wouldn't change anything still advertises the latest verified version.
+      if (row.paramsVersion !== version) {
+        await stampParamsVersion(service, row.id, version);
+      }
+      continue;
+    }
 
     // recompute under EFFECTIVE params (global active + this exercise's override),
     // so a recomputed number actually reflects the override (doc 14 §6.1).
@@ -795,7 +807,7 @@ export async function reconcilePrescriptions(
       // self-heal (doc 14 §6.3): can't replay → stamp the current expected
       // fingerprint and move on. Not a permanent lie: if any input changes again,
       // the expected fingerprint changes again and the row is re-attempted.
-      await stampFingerprint(service, row.id, expected);
+      await stampFingerprint(service, row.id, expected, version);
       continue;
     }
 
@@ -803,7 +815,7 @@ export async function reconcilePrescriptions(
     if (result.status === "unchanged" && !isBackfill) {
       // the change didn't move THIS row's prescription; stamp it current so the
       // next read short-circuits (the fingerprint, not the numbers, was stale).
-      await stampFingerprint(service, row.id, expected);
+      await stampFingerprint(service, row.id, expected, version);
       continue;
     }
 
@@ -823,12 +835,13 @@ export async function reconcilePrescriptions(
           target_rir: output.targetRir,
           notes: output.rationale,
           dep_fingerprint: expected,
+          params_version: version,
         })
         .eq("id", row.id);
       if (updateError) throw updateError;
     } else {
       // backfill with unchanged numbers: only the fingerprint needs stamping.
-      await stampFingerprint(service, row.id, expected);
+      await stampFingerprint(service, row.id, expected, version);
     }
 
     const { error: insertError } = await service.from("engine_decisions").insert({
@@ -889,15 +902,33 @@ export async function ensureFreshPrescriptions(
   }
 }
 
-/** Stamp a single open row's freshness fingerprint current (no prescription change). */
+/** Stamp a single open row's freshness fingerprint + verified params version
+ *  current (no prescription change). The two are written together so the legible
+ *  version stamp can never drift from the fingerprint (which already encodes it). */
 async function stampFingerprint(
   service: Client,
   workoutExerciseId: string,
   fingerprint: string,
+  version: number,
 ): Promise<void> {
   const { error } = await service
     .from("workout_exercises")
-    .update({ dep_fingerprint: fingerprint })
+    .update({ dep_fingerprint: fingerprint, params_version: version })
+    .eq("id", workoutExerciseId);
+  if (error) throw error;
+}
+
+/** Advance only the legible "accurate as of Vx" stamp on an already-fresh row
+ *  (its fingerprint already matches the active version, so the numbers are correct;
+ *  this just catches the version label up after a bump). */
+async function stampParamsVersion(
+  service: Client,
+  workoutExerciseId: string,
+  version: number,
+): Promise<void> {
+  const { error } = await service
+    .from("workout_exercises")
+    .update({ params_version: version })
     .eq("id", workoutExerciseId);
   if (error) throw error;
 }

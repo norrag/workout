@@ -2,7 +2,48 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-24 (latest) — Standalone-prescription fixes: runaway reps & suspect e1RM (S1/S2/S3/S5)
+## 2026-06-24 (latest) — Rep-window round 2 (v12) + legible prescription version stamp
+
+Follow-up to the v11 standalone-prescription work, from live review of Garron's
+W4·D3. Two rep-window engine fixes (gated as **v12, inactive**) plus a freshness
+legibility fix (ships active).
+
+- **v12 #1 — climb on PERFORMED reps (`climb_on_performed_reps`).** The Option-A
+  rep-climb / window-reset advanced off the previous *prescription* (`previous.reps`),
+  so a lift prescribed 12 but performed 11 still reset to the window bottom and bumped
+  the load. It now advances off the **minimum working-set reps actually performed**
+  (double progression resets only when *every* set reaches the top); falls back to the
+  prescription when there are no logged sets. (`engine/index.ts`.)
+- **v12 #2 — bound to the TARGET window (`bound_to_target_window`).** `boundRepsToWindow`
+  only nudged the load when predicted reps breached the hard `[6,15]` bounds, so a
+  rounded load predicting 13–14 was left there even when one loadable step landed in
+  `[8,12]` (e.g. High Row `50×14` when `55×10` fit). It now prefers the in-target step,
+  keeping the lighter load only when the next step would undershoot `target_low` (the
+  genuine coarse-increment buffer), while still enforcing the hard bounds. (`engine/index.ts`.)
+  Both flags are `.optional()` (absent ⇒ legacy), shipped in engine_params **v12
+  (inactive)** — activate after a replay diff (manual-operations.md).
+- **Legible "accurate as of Vx" stamp (`workout_exercises.params_version`,
+  `20260624000003`).** doc-14's freshness fingerprint proves a row is accurate under the
+  active version but is an opaque hash, and an *unchanged* recompute re-stamps the
+  fingerprint without writing a new decision — so the only visible version label was the
+  decision's, making fresh rows look stale (this caused real confusion during review). A
+  new column records the version each prescription was last computed **or verified-still-
+  accurate** under, stamped beside `dep_fingerprint` at every write site (generation, seed,
+  recompute) plus a one-time catch-up on the fresh-row short-circuit, so a planned row
+  always advertises the latest version it's known-correct under. Backfilled from each row's
+  latest decision version; the reconcile advances still-fresh planned rows on next view.
+  Additive + nullable; not gated (a correctness/legibility fix). `database.ts` type +
+  `Defaulted` updated.
+- **Confirmed NOT a bug:** the doc-14 reconcile was working — after v11 activation it
+  recomputed every planned row (verified all 15 of Garron's W4·D3 + W5·D1 fingerprints
+  match v11). The earlier "stale v9/v10 rows" reading was a misinterpretation of the
+  *decision* `params_version` (which only advances on a numeric change); the new column
+  removes that ambiguity going forward.
+- Tests: `v12-rep-window.test.ts` (#1/#2, each on/off the gate) + v12 hash guard in
+  `params-provenance.test.ts`. Full suite green (516), typecheck + lint clean. Both
+  migrations applied to hosted (v12 inactive; column backfilled).
+
+## 2026-06-24 — Standalone-prescription fixes: runaway reps & suspect e1RM (S1/S2/S3/S5)
 
 Implements [docs/reviews/2026-06-23-standalone-prescription-investigation.md](reviews/2026-06-23-standalone-prescription-investigation.md)
 (closes triage **T-A6**; extends PR22/PR23). The investigation root-caused four

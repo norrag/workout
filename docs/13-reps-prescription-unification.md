@@ -201,6 +201,21 @@ The fix turns on separating what were tangled together:
   Shipped in engine_params **v11 (inactive)**; activate after a replay diff
   (manual-operations.md). Mirrored in `params.ts` (schema `.optional()` fields) but
   **not** in `DEFAULT_ENGINE_PARAMS`, which stays = the active v10 row.
+- **v12 amendment (2026-06-24, round 2 — from live W4·D3 review).** Two more gated
+  `.optional()` rep-window fixes:
+  - `climb_on_performed_reps` — the Option-A rep-climb / window-reset advances off the
+    **minimum working-set reps actually performed**, not `previous.reps` (the
+    prescription). v11 reset to the window bottom and bumped the load when last week's
+    *prescribed* reps hit the top even if the lifter fell a rep short; now the reset
+    only fires when every set truly reached the top. Falls back to `previous.reps` with
+    no logged sets.
+  - `bound_to_target_window` — `boundRepsToWindow` prefers the loadable step that lands
+    in `[target_low, target_high]` when the rounded anchor load predicts above
+    `target_high`, instead of only correcting at the hard `[min,max]` bounds; it keeps
+    the lighter load (running reps to 13–15) only when the next step would undershoot
+    `target_low` (the genuine coarse-increment buffer), and still enforces the hard
+    bounds. Fixes e.g. High Row `50×14` → `55×10`.
+  Shipped in engine_params **v12 (inactive)**; activate after a replay diff.
 
 ## 5. Tests (hard rule #3 — every behavior change covered)
 
