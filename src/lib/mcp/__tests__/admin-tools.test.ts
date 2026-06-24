@@ -95,6 +95,7 @@ function decision(
   inputs: Record<string, unknown>,
   output: Record<string, unknown>,
   kind: DecisionRecord["kind"] = "advance",
+  incrementOverride: number | null = null,
 ): DecisionRecord {
   return {
     id: "d1",
@@ -113,6 +114,7 @@ function decision(
     created_at: "2026-06-10T00:00:00Z",
     inputs,
     output,
+    incrementOverride,
   };
 }
 
@@ -223,6 +225,34 @@ describe("replayDecisions", () => {
     // dispatch genuinely mattered
     const asAdvance = prescribe(seedIn as unknown as EngineInputs, DEFAULT_ENGINE_PARAMS);
     expect(asAdvance.weight).not.toBe(seedOut.weight);
+  });
+
+  it("folds the per-exercise increment override into the candidate params (replay fidelity)", () => {
+    // cold start (no previous/anchor) so the weight is just the plan default
+    // rounded to the loadable step — which is exactly what the override changes.
+    const coldStart = {
+      ...sampleInputs(),
+      previous: null,
+      actualSets: [],
+      strengthAnchor: null,
+      initial: { weight: 184, reps: 8, sets: 3 },
+    };
+    // a stored output that always differs, so fields.weight.to is the replayed load
+    const out = { weight: 999, reps: 8, sets: 3, targetRir: 2 };
+
+    // no override → stock barbell step 5: 184 → 185
+    const stock = replayDecisions(
+      [decision(coldStart, out)],
+      DEFAULT_ENGINE_PARAMS as EngineParams,
+    );
+    expect(stock.diffs[0].fields.weight!.to).toBe(185);
+
+    // custom 3 lb loadable step → 184 → 183 (rounds to the custom step, not 5)
+    const overridden = replayDecisions(
+      [decision(coldStart, out, "advance", 3)],
+      DEFAULT_ENGINE_PARAMS as EngineParams,
+    );
+    expect(overridden.diffs[0].fields.weight!.to).toBe(183);
   });
 });
 
