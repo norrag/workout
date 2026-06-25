@@ -10,6 +10,7 @@ import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
 import { HistorySheet } from "@/components/HistorySheet";
+import { PrescriptionDetailSheet } from "@/components/PrescriptionDetailSheet";
 import type {
   LoggedExercise,
   NavWeek,
@@ -109,6 +110,7 @@ export function DayView({
     setNumber: number;
   } | null>(null);
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
+  const [auditFor, setAuditFor] = useState<LoggedExercise | null>(null);
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
   const [noteSheet, setNoteSheet] = useState<{
     we: LoggedExercise;
@@ -188,6 +190,7 @@ export function DayView({
           }
           onCloseSetMenu={() => setSetMenu(null)}
           onHistory={() => setHistoryFor(we)}
+          onAudit={() => setAuditFor(we)}
           onReplace={() => setReplaceFor(we)}
           onNote={(origin) => setNoteSheet({ we, origin })}
           onFeedback={() => setFeedbackFor(we)}
@@ -242,6 +245,19 @@ export function DayView({
             : null
         }
         onClose={() => setHistoryFor(null)}
+      />
+      <PrescriptionDetailSheet
+        target={
+          auditFor
+            ? {
+                workoutExerciseId: auditFor.id,
+                exerciseName: auditFor.exercise_name,
+                equipmentType: auditFor.equipment_type,
+                paramsVersion: auditFor.params_version,
+              }
+            : null
+        }
+        onClose={() => setAuditFor(null)}
       />
       <FeedbackSheet
         key={feedbackFor?.id ?? "none"}
@@ -669,6 +685,7 @@ function ExerciseBlock({
   onOpenSetMenu,
   onCloseSetMenu,
   onHistory,
+  onAudit,
   onReplace,
   onNote,
   onFeedback,
@@ -690,6 +707,7 @@ function ExerciseBlock({
   onOpenSetMenu: (setNumber: number) => void;
   onCloseSetMenu: () => void;
   onHistory: () => void;
+  onAudit: () => void;
   onReplace: () => void;
   onNote: (origin: NoteOrigin) => void;
   onFeedback: () => void;
@@ -874,6 +892,14 @@ function ExerciseBlock({
           onClick={() => {
             onCloseMenu();
             router.push(`/exercises/${we.exercise_id}`);
+          }}
+        />
+        <MenuRow
+          label="Prescription detail"
+          trailing={we.params_version != null ? `V${we.params_version}` : "›"}
+          onClick={() => {
+            onCloseMenu();
+            onAudit();
           }}
         />
         <MenuRow

@@ -63,6 +63,7 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | PH40 | Sets reprice as you log — recalculating after each set; should it only use prior sets? | Q→B | — | A | answered → T-A7 |
 | PH41 | History includes the current (incomplete) workout — expected it to be excluded until complete | Q→B | — | A | answered → T-A8 |
 | PH42 | Note pencil icon hard to recognize | UX | MED | E | done (legible SVG PencilGlyph, +20%; absorbs I15) — PR pending |
+| O1 | Auditability: re-stamp every open decision to the new params version on a bump (even when output is unchanged); make version + decision kind viewable from the day-view exercise dropdown | F | — | I | **done (2026-06-25):** invariant already held (`workout_exercises.params_version` advances on every reconcile, day view reconciles on load) — confirmed, lazy is sufficient. Built the "Prescription detail" reveal (kind + verified-as-of vs computed-under + rationale/trace). Admin-gating = easy follow-up. |
 
 ## Open follow-up tasks (spawned during triage)
 

@@ -33,6 +33,19 @@ of WS-I was still unbuilt). Confirmed v13 is a throwaway test row (disregard).
   state — verify the planner/day view renders it as a "enter a starting weight"
   prompt (not blank/0) before activating. Engine produces the deferral; the surface
   should invite the manual seed.
+- **Auditability follow-on (owner ask, → O1).** Two parts. (1) Confirmed the
+  invariant "every open decision gets re-stamped to the new version on a bump, even
+  when output is unchanged" already holds: `workout_exercises.params_version` advances
+  on every reconcile confirmation (changed/unchanged/self-healed), and the day-view
+  page runs the reconcile on every load — so it's current by view time. Lazy (on
+  view) is sufficient; no eager sweep built (owner agreed). (2) **Built** the
+  prescription audit reveal: the exercise `…` dropdown in the day view now has a
+  "Prescription detail" row → a sheet showing decision **kind**, **verified as of
+  Vx** (row stamp) vs **computed under Vy** (latest decision), and the rationale +
+  trace — so a no-op version bump is visibly confirmed ("re-verified under Vx,
+  unchanged since Vy"). `queries/audit.ts` + action + `PrescriptionDetailSheet`.
+  Rule #8 deviation (no mockup) recorded in PROGRESS; admin-gating is an easy
+  follow-up if version/kind shouldn't be user-facing.
 
 ## 2026-06-25 — Owner ruling: retire the prior-peak seed; no fabricated prescriptions
 

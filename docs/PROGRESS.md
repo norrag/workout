@@ -2,7 +2,39 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-25 (latest) — Retire the prior-peak meso seed (WS-I / T-I5, gated v14)
+## 2026-06-25 (latest) — Prescription audit reveal in the day-view exercise dropdown
+
+Owner auditability request: make the engine_params version and decision kind behind
+a prescription viewable from the workout day view, to double-check that open rows are
+re-stamped on a version bump (the freshness reconcile advances
+`workout_exercises.params_version` on every confirmation — changed OR unchanged — and
+the day-view page runs that reconcile on every load, so the stamp is current by the
+time it's viewed; confirmed this invariant holds, no engine change needed).
+
+- **`getPrescriptionAudit` (`queries/audit.ts`) + `getPrescriptionAuditAction`.**
+  Reads the latest `engine_decisions` row for a workout_exercise (kind,
+  params_version, created_at, rationale, trace), RLS-scoped to the owner
+  (`engine_decisions` has an owner-or-admin SELECT policy — no service client). The
+  stored `output` jsonb is defensively parsed (`readTrace`, unit-tested).
+- **`PrescriptionDetailSheet`** (mirrors `HistorySheet`: fetch-on-open `BottomSheet`).
+  Shows **decision kind** (SEED / ADVANCE), **VERIFIED AS OF** v{`workout_exercises.params_version`,
+  the row stamp passed in client-side}, **COMPUTED UNDER** v{decision version} · date,
+  plus the **rationale + trace**. When the row stamp is ahead of the decision version
+  (a newer version re-verified the row without changing the numbers — no new decision
+  is written), it surfaces "re-verified under Vx — numbers unchanged since Vy", which
+  is exactly the audit signal: proof a no-op version bump still verified the row.
+- **Day view wiring** (`DayView.tsx`): a "Prescription detail" row in the exercise
+  `…` dropdown (trailing the row's current version) opens the sheet. `params_version`
+  already flows to the client via the `select("*")` detail spread.
+- Tests: `audit.test.ts` (trace coercion + malformed-jsonb defense). Suite green
+  (**524**), typecheck + lint clean.
+- **Rule #8 deviation (recorded):** this audit/verification surface has **no mockup
+  figure** — it's an owner-requested affordance, styled to the light-ledger system
+  (tracked all-caps labels, square corners, ink/cream, numerals; no orange). It is
+  visible to all users behind the dropdown tap; **gating it to admins is a easy
+  follow-up** if the version/kind detail should not be user-facing.
+
+## 2026-06-25 — Retire the prior-peak meso seed (WS-I / T-I5, gated v14)
 
 Workstream I, first build slice. The legacy `priorPeak × meso_seed_backoff_pct` meso
 seed (root-caused in the 2026-06-23 standalone-prescription investigation: it backs
