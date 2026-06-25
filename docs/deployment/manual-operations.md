@@ -168,12 +168,15 @@ Otherwise byte-identical to v14. Same gating discipline as v11/v12/v14.
 | **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v15** on a user with a logged deload (e.g. Garron's "June '25 - Bulk" W5 deload) + a couple of others. Confirm the deload load comes off the anchor (lighter than the working-week load, reduced sets), the prescribed reps land ~8–12, and the prescribed `weight × reps @ 6 RIR` triple is self-consistent — `impliedRirAtReps == 6` — so the day-view logging field shows the same reps as the prescription (no ~32 explosion). |
 | **Activate v15** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 15;` (single-active invariant). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating the prior version. |
 
-> **UI follow-up on activation:** the ungenerated-deload-week RIR previews in
-> `cycles/meso/[mesoId]/page.tsx` and `.../planned/[week]/[day]/page.tsx` hard-code
-> `4`. Once v15 is active, update them to the deload RIR (6) — or source them from
-> the active engine_params — so a not-yet-generated deload week doesn't preview the
-> wrong reserve. Generated weeks already read `microcycle.target_rir`, so they're
-> correct; this is only the preview fallback.
+> **No UI follow-up needed on activation (handled in this slice).** The deload RIR
+> now propagates automatically: `reconcilePrescriptions` live-resolves each *unlogged*
+> week's `target_rir` from the active params' ramp on every read (`liveWeekRirUpdates`),
+> so on the first day-view load after activation an existing meso's still-planned
+> deload week is refreshed 4→6 and its prescription recomputes at the anchor-based
+> 6-RIR form. Started/logged weeks are never touched (hard rule #5). The
+> ungenerated-deload-week RIR previews in `cycles/meso/[mesoId]/page.tsx` and
+> `.../planned/[week]/[day]/page.tsx` now source the deload RIR from the active
+> engine_params too, so they preview 6 the moment v15 is active.
 
 ---
 
