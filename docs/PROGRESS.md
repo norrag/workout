@@ -23,9 +23,10 @@ time it's viewed; confirmed this invariant holds, no engine change needed).
   (a newer version re-verified the row without changing the numbers — no new decision
   is written), it surfaces "re-verified under Vx — numbers unchanged since Vy", which
   is exactly the audit signal: proof a no-op version bump still verified the row.
-- **Day view wiring** (`DayView.tsx`): a "Prescription detail" row in the exercise
-  `…` dropdown (trailing the row's current version) opens the sheet. `params_version`
-  already flows to the client via the `select("*")` detail spread.
+- **Day view wiring** (`DayView.tsx`): the prescription/rationale row at the top of
+  the exercise `…` dropdown is itself the tap target (a chevron `›` keys it), opening
+  the sheet — no extra menu line item. `params_version` already flows to the client
+  via the `select("*")` detail spread.
 - Tests: `audit.test.ts` (trace coercion + malformed-jsonb defense). Suite green
   (**524**), typecheck + lint clean.
 - **Rule #8 deviation (recorded):** this audit/verification surface has **no mockup

@@ -882,9 +882,20 @@ function ExerciseBlock({
           EXERCISE — {we.exercise_name.toUpperCase()}
         </div>
         {we.notes && (
-          <div className="border-b border-ink/10 px-4 py-2 text-[11px] leading-[1.45] text-ink/60">
-            {we.notes}
-          </div>
+          <button
+            type="button"
+            aria-label={`${we.exercise_name} prescription detail`}
+            onClick={() => {
+              onCloseMenu();
+              onAudit();
+            }}
+            className="flex w-full items-start justify-between gap-2 border-b border-ink/10 px-4 py-2 text-left text-[11px] leading-[1.45] text-ink/60"
+          >
+            <span>{we.notes}</span>
+            <span aria-hidden className="shrink-0 pt-px text-ink/40">
+              ›
+            </span>
+          </button>
         )}
         <MenuRow
           label="View exercise"
@@ -892,14 +903,6 @@ function ExerciseBlock({
           onClick={() => {
             onCloseMenu();
             router.push(`/exercises/${we.exercise_id}`);
-          }}
-        />
-        <MenuRow
-          label="Prescription detail"
-          trailing={we.params_version != null ? `V${we.params_version}` : "›"}
-          onClick={() => {
-            onCloseMenu();
-            onAudit();
           }}
         />
         <MenuRow
