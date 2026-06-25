@@ -235,6 +235,18 @@ Make `startMeso`/`seedMeso` derive the seed exactly like `prescribe()`'s
 window's `target_low` reps at week-1 RIR, and set `prescribed_reps =
 predictRepsAtWeight(...)` bounded to the window. Fall back to `initial.*` plan
 values when there's no confident anchor (today's null-`priorPeak` behavior).
+
+> **Amendment (2026-06-25) — the `priorPeak × back-off` fallback is retired, not kept.**
+> S1 as built layered the anchor seed *in front of* the legacy prior-peak branch but
+> left that branch in place as a fallback. Owner ruling: the prior-peak × back-off
+> seed is fundamentally broken (carries `priorPeak.reps` verbatim — the live
+> "calf machine 175×20 → 180×20" and "leg curl 130×30" seeds — and reads a
+> never-performed per-column-max set pre-S2) and **must never be used again.** The
+> decided precedence is **confident anchor → user `initial_*` (manual seed) →
+> unseeded/prompt**; the engine never fabricates a seed from a peak set. This is
+> tracked as `T-I5` in [`docs/triage/I-engine-v9.md`](../triage/I-engine-v9.md)
+> (decision + principle) and `docs/triage/backlog.md`. Retire `meso_seed_backoff_pct`
+> with the branch.
 - **Effect:** week 1 lands at ~8 reps in-window instead of 16–30. Directly kills
   the headline symptom; this *is* T-A6, finished properly (reps as well as
   weight).
