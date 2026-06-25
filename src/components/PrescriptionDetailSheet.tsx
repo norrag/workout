@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { PrescriptionAudit } from "@/lib/queries/audit";
 import { getPrescriptionAuditAction } from "@/app/(app)/log/actions";
+import { formatPrescription } from "@/lib/units";
 
 export interface PrescriptionDetailTarget {
   workoutExerciseId: string;
@@ -11,6 +12,11 @@ export interface PrescriptionDetailTarget {
   equipmentType: string;
   /** the row's legible "verified accurate as of Vx" stamp (workout_exercises.params_version) */
   paramsVersion: number | null;
+  /** the live prescribed numbers, shown for verification */
+  prescribedWeight: number | null;
+  prescribedReps: number | null;
+  prescribedSets: number | null;
+  targetRir: number | null;
 }
 
 /** A version number as a tracked label, or an em dash when unknown. Pure. */
@@ -36,11 +42,12 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 
 /**
  * Prescription detail / audit reveal (owner request 2026-06-25) — opened from the
- * exercise dropdown in the day view. Shows the decision kind, the legible version
- * stamps (verified-accurate-as-of vs last-computed-under), and the engine rationale
- * + trace, so the user can confirm a version bump verified the row. Fetches the
- * latest decision on open (mirrors HistorySheet). No mockup figure — light-ledger
- * styling per rule #8; deviation recorded in PROGRESS.md.
+ * exercise dropdown in the day view. Shows the live prescribed weight × reps × sets
+ * @ RIR (for verification), the decision kind, the legible version stamps
+ * (verified-accurate-as-of vs last-computed-under), and the engine rationale + trace,
+ * so the user can confirm a version bump verified the row. Fetches the latest
+ * decision on open (mirrors HistorySheet). No mockup figure — light-ledger styling
+ * per rule #8; deviation recorded in PROGRESS.md.
  */
 export function PrescriptionDetailSheet({
   target,
@@ -122,16 +129,24 @@ export function PrescriptionDetailSheet({
             </p>
           )}
 
-          {audit?.rationale && (
-            <div className="mt-4">
-              <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
-                RATIONALE
-              </div>
-              <p className="mt-1.5 text-[12px] leading-[1.5] text-ink/75">
+          <div className="mt-4">
+            <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+              PRESCRIPTION
+            </div>
+            <p className="numeral mt-1.5 text-[14px] font-bold leading-[1.4] tracking-[-0.01em] text-ink">
+              {formatPrescription(
+                target.prescribedWeight,
+                target.prescribedReps,
+                target.prescribedSets,
+                target.targetRir,
+              )}
+            </p>
+            {audit?.rationale && (
+              <p className="mt-1.5 text-[12px] leading-[1.5] text-ink/70">
                 {audit.rationale}
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
           {audit && audit.trace.length > 0 && (
             <div className="mt-4">

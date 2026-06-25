@@ -254,6 +254,10 @@ export function DayView({
                 exerciseName: auditFor.exercise_name,
                 equipmentType: auditFor.equipment_type,
                 paramsVersion: auditFor.params_version,
+                prescribedWeight: auditFor.prescribed_weight,
+                prescribedReps: auditFor.prescribed_reps,
+                prescribedSets: auditFor.prescribed_sets,
+                targetRir: auditFor.target_rir ?? microcycle.target_rir,
               }
             : null
         }

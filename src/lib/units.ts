@@ -42,3 +42,23 @@ export function formatWeight(value: number): string {
   const r = roundWeight(value);
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
+
+/**
+ * A prescription as one clean line for display/verification, e.g.
+ * "110 lb × 8 reps · 3 sets · 2 RIR". A null weight (the T-I5 manual-seed
+ * deferral: no confident data, awaiting a user-entered start) reads "Unseeded".
+ * Each component is omitted when null, so it degrades gracefully. Pure.
+ */
+export function formatPrescription(
+  weight: number | null,
+  reps: number | null,
+  sets: number | null,
+  targetRir: number | null,
+): string {
+  if (weight == null && reps == null) return "Unseeded";
+  const load = weight == null ? "—" : `${formatWeight(weight)} lb`;
+  const parts = [reps == null ? load : `${load} × ${reps} reps`];
+  if (sets != null) parts.push(`${sets} ${sets === 1 ? "set" : "sets"}`);
+  if (targetRir != null) parts.push(`${targetRir} RIR`);
+  return parts.join(" · ");
+}
