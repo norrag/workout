@@ -25,8 +25,9 @@
 --
 -- Shipped INACTIVE (same discipline as v11/v12/v14): v15 changes the live deload
 -- math, so activate manually only AFTER a replay diff (admin replay_decisions; doc
--- 13 §6). See docs/deployment/manual-operations.md. v12 stays the active row until
--- a deliberate activation. schema_version stays 5 (an optional field is not a shape
+-- 13 §6). See docs/deployment/manual-operations.md. The current active row (v14 as
+-- of 2026-06-25) stays active until a deliberate activation. schema_version stays 5
+-- (an optional field is not a shape
 -- bump). The JSON below is the full materialization from engineParamsSchema.parse()
 -- with its canonical hashParams() sha256 (guarded in params-provenance.test.ts).
 

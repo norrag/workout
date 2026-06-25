@@ -39,8 +39,8 @@ recovery RIR, from the strength anchor — "the same model as normal, just a hig
 - **engine_params v15** (`20260625000003`, INACTIVE) = v14 + `deload_anchor_rir:true`
   + `deload.target_rir:6`. `deload_anchor_rir` is `.optional()` so v14/earlier rows
   hash byte-identically (replay/freshness untouched). Activate manually after a
-  `replay_decisions` diff (doc 13 §6); v12 stays active until then. Provenance hash
-  guarded in `params-provenance.test.ts`.
+  `replay_decisions` diff (doc 13 §6); the current active row (v14) stays active
+  until then. Provenance hash guarded in `params-provenance.test.ts`.
 - **Tests:** `engine/__tests__/deload.test.ts` — internal consistency, deload RIR/
   window, lighter-than-working-week + reduced sets, anchor in the rationale, legacy
   fallback (no anchor), and flag-off parity (v14 + DEFAULT keep the load_pct deload).
