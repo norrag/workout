@@ -3,6 +3,7 @@ import {
   engineInputsSchema,
   prescribe,
   resolveEffectiveParams,
+  rirRamp,
   seedMeso,
   toEngineEquipment,
   type E1rmAnchor,
@@ -305,6 +306,57 @@ function recomputeProvenance(
 }
 
 /**
+ * Live-resolve each UNLOGGED week's target RIR from the active params' ramp
+ * (doc 14 freshness). The working-week ramp (`rir_start`→`rir_end`) and the deload
+ * RIR (`params.deload.target_rir`) are *config* inputs, but they were frozen onto
+ * the microcycle row at meso-build time — so tuning `deload.target_rir` (or editing
+ * the meso's RIR ramp) never reached an existing meso's still-planned weeks: the
+ * freshness check recomputed the prescription numbers but re-read the stale stored
+ * RIR. Re-derive the live ramp here and return the microcycles whose stored RIR
+ * drifted. A microcycle is only refreshed when it has NOT been started — every one
+ * of its workouts is still `planned` (a started/completed week is the intensity the
+ * user actually trained; never rewrite it, hard rule #5). Pure; the caller persists
+ * the returned rows and feeds the corrected RIR into the freshness pass so the
+ * affected prescriptions go stale and recompute at the new RIR.
+ */
+export function liveWeekRirUpdates(
+  micros: { id: string; week_number: number; target_rir: number }[],
+  startedMicroIds: Set<string>,
+  meso: {
+    weeks: number;
+    includes_deload: boolean;
+    rir_start: number;
+    rir_end: number;
+  },
+  params: EngineParams,
+): { id: string; target_rir: number }[] {
+  let ramp;
+  try {
+    ramp = rirRamp(
+      meso.weeks,
+      meso.includes_deload,
+      meso.rir_start,
+      meso.rir_end,
+      params,
+    );
+  } catch {
+    // a meso with out-of-range weeks/RIR shouldn't exist (validated at creation),
+    // but never break the reconcile over it — leave the stored RIRs untouched.
+    return [];
+  }
+  const liveByWeek = new Map(ramp.map((w) => [w.weekNumber, w.targetRir]));
+  const updates: { id: string; target_rir: number }[] = [];
+  for (const m of micros) {
+    if (startedMicroIds.has(m.id)) continue; // started/logged week — never touch
+    const live = liveByWeek.get(m.week_number);
+    if (live != null && live !== m.target_rir) {
+      updates.push({ id: m.id, target_rir: live });
+    }
+  }
+  return updates;
+}
+
+/**
  * Bring a user's meso's stored prescriptions in line with their current inputs,
  * transparently and on demand. Two halves of one read-path job (doc 14 §10):
  *   1. heal generation gaps — create any missing day whose previous-week
@@ -361,6 +413,39 @@ export async function reconcilePrescriptions(
   const plannedWorkoutIds = new Set(
     workouts.filter((w) => w.status === "planned").map((w) => w.id),
   );
+
+  // 3b. live-resolve each UNLOGGED week's target RIR from the active params' ramp
+  //     (doc 14 freshness): the working ramp + deload RIR are config inputs that
+  //     were frozen onto the microcycle at build time, so tuning them never reached
+  //     existing planned weeks. A microcycle is started (untouchable) if ANY of its
+  //     workouts is past `planned`; otherwise refresh its stored RIR to the live
+  //     ramp and let the freshness pass below recompute the affected rows. Persist
+  //     before building `livePrescribed`/`rows` so they read the corrected RIR.
+  const startedMicroIds = new Set(
+    workouts.filter((w) => w.status !== "planned").map((w) => w.microcycle_id),
+  );
+  const { data: mesoConfig, error: mesoConfigError } = await service
+    .from("mesocycles")
+    .select("weeks, includes_deload, rir_start, rir_end")
+    .eq("id", mesoId)
+    .single();
+  if (mesoConfigError) throw mesoConfigError;
+  const rirUpdates = liveWeekRirUpdates(
+    micros,
+    startedMicroIds,
+    mesoConfig,
+    params,
+  );
+  for (const u of rirUpdates) {
+    const { error: rirError } = await service
+      .from("microcycles")
+      .update({ target_rir: u.target_rir })
+      .eq("id", u.id)
+      .eq("user_id", userId);
+    if (rirError) throw rirError;
+    const m = microById.get(u.id);
+    if (m) m.target_rir = u.target_rir; // downstream reads the corrected value
+  }
 
   // 4. ALL the meso's workout_exercises (need completed sources for `previous`)
   const { data: wes, error: wesError } = await service
