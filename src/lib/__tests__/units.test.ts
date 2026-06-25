@@ -5,6 +5,7 @@ import {
   feetInchesToInches,
   roundWeight,
   formatWeight,
+  formatPrescription,
 } from "../units";
 
 describe("units (imperial-only)", () => {
@@ -42,5 +43,17 @@ describe("units (imperial-only)", () => {
     expect(formatWeight(20.0)).toBe("20");
     expect(formatWeight(22.5)).toBe("22.5");
     expect(formatWeight(19.92)).toBe("20");
+  });
+
+  it("formats a prescription as a clean verification line", () => {
+    expect(formatPrescription(110, 8, 3, 2)).toBe("110 lb × 8 reps · 3 sets · 2 RIR");
+    expect(formatPrescription(45.5, 12, 1, 3)).toBe("45.5 lb × 12 reps · 1 set · 3 RIR");
+  });
+
+  it("degrades gracefully and shows 'Unseeded' with no load or reps (T-I5 deferral)", () => {
+    expect(formatPrescription(null, null, 3, 2)).toBe("Unseeded");
+    expect(formatPrescription(100, null, null, null)).toBe("100 lb");
+    expect(formatPrescription(100, 8, null, null)).toBe("100 lb × 8 reps");
+    expect(formatPrescription(null, 8, 3, 2)).toBe("— × 8 reps · 3 sets · 2 RIR");
   });
 });

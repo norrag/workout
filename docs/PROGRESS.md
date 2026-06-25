@@ -2,7 +2,18 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-25 (latest) — Prescription audit reveal in the day-view exercise dropdown
+## 2026-06-25 (latest) — Prescription detail: show the prescribed weight × reps
+
+Follow-up to the audit reveal (owner request): the prescription detail sheet now
+leads with the live prescribed numbers for verification, baked into the rationale
+block — a bold `PRESCRIPTION` line "110 lb × 8 reps · 3 sets · 2 RIR" above the engine
+rationale text (and always rendered, so it shows even before a decision is recorded).
+A null load (the T-I5 manual-seed deferral) reads "Unseeded". Pure `formatPrescription`
+in `units.ts` (unit-tested, degrades gracefully on null components); the numbers are
+passed from the day-view `we` row (prescribed_weight/reps/sets + resolved target RIR).
+Suite green (526), typecheck + lint clean.
+
+## 2026-06-25 — Prescription audit reveal in the day-view exercise dropdown
 
 Owner auditability request: make the engine_params version and decision kind behind
 a prescription viewable from the workout day view, to double-check that open rows are
