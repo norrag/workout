@@ -39,7 +39,9 @@ export const prescriptionSchema = z.object({
   weight: z.number().min(0).nullable(),
   reps: z.number().int().min(1).nullable(),
   sets: z.number().int().min(1),
-  targetRir: z.number().int().min(0).max(5),
+  // 0–8: working weeks ramp 0–3, but a deload prescribes a higher recovery RIR
+  // (≈6, anchor-based deload selection) — see engine_params.deload.target_rir.
+  targetRir: z.number().int().min(0).max(8),
 });
 
 /**
@@ -56,7 +58,8 @@ export const engineInputsSchema = z.object({
   goalType: z.enum(goalTypes),
   // the week being generated
   week: z.object({
-    targetRir: z.number().int().min(0).max(5),
+    // 0–8: a deload week carries the higher recovery RIR (≈6) into prescribe()
+    targetRir: z.number().int().min(0).max(8),
     isDeload: z.boolean(),
   }),
   // last week's prescription for this exercise (null in week 1)

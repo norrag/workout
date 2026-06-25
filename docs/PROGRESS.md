@@ -2,7 +2,55 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-25 (latest) — Prescription detail: show the prescribed weight × reps
+## 2026-06-25 (latest) — Anchor-based deload (engine_params v15)
+
+Owner bug: on a deload week the day-view logging field showed an absurd rep count
+(e.g. **32**, the predictor's high-end cap) while the prescription detail showed the
+real prescribed reps (e.g. **8**). The disagreement was a *symptom*; the root cause
+was that the deload prescription itself is internally inconsistent. The legacy
+`prescribeDeload` set the load to `deload.load_pct` (≈55%) of the meso peak, **carried
+the peak reps** forward, and stated a fixed `deload.target_rir` (4) — but 8 reps at
+≈55% of peak leaves far more than 4 RIR in reserve, so the triple is impossible. The
+live predictor (an uncapped reps-to-hit-target-RIR calculator, doc 11) then re-derived
+reps from the light load + RIR and exploded toward its rep cap (~32), diverging from
+the carried reps.
+
+**An earlier attempt hard-set the display to the prescribed reps** — rejected by the
+owner as a band-aid that forces the output without fixing the inconsistent
+prescription. Reverted. The correct fix is to **select the deload load the same way a
+working week does**: pick the weight that lands window-centered reps at a higher
+recovery RIR, from the strength anchor — "the same model as normal, just a higher RIR."
+
+- **Engine (`index.ts`, gated `deload_anchor_rir`).** When set (with
+  `weight_selection = rep_window` and a confident anchor), the deload short-circuit
+  picks `targetReps` = the goal window's centre (≈10 for hypertrophy 8–12),
+  `weight = roundToStep(weightForRepsAtRir(anchor, targetReps, deloadRir))`, bounds
+  reps into the window, then sets `reps = predictRepsAtWeight(anchor, weight,
+  deloadRir)`. Prescribed reps = predicted reps at the deload RIR **by construction**,
+  so the prescription and the logging field agree and the weight × reps @ RIR triple
+  is honest (verified by a test asserting `impliedRirAtReps == deloadRir`). Sets are
+  still reduced (`set_pct`). Falls back to the legacy `load_pct` deload with no
+  confident anchor or when the flag is off.
+- **Deload RIR 4 → 6** (`deload.target_rir`), per the owner's "≈6 RIR, give or take,
+  for ~10 reps." Required widening the `0–5` RIR bound: engine schemas
+  (`week.targetRir`, `prescriptionSchema.targetRir`, `deload.target_rir` → `0–8`) and
+  the DB CHECK constraints on `microcycles.target_rir` / `workout_exercises.target_rir`
+  (migration `20260625000002`, pure widening, no RLS change).
+- **engine_params v15** (`20260625000003`, INACTIVE) = v14 + `deload_anchor_rir:true`
+  + `deload.target_rir:6`. `deload_anchor_rir` is `.optional()` so v14/earlier rows
+  hash byte-identically (replay/freshness untouched). Activate manually after a
+  `replay_decisions` diff (doc 13 §6); the current active row (v14) stays active
+  until then. Provenance hash guarded in `params-provenance.test.ts`.
+- **Tests:** `engine/__tests__/deload.test.ts` — internal consistency, deload RIR/
+  window, lighter-than-working-week + reduced sets, anchor in the rationale, legacy
+  fallback (no anchor), and flag-off parity (v14 + DEFAULT keep the load_pct deload).
+
+Note: the ungenerated-deload-week RIR previews in `cycles/meso/[mesoId]/page.tsx` and
+`.../planned/[week]/[day]/page.tsx` still hard-code `4` (they match the active v10/v12
+row); refresh them to the deload RIR when v15 is activated. Suite green (535),
+typecheck + lint clean.
+
+## 2026-06-25 — Prescription detail: show the prescribed weight × reps
 
 Follow-up to the audit reveal (owner request): the prescription detail sheet now
 leads with the live prescribed numbers for verification, baked into the rationale

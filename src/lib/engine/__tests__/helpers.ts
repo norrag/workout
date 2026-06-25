@@ -36,6 +36,16 @@ export const V14_PARAMS: EngineParams = {
   retire_prior_peak_seed: true,
 };
 
+/** v15 = v14 plus anchor-based deload selection (owner ruling 2026-06-25): the
+ *  deload picks its load from the strength anchor to land window-centered reps at
+ *  a higher recovery RIR (≈6), the same model as a working week — instead of the
+ *  legacy load_pct-of-peak heuristic. Mirrors `…_engine_params_v15`. */
+export const V15_PARAMS: EngineParams = {
+  ...V14_PARAMS,
+  deload_anchor_rir: true,
+  deload: { ...V14_PARAMS.deload, target_rir: 6 },
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

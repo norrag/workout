@@ -108,6 +108,32 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v15 is a complete, replayable snapshot matching the migration hash", () => {
+    // v15 = v14 + deload_anchor_rir + deload.target_rir 4→6 (anchor-based deload).
+    // deload_anchor_rir is `.optional()`, so v14/earlier rows are byte-identical.
+    const v15 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+    });
+    const p = resolveProvenance(v15 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "437679f0707850638b85e77478c3b53be24d726fd58f689b637825eb94c00084",
+    );
+  });
+
+  it("deload_anchor_rir is absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("deload_anchor_rir");
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("retire_prior_peak_seed is absent from DEFAULT (v10), preserving its hash", () => {
     // the new flag is `.optional()`: a v10/v12 row without it must hash unchanged,
     // or every pre-v14 row would flip non-replayable and the fingerprint would churn.
