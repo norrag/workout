@@ -2,7 +2,35 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-25 (latest) — Prescription detail: show the prescribed weight × reps
+## 2026-06-25 (latest) — Deload prescriptions: reps/RIR made internally consistent
+
+Owner bug: on a deload week the day-view logging field showed an absurd rep count
+(e.g. **32**, the predictor's high-end cap) while the prescription detail showed the
+real prescribed reps (e.g. **8**) — a visible disagreement, and the stored triple
+"75 lb × 8 reps · 4 RIR" was itself inconsistent (8 reps at ≈55% of peak leaves far
+more than 4 in reserve). Root cause: a deload deliberately **decouples** the light
+load from the RIR target (doc 04 §6 prescribes "RIR 4+", a floor), but the day view's
+unlogged-set reps run through `predictRepsAtWeight(anchor, weight, targetRir)` — the
+uncapped reps-to-hit-target-RIR calculator (doc 11). At ≈55% load that explodes toward
+the curve's rep cap (~32), so the displayed number diverged from the prescription and
+implied a brutal high-rep session rather than recovery.
+
+- **Day view (`DayView.tsx`).** `SetRow`/`ExerciseBlock` now receive
+  `isDeload` (from `microcycle.is_deload`). On a deload, `predictReps` returns the
+  prescribed working reps instead of re-deriving from the reduced weight — so initial,
+  future, and on-weight-edit reps all show the prescribed count. Working weeks are
+  unchanged (the predictor still drives them; the load is chosen to put reps in the
+  window at the target RIR, so prescribed = predicted there).
+- **Prescription detail / `formatPrescription` (`units.ts`).** New optional
+  `rirIsFloor` renders the RIR as a minimum ("4+ RIR"); the day view passes
+  `microcycle.is_deload`, so the detail line reads "75 lb × 8 reps · 2 sets · 4+ RIR"
+  — an honest triple (the light working reps leave *at least* the target in reserve).
+  Unit-tested; no engine/stored-data change (the engine already carries peak reps and
+  `deload.target_rir` as a floor, and its rationale already says "4+ RIR").
+
+Suite green (527), typecheck + lint clean.
+
+## 2026-06-25 — Prescription detail: show the prescribed weight × reps
 
 Follow-up to the audit reveal (owner request): the prescription detail sheet now
 leads with the live prescribed numbers for verification, baked into the rationale

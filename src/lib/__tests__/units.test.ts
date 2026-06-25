@@ -50,6 +50,16 @@ describe("units (imperial-only)", () => {
     expect(formatPrescription(45.5, 12, 1, 3)).toBe("45.5 lb × 12 reps · 1 set · 3 RIR");
   });
 
+  it("renders the RIR as a floor on a deload (light load leaves at least the target in reserve)", () => {
+    expect(formatPrescription(75, 8, 2, 4, true)).toBe(
+      "75 lb × 8 reps · 2 sets · 4+ RIR",
+    );
+    // the floor only affects the RIR token, not the rest of the line
+    expect(formatPrescription(75, 8, 2, 4, false)).toBe(
+      "75 lb × 8 reps · 2 sets · 4 RIR",
+    );
+  });
+
   it("degrades gracefully and shows 'Unseeded' with no load or reps (T-I5 deferral)", () => {
     expect(formatPrescription(null, null, 3, 2)).toBe("Unseeded");
     expect(formatPrescription(100, null, null, null)).toBe("100 lb");

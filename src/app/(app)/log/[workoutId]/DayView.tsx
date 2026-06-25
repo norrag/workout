@@ -175,6 +175,7 @@ export function DayView({
           readOnly={readOnly}
           params={params}
           microTargetRir={microcycle.target_rir}
+          isDeload={microcycle.is_deload}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
           dropPending={dropPending[we.id] ?? false}
@@ -258,6 +259,7 @@ export function DayView({
                 prescribedReps: auditFor.prescribed_reps,
                 prescribedSets: auditFor.prescribed_sets,
                 targetRir: auditFor.target_rir ?? microcycle.target_rir,
+                rirIsFloor: microcycle.is_deload,
               }
             : null
         }
@@ -680,6 +682,7 @@ function ExerciseBlock({
   readOnly,
   params,
   microTargetRir,
+  isDeload,
   menuOpen,
   setMenuTarget,
   dropPending,
@@ -702,6 +705,7 @@ function ExerciseBlock({
   readOnly: boolean;
   params: EngineParams;
   microTargetRir: number;
+  isDeload: boolean;
   menuOpen: boolean;
   setMenuTarget: number | null;
   dropPending: boolean;
@@ -853,6 +857,7 @@ function ExerciseBlock({
                 setNumber={setNumber}
                 state={state}
                 readOnly={readOnly}
+                isDeload={isDeload}
                 params={params}
                 targetRir={we.target_rir ?? microTargetRir}
                 logged={logged ?? null}
@@ -1168,6 +1173,7 @@ function SetRow({
   setNumber,
   state,
   readOnly,
+  isDeload,
   params,
   targetRir,
   logged,
@@ -1184,6 +1190,7 @@ function SetRow({
   setNumber: number;
   state: "logged" | "skipped" | "next" | "future";
   readOnly: boolean;
+  isDeload: boolean;
   params: EngineParams;
   targetRir: number;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
@@ -1205,9 +1212,14 @@ function SetRow({
   const plannedWeight = we.set_weights?.[String(setNumber)] ?? null;
 
   // reps that land on the target RIR at a given weight, from the recency-
-  // weighted strength anchor (doc 11); null when there's no usable history
+  // weighted strength anchor (doc 11); null when there's no usable history.
+  // A deload deliberately decouples load from the RIR target — it's a light
+  // recovery week at a *floor* of the target RIR (doc 04 §6, "4+ RIR"), not a
+  // weight chosen to put the working reps at that RIR. Running the predictor at
+  // the reduced load (≈55% of peak) explodes toward its rep cap (~32), so on a
+  // deload we show the prescribed working reps and don't re-derive from weight.
   const predictReps = (w: number): number | null =>
-    predictRepsAtWeight(anchor, w, targetRir, params);
+    isDeload ? prescribedReps : predictRepsAtWeight(anchor, w, targetRir, params);
 
   const initialWeight =
     logged?.weight ?? plannedWeight ?? lastLogged?.weight ?? prescribedWeight ?? 0;

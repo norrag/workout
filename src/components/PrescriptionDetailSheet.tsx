@@ -17,6 +17,8 @@ export interface PrescriptionDetailTarget {
   prescribedReps: number | null;
   prescribedSets: number | null;
   targetRir: number | null;
+  /** deload weeks present the RIR as a floor ("4+ RIR") — see formatPrescription */
+  rirIsFloor?: boolean;
 }
 
 /** A version number as a tracked label, or an em dash when unknown. Pure. */
@@ -139,6 +141,7 @@ export function PrescriptionDetailSheet({
                 target.prescribedReps,
                 target.prescribedSets,
                 target.targetRir,
+                target.rirIsFloor,
               )}
             </p>
             {audit?.rationale && (
