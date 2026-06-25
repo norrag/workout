@@ -63,6 +63,7 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | PH40 | Sets reprice as you log — recalculating after each set; should it only use prior sets? | Q→B | — | A | answered → T-A7 |
 | PH41 | History includes the current (incomplete) workout — expected it to be excluded until complete | Q→B | — | A | answered → T-A8 |
 | PH42 | Note pencil icon hard to recognize | UX | MED | E | done (legible SVG PencilGlyph, +20%; absorbs I15) — PR pending |
+| O1 | Auditability: re-stamp every open decision to the new params version on a bump (even when output is unchanged); make version + decision kind viewable from the day-view exercise dropdown | F | — | I | **done (2026-06-25):** invariant already held (`workout_exercises.params_version` advances on every reconcile, day view reconciles on load) — confirmed, lazy is sufficient. Built the "Prescription detail" reveal (kind + verified-as-of vs computed-under + rationale/trace). Admin-gating = easy follow-up. |
 
 ## Open follow-up tasks (spawned during triage)
 
@@ -79,11 +80,11 @@ and rationale in [`A-engine-metrics.md`](./A-engine-metrics.md#spawned-follow-up
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
 | T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D | needs-input |
 | T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D | needs-input |
-| T-I1 | PR26 | Decide bodyweight data model (flag vs split buckets; loadable anchoring; store bodyweight-in-set?) | D | needs-input |
-| T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 |
+| T-I1 | PR26 | Decide bodyweight data model (load type; bodyweight as effective load; assisted = negative) | D | **decided (2026-06-25)** — bodyweight-only: profile BW as read-only load, progress on reps; loadable: BW+added, BW used in calc not shown; assisted: negative weight, UI deferred if no such exercises yet. See `I-engine-v9.md`. |
+| T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | ready (unblocked by T-I1); needs load-type column + bodyweight-as-load |
 | T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
-| T-I4 | PR26 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | blocked on T-I2 |
-| T-I5 | owner ruling 2026-06-25 | Retire the prior-peak × back-off meso seed (`seedMeso` `priorPeak` branch) + the no-anchor fabrication fallback; seed precedence = confident anchor → user `initial_*` (manual seed) → unseeded/prompt. New engine_params version, drop `meso_seed_backoff_pct`, update seed goldens + replay. | F | **ready (decided); retire at next opportunity** |
+| T-I4 | PR26 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | blocked on T-I2 (also finally drops `meso_seed_backoff_pct` + migrates old rows) |
+| T-I5 | owner ruling 2026-06-25 | Retire the prior-peak × back-off meso seed (`seedMeso` `priorPeak` branch); seed precedence = confident anchor → user `initial_*` (manual seed) → unseeded/prompt. | F | **done (2026-06-25, gated): `retire_prior_peak_seed` flag; engine_params v14 INACTIVE; activate after replay diff. `meso_seed_backoff_pct` left in schema for T-I4.** |
 
 ---
 

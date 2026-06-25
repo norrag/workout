@@ -37,6 +37,10 @@ import {
   unlogSet,
 } from "@/lib/queries/logging";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
+import {
+  getPrescriptionAudit,
+  type PrescriptionAudit,
+} from "@/lib/queries/audit";
 import { getProfile } from "@/lib/queries/profiles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { estimateE1rm } from "@/lib/engine";
@@ -427,6 +431,15 @@ export async function getExerciseHistoryAction(
   const parsed = z.string().uuid().parse(exerciseId);
   const { supabase, user } = await requireUser();
   return getExerciseHistory(supabase, user.id, parsed);
+}
+
+/** Latest engine decision behind a prescription (day-view audit reveal). */
+export async function getPrescriptionAuditAction(
+  workoutExerciseId: string,
+): Promise<PrescriptionAudit | null> {
+  const parsed = z.string().uuid().parse(workoutExerciseId);
+  const { supabase, user } = await requireUser();
+  return getPrescriptionAudit(supabase, user.id, parsed);
 }
 
 const replaceSchema = z.object({

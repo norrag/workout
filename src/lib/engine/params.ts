@@ -191,6 +191,26 @@ export const engineParamsSchema = z.object({
   // ABSENT / false ⇒ legacy nudge only at the hard [min,max] bounds, so a load that
   // predicts 13–14 is left there even when one step lands squarely in 8–12.
   bound_to_target_window: z.boolean().optional(),
+
+  // ----- WS-I / T-I5 — retire the prior-peak meso seed (owner ruling 2026-06-25) ---
+  // Same `.optional()` discipline (absent ⇒ prior behavior, no fingerprint churn).
+  //
+  // Retire the legacy `priorPeak × meso_seed_backoff_pct` meso seed: it backs the
+  // weight off but carries `priorPeak.reps` VERBATIM (escaping the rep window) and
+  // reads a per-column-max set the user never performed — a fabricated seed (full
+  // root-cause in the 2026-06-23 standalone-prescription investigation). The owner
+  // ruled it fundamentally broken and never to be used again: a prescription is not
+  // emitted at any cost — use real data when present, else defer to the user.
+  //
+  // true ⇒ skip the prior-peak branch entirely; the seed precedence becomes
+  //   confident recency anchor (seed_from_anchor) → the user's own plan `initial_*`
+  //   (a manual seed) → UNSEEDED (null weight, prompt the user). Nothing is ever
+  //   fabricated from a peak set. ABSENT / false ⇒ legacy prior-peak back-off seed.
+  // The param `meso_seed_backoff_pct` is left in the schema (historical rows still
+  // carry it, so removing it would flip them non-replayable); its actual removal +
+  // row migration is T-I4, where the whole legacy block is retired together.
+  retire_prior_peak_seed: z.boolean().optional(),
+
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
   // fixed −%, carries genuine regression — doc 13 §4.3).

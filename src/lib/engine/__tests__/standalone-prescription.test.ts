@@ -10,7 +10,7 @@ import { DEFAULT_ENGINE_PARAMS, prescribe, seedMeso } from "../index";
 import { estimateE1rm } from "../e1rm";
 import { predictRepsAtWeight, impliedRirAtReps } from "../reps";
 import type { EngineInputs } from "../types";
-import { baseInputs, V11_PARAMS } from "./helpers";
+import { baseInputs, V11_PARAMS, V14_PARAMS } from "./helpers";
 
 const exercise = { equipmentType: "machine" as const };
 const user = { experienceLevel: "intermediate" as const };
@@ -179,5 +179,62 @@ describe("§S1 — seed week 1 from the strength anchor", () => {
     );
     expect(out.weight).toBe(80);
     expect(out.reps).toBe(10);
+  });
+});
+
+describe("§T-I5 — retire the prior-peak meso seed (owner ruling 2026-06-25)", () => {
+  const anchor = {
+    value: estimateE1rm(100, 8, 3, V14_PARAMS)!.value,
+    confidence: "moderate" as const,
+  };
+  // the never-performed per-column-max set v_exercise_prs used to hand seedMeso
+  const priorPeak = { weight: 140, reps: 30, sets: 3 };
+
+  it("v14 NO LONGER fabricates from the prior peak when there is no anchor", () => {
+    // under v12 this same call produced the 130×30 fabricated seed (above); v14
+    // skips the peak entirely. With a usable plan seed it uses THAT, never the peak.
+    const out = seedMeso(
+      priorPeak,
+      { weight: 80, reps: 10, sets: 3 },
+      exercise,
+      user,
+      3,
+      V14_PARAMS,
+      { goalType: "hypertrophy", anchor: null },
+    );
+    expect(out.weight).toBe(80); // the user's plan seed, not 140 × 0.925 = 130
+    expect(out.reps).toBe(10); // not the peak's 30
+    expect(out.rationale).toMatch(/planned values/i);
+  });
+
+  it("v14 leaves the slot UNSEEDED (null weight) when there is a peak but no anchor and no plan seed", () => {
+    // the decided principle: never invent a number — defer to a manual seed.
+    const out = seedMeso(priorPeak, null, exercise, user, 3, V14_PARAMS, {
+      goalType: "hypertrophy",
+      anchor: null,
+    });
+    expect(out.weight).toBeNull();
+    expect(out.reps).toBeNull();
+    expect(out.rationale).toMatch(/enter a starting weight/i);
+    expect(out.trace[0]?.detail).toMatch(/awaiting a manual starting weight/i);
+  });
+
+  it("v14 still seeds from a confident anchor (the retirement only removes the peak path)", () => {
+    const out = seedMeso(priorPeak, null, exercise, user, 3, V14_PARAMS, {
+      goalType: "hypertrophy",
+      anchor,
+    });
+    expect(out.rationale).toMatch(/seeded from strength anchor/i);
+    expect(out.reps).toBeLessThanOrEqual(10); // in-window, not the peak's 30
+    expect(out.weight).not.toBeNull();
+  });
+
+  it("the legacy peak seed is unchanged when the flag is off (v11/v12)", () => {
+    const out = seedMeso(priorPeak, null, exercise, user, 3, V11_PARAMS, {
+      goalType: "hypertrophy",
+      anchor: null,
+    });
+    expect(out.weight).toBe(130); // 140 × 0.925 — gate is real
+    expect(out.reps).toBe(30);
   });
 });

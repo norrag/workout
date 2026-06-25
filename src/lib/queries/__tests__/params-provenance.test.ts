@@ -90,6 +90,33 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v14 is a complete, replayable snapshot matching the migration hash", () => {
+    // v14 = v12 + retire_prior_peak_seed (T-I5). (v13 is a throwaway hosted test
+    // row with no migration — skipped.) The flag is `.optional()`, so v12/earlier
+    // rows are byte-identical and the new row stays replayable.
+    const v14 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+    });
+    const p = resolveProvenance(v14 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "6b7bce05f0c2002038c1e8ad1e9ffa328626a947e41c74971045074bfcdf4ace",
+    );
+  });
+
+  it("retire_prior_peak_seed is absent from DEFAULT (v10), preserving its hash", () => {
+    // the new flag is `.optional()`: a v10/v12 row without it must hash unchanged,
+    // or every pre-v14 row would flip non-replayable and the fingerprint would churn.
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("retire_prior_peak_seed");
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("the optional v11 fields leave v10's canonical hash untouched", () => {
     // the gated fields are `.optional()`, so a v10 row (without them) must still
     // hash to the same sha256 it did before — otherwise every pre-v11 row would
