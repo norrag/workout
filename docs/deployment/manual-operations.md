@@ -124,6 +124,32 @@ running reps to 13–15). Same discipline as v11.
 > planned row's `params_version` advances to 12 on its next reconcile (one-time
 > catch-up), so "accurate as of Vx" stays truthful without a new decision row.
 
+### Apply + activate engine_params **v14** (retire the prior-peak meso seed — T-I5)
+
+`20260625000001_engine_params_v14_retire_prior_peak_seed.sql` ships v14 **inactive**.
+It sets `retire_prior_peak_seed = true`: the legacy `priorPeak × meso_seed_backoff_pct`
+seed (which fabricated week 1 from a never-performed per-column-max set and carried
+its rep count verbatim) is **skipped**. New seed precedence = confident anchor → the
+user's plan `initial_*` → **unseeded** (null weight, the user is prompted to enter a
+starting weight). Otherwise byte-identical to v12. Same gating discipline as v11/v12.
+
+> A throwaway **v13** "deload tuning" row exists in the hosted DB only (no migration,
+> owner-flagged as a test). It is unrelated; v14 is the next real version. Leave v13
+> alone or delete it — `on conflict do nothing` means the v14 migration ignores it.
+
+| Operation | Notes |
+|---|---|
+| Apply the v14 migration to hosted | Inserts engine_params v14 with `is_active = false`. Additive; v12 remains active, so nothing changes for users yet. (Not yet applied — feature branch.) |
+| **Replay before activating** | Run admin MCP `replay_decisions` for **v14** on users with standalone back-to-back mesos (e.g. Madeline `0af27789-…`) + a couple of others. Confirm: seeds with a confident anchor are unchanged (anchor path); seeds that previously fell to the prior-peak branch now either use the user's plan `initial_*` or come back **unseeded** (null weight) — and that an unseeded slot reads sensibly in the UI (prompt to enter a starting weight), not as a crash or a 0. |
+| **Activate v14** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 14;` (single-active invariant). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v12. |
+
+> **UI follow-up (not in this slice):** activation makes "unseeded" (null weight) a
+> live state for cold-start exercises with no confident anchor and no plan seed.
+> Verify the planner/day view renders a null prescribed weight as a "needs a starting
+> weight" prompt rather than blank/0 before activating for real users. This is the
+> manual-seed deferral the owner asked for; the engine now produces it, the surface
+> should invite it.
+
 ---
 
 ## How Claude flags these

@@ -2,7 +2,54 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-24 (latest) — Rep-window round 2 (v12) + legible prescription version stamp
+## 2026-06-25 (latest) — Retire the prior-peak meso seed (WS-I / T-I5, gated v14)
+
+Workstream I, first build slice. The legacy `priorPeak × meso_seed_backoff_pct` meso
+seed (root-caused in the 2026-06-23 standalone-prescription investigation: it backs
+the weight off but carries `priorPeak.reps` verbatim off a never-performed
+per-column-max set — a fabricated week-1 seed) is **retired**, per the owner ruling
+that a prescription is never emitted at any cost: use real data when present, else
+defer to the user's own manual seed.
+
+- **`retire_prior_peak_seed` (engine, gated).** New `.optional()` param; `seedMeso`
+  skips the prior-peak branch when set. Seed precedence becomes **confident recency
+  anchor → the user's plan `initial_*` (manual seed) → UNSEEDED** (null weight, with
+  a rationale that prompts the user to enter a starting weight). The S1 anchor seed
+  (already live in v12) is unchanged; this only removes the fabrication fallback
+  behind it. (`engine/index.ts seedMeso`, `engine/params.ts`.)
+- **Honest fallback copy.** When the flag is OFF the cold-start fallback is
+  byte-identical (preserves replay); when ON, the rationale distinguishes "starting
+  from your planned values" from "not enough confident data — enter a starting
+  weight" instead of always claiming "no prior history".
+- **engine_params v14, INACTIVE** (`20260625000001_engine_params_v14_retire_prior_peak_seed.sql`).
+  v14 = v12 + `retire_prior_peak_seed:true`, full materialization + canonical hash.
+  The flag is `.optional()`, so v12/earlier rows parse byte-identically — their hash,
+  `is_replayable`, and the doc-14 freshness fingerprint are untouched (guarded in
+  `params-provenance.test.ts`). `meso_seed_backoff_pct` is **left in the schema**
+  (dropping it would flip historical rows non-replayable); its removal + per-row
+  migration is deferred to **T-I4**, where the whole legacy block is retired. A
+  throwaway **v13** "deload tuning" row exists in the hosted DB only (no migration,
+  owner-flagged test) — unrelated; v14 is the next real version.
+- **T-I1 bodyweight model decided** (owner) and recorded in
+  `docs/triage/I-engine-v9.md`: bodyweight-only (profile bodyweight as read-only
+  load, reps-only progression), bodyweight-loadable (bodyweight + added; bodyweight
+  used in calc, not shown), bodyweight-assisted (negative weight; UI deferred if no
+  such exercises yet). Unblocks T-I2 (the v9 no-anchor / bodyweight model).
+- Tests: seed on/off matrix (anchor / plan-seed / unseeded) in
+  `standalone-prescription.test.ts` + v14 hash/replayability guard + "DEFAULT lacks
+  the flag" guard in `params-provenance.test.ts`. Full suite green (**522**, +6),
+  typecheck + lint clean.
+
+### Remaining / external
+- **Apply + activate v14** is a manual post-replay step (see
+  `docs/deployment/manual-operations.md`): apply the migration to hosted (inactive),
+  run `replay_decisions` for v14 on standalone users, confirm the diff, then flip
+  v14 active. Not applied to the live DB in this slice (feature branch only).
+- **UI:** activation makes "unseeded" (null prescribed weight) a more common live
+  state — verify the planner/day view renders it as a "enter a starting weight"
+  prompt rather than blank/0 before activating for real users.
+
+## 2026-06-24 — Rep-window round 2 (v12) + legible prescription version stamp
 
 Follow-up to the v11 standalone-prescription work, from live review of Garron's
 W4·D3. Two rep-window engine fixes (gated as **v12, inactive**) plus a freshness

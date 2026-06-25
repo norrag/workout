@@ -2,6 +2,38 @@
 
 Append a dated entry whenever a session moves work. Newest first.
 
+## 2026-06-25 — Session 6: WS-I kickoff — T-I1 decided + T-I5 built (gated)
+
+Owner reviewed Workstream I in light of the current engine state (corrected the
+stale "active = v9" framing: live active is now **v12**, after v10 imperial, v11
+standalone fixes, v12 rep-window round 2; the S1 anchor seed and S3/S5 fixes are
+already live but **layered in front of** the still-present prior-peak branch, so all
+of WS-I was still unbuilt). Confirmed v13 is a throwaway test row (disregard).
+
+- **T-I1 — bodyweight model DECIDED (owner).** Recorded in `I-engine-v9.md`
+  ("Decision: bodyweight model"). Three load types: **bodyweight-only** (profile
+  bodyweight as a read-only prefilled load, cue the user, progress on reps only);
+  **bodyweight-loadable** (effective load = bodyweight + added; bodyweight used in
+  the calc but not shown; narrow + under-tested); **bodyweight-assisted** (negative
+  weight = bodyweight − assist; same engine math; UI for entry/display deferred +
+  documented if the library has no assisted exercises yet). Implies a first-class
+  **load-type** column and **user bodyweight as an engine input**. Unblocks T-I2.
+- **T-I5 — prior-peak seed retirement BUILT (gated, inactive).** New
+  `retire_prior_peak_seed` `.optional()` param; `seedMeso` skips the
+  `priorPeak × meso_seed_backoff_pct` branch when set, so seed precedence becomes
+  **confident anchor → user `initial_*` → unseeded (null weight, prompt the user)**.
+  Shipped as **engine_params v14, INACTIVE** (`20260625000001`), byte-identical to
+  v12 plus the flag — pre-v14 rows parse unchanged (hash/replay/fingerprint
+  untouched, guarded). `meso_seed_backoff_pct` is **left in the schema** (removing it
+  would flip historical rows non-replayable); its removal + row migration stays in
+  **T-I4**. Activation is the manual post-replay step (manual-operations.md). Tests:
+  seed on/off matrix in `standalone-prescription.test.ts` + v14 hash guard in
+  `params-provenance.test.ts`. Suite green (522), typecheck + lint clean.
+- **Flagged for activation:** "unseeded" (null weight) becomes a more common live
+  state — verify the planner/day view renders it as a "enter a starting weight"
+  prompt (not blank/0) before activating. Engine produces the deferral; the surface
+  should invite the manual seed.
+
 ## 2026-06-25 — Owner ruling: retire the prior-peak seed; no fabricated prescriptions
 
 While reviewing a `replay_decisions(v12)` diff, the owner saw the "Calf Machine

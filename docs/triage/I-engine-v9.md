@@ -120,6 +120,49 @@ model.
 fixed load**? And do we want to fold the user's bodyweight into the set's
 effective load (for loadable variants and e1RM honesty)?
 
+### Decision (2026-06-25) — bodyweight model (T-I1, owner)
+
+Binding direction for the three load types. Resolves T-I1; sequences T-I2.
+
+- **Bodyweight-only** (push-ups, unweighted pull-ups, etc.). The set's effective
+  load **is the user's profile bodyweight.** Prefill the weight field with the
+  profile bodyweight and make it **read-only**, with a visible cue to the user that
+  the load is their bodyweight (not an editable number). The engine cannot add
+  external load, so **the only progression axis is reps** — keep progressing reps in
+  the normal logical way (the rep-window climb already does this; it just needs a
+  real, non-zero load to anchor on instead of `weight = 0`).
+- **Bodyweight-loadable** (weighted pull-ups/dips). Effective load = **profile
+  bodyweight + the added external weight.** The bodyweight component is used in the
+  **progression/e1RM calculation** but **does not need to be shown to the user** —
+  they just enter the added weight as today. Bodyweight is ~static short-term; the
+  reason to include it at all is that over the **medium/long term it drifts** for
+  some users, and the metrics should track real load. This is a **narrow slice** of
+  exercises and is **under-tested** — approach it this way but treat it as lower
+  confidence.
+- **Bodyweight-assisted** (assisted pull-up/dip machine — counterweight *reduces*
+  effective bodyweight). Engine-side, handle like loadable but with a **negative**
+  added weight (effective load = bodyweight − assist), so the same math covers it.
+  The **UI for entry/display** of an assist value needs its own design (it is not
+  "add weight"). **If the library has no assisted exercises yet, defer the build and
+  document it** — but design the load-type model so a negative/assist value drops in
+  later without rework.
+
+**Implications for the data model (T-I1 build, → T-I2):**
+- A first-class **load type** is needed (`external` | `bodyweight_only` |
+  `bodyweight_loadable` | `bodyweight_assisted`) rather than inferring from
+  `equipment_type` — `toEngineEquipment` currently collapses the two bodyweight
+  buckets and can't represent assisted at all.
+- The engine needs the **user's bodyweight** as an input to compute effective load
+  for all three bodyweight types. Bodyweight is a profile value that **drifts**, so
+  treat it as a *derived* engine input (like the anchor) — excluded from the
+  freshness fingerprint, refreshed on recompute — OR capture the bodyweight on the
+  logged set at log time for historical honesty. **Open sub-question for T-I2:**
+  store bodyweight-on-set vs. read live profile weight (affects e1RM reproducibility
+  of past sets). Bodyweight-only display is read-only prefilled; loadable/assisted
+  hide the bodyweight component and surface only the added/assist value.
+- `weight = 0` stops being the bodyweight signal; the rep-window math then has a
+  real load to anchor on, which is what unblocks deleting the legacy no-anchor path.
+
 ## What would be lost if the legacy path were deleted today
 
 | Behavior | rep-window covers it? | v9 needs |
@@ -151,15 +194,18 @@ effective load (for loadable variants and e1RM honesty)?
   (any unanchored fixture exercise) will shift.
 - **There is no weight=0 / bodyweight prescribe test today** — add one first.
 
-## Recommended sequencing (proposed; needs owner sign-off)
+## Recommended sequencing (updated 2026-06-25)
 
-1. **Decide the bodyweight data model** (a first-class flag or split the two
-   bodyweight equipment buckets; +how loadable should anchor). → **needs-input.**
+0. **T-I5 — retire the prior-peak seed. ✅ DONE (gated, v14 INACTIVE).** Independent
+   of the bodyweight work; shipped first as the clean, decided slice.
+1. **Decide the bodyweight data model.** ✅ **Decided (2026-06-25)** — see "Decision:
+   bodyweight model" above (load type; bodyweight as effective load; assisted =
+   negative; assisted UI/build deferred if no such exercises yet).
 2. **Build the v9 no-anchor / cold-start prescription model** (incl. bodyweight
-   reps-at-fixed-load) behind the existing branch, with a new weight=0 test.
-3. **Decide the big-miss back-off** policy (explicit vs anchor-only). → **needs-input.**
+   reps-at-fixed-load) behind the existing branch, with a new weight=0 test. **← next.**
+3. **Decide the big-miss back-off** policy. ✅ **Decided: anchor-only.**
 4. **Delete the legacy block + retire its params** (new engine_params version;
-   migrate old rows); update the test suite.
+   migrate old rows — incl. finally dropping `meso_seed_backoff_pct`); update tests.
 5. (Separately) **T-A5** — graded MEV→MAV→MRV volume ramp + MRV-stop auto-deload,
    or amend doc 10 to the ±1 model.
 
@@ -167,11 +213,11 @@ effective load (for loadable variants and e1RM honesty)?
 
 | ID | Title | Type | Status |
 |----|-------|------|--------|
-| T-I1 | Decide bodyweight data model (flag vs split buckets; loadable anchoring; store bodyweight-in-set?) | D | needs-input |
-| T-I2 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 — *no-data case decided: manual-seed deferral, no fabrication (2026-06-25)* |
+| T-I1 | Decide bodyweight data model (load type; bodyweight as effective load; assisted = negative) | D | **decided (2026-06-25) — see "Decision: bodyweight model" above; sequences T-I2** |
+| T-I2 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 build (load-type column + bodyweight-as-load); no-data case decided: manual-seed deferral, no fabrication |
 | T-I3 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
 | T-I4 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | blocked on T-I2 |
-| T-I5 | **Retire the prior-peak × back-off meso seed** (`seedMeso` `priorPeak` branch) and the no-anchor fabrication fallback; seed precedence = confident anchor → user `initial_*` → unseeded/prompt. New engine_params version (drop `meso_seed_backoff_pct` once unreferenced); update seed goldens + replay. | F | **ready (decided 2026-06-25); retire at next opportunity** |
+| T-I5 | **Retire the prior-peak × back-off meso seed** (`seedMeso` `priorPeak` branch); seed precedence = confident anchor → user `initial_*` → unseeded/prompt. | F | **DONE (2026-06-25, gated) — `retire_prior_peak_seed` flag; engine_params v14 INACTIVE; activate after replay diff. `meso_seed_backoff_pct` left for T-I4.** |
 
 > **PH36** (bodyweight model/increment settings) and **T-A3** (confidence
 > fallback) are subsumed here: PH36 is the bodyweight half of T-I1/T-I2; T-A3 is

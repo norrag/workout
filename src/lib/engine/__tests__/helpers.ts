@@ -27,6 +27,15 @@ export const V12_PARAMS: EngineParams = {
   bound_to_target_window: true,
 };
 
+/** v14 = v12 plus the prior-peak seed retirement (T-I5, owner ruling 2026-06-25):
+ *  no fabricated peak seed — precedence is confident anchor → user initial_* →
+ *  unseeded. Mirrors `20260625000001_engine_params_v14`. (v13 is a throwaway test
+ *  row in the hosted DB only — no migration; skipped.) */
+export const V14_PARAMS: EngineParams = {
+  ...V12_PARAMS,
+  retire_prior_peak_seed: true,
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

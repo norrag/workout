@@ -503,6 +503,13 @@ function round2(n: number): number {
  * no goal otherwise); `opts.anchor` is the caller-computed recency anchor (engine
  * stays pure). It is a *derived* input, so it does not enter the freshness
  * fingerprint (doc 14 §3) — see buildSeedInputs/seedEngineInputs.
+ *
+ * §T-I5 (owner ruling 2026-06-25, WS-I): when `retire_prior_peak_seed` is set the
+ * legacy `priorPeak × meso_seed_backoff_pct` branch is skipped entirely — it
+ * fabricated a seed (carried `priorPeak.reps` verbatim off a never-performed
+ * per-column-max set). Seed precedence is then strictly: confident anchor → the
+ * user's plan `initial_*` (a manual seed) → UNSEEDED (null weight, prompt the user).
+ * A prescription is never invented from a peak set. ABSENT / false ⇒ legacy.
  */
 export function seedMeso(
   priorPeak: { weight: number | null; reps: number | null; sets: number } | null,
@@ -548,7 +555,12 @@ export function seedMeso(
     }
   }
 
-  if (priorPeak?.weight != null) {
+  // §T-I5 (owner ruling 2026-06-25): the legacy prior-peak × back-off seed is
+  // RETIRED when `retire_prior_peak_seed` is set — it fabricates a seed (carries
+  // priorPeak.reps verbatim, off a never-performed per-column-max set). With the
+  // flag set we skip it: the seed defers to the user's plan `initial_*` (a manual
+  // seed) and, absent that, leaves the slot unseeded rather than invent a number.
+  if (!(params.retire_prior_peak_seed ?? false) && priorPeak?.weight != null) {
     return {
       weight: roundToStep(
         priorPeak.weight * params.meso_seed_backoff_pct,
@@ -567,21 +579,38 @@ export function seedMeso(
       ],
     };
   }
+  // No confident anchor and no usable peak (or the peak was retired by the flag).
+  // Use the user's own plan values when present; otherwise leave the slot UNSEEDED
+  // (null weight) and prompt them to enter a starting point — never fabricate one.
+  const hasInitial = initial?.weight != null;
+  // When the flag is OFF this branch is reached only on a true cold start (no peak),
+  // so keep its rationale byte-identical to preserve flag-off replay. When the flag
+  // is ON it may be reached because a peak was retired, so the copy reflects that a
+  // retired peak is not a cold start, and an unseeded slot is awaiting a manual seed.
+  const retired = params.retire_prior_peak_seed ?? false;
+  const { rationale, detail } = !retired
+    ? {
+        rationale: `No prior history; starting from plan defaults at ${startRir} RIR.`,
+        detail: `no prior history; starting from plan defaults at ${startRir} RIR`,
+      }
+    : hasInitial
+      ? {
+          rationale: `Starting from your planned values at ${startRir} RIR.`,
+          detail: `no confident anchor; starting from plan defaults at ${startRir} RIR`,
+        }
+      : {
+          rationale: `Not enough confident recent data to prescribe — enter a starting weight to seed this exercise.`,
+          detail: `no confident data to seed; awaiting a manual starting weight`,
+        };
   return {
-    weight:
-      initial?.weight == null
-        ? null
-        : roundToStep(initial.weight, exercise.equipmentType, params),
+    weight: hasInitial
+      ? roundToStep(initial!.weight!, exercise.equipmentType, params)
+      : null,
     reps: initial?.reps ?? null,
     sets: clampSets(initial?.sets ?? params.min_sets, params),
     targetRir: startRir,
-    rationale: `No prior history; starting from plan defaults at ${startRir} RIR.`,
-    trace: [
-      {
-        rule: "seed",
-        detail: `no prior history; starting from plan defaults at ${startRir} RIR`,
-      },
-    ],
+    rationale,
+    trace: [{ rule: "seed", detail }],
   };
 }
 
