@@ -10,8 +10,10 @@ import {
 import {
   recomputeRow,
   advanceSourceKey,
+  liveWeekRirUpdates,
   type RecomputeArgs,
 } from "../regeneration";
+import { V15_PARAMS } from "@/lib/engine/__tests__/helpers";
 import {
   buildConfigInputs,
   buildSeedInputs,
@@ -416,5 +418,44 @@ describe("advanceSourceKey (decision-less backfill routing)", () => {
   it("keys by day and exercise so a different slot is not mistaken for the source", () => {
     expect(advanceSourceKey(3, 4, "ex-a")).not.toBe(advanceSourceKey(3, 2, "ex-a"));
     expect(advanceSourceKey(3, 4, "ex-a")).not.toBe(advanceSourceKey(3, 4, "ex-b"));
+  });
+});
+
+describe("liveWeekRirUpdates", () => {
+  // a 5-week meso with a deload (ramp 3→0 across weeks 1–4, deload week 5)
+  const meso = { weeks: 5, includes_deload: true, rir_start: 3, rir_end: 0 };
+  const micros = [
+    { id: "w1", week_number: 1, target_rir: 3 },
+    { id: "w2", week_number: 2, target_rir: 2 },
+    { id: "w3", week_number: 3, target_rir: 1 },
+    { id: "w4", week_number: 4, target_rir: 0 },
+    { id: "w5", week_number: 5, target_rir: 4 }, // deload, frozen at the old RIR 4
+  ];
+
+  it("refreshes an unlogged deload week to the active params' deload RIR", () => {
+    // only week 1 started; weeks 2–5 are still planned
+    const started = new Set(["w1"]);
+    const updates = liveWeekRirUpdates(micros, started, meso, V15_PARAMS);
+    // v15 deload RIR is 6; the working weeks are unchanged (ramp from rir_start/end)
+    expect(updates).toEqual([{ id: "w5", target_rir: 6 }]);
+  });
+
+  it("never touches a started/logged week, even if its stored RIR drifted", () => {
+    // pretend the deload week has been started — it must stay as trained
+    const started = new Set(["w1", "w5"]);
+    const updates = liveWeekRirUpdates(micros, started, meso, V15_PARAMS);
+    expect(updates).toEqual([]);
+  });
+
+  it("is a no-op under the active (v14-equivalent) deload RIR of 4", () => {
+    const started = new Set(["w1"]);
+    // DEFAULT deload RIR is 4, matching the stored value → nothing to update
+    const updates = liveWeekRirUpdates(micros, started, meso, DEFAULT_ENGINE_PARAMS);
+    expect(updates).toEqual([]);
+  });
+
+  it("degrades gracefully (no updates) on an out-of-range meso instead of throwing", () => {
+    const bad = { weeks: 99, includes_deload: true, rir_start: 3, rir_end: 0 };
+    expect(liveWeekRirUpdates(micros, new Set(), bad, V15_PARAMS)).toEqual([]);
   });
 });

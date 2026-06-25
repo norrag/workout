@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoDeletionImpact, getMesoPlan } from "@/lib/queries/cycles";
+import { getActiveEngineParams } from "@/lib/queries/generation";
 import { saveMesoAsTemplateAction } from "../../actions";
 import { ShareRow } from "@/components/ShareRow";
 import { StartMesoForm } from "./StartMesoForm";
@@ -62,9 +63,12 @@ export default async function MesoDetailPage({
   const dayCols = days.length > 0 ? days : [null];
   const gridCols = { gridTemplateColumns: `44px 52px repeat(${dayCols.length}, 1fr)` };
 
-  // ramp values for planned mesos (no microcycles yet)
+  // ramp values for planned mesos (no microcycles yet). The deload RIR comes from
+  // the active engine params (so the preview tracks tuning, e.g. v15's 6); working
+  // weeks from the meso's own ramp.
+  const { params: engineParams } = await getActiveEngineParams(supabase);
   const previewRir = (weekIdx: number, isDeload: boolean) => {
-    if (isDeload) return 4;
+    if (isDeload) return engineParams.deload.target_rir;
     const working = meso.includes_deload ? meso.weeks - 1 : meso.weeks;
     const t = working === 1 ? 1 : Math.min(weekIdx, working - 1) / (working - 1);
     return Math.round(meso.rir_start + (meso.rir_end - meso.rir_start) * t);

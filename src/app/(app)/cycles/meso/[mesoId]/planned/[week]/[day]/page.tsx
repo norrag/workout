@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoPlan } from "@/lib/queries/cycles";
+import { getActiveEngineParams } from "@/lib/queries/generation";
 
 const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -43,8 +44,11 @@ export default async function PlannedDayPage({
 
   const isDeload =
     micro?.is_deload ?? (meso.includes_deload && weekNumber === meso.weeks);
+  // preview RIR for a not-yet-generated week: the deload RIR comes from the active
+  // engine params (so it tracks tuning, e.g. v15's 6), working weeks from the ramp
+  const { params: engineParams } = await getActiveEngineParams(supabase);
   const previewRir = () => {
-    if (isDeload) return 4;
+    if (isDeload) return engineParams.deload.target_rir;
     const working = meso.includes_deload ? meso.weeks - 1 : meso.weeks;
     const t =
       working <= 1 ? 1 : Math.min(weekNumber - 1, working - 1) / (working - 1);

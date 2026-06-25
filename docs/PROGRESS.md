@@ -45,10 +45,21 @@ recovery RIR, from the strength anchor — "the same model as normal, just a hig
   window, lighter-than-working-week + reduced sets, anchor in the rationale, legacy
   fallback (no anchor), and flag-off parity (v14 + DEFAULT keep the load_pct deload).
 
-Note: the ungenerated-deload-week RIR previews in `cycles/meso/[mesoId]/page.tsx` and
-`.../planned/[week]/[day]/page.tsx` still hard-code `4` (they match the active v10/v12
-row); refresh them to the deload RIR when v15 is activated. Suite green (535),
-typecheck + lint clean.
+**Deload RIR now propagates to existing unlogged weeks (live-resolve on reconcile).**
+The deload RIR (and the working ramp) are config inputs, but were frozen onto the
+microcycle row at meso-build time — so tuning `deload.target_rir` (v15's 4→6) would
+never reach an existing meso's still-planned deload week: the freshness check
+recomputed the prescription numbers but re-read the stale stored RIR.
+`reconcilePrescriptions` now live-resolves each *unlogged* week's `target_rir` from
+the active params' `rirRamp` (`liveWeekRirUpdates`, pure + unit-tested) and persists
+the drift before the freshness pass, so the affected deload row goes stale and
+recomputes at the new RIR. A week is only refreshed when **every** workout in it is
+still `planned` — a started/logged week keeps the intensity the user trained (hard
+rule #5). With v14 active (deload RIR 4) it's a no-op; the moment v15 is active, the
+next day-view load refreshes existing unlogged deloads to 6 (anchor-based) with no
+manual backfill. The two ungenerated-week RIR previews now source the deload RIR from
+the active engine_params instead of hard-coding `4`. Suite green (539), typecheck +
+lint clean.
 
 ## 2026-06-25 — Prescription detail: show the prescribed weight × reps
 
