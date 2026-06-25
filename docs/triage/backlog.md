@@ -74,15 +74,16 @@ and rationale in [`A-engine-metrics.md`](./A-engine-metrics.md#spawned-follow-up
 | T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley stats view); decide what screens show | D→F | needs-input |
 | T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores` | D→B | needs-input |
 | T-A3 | S4 | Confirm active `weight_selection`; surface the legacy fallback | Q→B | resolved (fallback moot under v9; folded into WS I) |
-| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | needs-input (see also T-I3) |
+| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (see T-I3/T-I5) |
 | T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input (sequenced in WS I) |
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
 | T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D | needs-input |
 | T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D | needs-input |
 | T-I1 | PR26 | Decide bodyweight data model (flag vs split buckets; loadable anchoring; store bodyweight-in-set?) | D | needs-input |
 | T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 |
-| T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | needs-input |
+| T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
 | T-I4 | PR26 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | blocked on T-I2 |
+| T-I5 | owner ruling 2026-06-25 | Retire the prior-peak × back-off meso seed (`seedMeso` `priorPeak` branch) + the no-anchor fabrication fallback; seed precedence = confident anchor → user `initial_*` (manual seed) → unseeded/prompt. New engine_params version, drop `meso_seed_backoff_pct`, update seed goldens + replay. | F | **ready (decided); retire at next opportunity** |
 
 ---
 
@@ -125,6 +126,7 @@ never lost.
 
 ### Progression model
 - **PR26** *(added v2)* — "From what I understand the legacy increment path that it's keeping as a fall back. This legacy model probably shouldn't be present at all, however we need to understand where and how it's still used if at all to ensure it's done correctly. I think the only remaining use case might be how bodyweight only and bodyweight loadable exercises are handled. We should consider these and any other use cases and probably roll them into the v9 model so that everything is handled cleanly."
+- **Owner ruling (2026-06-25)** *(→ T-I5)* — "We don't ever want to use the old, defunct load_first, prior peak back off seed ever again for any reason. This is discussed in the triage docs… That logic is broken fundamentally, and it should be retired at the next possible opportunity. The goal with prescriptions is not always to provide one at any cost — it's to use the data when available to effectively train the user as best as possible. If something truly does not have enough data to provide a starting place, the user should just seed themselves and enter a starting place themselves manually rather than make up data or produce bad numbers."
 
 > _v2 removed PR22–PR25 (RIR-ramp seeding, baselining, mid-cycle swap-in, no-history) as resolved — answers retained in `A-engine-metrics.md`. Kept below for the record:_
 

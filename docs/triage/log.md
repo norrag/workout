@@ -2,6 +2,35 @@
 
 Append a dated entry whenever a session moves work. Newest first.
 
+## 2026-06-25 — Owner ruling: retire the prior-peak seed; no fabricated prescriptions
+
+While reviewing a `replay_decisions(v12)` diff, the owner saw the "Calf Machine
+seed 175×20 → 180×20" line and challenged it. Investigation (run against live
+data + the branch engine) showed the diff was **not** a v12 effect: it's an old
+v10 *seed* whose stored inputs carry `strengthAnchor: null` (recorded before S1),
+so replay correctly fell through to the legacy `priorPeak × back-off` branch,
+which carries `priorPeak.reps = 20` verbatim. The 175→180 move was the **20 lb
+per-exercise increment override** (set 2026-06-24) folded into rounding by replay —
+a config artifact, not engine behavior. S1's anchor seed is wired in
+`generation.ts` but **hasn't run in prod** (zero seed decisions at v11).
+
+**Decision recorded (binding):** the `priorPeak × back-off` seed and the no-anchor
+*fabrication* fallback are **fundamentally broken and retired at the next
+opportunity** (`T-I5`). Principle: a prescription is not produced at any cost — use
+real data when available; when there isn't enough, **defer to a manual user seed**
+(the user enters their own starting point), never fabricate. Seed precedence =
+**confident anchor → user `initial_*` → unseeded/prompt.** This also decides `T-A4`/
+`T-I3` (anchor-only; **no** hidden big-miss back-off; retire `regression_pct`).
+
+- Recorded in [`I-engine-v9.md`](./I-engine-v9.md) (decision + principle + seed
+  precedence; new `T-I5`; updated the "what would be lost" table and T-I2/T-I3),
+  [`A-engine-metrics.md`](./A-engine-metrics.md) (PR25 + T-A4/T-A6 notes),
+  [`backlog.md`](./backlog.md) (T-I5 + verbatim ruling + T-A4/T-I3 status), and the
+  [standalone-prescription investigation](../reviews/2026-06-23-standalone-prescription-investigation.md)
+  (S1 amendment: the fallback is retired, not kept).
+- **No code changed this session** — documentation/decision only. T-I5 is `ready`
+  and sequences ahead of / with the WS-I legacy-path deletion (T-I4).
+
 ## 2026-06-23 — Session 5: Workstream B — e1RM audit & exposure (PH31 + PH32)
 
 Owner picked the next slice = **Workstream B** and made the two scoping calls:

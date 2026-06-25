@@ -180,6 +180,14 @@ week's target RIR. Mid-workout slot adds seed via `seedMeso` with null `priorPea
 ⇒ planner `initial`. Note: a low-confidence lifetime history silently behaves like
 cold start rather than using the low-confidence anchor. **Status: answered.**
 
+> **Decision (2026-06-25):** this `initial`/manual-seed behavior is now the
+> **intended** no-data path — and the *only* non-anchor seed path. The
+> `priorPeak × back-off` seed and any other fabricated-number fallback are retired
+> (see `T-A6`/`T-I5` and [`I-engine-v9.md`](./I-engine-v9.md)): no confident anchor
+> and no user-entered `initial_*` ⇒ leave the slot **unseeded and prompt the user**,
+> never invent a load. A low-confidence anchor is treated as no anchor (defer to the
+> user), not used to compute a shaky seed.
+
 ---
 
 ## PH39 — How fast does e1RM recency decay? (Pulldown 110.1 but did 115×11 May 22)
@@ -225,8 +233,8 @@ workout is completed — interacts with PH40). **Status: answered → spawns T-A
 | T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley view) — document the divergence and decide whether stats screens should show the anchor. | D→F |
 | T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores`. | D→B |
 | T-A3 | S4 | ~~Surface/log the low-confidence fallback~~ — **resolved by the PR26 investigation:** active `weight_selection` is `rep_window` with `min_confidence: low`, so the confidence fallback never fires; the legacy path is reached via **no anchor** (bodyweight/cold-start). Folded into workstream **I** (`I-engine-v9.md`). | Q→B |
-| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode, or document the anchor as sole mechanism. | D |
+| T-A4 | S5 | ~~Decide whether a hard big-miss back-off belongs in rep_window mode.~~ **Decided (2026-06-25): anchor-only — no explicit back-off; retire `regression_pct`.** Folded into WS I (T-I3/T-I5). | D |
 | T-A5 | S7 | Implement graded MEV→MAV→MRV volume ramp + MRV-stop auto-deload, or amend doc 10 to the ±1 model. | D→F |
-| T-A6 | PR22/PR23 | ~~Seed a new meso from the recency anchor / rep-based high-water-mark, not just the top-weight PR.~~ **Done (gated, pending activation):** `seed_from_anchor` (§S1) makes `seedMeso` mirror the swap-in `seed_anchor` branch — seeds week 1 from the recency anchor for the window's low rep at the start RIR; `v_exercise_prs` (§S2) now returns a coherent best-e1RM set as the fallback peak. Shipped in engine_params **v11 (inactive)**; activate after a replay diff. See `docs/reviews/2026-06-23-standalone-prescription-investigation.md`. | F |
+| T-A6 | PR22/PR23 | ~~Seed a new meso from the recency anchor / rep-based high-water-mark, not just the top-weight PR.~~ **Done (gated, pending activation):** `seed_from_anchor` (§S1) makes `seedMeso` mirror the swap-in `seed_anchor` branch — seeds week 1 from the recency anchor for the window's low rep at the start RIR; `v_exercise_prs` (§S2) now returns a coherent best-e1RM set as the fallback peak. Shipped in engine_params **v11 (inactive)**; activate after a replay diff. See `docs/reviews/2026-06-23-standalone-prescription-investigation.md`. **Follow-on (2026-06-25): retire the prior-peak × back-off fallback entirely → `T-I5`.** | F |
 | T-A7 | PH40 | Decide whether in-session prescription should freeze at session start or adapt live; make adaptation legible. | D |
 | T-A8 | PH41 | Decide whether in-progress (incomplete) workout sets count toward history/stats. | D |

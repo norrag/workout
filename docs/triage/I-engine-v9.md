@@ -11,6 +11,50 @@ settings). Grounded in a read-only code investigation; file:line refs throughout
 > **not** the configured default. The user's note asks to remove it; this doc
 > scopes that.
 
+## Decision (2026-06-25) — no fabricated prescriptions; retire the prior-peak back-off seed
+
+> **Owner ruling, binding for this workstream.** The legacy
+> "prior-peak × back-off" meso seed (`seedMeso`'s `priorPeak` branch,
+> `index.ts:551-569`) is **fundamentally broken and must never be used again, for
+> any reason.** It is to be **retired at the next possible opportunity.** The same
+> ruling extends to the legacy no-anchor *progression* fabrication: the engine must
+> not invent a number when it lacks the data to compute an honest one.
+
+**The principle.** The goal of a prescription is **not to emit a number at any
+cost** — it is to use real data, when available, to train the user as effectively
+as possible. When there genuinely isn't enough data to compute an honest starting
+point, the engine must **defer to the user** (let them enter their own starting
+weight/reps — a manual seed) rather than fabricate data or emit bad numbers. A
+missing-but-honest prescription beats a present-but-wrong one.
+
+**Why the prior-peak seed is broken** (full root-cause in
+[`docs/reviews/2026-06-23-standalone-prescription-investigation.md`](../reviews/2026-06-23-standalone-prescription-investigation.md)
+§1–2): it backs the *weight* off 7.5% but carries `prescribed_reps =
+priorPeak.reps` **verbatim**, so week 1 escapes the rep window entirely (the live
+"calf machine 175×20" / "leg curl 130×30" seeds). It reads `v_exercise_prs`
+per-column maxes — a `(best_weight, best_reps)` set the user never performed
+(pre-S2). It never re-prices through the rep window the rest of the engine uses.
+S1 (v11) added the anchor-aware seed *in front of* it but **deliberately left it as
+the fallback** — this decision removes that fallback.
+
+**The decided seed precedence** (replaces the `priorPeak` branch):
+
+1. **Confident recency anchor** → rep-window seed (S1, `seed_anchor`): load for the
+   window's `target_low` at week-1 RIR, reps = bounded predictor. *This is the only
+   data-derived seed path.*
+2. **Else → the user's own planner-board `initial_*`** (`meso_exercises.initial_weight/
+   reps/sets`) — a manual seed the user controls. No back-off, no fabrication.
+3. **Else (no anchor, no initial) → do not fabricate.** Leave the slot unseeded and
+   prompt the user to enter a starting point. Never compute a load from a peak set,
+   a per-column max, or a low-confidence anchor.
+
+This is `T-I5` below, and it tightens the answers to `T-I2`/`T-I3`: the "no-anchor /
+cold-start model" is, for the *no-data* case, **manual-seed deferral, not a
+fabrication model** (the genuine-data sub-case — bodyweight reps-at-fixed-load — is
+still real work under T-I2; see T-I1). It also closes the policy question in `T-A4`/
+`T-I3`: there is **no hidden big-miss back-off** — a falling anchor handles
+under-performance, and where there's no anchor there's no prescription to back off.
+
 ## The note (PR26)
 
 > "From what I understand the legacy increment path … is keeping as a fall back.
@@ -80,11 +124,11 @@ effective load (for loadable variants and e1RM honesty)?
 
 | Behavior | rep-window covers it? | v9 needs |
 |----------|----------------------|----------|
-| No-anchor progression (weight + increment off actuals) | No (needs an anchor) | **Yes — a cold-start model** |
-| Bodyweight-only (weight=0) | No (math null at 0) | **Yes — biggest gap; reps-at-fixed-load + a bodyweight flag** |
-| `reps_first` (+1 rep at held load) | Yes for anchored lifts (`index.ts:217-221`) | only inside the no-anchor model |
-| `hold` for cut/maintain | Anchor reprices instead (arguably better) | replacement for *unanchored* cut/maintain |
-| −10% big-miss back-off (`regression_pct`) | No — rep-window leans on the *falling anchor* | **Decide:** explicit cold-start regression vs anchor-only (documented) |
+| No-anchor progression (weight + increment off actuals) | No (needs an anchor) | **Decided (2026-06-25): nothing — do not fabricate. No anchor ⇒ defer to the user's `initial_*` / manual seed, else unseeded.** |
+| Bodyweight-only (weight=0) | No (math null at 0) | **Yes — biggest *genuine-data* gap; reps-at-fixed-load + a bodyweight flag (T-I1/T-I2)** |
+| `reps_first` (+1 rep at held load) | Yes for anchored lifts (`index.ts:217-221`) | covered by the anchored path; not needed unanchored |
+| `hold` for cut/maintain | Anchor reprices instead (arguably better) | covered by the anchored path; not needed unanchored |
+| −10% big-miss back-off (`regression_pct`) | No — rep-window leans on the *falling anchor* | **Decided (2026-06-25): anchor-only. No explicit back-off; retire `regression_pct`.** |
 
 ## engine_params to retire vs keep
 
@@ -124,9 +168,10 @@ effective load (for loadable variants and e1RM honesty)?
 | ID | Title | Type | Status |
 |----|-------|------|--------|
 | T-I1 | Decide bodyweight data model (flag vs split buckets; loadable anchoring; store bodyweight-in-set?) | D | needs-input |
-| T-I2 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 |
-| T-I3 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | needs-input |
+| T-I2 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | blocked on T-I1 — *no-data case decided: manual-seed deferral, no fabrication (2026-06-25)* |
+| T-I3 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
 | T-I4 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | blocked on T-I2 |
+| T-I5 | **Retire the prior-peak × back-off meso seed** (`seedMeso` `priorPeak` branch) and the no-anchor fabrication fallback; seed precedence = confident anchor → user `initial_*` → unseeded/prompt. New engine_params version (drop `meso_seed_backoff_pct` once unreferenced); update seed goldens + replay. | F | **ready (decided 2026-06-25); retire at next opportunity** |
 
 > **PH36** (bodyweight model/increment settings) and **T-A3** (confidence
 > fallback) are subsumed here: PH36 is the bodyweight half of T-I1/T-I2; T-A3 is
