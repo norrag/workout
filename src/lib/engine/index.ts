@@ -93,8 +93,77 @@ export function prescribe(
   const inputs = engineInputsSchema.parse(rawInputs);
   const params = engineParamsSchema.parse(rawParams);
 
-  // §6 deload week short-circuits everything else
+  // §6 deload week short-circuits everything else.
   if (inputs.week.isDeload) {
+    // Anchor-based deload (gated by `deload_anchor_rir`): select the load the
+    // SAME way a working week does — pick the weight that lands window-centered
+    // reps at the week's (higher) deload target RIR, from the strength anchor —
+    // instead of the legacy "load_pct of peak, carry the peak reps" heuristic.
+    // That heuristic produced an internally inconsistent triple (e.g. 75 lb × 8
+    // reps @ 4 RIR, when 8 reps at ≈55% of peak leaves far more than 4 in
+    // reserve), which the live predictor then "corrected" by re-deriving reps
+    // from the light load + RIR — exploding toward its rep cap (~32). Choosing
+    // the load from the anchor makes prescribed reps = predicted reps at the
+    // deload RIR by construction, so the prescription and the logging field agree.
+    const deloadRir = inputs.week.targetRir; // = params.deload.target_rir (rir.ts)
+    const win = repWindowFor(inputs.goalType, params);
+    const anchor = inputs.strengthAnchor;
+    if (
+      (params.deload_anchor_rir ?? false) &&
+      params.weight_selection === "rep_window" &&
+      anchor != null &&
+      win != null &&
+      confidenceAtLeast(anchor.confidence, params.reps_predict.min_confidence)
+    ) {
+      // center the deload on the goal's window (≈10 reps for hypertrophy 8–12),
+      // i.e. "the same model as normal, just a higher RIR" — no rep climb.
+      const targetReps = Math.round((win.target_low + win.target_high) / 2);
+      const raw = weightForRepsAtRir(anchor.value, targetReps, deloadRir, params);
+      if (raw != null) {
+        let finalWeight = roundToStep(
+          raw,
+          inputs.exercise.equipmentType,
+          params,
+        );
+        // keep reps inside the window if rounding nudged them out (same bound the
+        // working path uses; predictRepsAtWeight here reads the deload RIR).
+        finalWeight = boundRepsToWindow(
+          finalWeight,
+          anchor.value,
+          win,
+          inputs,
+          params,
+        );
+        const predicted = predictRepsAtWeight(
+          anchor.value,
+          finalWeight,
+          deloadRir,
+          params,
+        );
+        const reps =
+          predicted == null
+            ? targetReps
+            : Math.min(win.max, Math.max(win.min, predicted));
+        const baseSets =
+          inputs.weekPeak?.sets ??
+          inputs.previous?.sets ??
+          inputs.initial?.sets ??
+          params.min_sets;
+        const sets = clampSets(
+          Math.max(params.min_sets, Math.round(baseSets * params.deload.set_pct)),
+          params,
+        );
+        const detail = `deload off strength anchor (e1RM ${anchor.value} lb): ${finalWeight} lb for ${reps} reps at ${deloadRir} RIR, ${sets} sets`;
+        return {
+          weight: finalWeight,
+          reps,
+          sets,
+          targetRir: deloadRir,
+          rationale: capitalize(detail + ". Recover before the next block."),
+          trace: [{ rule: "deload", detail }],
+        };
+      }
+    }
     return prescribeDeload(inputs, params);
   }
 

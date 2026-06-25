@@ -130,7 +130,9 @@ export const engineParamsSchema = z.object({
   deload: z.object({
     load_pct: z.number().min(0.3).max(0.9),
     set_pct: z.number().min(0.3).max(1),
-    target_rir: z.number().int().min(3).max(5),
+    // a deload sits well short of failure; the bound allows a genuine recovery
+    // RIR (≈6) for anchor-based deload selection, not just the legacy ≤5.
+    target_rir: z.number().int().min(3).max(8),
   }),
   meso_seed_backoff_pct: z.number().min(0.7).max(1),
   // weights are rounded to this loadable step per equipment, in pounds
@@ -210,6 +212,20 @@ export const engineParamsSchema = z.object({
   // carry it, so removing it would flip them non-replayable); its actual removal +
   // row migration is T-I4, where the whole legacy block is retired together.
   retire_prior_peak_seed: z.boolean().optional(),
+
+  // ----- deload: anchor-based load selection (owner ruling 2026-06-25) ----------
+  // Same `.optional()` discipline (absent ⇒ legacy load_pct deload, no fingerprint
+  // churn). Replaces the "load_pct of peak + carry the peak reps + state a fixed
+  // RIR" deload — which produced an internally inconsistent triple (the carried
+  // reps at ≈55% of peak leave far more than the stated RIR in reserve) — with the
+  // SAME rep-window weight selection a working week uses, just at the higher deload
+  // target RIR (`deload.target_rir`) and centered in the goal's rep window. The
+  // load is chosen from the strength anchor so prescribed reps = predicted reps at
+  // the deload RIR by construction; the live logging predictor then agrees with the
+  // prescription instead of re-deriving an exploded rep count from the light load.
+  // Only takes effect with `weight_selection = rep_window` and a confident anchor;
+  // falls back to the legacy load_pct deload otherwise. ABSENT / false ⇒ legacy.
+  deload_anchor_rir: z.boolean().optional(),
 
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a

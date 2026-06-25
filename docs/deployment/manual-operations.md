@@ -150,6 +150,31 @@ starting weight). Otherwise byte-identical to v12. Same gating discipline as v11
 > manual-seed deferral the owner asked for; the engine now produces it, the surface
 > should invite it.
 
+### Apply + activate engine_params **v15** (anchor-based deload)
+
+`20260625000003_engine_params_v15_anchor_deload.sql` ships v15 **inactive**, paired
+with `20260625000002_widen_target_rir_for_deload.sql` (widens the `target_rir` CHECK
+on `microcycles` / `workout_exercises` from `0–5` to `0–8`). v15 sets
+`deload_anchor_rir = true` and `deload.target_rir = 6`: the deload now selects its
+load from the strength anchor to land window-centered reps (≈10) at the deload RIR —
+the same rep-window model a working week uses — so the prescription is internally
+consistent and the live predictor agrees, replacing the legacy `load_pct`-of-peak
+heuristic (which carried the peak reps and stated a fixed RIR the load contradicted).
+Otherwise byte-identical to v14. Same gating discipline as v11/v12/v14.
+
+| Operation | Notes |
+|---|---|
+| Apply both migrations to hosted | First `20260625000002` (widen CHECK — must precede any 6-RIR write), then `20260625000003` (insert engine_params v15, `is_active = false`). Additive; the active row is unchanged, so nothing changes for users yet. (Not yet applied — feature branch.) |
+| **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v15** on a user with a logged deload (e.g. Garron's "June '25 - Bulk" W5 deload) + a couple of others. Confirm the deload load comes off the anchor (lighter than the working-week load, reduced sets), the prescribed reps land ~8–12, and the prescribed `weight × reps @ 6 RIR` triple is self-consistent — `impliedRirAtReps == 6` — so the day-view logging field shows the same reps as the prescription (no ~32 explosion). |
+| **Activate v15** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 15;` (single-active invariant). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating the prior version. |
+
+> **UI follow-up on activation:** the ungenerated-deload-week RIR previews in
+> `cycles/meso/[mesoId]/page.tsx` and `.../planned/[week]/[day]/page.tsx` hard-code
+> `4`. Once v15 is active, update them to the deload RIR (6) — or source them from
+> the active engine_params — so a not-yet-generated deload week doesn't preview the
+> wrong reserve. Generated weeks already read `microcycle.target_rir`, so they're
+> correct; this is only the preview fallback.
+
 ---
 
 ## How Claude flags these

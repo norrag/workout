@@ -48,23 +48,17 @@ export function formatWeight(value: number): string {
  * "110 lb × 8 reps · 3 sets · 2 RIR". A null weight (the T-I5 manual-seed
  * deferral: no confident data, awaiting a user-entered start) reads "Unseeded".
  * Each component is omitted when null, so it degrades gracefully. Pure.
- *
- * `rirIsFloor` renders the RIR as a minimum ("4+ RIR"). A deload decouples the
- * light load from the RIR target (doc 04 §6): the working reps at ≈55% of peak
- * leave *at least* the target in reserve, not exactly it, so "4 RIR" would
- * misrepresent the triple. The floor form keeps weight × reps × RIR honest.
  */
 export function formatPrescription(
   weight: number | null,
   reps: number | null,
   sets: number | null,
   targetRir: number | null,
-  rirIsFloor = false,
 ): string {
   if (weight == null && reps == null) return "Unseeded";
   const load = weight == null ? "—" : `${formatWeight(weight)} lb`;
   const parts = [reps == null ? load : `${load} × ${reps} reps`];
   if (sets != null) parts.push(`${sets} ${sets === 1 ? "set" : "sets"}`);
-  if (targetRir != null) parts.push(`${targetRir}${rirIsFloor ? "+" : ""} RIR`);
+  if (targetRir != null) parts.push(`${targetRir} RIR`);
   return parts.join(" · ");
 }
