@@ -96,10 +96,12 @@ export function buildEngineInputs(args: {
   nextWeek: { targetRir: number; isDeload: boolean };
   goal: EngineGoal;
   equipmentType: string;
+  loadType?: string | null;
   profile: Pick<ProfileRow, "experience_level">;
   muscleGroupWeeklySets: number | null;
   weekPeak: EngineInputs["weekPeak"];
   strengthAnchor: EngineInputs["strengthAnchor"];
+  bodyweight: EngineInputs["bodyweight"];
 }): EngineInputs {
   const { we } = args;
   // config half resolved through the single shared resolver (doc 14 §3) so the
@@ -114,6 +116,7 @@ export function buildEngineInputs(args: {
   return {
     ...buildConfigInputs({
       equipmentType: args.equipmentType,
+      loadType: args.loadType,
       profile: args.profile,
       goal: args.goal,
       week: args.nextWeek,
@@ -147,6 +150,7 @@ export function buildEngineInputs(args: {
     muscleGroupWeeklySets: args.muscleGroupWeeklySets,
     weekPeak: args.weekPeak,
     strengthAnchor: args.strengthAnchor,
+    bodyweight: args.bodyweight,
   };
 }
 
@@ -267,6 +271,7 @@ async function generateDay(
         : null,
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
       strengthAnchor: ctx.anchorsByExercise.get(we.exercise_id) ?? null,
+      bodyweight: ctx.profile.bodyweight ?? null,
     });
     // effective params = global active + this user×exercise increment override
     // (doc 14 §6.1); the override also feeds the row's fingerprint token below.
@@ -1120,6 +1125,7 @@ export async function projectNextPrescription(
       : null,
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,
+    bodyweight: profile.bodyweight ?? null,
   });
   const override = await getExerciseIncrementOverride(supabase, userId, exerciseId);
   const output = prescribe(

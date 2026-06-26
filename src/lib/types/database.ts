@@ -21,6 +21,10 @@ type Defaulted =
   | "kind"
   // nullable per-set e1RM (PH31); computed at log/amend time, optional on insert
   | "e1rm"
+  // T-I2: exercises.load_type has a DB default ('external'); bodyweight is captured
+  // at log time on logged_sets (nullable) — both optional on insert.
+  | "load_type"
+  | "bodyweight"
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id";
 type InsertOf<R> = Omit<R, Defaulted> &
@@ -93,6 +97,10 @@ export type ExerciseRow = {
   legacy_id: number | null;
   name: string;
   equipment_type: EquipmentType;
+  /** T-I2: how the entered weight maps to effective load (external |
+   *  bodyweight_only | bodyweight_loadable | bodyweight_assisted); backfilled from
+   *  equipment_type. Null on rows not yet backfilled ⇒ derived from equipment_type. */
+  load_type: string | null;
   description: string | null;
   notes: string | null;
   video_url: string | null;
@@ -301,6 +309,10 @@ export type LoggedSetRow = {
   rir_reported: number | null;
   /** engine per-set e1RM estimate (PH31); null for bodyweight/non-working sets */
   e1rm: number | null;
+  /** T-I2/#4: the lifter's bodyweight at log time (lb) — the effective-load base
+   *  for bodyweight movements. Captured at log, locked once the workout completes.
+   *  Null when the profile had no bodyweight set. */
+  bodyweight: number | null;
   is_warmup: boolean;
   notes: string | null;
   created_at: string;

@@ -107,6 +107,9 @@ export async function logSetAction(input: {
     rir_reported: parsed.rir_reported,
     set_type: parsed.set_type,
     e1rm: computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
+    // T-I2/#4: capture the lifter's bodyweight at log time (effective-load base for
+    // bodyweight movements); locked once the workout completes.
+    bodyweight: profile?.bodyweight ?? null,
   });
   // auto-match (doc 11): carry the logged weight onto the remaining unlogged
   // sets. Done here (after the insert excludes this set) to avoid a client race.

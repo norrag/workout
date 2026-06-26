@@ -121,7 +121,7 @@ function decision(
 // a minimal valid EngineInputs that yields a deterministic prescription
 function sampleInputs(): Record<string, unknown> {
   return {
-    exercise: { equipmentType: "barbell" },
+    exercise: { equipmentType: "barbell", loadType: "external" },
     user: { experienceLevel: "intermediate" },
     goalType: "gain",
     week: { targetRir: 2, isDeload: false },
@@ -204,7 +204,7 @@ describe("replayDecisions", () => {
     const seedOut = seedMeso(
       { weight: 200, reps: 5, sets: 3 },
       { weight: 100, reps: 8, sets: 3 },
-      { equipmentType: "barbell" },
+      { equipmentType: "barbell", loadType: "external" },
       { experienceLevel: "intermediate" },
       3,
       DEFAULT_ENGINE_PARAMS,
