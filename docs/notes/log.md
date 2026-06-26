@@ -1,6 +1,40 @@
-# Triage log
+# Notes-area log
 
 Append a dated entry whenever a session moves work. Newest first.
+(Formerly "Triage log" — the area was rebranded to an ongoing notes system on
+2026-06-26; see the entry below.)
+
+## 2026-06-26 — Session 7: rebrand triage → ongoing notes area
+
+Owner asked to turn the one-time "triage" area into a **functional, ongoing**
+place to drop notes that Claude assesses, relates, groups, prioritizes, tracks,
+and prunes — with Claude owning the structure and the owner interfacing through
+chat rather than the files. No backlog items were worked this session; this was a
+structural reorg.
+
+- **Renamed `docs/triage/` → `docs/notes/`** (`git mv`, history preserved).
+- **New `CLAUDE.md`** — the operating manual for the area: the intake protocol
+  (capture verbatim → parse → **assess against known items** for dupes /
+  relationships / dependencies / grouping / priority → classify → scope →
+  log), the full lifecycle incl. a new `archived` terminal state, the
+  consolidation & purge policy, the file map, and the resume protocol. This is
+  the standing instruction set the owner asked for.
+- **Reframed `README.md`** to a thin orientation + the workstream roster
+  (pointer to `CLAUDE.md` for process). **Reframed `backlog.md`** from a finite
+  "imported 2026-06-22" doc to the **live index**; its verbatim appendix is now
+  the **append-only** record, organized into dated **intake batches** (Batch 1 =
+  the original Notes doc) so future drops append cleanly.
+- **New `archive.md` + first purge sweep.** Moved genuinely-terminal rows out of
+  the live index: merged/confirmed (**M9**, **I13**), superseded (**I15** → PH42),
+  resolved-and-removed-in-v2 (**S4**, **S5**, **PR22–PR25**), and the resolved
+  follow-up **T-A3**. Kept all "done (PR pending)" items live (not yet merged) per
+  the purge policy. Raw text for the moved items stays in the backlog appendix.
+- **Fixed cross-references** to the renamed folder in `docs/PROGRESS.md` and
+  `docs/reviews/2026-06-23-standalone-prescription-investigation.md`, and added a
+  pointer to the notes area from the root `CLAUDE.md` docs list so it's
+  integrated into the overall doc system.
+- No code, schema, or engine changes. Detail files (`A-engine-metrics.md`,
+  `I-engine-v9.md`, `scoping.md`) carried over unchanged.
 
 ## 2026-06-25 — Session 6: WS-I kickoff — T-I1 decided + T-I5 built (gated)
 
