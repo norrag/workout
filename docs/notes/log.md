@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-26 — Session 8: intake batch 2 (perf + engine corrections), notes-only
+
+Owner handed over a perf review request plus two notes; explicitly **not** ready
+to execute — capture/assess only. Ran the intake protocol; logged as appendix
+**Batch 2**. Three new items (new `N*` batch-prefix per the ID convention):
+
+- **N1 — Performance & efficiency (new workstream J).** Reviewed the app structure
+  against the owner's perf questions. Finding: the backend already does the heavy
+  lifting (SQL-view aggregation, server-side engine + freshness reconcile,
+  batched/indexed queries); the real wins are client bundle/render + a few
+  query-scope/caching fixes, **not** relocating compute to edge/DB (engine stays
+  pure TS, hard rule #3). Phased measure-first plan in
+  [`J-performance.md`](./J-performance.md); added WS **J** to the README.
+  Cross-linked PH29 (page-switch slowness overlaps the streaming work).
+- **N2 — History e1RM averaging (B, WS-B).** Owner: history e1RM "appears to take
+  max"; should **average** across all working sets in the session. Not yet
+  investigated against `v_exercise_*` / `ExerciseHistoryList`. Flagged as likely
+  sharing a fix with N3 (the engine anchor already averages session e1RM).
+- **N3 — Active workout must not feed live prescriptions (owner DECISION).**
+  Prescriptions/predictions read **previous completed workouts only**; the current
+  workout becomes canonical only when marked complete **with feedback**. Live
+  posting of current sets to history is fine. This **resolves the open needs-input
+  on T-A7 (PH40) and T-A8 (PH41)** — both moved to decided/build-pending. Root
+  cause the owner described: the first logged set of a current exercise, if it's
+  the recency-weighted best, makes the session-average anchor (one set logged)
+  snap all remaining sets to that weight. Build deferred per owner.
+
+No code changed; no tests run (notes-only). This branch
+(`claude/app-performance-review-twermm`, PR #77) was originally cut against the
+pre-rebrand `docs/triage/` tree; merged `main` (the rebrand, PR #76) and re-applied
+all three items into the new `docs/notes/` structure with `N*` IDs.
+
 ## 2026-06-26 — Session 7: rebrand triage → ongoing notes area
 
 Owner asked to turn the one-time "triage" area into a **functional, ongoing**

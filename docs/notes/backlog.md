@@ -63,6 +63,9 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | PH41 | History includes the current (incomplete) workout — expected it to be excluded until complete | Q→B | — | A | answered → T-A8 |
 | PH42 | Note pencil icon hard to recognize | UX | MED | E | done (legible SVG PencilGlyph, +20%; absorbs I15) — PR pending |
 | O1 | Auditability: re-stamp every open decision to the new params version on a bump (even when output is unchanged); make version + decision kind viewable from the day-view exercise dropdown | F | — | I | **done (2026-06-25):** invariant already held (`workout_exercises.params_version` advances on every reconcile, day view reconciles on load) — confirmed, lazy is sufficient. Built the "Prescription detail" reveal (kind + verified-as-of vs computed-under + rationale/trace). Admin-gating = easy follow-up. |
+| N1 | Performance & efficiency pass: measure first (bundle analyzer, slow-query baseline), then client bundle/render wins + query-scope/caching. Key finding: backend already does the heavy lifting — do **not** relocate the engine to edge/DB | F | — | J | inbox (directional; plan in [`J-performance.md`](./J-performance.md), not scheduled). Cross-links PH29 (page-switch slowness) |
+| N2 | History e1RM appears to take the session **max**; should **average** e1RM across all working sets in the session | B | — | B | inbox. Likely shares a fix with N3 (engine anchor already averages session e1RM) |
+| N3 | Active/in-progress workout must not feed live prescriptions or predictions — limit to previous completed workouts; current workout becomes canonical only on complete + feedback (live posting to history is fine) | D→B | HIGH | A/I | **decided (owner 2026-06-26)** — resolves T-A7/T-A8 (build pending) |
 
 ## Open follow-up tasks
 
@@ -79,8 +82,8 @@ in [`archive.md`](./archive.md).
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (see T-I3/T-I5) |
 | T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input (sequenced in WS I) |
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
-| T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D | needs-input |
-| T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D | needs-input |
+| T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D→F | **decided (2026-06-26, N3): prescriptions/predictions read previous completed workouts only; current-session sets never re-price the live session** (build pending) |
+| T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D→F | **decided (2026-06-26, N3): in-progress sets may post to history/stats live, but must NOT feed prescriptions/predictions until the workout is complete with feedback** (build pending) |
 | T-I1 | PR26 | Decide bodyweight data model (load type; bodyweight as effective load; assisted = negative) | D | **decided (2026-06-25)** — bodyweight-only: profile BW as read-only load, progress on reps; loadable: BW+added, BW used in calc not shown; assisted: negative weight, UI deferred if no such exercises yet. See `I-engine-v9.md`. |
 | T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | ready (unblocked by T-I1); needs load-type column + bodyweight-as-load |
 | T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
@@ -159,3 +162,12 @@ add the next batch below the last, never edit a prior one.
 - **PH40** — NEEDS THOUGHT — "It looks like sets are repricing as you go in the set. I guess if your current set is your best set, then it's averaging your remaining sets as you go… so it's recalculating after every set is calculated apparently. Is that good or should it only look at previous sets"
 - **PH41** — NEEDS THOUGHT — "History also includes current workout — had in my head that basically a current workout doesn't get entered anywhere until it's complete"
 - **PH42** — PRIORITY MEDIUM — "Note pencil icon is hard to see what it is"
+
+### Batch 2 — performance + engine-correctness (2026-06-26)
+
+#### Performance & efficiency
+- **N1** — directional (owner not ready to execute): "I'm not ecstatic about the speed/performance of the app as is. What improvements to speed and efficiency could be made based on the app structure so far." Asked specifically about (a) front-end vs backend/DB split of heavy lifting, (b) whether to move more to DB/edge functions and make the front end a thinner UI client, (c) load-time reductions, (d) server-load / compute / data-transfer cost reductions, (e) other structural/refactor observations. Directional answer + phased plan captured in [`J-performance.md`](./J-performance.md). Headline: the backend already does the heavy lifting (SQL-view aggregation, server-side engine + freshness reconcile, batched/indexed queries) — the real wins are on the **client bundle/render path** plus a few **query-scope/caching** fixes; relocating compute to Supabase Edge Functions is **not** the win, and the engine must stay pure TS (root `CLAUDE.md` hard rule #3).
+
+#### Engine / prescription corrections
+- **N2** — "E1rm in history should average the stat over all session sets — appears to take max"
+- **N3** — "Decision: an active workout should definitely not play into live prescriptions. Right now, if the first set of a current exercise ends up being your recency-weighted best set, then all subsequent sets immediately anchor on it. Since, at that moment, only one set is logged, then that set is the average of all sets in your best session, therefore all remaining sets get updated to the same weight. Prescriptions and predictions should only look at previous workouts, not the current one. The current workout becomes canonical once it's marked as complete, with feedback. It's fine if the current sets post to history live as they're done, but prescriptions should be limited to previous workouts"

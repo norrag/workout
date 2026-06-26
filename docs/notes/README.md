@@ -28,3 +28,4 @@ grouping.
 | **G** | Bugs | _tbd_ | Discrete defects to reproduce + fix (match-weights crash, page-switch flicker, switch-exercise prescription, height units). |
 | **H** | Needs product decision | _tbd_ | Items blocked on an owner call (LLM prescription analysis, admin-tool privacy, soreness rule). |
 | **I** | Engine v9 cleanup | [`I-engine-v9.md`](./I-engine-v9.md) | Retire the legacy increment path; fold bodyweight / cold-start / big-miss into a clean v9 model. |
+| **J** | Performance & efficiency | [`J-performance.md`](./J-performance.md) | Speed/efficiency pass (N1): measure-first baseline, then client bundle/render wins + query-scope/caching. Heavy lifting already lives in the backend; the engine stays pure TS (not relocated to edge/DB). |
