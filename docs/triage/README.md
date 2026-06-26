@@ -77,6 +77,7 @@ is picked up.
 | **G** | Bugs | _tbd_ | Discrete defects to reproduce + fix (match-weights crash, page-switch flicker, switch-exercise prescription, height units). |
 | **H** | Needs product decision | _tbd_ | Items blocked on an owner call (LLM prescription analysis, admin-tool privacy, soreness rule). |
 | **I** | Engine v9 cleanup | [`I-engine-v9.md`](./I-engine-v9.md) | Retire the legacy increment path and fold genuinely-needed behavior (bodyweight-only / -loadable, cold start, big-miss back-off) into a clean v9 model. Pulls in T-A3, T-A5, PH36. |
+| **J** | Performance & efficiency | [`J-performance.md`](./J-performance.md) | Speed/efficiency pass (PH43): measure-first baseline, then client bundle/render wins + query-scope/caching. Establishes that the heavy lifting already lives in the backend; the engine stays pure TS (not relocated to edge/DB). |
 
 ## Resuming across sessions
 

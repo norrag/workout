@@ -2,6 +2,32 @@
 
 Append a dated entry whenever a session moves work. Newest first.
 
+## 2026-06-26 — Session 7: capture three owner notes (no build)
+
+Owner reviewed app speed/perf and added three items; explicitly **not** ready to
+execute — capture only.
+
+- **PH43 — Performance & efficiency (new workstream J).** Reviewed the app structure
+  for the owner's perf questions. Finding: the backend already does the heavy lifting
+  (SQL-view aggregation, server-side engine + freshness reconcile, batched/indexed
+  queries); the real wins are client bundle/render + a few query-scope/caching fixes,
+  **not** relocating compute to edge/DB (engine stays pure TS, hard rule #3). Drafted
+  a phased, measure-first plan in [`J-performance.md`](./J-performance.md) and added
+  WS **J** to the README. Status: inbox / directional, unscheduled.
+- **PH44 — History e1RM averaging (new, B, WS-B).** Owner: history e1RM "appears to
+  take max"; it should **average** e1RM across all working sets in the session.
+  Captured, not yet investigated against `v_exercise_*` views / `ExerciseHistoryList`.
+- **PH45 — Active workout must not feed live prescriptions (owner DECISION).**
+  Prescriptions/predictions must read **previous completed workouts only**; the
+  current workout becomes canonical only when marked complete **with feedback**.
+  Live posting of current sets to history is fine. This **resolves the open
+  needs-input on T-A7 (PH40) and T-A8 (PH41)** — both moved to decided/build-pending.
+  Root cause the owner described: when the first logged set of a current exercise is
+  the recency-weighted best, the anchor (session-average e1RM, but only one set
+  logged) snaps all remaining sets to that weight. Build deferred per owner.
+
+No code changed; no tests run (notes-only session).
+
 ## 2026-06-25 — Session 6: WS-I kickoff — T-I1 decided + T-I5 built (gated)
 
 Owner reviewed Workstream I in light of the current engine state (corrected the
