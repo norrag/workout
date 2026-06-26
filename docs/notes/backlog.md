@@ -1,19 +1,27 @@
-# Backlog — field notes (imported 2026-06-22)
+# Backlog — live index
 
-Single source of truth for every item parsed from the Notes doc. Update the
-**status** column whenever an item moves; record the *why* in [`log.md`](./log.md).
-Verbatim source text for each item is preserved in the [appendix](#appendix-verbatim-source) so nothing is lost in summarizing.
+The **live index** of every open/active field-note item. The single source of
+truth for item *state* — update the **status** column whenever an item moves and
+record the *why* in [`log.md`](./log.md). Terminal items (done-and-merged,
+wontfix, superseded) are swept out to [`archive.md`](./archive.md); their raw
+text stays in this file's [appendix](#appendix-verbatim-source), which is the
+**append-only** permanent record of everything the owner has ever noted.
 
-Type: `Q` question · `B` bug · `F` feature · `UX` polish · `D` needs-decision.
-Status legend and workstreams: see [`README.md`](./README.md).
+How this area works — intake protocol, lifecycle, consolidation/purge rules — is
+in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
+`UX` polish · `D` needs-decision. Status legend + workstreams: [`README.md`](./README.md).
 
-> **Reconciled with Notes v2 (2026-06-22).** The owner pruned items that session 1
-> resolved and added two. Removed as stale/resolved: **S4**, **S5** (answered in
-> `A-engine-metrics.md`), **I13** (shipped), **I15** (already exists),
-> **PR22–PR25** (answered). Added: **S8** (engine add/remove sets/reps — answered
-> by the existing S7/S4 research) and **PR26** (retire the legacy increment path →
-> v9, the new substantive engine task). Removed items are kept here with status
-> `resolved (removed in v2)` rather than deleted, so the history is intact.
+> **Origin.** This started as a one-time triage of the "Notes" doc (imported
+> 2026-06-22, reconciled with Notes v2 the same day) and has since become the
+> ongoing intake area. Items resolved-and-removed at the v2 reconciliation
+> (**S4**, **S5**, **PR22–PR25**) and shipped-and-merged items (**M9**, **I13**,
+> **I15**) now live in [`archive.md`](./archive.md). Follow-ups they spawned
+> (`T-A*`) are tracked in the [follow-up table](#open-follow-up-tasks) below.
+
+> **Note on "done (PR pending)" items.** Several items below are built but not
+> yet merged. Per the purge policy they stay in this live index until the PR
+> merges, then get swept to `archive.md`. Don't archive a `done` item on the
+> strength of the status word alone — confirm it's merged/owner-confirmed first.
 
 ## Index
 
@@ -22,29 +30,20 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | S1 | How is estimated strength (e1RM) calculated? | Q | — | A | answered |
 | S2 | How is strength increase calculated? (e.g. Est. Strength Key Lifts) | Q | — | A | answered |
 | S3 | How are deload weeks handled in stats? | Q | — | A | answered → T-A2 |
-| S4 | Progression: add sets vs reps vs weight; double-progression? | Q | — | A | resolved (removed in v2) → T-A3 |
-| S5 | How are misses defined and handled? | Q | — | A | resolved (removed in v2) → T-A4 |
 | S6 | Does adding a set manually transfer to future plans? | Q | — | A | answered |
 | S7 | How is the number of sets planned? | Q | — | A | answered → T-A5 |
 | S8 | When/why/how does the engine add or remove sets/reps? | Q | — | A | answered (see S7 + S4) |
 | M8 | Stats unification: meso gets est-strength under performance; macro gets balance+performance via 3-way toggle | F | — | C | needs-input (meso est-strength present but owner wants its meaning clarified; macro part folds into a broader meso/macro stats redesign) |
-| M9 | Macrocycle custom-duration field won't allow momentary empty cell (can't backspace to re-enter) | B | MED | D | done (PR #61) |
 | M10 | Show only *unplanned* mesocycles on the macrocycle overview page | UX | — | D | needs-input |
 | I11 | Meso stats rework — include strength increases for all exercises | F | HIGH | C | triaged |
 | I12 | Address mesocycle management under a macrocycle | F | HIGH | D | triaged (needs design pass) |
-| I13 | Per-exercise, per-user weight increment | F | HIGH | F | done (confirmed merged by owner) |
 | I14 | Raise complete-workout feedback slider resolution to match per-exercise feedback | F | HIGH | E | needs-input (scope) |
-| I15 | Add exercise-note icon left of the history icon in day view | F | HIGH | E | done (already exists — removed in v2; see PH42) |
 | P16 | Meso overview buttons monotonous/ugly → overview↔stats page toggle | UX | LOW | C | needs-input |
 | P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | needs-input |
 | P18 | Remove the set-type option from the set menu | UX | LOW | E | needs-input (spec conflict) |
 | P19 | Logged sets get a small over/under-prescription icon | F | LOW | E | done (rule = e1RM; PR pending) |
 | P20 | Exercise search list should live-filter as you type | UX | LOW | F | done (client ExercisesBrowser; PR pending) |
 | P21 | Should soreness be recorded when user reports 0 days sore? | D | LOW | H | needs-input |
-| PR22 | RIR ramp: how is starting weight seeded? does it catch over-performance and re-baseline a new 0-RIR high-water-mark? | Q→F | — | A | resolved (removed in v2) → T-A6 |
-| PR23 | How is baseline weight & reps set (last vs best vs combo; recency/goal/averages)? | Q | — | A | resolved (removed in v2) |
-| PR24 | Mid-cycle add/sub of an exercise with history but none in the current meso — behavior? | Q | — | A | resolved (removed in v2) |
-| PR25 | Behavior when no history is present at all? | Q | — | A | resolved (removed in v2) |
 | PR26 | Retire the legacy increment path; understand its remaining use (likely bodyweight) and fold cleanly into a v9 engine model | F | HIGH | I | scoped (see `I-engine-v9.md`; spawns T-I1–T-I4) |
 | PH26 | Clean up settings page: move match-weight/export/delete-acct to a dedicated page | UX | LOW | F | done (/more/account; PR pending) |
 | PH27 | Move template share-code into the New Template button (tray: blank or enter code) | F | LOW | F | done (PR pending) |
@@ -64,25 +63,27 @@ Status legend and workstreams: see [`README.md`](./README.md).
 | PH41 | History includes the current (incomplete) workout — expected it to be excluded until complete | Q→B | — | A | answered → T-A8 |
 | PH42 | Note pencil icon hard to recognize | UX | MED | E | done (legible SVG PencilGlyph, +20%; absorbs I15) — PR pending |
 | O1 | Auditability: re-stamp every open decision to the new params version on a bump (even when output is unchanged); make version + decision kind viewable from the day-view exercise dropdown | F | — | I | **done (2026-06-25):** invariant already held (`workout_exercises.params_version` advances on every reconcile, day view reconciles on load) — confirmed, lazy is sufficient. Built the "Prescription detail" reveal (kind + verified-as-of vs computed-under + rationale/trace). Admin-gating = easy follow-up. |
-| PH43 | Performance & efficiency pass: measure first (bundle analyzer, slow-query baseline), then client bundle/render wins + query-scope/caching. Key finding: backend already does the heavy lifting — do **not** relocate the engine to edge/DB | F | — | J | inbox (directional; plan drafted in [`J-performance.md`](./J-performance.md), not scheduled) |
-| PH44 | History e1RM appears to take the session **max**; should **average** e1RM across all working sets in the session | B | — | B | inbox |
-| PH45 | Active/in-progress workout must not feed live prescriptions or predictions — limit to previous completed workouts; current workout becomes canonical only on complete + feedback (live posting to history is fine) | D→B | HIGH | A/I | **decided (owner 2026-06-26)** — resolves PH40/PH41/T-A7/T-A8 (build pending) |
+| N1 | Performance & efficiency pass: measure first (bundle analyzer, slow-query baseline), then client bundle/render wins + query-scope/caching. Key finding: backend already does the heavy lifting — do **not** relocate the engine to edge/DB | F | — | J | inbox (directional; plan in [`J-performance.md`](./J-performance.md), not scheduled). Cross-links PH29 (page-switch slowness) |
+| N2 | History e1RM appears to take the session **max**; should **average** e1RM across all working sets in the session | B | — | B | inbox. Likely shares a fix with N3 (engine anchor already averages session e1RM) |
+| N3 | Active/in-progress workout must not feed live prescriptions or predictions — limit to previous completed workouts; current workout becomes canonical only on complete + feedback (live posting to history is fine) | D→B | HIGH | A/I | **decided (owner 2026-06-26)** — resolves T-A7/T-A8 (build pending) |
 
-## Open follow-up tasks (spawned during triage)
+## Open follow-up tasks
 
-Tasks surfaced by the answered engine/metrics questions (workstream A). Details
-and rationale in [`A-engine-metrics.md`](./A-engine-metrics.md#spawned-follow-up-tasks-add-to-backlogmd).
+Tasks surfaced by the answered engine/metrics questions (workstream A) and the
+engine cleanup (workstream I). Details and rationale in
+[`A-engine-metrics.md`](./A-engine-metrics.md#spawned-follow-up-tasks-add-to-backlogmd)
+and [`I-engine-v9.md`](./I-engine-v9.md). Resolved follow-ups (e.g. **T-A3**) are
+in [`archive.md`](./archive.md).
 
 | ID | From | Title | Type | Status |
 |----|------|-------|------|--------|
 | T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley stats view); decide what screens show | D→F | needs-input |
 | T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores` | D→B | needs-input |
-| T-A3 | S4 | Confirm active `weight_selection`; surface the legacy fallback | Q→B | resolved (fallback moot under v9; folded into WS I) |
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (see T-I3/T-I5) |
 | T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input (sequenced in WS I) |
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
-| T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D→F | **decided (2026-06-26, PH45): prescriptions/predictions read previous completed workouts only; current-session sets never re-price the live session** (build pending) |
-| T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D→F | **decided (2026-06-26, PH45): in-progress sets may post to history/stats live, but must NOT feed prescriptions/predictions until the workout is complete with feedback** (build pending) |
+| T-A7 | PH40 | Freeze in-session prescription at session start vs adapt live (+ make legible) | D→F | **decided (2026-06-26, N3): prescriptions/predictions read previous completed workouts only; current-session sets never re-price the live session** (build pending) |
+| T-A8 | PH41 | Decide whether in-progress workout sets count toward history/stats | D→F | **decided (2026-06-26, N3): in-progress sets may post to history/stats live, but must NOT feed prescriptions/predictions until the workout is complete with feedback** (build pending) |
 | T-I1 | PR26 | Decide bodyweight data model (load type; bodyweight as effective load; assisted = negative) | D | **decided (2026-06-25)** — bodyweight-only: profile BW as read-only load, progress on reps; loadable: BW+added, BW used in calc not shown; assisted: negative weight, UI deferred if no such exercises yet. See `I-engine-v9.md`. |
 | T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | ready (unblocked by T-I1); needs load-type column + bodyweight-as-load |
 | T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
@@ -93,10 +94,14 @@ and rationale in [`A-engine-metrics.md`](./A-engine-metrics.md#spawned-follow-up
 
 ## Appendix: verbatim source
 
-Exact text from the Notes doc, grouped as written, so the original phrasing is
-never lost.
+The **append-only permanent record** of the owner's raw notes, exactly as
+written, so the original phrasing is never lost — independent of how items were
+later split, reworded, or archived. Each intake batch gets its own dated heading;
+add the next batch below the last, never edit a prior one.
 
-### Stats, metrics, calculations
+### Batch 1 — "Notes" doc (imported 2026-06-22, reconciled v2 same day)
+
+#### Stats, metrics, calculations
 - **S1** — How is estimated strength calculated?
 - **S2** — How is strength increase calculated?
 - **S3** — How are deload weeks handled in stats?
@@ -108,19 +113,19 @@ never lost.
 
 > _v2 removed S4 ("Progression algorithm tuning: when to add sets, reps, or weight? It seems like it's preferring to add weight each week… [double-progression description]") and S5 ("How does the progression algorithm handle misses…") as resolved — answers retained in `A-engine-metrics.md`._
 
-### Macrocycles
+#### Macrocycles
 - **M8** — "I'm thinking there should be a bit of stats unification between meso stats and macro stats. Stats that should be in both: Meso stats should get estimated strength under performance. Macro stats should get the same balance and performance tabs, probably via a three way page toggle; overview, balance, performance."
 - **M9** — "Choosing a custom duration in macrocycles will not allow an empty cell even momentarily. This prohibits the user from backspacing the value to enter a new one. This needs to be handled."
 - **M10** — "Only show unplanned mesocycles under the macrocycle overview page. This leaves the cycles page cleaner, and the user can click on the macrocycle to see and begin planning unplanned mesos."
 
-### More important
+#### More important
 - **I11** — "Meso stats needs a rework. Include strength increases for all exercises? Q: how is it calculated"
 - **I12** — "Need to address mesocycle management under a macrocycle"
 - **I13** — "Expose a per-exercise, per-user weight increment. It needs to be per-user as not to mess with other users who may have different increments on the same exercise/machine." (NOTE: a per-user/per-exercise `weight_increment` override shipped 2026-06-21 per PROGRESS.md — verify this fully satisfies the note before closing.)
 - **I14** — "Increase the complete workout feedback sliders resolution to the same resolution scale as the exercise feedback. This will unify the feedback scales."
 - **I15** — "Put an exercise note icon to the left of the exercise history icon in the workout day view, for users to quickly log an exercise note."
 
-### Less important
+#### Less important
 - **P16** — "The buttons on the mesocycle overview page are monotonous and ugly. I am thinking a page toggle between overview and stats."
 - **P17** — "When the user drops down the weeks/days from the workout page and selects a new day, it displays the page back button in the top left corner, but I don't like this in this condition and it clutters it up. The user can just select the current day again to go back. Remove this."
 - **P18** — "The set type option from the set menu can be removed."
@@ -128,7 +133,7 @@ never lost.
 - **P20** — "Exercises search list should live filter as you type"
 - **P21** — "Should muscle soreness be recorded when the user states they were sore for 0 days?"
 
-### Progression model
+#### Progression model
 - **PR26** *(added v2)* — "From what I understand the legacy increment path that it's keeping as a fall back. This legacy model probably shouldn't be present at all, however we need to understand where and how it's still used if at all to ensure it's done correctly. I think the only remaining use case might be how bodyweight only and bodyweight loadable exercises are handled. We should consider these and any other use cases and probably roll them into the v9 model so that everything is handled cleanly."
 - **Owner ruling (2026-06-25)** *(→ T-I5)* — "We don't ever want to use the old, defunct load_first, prior peak back off seed ever again for any reason. This is discussed in the triage docs… That logic is broken fundamentally, and it should be retired at the next possible opportunity. The goal with prescriptions is not always to provide one at any cost — it's to use the data when available to effectively train the user as best as possible. If something truly does not have enough data to provide a starting place, the user should just seed themselves and enter a starting place themselves manually rather than make up data or produce bad numbers."
 
@@ -139,7 +144,7 @@ never lost.
 - **PR24** — "What does it do if I add or sub in an exercise mid-cycle which has exercise history, but no history in the current meso?"
 - **PR25** — "What does it do if no history is present?"
 
-### Phone Notes
+#### Phone Notes
 - **PH26** — PRIORITY LOW — "Clean up settings page: move match weight, export, delete acct to a dedicated page"
 - **PH27** — PRIORITY LOW — "Move template share code to the new template button. New button shows tray similar to the create new mesocycle, but shows blank template or enter code."
 - **PH28** — PRIORITY HIGH — "Weight input in profile is entered in cm and the converted to ft. should follow units"
@@ -158,9 +163,11 @@ never lost.
 - **PH41** — NEEDS THOUGHT — "History also includes current workout — had in my head that basically a current workout doesn't get entered anywhere until it's complete"
 - **PH42** — PRIORITY MEDIUM — "Note pencil icon is hard to see what it is"
 
-### Performance & efficiency (added 2026-06-26)
-- **PH43** — directional (owner not ready to execute): "I'm not ecstatic about the speed/performance of the app as is. What improvements to speed and efficiency could be made based on the app structure so far." Asked specifically about (a) front-end vs backend/DB split of heavy lifting, (b) whether to move more to DB/edge functions and make the front end a thinner UI client, (c) load-time reductions, (d) server-load / compute / data-transfer cost reductions, (e) other structural/refactor observations. Directional answer + phased plan captured in [`J-performance.md`](./J-performance.md). Headline: the backend already does the heavy lifting (SQL-view aggregation, server-side engine + freshness reconcile, batched/indexed queries) — the real wins are on the **client bundle/render path** plus a few **query-scope/caching** fixes; relocating compute to Supabase Edge Functions is **not** the win, and the engine must stay pure TS (hard rule #3).
+### Batch 2 — performance + engine-correctness (2026-06-26)
 
-### Engine / prescription corrections (added 2026-06-26)
-- **PH44** — "E1rm in history should average the stat over all session sets — appears to take max"
-- **PH45** — "Decision: an active workout should definitely not play into live prescriptions. Right now, if the first set of a current exercise ends up being your recency-weighted best set, then all subsequent sets immediately anchor on it. Since, at that moment, only one set is logged, then that set is the average of all sets in your best session, therefore all remaining sets get updated to the same weight. Prescriptions and predictions should only look at previous workouts, not the current one. The current workout becomes canonical once it's marked as complete, with feedback. It's fine if the current sets post to history live as they're done, but prescriptions should be limited to previous workouts"
+#### Performance & efficiency
+- **N1** — directional (owner not ready to execute): "I'm not ecstatic about the speed/performance of the app as is. What improvements to speed and efficiency could be made based on the app structure so far." Asked specifically about (a) front-end vs backend/DB split of heavy lifting, (b) whether to move more to DB/edge functions and make the front end a thinner UI client, (c) load-time reductions, (d) server-load / compute / data-transfer cost reductions, (e) other structural/refactor observations. Directional answer + phased plan captured in [`J-performance.md`](./J-performance.md). Headline: the backend already does the heavy lifting (SQL-view aggregation, server-side engine + freshness reconcile, batched/indexed queries) — the real wins are on the **client bundle/render path** plus a few **query-scope/caching** fixes; relocating compute to Supabase Edge Functions is **not** the win, and the engine must stay pure TS (root `CLAUDE.md` hard rule #3).
+
+#### Engine / prescription corrections
+- **N2** — "E1rm in history should average the stat over all session sets — appears to take max"
+- **N3** — "Decision: an active workout should definitely not play into live prescriptions. Right now, if the first set of a current exercise ends up being your recency-weighted best set, then all subsequent sets immediately anchor on it. Since, at that moment, only one set is logged, then that set is the average of all sets in your best session, therefore all remaining sets get updated to the same weight. Prescriptions and predictions should only look at previous workouts, not the current one. The current workout becomes canonical once it's marked as complete, with feedback. It's fine if the current sets post to history live as they're done, but prescriptions should be limited to previous workouts"

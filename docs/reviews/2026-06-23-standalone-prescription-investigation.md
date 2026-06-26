@@ -9,7 +9,7 @@ inflated. Hypothesis raised: standalone (no-macrocycle) usage may be involved.
 engine_params **v11 (INACTIVE)**; S4 deferred. Activation is the documented manual
 step after a replay diff (see `docs/deployment/manual-operations.md` and the
 checklist at the end of this file). This confirms and extends the previously-filed
-gap **T-A6 / PR22 / PR23** (`docs/triage/A-engine-metrics.md`).
+gap **T-A6 / PR22 / PR23** (`docs/notes/A-engine-metrics.md`).
 
 ---
 
@@ -244,8 +244,8 @@ values when there's no confident anchor (today's null-`priorPeak` behavior).
 > never-performed per-column-max set pre-S2) and **must never be used again.** The
 > decided precedence is **confident anchor → user `initial_*` (manual seed) →
 > unseeded/prompt**; the engine never fabricates a seed from a peak set. This is
-> tracked as `T-I5` in [`docs/triage/I-engine-v9.md`](../triage/I-engine-v9.md)
-> (decision + principle) and `docs/triage/backlog.md`. Retire `meso_seed_backoff_pct`
+> tracked as `T-I5` in [`docs/notes/I-engine-v9.md`](../notes/I-engine-v9.md)
+> (decision + principle) and `docs/notes/backlog.md`. Retire `meso_seed_backoff_pct`
 > with the branch.
 - **Effect:** week 1 lands at ~8 reps in-window instead of 16–30. Directly kills
   the headline symptom; this *is* T-A6, finished properly (reps as well as
@@ -453,6 +453,6 @@ INACTIVE; no data rewrite. Activation pending the replay diff. Per-item notes be
   `baseWeight` + clamp-to-window reps. (Defect #4 / S5.)
 - `src/lib/engine/rules/feedback.ts:54-59` session dampener (`fatigue ≥ 3` OR
   `performance ≤ 1`) — over-blunt. (Defect #4 / S5 tuning.)
-- `docs/triage/A-engine-metrics.md` PR22/PR23 → **T-A6** (this report closes the
+- `docs/notes/A-engine-metrics.md` PR22/PR23 → **T-A6** (this report closes the
   analysis for it and adds the reps + view + e1RM dimensions).
 </content>

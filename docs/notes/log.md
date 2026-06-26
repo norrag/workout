@@ -1,32 +1,72 @@
-# Triage log
+# Notes-area log
 
 Append a dated entry whenever a session moves work. Newest first.
+(Formerly "Triage log" — the area was rebranded to an ongoing notes system on
+2026-06-26; see the entry below.)
 
-## 2026-06-26 — Session 7: capture three owner notes (no build)
+## 2026-06-26 — Session 8: intake batch 2 (perf + engine corrections), notes-only
 
-Owner reviewed app speed/perf and added three items; explicitly **not** ready to
-execute — capture only.
+Owner handed over a perf review request plus two notes; explicitly **not** ready
+to execute — capture/assess only. Ran the intake protocol; logged as appendix
+**Batch 2**. Three new items (new `N*` batch-prefix per the ID convention):
 
-- **PH43 — Performance & efficiency (new workstream J).** Reviewed the app structure
-  for the owner's perf questions. Finding: the backend already does the heavy lifting
-  (SQL-view aggregation, server-side engine + freshness reconcile, batched/indexed
-  queries); the real wins are client bundle/render + a few query-scope/caching fixes,
-  **not** relocating compute to edge/DB (engine stays pure TS, hard rule #3). Drafted
-  a phased, measure-first plan in [`J-performance.md`](./J-performance.md) and added
-  WS **J** to the README. Status: inbox / directional, unscheduled.
-- **PH44 — History e1RM averaging (new, B, WS-B).** Owner: history e1RM "appears to
-  take max"; it should **average** e1RM across all working sets in the session.
-  Captured, not yet investigated against `v_exercise_*` views / `ExerciseHistoryList`.
-- **PH45 — Active workout must not feed live prescriptions (owner DECISION).**
-  Prescriptions/predictions must read **previous completed workouts only**; the
-  current workout becomes canonical only when marked complete **with feedback**.
-  Live posting of current sets to history is fine. This **resolves the open
-  needs-input on T-A7 (PH40) and T-A8 (PH41)** — both moved to decided/build-pending.
-  Root cause the owner described: when the first logged set of a current exercise is
-  the recency-weighted best, the anchor (session-average e1RM, but only one set
-  logged) snaps all remaining sets to that weight. Build deferred per owner.
+- **N1 — Performance & efficiency (new workstream J).** Reviewed the app structure
+  against the owner's perf questions. Finding: the backend already does the heavy
+  lifting (SQL-view aggregation, server-side engine + freshness reconcile,
+  batched/indexed queries); the real wins are client bundle/render + a few
+  query-scope/caching fixes, **not** relocating compute to edge/DB (engine stays
+  pure TS, hard rule #3). Phased measure-first plan in
+  [`J-performance.md`](./J-performance.md); added WS **J** to the README.
+  Cross-linked PH29 (page-switch slowness overlaps the streaming work).
+- **N2 — History e1RM averaging (B, WS-B).** Owner: history e1RM "appears to take
+  max"; should **average** across all working sets in the session. Not yet
+  investigated against `v_exercise_*` / `ExerciseHistoryList`. Flagged as likely
+  sharing a fix with N3 (the engine anchor already averages session e1RM).
+- **N3 — Active workout must not feed live prescriptions (owner DECISION).**
+  Prescriptions/predictions read **previous completed workouts only**; the current
+  workout becomes canonical only when marked complete **with feedback**. Live
+  posting of current sets to history is fine. This **resolves the open needs-input
+  on T-A7 (PH40) and T-A8 (PH41)** — both moved to decided/build-pending. Root
+  cause the owner described: the first logged set of a current exercise, if it's
+  the recency-weighted best, makes the session-average anchor (one set logged)
+  snap all remaining sets to that weight. Build deferred per owner.
 
-No code changed; no tests run (notes-only session).
+No code changed; no tests run (notes-only). This branch
+(`claude/app-performance-review-twermm`, PR #77) was originally cut against the
+pre-rebrand `docs/triage/` tree; merged `main` (the rebrand, PR #76) and re-applied
+all three items into the new `docs/notes/` structure with `N*` IDs.
+
+## 2026-06-26 — Session 7: rebrand triage → ongoing notes area
+
+Owner asked to turn the one-time "triage" area into a **functional, ongoing**
+place to drop notes that Claude assesses, relates, groups, prioritizes, tracks,
+and prunes — with Claude owning the structure and the owner interfacing through
+chat rather than the files. No backlog items were worked this session; this was a
+structural reorg.
+
+- **Renamed `docs/triage/` → `docs/notes/`** (`git mv`, history preserved).
+- **New `CLAUDE.md`** — the operating manual for the area: the intake protocol
+  (capture verbatim → parse → **assess against known items** for dupes /
+  relationships / dependencies / grouping / priority → classify → scope →
+  log), the full lifecycle incl. a new `archived` terminal state, the
+  consolidation & purge policy, the file map, and the resume protocol. This is
+  the standing instruction set the owner asked for.
+- **Reframed `README.md`** to a thin orientation + the workstream roster
+  (pointer to `CLAUDE.md` for process). **Reframed `backlog.md`** from a finite
+  "imported 2026-06-22" doc to the **live index**; its verbatim appendix is now
+  the **append-only** record, organized into dated **intake batches** (Batch 1 =
+  the original Notes doc) so future drops append cleanly.
+- **New `archive.md` + first purge sweep.** Moved genuinely-terminal rows out of
+  the live index: merged/confirmed (**M9**, **I13**), superseded (**I15** → PH42),
+  resolved-and-removed-in-v2 (**S4**, **S5**, **PR22–PR25**), and the resolved
+  follow-up **T-A3**. Kept all "done (PR pending)" items live (not yet merged) per
+  the purge policy. Raw text for the moved items stays in the backlog appendix.
+- **Fixed cross-references** to the renamed folder in `docs/PROGRESS.md` and
+  `docs/reviews/2026-06-23-standalone-prescription-investigation.md`, and added a
+  pointer to the notes area from the root `CLAUDE.md` docs list so it's
+  integrated into the overall doc system.
+- No code, schema, or engine changes. Detail files (`A-engine-metrics.md`,
+  `I-engine-v9.md`, `scoping.md`) carried over unchanged.
 
 ## 2026-06-25 — Session 6: WS-I kickoff — T-I1 decided + T-I5 built (gated)
 

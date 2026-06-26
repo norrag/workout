@@ -134,7 +134,7 @@ defer to the user's own manual seed.
   throwaway **v13** "deload tuning" row exists in the hosted DB only (no migration,
   owner-flagged test) — unrelated; v14 is the next real version.
 - **T-I1 bodyweight model decided** (owner) and recorded in
-  `docs/triage/I-engine-v9.md`: bodyweight-only (profile bodyweight as read-only
+  `docs/notes/I-engine-v9.md`: bodyweight-only (profile bodyweight as read-only
   load, reps-only progression), bodyweight-loadable (bodyweight + added; bodyweight
   used in calc, not shown), bodyweight-assisted (negative weight; UI deferred if no
   such exercises yet). Unblocks T-I2 (the v9 no-anchor / bodyweight model).
@@ -371,7 +371,7 @@ Follow-ups from field testing the PH28/units work. All green (typecheck, lint,
 
 ## 2026-06-22 — Triage slices 1 + 2 + the real PH35 fix (profiles RLS recursion)
 
-Field-notes triage (see `docs/triage/`): the genuine PH35 root cause plus slice 1
+Field-notes triage (see `docs/notes/`): the genuine PH35 root cause plus slice 1
 (PH42, P20, PH26) and slice 2 (P19, PH27, PH28). All green (typecheck, lint, 486
 unit tests).
 

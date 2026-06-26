@@ -1,11 +1,11 @@
-# Workstream J — Performance & efficiency (PH43)
+# Workstream J — Performance & efficiency (N1)
 
 > **Status: directional / not scheduled.** Owner flagged perceived speed but is
 > not ready to execute. This file captures the analysis + a phased, **measure-first**
 > plan so it isn't lost. It also lines up with the still-open Phase 7 "performance
 > pass" in `docs/07-implementation-plan.md` / `docs/PROGRESS.md`.
 
-## The owner's questions (PH43)
+## The owner's questions (N1)
 
 1. How much heavy lifting is on the front-end vs the backend/DB?
 2. Would moving more work into DB/edge functions (thinner UI client) help?
@@ -107,4 +107,4 @@ analyzer, no Sentry, Phase 7 perf pass unstarted) — so measure first.
 
 ## Cross-refs
 - Relates to PH29 (page-switch slowness/flicker — Suspense/streaming overlaps).
-- Independent of PH44/PH45 (those are engine-correctness, not performance).
+- Independent of N2/N3 (those are engine-correctness, not performance).
