@@ -2,7 +2,52 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-25 (latest) — Anchor-based deload (engine_params v15)
+## 2026-06-26 (latest) — Group 1: active-workout isolation + session-average e1RM (N3/T-A7/T-A8, N2)
+
+First build group off the notes backlog (`docs/notes/backlog.md`). Two owner-decided
+engine-correctness fixes, both in query land + one read-model view; the pure engine is
+unchanged.
+
+- **N3 / T-A7 / T-A8 — prescriptions & predictions read previous *completed* workouts
+  only (`src/lib/queries/anchors.ts`).** The recency-weighted strength anchor query read
+  *all* of a user's working sets, including the in-progress workout's. So the first
+  logged set of the current exercise, if it was the recency-weighted best, made the
+  session-average anchor (one set logged ⇒ that set *is* the average) snap every
+  remaining live prescription onto it — the repricing the owner described (PH40/PH41,
+  closes T-A7/T-A8). Fix: after fetching candidate sets, filter to those whose parent
+  `workouts.status = 'completed'` (a workout reaches `completed` at the same step
+  feedback is captured, `logging.ts completeWorkout`), so the in-progress workout never
+  feeds the anchor. Single-point fix at the anchor source ⇒ every consumer (day-view live
+  predictor, seed, progression, regeneration) inherits it. **In-progress sets still post
+  to history/stats live** (owner: that's fine) — only the anchor (prescription/prediction
+  input) excludes them; the current workout becomes canonical for the engine on complete.
+  IO change; per the codebase convention (pure helpers unit-tested, data assembly covered
+  by integration smoke) no new mock test — verified by typecheck/lint + the full suite.
+- **N2 / T-A1 (history-stat half) — session e1RM = average, on the engine formula.** The
+  per-session e1RM stat took the session *best* set on *raw single-formula Epley*. Owner
+  (N2): average over the session's working sets; (T-A1) unify on the engine's e1RM. Both
+  surfaces changed to **average the stored engine per-set e1RM** (`logged_sets.e1rm`,
+  PH31 — RIR-aware averaged Epley/Brzycki):
+  - `src/lib/queries/history.ts` — `sessionBestE1rm` → `sessionAvgE1rm` (Exercise-page
+    history / PH32 flip view); nulls skipped, not counted as zero; rounded to 1 dp.
+  - `supabase/migrations/20260626000001_v_exercise_history_avg_e1rm.sql` — `v_exercise_history.e1rm`
+    from `max(weight·(1+reps/30))` → `round(avg(logged_sets.e1rm) filter (not warmup), 1)`.
+    Drop+recreate (column type double→numeric; CREATE OR REPLACE can't change type). No SQL
+    view depends on it (macro/meso summaries derive in the query layer). security_invoker
+    preserved; RLS unaffected (reads owner-scoped `logged_sets`). `v_exercise_prs` already
+    recomputes on the engine formula (2026-06-24) so PR badges stay coherent and unchanged.
+  - Trend consumers (`stats.getMesoProgressScores`, `macro` est-strength, `exercises`
+    overview bars) read `e1rm` as a per-session value with no best-set assumption — they
+    now read session averages. `comparability.ts`/`pickSessionE1rm` is a separate analysis
+    system (already engine-formula, deliberate representative-top-set) — left as-is.
+- **Tests:** `exercise-overview.test.ts` — `sessionAvgE1rm` (average vs old max, null
+  skipping, 1-dp rounding, bodyweight ⇒ null). Suite green (540), typecheck + lint clean.
+- **Deferred to Group 2 (owner rulings recorded, not built here):** store bodyweight on
+  the set at log time, uneditable after complete (decision #4); no explicit seed-weight
+  prompt — leave weight/reps blank + set the prescription-reasoning copy to invite a
+  manual starting point (decision #5).
+
+## 2026-06-25 — Anchor-based deload (engine_params v15)
 
 Owner bug: on a deload week the day-view logging field showed an absurd rep count
 (e.g. **32**, the predictor's high-end cap) while the prescription detail showed the

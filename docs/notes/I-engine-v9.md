@@ -44,9 +44,14 @@ the fallback** — this decision removes that fallback.
    data-derived seed path.*
 2. **Else → the user's own planner-board `initial_*`** (`meso_exercises.initial_weight/
    reps/sets`) — a manual seed the user controls. No back-off, no fabrication.
-3. **Else (no anchor, no initial) → do not fabricate.** Leave the slot unseeded and
-   prompt the user to enter a starting point. Never compute a load from a peak set,
-   a per-column max, or a low-confidence anchor.
+3. **Else (no anchor, no initial) → do not fabricate.** Leave the slot unseeded.
+   **DECIDED (owner 2026-06-26, #5): no dedicated "enter a starting weight" prompt
+   UI** — just leave the weight/reps fields **blank** for the user to fill (obvious
+   enough on its own), and set the exercise's **prescription-reasoning copy** (the
+   day-view `…` dropdown / prescription detail) to an informative line like *"no
+   previous history to prescribe a weight and reps — enter your own starting weight
+   and target N reps in reserve"* (not verbatim). Never compute a load from a peak
+   set, a per-column max, or a low-confidence anchor.
 
 This is `T-I5` below, and it tightens the answers to `T-I2`/`T-I3`: the "no-anchor /
 cold-start model" is, for the *no-data* case, **manual-seed deferral, not a
@@ -156,10 +161,14 @@ Binding direction for the three load types. Resolves T-I1; sequences T-I2.
   for all three bodyweight types. Bodyweight is a profile value that **drifts**, so
   treat it as a *derived* engine input (like the anchor) — excluded from the
   freshness fingerprint, refreshed on recompute — OR capture the bodyweight on the
-  logged set at log time for historical honesty. **Open sub-question for T-I2:**
-  store bodyweight-on-set vs. read live profile weight (affects e1RM reproducibility
-  of past sets). Bodyweight-only display is read-only prefilled; loadable/assisted
-  hide the bodyweight component and surface only the added/assist value.
+  logged set at log time for historical honesty. **DECIDED (owner 2026-06-26, #4):
+  store the bodyweight on the logged set at log time, uneditable after the workout is
+  complete.** Past sets keep the bodyweight they were performed at ⇒ historical e1RM
+  stays reproducible; live (incomplete) sets can still pick up a corrected profile
+  weight, but it locks on completion. (Implies a `bodyweight` numeric column on
+  `logged_sets`, prefilled from profile at log time.) Bodyweight-only display is
+  read-only prefilled; loadable/assisted hide the bodyweight component and surface
+  only the added/assist value.
 - `weight = 0` stops being the bodyweight signal; the rep-window math then has a
   real load to anchor on, which is what unblocks deleting the legacy no-anchor path.
 
