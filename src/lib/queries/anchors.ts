@@ -36,7 +36,7 @@ export async function getExerciseE1rmAnchors(
   const { data: sets, error } = await supabase
     .from("logged_sets")
     .select(
-      "exercise_id, workout_exercise_id, weight, reps, rir_reported, performed_at",
+      "exercise_id, workout_exercise_id, workout_id, weight, reps, rir_reported, performed_at",
     )
     .eq("user_id", userId)
     .in("exercise_id", exerciseIds)
@@ -48,9 +48,28 @@ export async function getExerciseE1rmAnchors(
   if (error) throw error;
   if (!sets || sets.length === 0) return out;
 
+  // N3 (resolves T-A7/T-A8): prescriptions and predictions read PREVIOUS
+  // COMPLETED workouts only. The in-progress workout's sets post to history live
+  // as they're logged, but must NOT feed the anchor — otherwise the first set of
+  // the current exercise, if it's the recency-weighted best, makes the session
+  // average (one set logged ⇒ that set IS the average) snap every remaining
+  // prescription onto it. A workout becomes canonical for the engine only once
+  // it is marked complete (with feedback ⇒ status 'completed'). Filtered in query
+  // land so the pure engine stays clock-/state-free.
+  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
+  const { data: completedWorkouts, error: cwError } = await supabase
+    .from("workouts")
+    .select("id")
+    .in("id", workoutIds)
+    .eq("status", "completed");
+  if (cwError) throw cwError;
+  const completedIds = new Set((completedWorkouts ?? []).map((w) => w.id));
+  const completedSets = sets.filter((s) => completedIds.has(s.workout_id));
+  if (completedSets.length === 0) return out;
+
   // assumed RIR = the parent prescription's target RIR (RIR premise, doc 11),
   // unless the set carried an explicit reported RIR
-  const weIds = [...new Set(sets.map((s) => s.workout_exercise_id))];
+  const weIds = [...new Set(completedSets.map((s) => s.workout_exercise_id))];
   const { data: wes, error: weError } = await supabase
     .from("workout_exercises")
     .select("id, target_rir")
@@ -60,7 +79,7 @@ export async function getExerciseE1rmAnchors(
 
   const now = Date.now();
   const byExercise = new Map<string, E1rmSample[]>();
-  for (const s of sets) {
+  for (const s of completedSets) {
     const ageDays = Math.max(
       0,
       (now - new Date(s.performed_at).getTime()) / DAY_MS,

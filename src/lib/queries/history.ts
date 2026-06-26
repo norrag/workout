@@ -10,8 +10,8 @@ export interface HistoryEntry {
   performed_on: string;
   top_weight: number | null;
   reps: string;
-  /** session-best stored per-set e1RM (PH31/PH32 flip view); null if none stored
-   * (e.g. a bodyweight session, where weight 0 yields no estimate) */
+  /** session-average stored per-set e1RM (PH31/PH32 flip view); null if none
+   * stored (e.g. a bodyweight session, where weight 0 yields no estimate) */
   e1rm: number | null;
   is_deload: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
@@ -25,14 +25,18 @@ export interface HistoryMesoGroup {
 }
 
 /**
- * The session's best stored per-set e1RM (PH32 flip view): the strongest engine
- * estimate among the session's working sets, mirroring how top_weight is the
- * session's heaviest set. Null when no set carries an estimate — e.g. a
- * bodyweight session, where weight 0 yields no e1RM (the flip view shows "—").
+ * The session's average stored per-set e1RM (PH32 flip view, N2): the mean engine
+ * estimate across the session's working sets. N2 — the session e1RM stat should
+ * average over all the session's sets, not take the single best set (the old
+ * `max`), so one strong set no longer defines the session. Rounded to one decimal
+ * to match the stored per-set precision. Null when no set carries an estimate —
+ * e.g. a bodyweight session, where weight 0 yields no e1RM (the flip view shows
+ * "—"); null per-set values are skipped, never counted as zero.
  */
-export function sessionBestE1rm(e1rms: (number | null)[]): number | null {
+export function sessionAvgE1rm(e1rms: (number | null)[]): number | null {
   const present = e1rms.filter((v): v is number => v != null);
-  return present.length > 0 ? Math.max(...present) : null;
+  if (present.length === 0) return null;
+  return Math.round((present.reduce((a, b) => a + b, 0) / present.length) * 10) / 10;
 }
 
 /**
@@ -124,7 +128,7 @@ export async function getExerciseHistory(
       .sort((a, b) => a.set_number - b.set_number)
       .map((s) => s.reps)
       .join(", ");
-    const e1rm = sessionBestE1rm(group.map((s) => s.e1rm));
+    const e1rm = sessionAvgE1rm(group.map((s) => s.e1rm));
     const micro = microById.get(group[0].microcycle_id);
     const workout = workoutById.get(workoutId);
     return {

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { buildExerciseMacroBars } from "../exercises";
 import {
   groupHistoryByMeso,
-  sessionBestE1rm,
+  sessionAvgE1rm,
   type HistoryEntry,
 } from "../history";
 
@@ -49,18 +49,25 @@ describe("buildExerciseMacroBars", () => {
   });
 });
 
-describe("sessionBestE1rm", () => {
-  it("takes the strongest stored per-set estimate in the session", () => {
-    expect(sessionBestE1rm([220.5, 281.3, 250])).toBe(281.3);
+describe("sessionAvgE1rm", () => {
+  it("averages the stored per-set estimates across the session (N2)", () => {
+    // (220.5 + 281.3 + 250) / 3 = 250.6, not the max 281.3
+    expect(sessionAvgE1rm([220.5, 281.3, 250])).toBe(250.6);
   });
 
-  it("ignores sets without a stored estimate", () => {
-    expect(sessionBestE1rm([null, 200, null])).toBe(200);
+  it("ignores sets without a stored estimate (averages only the present ones)", () => {
+    expect(sessionAvgE1rm([null, 200, null])).toBe(200);
+    expect(sessionAvgE1rm([null, 200, 210])).toBe(205);
+  });
+
+  it("rounds to one decimal to match stored per-set precision", () => {
+    expect(sessionAvgE1rm([100, 101])).toBe(100.5);
+    expect(sessionAvgE1rm([100, 100, 101])).toBe(100.3);
   });
 
   it("returns null when no set carries an estimate (bodyweight session)", () => {
-    expect(sessionBestE1rm([null, null])).toBeNull();
-    expect(sessionBestE1rm([])).toBeNull();
+    expect(sessionAvgE1rm([null, null])).toBeNull();
+    expect(sessionAvgE1rm([])).toBeNull();
   });
 });
 

@@ -4,6 +4,36 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-26 — Session 9: Group 1 built — active-workout isolation + session-average e1RM
+
+Owner reviewed the proposed next work-groups and selected **Group 1** (engine
+correctness), ruling: unify the e1RM systems by **averaging the stored engine per-set
+e1RM**. Built both items; branch `claude/next-work-groups-88mqme`.
+
+- **N3 / T-A7 / T-A8 — done (PR pending).** `getExerciseE1rmAnchors` (`anchors.ts`) now
+  filters candidate sets to those whose parent `workouts.status='completed'`, so the
+  in-progress workout never feeds the anchor (the recency-best-first-set repricing the
+  owner described). Single-point fix ⇒ live predictor, seed, progression, regeneration
+  all inherit it. History/stats keep posting in-progress sets live (owner: fine); only
+  the prescription/prediction input excludes them. `status='completed'` is set at the same
+  step feedback is captured (`completeWorkout`), so it's a faithful "canonical with
+  feedback" gate. T-A7/T-A8 moved done.
+- **N2 / T-A1 (history half) — done (PR pending).** Session e1RM was the session *max* on
+  raw Epley; now the **session average of `logged_sets.e1rm`** (engine RIR-aware formula).
+  Two surfaces: `history.ts sessionBestE1rm → sessionAvgE1rm` (Exercise history / PH32
+  flip), and `v_exercise_history.e1rm` (migration `20260626000001`, drop+recreate for the
+  double→numeric type change). `v_exercise_prs` already recomputes on the engine formula
+  (06-24), so PR badges stay coherent. Trend consumers read per-session values, no best-set
+  assumption — they now read averages; `comparability.ts` (separate analysis system,
+  already engine-formula) left as-is. **T-A1 advanced** (only `v_exercise_overview.best_e1rm`
+  still raw-Epley; the "what each screen shows" + PH39 decay question stay open).
+- **Tests:** `sessionAvgE1rm` unit tests (average vs old max, null-skip, 1-dp rounding,
+  bodyweight⇒null). Full suite green (540), typecheck + lint clean. Engine itself unchanged.
+- **Recorded for Group 2 (owner rulings, not built):** store bodyweight on the set at log
+  time, uneditable after complete (#4); no seed-weight prompt — blank weight/reps + an
+  informative prescription-reasoning line inviting a manual start (#5). Folded into
+  `I-engine-v9.md` sequencing (T-I2).
+
 ## 2026-06-26 — Session 8: intake batch 2 (perf + engine corrections), notes-only
 
 Owner handed over a perf review request plus two notes; explicitly **not** ready

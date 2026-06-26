@@ -18,8 +18,9 @@ function shortDate(iso: string): string {
  * reveal the note when the icon is tapped.
  *
  * PH32: tapping a row flips every row between the default weight×reps view and
- * an estimated-1RM view (the engine's stored per-set e1RM, session best), with
- * a quick fade. The flip is list-wide; default on load is always sets/reps.
+ * an estimated-1RM view (the engine's stored per-set e1RM, averaged across the
+ * session's working sets — N2), with a quick fade. The flip is list-wide;
+ * default on load is always sets/reps.
  */
 export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
