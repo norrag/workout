@@ -4,6 +4,22 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-26 — Session 12: Group 2 — audit, loadable data migration, v16 ACTIVATED
+
+- **Pre-activation audit** (read-only, all users): every bodyweight_loadable exercise was
+  logged as **total** (entered ≈/≥ bodyweight); assisted entries are valid assist amounts
+  (no migration); bodyweight_only ≈ bodyweight (safe). Only 2 users have bodyweight history.
+- **Loadable data migration** (one-time live cleanup, NOT a repo migration): 73 working
+  sets rewritten to `weight = round(added/5)×5`, `bodyweight = entered − added` —
+  effective load preserved exactly. Slant Board uses bw_ref 150 (owner's note). assisted/
+  only/external untouched.
+- **Replay (post-migration)** confirmed sane v16 output; Back Raise anchor 379→220 (double-
+  count fixed). **Activated engine_params v16** (v15 retired) — bodyweight model is LIVE.
+- **T-I4 (legacy deletion) deferred to its own PR** — the legacy path is the engine
+  test-harness default (7 files, ~38 assertions) and feeds historical replay/provenance;
+  bundling a full re-point into the UI PR right after a live activation is too risky.
+  Dead under v16; deletion ships as a focused, fully-tested follow-up. Recorded in PR #81.
+
 ## 2026-06-26 — Session 11: Group 2 — replay dry run, migrations applied, bodyweight UI
 
 - **Migrations applied to live** (002 columns + backfill, 003 v16 INACTIVE), recorded

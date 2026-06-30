@@ -2,6 +2,44 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-26 (latest) — Group 2 / T-I2: data migration + v16 ACTIVATED (bodyweight model live)
+
+The bodyweight model is now **live** (engine_params **v16 active**, v15 retired). Sequence:
+
+- **Pre-activation audit (read-only).** Per-(user,exercise) check across all bodyweight
+  lifts: loadable flagged where `entered ≈/≥ bodyweight` (⇒ logged as TOTAL, not added),
+  assisted/only checked separately. Only **2 users** have bodyweight history. Findings:
+  every loadable exercise was logged as **total**; assisted entries are valid assist
+  amounts (no migration); bodyweight_only ≈ bodyweight (safe, v16 ignores entered).
+- **Loadable data migration (one-time, live data — NOT a repo migration).** For the 5
+  loadable exercises, rewrote each working set `weight := round((entered − bw_ref)/5)×5`
+  (the recovered *added* plate) and `bodyweight := entered − added`, so **effective load
+  is preserved exactly** while the stored weight becomes a clean plate. `bw_ref` =
+  stored bodyweight except **Slant Board Sit-Up → 150** (owner: weighed ~150 then;
+  kg-converted decimals now live harmlessly in the per-set bodyweight). 73 working sets
+  across 2 users; assisted / bodyweight_only / external untouched. Verified: effective
+  load unchanged on every exercise (Back Raise 153.0/205.5, Dip 195, Pullup 192, Slant
+  161.3).
+- **Replay (v15→v16, post-migration).** Through the real engine on migrated data: Pushup
+  → `bodyweight × 11` (reps progression); Back Raise anchor **379 → 220** (the double-
+  count is gone — ≈ v15's 215.5) → `30 lb added × 11` (effective 155); Assisted Dip →
+  `50 lb assist × 12` (effective 75). All sane ⇒ safe to activate.
+- **Activated v16** (`update engine_params set is_active = (version = 16)`; v15 → inactive).
+
+**Migrations applied to live this session:** 002 (columns + backfill), 003 (v16, now
+active). The data migration above is a one-time hosted-data cleanup (specific to existing
+rows), intentionally not added to `supabase/migrations/`.
+
+**T-I4 (legacy deletion) — deliberately NOT in this PR.** The legacy increment/regression
+path is the default in the engine test harness (7 files build `baseInputs` with
+`strengthAnchor: null`; ~38 assertions encode increment/regression/hold behavior;
+`prescribe.test.ts` is entirely legacy-path), and the legacy seed feeds historical-row
+replay/provenance. Removing it cleanly = re-point the whole suite onto an anchored
+default + decide how pre-rep-window decisions replay. That is a substantial standalone
+refactor and is unwise to bundle into the UI PR immediately after a live activation — it
+ships as its own focused, fully-tested PR. Until then the legacy block is **dead under
+v16** (rep-window + bodyweight + cold-start cover every live case), just not yet deleted.
+
 ## 2026-06-26 (latest) — Group 2 / T-I2: bodyweight day-view UI + effective-load history flip
 
 The user-facing half of the bodyweight model (the engine + schema shipped in
