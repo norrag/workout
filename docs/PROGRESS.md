@@ -3974,3 +3974,30 @@ Four backlog bugs (`docs/notes/`). No schema/migration changes; no rule-#8 devia
   `volume-projection.test.ts` + updated `stats.test.ts`/`read-tools.test.ts`.
 
 Full suite green (560, +8), typecheck + lint clean.
+
+## 2026-06-30 — Performance WS-J: server load-time slice
+
+Server-side read-path wins from the measured audit (Supabase advisors + code).
+
+- **Reconcile gate (#1).** `mesocycles.last_reconcile_sig` (migration
+  `20260630000001_meso_reconcile_signature.sql`, **applied to the live project**
+  `juqvbiymmdcggctdqoiq` via MCP — additive nullable column, no backfill). Every
+  prescription surface ran the full ~8-10-round-trip reconcile on open even when
+  fresh; now `reconcilePrescriptions` first computes a cheap meso-level staleness
+  signature (`loadMesoStaleInputs`, ~2 round-trips) over every meso-global dependency-
+  fingerprint input and skips the full pass (gap-heal + freshness) when it matches the
+  stored stamp, which it writes on each successful reconcile. Conservatism (the gate
+  never skips a genuinely-stale row) is pinned by `reconcile-gate.test.ts`. **Deploy
+  note:** the column is live; the first open of each existing meso runs one full
+  reconcile (null stamp) then the gate engages — self-healing, no manual step.
+- **Double engine_params read (#8).** Threaded an optional pre-resolved
+  `{version,params}` through `ensureFreshPrescriptions`/`reconcilePrescriptions`; the
+  Workout + Log pages resolve once and pass it in.
+- **Anchor round-trips (#4).** `getExerciseE1rmAnchors`: 3 serial reads → one
+  `Promise.all`; output byte-identical.
+- **Anchor recency floor (#3) — rejected.** A live check showed a 120-day `performed_at`
+  floor would drop the anchor for ~56% of (user,exercise) pairs (recency weighting is
+  relative; a stale exercise still yields a usable anchor), forcing cold-start where
+  real data exists. Not shipped; rationale left in a code comment.
+
+Full suite green (563, +3), typecheck + lint + production build clean.

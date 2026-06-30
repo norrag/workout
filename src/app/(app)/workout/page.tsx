@@ -36,7 +36,15 @@ export default async function WorkoutPage() {
   // user transparently on their next open — no manual regenerate step. Idempotent
   // + additive; a hash compare when nothing changed.
   if (state.mesocycle) {
-    const result = await ensureFreshPrescriptions(user.id, state.mesocycle.id);
+    // resolve the active params once (request-cached with the predictor read at
+    // render) and pass them in, so the reconcile's service client doesn't re-read
+    // the global engine_params row (#8).
+    const active = await getActiveEngineParams(supabase);
+    const result = await ensureFreshPrescriptions(
+      user.id,
+      state.mesocycle.id,
+      active,
+    );
     if (result && (result.generated > 0 || result.refreshed > 0)) {
       state = await getCurrentState(supabase, user.id);
     }

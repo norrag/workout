@@ -246,6 +246,35 @@ Cleared by the audit (do NOT touch): anchor hot-path indexes exist + are correct
 `v_meso_summary`/`v_meso_week_sets`/`v_exercise_history` raised no perf advisor (leave
 live, don't pre-materialize); engine-stays-pure is not a bottleneck.
 
+**Shipped 2026-06-30 (Phase 2 slice):**
+- **#1 (reconcile gate) — done.** `mesocycles.last_reconcile_sig` (migration
+  `20260630000001`, **applied live**). `loadMesoStaleInputs` + pure `mesoStaleSignature`
+  (`regeneration.ts`): a cheap ~2-round-trip signature of every meso-global fingerprint
+  input (params version, RIR ramp, macro goal, profile experience, override/exercise/
+  completed-work watermarks). Gate at the top of `reconcilePrescriptions` skips the full
+  ~8-10-round-trip pass (both gap-heal + freshness) on a match; stamps the start-signature
+  on success. Conservatism proven by `reconcile-gate.test.ts` (each input flip busts the
+  hash). Null stamp ⇒ one full reconcile on first open of each existing meso, then it
+  engages. Validated `loadMesoStaleInputs` against live schema/data.
+- **#8 (double params read) — done.** `ensureFreshPrescriptions`/`reconcilePrescriptions`
+  take an optional pre-resolved `{version,params}`; both the Workout and Log pages resolve
+  it once (request-cached with the predictor read) and pass it in — the reconcile's service
+  client no longer re-reads `engine_params`.
+- **#4 (serial anchor round-trips) — done.** `anchors.ts`: the completed-workout filter +
+  the `target_rir` lookup (+ bodyweight load-type lookup) now run in one `Promise.all`
+  (3 serial → 1 parallel round-trip); `target_rir` resolved for the harmless superset of
+  all fetched WEs. Result byte-identical.
+- **#3 (anchor recency date floor) — REJECTED after live verification.** A 4-half-life
+  (120-day) `performed_at` floor would have dropped the anchor **entirely** for ~56% of
+  (user,exercise) pairs whose latest set is >120 days old (live check), because recency
+  weighting is *relative* — an old exercise still yields a valid anchor the predictor
+  uses. Dropping it forces cold-start where real data exists, against the "use real data
+  when available" ruling. Egress is already bounded by `.limit(600)`. Kept a code comment
+  so it isn't re-added.
+- **Deferred (cheap migrations, own slice):** #2 `v_exercise_overview` `security_invoker`
+  (security advisory), #9 FK index, #10 RLS init-plan; plus #5/#6/#7 caching (need tagging
+  first).
+
 ### Phase 3 — Streaming & structural cleanup (optional)
 - Suspense streaming on heavy server pages using `DayViewSkeleton`.
 - Decompose `DayView` / `PlannerBoard` into feature modules.

@@ -19,10 +19,11 @@ export default async function LogWorkoutPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [initialDetail, { params: engineParams }] = await Promise.all([
+  const [initialDetail, active] = await Promise.all([
     getWorkoutDetail(supabase, user.id, workoutId),
     getActiveEngineParams(supabase),
   ]);
+  const engineParams = active.params;
   let detail = initialDetail;
   if (!detail) notFound();
 
@@ -32,7 +33,11 @@ export default async function LogWorkoutPage({
   // config, an exercise increment override) before rendering, then re-read if the
   // recompute actually moved anything. A bypassed/un-logged planned day reached by
   // deep link is refreshed here exactly as it would be from the Workout tab.
-  const fresh = await ensureFreshPrescriptions(user.id, detail.mesocycle.id);
+  const fresh = await ensureFreshPrescriptions(
+    user.id,
+    detail.mesocycle.id,
+    active,
+  );
   if (fresh && (fresh.generated > 0 || fresh.refreshed > 0)) {
     detail = await getWorkoutDetail(supabase, user.id, workoutId);
     if (!detail) notFound();
