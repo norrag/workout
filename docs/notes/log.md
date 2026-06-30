@@ -4,6 +4,26 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 21: WS-J — cold-start splash (no more black screen)
+
+Owner: cold load is 3–5s of **black screen** ("is it hung?"); fine with the load time, just
+doesn't want to stare at black. Root cause: `(app)/layout.tsx` does `await auth.getUser()` (a
+network call) before rendering anything, and there's no Suspense boundary above it, so nothing
+paints for the whole TTFB (black on a dark-themed device). The manifest bg is already cream;
+the user's device is in dark mode (theme-color `#14110C`).
+
+- **Branded cold-start splash** (`components/ui/Splash.tsx`) streamed as the **root** Suspense
+  fallback (`app/layout.tsx` wraps `{children}`). Paints from the first byte — app background +
+  "workout" logotype + a quiet activity cue — so a cold/hard load shows the app starting, then
+  swaps to the per-route skeleton when the shell streams in, then content. Theme-aware
+  (`bg-bg-base`/`text-ink`). Soft tab navigations are unaffected (they use per-route loading.tsx).
+- Doesn't change load time (owner's stated preference) — removes the black void during it.
+- Note: covers the document/data load. The iOS PWA **pre-document** launch blank (needs
+  `apple-touch-startup-image`s) is a separate, larger follow-up if still bothersome.
+- Green: typecheck, lint, production build. Streaming verified structurally (the placeholder-auth
+  path fast-redirects, so the splash window only exercises with a real authenticated session —
+  on-device cold launch is the final check).
+
 ## 2026-06-30 — Session 20: WS-J — advisor cleanup (security + cheap perf migrations)
 
 #87 merged + owner-verified. Acknowledgment north star is largely met (#85 + the toggle
