@@ -4,6 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 18: WS-J Phase 2 slice — server load-time
+
+Owner picked the server load-time path; #85 merged, branch restarted from main. Built the
+ranked server wins from the audit (design via the audit agent).
+
+- **#1 reconcile gate (the big win).** Every prescription-showing surface ran the full
+  ~8-10-round-trip reconcile on open even when fresh. Added `mesocycles.last_reconcile_sig`
+  (migration `20260630000001`, **applied to live**) + a cheap meso-level staleness signature
+  (`loadMesoStaleInputs` ~2 round-trips + pure `mesoStaleSignature`) hashing every meso-global
+  fingerprint input (params version, RIR ramp, macro goal, profile experience, override/
+  exercise/completed-work watermarks). Gate at the top of `reconcilePrescriptions` skips both
+  gap-heal + freshness on a match; stamps the start-signature on success. **Conservatism is
+  the safety property** — `reconcile-gate.test.ts` asserts each input flip busts the hash.
+  Validated the loader against live schema/data.
+- **#8 double params read.** `ensureFreshPrescriptions`/`reconcilePrescriptions` take an
+  optional pre-resolved `{version,params}`; Workout + Log pages resolve once and pass in.
+- **#4 anchor round-trips.** `anchors.ts`: 3 serial reads → 1 `Promise.all` (completed
+  workouts + target_rir + bw load-type), result byte-identical.
+- **#3 anchor date floor — REJECTED.** Live check: a 120-day floor would delete the anchor
+  for ~56% of (user,exercise) pairs (recency weighting is relative; old exercises still give
+  a valid anchor). Reverted; left a comment. Measurement caught what the design missed.
+- Green: 563 tests (+3 conservatism), typecheck, lint, production build. Migration applied
+  live (additive nullable column; first open of each existing meso runs one full reconcile,
+  then the gate engages — self-healing, no manual step).
+
 ## 2026-06-30 — Session 17: WS-J Phase A slice 1 — interaction acknowledgment
 
 Ran the measure + audit phase (3 parallel agents + ANALYZE build), then shipped the

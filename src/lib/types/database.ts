@@ -17,6 +17,8 @@ type Defaulted =
   | "dep_fingerprint"
   // nullable verified-accurate params version; stamped by the engine/reconcile paths
   | "params_version"
+  // nullable meso reconcile-gate signature (WS-J #1); stamped by the reconcile only
+  | "last_reconcile_sig"
   // engine_decisions.kind defaults to 'advance' in the DB; seed writers pass it
   | "kind"
   // nullable per-set e1RM (PH31); computed at log/amend time, optional on insert
@@ -195,6 +197,8 @@ export type MesocycleRow = {
     | "abandoned";
   template_id: string | null;
   start_date: string | null;
+  /** read-path reconcile gate signature (WS-J #1); null until first reconcile */
+  last_reconcile_sig: string | null;
   created_at: string;
   updated_at: string;
 }

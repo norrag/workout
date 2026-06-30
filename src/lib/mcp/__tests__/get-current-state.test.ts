@@ -36,6 +36,7 @@ function meso(overrides: Partial<MesocycleRow> = {}): MesocycleRow {
     status: "active",
     template_id: null,
     start_date: "2026-06-01",
+    last_reconcile_sig: null,
     created_at: "2026-06-01T00:00:00Z",
     updated_at: "2026-06-01T00:00:00Z",
     ...overrides,

@@ -14,6 +14,14 @@ type Client = SupabaseClient<Database>;
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
+// NB (WS-J): we deliberately do NOT add a `performed_at` recency floor here. The
+// recency weight (0.5^(ageDays/halflife)) is RELATIVE within an exercise's samples,
+// so an exercise last trained months ago still yields a valid (old) anchor the
+// predictor uses. A live-data check showed ~56% of (user, exercise) pairs were last
+// trained >4 half-lives ago — a floor would drop their anchor entirely, forcing
+// cold-start where real data exists (against the "use real data when available"
+// ruling). Egress is already bounded by the .limit(600) below.
+
 /**
  * Recency-weighted strength anchor (e1RM) per exercise (doc 11), powering the
  * live reps predictor — and, with `seed_from_anchor` (§S1, standalone-prescription
@@ -59,46 +67,59 @@ export async function getExerciseE1rmAnchors(
   if (error) throw error;
   if (!sets || sets.length === 0) return out;
 
+  // #4: the completed-workout filter, the target-RIR lookup, and (under the
+  // bodyweight model) the load-type lookup are independent of each other, so fetch
+  // them in one Promise.all instead of three serial round-trips. `target_rir` is
+  // resolved for ALL fetched sets' workout_exercises (a harmless superset) so it
+  // no longer has to wait on the completed-workout filter.
+  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
+  const allWeIds = [...new Set(sets.map((s) => s.workout_exercise_id))];
+  const [
+    { data: completedWorkouts, error: cwError },
+    { data: wes, error: weError },
+    exResult,
+  ] = await Promise.all([
+    supabase
+      .from("workouts")
+      .select("id")
+      .in("id", workoutIds)
+      .eq("status", "completed"),
+    supabase.from("workout_exercises").select("id, target_rir").in("id", allWeIds),
+    bwModel
+      ? supabase
+          .from("exercises")
+          .select("id, load_type, equipment_type")
+          .in("id", exerciseIds)
+      : Promise.resolve({
+          data: null as { id: string; load_type: string | null; equipment_type: string }[] | null,
+          error: null,
+        }),
+  ]);
+  if (cwError) throw cwError;
+  if (weError) throw weError;
+  if (exResult.error) throw exResult.error;
+
   // N3 (resolves T-A7/T-A8): prescriptions and predictions read PREVIOUS
   // COMPLETED workouts only. The in-progress workout's sets post to history live
   // as they're logged, but must NOT feed the anchor — otherwise the first set of
   // the current exercise, if it's the recency-weighted best, makes the session
   // average (one set logged ⇒ that set IS the average) snap every remaining
   // prescription onto it. A workout becomes canonical for the engine only once
-  // it is marked complete (with feedback ⇒ status 'completed'). Filtered in query
-  // land so the pure engine stays clock-/state-free.
-  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
-  const { data: completedWorkouts, error: cwError } = await supabase
-    .from("workouts")
-    .select("id")
-    .in("id", workoutIds)
-    .eq("status", "completed");
-  if (cwError) throw cwError;
+  // it is marked complete (with feedback ⇒ status 'completed').
   const completedIds = new Set((completedWorkouts ?? []).map((w) => w.id));
   const completedSets = sets.filter((s) => completedIds.has(s.workout_id));
   if (completedSets.length === 0) return out;
 
   // assumed RIR = the parent prescription's target RIR (RIR premise, doc 11),
   // unless the set carried an explicit reported RIR
-  const weIds = [...new Set(completedSets.map((s) => s.workout_exercise_id))];
-  const { data: wes, error: weError } = await supabase
-    .from("workout_exercises")
-    .select("id, target_rir")
-    .in("id", weIds);
-  if (weError) throw weError;
   const targetRirByWe = new Map((wes ?? []).map((w) => [w.id, w.target_rir]));
 
   // T-I2: resolve each exercise's load type so a bodyweight set's effective load
   // (bodyweight ± entered) anchors correctly. Only needed under the flag.
   let loadTypeByEx: Map<string, LoadType> | null = null;
   if (bwModel) {
-    const { data: exRows, error: exErr } = await supabase
-      .from("exercises")
-      .select("id, load_type, equipment_type")
-      .in("id", exerciseIds);
-    if (exErr) throw exErr;
     loadTypeByEx = new Map(
-      (exRows ?? []).map((e) => [
+      (exResult.data ?? []).map((e) => [
         e.id,
         coerceLoadType(e.load_type, e.equipment_type),
       ]),

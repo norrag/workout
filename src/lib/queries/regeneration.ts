@@ -362,6 +362,125 @@ export function liveWeekRirUpdates(
 }
 
 /**
+ * The meso-global inputs whose change could make ANY prescription in the meso
+ * stale (WS-J #1 reconcile gate). Each maps to a dependency-fingerprint input
+ * (`fingerprint.ts` / `paramsTokenFor`); a coarse watermark (count + latest
+ * `updated_at`) only ever OVER-triggers a reconcile, never under — so the gate
+ * cannot miss a genuinely stale row. Hashed into `mesocycles.last_reconcile_sig`.
+ */
+interface MesoStaleInputs {
+  /** active engine_params version */
+  paramsVersion: number;
+  /** meso RIR ramp + length → `week.targetRir` / `isDeload` in the fingerprint */
+  rirStart: number;
+  rirEnd: number;
+  weeks: number;
+  includesDeload: boolean;
+  /** macro `goal_type` (fingerprint goal); null for a standalone meso */
+  goalType: string | null;
+  /** profile experience level (fingerprint config). Deliberately NOT a coarse
+   *  `profiles.updated_at` — bodyweight edits are frequent and fingerprint-irrelevant. */
+  experienceLevel: string | null;
+  /** per-user override watermark: count + latest `updated_at` catches add/edit/delete */
+  overrideCount: number;
+  overrideLatest: string | null;
+  /** exercise-library watermark (equipment/load_type edits — rare; global) */
+  exerciseLatest: string | null;
+  /** completed-work watermark: a completion/skip/advance bumps a workout's
+   *  `updated_at`; generation adds workout rows. count + latest catches both. */
+  workoutCount: number;
+  workoutLatest: string | null;
+}
+
+/** Stable signature of the meso-stale inputs (sha256 of canonical JSON). Pure, so
+ *  the conservatism test can assert each input is captured. */
+export function mesoStaleSignature(inputs: MesoStaleInputs): string {
+  return hashParams(inputs);
+}
+
+/** Load the meso-stale inputs with a handful of cheap, indexed reads (two
+ *  round-trips) — far cheaper than the full reconcile this gates. */
+async function loadMesoStaleInputs(
+  service: Client,
+  userId: string,
+  mesoId: string,
+  paramsVersion: number,
+): Promise<MesoStaleInputs> {
+  const [mesoRes, profileRes, overrideRes, exerciseRes, microRes] =
+    await Promise.all([
+      service
+        .from("mesocycles")
+        .select("rir_start, rir_end, weeks, includes_deload, macrocycle_id")
+        .eq("id", mesoId)
+        .eq("user_id", userId)
+        .single(),
+      service.from("profiles").select("experience_level").eq("id", userId).single(),
+      service
+        .from("exercise_param_overrides")
+        .select("updated_at", { count: "exact" })
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(1),
+      service
+        .from("exercises")
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1),
+      service
+        .from("microcycles")
+        .select("id")
+        .eq("mesocycle_id", mesoId)
+        .eq("user_id", userId),
+    ]);
+  if (mesoRes.error) throw mesoRes.error;
+  if (profileRes.error) throw profileRes.error;
+  if (overrideRes.error) throw overrideRes.error;
+  if (exerciseRes.error) throw exerciseRes.error;
+  if (microRes.error) throw microRes.error;
+
+  const microIds = (microRes.data ?? []).map((m) => m.id);
+  const [macroRes, workoutRes] = await Promise.all([
+    mesoRes.data.macrocycle_id
+      ? service
+          .from("macrocycles")
+          .select("goal_type")
+          .eq("id", mesoRes.data.macrocycle_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { goal_type: string } | null, error: null }),
+    microIds.length > 0
+      ? service
+          .from("workouts")
+          .select("updated_at", { count: "exact" })
+          .in("microcycle_id", microIds)
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+      : Promise.resolve({
+          data: [] as { updated_at: string }[],
+          count: 0,
+          error: null,
+        }),
+  ]);
+  if (macroRes.error) throw macroRes.error;
+  if (workoutRes.error) throw workoutRes.error;
+
+  return {
+    paramsVersion,
+    rirStart: mesoRes.data.rir_start,
+    rirEnd: mesoRes.data.rir_end,
+    weeks: mesoRes.data.weeks,
+    includesDeload: mesoRes.data.includes_deload,
+    goalType: macroRes.data?.goal_type ?? null,
+    experienceLevel: profileRes.data?.experience_level ?? null,
+    overrideCount: overrideRes.count ?? 0,
+    overrideLatest: overrideRes.data?.[0]?.updated_at ?? null,
+    exerciseLatest: exerciseRes.data?.[0]?.updated_at ?? null,
+    workoutCount: workoutRes.count ?? 0,
+    workoutLatest: workoutRes.data?.[0]?.updated_at ?? null,
+  };
+}
+
+/**
  * Bring a user's meso's stored prescriptions in line with their current inputs,
  * transparently and on demand. Two halves of one read-path job (doc 14 §10):
  *   1. heal generation gaps — create any missing day whose previous-week
@@ -387,12 +506,36 @@ export async function reconcilePrescriptions(
   service: Client,
   userId: string,
   mesoId: string,
+  activeParams?: { version: number; params: EngineParams },
 ): Promise<ReconcileResult> {
+  // active engine params: reuse the caller's already-resolved value when given
+  // (the page resolves it once for the predictor — avoids a duplicate read on the
+  // hot path, #8). The active row is global, so it's identical to a service read.
+  const { version, params } = activeParams ?? (await getActiveEngineParams(service));
+
+  // #1 reconcile gate: if no meso-global input that feeds a dependency fingerprint
+  // has changed since the last successful reconcile, no row can be stale and no
+  // generation gap can have opened (a gap only opens when a workout closes, which
+  // moves the completed-work watermark) — so skip the whole pass. A null/absent
+  // stamp or any change falls through to the full reconcile, which re-stamps. The
+  // gate is ~2 cheap round-trips vs. the full pass's ~8-10.
+  const staleSig = mesoStaleSignature(
+    await loadMesoStaleInputs(service, userId, mesoId, version),
+  );
+  const { data: mesoStamp, error: stampError } = await service
+    .from("mesocycles")
+    .select("last_reconcile_sig")
+    .eq("id", mesoId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (stampError) throw stampError;
+  if (mesoStamp?.last_reconcile_sig === staleSig) {
+    return { generated: 0, refreshed: 0 };
+  }
+
   // 1. heal generation gaps first; freshly generated days are stamped current, so
   //    the freshness pass below sees them as fresh.
   const generated = await catchUpMesoGeneration(service, userId, mesoId);
-
-  const { version, params } = await getActiveEngineParams(service);
 
   // 2. the meso's weeks (target RIR / deload per week)
   const { data: micros, error: microsError } = await service
@@ -974,6 +1117,19 @@ export async function reconcilePrescriptions(
     }
   }
 
+  // #1: stamp the signature computed at the start of this pass so the next open
+  // short-circuits. Safe to stamp the start value: the reconcile writes only
+  // microcycles.target_rir + workout_exercises (no signature input). Generation
+  // may have added workouts (bumping the completed-work watermark) — that re-misses
+  // the gate exactly once on the next open, then settles. A false re-reconcile is
+  // harmless; a missed stale row would not be, so we never stamp optimistically.
+  const { error: stampWriteError } = await service
+    .from("mesocycles")
+    .update({ last_reconcile_sig: staleSig })
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (stampWriteError) throw stampWriteError;
+
   return { generated, refreshed };
 }
 
@@ -991,9 +1147,15 @@ export async function reconcilePrescriptions(
 export async function ensureFreshPrescriptions(
   userId: string,
   mesoId: string,
+  activeParams?: { version: number; params: EngineParams },
 ): Promise<ReconcileResult | null> {
   try {
-    return await reconcilePrescriptions(createServiceClient(), userId, mesoId);
+    return await reconcilePrescriptions(
+      createServiceClient(),
+      userId,
+      mesoId,
+      activeParams,
+    );
   } catch (error) {
     console.error("prescription freshness reconcile failed", error);
     return null;
