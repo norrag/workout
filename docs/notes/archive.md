@@ -11,6 +11,20 @@ for the purge policy.
 
 ---
 
+## Swept 2026-06-30 (later) — bug sweep (PR #84)
+
+Session 15 closed the open Workstream-G/adjacent bugs in one PR, now merged. Raw
+text stays in the backlog appendix.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| PH38 | First sets/reps wrong after switching exercise | B | G | **done — merged (PR #84).** `replaceWorkoutExercise` left the outgoing exercise's per-set `set_weights` overrides on the slot, so the first set showed the old planned weight/reps until "reset to prescription"; now cleared on swap. Query-layer test added. |
+| PH29 | Page-switch "double layer label" glitch | B | G | **done — merged (PR #84).** Bottom nav drew two `■` position markers during a transition (`usePathname` lags the commit → old tab `active` while tapped tab `pending`); lifted a single `anyPending` signal so exactly one shows. The instant-switch/slowness remainder is server-compute-bound → carried into WS-J (N1). |
+| PH36 | Model & weight-increment settings for bodyweight-only exercises | B/Q | F | **done — merged (PR #84).** Engine half already correct under engine_params v16 (reps-only at fixed bodyweight; increment inert); UI gap closed by hiding the Exercise-page "Load step" control for `bodyweight_only` lifts. |
+| PH34 | Meso-stats "planned sets" off mid-meso (what counts as "planned"?) | Q→B | C | **done — merged (PR #84).** Owner ruled "autoregulated projection": pure `projectWeekSets` (`queries/volume-projection.ts`) carries the last materialized week's set count forward (deload-scaled) for unmaterialized weeks; wired into `buildVolumeMatrix` (stats) + `get_muscle_group_volume` (MCP, `projected` status) as one definition, no SQL migration. Caveat: flat across accumulation weeks (no forward set ramp — T-A5). |
+
+---
+
 ## Swept 2026-06-30 — reconcile merged build PRs
 
 Catch-up sweep. A pile of rows sat in the live index as `done (PR pending)` even

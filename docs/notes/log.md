@@ -4,6 +4,21 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 16: WS-J performance kickoff + post-merge sweep
+
+PR #84 merged. **Reconciliation sweep:** archived PH38/PH29/PH36/PH34 (the bug sweep) to
+`archive.md` under "Swept 2026-06-30 (later) — bug sweep (PR #84)"; trimmed the live index.
+Restarted the designated branch from the merged `main` for the new workstream.
+
+**Owner reframed the performance goal (north star).** "Snappy" is defined as: *every* user
+interaction on *every* surface is **visually acknowledged immediately** — the user must never
+be left wondering "is it loading, or did I mis-tap?" Responsiveness (acknowledge the action,
+even with a placeholder/spinner) matters more than instantaneous data; real load times still
+get addressed via efficient code + strategic caching. Updated the N1 row (HIGH, in-progress)
+and `J-performance.md` to make interaction-acknowledgment the primary lens, alongside the
+existing measure-first bundle/render + query/caching plan. Work starts with Phase 0 measurement
+(bundle analyzer, slow-query baseline) + an interaction-acknowledgment audit of every surface.
+
 ## 2026-06-30 — Session 15: bug sweep (PH29, PH38, PH36) + PH34 decision framed
 
 Owner asked to attack all the open bug items, perf to follow. Ran four parallel

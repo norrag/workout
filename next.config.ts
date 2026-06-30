@@ -1,5 +1,13 @@
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
+import withBundleAnalyzer from "@next/bundle-analyzer";
+
+// Bundle analyzer (perf Phase 0 — `docs/notes/J-performance.md`). Inert unless
+// ANALYZE=true, so it never affects normal/CI builds: `ANALYZE=true npm run build`
+// writes the per-route client/server treemaps under `.next/analyze/`.
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
@@ -33,4 +41,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSerwist(nextConfig);
+export default withAnalyzer(withSerwist(nextConfig));
