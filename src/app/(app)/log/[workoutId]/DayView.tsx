@@ -19,6 +19,10 @@ import type {
 import {
   predictRepsAtWeight,
   estimateE1rm,
+  effectiveLoad,
+  isBodyweightLoad,
+  coerceLoadType,
+  type LoadType,
   type EngineParams,
 } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
@@ -48,8 +52,97 @@ import {
   toggleSkipSetAction,
   unlogSetAction,
   unskipAllAction,
+  updateBodyweightAction,
   type ReplacementCandidate,
 } from "../actions";
+
+/**
+ * T-I2: the bodyweight chip in a bodyweight exercise's header. The load is the
+ * lifter's bodyweight (only) / added to it (loadable) / subtracted from it
+ * (assisted); the chip shows that base with a +/− cue and is inline-editable —
+ * the day-view value and the profile value are one and the same, so an edit writes
+ * straight through to the profile. Minimal by design; bodyweight rarely changes.
+ */
+function BodyweightChip({
+  workoutId,
+  loadType,
+  bodyweight,
+}: {
+  workoutId: string;
+  loadType: LoadType;
+  bodyweight: number | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(
+    bodyweight != null ? formatWeight(bodyweight) : "",
+  );
+  const [saving, startSaving] = useTransition();
+  const toast = useToast();
+  useEffect(() => {
+    setValue(bodyweight != null ? formatWeight(bodyweight) : "");
+  }, [bodyweight]);
+
+  const prefix =
+    loadType === "bodyweight_loadable"
+      ? "+ "
+      : loadType === "bodyweight_assisted"
+        ? "− "
+        : "";
+  const labelCls = "text-[9.5px] font-medium tracking-[0.12em]";
+
+  const save = () => {
+    setEditing(false);
+    const w = Number(value);
+    if (Number.isNaN(w) || w <= 0 || w === bodyweight) {
+      setValue(bodyweight != null ? formatWeight(bodyweight) : "");
+      return;
+    }
+    startSaving(async () => {
+      try {
+        await updateBodyweightAction({ workout_id: workoutId, bodyweight: w });
+      } catch {
+        toast("Couldn't update bodyweight");
+        setValue(bodyweight != null ? formatWeight(bodyweight) : "");
+      }
+    });
+  };
+
+  if (editing) {
+    return (
+      <span className={`flex items-baseline gap-1 ${labelCls} text-ink/55`}>
+        {prefix}BW
+        <input
+          autoFocus
+          type="text"
+          inputMode="decimal"
+          aria-label="bodyweight in pounds"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            else if (e.key === "Escape") {
+              setValue(bodyweight != null ? formatWeight(bodyweight) : "");
+              setEditing(false);
+            }
+          }}
+          className="w-9 border-b border-ink/40 bg-transparent text-center numeral focus:outline-none"
+        />
+        LB
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-label="edit bodyweight"
+      onClick={() => setEditing(true)}
+      className={`${labelCls} ${saving ? "text-ink/30" : "text-ink/50"}`}
+    >
+      {prefix}BW {bodyweight != null ? `${formatWeight(bodyweight)} LB` : "— SET"}
+    </button>
+  );
+}
 import type { AddExerciseCandidate } from "@/lib/queries/exercises";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -787,12 +880,21 @@ function ExerciseBlock({
           </button>
         </div>
       </div>
-      <div className="mt-0.5 flex items-baseline justify-between">
+      <div className="mt-0.5 flex items-baseline justify-between gap-2">
         <div className="text-xl font-bold tracking-[-0.01em]">
           {we.exercise_name}
         </div>
-        <div className="text-[9.5px] font-medium tracking-[0.12em] text-ink/50">
-          {we.equipment_type.toUpperCase()}
+        <div className="flex flex-col items-end gap-0.5 text-right">
+          <div className="text-[9.5px] font-medium tracking-[0.12em] text-ink/50">
+            {we.equipment_type.toUpperCase()}
+          </div>
+          {isBodyweightLoad(coerceLoadType(we.load_type, we.equipment_type)) && (
+            <BodyweightChip
+              workoutId={we.workout_id}
+              loadType={coerceLoadType(we.load_type, we.equipment_type)}
+              bodyweight={we.bodyweight}
+            />
+          )}
         </div>
       </div>
       {we.pinned_note && (
@@ -1204,13 +1306,33 @@ function SetRow({
   // unlogged set, and is where auto-match writes the shared weight
   const plannedWeight = we.set_weights?.[String(setNumber)] ?? null;
 
+  // T-I2: how the entered weight maps to effective load. For bodyweight_only the
+  // load IS the lifter's bodyweight (the weight cell is read-only); for loadable/
+  // assisted the entered value is the added/assist and the engine math runs on the
+  // effective load (bodyweight ± entered).
+  const loadType = coerceLoadType(we.load_type, we.equipment_type);
+  const isBw = isBodyweightLoad(loadType);
+  const bwOnly = loadType === "bodyweight_only";
+  const bw = we.bodyweight;
+
   // reps that land on the target RIR at a given weight, from the recency-
-  // weighted strength anchor (doc 11); null when there's no usable history
-  const predictReps = (w: number): number | null =>
-    predictRepsAtWeight(anchor, w, targetRir, params);
+  // weighted strength anchor (doc 11); null when there's no usable history. For
+  // bodyweight movements the anchor is on EFFECTIVE load, so convert first.
+  const predictReps = (w: number): number | null => {
+    const eff = isBw ? effectiveLoad(loadType, w, bw) : w;
+    if (eff == null || eff <= 0) return null;
+    return predictRepsAtWeight(anchor, eff, targetRir, params);
+  };
 
   const initialWeight =
-    logged?.weight ?? plannedWeight ?? lastLogged?.weight ?? prescribedWeight ?? 0;
+    logged?.weight ??
+    // bodyweight_only logs the bodyweight as the load (read-only); seed it from
+    // the current profile bodyweight when there's nothing logged yet.
+    (bwOnly ? (bw ?? prescribedWeight ?? 0) : null) ??
+    plannedWeight ??
+    lastLogged?.weight ??
+    prescribedWeight ??
+    0;
   // unlogged rows start from the predicted reps for their weight; logged rows
   // show what was done; fall back to the prescription when there's no anchor
   const initialReps =
@@ -1219,8 +1341,10 @@ function SetRow({
     prescribedReps ??
     lastLogged?.reps ??
     8;
-  // the planned weight shown on static (future) rows
+  // the planned weight shown on static (future) rows; bodyweight_only always shows
+  // the lifter's bodyweight as the (read-only) load.
   const futureWeight = plannedWeight ?? prescribedWeight;
+  const staticWeight = bwOnly ? bw : futureWeight;
   // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
   const [weight, setWeight] = useState(formatWeight(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
@@ -1258,7 +1382,7 @@ function SetRow({
     edited.current = false;
     repsManual.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logged?.id, logged?.weight, logged?.reps, plannedWeight]);
+  }, [logged?.id, logged?.weight, logged?.reps, plannedWeight, we.bodyweight]);
 
   // denser rows (09 §5): 32px box, 14px value, 21px log box
   const cellBase =
@@ -1335,14 +1459,26 @@ function SetRow({
   // the RIR left in reserve (more reps OR closer to failure => above). Null when
   // there's no prescription or the set isn't logged; on-target (within a small
   // band) shows no marker to keep the row quiet.
+  // for bodyweight movements the e1RM compares on EFFECTIVE load: the prescription
+  // against the current bodyweight, the logged set against the bodyweight captured
+  // on that set (historical honesty).
+  const prescribedEff = isBw
+    ? effectiveLoad(loadType, prescribedWeight ?? 0, bw)
+    : prescribedWeight;
   const prescriptionE1rm =
-    prescribedWeight != null && prescribedReps != null
-      ? (estimateE1rm(prescribedWeight, prescribedReps, targetRir, params)
-          ?.value ?? null)
+    prescribedEff != null && prescribedEff > 0 && prescribedReps != null
+      ? (estimateE1rm(prescribedEff, prescribedReps, targetRir, params)?.value ??
+        null)
+      : null;
+  const loggedEff =
+    state === "logged" && logged
+      ? isBw
+        ? effectiveLoad(loadType, logged.weight, logged.bodyweight ?? bw)
+        : logged.weight
       : null;
   const loggedE1rm =
-    state === "logged" && logged
-      ? (estimateE1rm(logged.weight, logged.reps, logged.rir_reported, params)
+    state === "logged" && logged && loggedEff != null && loggedEff > 0
+      ? (estimateE1rm(loggedEff, logged.reps, logged.rir_reported, params)
           ?.value ?? null)
       : null;
   const performance: "over" | "under" | null =
@@ -1372,47 +1508,63 @@ function SetRow({
       {staticCells ? (
         <>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {futureWeight != null ? formatWeight(futureWeight) : "—"}
+            {staticWeight != null ? formatWeight(staticWeight) : "—"}
           </div>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
             {/* future rows show the reps that hit target RIR at the planned
                 weight, falling back to the prescription without an anchor */}
-            {(futureWeight != null ? predictReps(futureWeight) : null) ??
+            {(staticWeight != null ? predictReps(staticWeight) : null) ??
               prescribedReps ??
               "—"}
           </div>
         </>
       ) : (
         <>
-          <input
-            type="text"
-            inputMode="decimal"
-            aria-label={`set ${setNumber} weight`}
-            value={weight}
-            onChange={(e) => {
-              setWeight(e.target.value);
-              edited.current = true;
-            }}
-            onBlur={() => {
-              // once the user finishes typing the weight (not live): persist the
-              // planned weight so it survives navigation + feeds auto-match, then
-              // re-estimate reps unless the user set their own. Only on unlogged
-              // rows — a logged row's reps/weight are recorded actuals.
-              if (state === "next") {
-                const w = Number(weight);
-                if (weight !== "" && !Number.isNaN(w)) {
-                  if (edited.current) persistPlannedWeight(w);
-                  if (!repsManual.current) {
-                    const predicted = predictReps(w);
-                    if (predicted != null) setReps(String(predicted));
-                  }
-                }
-              } else if (state === "logged") {
-                save();
+          {bwOnly ? (
+            // bodyweight_only: the load is the lifter's bodyweight — read-only.
+            // Only reps are logged. Edit the bodyweight via the header BW chip.
+            <div
+              aria-label={`set ${setNumber} weight (bodyweight)`}
+              className={
+                cell.replace("w-full", "") +
+                " flex items-center justify-center text-ink/55"
               }
-            }}
-            className={cell}
-          />
+            >
+              {weight !== "" && !Number.isNaN(Number(weight))
+                ? formatWeight(Number(weight))
+                : "—"}
+            </div>
+          ) : (
+            <input
+              type="text"
+              inputMode="decimal"
+              aria-label={`set ${setNumber} weight`}
+              value={weight}
+              onChange={(e) => {
+                setWeight(e.target.value);
+                edited.current = true;
+              }}
+              onBlur={() => {
+                // once the user finishes typing the weight (not live): persist the
+                // planned weight so it survives navigation + feeds auto-match, then
+                // re-estimate reps unless the user set their own. Only on unlogged
+                // rows — a logged row's reps/weight are recorded actuals.
+                if (state === "next") {
+                  const w = Number(weight);
+                  if (weight !== "" && !Number.isNaN(w)) {
+                    if (edited.current) persistPlannedWeight(w);
+                    if (!repsManual.current) {
+                      const predicted = predictReps(w);
+                      if (predicted != null) setReps(String(predicted));
+                    }
+                  }
+                } else if (state === "logged") {
+                  save();
+                }
+              }}
+              className={cell}
+            />
+          )}
           <div className="relative">
             <input
               type="text"

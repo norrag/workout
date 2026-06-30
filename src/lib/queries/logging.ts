@@ -44,12 +44,18 @@ export { getExerciseE1rmAnchors } from "./anchors";
 export interface LoggedExercise extends WorkoutExerciseRow {
   exercise_name: string;
   equipment_type: string;
+  /** T-I2: how the entered weight maps to effective load (external | bodyweight_*) */
+  load_type: string;
   muscle_group: string;
   sets: LoggedSetRow[];
   pinned_note: ExerciseNoteRow | null;
   feedback: ExerciseFeedbackRow | null;
   /** recency-weighted strength anchor for the live reps predictor (doc 11) */
   e1rm_anchor: number | null;
+  /** T-I2: the lifter's current bodyweight (lb), the effective-load base for a
+   *  bodyweight movement; null when the profile has none. Same value across the
+   *  day's exercises (read from the profile), shown by the editable BW chip. */
+  bodyweight: number | null;
 }
 
 /** A programmed day in the navigator (fig 1.1 expanded header). */
@@ -160,7 +166,7 @@ export async function getWorkoutDetail(
     exerciseIds.length > 0
       ? supabase
           .from("exercises")
-          .select("id, name, equipment_type")
+          .select("id, name, equipment_type, load_type")
           .in("id", exerciseIds)
       : Promise.resolve({ data: [], error: null }),
     weIds.length > 0
@@ -287,6 +293,14 @@ export async function getWorkoutDetail(
     exerciseIds,
     params,
   );
+  // T-I2: the lifter's current bodyweight — the effective-load base for bodyweight
+  // movements (the day-view chip + the live effective-load prediction/marker).
+  const { data: bwProfile } = await supabase
+    .from("profiles")
+    .select("bodyweight")
+    .eq("id", userId)
+    .maybeSingle();
+  const userBodyweight = bwProfile?.bodyweight ?? null;
 
   // macro context caption (fig 1.1)
   let contextLabel = "STANDALONE MESO";
@@ -325,6 +339,7 @@ export async function getWorkoutDetail(
       ...we,
       exercise_name: exerciseById.get(we.exercise_id)?.name ?? "",
       equipment_type: exerciseById.get(we.exercise_id)?.equipment_type ?? "",
+      load_type: exerciseById.get(we.exercise_id)?.load_type ?? "external",
       muscle_group: we.muscle_group_id
         ? (mgNameById.get(we.muscle_group_id) ?? "")
         : "",
@@ -332,6 +347,7 @@ export async function getWorkoutDetail(
       pinned_note: noteByExercise.get(we.exercise_id) ?? null,
       feedback: feedbackByWe.get(we.id) ?? null,
       e1rm_anchor: e1rmAnchors.get(we.exercise_id)?.value ?? null,
+      bodyweight: userBodyweight,
     })),
   };
 }

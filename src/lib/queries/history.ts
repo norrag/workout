@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { coerceLoadType, effectiveLoad, isBodyweightLoad } from "@/lib/engine";
 import type { Database } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
@@ -13,6 +14,10 @@ export interface HistoryEntry {
   /** session-average stored per-set e1RM (PH31/PH32 flip view); null if none
    * stored (e.g. a bodyweight session, where weight 0 yields no estimate) */
   e1rm: number | null;
+  /** T-I2: session-average EFFECTIVE load (bodyweight ± entered) for a bodyweight
+   * exercise — the flip-view metric in place of e1RM there (owner #3). Null for
+   * external exercises (the flip shows e1RM) or when no bodyweight was captured. */
+  effective_load: number | null;
   is_deload: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
   session_note: string | null;
@@ -89,6 +94,7 @@ export async function getExerciseHistory(
     { data: micros, error: microError },
     { data: workouts, error: workoutError },
     { data: feedback, error: feedbackError },
+    { data: exercise, error: exError },
   ] = await Promise.all([
     supabase.from("mesocycles").select("id, name").in("id", mesoIds),
     supabase
@@ -100,11 +106,23 @@ export async function getExerciseHistory(
       .from("exercise_feedback")
       .select("workout_exercise_id, notes")
       .in("workout_exercise_id", weIds),
+    supabase
+      .from("exercises")
+      .select("equipment_type, load_type")
+      .eq("id", exerciseId)
+      .maybeSingle(),
   ]);
   if (mesoError) throw mesoError;
   if (microError) throw microError;
   if (workoutError) throw workoutError;
   if (feedbackError) throw feedbackError;
+  if (exError) throw exError;
+  // T-I2: for a bodyweight exercise the flip view shows the session-average
+  // EFFECTIVE load (bodyweight ± entered) using each set's captured bodyweight.
+  const loadType = exercise
+    ? coerceLoadType(exercise.load_type, exercise.equipment_type)
+    : "external";
+  const isBw = isBodyweightLoad(loadType);
   const mesoById = new Map((mesos ?? []).map((m) => [m.id, m]));
   const microById = new Map((micros ?? []).map((m) => [m.id, m]));
   const workoutById = new Map((workouts ?? []).map((w) => [w.id, w]));
@@ -129,6 +147,11 @@ export async function getExerciseHistory(
       .map((s) => s.reps)
       .join(", ");
     const e1rm = sessionAvgE1rm(group.map((s) => s.e1rm));
+    const effective_load = isBw
+      ? sessionAvgE1rm(
+          group.map((s) => effectiveLoad(loadType, s.weight, s.bodyweight)),
+        )
+      : null;
     const micro = microById.get(group[0].microcycle_id);
     const workout = workoutById.get(workoutId);
     return {
@@ -139,6 +162,7 @@ export async function getExerciseHistory(
       top_weight: top,
       reps,
       e1rm,
+      effective_load,
       is_deload: micro?.is_deload ?? false,
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };
