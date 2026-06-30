@@ -6,6 +6,7 @@ import {
   BalanceView,
   PerformanceView,
 } from "@/components/stats/MesoStatsViews";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
 // 09 2026-06-14 §4: the Volume tab was removed; meso stats are Balance (4.1) ·
 // Performance (4.2) and default to Balance.
@@ -61,28 +62,16 @@ export default async function MesoStatsPage({
         {stats.meso.name.toUpperCase()} · {stats.contextLine}
       </div>
 
-      {/* segmented control */}
-      <div className="mt-4 flex border-[1.5px] border-ink">
-        {VIEWS.map((v, i) => {
-          const active = v === view;
-          return (
-            <Link
-              key={v}
-              href={`/cycles/meso/${mesoId}/stats?view=${v}`}
-              className={`flex-1 py-2.5 text-center text-[10px] tracking-[0.1em] ${
-                active
-                  ? "bg-ink font-bold text-bg-base"
-                  : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
-              }`}
-            >
-              {v.toUpperCase()}
-            </Link>
-          );
-        })}
-      </div>
-
-      {view === "balance" && <BalanceView stats={stats} />}
-      {view === "performance" && <PerformanceView stats={stats} />}
+      {/* segmented control — instant client-state toggle (both views' data is
+          already fetched); `?view=` still seeds the initial panel for deep-links */}
+      <SegmentedTabs
+        labels={["BALANCE", "PERFORMANCE"]}
+        initial={view === "performance" ? 1 : 0}
+        panels={[
+          <BalanceView key="balance" stats={stats} />,
+          <PerformanceView key="performance" stats={stats} />,
+        ]}
+      />
     </div>
   );
 }

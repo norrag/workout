@@ -162,6 +162,29 @@ Shared helpers (fix many at once):
 - **`active:bg-ink/5` press utility** on bespoke rows → 13, 14.
 - **`/templates/loading.tsx`** skeleton → 6.
 
+**Shipped 2026-06-30 (Phase A slice 1):**
+- **#3, #4 (dead tab toggles) — done.** New reusable `SegmentedTabs`
+  (`components/ui/SegmentedTabs.tsx`): server-rendered panels, instant client-state
+  switch, no refetch. Wired into the exercise OVERVIEW|HISTORY page and the meso-stats
+  BALANCE|PERFORMANCE page; `?tab=`/`?view=` still seed the initial panel for deep-links.
+- **#5 (END WORKOUT / END MESOCYCLE) — done.** Captured the discarded `ending` flag →
+  disabled + "ENDING…".
+- **#2 (PlannerBoard SAVE CHANGES) — done.** Captured `pending`; the confirm button
+  shows "SAVING…"/disabled and the sheet self-closes when the save resolves.
+- **#7–12 (plain `<form action>` submits) — done.** New `SubmitButton`
+  (`components/ui/SubmitButton.tsx`, `useFormStatus`) on SAVE AS TEMPLATE, DISCARD
+  DRAFT, DELETE meso, blank-template, SIGN OUT.
+
+**Deferred to a focused follow-up (tracked):**
+- **#1 (PlannerBoard draft-path optimistic) — HIGH but risky.** Making the draft
+  steppers/reorder/remove optimistic touches the planner's draft mutation + revalidation
+  semantics (which already have subtle sheet/active-day edge cases); warrants isolated
+  review + the verify skill rather than riding in a broad slice.
+- **#6 (TemplateFilters stale list).** The native `<select>` already updates its value
+  instantly (the tap *is* acknowledged); the proper stale-list dim needs page-level state.
+  Low value.
+- **#13–14 press-state sweep.** Broad, low individual value.
+
 ### Phase 1 — Client bundle & render (highest leverage)
 - **Code-split the engine off the initial path.** Split the predictor into a tiny
   module (`e1rm.ts` + `reps.ts` only) or `dynamic()`-import it so `engine/index.ts`

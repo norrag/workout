@@ -4,6 +4,29 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 17: WS-J Phase A slice 1 — interaction acknowledgment
+
+Ran the measure + audit phase (3 parallel agents + ANALYZE build), then shipped the
+first acknowledgment slice (the owner's primary north-star track). Branch
+`claude/notes-review-assessment-t14bcu`.
+
+- **Phase 0 measured:** bundle is lean (104 kB shared; only /workout + /log heavy at
+  142 kB ≈ +38 kB engine). Bundle code-split is a *secondary*, single-route win.
+  Server audit (Supabase advisors): the "feels slow" cause is the **per-open
+  reconcile** running full work even when fresh (#1); plus anchor-query global limit,
+  duplicated params read, a `SECURITY DEFINER` view, an FK index. Interaction audit:
+  app is broadly well-acknowledged (logging loop exemplary); gaps = same-route
+  `?param=` tab toggles (dead), planner draft path, discarded `isPending` on SAVE/END.
+- **Shipped (Phase A slice 1):** `SegmentedTabs` (instant client-state toggle, no
+  refetch) for the two dead tab toggles (exercise OVERVIEW|HISTORY, meso-stats
+  BALANCE|PERFORMANCE); `ending`/`pending` flags wired to END WORKOUT/MESO and
+  PlannerBoard SAVE CHANGES (self-closing sheet); `SubmitButton` (`useFormStatus`) on
+  five plain-form submits (save-as-template, discard-draft, delete-meso, blank-template,
+  sign-out).
+- **Deferred (tracked in J-performance.md):** planner draft-path optimistic (#1, HIGH
+  but risky — own PR); TemplateFilters stale-list (#6, low); press-state sweep.
+- Green: 560 tests, typecheck, lint, production build.
+
 ## 2026-06-30 — Session 16: WS-J performance kickoff + post-merge sweep
 
 PR #84 merged. **Reconciliation sweep:** archived PH38/PH29/PH36/PH34 (the bug sweep) to
