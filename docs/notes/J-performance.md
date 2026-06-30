@@ -289,9 +289,16 @@ live, don't pre-materialize); engine-stays-pure is not a bottleneck.
   uses. Dropping it forces cold-start where real data exists, against the "use real data
   when available" ruling. Egress is already bounded by `.limit(600)`. Kept a code comment
   so it isn't re-added.
-- **Deferred (cheap migrations, own slice):** #2 `v_exercise_overview` `security_invoker`
-  (security advisory), #9 FK index, #10 RLS init-plan; plus #5/#6/#7 caching (need tagging
-  first).
+- **Cheap migrations — done 2026-06-30** (`20260630000002_advisor_cleanup.sql`, applied +
+  verified live): #2 `v_exercise_overview` → `security_invoker` (cleared the linter **ERROR**;
+  verified an authenticated user sees only their own rows, 0 foreign), #9 FK index on
+  `exercise_param_overrides(exercise_id)`, #10 RLS init-plan wrap `auth.uid()` →
+  `(select auth.uid())`. Left intentionally: the `current_profile_role`/`is_admin`
+  SECURITY DEFINER **function** WARNs (anti-recursion RLS helpers; return only the caller's
+  own role/admin status), the leaked-password toggle (dashboard-only), and the unused-index /
+  `shares` multi-policy INFO/WARN noise (dropping/rewriting riskier than the benefit).
+- **Still deferred:** #5/#6/#7 caching (`revalidateTag` + `unstable_cache` stable reads +
+  `select` narrowing — need tagging first); engine code-split off the `/log` client bundle.
 
 ### Phase 3 — Streaming & structural cleanup (optional)
 - Suspense streaming on heavy server pages using `DayViewSkeleton`.

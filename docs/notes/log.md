@@ -4,6 +4,26 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 20: WS-J — advisor cleanup (security + cheap perf migrations)
+
+#87 merged + owner-verified. Acknowledgment north star is largely met (#85 + the toggle
+conversions cover the daily-loop surfaces; only the lower-frequency PlannerBoard *draft* path
+remains a residual). Picked the remaining audit migrations — led by a real **security ERROR**.
+
+- **Migration `20260630000002_advisor_cleanup.sql` (applied + verified live).**
+  - **#2 (security ERROR):** `v_exercise_overview` was SECURITY DEFINER → bypassed RLS. Confirmed
+    every usage filters `.eq(user_id, …)` and the view is per-user; flipped to `security_invoker`.
+    Verified live: simulating an authenticated user, the view returns exactly their own 111 rows,
+    **0 foreign** — same app data, now RLS-enforced; the linter ERROR is cleared.
+  - **#9:** FK index `exercise_param_overrides(exercise_id)` (was a seq scan on the reconcile path).
+  - **#10:** wrapped the owner RLS policy `auth.uid()` → `(select auth.uid())` (init-plan, per-query).
+- **Left intentionally:** `current_profile_role`/`is_admin` SECURITY DEFINER function WARNs (the
+  anti-recursion RLS helpers — they return only the caller's own role/admin status, not a leak),
+  the leaked-password dashboard toggle (already in `manual-operations.md`), and the unused-index /
+  `shares` multi-policy INFO/WARN noise.
+- Docs only on the code side (no TS change; view columns unchanged → no type regen). Suite/types
+  unaffected.
+
 ## 2026-06-30 — Session 19: WS-J — return-to-tab snappiness + nav label fix
 
 Owner feedback after #86 merged: (a) the page-switch label still ghosts ("double layer"),

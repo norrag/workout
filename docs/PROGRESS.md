@@ -4001,3 +4001,24 @@ Server-side read-path wins from the measured audit (Supabase advisors + code).
   real data exists. Not shipped; rationale left in a code comment.
 
 Full suite green (563, +3), typecheck + lint + production build clean.
+
+## 2026-06-30 — Performance WS-J: advisor cleanup (security + cheap migrations)
+
+`20260630000002_advisor_cleanup.sql` — **applied + verified on the live project**
+`juqvbiymmdcggctdqoiq` via MCP.
+
+- **Security (linter ERROR, now cleared):** `v_exercise_overview` was `SECURITY
+  DEFINER`, bypassing the querying user's RLS. The view aggregates `logged_sets`
+  GROUP BY user_id and every app read filters `.eq(user_id, …)`, so flipping it to
+  `security_invoker` returns the same per-user data — now RLS-enforced. Verified by
+  simulating an authenticated role: the view returned only that user's own rows
+  (111), zero foreign.
+- **Performance:** added the missing FK index
+  `exercise_param_overrides(exercise_id)`; wrapped the owner RLS policy's
+  `auth.uid()` in a scalar subselect (init-plan, evaluated once per query).
+- **Deliberately left:** the `current_profile_role`/`is_admin` SECURITY DEFINER
+  *function* advisories (intentional anti-recursion RLS helpers — they expose only
+  the caller's own role/admin status) and the leaked-password protection toggle (a
+  dashboard-only setting, tracked in `manual-operations.md`).
+
+No application code changed (view columns unchanged → no type regeneration).
