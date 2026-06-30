@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
+import { Splash } from "@/components/ui/Splash";
 import "@/styles/globals.css";
 
 const archivo = localFont({
@@ -50,7 +52,13 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
-      <body className="min-h-dvh bg-bg-base text-ink">{children}</body>
+      <body className="min-h-dvh bg-bg-base text-ink">
+        {/* Stream a branded splash from the first byte so a cold load never shows
+            a blank/black viewport while the `(app)` layout's auth check + the
+            page data resolve (perf WS-J). Only the initial/hard load hits this;
+            soft tab navigations are handled by per-route loading.tsx. */}
+        <Suspense fallback={<Splash />}>{children}</Suspense>
+      </body>
     </html>
   );
 }
