@@ -227,6 +227,21 @@ export const engineParamsSchema = z.object({
   // falls back to the legacy load_pct deload otherwise. ABSENT / false ⇒ legacy.
   deload_anchor_rir: z.boolean().optional(),
 
+  // ----- WS-I / T-I2 — bodyweight load-type model (owner ruling 2026-06-25) ------
+  // Same `.optional()` discipline (absent ⇒ prior behaviour, no fingerprint churn).
+  //
+  // true ⇒ the engine reads each exercise's load type (`exercise.loadType`) and the
+  // lifter's bodyweight (`user.bodyweight`) and prices bodyweight movements on their
+  // EFFECTIVE load — bodyweight (only), bodyweight + added (loadable), bodyweight −
+  // assist (assisted) — instead of collapsing them to `weight = 0`. A weight-0
+  // bodyweight set then anchors and progresses (reps at a fixed bodyweight load for
+  // bodyweight_only; the rep-window in effective space for loadable/assisted, with
+  // rounding applied to the entered added/assist value). This is the last reason the
+  // legacy increment path survives; retiring that path is the follow-on T-I4.
+  // ABSENT / false ⇒ bodyweight collapses to the `bodyweight` equipment bucket and
+  // the weight-0 → null-anchor → legacy path, exactly as today.
+  bodyweight_model: z.boolean().optional(),
+
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
   // fixed −%, carries genuine regression — doc 13 §4.3).

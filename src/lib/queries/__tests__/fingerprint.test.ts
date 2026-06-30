@@ -62,6 +62,7 @@ function engineArgs() {
     muscleGroupWeeklySets: 12,
     weekPeak: null,
     strengthAnchor: { value: 230, confidence: "high" as const },
+    bodyweight: null,
   };
 }
 
@@ -125,7 +126,7 @@ describe("computeDepFingerprint", () => {
     ["goal", { goal: "strength" as const }],
     ["week", { week: { targetRir: 0, isDeload: true } }],
     ["previous", { previous: { weight: 999, reps: 8, sets: 3, targetRir: 2 } }],
-    ["equipment", { equipmentType: "dumbbell" }],
+    ["equipment", { equipmentType: "dumbbell", loadType: "external" }],
     ["initial", { initial: { weight: 45, reps: 10, sets: 3 } }],
   ])("changes when the %s config dimension changes", (_label, over) => {
     const base = computeDepFingerprint(buildConfigInputs(configArgs()), token);
@@ -255,7 +256,7 @@ describe("source scoping (doc 14 §7, phase 4) — a change recomputes the right
       // dimensions (a different exercise, a different meso goal, a different week)
       // all go stale together when experience changes.
       const rows = [
-        row({ equipmentType: "barbell" }),
+        row({ equipmentType: "barbell", loadType: "external" }),
         row({ equipmentType: "dumbbell", goal: "strength" }),
         row({ week: { targetRir: 0, isDeload: true } }),
       ];
@@ -389,7 +390,7 @@ describe("seed inputs (doc 14 §6.2)", () => {
     ["initial", { initial: { weight: 105, reps: 8, sets: 3 } }],
     ["startRir", { startRir: 1 }],
     ["goal", { goal: "strength" as const }],
-    ["equipment", { equipmentType: "dumbbell" }],
+    ["equipment", { equipmentType: "dumbbell", loadType: "external" }],
   ])("fingerprint changes when the %s config dimension changes", (_label, over) => {
     const a = computeDepFingerprint(configProjection(buildSeedInputs(seedBase)), token);
     const b = computeDepFingerprint(configProjection(buildSeedInputs({ ...seedBase, ...over })), token);

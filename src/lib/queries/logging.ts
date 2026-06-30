@@ -16,6 +16,7 @@ import {
   resolveEffectiveParams,
   seedMeso,
   toEngineEquipment,
+  toEngineLoadType,
 } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseE1rmAnchors } from "./anchors";
@@ -351,6 +352,10 @@ export async function logSet(
     set_type: SetType;
     /** engine per-set e1RM (PH31), computed by the caller from active params */
     e1rm: number | null;
+    /** T-I2/#4: the lifter's bodyweight at log time — the effective-load base for
+     *  bodyweight movements. Captured here, locked once the workout completes (amend
+     *  never rewrites it). Null when the profile has no bodyweight set. */
+    bodyweight: number | null;
   },
 ): Promise<LoggedSetRow> {
   // denormalized cycle stamps come from the workout chain
@@ -396,6 +401,7 @@ export async function logSet(
       set_type: input.set_type,
       rir_reported: input.rir_reported,
       e1rm: input.e1rm,
+      bodyweight: input.bodyweight,
       is_warmup: false,
       notes: null,
     })
@@ -941,7 +947,7 @@ export async function addWorkoutExercises(
       .in("id", exerciseIds),
     supabase
       .from("profiles")
-      .select("experience_level")
+      .select("experience_level, bodyweight")
       .eq("id", userId)
       .single(),
     resolveAddGoal(supabase, micro.mesocycle_id),
@@ -978,11 +984,11 @@ export async function addWorkoutExercises(
     const output = seedMeso(
       null,
       initial,
-      { equipmentType: toEngineEquipment(equipment) },
+      { equipmentType: toEngineEquipment(equipment), loadType: toEngineLoadType(equipment) },
       { experienceLevel: profile.experience_level ?? "beginner" },
       micro.target_rir,
       effectiveParams,
-      { goalType: goal, anchor },
+      { goalType: goal, anchor, bodyweight: profile.bodyweight ?? null },
     );
     const inputs = buildSeedInputs({
       equipmentType: equipment,
@@ -993,6 +999,7 @@ export async function addWorkoutExercises(
       initial,
       priorPeak: null,
       strengthAnchor: anchor,
+      bodyweight: profile.bodyweight ?? null,
     });
     return {
       row: {

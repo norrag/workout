@@ -143,6 +143,7 @@ describe("buildEngineInputs", () => {
     muscleGroupWeeklySets: 12,
     weekPeak: null,
     strengthAnchor: null,
+    bodyweight: null,
   };
 
   it("maps week-N rows onto the engine input shape", () => {

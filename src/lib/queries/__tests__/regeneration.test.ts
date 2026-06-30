@@ -31,7 +31,7 @@ function sampleInputs(
   over: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
-    exercise: { equipmentType: "barbell" },
+    exercise: { equipmentType: "barbell", loadType: "external" },
     user: { experienceLevel: "intermediate" },
     goalType: "hypertrophy",
     week: { targetRir: 2, isDeload: false },
@@ -46,6 +46,7 @@ function sampleInputs(
     weekPeak: null,
     initial: null,
     strengthAnchor: null,
+    bodyweight: null,
     ...over,
   };
 }
@@ -71,6 +72,7 @@ function args(over: Partial<RecomputeArgs> = {}): RecomputeArgs {
     storedInputs,
     liveConfig: sampleConfig(),
     anchor: null,
+    bodyweight: null,
     currentOutput: output,
     ...over,
   };
@@ -140,7 +142,7 @@ describe("recomputeRow", () => {
     // a hypertrophy lift logged above its window: anchor-less it takes the legacy
     // increment branch; overlaying a fresh anchor flips it to the rep-window path
     const storedInputs = sampleInputs({
-      exercise: { equipmentType: "dumbbell" },
+      exercise: { equipmentType: "dumbbell", loadType: "external" },
       goalType: "hypertrophy",
       week: { targetRir: 0, isDeload: false },
       previous: { weight: 25, reps: 11, sets: 3, targetRir: 1 },
@@ -161,7 +163,7 @@ describe("recomputeRow", () => {
 
     // anchor-less recompute reproduces the legacy prescription → unchanged
     const before = recomputeRow(
-      { kind: "advance", storedInputs, liveConfig, anchor: null, currentOutput: legacyOut },
+      { kind: "advance", storedInputs, liveConfig, anchor: null, bodyweight: null, currentOutput: legacyOut },
       PARAMS,
     );
     expect(before.status).toBe("unchanged");
@@ -169,7 +171,7 @@ describe("recomputeRow", () => {
     // overlay a high-confidence anchor → rep-window path engages and diverges
     const anchor: E1rmAnchor = { value: 40, confidence: "high" };
     const after = recomputeRow(
-      { kind: "advance", storedInputs, liveConfig, anchor, currentOutput: legacyOut },
+      { kind: "advance", storedInputs, liveConfig, anchor, bodyweight: null, currentOutput: legacyOut },
       PARAMS,
     );
     expect(after.status).toBe("changed");
@@ -202,7 +204,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
     const output = seedMeso(
       priorPeak,
       init,
-      { equipmentType: "barbell" },
+      { equipmentType: "barbell", loadType: "external" },
       { experienceLevel: "intermediate" },
       startRir,
       DEFAULT_ENGINE_PARAMS as EngineParams,
@@ -225,7 +227,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
   it("replays through seedMeso and reports unchanged when nothing changed", () => {
     const { stored, output } = storedSeed(peak, initial);
     const res = recomputeRow(
-      { kind: "seed", storedInputs: stored, liveConfig: liveCfg(), anchor: null, currentOutput: output },
+      { kind: "seed", storedInputs: stored, liveConfig: liveCfg(), anchor: null, bodyweight: null, currentOutput: output },
       PARAMS,
     );
     expect(res.status).toBe("unchanged");
@@ -240,6 +242,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         storedInputs: stored,
         liveConfig: liveCfg({ week: { targetRir: 1, isDeload: false } }),
         anchor: null,
+        bodyweight: null,
         currentOutput: output,
       },
       PARAMS,
@@ -258,6 +261,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         storedInputs: stored,
         liveConfig: liveCfg({ initial: { weight: 999, reps: 8, sets: 3 } }),
         anchor: null,
+        bodyweight: null,
         currentOutput: output,
       },
       PARAMS,
@@ -275,6 +279,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         storedInputs: noPeak.stored,
         liveConfig: liveCfg({ initial: { weight: 160, reps: 8, sets: 3 } }),
         anchor: null,
+        bodyweight: null,
         currentOutput: noPeak.output,
       },
       PARAMS,
@@ -285,7 +290,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
       seedMeso(
         null,
         { weight: 160, reps: 8, sets: 3 },
-        { equipmentType: "barbell" },
+        { equipmentType: "barbell", loadType: "external" },
         { experienceLevel: "intermediate" },
         3,
         PARAMS,
@@ -302,6 +307,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         storedInputs: stored,
         liveConfig: liveCfg(),
         anchor: { value: 500, confidence: "high" },
+        bodyweight: null,
         currentOutput: output,
       },
       PARAMS,
@@ -355,7 +361,7 @@ describe("reconcile backfill — decision-less open rows (doc 14 §6.2/§6.3)", 
     // the row carries some old, now-wrong prescribed value (null fingerprint)
     const staleOutput = { weight: 999, reps: 8, sets: 3, targetRir: 3 };
     const res = recomputeRow(
-      { kind: "seed", storedInputs, liveConfig, anchor: null, currentOutput: staleOutput },
+      { kind: "seed", storedInputs, liveConfig, anchor: null, bodyweight: null, currentOutput: staleOutput },
       PARAMS,
     );
     expect(res.status).toBe("changed");
@@ -363,7 +369,7 @@ describe("reconcile backfill — decision-less open rows (doc 14 §6.2/§6.3)", 
     const expected = seedMeso(
       priorPeak,
       planInitial,
-      { equipmentType },
+      { equipmentType, loadType: "external" },
       { experienceLevel: "intermediate" },
       week.targetRir,
       PARAMS,

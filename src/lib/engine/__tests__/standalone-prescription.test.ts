@@ -12,7 +12,7 @@ import { predictRepsAtWeight, impliedRirAtReps } from "../reps";
 import type { EngineInputs } from "../types";
 import { baseInputs, V11_PARAMS, V14_PARAMS } from "./helpers";
 
-const exercise = { equipmentType: "machine" as const };
+const exercise = { equipmentType: "machine" as const, loadType: "external" as const };
 const user = { experienceLevel: "intermediate" as const };
 
 // the §2.4 leg-curl shape: a bad week-1 seed of 100×30, an inflated anchor, a

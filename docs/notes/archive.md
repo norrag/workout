@@ -11,6 +11,29 @@ for the purge policy.
 
 ---
 
+## Swept 2026-06-26 — Group 1 merged (PR #78)
+
+Active-workout isolation + session-average e1RM. Built and merged (PR #78); the
+view migration was applied to the live project and verified against real data
+(all 4,411 history rows now equal the session average; 1,271 differ from the old
+session max). Raw text stays in the backlog appendix (Batch 2).
+
+### Shipped & merged
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N2 | History e1RM took the session **max**; should **average** across working sets | B | B | **done — merged (PR #78).** Both surfaces average the stored engine per-set e1RM: `history.ts sessionAvgE1rm` + `v_exercise_history.e1rm` (migration `20260626000001`, applied 2026-06-26). Unified the history stat onto the engine formula (advanced **T-A1**, still open for `v_exercise_overview.best_e1rm` + the "what each screen shows" / PH39 call). |
+| N3 | Active/in-progress workout must not feed live prescriptions/predictions | D→B | A/I | **done — merged (PR #78).** `getExerciseE1rmAnchors` filters candidate sets to `workouts.status='completed'` at source ⇒ all consumers (live predictor, seed, progression, regeneration) exclude the in-progress workout; history/stats still post live. |
+
+### Resolved follow-up tasks
+
+| ID | From | Title | Type | Resolution |
+|----|------|-------|------|------------|
+| T-A7 | PH40 | Freeze in-session prescription vs adapt live | D→F | **done — merged (PR #78, via N3).** Anchor reads completed workouts only ⇒ current-session sets never re-price the live session. |
+| T-A8 | PH41 | Should in-progress sets count toward history/stats? | D→F | **done — merged (PR #78, via N3).** In-progress sets post to history/stats live but are excluded from the anchor (prescription/prediction input) until the workout completes. |
+
+---
+
 ## Swept 2026-06-26 — notes-area reorg
 
 ### Resolved-and-removed at the Notes-v2 reconciliation (2026-06-22)

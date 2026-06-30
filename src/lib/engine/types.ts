@@ -5,6 +5,7 @@ import {
   experienceLevels,
   goalTypes,
 } from "./params";
+import { loadTypes } from "./load";
 
 export const loggedSetInputSchema = z.object({
   setNumber: z.number().int().min(1),
@@ -51,6 +52,10 @@ export const prescriptionSchema = z.object({
 export const engineInputsSchema = z.object({
   exercise: z.object({
     equipmentType: z.enum(equipmentTypes),
+    // T-I2: how the entered weight maps to effective load. Defaults to `external`
+    // so inputs built before the bodyweight model parse unchanged; only consulted
+    // when `params.bodyweight_model` is on.
+    loadType: z.enum(loadTypes).default("external"),
   }),
   user: z.object({
     experienceLevel: z.enum(experienceLevels),
@@ -92,6 +97,12 @@ export const engineInputsSchema = z.object({
     })
     .nullable()
     .default(null),
+  // T-I2: the lifter's current bodyweight (lb), the effective-load base for
+  // bodyweight movements (see load.ts). A drifting, DERIVED input — excluded from
+  // the freshness fingerprint (doc 14 §3, like strengthAnchor) and refreshed from
+  // the live profile on recompute. Null when unknown ⇒ a bodyweight lift defers to
+  // a manual seed. Only consulted when `params.bodyweight_model` is on.
+  bodyweight: z.number().positive().nullable().default(null),
 });
 
 export type EngineInputs = z.infer<typeof engineInputsSchema>;

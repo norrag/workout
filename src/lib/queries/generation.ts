@@ -6,6 +6,7 @@ import {
   rirRamp,
   seedMeso,
   toEngineEquipment,
+  toEngineLoadType,
   type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
@@ -40,6 +41,8 @@ interface SeedCtx {
   equipmentById: Map<string, ExerciseRow["equipment_type"]>;
   prById: Map<string, { best_weight: number | null; best_reps: number | null }>;
   experienceLevel: ProfileRow["experience_level"];
+  /** T-I2: the lifter's bodyweight — effective-load base for bodyweight movements */
+  bodyweight: number | null;
   targetRir: number;
   isDeload: boolean;
   goal: EngineGoal;
@@ -114,11 +117,11 @@ function seedExerciseRow(
   const output = seedMeso(
     priorPeak,
     initial,
-    { equipmentType: engineEquipment },
+    { equipmentType: engineEquipment, loadType: toEngineLoadType(equipment) },
     { experienceLevel: ctx.experienceLevel ?? "beginner" },
     ctx.targetRir,
     effectiveParams,
-    { goalType: ctx.goal, anchor },
+    { goalType: ctx.goal, anchor, bodyweight: ctx.bodyweight },
   );
   const inputs = buildSeedInputs({
     equipmentType: equipment,
@@ -129,6 +132,7 @@ function seedExerciseRow(
     initial,
     priorPeak,
     strengthAnchor: anchor,
+    bodyweight: ctx.bodyweight,
   });
   return {
     row: {
@@ -332,6 +336,7 @@ export async function startMeso(
     equipmentById,
     prById,
     experienceLevel: profile.experience_level,
+    bodyweight: profile.bodyweight ?? null,
     targetRir: meso.rir_start,
     isDeload: week1.is_deload,
     goal,
@@ -450,6 +455,7 @@ export async function regenerateOpenWorkouts(
       equipmentById,
       prById,
       experienceLevel: profile.experience_level,
+      bodyweight: profile.bodyweight ?? null,
       targetRir: micro.target_rir,
       isDeload: micro.is_deload,
       goal,

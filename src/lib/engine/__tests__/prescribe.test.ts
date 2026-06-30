@@ -53,7 +53,7 @@ describe("prescribe — performance delta (§3)", () => {
   it("kettlebell steps in kettlebell jumps, not plate math", () => {
     const out = prescribe(
       baseInputs({
-        exercise: { equipmentType: "kettlebell" },
+        exercise: { equipmentType: "kettlebell", loadType: "external" },
         user: { experienceLevel: "intermediate" },
         previous: { weight: 16, reps: 10, sets: 3, targetRir: 3 },
         actualSets: [
@@ -69,7 +69,7 @@ describe("prescribe — performance delta (§3)", () => {
   it("bands progress in coarse band steps", () => {
     const out = prescribe(
       baseInputs({
-        exercise: { equipmentType: "bands" },
+        exercise: { equipmentType: "bands", loadType: "external" },
         user: { experienceLevel: "intermediate" },
         previous: { weight: 30, reps: 12, sets: 3, targetRir: 3 },
         actualSets: [

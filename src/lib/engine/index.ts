@@ -20,6 +20,7 @@ import {
   predictRepsAtWeight,
   type E1rmAnchor,
 } from "./reps";
+import { prescribeBodyweight, usesBodyweightModel } from "./rules/bodyweight";
 
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
@@ -83,6 +84,15 @@ export {
   type ExerciseParamOverride,
 } from "./effective-params";
 export { incrementFor } from "./rules/rounding";
+export {
+  loadTypes,
+  isBodyweightLoad,
+  toEngineLoadType,
+  coerceLoadType,
+  effectiveLoad,
+  enteredForEffective,
+  type LoadType,
+} from "./load";
 export type { EquipmentType } from "./params";
 export type { EngineInputs, Prescription, EngineParams };
 
@@ -92,6 +102,14 @@ export function prescribe(
 ): Prescription {
   const inputs = engineInputsSchema.parse(rawInputs);
   const params = engineParamsSchema.parse(rawParams);
+
+  // T-I2: bodyweight load types price on effective load (bodyweight ± entered) and
+  // progress on reps at a fixed load (bodyweight_only) or the rep-window in effective
+  // space (loadable/assisted). Gated on `bodyweight_model`; the external path below
+  // is unchanged. Covers deload + cold start internally.
+  if (usesBodyweightModel(inputs, params)) {
+    return prescribeBodyweight(inputs, params);
+  }
 
   // §6 deload week short-circuits everything else.
   if (inputs.week.isDeload) {
@@ -587,9 +605,30 @@ export function seedMeso(
   user: EngineInputs["user"],
   startRir: number,
   rawParams: EngineParams,
-  opts?: { goalType?: EngineInputs["goalType"]; anchor?: E1rmAnchor | null },
+  opts?: {
+    goalType?: EngineInputs["goalType"];
+    anchor?: E1rmAnchor | null;
+    bodyweight?: number | null;
+  },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
+
+  // T-I2: bodyweight load types seed through the bodyweight model (effective load
+  // off the anchor; reps-only for bodyweight_only). Gated on `bodyweight_model`.
+  if ((params.bodyweight_model ?? false) && exercise.loadType !== "external") {
+    const seedInputs = engineInputsSchema.parse({
+      exercise,
+      user,
+      goalType: opts?.goalType ?? "hypertrophy",
+      week: { targetRir: startRir, isDeload: false },
+      previous: null,
+      actualSets: [],
+      strengthAnchor: opts?.anchor ?? null,
+      initial,
+      bodyweight: opts?.bodyweight ?? null,
+    });
+    return prescribeBodyweight(seedInputs, params);
+  }
 
   // §S1 anchor seed — mirrors prescribe()'s seed_anchor branch (index.ts:103-151)
   const anchor = opts?.anchor ?? null;

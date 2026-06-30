@@ -8,7 +8,7 @@ import { DEFAULT_ENGINE_PARAMS, prescribe, rirRamp, seedMeso } from "../index";
 import type { EngineInputs, Prescription } from "../types";
 
 const params = DEFAULT_ENGINE_PARAMS;
-const exercise = { equipmentType: "barbell" as const };
+const exercise = { equipmentType: "barbell" as const, loadType: "external" as const };
 const user = { experienceLevel: "intermediate" as const };
 
 function simulateCleanWeek(prev: Prescription): EngineInputs["actualSets"] {
@@ -54,6 +54,7 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100lb start"
           weekPeak: { weight: peak.weight, reps: peak.reps, sets: peak.sets, targetRir: peak.targetRir },
           initial: null,
           strengthAnchor: null,
+          bodyweight: null,
         },
         params,
       );

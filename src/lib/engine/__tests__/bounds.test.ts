@@ -30,6 +30,7 @@ function randomInputs(r: () => number): EngineInputs {
   return {
     exercise: {
       equipmentType: pick(["barbell", "dumbbell", "machine", "cable", "smith", "bodyweight", "bands", "kettlebell", "other"] as const),
+      loadType: "external",
     },
     user: {
       experienceLevel: pick(["beginner", "intermediate", "advanced"] as const),
@@ -65,6 +66,7 @@ function randomInputs(r: () => number): EngineInputs {
             confidence: pick(["low", "moderate", "high"] as const),
           }
         : null,
+    bodyweight: null,
   };
 }
 
