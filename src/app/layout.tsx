@@ -2,6 +2,11 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Suspense } from "react";
 import { Splash } from "@/components/ui/Splash";
+import {
+  IOS_LAUNCH_SCREENS,
+  launchImageHref,
+  launchImageMedia,
+} from "@/lib/pwa/ios-launch-screens";
 import "@/styles/globals.css";
 
 const archivo = localFont({
@@ -51,6 +56,19 @@ export default function RootLayout({
     <html lang="en" className={archivo.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {/* iOS PWA launch screens — replace the OS pre-document blank (which
+            ignores the manifest bg) with the brand background so a home-screen
+            launch never flashes black. See lib/pwa/ios-launch-screens.ts. */}
+        {IOS_LAUNCH_SCREENS.flatMap((s) =>
+          (["light", "dark"] as const).map((theme) => (
+            <link
+              key={`${s.w}x${s.h}@${s.dpr}-${theme}`}
+              rel="apple-touch-startup-image"
+              href={launchImageHref(s, theme)}
+              media={launchImageMedia(s, theme)}
+            />
+          )),
+        )}
       </head>
       <body className="min-h-dvh bg-bg-base text-ink">
         {/* Stream a branded splash from the first byte so a cold load never shows
