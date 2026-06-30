@@ -4,6 +4,30 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 14: reconcile merged PRs + harden the PR-sync process
+
+Owner flagged that the live index was full of `done (PR pending)` rows whose PRs had
+actually merged — the post-merge sweep had never been run — and asked to (a) reconcile
+the notes against real PR/commit state and (b) fix the operating manual so status moves
+in lockstep with PRs going forward. Branch `claude/review-notes-section-khtf4p`.
+
+- **Reconciliation.** Checked the live index against the merged-PR list (only the
+  unrelated **#48** is still open). Every `done (PR pending)` item maps to a merged PR —
+  nothing was actually stuck. **Swept 12 rows + WS-I (T-I1–T-I5) to `archive.md`** under a
+  new "Swept 2026-06-30 — reconcile merged build PRs" section, with PR links + resolutions:
+  PH35/PH42/P20/PH26/P19/PH27/PH28 (**#62**), PH31/PH32 (**#65**, backfill **#66**), O1
+  (**#72/#73**), PH40/PH41 (**#78**), PR26 + T-I2/T-I4/T-I5 (**#72/#80/#81/#82**).
+- **Backlog.** Live index trimmed to genuinely-open items; follow-up table drops the merged
+  WS-I tasks (note + archive link left in place); T-A4 annotated as realized via #82. Replaced
+  the "done (PR pending)" note with the new status convention.
+- **Process fix (the real ask).** `docs/notes/CLAUDE.md`: new **"Keeping the index in sync
+  with PRs"** section (rule 1: the *building* PR sets `done (PR #<n>)` with the real number +
+  logs it; rule 2: a merged PR can't sweep its own row; rule 3: a **reconciliation sweep** runs
+  at every session start). Wired the sweep into the **resume protocol** as step 3. Root
+  `CLAUDE.md`: added the "any PR that resolves a backlog item updates its row in the same PR"
+  rule to the `docs/notes/` bullet so non-notes sessions follow it too.
+- No code/schema/engine changes; docs only.
+
 ## 2026-06-26 — Session 13: T-I4 — retire the legacy increment model (WS-I complete)
 
 With v16 active the legacy path is dead in production, so this deletes it (own PR,

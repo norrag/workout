@@ -11,6 +11,43 @@ for the purge policy.
 
 ---
 
+## Swept 2026-06-30 — reconcile merged build PRs
+
+Catch-up sweep. A pile of rows sat in the live index as `done (PR pending)` even
+though their PRs had **merged** — the post-merge sweep was never run. Reconciled
+the index against the merged-PR list (only the unrelated #48 remains open); every
+item below is confirmed merged. Raw text stays in the backlog appendix.
+
+### Shipped & merged — UI / feature / bug items
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| PH35 | Application error on auto-match weights | B | G | **done — merged (PR #62).** Real cause: `profiles` RLS recursion (`42P17`) — `profiles_update_own` self-referenced `profiles` in its WITH CHECK. Fix migration (`…220627`) reads role via a SECURITY DEFINER helper; **applied live + verified** (normal update OK, escalation BLOCKED 42501). Error boundary + toggle revert/toast retained as defense-in-depth. |
+| PH42 | Note pencil icon hard to recognize (absorbs **I15**) | UX | E | **done — merged (PR #62).** Illegible Unicode `✎` swapped for a legible inline SVG `PencilGlyph` (+20%). |
+| P20 | Exercise search list should live-filter as you type | UX | F | **done — merged (PR #62).** Client `ExercisesBrowser` filters the loaded list in memory (mirrors the muscle/equip axis pattern). |
+| PH26 | Move match-weight / export / delete-acct to a dedicated settings sub-page | UX | F | **done — merged (PR #62).** `/more/account` sub-page; single Link left on the More page. |
+| P19 | Over/under-prescription marker on logged sets | F | E | **done — merged (PR #62).** `▲`/`▼` marker in `SetRow`, compared by **e1RM** (owner's rule), ±1.5% on-target band, no marker without a prescription. |
+| PH27 | Template share-code into the New Template button (tray) | F | F | **done — merged (PR #62).** `NewTemplateButton` tray (blank template → planner, or redeem a share code). |
+| PH28 | Profile height entered in cm, ignores chosen units | B | G | **done — merged (PR #62).** Unit-aware height input (ft/in when imperial), canonical `height_cm` storage, both `formatHeight` copies unified; onboarding reordered (units first; deviation recorded in PROGRESS). |
+| PH31 | Store calculated e1RM per set; expose to public MCP tools (audit) | F | B | **done — merged (PR #65; backfill SQL fix #66).** Nullable `logged_sets.e1rm` + backfill on the RIR-aware engine formula; write path computes+stores; MCP `get_exercise_history` returns a per-session e1RM with an honesty caveat. |
+| PH32 | Tap a set in history to flip sets/reps ↔ e1RM view | F | B | **done — merged (PR #65).** List-wide flip in `ExerciseHistoryList`, session-best e1RM, `metric-fade` (reduced-motion → instant), default load = sets/reps. |
+| O1 | Auditability: re-stamp open decisions on a params bump; make version + decision kind viewable from the day-view dropdown | F | I | **done — merged (PR #72/#73).** Invariant confirmed already held (`params_version` advances on every reconcile; day view reconciles on load). Built the "Prescription detail" reveal (decision kind, verified-as-of vs computed-under, rationale/trace) + the prescribed `weight × reps · sets · RIR` line. Admin-gating left as an easy follow-up. |
+| PH40 | Sets reprice as you log — should it only use prior sets? | Q→B | A | **done — merged (PR #78, via N3/T-A7).** Anchor reads `workouts.status='completed'` only ⇒ the in-progress workout never re-prices the live session. |
+| PH41 | History includes the current (incomplete) workout | Q→B | A | **done — merged (PR #78, via N3/T-A8).** In-progress sets still post to history/stats live, but are excluded from the prescription/prediction anchor until the workout completes. |
+
+### Shipped & merged — engine (WS-I / PR26 complete)
+
+| ID | From | Title | Type | Resolution |
+|----|------|-------|------|------------|
+| PR26 | — | Retire the legacy increment path; fold remaining (bodyweight) use into the v9 model | F | **done — WS-I complete (PRs #72/#80/#81/#82).** Bodyweight load-type model live (engine_params **v16 active**); legacy increment/regression + prior-peak seed retired. Umbrella for T-I1–T-I5. |
+| T-I1 | PR26 | Decide bodyweight data model (load type; bodyweight as effective load; assisted = negative) | D | **decided 2026-06-25; realized in T-I2.** bodyweight-only (profile BW read-only, progress on reps), loadable (BW+added), assisted (negative). |
+| T-I2 | PR26 | Build the v9 no-anchor/cold-start + bodyweight effective-load model | F | **done + LIVE — merged (engine PR #80, UI PR #81).** Load-type model + effective load; migrations applied; **engine_params v16 ACTIVATED**. |
+| T-I3 | PR26 | Big-miss back-off policy (regression vs anchor-only) | D | **decided 2026-06-25: anchor-only, no hidden back-off** (realized via T-I4). |
+| T-I4 | PR26 | Delete legacy increment block + retire legacy-only params | F | **done — merged (PR #82).** Legacy `else` → no-anchor hold; `incrementFor` removed; legacy params marked DEPRECATED (kept in schema for replay; no version bump / no row migration); test harness re-pointed. |
+| T-I5 | owner ruling 2026-06-25 | Retire the prior-peak × back-off meso seed | F | **done — merged (PR #72; gated v14, superseded by the v16 active model + T-I4 deletion).** Seed precedence = confident anchor → user `initial_*` → unseeded/prompt. |
+
+---
+
 ## Swept 2026-06-26 — Group 1 merged (PR #78)
 
 Active-workout isolation + session-average e1RM. Built and merged (PR #78); the
