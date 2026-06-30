@@ -145,18 +145,19 @@ describe("rep-window — seeding & fallback", () => {
     expect(out.rationale).toMatch(/seeded from strength anchor/i);
   });
 
-  it("with no anchor, falls back to the legacy increment path", () => {
-    // identical to the parity case in prescribe.test.ts: +5 lb
+  it("with no anchor, holds the load (T-I4: legacy increment path retired)", () => {
     const out = prescribe(baseInputs(), params); // no strengthAnchor
-    expect(out.weight).toBe(105);
+    expect(out.weight).toBe(100); // hold, no fabricated +increment
+    expect(out.rationale).toMatch(/not enough recent data to reprice/i);
   });
 
-  it("below min_confidence, holds the plan via the increment path", () => {
+  it("below min_confidence, holds the load (no shaky-anchor repricing)", () => {
     const strict = { ...params, reps_predict: { min_confidence: "high" as const } };
     const out = prescribe(
       repWeek({ strengthAnchor: { value: 160, confidence: "moderate" } }),
       strict,
     );
-    expect(out.weight).toBe(105); // shaky anchor ignored → increment path
+    // the moderate anchor is below the `high` floor → no rep-window repricing → hold
+    expect(out.weight).toBe(100);
   });
 });

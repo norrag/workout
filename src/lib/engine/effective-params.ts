@@ -21,15 +21,11 @@ export interface ExerciseParamOverride {
  * The weight increment is the exercise's **loadable step** — the smallest jump you
  * can actually put on the bar/stack. That step is what the engine rounds EVERY
  * prescribed weight to, in EVERY path (`roundToStep` reads `params.rounding`): the
- * meso seed, the anchor cold-start, the rep-window advance, and the legacy advance.
- * So the override sets `params.rounding` for this exercise's equipment — that
- * is what makes "I lift this in 25s" actually produce loads in 25s, seed or advance.
- *
- * It also sets the legacy `params.increment` (the +step progression jump used only
- * on the no-anchor fallback path, `weight_selection: "increment"`) to the same
- * value, so the user's step is honoured there too. `increment` composes with
- * `experience_increment_scale`; `rounding` (a physical step) does not — it is used
- * literally, which is what the user means by the loadable step.
+ * meso seed, the anchor cold-start, and the rep-window advance. So the override
+ * sets `params.rounding` for this exercise's equipment — that is what makes "I lift
+ * this in 25s" actually produce loads in 25s, seed or advance. (T-I4 retired the
+ * legacy `increment` / `experience_increment_scale` progression jump, so the
+ * override no longer touches `params.increment` — nothing reads it.)
  *
  * A null/absent override returns the params unchanged (and, by the fingerprint
  * contract, produces the identical fingerprint a pre-phase-3 row carried — so the
@@ -44,15 +40,10 @@ export function resolveEffectiveParams(
   if (step == null) return params;
   return {
     ...params,
-    // the loadable step every prescription rounds to (the one that matters under
-    // the active rep_window params, where load is priced off the strength anchor)
+    // the loadable step every prescription rounds to (load is priced off the
+    // strength anchor and rounded to this step)
     rounding: {
       ...params.rounding,
-      [equipment]: step,
-    },
-    // the legacy +step jump (no-anchor fallback / increment mode), kept in sync
-    increment: {
-      ...params.increment,
       [equipment]: step,
     },
   };

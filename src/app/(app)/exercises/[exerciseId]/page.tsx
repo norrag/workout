@@ -5,7 +5,7 @@ import { getExerciseHistory } from "@/lib/queries/history";
 import { getExerciseOverview } from "@/lib/queries/exercises";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
-import { incrementFor, toEngineEquipment } from "@/lib/engine";
+import { toEngineEquipment } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
@@ -75,7 +75,6 @@ export default async function ExerciseDetailPage({
     { data: links, error: linkError },
     { data: groups, error: groupError },
     { data: pinned, error: pinnedError },
-    { data: profile, error: profileError },
     overview,
     history,
     activeParams,
@@ -92,11 +91,6 @@ export default async function ExerciseDetailPage({
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("experience_level")
-      .eq("id", user.id)
-      .single(),
     getExerciseOverview(supabase, user.id, exercise.id),
     getExerciseHistory(supabase, user.id, exercise.id),
     getActiveEngineParams(supabase),
@@ -105,14 +99,13 @@ export default async function ExerciseDetailPage({
   if (linkError) throw linkError;
   if (groupError) throw groupError;
   if (pinnedError) throw pinnedError;
-  if (profileError) throw profileError;
 
-  // engine default load step for this exercise/user, for the settings editor
-  const defaultStep = incrementFor(
-    toEngineEquipment(exercise.equipment_type),
-    profile.experience_level ?? "beginner",
-    activeParams.params,
-  );
+  // engine default loadable step for this exercise, for the increment-override
+  // editor. The override sets the exercise's rounding step (the load the engine
+  // rounds every prescription to), so the editor's default is that rounding step.
+  // (T-I4 retired the legacy experience-scaled `increment`.)
+  const defaultStep =
+    activeParams.params.rounding[toEngineEquipment(exercise.equipment_type)] ?? 5;
 
   const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]));
   const primary = (links ?? []).find((l) => l.role === "primary");

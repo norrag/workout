@@ -4,6 +4,22 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-26 — Session 13: T-I4 — retire the legacy increment model (WS-I complete)
+
+With v16 active the legacy path is dead in production, so this deletes it (own PR,
+branch `claude/t-i4-retire-legacy`). No version bump / no row migration — legacy param
+fields stay in the schema (deprecated) to keep historical rows replayable; only the code
+is removed.
+
+- `prescribe()` legacy `else` → no-anchor **hold** (anchor-only; no +increment / no
+  −regression%). `seedMeso()` prior-peak branch deleted (precedence: anchor → initial →
+  unseeded). `incrementFor` removed; `effective-params` drops the dead `increment` set;
+  exercise page default = rounding step. Legacy params marked DEPRECATED in `params.ts`.
+- Re-pointed the engine test harness off the legacy default (`prescribe.test.ts`,
+  `golden-meso`, `rep-window`, `standalone-prescription`, `regeneration`, `admin-tools`,
+  `equipment`, `effective-params`). Suite green (549), typecheck + lint + build clean.
+- **WS-I / PR26 complete**: T-I1–T-I5 all done. T-I4 → done (PR pending).
+
 ## 2026-06-26 — Session 12: Group 2 — audit, loadable data migration, v16 ACTIVATED
 
 - **Pre-activation audit** (read-only, all users): every bodyweight_loadable exercise was

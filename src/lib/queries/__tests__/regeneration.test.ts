@@ -251,9 +251,9 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
     expect(res.output!.targetRir).toBe(1);
   });
 
-  it("backs off the FROZEN prior peak, so a changed plan initial does not move it", () => {
-    // a meso seed with a prior peak: seedMeso uses the peak branch, ignoring
-    // `initial`, so bumping the live initial recomputes but yields the same number.
+  it("a changed plan initial moves the seed even with a prior peak (T-I4: peak retired)", () => {
+    // T-I4 retired the prior-peak seed: precedence is anchor → plan initial →
+    // unseeded, so the peak no longer freezes the seed — the live initial drives it.
     const { stored, output } = storedSeed(peak, initial);
     const res = recomputeRow(
       {
@@ -266,8 +266,8 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
       },
       PARAMS,
     );
-    expect(res.status).toBe("unchanged");
-    expect(res.output!.weight).toBe(output.weight);
+    expect(res.status).toBe("changed");
+    expect(res.output!.weight).not.toBe(output.weight);
   });
 
   it("seeds from the live plan initial when there is no prior peak (user-add shape)", () => {

@@ -14,7 +14,7 @@ import { assessPerformance, gradeOnRir } from "./rules/performance";
 import { modulateFromFeedback } from "./rules/feedback";
 import { prescribeDeload } from "./rules/deload";
 import { rirRamp, type WeekPlan } from "./rules/rir";
-import { incrementFor, roundToStep } from "./rules/rounding";
+import { roundToStep } from "./rules/rounding";
 import {
   weightForRepsAtRir,
   predictRepsAtWeight,
@@ -83,7 +83,6 @@ export {
   resolveEffectiveParams,
   type ExerciseParamOverride,
 } from "./effective-params";
-export { incrementFor } from "./rules/rounding";
 export {
   loadTypes,
   isBodyweightLoad,
@@ -350,71 +349,29 @@ export function prescribe(
       gateHeld: gateHeld && (params.hold_rep_consistent ?? false),
     };
   } else {
-    // ----- legacy increment path (unchanged — parity, doc 13 §3.8) ----------
-    const style = params.progression_style[inputs.goalType] ?? "hold";
-    const increment = incrementFor(
-      inputs.exercise.equipmentType,
-      inputs.user.experienceLevel,
-      params,
-    );
-
-    if (perf.outcome === "met" || perf.outcome === "beat") {
-      const wantsLoad = style === "load_first" || perf.outcome === "beat";
-      if (wantsLoad && !mod.painGated && !mod.sessionDampened) {
-        weight = baseWeight + increment;
-        reasons.unshift({
-          rule: "load",
-          detail: `+${increment} lb: ${perf.detail}`,
-        });
-        if (rirStepped) {
-          reasons.push({
-            rule: "rir",
-            detail: `target RIR steps ${prevRir} to ${inputs.week.targetRir}`,
-          });
-        }
-      } else if (style === "reps_first" && !mod.sessionDampened) {
-        reps = baseReps + 1;
-        reasons.unshift({ rule: "load", detail: `+1 rep: ${perf.detail}` });
-      } else {
-        weight = baseWeight;
-        if (mod.painGated || mod.sessionDampened) {
-          reasons.unshift({
-            rule: "load",
-            detail: `hold ${baseWeight} lb: ${perf.detail}`,
-          });
-        } else {
-          reasons.unshift({
-            rule: "load",
-            detail: rirStepped
-              ? `hold load; RIR drop ${prevRir} to ${inputs.week.targetRir} is the progression (${perf.detail})`
-              : `hold steady per ${inputs.goalType} goal (${perf.detail})`,
-          });
-        }
-      }
-    } else if (perf.outcome === "small_miss") {
-      weight = baseWeight;
-      // a "small_miss" holds the load for two different reasons: a genuine
-      // reps-short miss, or reps met/beaten but at a lower RIR than target (the
-      // set was harder than prescribed). Word each accurately (§5.11) — calling
-      // the latter a "close miss" misread a set the lifter actually hit.
-      reasons.unshift({
-        rule: "load",
-        detail: perf.repsMet
-          ? `hold load, hit reps but below target RIR: ${perf.detail}`
-          : `hold load, close miss: ${perf.detail}`,
+    // ----- no-anchor safety hold (T-I4: the legacy increment/regression path is
+    // retired) ----------------------------------------------------------------
+    // The legacy model fabricated progression without a strength anchor (+fixed
+    // increment on a hit, −regression_pct on a big miss, reps_first/load_first per
+    // goal). The owner ruling (2026-06-25, T-I3) is anchor-only: real strength
+    // change is carried by the recency anchor (rising or falling), never a fixed
+    // step or hidden back-off. Under the active params (rep_window + bodyweight
+    // model) every lift with usable history has an anchor, so this branch is a rare
+    // SAFETY fallback for the no-confident-anchor case — HOLD the last load and reps
+    // rather than invent a number. `setDelta` (volume autoregulation) still applies
+    // below; the pain gate can only hold, never lift, so no extra bound is needed.
+    weight = baseWeight;
+    reps = baseReps;
+    const gated = mod.painGated || mod.sessionDampened;
+    reasons.unshift({
+      rule: "load",
+      detail: `hold ${baseWeight} lb at ${baseReps} reps${gated ? " (gated)" : ""}; not enough recent data to reprice (${perf.detail})`,
+    });
+    if (rirStepped) {
+      reasons.push({
+        rule: "rir",
+        detail: `target RIR steps ${prevRir} to ${inputs.week.targetRir} is the progression`,
       });
-    } else {
-      // big miss
-      weight = baseWeight * params.regression_pct;
-      reasons.unshift({
-        rule: "load",
-        detail: `-${Math.round((1 - params.regression_pct) * 100)}% load: ${perf.detail}`,
-      });
-    }
-
-    // pain gate is a hard bound: never above what was actually handled
-    if (mod.painGated && weight > baseWeight) {
-      weight = baseWeight;
     }
   }
 
@@ -663,53 +620,23 @@ export function seedMeso(
     }
   }
 
-  // §T-I5 (owner ruling 2026-06-25): the legacy prior-peak × back-off seed is
-  // RETIRED when `retire_prior_peak_seed` is set — it fabricates a seed (carries
-  // priorPeak.reps verbatim, off a never-performed per-column-max set). With the
-  // flag set we skip it: the seed defers to the user's plan `initial_*` (a manual
-  // seed) and, absent that, leaves the slot unseeded rather than invent a number.
-  if (!(params.retire_prior_peak_seed ?? false) && priorPeak?.weight != null) {
-    return {
-      weight: roundToStep(
-        priorPeak.weight * params.meso_seed_backoff_pct,
-        exercise.equipmentType,
-        params,
-      ),
-      reps: priorPeak.reps,
-      sets: clampSets(priorPeak.sets, params),
-      targetRir: startRir,
-      rationale: `Seeded from prior meso peak, backed off ${Math.round((1 - params.meso_seed_backoff_pct) * 100)}% to start at ${startRir} RIR.`,
-      trace: [
-        {
-          rule: "seed",
-          detail: `seeded from prior meso peak, backed off ${Math.round((1 - params.meso_seed_backoff_pct) * 100)}% to start at ${startRir} RIR`,
-        },
-      ],
-    };
-  }
-  // No confident anchor and no usable peak (or the peak was retired by the flag).
-  // Use the user's own plan values when present; otherwise leave the slot UNSEEDED
-  // (null weight) and prompt them to enter a starting point — never fabricate one.
+  // T-I4 / T-I5 (owner ruling 2026-06-25): the legacy prior-peak × back-off seed is
+  // RETIRED — it fabricated a seed (carried priorPeak.reps verbatim off a
+  // never-performed per-column-max set, and never re-priced through the rep window).
+  // Seed precedence is now strictly: confident recency anchor (above) → the user's
+  // plan `initial_*` (a manual seed) → UNSEEDED (null weight, prompt the user).
+  // Nothing is ever invented from a peak set. (`meso_seed_backoff_pct` is retained
+  // in the schema for historical-row parsing only; no code reads it.)
   const hasInitial = initial?.weight != null;
-  // When the flag is OFF this branch is reached only on a true cold start (no peak),
-  // so keep its rationale byte-identical to preserve flag-off replay. When the flag
-  // is ON it may be reached because a peak was retired, so the copy reflects that a
-  // retired peak is not a cold start, and an unseeded slot is awaiting a manual seed.
-  const retired = params.retire_prior_peak_seed ?? false;
-  const { rationale, detail } = !retired
+  const { rationale, detail } = hasInitial
     ? {
-        rationale: `No prior history; starting from plan defaults at ${startRir} RIR.`,
-        detail: `no prior history; starting from plan defaults at ${startRir} RIR`,
+        rationale: `Starting from your planned values at ${startRir} RIR.`,
+        detail: `no confident anchor; starting from plan defaults at ${startRir} RIR`,
       }
-    : hasInitial
-      ? {
-          rationale: `Starting from your planned values at ${startRir} RIR.`,
-          detail: `no confident anchor; starting from plan defaults at ${startRir} RIR`,
-        }
-      : {
-          rationale: `Not enough confident recent data to prescribe — enter a starting weight to seed this exercise.`,
-          detail: `no confident data to seed; awaiting a manual starting weight`,
-        };
+    : {
+        rationale: `Not enough confident recent data to prescribe — enter a starting weight to seed this exercise.`,
+        detail: `no confident data to seed; awaiting a manual starting weight`,
+      };
   return {
     weight: hasInitial
       ? roundToStep(initial!.weight!, exercise.equipmentType, params)

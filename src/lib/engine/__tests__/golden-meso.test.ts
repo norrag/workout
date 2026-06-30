@@ -24,7 +24,10 @@ function simulateCleanWeek(prev: Prescription): EngineInputs["actualSets"] {
 describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100lb start", () => {
   const ramp = rirRamp(5, true, 3, 0, params);
 
-  it("progresses 100 → 105 → 110 → 115 then deloads to 65", () => {
+  // T-I4: with no strength anchor the engine HOLDS the load (the legacy +increment
+  // progression is retired) while the RIR ramp tightens week to week, then deloads.
+  // Anchor-driven progression is covered by the rep-window golden tests.
+  it("holds the load down the RIR ramp (no anchor), then deloads", () => {
     const prescriptions: Prescription[] = [];
     let prev: Prescription = seedMeso(
       null,
@@ -66,11 +69,11 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100lb start"
       prescriptions.map((p) => ({ weight: p.weight, rir: p.targetRir, sets: p.sets })),
     ).toEqual([
       { weight: 100, rir: 3, sets: 3 },
-      { weight: 105, rir: 2, sets: 3 },
-      { weight: 110, rir: 1, sets: 3 },
-      { weight: 115, rir: 0, sets: 3 },
-      // deload: 55% of 115 = 63.25, rounded to barbell 5 step = 65; half sets
-      { weight: 65, rir: 4, sets: 2 },
+      { weight: 100, rir: 2, sets: 3 },
+      { weight: 100, rir: 1, sets: 3 },
+      { weight: 100, rir: 0, sets: 3 },
+      // deload: legacy load_pct path (no anchor) = 55% of peak 100 = 55; half sets
+      { weight: 55, rir: 4, sets: 2 },
     ]);
 
     // every prescription explains itself
@@ -79,7 +82,7 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100lb start"
     }
   });
 
-  it("next meso seeds from this meso's peak, backed off", () => {
+  it("a new meso no longer seeds from the prior peak (T-I4): it defers to a manual seed", () => {
     const seeded = seedMeso(
       { weight: 107.5, reps: 8, sets: 3 },
       null,
@@ -88,9 +91,10 @@ describe("golden meso: intermediate gain, 5 weeks + deload, barbell 100lb start"
       3,
       params,
     );
-    // 107.5 × 0.925 = 99.4 → rounded to 100
-    expect(seeded.weight).toBe(100);
+    // the prior-peak × back-off seed is retired — with no anchor and no plan seed,
+    // defer rather than fabricate.
+    expect(seeded.weight).toBeNull();
     expect(seeded.targetRir).toBe(3);
-    expect(seeded.rationale).toMatch(/prior meso peak/);
+    expect(seeded.rationale).toMatch(/enter a starting weight/i);
   });
 });

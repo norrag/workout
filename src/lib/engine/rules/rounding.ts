@@ -16,12 +16,7 @@ export function roundToStep(
   return Math.round((Math.round(weight / step) * step) * 100) / 100;
 }
 
-/** The load increment for this exercise/user, in pounds. */
-export function incrementFor(
-  equipment: Equipment,
-  experience: "beginner" | "intermediate" | "advanced",
-  params: EngineParams,
-): number {
-  const base = params.increment[equipment] ?? FALLBACK_STEP;
-  return base * (params.experience_increment_scale[experience] ?? 1);
-}
+// `incrementFor` (the legacy +step / experience-scaled progression jump) was
+// retired with the legacy increment path in T-I4. The `increment` and
+// `experience_increment_scale` params remain in the schema for historical-row
+// parsing only; no code reads them.
