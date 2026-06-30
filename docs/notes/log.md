@@ -4,6 +4,33 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 19: WS-J — return-to-tab snappiness + nav label fix
+
+Owner feedback after #86 merged: (a) the page-switch label still ghosts ("double layer"),
+(b) the Workout tab takes ~1s and reloads everything + resets to the current day every tap;
+wants it to "just switch back to where I was" (day/week/scroll retained). Investigated the
+reload architecture (agent): `/workout` recomputes the current day via `getCurrentState` on
+every open and renders DayView inline; day chips are full `/log/[id]` navigations (unmount +
+scroll loss); the ~1s is serial Supabase round-trips, not bundle/render; the client Router
+Cache (`staleTimes`) was unset (dynamic=0 ⇒ refetch every return). Owner chose a **~2 min**
+("balanced") cache window.
+
+- **Nav label glitch — fixed.** Removed the label loading animation entirely (the
+  `animate-pulse` + active/pending marker handoff ghosts on mobile). `BottomNav` now
+  acknowledges a tap by optimistically moving the ■ marker to the tapped tab (no animation),
+  cleared on commit. Load indication lives in the destination skeleton, per owner preference.
+- **Return-to-tab is instant + state-retained.** `experimental.staleTimes { dynamic: 120,
+  static: 300 }` (`next.config.ts`): returning to a previously-viewed `/workout` or `/log/[id]`
+  within 2 min is served from the client Router Cache — no server round-trip, scroll restored.
+- **Workout tab no longer resets to current day.** `DayView` stamps a session-scoped
+  `lastWorkoutId` (active meso only); `BottomNav`'s Workout tab links to that `/log/[id]` so
+  it returns to the day/week you left. The tab also now matches `/log/*` as the Workout section.
+- **Staleness guard.** `setIncrementOverrideAction` already revalidated `/workout`; added
+  `/log/[workoutId]` so an override edit is never stale on return to a cached day. Only rare
+  out-of-band admin param tunes can be briefly stale (self-heal within the window) — the
+  owner-accepted tradeoff.
+- Green: 563 tests, typecheck, lint, production build (staleTimes active).
+
 ## 2026-06-30 — Session 18: WS-J Phase 2 slice — server load-time
 
 Owner picked the server load-time path; #85 merged, branch restarted from main. Built the

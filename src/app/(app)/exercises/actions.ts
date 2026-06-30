@@ -76,6 +76,10 @@ export async function setIncrementOverrideAction(input: {
   }
   revalidatePath(`/exercises/${parsed.exercise_id}`);
   revalidatePath("/workout");
+  // also bust the cached day-view pages (the Workout tab now lands on a
+  // `/log/[id]` via the last-viewed pointer); with the client Router Cache on,
+  // this keeps an override edit from reading stale on return there (WS-J).
+  revalidatePath("/log/[workoutId]", "page");
 }
 
 const customExerciseSchema = z.object({

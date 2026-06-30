@@ -36,6 +36,17 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Client Router Cache (WS-J). Default for dynamic routes is 0, so returning
+    // to a tab refetches the whole RSC payload every time. A positive `dynamic`
+    // window serves the already-rendered segment from the client cache on
+    // return — instant, with scroll position restored, no server round-trip —
+    // which is the "switch back to where I was" behavior the owner wants. 120s
+    // (owner-chosen "balanced"): own edits still bust the cache via
+    // revalidatePath, so only rare out-of-band prescription changes can be briefly
+    // stale, and they self-heal on the next cold load.
+    staleTimes: { dynamic: 120, static: 300 },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
