@@ -4,6 +4,27 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 22: WS-J — iOS PWA launch screens (the pre-document gap)
+
+#89 merged + owner-verified ("in general it looks good"); the remaining black is the iOS
+**pre-document** launch blank (the OS screen between the icon tap and the WebView loading the
+start URL — iOS ignores the manifest `background_color` and shows black unless an
+`apple-touch-startup-image` matches the device exactly). Owner is installed to the iOS home
+screen and wants it gone.
+
+- **24 launch images** (`public/splash/apple-splash-<pw>-<ph>-<theme>.png`) — solid brand
+  background (cream `#f4f0e6` / dark `#14110c`) matching the in-document `Splash`, generated with
+  `sharp` for 12 portrait iPhone classes (SE → 16 Pro Max) × light/dark. Reproducible via
+  `scripts/gen-ios-splash.mjs`.
+- **`<link rel="apple-touch-startup-image">` per class** emitted from the root layout head,
+  driven by `src/lib/pwa/ios-launch-screens.ts` (exact `device-width/height/-webkit-device-pixel-
+  ratio/orientation/prefers-color-scheme` media queries). Verified 48 well-formed tags render.
+- Result: home-screen launch now shows the brand background (not black) → in-document logotype
+  splash → content. Solid bg keeps the OS-screen → document-splash transition seamless (no
+  icon/text pop; sidesteps the cream-tiled-icon blending differently per theme).
+- Green: typecheck, lint, production build. On-device cold launch is the final check (the gap is
+  iOS-OS-level, not reproducible headlessly).
+
 ## 2026-06-30 — Session 21: WS-J — cold-start splash (no more black screen)
 
 Owner: cold load is 3–5s of **black screen** ("is it hung?"); fine with the load time, just
