@@ -18,10 +18,14 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 > **I15**) now live in [`archive.md`](./archive.md). Follow-ups they spawned
 > (`T-A*`) are tracked in the [follow-up table](#open-follow-up-tasks) below.
 
-> **Note on "done (PR pending)" items.** Several items below are built but not
-> yet merged. Per the purge policy they stay in this live index until the PR
-> merges, then get swept to `archive.md`. Don't archive a `done` item on the
-> strength of the status word alone — confirm it's merged/owner-confirmed first.
+> **Status convention for built items.** When a PR addresses an item, the **same
+> PR** sets the row to `done (PR #N)` with the real PR number (never a bare "PR
+> pending") and logs it. After that PR **merges**, the row is swept to
+> `archive.md`. A merged PR can't sweep its own row (the merge happens after), so
+> the **resume protocol's reconciliation sweep** (see [`CLAUDE.md`](./CLAUDE.md#resume-protocol-every-session-start-here))
+> catches any `done`/`PR #N` row whose PR is now merged and archives it before new
+> work starts. Don't archive a `done` item on the status word alone — confirm the
+> PR is merged first.
 
 ## Index
 
@@ -41,28 +45,15 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | P16 | Meso overview buttons monotonous/ugly → overview↔stats page toggle | UX | LOW | C | needs-input |
 | P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | needs-input |
 | P18 | Remove the set-type option from the set menu | UX | LOW | E | needs-input (spec conflict) |
-| P19 | Logged sets get a small over/under-prescription icon | F | LOW | E | done (rule = e1RM; PR pending) |
-| P20 | Exercise search list should live-filter as you type | UX | LOW | F | done (client ExercisesBrowser; PR pending) |
 | P21 | Should soreness be recorded when user reports 0 days sore? | D | LOW | H | needs-input |
-| PR26 | Retire the legacy increment path; understand its remaining use (likely bodyweight) and fold cleanly into a v9 engine model | F | HIGH | I | **done (PR pending, 2026-06-26): WS-I complete — bodyweight model live (v16), legacy increment/regression + prior-peak seed retired (T-I1–T-I5).** |
-| PH26 | Clean up settings page: move match-weight/export/delete-acct to a dedicated page | UX | LOW | F | done (/more/account; PR pending) |
-| PH27 | Move template share-code into the New Template button (tray: blank or enter code) | F | LOW | F | done (PR pending) |
-| PH28 | Profile height input behaves in cm→ft, ignores chosen units | B | HIGH | G | done (imply system from units; onboarding reordered; PR pending) |
 | PH29 | Page switches slow + double-layer label/loading glitch; want instant switch w/ placeholders | B | HIGH | G | triaged (needs repro) |
 | PH30 | Expanded weekly prescription explanation — LLM API for brief analysis? | D | — | H | needs-input |
-| PH31 | Store calculated e1RM per set; expose to public MCP tools (audit) | F | HIGH | B | done (logged_sets.e1rm + backfill; RIR-aware engine formula; MCP history; PR pending) |
-| PH32 | Tap a set in history to flip sets/reps ↔ e1RM view (fade anim, default sets/reps) | F | HIGH | B | done (list-wide flip in ExerciseHistoryList, session-best e1rm, metric-fade; PR pending) |
 | PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | LOW | H | needs-input (likely low/wontfix) |
 | PH34 | Meso-stats "planned sets" review — what counts as "planned"? completed + remaining prescribed | Q→B | — | C | triaged |
-| PH35 | BUG: application error on auto match weights | B | HIGH | G | done — REAL cause was `profiles` RLS recursion (42P17); migration applied live + error boundary/toggle guards (PR pending) |
 | PH36 | Check model & weight-increment settings for bodyweight-only exercises | B/Q | MED | F | triaged (needs repro) |
 | PH37 | Aggregate strength gains per muscle group over macro/meso/all-time | F | — | C | inbox |
 | PH38 | First sets/reps wrong when you switch exercise (correct after reset to prescription) | B | HIGH | G | triaged (needs repro) |
 | PH39 | How fast does e1RM recency decay? (Pulldown e1RM 110.1 but did 115×11 on May 22) | Q | — | A | answered → T-A1 |
-| PH40 | Sets reprice as you log — recalculating after each set; should it only use prior sets? | Q→B | — | A | answered → T-A7 |
-| PH41 | History includes the current (incomplete) workout — expected it to be excluded until complete | Q→B | — | A | answered → T-A8 |
-| PH42 | Note pencil icon hard to recognize | UX | MED | E | done (legible SVG PencilGlyph, +20%; absorbs I15) — PR pending |
-| O1 | Auditability: re-stamp every open decision to the new params version on a bump (even when output is unchanged); make version + decision kind viewable from the day-view exercise dropdown | F | — | I | **done (2026-06-25):** invariant already held (`workout_exercises.params_version` advances on every reconcile, day view reconciles on load) — confirmed, lazy is sufficient. Built the "Prescription detail" reveal (kind + verified-as-of vs computed-under + rationale/trace). Admin-gating = easy follow-up. |
 | N1 | Performance & efficiency pass: measure first (bundle analyzer, slow-query baseline), then client bundle/render wins + query-scope/caching. Key finding: backend already does the heavy lifting — do **not** relocate the engine to edge/DB | F | — | J | inbox (directional; plan in [`J-performance.md`](./J-performance.md), not scheduled). Cross-links PH29 (page-switch slowness) |
 
 ## Open follow-up tasks
@@ -77,14 +68,11 @@ in [`archive.md`](./archive.md).
 |----|------|-------|------|--------|
 | T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley stats view); decide what screens show | D→F | **partially done (2026-06-26, via N2):** `v_exercise_history.e1rm` + Exercise-history flip view now use the engine per-set e1RM (`v_exercise_prs` already did). Remaining raw-Epley: `v_exercise_overview.best_e1rm`. Still needs the owner call on what each screen *shows* + the recency-decay framing (PH39). |
 | T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores` | D→B | needs-input |
-| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (see T-I3/T-I5) |
+| T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (realized via WS-I / T-I4, merged PR #82) |
 | T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input (sequenced in WS I) |
 | T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
-| T-I1 | PR26 | Decide bodyweight data model (load type; bodyweight as effective load; assisted = negative) | D | **decided (2026-06-25)** — bodyweight-only: profile BW as read-only load, progress on reps; loadable: BW+added, BW used in calc not shown; assisted: negative weight, UI deferred if no such exercises yet. See `I-engine-v9.md`. |
-| T-I2 | PR26 | Build v9 no-anchor/cold-start prescription model incl. bodyweight reps-at-fixed-load (+ weight=0 test) | F | **done + LIVE (2026-06-26): engine + schema (PR #80, merged), day-view UI + history effective-load flip (PR #81), loadable data migration (total→added, effective preserved), v16 ACTIVATED.** Only follow-up left is T-I4 (legacy deletion). |
-| T-I3 | PR26 | Decide big-miss back-off policy in the v9 model (explicit regression vs anchor-only) | D | **decided (2026-06-25): anchor-only; no hidden back-off** |
-| T-I4 | PR26 | Delete legacy increment block + retire legacy-only params (new engine_params version, migrate old rows, update tests) | F | **done (PR pending, 2026-06-26):** legacy `else` → no-anchor hold; `seedMeso` prior-peak branch deleted; `incrementFor` removed; legacy params marked DEPRECATED (kept in schema for historical replay ⇒ **no version bump / no row migration** — `is_replayable` preserved). Test harness re-pointed off the legacy default. **WS-I / PR26 complete (T-I1–T-I5).** |
-| T-I5 | owner ruling 2026-06-25 | Retire the prior-peak × back-off meso seed (`seedMeso` `priorPeak` branch); seed precedence = confident anchor → user `initial_*` (manual seed) → unseeded/prompt. | F | **done (2026-06-25, gated): `retire_prior_peak_seed` flag; engine_params v14 INACTIVE; activate after replay diff. `meso_seed_backoff_pct` left in schema for T-I4.** |
+
+> **WS-I (T-I1–T-I5) complete & merged** — swept to [`archive.md`](./archive.md#swept-2026-06-30--reconcile-merged-build-prs) 2026-06-30. Bodyweight load-type model live (engine_params v16), legacy increment/regression + prior-peak seed retired. PRs #72 / #80 / #81 / #82.
 
 ---
 

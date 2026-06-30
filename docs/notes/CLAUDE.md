@@ -108,6 +108,32 @@ grouping — the letters are labels, not a fixed taxonomy. The current roster
 lives in [`README.md`](./README.md#workstreams) and the per-item assignment in
 `backlog.md`.
 
+## Keeping the index in sync with PRs (the non-negotiable part)
+
+The index only stays truthful if status moves **in lockstep with the code**. The
+failure mode this prevents: a build PR ships the fix but leaves the row reading
+`done (PR pending)` forever, so the live index slowly fills with already-merged
+work. Two rules, and the resume sweep that backstops them:
+
+1. **When a PR addresses an item, that same PR updates the item's row** — set the
+   status to `done (PR #<n>)` with the **real PR number** (never a bare "PR
+   pending"), and append the `log.md` entry in the same PR. Building the code and
+   leaving the row stale is an incomplete change. If you open the PR before you
+   know its number, write the branch name and fix the number to `#<n>` the moment
+   the PR exists. This applies to **any** PR that closes/advances a tracked item,
+   not just sessions that start from this area — if you touch code that resolves a
+   backlog ID, update its row before you push.
+2. **A merged PR cannot sweep its own row** (the merge happens after the PR is
+   written), so archival is a **separate, mandatory step owned by the resume
+   protocol** (below). Never assume "the build PR will handle archival" — it
+   structurally can't.
+3. **Reconciliation sweep, every session start** — before picking new work,
+   reconcile the live index against actual merge state: for every row marked
+   `done` / `done (PR #<n>)` / any "PR pending" wording, check whether that PR has
+   **merged** (git log / list merged PRs). If merged, sweep the row to `archive.md`
+   with its PR link and a one-line resolution, per the purge policy. This is what
+   makes the system self-correct even when a prior session forgot rule 1.
+
 ## Consolidation & purge policy (keeping the live index lean)
 
 An ongoing system rots if every closed item stays in the live table forever. So:
@@ -145,11 +171,18 @@ An ongoing system rots if every closed item stays in the live table forever. So:
 1. Read `log.md` (newest entry = where the last session left off).
 2. Open `backlog.md` (live state of every open item) and `archive.md` if you
    need a closed item's history.
-3. If the owner handed over notes, run the **intake protocol** above.
-4. Otherwise pick the next item by priority + `ready`-ness, respecting
+3. **Run the reconciliation sweep** (see *Keeping the index in sync with PRs*):
+   for every `done` / `done (PR #<n>)` / "PR pending" row, confirm whether its PR
+   has merged, and archive the merged ones **before** doing anything else. Do this
+   every session, not only when something looks stale — it's the backstop for any
+   row a prior session left un-swept.
+4. If the owner handed over notes, run the **intake protocol** above.
+5. Otherwise pick the next item by priority + `ready`-ness, respecting
    `blocked on` dependencies.
-5. Whenever you change anything, update the item's row in `backlog.md` **and**
+6. Whenever you change anything, update the item's row in `backlog.md` **and**
    append a dated `log.md` entry. Keep `backlog.md` the single source of truth.
+   If the change is a **code PR** that resolves an item, set the row to
+   `done (PR #<n>)` in that same PR (rule 1 above).
 
 ## Integration with the rest of `docs/`
 

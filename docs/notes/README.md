@@ -25,7 +25,7 @@ grouping.
 | **D** | Macrocycle & meso management | _tbd_ | Custom-duration input bug, unplanned-meso display, meso management under a macro. |
 | **E** | Logging & feedback UX | _tbd_ | Feedback slider resolution, note icon, back-button clutter, set-type removal, over/under marker, soreness capture. |
 | **F** | Settings, profile & search | _tbd_ | Settings cleanup, template-code flow, profile height units, live search filter, bodyweight-exercise settings. |
-| **G** | Bugs | _tbd_ | Discrete defects to reproduce + fix (match-weights crash, page-switch flicker, switch-exercise prescription, height units). |
+| **G** | Bugs | _tbd_ | Discrete defects to reproduce + fix. Open: page-switch flicker (PH29), switch-exercise prescription (PH38). Shipped: match-weights crash (PH35), height units (PH28). |
 | **H** | Needs product decision | _tbd_ | Items blocked on an owner call (LLM prescription analysis, admin-tool privacy, soreness rule). |
-| **I** | Engine v9 cleanup | [`I-engine-v9.md`](./I-engine-v9.md) | Retire the legacy increment path; fold bodyweight / cold-start / big-miss into a clean v9 model. |
+| **I** | Engine v9 cleanup | [`I-engine-v9.md`](./I-engine-v9.md) _(shipped)_ | Retire the legacy increment path; fold bodyweight / cold-start / big-miss into a clean v9 model. Complete (T-I1–T-I5, engine_params v16 active); detail file kept for history. |
 | **J** | Performance & efficiency | [`J-performance.md`](./J-performance.md) | Speed/efficiency pass (N1): measure-first baseline, then client bundle/render wins + query-scope/caching. Heavy lifting already lives in the backend; the engine stays pure TS (not relocated to edge/DB). |
