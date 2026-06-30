@@ -23,6 +23,15 @@ branch `claude/group2-bodyweight-model`.
   captured at log time; **engine_params v16 INACTIVE** (`…003`). Hash guarded.
 - **Deferred to activation:** DayView UI (#5 + rule-8 no-mockup), effective-load e1RM
   write, then **T-I4** legacy deletion. T-I2 → done (PR pending). Suite green (557).
+## 2026-06-26 — Session 9b: Group 1 merged, migration applied, archival sweep
+
+PR #78 **merged**. Applied the view migration `20260626000001_v_exercise_history_avg_e1rm`
+to the live project (`apply_migration`) and verified against real data: all **4,411**
+history rows now equal the session average, **1,271** of them differ from the old session
+max — change confirmed live and correct. **Archival sweep** (post-merge, per the purge
+policy): moved **N2**, **N3**, **T-A7**, **T-A8** out of the live index into `archive.md`
+(new "Group 1 merged (PR #78)" section). **T-A1** stays live (only partially advanced —
+`v_exercise_overview.best_e1rm` still raw-Epley + the per-screen / PH39 call open).
 
 ## 2026-06-26 — Session 9: Group 1 built — active-workout isolation + session-average e1RM
 
