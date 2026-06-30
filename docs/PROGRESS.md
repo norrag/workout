@@ -2,6 +2,55 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-26 (latest) — Group 2 / T-I2: bodyweight load-type model (gated engine_params v16)
+
+The last reason the legacy increment path survives is bodyweight movements: with no
+load-type model they log `weight = 0`, produce no e1RM/anchor, and fall through the
+rep-window path to the legacy increment block (`docs/notes/I-engine-v9.md`). T-I2 gives
+the engine a first-class load-type model so those lifts price on **effective load**.
+Shipped gated as **engine_params v16, INACTIVE** (byte-identical to v15 plus one
+`.optional()` flag), so nothing changes live until a deliberate, replay-reviewed
+activation.
+
+- **Load-type model (`src/lib/engine/load.ts`, pure).** `LoadType` =
+  `external | bodyweight_only | bodyweight_loadable | bodyweight_assisted`;
+  `effectiveLoad`/`enteredForEffective` convert between the entered weight and the
+  effective load (bodyweight / bodyweight+added / bodyweight−assist); `toEngineLoadType`/
+  `coerceLoadType` map the library equipment vocabulary to a load type.
+- **Engine (`rules/bodyweight.ts` + `index.ts`/`seedMeso` routing, gated `bodyweight_model`).**
+  bodyweight_only progresses on **reps at the fixed bodyweight load**; loadable/assisted
+  run the rep-window in **effective space** and round the entered **added/assist** value
+  (so plates stay clean even when bodyweight isn't a multiple of the step); assisted is
+  the inverse of loadable (negative added). No anchor + no manual seed ⇒ **defer** (null
+  weight), never fabricate (owner ruling 2026-06-25). The external path is byte-identical.
+- **Inputs (`engine/types.ts`).** `exercise.loadType` (a **config** input — in the
+  freshness fingerprint, so changing a load type stales the row) and a top-level
+  `bodyweight` (a **derived** input — excluded from the fingerprint like the anchor,
+  refreshed from the live profile on recompute). Wired through every EngineInputs builder
+  (`fingerprint`/`progression`/`generation`/`logging`/`regeneration`); `loadType` is
+  auto-derived from `equipment_type` so callers needn't thread it.
+- **Anchor (`queries/anchors.ts`, gated).** Under the flag the anchor prices on effective
+  load (joins `exercises.load_type`, uses the per-set captured bodyweight) and stops
+  dropping weight-0 bodyweight sets; off ⇒ the exact prior query.
+- **Schema (`20260626000002`).** `exercises.load_type` (backfilled from `equipment_type`,
+  incl. `machine assistance → bodyweight_assisted`) + `logged_sets.bodyweight` (captured
+  at log time by the log action, backfilled from the current profile; locked after
+  completion). Column adds on owner-scoped / library tables ⇒ RLS unaffected, no new test
+  (per `20260623130000_logged_set_e1rm`). **engine_params v16 INACTIVE** (`20260626000003`,
+  hash guarded in `params-provenance.test.ts`).
+- **Tests:** `engine/__tests__/bodyweight.test.ts` (load helpers; the three load types;
+  reps-progression; defer-when-no-bodyweight / no-data; flag-off gating; seed). Suite green
+  (557), typecheck + lint clean.
+- **Deferred to the activation PR (documented, not built here):** (1) **DayView UI** — a
+  read-only bodyweight prefill + cue for bodyweight_only and an added/assist label for
+  loadable/assisted. Deferred because the model ships INACTIVE (no user-visible effect
+  until activation) and there is **no mockup for bodyweight entry** (hard rule #8 — to be
+  designed before activation). (2) **Effective-load e1RM on the write path** — stored
+  `logged_sets.e1rm` for bodyweight sets still uses the raw entered weight; the engine
+  anchor computes effective load independently, so this only affects the history *display*
+  of bodyweight sets and is a small follow-up. (3) **T-I4** legacy-path deletion, after
+  v16 is activated.
+
 ## 2026-06-26 (latest) — Group 1: active-workout isolation + session-average e1RM (N3/T-A7/T-A8, N2)
 
 First build group off the notes backlog (`docs/notes/backlog.md`). Two owner-decided

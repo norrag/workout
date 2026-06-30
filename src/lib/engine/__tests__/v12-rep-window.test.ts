@@ -11,7 +11,7 @@ import { baseInputs, V11_PARAMS, V12_PARAMS } from "./helpers";
 // Cable Overhead Triceps: prescribed 12 last week, but only PERFORMED 11.
 function cableOverhead(over: Partial<EngineInputs> = {}): EngineInputs {
   return baseInputs({
-    exercise: { equipmentType: "cable" },
+    exercise: { equipmentType: "cable", loadType: "external" },
     goalType: "hypertrophy",
     week: { targetRir: 0, isDeload: false },
     previous: { weight: 125, reps: 12, sets: 2, targetRir: 1 },
@@ -71,7 +71,7 @@ describe("§v12 #2 — bound the load to the TARGET window, not just the hard bo
   function highRow(params = V12_PARAMS) {
     return prescribe(
       baseInputs({
-        exercise: { equipmentType: "machine" },
+        exercise: { equipmentType: "machine", loadType: "external" },
         goalType: "hypertrophy",
         week: { targetRir: 0, isDeload: false },
         previous: { weight: 50, reps: 11, sets: 2, targetRir: 1 },
@@ -105,7 +105,7 @@ describe("§v12 #2 — bound the load to the TARGET window, not just the hard bo
     // predicts ~5 reps (below target_low) ⇒ keep 20, run the buffer.
     const out = prescribe(
       baseInputs({
-        exercise: { equipmentType: "machine" },
+        exercise: { equipmentType: "machine", loadType: "external" },
         goalType: "hypertrophy",
         week: { targetRir: 0, isDeload: false },
         previous: { weight: 20, reps: 11, sets: 3, targetRir: 1 },
@@ -126,7 +126,7 @@ describe("§v12 #2 — bound the load to the TARGET window, not just the hard bo
     // a very light load vs a high anchor predicts > 15 ⇒ must step up regardless
     const out = prescribe(
       baseInputs({
-        exercise: { equipmentType: "machine" },
+        exercise: { equipmentType: "machine", loadType: "external" },
         goalType: "hypertrophy",
         week: { targetRir: 0, isDeload: false },
         previous: { weight: 25, reps: 11, sets: 3, targetRir: 1 },

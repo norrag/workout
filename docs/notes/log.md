@@ -4,6 +4,25 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-26 — Session 10: Group 2 / T-I2 built — bodyweight load-type model (gated v16)
+
+Owner picked Group 2, scoped to **just the bodyweight model**, and ruled: **build
+assisted now** (it's the inverse of loadable). Built T-I2 as a gated, INACTIVE slice on
+branch `claude/group2-bodyweight-model`.
+
+- **Load-type model + effective load** (`engine/load.ts`): `LoadType` (external /
+  bodyweight_only / bodyweight_loadable / bodyweight_assisted), `effectiveLoad`/
+  `enteredForEffective`, `toEngineLoadType`/`coerceLoadType`. Engine handler
+  `rules/bodyweight.ts` (reps-at-fixed-bodyweight for only; rep-window in effective space
+  with entered-value rounding for loadable/assisted; defer when no anchor+no seed). Routed
+  from `prescribe()`/`seedMeso()` behind `bodyweight_model`; external path byte-identical.
+- **Inputs/fingerprint:** `exercise.loadType` is a config input (in the fingerprint);
+  top-level `bodyweight` is derived (excluded, like the anchor). Wired through all
+  EngineInputs builders; anchor query prices on effective load under the flag.
+- **Schema:** `exercises.load_type` + `logged_sets.bodyweight` (migrations `…002`),
+  captured at log time; **engine_params v16 INACTIVE** (`…003`). Hash guarded.
+- **Deferred to activation:** DayView UI (#5 + rule-8 no-mockup), effective-load e1RM
+  write, then **T-I4** legacy deletion. T-I2 → done (PR pending). Suite green (557).
 ## 2026-06-26 — Session 9b: Group 1 merged, migration applied, archival sweep
 
 PR #78 **merged**. Applied the view migration `20260626000001_v_exercise_history_avg_e1rm`

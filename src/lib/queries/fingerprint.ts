@@ -1,5 +1,6 @@
 import {
   toEngineEquipment,
+  coerceLoadType,
   type EngineInputs,
 } from "@/lib/engine";
 import type { ProfileRow } from "@/lib/types/database";
@@ -45,6 +46,11 @@ export const DERIVED_INPUT_KEYS = [
   "muscleGroupWeeklySets",
   "weekPeak",
   "strengthAnchor",
+  // T-I2: the lifter's bodyweight is a drifting, derived input (like the anchor) —
+  // excluded from the freshness signature so a routine bodyweight change doesn't
+  // mass-stale every bodyweight prescription; refreshed from the live profile on
+  // recompute (doc 14 §3).
+  "bodyweight",
 ] as const;
 
 export type DerivedInputKey = (typeof DERIVED_INPUT_KEYS)[number];
@@ -65,6 +71,10 @@ export function configProjection(inputs: EngineInputs): ConfigInputs {
 
 export interface ConfigInputArgs {
   equipmentType: string;
+  /** stored `exercises.load_type`; null/omitted ⇒ derived from equipmentType. A
+   * config input (model-changing) — IN the fingerprint, so changing an exercise's
+   * load type correctly stales its prescriptions. */
+  loadType?: string | null;
   profile: Pick<ProfileRow, "experience_level">;
   goal: EngineInputs["goalType"];
   week: EngineInputs["week"];
@@ -82,7 +92,10 @@ export interface ConfigInputArgs {
  */
 export function buildConfigInputs(args: ConfigInputArgs): ConfigInputs {
   return {
-    exercise: { equipmentType: toEngineEquipment(args.equipmentType) },
+    exercise: {
+      equipmentType: toEngineEquipment(args.equipmentType),
+      loadType: coerceLoadType(args.loadType, args.equipmentType),
+    },
     user: {
       experienceLevel: args.profile.experience_level ?? "beginner",
     },
@@ -118,6 +131,7 @@ export function seedEngineInputs(
   config: ConfigInputs,
   priorPeak: SeedPeak | null,
   strengthAnchor: EngineInputs["strengthAnchor"] = null,
+  bodyweight: EngineInputs["bodyweight"] = null,
 ): EngineInputs {
   return {
     ...config,
@@ -138,11 +152,16 @@ export function seedEngineInputs(
     // carrying it never changes a seed row's signature; it is refreshed from live
     // history on recompute exactly like an advance's anchor.
     strengthAnchor,
+    // T-I2: the lifter's bodyweight (effective-load base for bodyweight movements).
+    // Also a DERIVED input — excluded from the fingerprint, refreshed on recompute.
+    bodyweight,
   };
 }
 
 export interface SeedInputArgs {
   equipmentType: string;
+  /** stored `exercises.load_type`; null ⇒ derived from equipmentType (config input) */
+  loadType?: string | null;
   profile: Pick<ProfileRow, "experience_level">;
   goal: EngineInputs["goalType"];
   startRir: number;
@@ -153,6 +172,8 @@ export interface SeedInputArgs {
   priorPeak: SeedPeak | null;
   /** §S1: the recency strength anchor the anchor-seed used (derived; null otherwise) */
   strengthAnchor?: EngineInputs["strengthAnchor"];
+  /** T-I2: the lifter's bodyweight (derived; null otherwise) */
+  bodyweight?: EngineInputs["bodyweight"];
 }
 
 /**
@@ -163,13 +184,19 @@ export interface SeedInputArgs {
 export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
   const config = buildConfigInputs({
     equipmentType: args.equipmentType,
+    loadType: args.loadType,
     profile: args.profile,
     goal: args.goal,
     week: { targetRir: args.startRir, isDeload: args.isDeload },
     previous: null,
     initial: args.initial,
   });
-  return seedEngineInputs(config, args.priorPeak, args.strengthAnchor ?? null);
+  return seedEngineInputs(
+    config,
+    args.priorPeak,
+    args.strengthAnchor ?? null,
+    args.bodyweight ?? null,
+  );
 }
 
 /**

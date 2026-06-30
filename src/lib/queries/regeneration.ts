@@ -105,6 +105,9 @@ export interface RecomputeArgs {
   liveConfig: ConfigInputs;
   /** the strength anchor recomputed from current logged history (advance only) */
   anchor: E1rmAnchor | null;
+  /** T-I2: the lifter's current bodyweight, refreshed from the live profile on
+   *  recompute (a derived input, like the anchor) */
+  bodyweight: number | null;
   /** the row's current stored prescription, for diffing */
   currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
 }
@@ -164,6 +167,7 @@ function recomputeAdvance(
     ...args.storedInputs,
     ...args.liveConfig,
     strengthAnchor: args.anchor,
+    bodyweight: args.bodyweight,
   };
   const parsed = engineInputsSchema.safeParse(rebuilt);
   if (!parsed.success) return { status: "invalid_source" };
@@ -215,7 +219,8 @@ function recomputeSeed(
       params,
       // §S1: the anchor (refreshed from live history by the reconcile) drives the
       // anchor-aware seed when seed_from_anchor is active; ignored otherwise.
-      { goalType: cfg.goalType, anchor: args.anchor },
+      // T-I2: bodyweight drives the bodyweight model when active.
+      { goalType: cfg.goalType, anchor: args.anchor, bodyweight: args.bodyweight },
     );
   } catch {
     return { status: "invalid_source" };
@@ -225,7 +230,7 @@ function recomputeSeed(
     status: prescriptionChanged(args.currentOutput, output)
       ? "changed"
       : "unchanged",
-    inputs: seedEngineInputs(cfg, priorPeak, args.anchor),
+    inputs: seedEngineInputs(cfg, priorPeak, args.anchor, args.bodyweight),
     output,
   };
 }
@@ -754,6 +759,7 @@ export async function reconcilePrescriptions(
             : null,
           weekPeak: peaks.get(row.exerciseId) ?? null,
           strengthAnchor: null,
+          bodyweight: profile.bodyweight ?? null,
         }),
       );
     }
@@ -884,7 +890,14 @@ export async function reconcilePrescriptions(
       anchor = anchors.get(row.exerciseId) ?? null;
     }
     const result = recomputeRow(
-      { kind, storedInputs, liveConfig, anchor, currentOutput: row.currentOutput },
+      {
+        kind,
+        storedInputs,
+        liveConfig,
+        anchor,
+        bodyweight: profile.bodyweight ?? null,
+        currentOutput: row.currentOutput,
+      },
       effectiveParams,
     );
 

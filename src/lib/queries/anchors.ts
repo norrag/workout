@@ -1,9 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   recencyWeightedE1rm,
+  coerceLoadType,
+  effectiveLoad,
   type EngineParams,
   type E1rmSample,
   type E1rmAnchor,
+  type LoadType,
 } from "@/lib/engine";
 import type { Database } from "@/lib/types/database";
 
@@ -33,16 +36,24 @@ export async function getExerciseE1rmAnchors(
   const out = new Map<string, E1rmAnchor>();
   if (exerciseIds.length === 0) return out;
 
-  const { data: sets, error } = await supabase
+  // T-I2: under the bodyweight model the anchor prices on EFFECTIVE load, so a
+  // bodyweight set (entered weight 0) anchors on the lifter's bodyweight. Drop the
+  // `weight > 0` DB filter so those rows are fetched; the effective load is computed
+  // per set below and the junk (effective ≤ 0) is dropped in JS. Off ⇒ exactly the
+  // prior query (filter weight > 0, raw weight). `bodyweight` is always selected
+  // (a real column post-migration); it is simply unused when the flag is off.
+  const bwModel = params.bodyweight_model ?? false;
+  let query = supabase
     .from("logged_sets")
     .select(
-      "exercise_id, workout_exercise_id, workout_id, weight, reps, rir_reported, performed_at",
+      "exercise_id, workout_exercise_id, workout_id, weight, reps, rir_reported, performed_at, bodyweight",
     )
     .eq("user_id", userId)
     .in("exercise_id", exerciseIds)
     .eq("is_warmup", false)
-    .gt("weight", 0)
-    .gt("reps", 0)
+    .gt("reps", 0);
+  if (!bwModel) query = query.gt("weight", 0);
+  const { data: sets, error } = await query
     .order("performed_at", { ascending: false })
     .limit(600);
   if (error) throw error;
@@ -77,15 +88,42 @@ export async function getExerciseE1rmAnchors(
   if (weError) throw weError;
   const targetRirByWe = new Map((wes ?? []).map((w) => [w.id, w.target_rir]));
 
+  // T-I2: resolve each exercise's load type so a bodyweight set's effective load
+  // (bodyweight ± entered) anchors correctly. Only needed under the flag.
+  let loadTypeByEx: Map<string, LoadType> | null = null;
+  if (bwModel) {
+    const { data: exRows, error: exErr } = await supabase
+      .from("exercises")
+      .select("id, load_type, equipment_type")
+      .in("id", exerciseIds);
+    if (exErr) throw exErr;
+    loadTypeByEx = new Map(
+      (exRows ?? []).map((e) => [
+        e.id,
+        coerceLoadType(e.load_type, e.equipment_type),
+      ]),
+    );
+  }
+
   const now = Date.now();
   const byExercise = new Map<string, E1rmSample[]>();
   for (const s of completedSets) {
+    // effective load: raw entered weight (external / flag off), or bodyweight ±
+    // entered under the bodyweight model. Skip sets with no usable load (effective
+    // ≤ 0 — e.g. a bodyweight lift with no captured bodyweight, or junk 0 entries).
+    let load = s.weight;
+    if (bwModel && loadTypeByEx) {
+      const lt = loadTypeByEx.get(s.exercise_id) ?? "external";
+      const eff = effectiveLoad(lt, s.weight, s.bodyweight ?? null);
+      if (eff == null || eff <= 0) continue;
+      load = eff;
+    }
     const ageDays = Math.max(
       0,
       (now - new Date(s.performed_at).getTime()) / DAY_MS,
     );
     const sample: E1rmSample = {
-      weight: s.weight,
+      weight: load,
       reps: s.reps,
       targetRir: s.rir_reported ?? targetRirByWe.get(s.workout_exercise_id) ?? null,
       ageDays,

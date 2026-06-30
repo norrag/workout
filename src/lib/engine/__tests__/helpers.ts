@@ -46,14 +46,23 @@ export const V15_PARAMS: EngineParams = {
   deload: { ...V14_PARAMS.deload, target_rir: 6 },
 };
 
+/** v16 = v15 plus the bodyweight load-type model (T-I2): bodyweight movements price
+ *  on effective load and progress on reps / the rep-window in effective space.
+ *  Mirrors `20260626000003_engine_params_v16_bodyweight_model`. */
+export const V16_PARAMS: EngineParams = {
+  ...V15_PARAMS,
+  bodyweight_model: true,
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {
   return {
-    exercise: { equipmentType: "barbell" },
+    exercise: { equipmentType: "barbell", loadType: "external" },
     user: { experienceLevel: "intermediate" },
     goalType: "gain",
     week: { targetRir: 2, isDeload: false },
+    bodyweight: null,
     previous: { weight: 100, reps: 8, sets: 3, targetRir: 3 },
     actualSets: [
       { setNumber: 1, weight: 100, reps: 8, rirReported: 3, isWarmup: false },

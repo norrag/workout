@@ -46,7 +46,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     // under the active params load is priced off the strength anchor, then rounded
     // to the loadable step — so the override must move the prescribed weight here.
     const inputs: EngineInputs = {
-      exercise: { equipmentType: "barbell" },
+      exercise: { equipmentType: "barbell", loadType: "external" },
       user: { experienceLevel: "intermediate" },
       goalType: "hypertrophy",
       week: { targetRir: 2, isDeload: false },
@@ -61,6 +61,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
       weekPeak: null,
       strengthAnchor: { value: 315, confidence: "high" },
       initial: null,
+      bodyweight: null,
     };
     const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell");
     const out = prescribe(inputs, eff);
@@ -73,7 +74,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     const out = seedMeso(
       { weight: 315, reps: 5, sets: 3 },
       null,
-      { equipmentType: "barbell" },
+      { equipmentType: "barbell", loadType: "external" },
       { experienceLevel: "intermediate" },
       2,
       eff,
@@ -83,7 +84,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     const def = seedMeso(
       { weight: 315, reps: 5, sets: 3 },
       null,
-      { equipmentType: "barbell" },
+      { equipmentType: "barbell", loadType: "external" },
       { experienceLevel: "intermediate" },
       2,
       P,
@@ -96,7 +97,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     // engine adds the (scaled) increment on a met prescription.
     const legacy = { ...P, weight_selection: "increment" as const };
     const inputs: EngineInputs = {
-      exercise: { equipmentType: "barbell" },
+      exercise: { equipmentType: "barbell", loadType: "external" },
       user: { experienceLevel: "intermediate" },
       goalType: "hypertrophy",
       week: { targetRir: 2, isDeload: false },
@@ -111,6 +112,7 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
       weekPeak: null,
       strengthAnchor: null,
       initial: null,
+      bodyweight: null,
     };
     const base = prescribe(inputs, legacy); // intermediate scale = 1.0 ⇒ +5 default
     const overridden = prescribe(

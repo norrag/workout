@@ -127,6 +127,33 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v16 is a complete, replayable snapshot matching the migration hash", () => {
+    // v16 = v15 + bodyweight_model (T-I2). The flag is `.optional()`, so v15/earlier
+    // rows are byte-identical and the new row stays replayable.
+    const v16 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+    });
+    const p = resolveProvenance(v16 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "20d84f6eb6245c9355d058e6729c708b85cdcce424eba000ff3076520760e478",
+    );
+  });
+
+  it("bodyweight_model is absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("bodyweight_model");
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("deload_anchor_rir is absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("deload_anchor_rir");
     expect(
