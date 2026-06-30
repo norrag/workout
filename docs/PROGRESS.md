@@ -2,6 +2,43 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-26 (latest) — T-I4: retire the legacy increment model (WS-I complete)
+
+With v16 active, the legacy increment/regression progression is dead in production
+(rep-window + bodyweight + cold-start cover every live case), so this removes the code.
+**No engine_params version bump, no row migration** — the legacy param *fields* stay in
+the schema (deprecated) so every historical row still parses to a complete
+materialization (`is_replayable` / `params_hash` unchanged); only the *code* that read
+them is deleted.
+
+- **`index.ts prescribe()`** — the legacy `else` (increment on a hit, −`regression_pct`
+  on a big miss, `load_first`/`reps_first`/`hold` per `progression_style`) is replaced by
+  a **no-anchor safety HOLD**: with no confident anchor, hold the last load and reps and
+  never fabricate a step or a back-off (anchor-only, owner ruling T-I3). A dropping target
+  RIR is still noted as the progression. Under the active params this branch is a rare
+  fallback (every lift with history has an anchor).
+- **`index.ts seedMeso()`** — the retired prior-peak × back-off branch is **deleted**
+  (it was already gated off since v14). Seed precedence is now strictly: confident anchor
+  → the user's plan `initial_*` → unseeded (defer; never fabricate).
+- **`rules/rounding.ts`** — `incrementFor` removed; **`effective-params.ts`** no longer
+  sets the dead `increment` on an override (only `rounding`, the loadable step);
+  **exercise page** computes the increment-editor default from `rounding` instead.
+- **Schema (`params.ts`)** — `increment`, `experience_increment_scale`,
+  `progression_style`, `regression_pct`, `meso_seed_backoff_pct` marked **DEPRECATED**,
+  retained for historical-row parsing only. No code reads them. (Comment-only ⇒
+  DEFAULT_ENGINE_PARAMS hash unchanged; provenance tests pass.)
+- **Tests re-pointed off the legacy default** (the work that made this its own PR):
+  `prescribe.test.ts` (was entirely legacy-path) now tests the no-anchor hold + feedback/
+  volume/cold-start; `golden-meso` now a hold+deload golden; `rep-window`, `standalone-
+  prescription`, `regeneration`, `admin-tools`, `equipment`, `effective-params` updated to
+  the retired-seed / hold behavior. Suite green (549), typecheck + lint + build clean.
+
+**WS-I (PR26 / the v9 engine cleanup) is now complete:** T-I1 (bodyweight model decided),
+T-I2 (built + live), T-I3 (anchor-only), T-I4 (legacy retired), T-I5 (prior-peak seed
+retired, folded in here). Note: replaying a *pre-rep-window* historical decision now takes
+the hold fallback instead of the old increment math — acceptable (the live reconcile uses
+the active params; pre-rep-window replay was already largely non-replayable).
+
 ## 2026-06-26 (latest) — Group 2 / T-I2: data migration + v16 ACTIVATED (bodyweight model live)
 
 The bodyweight model is now **live** (engine_params **v16 active**, v15 retired). Sequence:

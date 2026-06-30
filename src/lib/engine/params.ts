@@ -98,19 +98,26 @@ const experienceRanges = z.object({
  * both parse with this schema.
  */
 export const engineParamsSchema = z.object({
-  // weight increment per equipment type, in pounds
+  // DEPRECATED (T-I4): the legacy increment/regression progression was retired. These
+  // fields are RETAINED in the schema so every historical engine_params row still
+  // parses to a complete materialization (preserving `is_replayable` / params_hash —
+  // removing them would flip all pre-T-I4 rows non-replayable). No engine code reads
+  // `increment`, `experience_increment_scale`, `progression_style`, or `regression_pct`
+  // any more; progression is anchor-only (rep-window + bodyweight; hold without an
+  // anchor).
   increment: perEquipmentStep,
   experience_increment_scale: z.record(
     z.enum(experienceLevels),
     z.number().positive(),
   ),
-  // how each goal progresses on a met prescription
   progression_style: z.record(
     z.enum(goalTypes),
     z.enum(["load_first", "reps_first", "hold"]),
   ),
   // missed reps by <= this margin => hold; more => regress
   small_miss_reps: z.number().int().min(0),
+  // DEPRECATED (T-I4): the big-miss back-off is retired (anchor-only). Retained for
+  // historical-row parsing; no code reads it.
   regression_pct: z.number().min(0.5).max(1),
   // joint_pain >= pain_gate blocks load increases
   pain_gate: z.number().int().min(1).max(3),
@@ -134,6 +141,8 @@ export const engineParamsSchema = z.object({
     // RIR (≈6) for anchor-based deload selection, not just the legacy ≤5.
     target_rir: z.number().int().min(3).max(8),
   }),
+  // DEPRECATED (T-I4 / T-I5): the prior-peak × back-off meso seed is retired.
+  // Retained for historical-row parsing; no code reads it.
   meso_seed_backoff_pct: z.number().min(0.7).max(1),
   // weights are rounded to this loadable step per equipment, in pounds
   rounding: perEquipmentStep,

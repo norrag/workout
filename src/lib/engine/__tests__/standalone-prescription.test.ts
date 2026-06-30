@@ -136,13 +136,16 @@ describe("§S1 — seed week 1 from the strength anchor", () => {
   // a fabricated all-time peak like v_exercise_prs used to hand seedMeso
   const priorPeak = { weight: 140, reps: 30, sets: 3 };
 
-  it("legacy seed carries the peak's rep count verbatim (the runaway-reps bug)", () => {
+  it("the prior peak is never used (T-I4 retired it): without seed_from_anchor it defers", () => {
+    // DEFAULT has no seed_from_anchor, so the anchor branch is skipped; the legacy
+    // peak-backoff path is gone; with no plan seed the slot defers (was the 130×30
+    // runaway-reps bug).
     const out = seedMeso(priorPeak, null, exercise, user, 3, DEFAULT_ENGINE_PARAMS, {
       goalType: "hypertrophy",
       anchor,
     });
-    expect(out.reps).toBe(30); // escapes the 6–15 window
-    expect(out.weight).toBe(130); // 140 × 0.925 backoff
+    expect(out.weight).toBeNull();
+    expect(out.reps).toBeNull();
   });
 
   it("v11 seeds in-window reps from the anchor (≈ target_low at the start RIR)", () => {
@@ -158,13 +161,13 @@ describe("§S1 — seed week 1 from the strength anchor", () => {
     expect(predictRepsAtWeight(anchor.value, out.weight!, 3, V11_PARAMS)).toBe(out.reps);
   });
 
-  it("v11 falls back to the legacy peak seed when there is no confident anchor", () => {
+  it("with a peak but no anchor and no plan seed, defers (peak path retired, T-I4)", () => {
     const out = seedMeso(priorPeak, null, exercise, user, 3, V11_PARAMS, {
       goalType: "hypertrophy",
       anchor: null,
     });
-    expect(out.reps).toBe(30); // no anchor ⇒ legacy peak-backoff seed
-    expect(out.weight).toBe(130);
+    expect(out.weight).toBeNull(); // no 140 × 0.925 fabrication anymore
+    expect(out.reps).toBeNull();
   });
 
   it("v11 falls back to plan defaults when there is neither a peak nor an anchor", () => {
@@ -229,12 +232,15 @@ describe("§T-I5 — retire the prior-peak meso seed (owner ruling 2026-06-25)",
     expect(out.weight).not.toBeNull();
   });
 
-  it("the legacy peak seed is unchanged when the flag is off (v11/v12)", () => {
+  it("the prior-peak seed is gone even with the retire flag off (T-I4 removed the code)", () => {
+    // T-I4 deletes the priorPeak branch entirely, so even a flag-off (v11) row no
+    // longer fabricates 140 × 0.925 — it defers to a manual seed.
     const out = seedMeso(priorPeak, null, exercise, user, 3, V11_PARAMS, {
       goalType: "hypertrophy",
       anchor: null,
     });
-    expect(out.weight).toBe(130); // 140 × 0.925 — gate is real
-    expect(out.reps).toBe(30);
+    expect(out.weight).toBeNull();
+    expect(out.reps).toBeNull();
+    expect(out.rationale).toMatch(/enter a starting weight/i);
   });
 });

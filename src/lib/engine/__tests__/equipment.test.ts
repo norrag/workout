@@ -4,7 +4,7 @@ import {
   equipmentTypes,
   toEngineEquipment,
 } from "../params";
-import { incrementFor, roundToStep } from "../rules/rounding";
+import { roundToStep } from "../rules/rounding";
 
 describe("toEngineEquipment", () => {
   it("passes canonical buckets through unchanged", () => {
@@ -37,19 +37,7 @@ describe("toEngineEquipment", () => {
       ["freemotion", "cable"],
     ];
     for (const [raw, bucket] of cases) {
-      expect(
-        incrementFor(
-          toEngineEquipment(raw),
-          "intermediate",
-          DEFAULT_ENGINE_PARAMS,
-        ),
-      ).toBe(
-        incrementFor(
-          toEngineEquipment(bucket),
-          "intermediate",
-          DEFAULT_ENGINE_PARAMS,
-        ),
-      );
+      // the loadable step (what every prescription rounds to) must match the bucket
       expect(
         roundToStep(123.4, toEngineEquipment(raw), DEFAULT_ENGINE_PARAMS),
       ).toBe(

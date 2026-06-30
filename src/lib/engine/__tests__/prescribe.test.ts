@@ -4,84 +4,36 @@ import { baseInputs } from "./helpers";
 
 const params = DEFAULT_ENGINE_PARAMS;
 
-describe("prescribe — performance delta (§3)", () => {
-  it("met reps at target RIR with gain goal: load increases by equipment increment", () => {
+// T-I4: the legacy increment/regression progression is retired. With no confident
+// strength anchor (baseInputs default) prescribe() takes the no-anchor SAFETY HOLD —
+// it never fabricates a +increment on a hit or a −regression% on a miss (anchor-only,
+// owner ruling T-I3). The live progression (rep-window, anchor-driven) is covered by
+// rep-window.test.ts / v12-rep-window.test.ts / standalone-prescription.test.ts.
+describe("prescribe — no-anchor hold fallback (§3, T-I4)", () => {
+  it("met reps but no strength anchor: holds the load (no fabricated increment)", () => {
     const out = prescribe(baseInputs(), params);
-    // barbell 5 lb × intermediate 1.0
-    expect(out.weight).toBe(105);
+    expect(out.weight).toBe(100);
     expect(out.sets).toBe(3);
     expect(out.targetRir).toBe(2);
-    expect(out.rationale).toMatch(/\+5 lb/);
+    expect(out.rationale).toMatch(/hold 100 lb/i);
+    expect(out.rationale).toMatch(/not enough recent data to reprice/i);
   });
 
   it("emits a structured trace the rationale is composed from (P0-4)", () => {
     const out = prescribe(baseInputs(), params);
     expect(out.trace.length).toBeGreaterThan(0);
-    // every trace step has a stable rule code + detail
     for (const step of out.trace) {
       expect(typeof step.rule).toBe("string");
       expect(step.detail.length).toBeGreaterThan(0);
     }
-    // the load step is what drove the +5 lb increase
     expect(out.trace.some((s) => s.rule === "load")).toBe(true);
-    // rationale === the trace details joined, capitalized, terminated
     const composed =
       out.trace.map((s) => s.detail).join("; ").replace(/^./, (c) => c.toUpperCase()) +
       ".";
     expect(out.rationale).toBe(composed);
   });
 
-  it("scales the increment by experience level", () => {
-    const out = prescribe(
-      baseInputs({ user: { experienceLevel: "beginner" } }),
-      params,
-    );
-    // 5 × 1.5 = +7.5 ⇒ 107.5, rounded to the 5 lb barbell step ⇒ 110
-    expect(out.weight).toBe(110);
-  });
-
-  it("uses per-equipment lb increments for lb users", () => {
-    const out = prescribe(
-      baseInputs({ user: { experienceLevel: "intermediate" } }),
-      params,
-    );
-    // barbell lb increment is 5
-    expect(out.weight).toBe(105);
-    expect(out.rationale).toMatch(/\+5 lb/);
-  });
-
-  it("kettlebell steps in kettlebell jumps, not plate math", () => {
-    const out = prescribe(
-      baseInputs({
-        exercise: { equipmentType: "kettlebell", loadType: "external" },
-        user: { experienceLevel: "intermediate" },
-        previous: { weight: 16, reps: 10, sets: 3, targetRir: 3 },
-        actualSets: [
-          { setNumber: 1, weight: 16, reps: 10, rirReported: 3, isWarmup: false },
-        ],
-      }),
-      params,
-    );
-    // 16 + 9 lb kettlebell jump ⇒ 25, rounded to the 9 lb kettlebell step ⇒ 27
-    expect(out.weight).toBe(27);
-  });
-
-  it("bands progress in coarse band steps", () => {
-    const out = prescribe(
-      baseInputs({
-        exercise: { equipmentType: "bands", loadType: "external" },
-        user: { experienceLevel: "intermediate" },
-        previous: { weight: 30, reps: 12, sets: 3, targetRir: 3 },
-        actualSets: [
-          { setNumber: 1, weight: 30, reps: 12, rirReported: 3, isWarmup: false },
-        ],
-      }),
-      params,
-    );
-    expect(out.weight).toBe(40);
-  });
-
-  it("small miss: holds the weight actually achieved", () => {
+  it("a small miss holds the load", () => {
     const out = prescribe(
       baseInputs({
         actualSets: [
@@ -91,26 +43,9 @@ describe("prescribe — performance delta (§3)", () => {
       params,
     );
     expect(out.weight).toBe(100);
-    expect(out.rationale).toMatch(/close miss/);
   });
 
-  it("reps met but at a lower RIR than target: holds load, worded as not a miss (§5.11)", () => {
-    const out = prescribe(
-      baseInputs({
-        // hit the prescribed 8 reps but at 1 RIR vs the 3 RIR target — harder
-        // than prescribed, so the load holds; this is NOT a missed-reps set
-        actualSets: [
-          { setNumber: 1, weight: 100, reps: 8, rirReported: 1, isWarmup: false },
-        ],
-      }),
-      params,
-    );
-    expect(out.weight).toBe(100);
-    expect(out.rationale).toMatch(/hit reps but below target RIR/);
-    expect(out.rationale).not.toMatch(/close miss/);
-  });
-
-  it("big miss: regresses load by regression_pct", () => {
+  it("a big miss holds too — no −% regression without an anchor (anchor-only, T-I3)", () => {
     const out = prescribe(
       baseInputs({
         actualSets: [
@@ -119,8 +54,8 @@ describe("prescribe — performance delta (§3)", () => {
       }),
       params,
     );
-    expect(out.weight).toBe(90);
-    expect(out.rationale).toMatch(/-10% load/);
+    expect(out.weight).toBe(100);
+    expect(out.rationale).not.toMatch(/%/); // no regression_pct back-off
   });
 
   it("warmup sets are ignored when anchoring", () => {
@@ -133,7 +68,7 @@ describe("prescribe — performance delta (§3)", () => {
       }),
       params,
     );
-    expect(out.weight).toBe(105);
+    expect(out.weight).toBe(100);
   });
 
   it("no history and no previous: falls back to plan initials", () => {
@@ -150,33 +85,22 @@ describe("prescribe — performance delta (§3)", () => {
 });
 
 describe("prescribe — goal bias (§5)", () => {
-  it("cut goal holds load when prescription merely met", () => {
+  it("holds the load without a strength anchor regardless of goal", () => {
+    expect(prescribe(baseInputs({ goalType: "cut" }), params).weight).toBe(100);
+    expect(prescribe(baseInputs({ goalType: "maintain" }), params).weight).toBe(100);
+    expect(prescribe(baseInputs({ goalType: "gain" }), params).weight).toBe(100);
+  });
+
+  it("a dropping target RIR is itself the progression on a held load", () => {
+    // previous targetRir 3, this week 2 → the RIR step is noted as the progression
     const out = prescribe(baseInputs({ goalType: "cut" }), params);
     expect(out.weight).toBe(100);
-    expect(out.rationale).toMatch(/RIR drop/);
-  });
-
-  it("cut goal still progresses on clear overperformance", () => {
-    const out = prescribe(
-      baseInputs({
-        goalType: "cut",
-        actualSets: [
-          { setNumber: 1, weight: 100, reps: 11, rirReported: 3, isWarmup: false },
-        ],
-      }),
-      params,
-    );
-    expect(out.weight).toBe(105);
-  });
-
-  it("maintain goal holds prescriptions stable", () => {
-    const out = prescribe(baseInputs({ goalType: "maintain" }), params);
-    expect(out.weight).toBe(100);
+    expect(out.rationale).toMatch(/target RIR steps 3 to 2/);
   });
 });
 
 describe("prescribe — feedback modulation (§4, pump/workload 0–10)", () => {
-  it("pain at the gate blocks load increases", () => {
+  it("pain at the gate is reported (load already held without an anchor)", () => {
     const out = prescribe(
       baseInputs({
         exerciseFeedback: { jointPain: 2, pump: 5, workload: 5 },
@@ -232,7 +156,7 @@ describe("prescribe — feedback modulation (§4, pump/workload 0–10)", () => 
     expect(out.sets).toBe(3);
   });
 
-  it("low pump at the right workload flags exercise selection, not load", () => {
+  it("low pump at the right workload flags exercise selection", () => {
     const out = prescribe(
       baseInputs({
         exerciseFeedback: { jointPain: 0, pump: 1, workload: 5 },
@@ -240,11 +164,11 @@ describe("prescribe — feedback modulation (§4, pump/workload 0–10)", () => 
       params,
     );
     expect(out.sets).toBe(3);
-    expect(out.weight).toBe(105);
+    expect(out.weight).toBe(100);
     expect(out.rationale).toMatch(/different exercise/);
   });
 
-  it("a rough session dampens load increases", () => {
+  it("a rough session is reported on a held load", () => {
     const out = prescribe(
       baseInputs({
         workoutFeedback: { overallFatigue: 4, effortRating: 2, performanceRating: 3 },

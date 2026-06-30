@@ -191,7 +191,8 @@ describe("replayDecisions", () => {
   });
 
   it("replays a seed decision through seedMeso, not prescribe (doc 14 §6.2)", () => {
-    // a meso seed with a prior peak: its stored output is the peak-backoff number.
+    // a meso seed: its stored output is what seedMeso produced. (T-I4: the prior-peak
+    // back-off seed is retired, so the seed defers to the plan `initial`.)
     const seedIn = buildSeedInputs({
       equipmentType: "barbell",
       profile: { experience_level: "intermediate" },
@@ -214,17 +215,11 @@ describe("replayDecisions", () => {
       seedOut as unknown as Record<string, unknown>,
       "seed",
     );
-    // dispatched to seedMeso → reproduces the stored output (unchanged). If it had
-    // wrongly run prescribe (cold start from `initial`, no backoff), it would diff.
+    // dispatched to seedMeso → reproduces the stored output (unchanged).
     const outcome = replayDecisions([stored], DEFAULT_ENGINE_PARAMS as EngineParams);
     expect(outcome.changed).toBe(0);
     expect(outcome.outcomes.unchanged).toBe(1);
     expect(outcome.errors).toBe(0);
-
-    // sanity: the prescribe cold-start path would NOT match the seed output, so the
-    // dispatch genuinely mattered
-    const asAdvance = prescribe(seedIn as unknown as EngineInputs, DEFAULT_ENGINE_PARAMS);
-    expect(asAdvance.weight).not.toBe(seedOut.weight);
   });
 
   it("folds the per-exercise increment override into the candidate params (replay fidelity)", () => {
