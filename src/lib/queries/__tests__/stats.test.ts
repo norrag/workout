@@ -12,6 +12,7 @@ import {
   buildVolumeMatrix,
   type MesoStatsWeek,
 } from "../stats";
+import type { ProjectedCell } from "../volume-projection";
 import { templateEmphasis } from "../templates";
 
 const weeks: MesoStatsWeek[] = [
@@ -37,42 +38,65 @@ describe("buildVolumeMatrix", () => {
     viewRow(1, "back", 4, 4),
     viewRow(2, "back", 4, 0),
   ];
-  const baseline = new Map([
-    ["quads", 6],
-    ["back", 4],
-  ]);
+  // projection for the two ungenerated future weeks (W3 working, W4 deload).
+  const cell = (
+    week_number: number,
+    muscle_group: string,
+    projected_sets: number,
+    is_deload = false,
+  ): ProjectedCell => ({
+    week_number,
+    muscle_group,
+    muscle_group_id: muscle_group,
+    projected_sets,
+    is_deload,
+  });
+  const projected: ProjectedCell[] = [
+    cell(3, "quads", 7),
+    cell(4, "quads", 4, true),
+    cell(3, "back", 4),
+    cell(4, "back", 2, true),
+  ];
 
   it("shows logged for closed weeks, logged-so-far for the active week", () => {
-    const volume = buildVolumeMatrix(weeks, rows, baseline);
+    const volume = buildVolumeMatrix(weeks, rows, projected);
     const quads = volume.groups.find((g) => g.name === "quads")!;
     expect(quads.cells[0]).toEqual({ value: 6, kind: "logged" });
     expect(quads.cells[1]).toEqual({ value: 3, kind: "current" });
   });
 
-  it("falls back to the planner baseline for ungenerated weeks", () => {
-    const volume = buildVolumeMatrix(weeks, rows, baseline);
+  it("uses the engine projection for ungenerated future weeks", () => {
+    const volume = buildVolumeMatrix(weeks, rows, projected);
     const quads = volume.groups.find((g) => g.name === "quads")!;
-    expect(quads.cells[2]).toEqual({ value: 6, kind: "planned" });
+    expect(quads.cells[2]).toEqual({ value: 7, kind: "planned" });
   });
 
-  it("leaves ungenerated deload weeks empty — the engine sizes them later", () => {
-    const volume = buildVolumeMatrix(weeks, rows, baseline);
+  it("projects ungenerated deload weeks (deload-scaled) rather than leaving them empty", () => {
+    const volume = buildVolumeMatrix(weeks, rows, projected);
     const quads = volume.groups.find((g) => g.name === "quads")!;
+    expect(quads.cells[3]).toEqual({ value: 4, kind: "planned" });
+  });
+
+  it("leaves a future week with no projection basis empty", () => {
+    const volume = buildVolumeMatrix(weeks, rows, []);
+    const quads = volume.groups.find((g) => g.name === "quads")!;
+    expect(quads.cells[2]).toEqual({ value: null, kind: "empty" });
     expect(quads.cells[3]).toEqual({ value: null, kind: "empty" });
   });
 
-  it("uses the autoregulated plan when a future week is generated", () => {
+  it("uses the materialized autoregulated plan when a future week is generated", () => {
     const volume = buildVolumeMatrix(
       weeks,
       [...rows, viewRow(3, "quads", 8, 0)],
-      baseline,
+      projected,
     );
     const quads = volume.groups.find((g) => g.name === "quads")!;
+    // a real generated row wins over the projection
     expect(quads.cells[2]).toEqual({ value: 8, kind: "planned" });
   });
 
   it("totals per week and reports the current-week footer", () => {
-    const volume = buildVolumeMatrix(weeks, rows, baseline);
+    const volume = buildVolumeMatrix(weeks, rows, projected);
     expect(volume.totals[0].value).toBe(10);
     expect(volume.currentLogged).toBe(3);
     expect(volume.currentPlanned).toBe(11);
@@ -96,9 +120,9 @@ describe("buildBalance", () => {
       viewRow(1, "quads", 4, 4),
       viewRow(2, "quads", 4, 1),
     ];
-    const volume = buildVolumeMatrix(weeks, rows, new Map());
+    const volume = buildVolumeMatrix(weeks, rows, []);
     const balance = buildBalance(volume, weeks);
-    // chest avg over W1 logged 10, W2 logged 5, W3 — no baseline → 2 weeks
+    // chest avg over W1 logged 10, W2 logged 5, W3 — no projection → 2 weeks
     expect(balance.push).toBe(8);
     expect(balance.pull).toBe(5);
     expect(balance.legs).toBe(3);

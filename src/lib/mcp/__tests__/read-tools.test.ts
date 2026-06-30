@@ -586,6 +586,28 @@ describe("formatMuscleGroupVolume", () => {
     expect(weeks[3]).toMatchObject({ status: "not_yet_generated", planned_sets: null, logged_sets: 0 });
     expect(weeks[4].status).toBe("not_yet_generated");
   });
+
+  it("shows projected sets for unmaterialized weeks when a projection is given (PH34)", () => {
+    // weeks 1–3 generated; the projection supplies the unmaterialized 4–5.
+    const rows: VMesoWeekSetsRow[] = [1, 2, 3].map((week_number) => ({
+      user_id: "u1",
+      mesocycle_id: "m1",
+      week_number,
+      is_deload: false,
+      muscle_group_id: "g1",
+      muscle_group: "Chest",
+      planned_sets: 10,
+      logged_sets: week_number === 3 ? 0 : 10,
+    }));
+    const projected = [
+      { week_number: 4, muscle_group_id: "g1", muscle_group: "Chest", projected_sets: 10, is_deload: false },
+      { week_number: 5, muscle_group_id: "g1", muscle_group: "Chest", projected_sets: 5, is_deload: true },
+    ];
+    const out = formatMuscleGroupVolume("m1", rows, 5, projected) as Record<string, unknown>;
+    const weeks = (out.groups as Record<string, unknown>[])[0].weeks as Record<string, unknown>[];
+    expect(weeks[3]).toMatchObject({ status: "projected", planned_sets: 10, is_deload: false });
+    expect(weeks[4]).toMatchObject({ status: "projected", planned_sets: 5, is_deload: true });
+  });
 });
 
 // --- formatExerciseSearch / Templates / Notes / Exclusions -----------------

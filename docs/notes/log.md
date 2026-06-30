@@ -4,6 +4,50 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-06-30 — Session 15: bug sweep (PH29, PH38, PH36) + PH34 decision framed
+
+Owner asked to attack all the open bug items, perf to follow. Ran four parallel
+code investigations (PH29/PH38/PH36/PH34). Branch `claude/notes-review-assessment-t14bcu`,
+**PR #84**. Reconciliation sweep: nothing new to archive (#82/#83 merged last session; only
+unrelated #48 open).
+
+- **PH38 — done (PR #84).** Root cause in `replaceWorkoutExercise`
+  (`queries/logging.ts`): the swap updated only `exercise_id`/`prescribed_*` and left
+  the outgoing exercise's per-set `set_weights` overrides on the slot, so the first set
+  showed the old planned weight (reps predicted off it) until "reset to prescription"
+  (which clears exactly `set_weights` — matching the reported workaround). Fix: clear
+  `set_weights` on swap. New query-layer test `__tests__/replace-exercise.test.ts`
+  (cleared payload + no-history + logged-sets guard). No engine change. *Noted but not
+  taken:* the swap also seeds raw `v_exercise_prs` best rather than `seedMeso`, and the
+  freshness fingerprint is blind to exercise identity (same-equipment swaps escape the
+  reconcile) — latent, deferred; the `set_weights` clear closes the reported symptom.
+- **PH29 — done (PR #84)** for the glitch. The "double layer label" = two `■` markers in
+  the bottom nav during a transition (`usePathname` lags the commit → old tab still
+  `active` while tapped tab `pending`, both draw ■). Fix in `BottomNav.tsx`: lift a single
+  `anyPending` signal so the source tab yields its marker to the tapped tab; exactly one ■
+  ever shows. The *instant-switch/slowness* half is server-compute-bound (Workout tab RSC)
+  → folded into N1/WS-J; route-level `loading.tsx` + prefetch already exist.
+- **PH36 — done (PR #84).** Confirmed the owner's expectation: the engine/model half was
+  already fixed by **engine_params v16** (active) — bodyweight_only progresses on reps at
+  fixed bodyweight and the increment override is inert (weight never rounded through the
+  step). Remaining gap was UI: the Exercise page surfaced the "Load step" control for
+  bodyweight_only lifts where it does nothing. Fix: hide `ExerciseSettingsMenu` for
+  `bodyweight_only` (loadable/assisted keep it).
+- **PH34 — done (PR #84).** Owner ruled **autoregulated projection**. Confirmed the
+  engine's set-count model is single-step (carry `previous.sets` forward + a ±1 feedback
+  nudge `index.ts:378` + deload scaling), with **no forward MEV→MAV→MRV ramp** (T-A5
+  unbuilt) — so an unmaterialized week (no feedback) faithfully projects to the last
+  materialized week's count carried forward, deload-scaled. Built pure `projectWeekSets`
+  + shared `loadPlannerBaseline`/`loadMesoSetProjection` (`queries/volume-projection.ts`),
+  rewired `buildVolumeMatrix` (stats) and `get_muscle_group_volume` (MCP, new `projected`
+  status) off the old baseline-vs-`null` split so both read one definition. **No SQL
+  migration** — the projection is pure TS from data the views already expose. Tests:
+  `volume-projection.test.ts` (6, carry-forward/deload/floor/baseline-seed/post-deload),
+  updated `stats.test.ts` + `read-tools.test.ts`. **Caveat relayed to owner:** the
+  projection is flat across accumulation weeks (honest, not a climbing ramp); a climbing
+  projection needs the unbuilt set ramp (T-A5).
+- Green: `npm run test` **560** (+8), typecheck, lint.
+
 ## 2026-06-30 — Session 14: reconcile merged PRs + harden the PR-sync process
 
 Owner flagged that the live index was full of `done (PR pending)` rows whose PRs had

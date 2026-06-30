@@ -752,6 +752,11 @@ export async function replaceWorkoutExercise(
       exercise_id: newExerciseId,
       prescribed_weight: pr?.best_weight ?? null,
       prescribed_reps: pr?.best_reps ?? null,
+      // Clear any per-set weight overrides left on the slot by the outgoing
+      // exercise — otherwise the first set shows the old movement's planned
+      // weight (and reps predicted off it) until the user hits "reset to
+      // prescription" (PH38). The incoming exercise starts from its own seed.
+      set_weights: {},
       notes: pr?.best_weight
         ? `Swapped in at your all-time best ${pr.best_weight} × ${pr.best_reps}; this week's sets seed next week`
         : "Swapped in — no history yet; this week's sets seed next week",

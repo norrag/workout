@@ -3940,3 +3940,37 @@ Closed the doc 13 §4.4 fast-follow and added the missing piece it implied.
   to the engine's W2·D4 → W3·D4 advance with matching `advance` decisions + fresh
   `dep_fingerprint`s (validated against the same anchors the already-generated W4
   days recorded). Full suite green (481), typecheck + lint clean.
+
+## 2026-06-30 — Field-notes bug sweep (PH29 / PH38 / PH36 / PH34, PR #84)
+
+Four backlog bugs (`docs/notes/`). No schema/migration changes; no rule-#8 deviations
+(all touch existing screens/behaviors).
+
+- **PH38 (swap-exercise prescription).** `replaceWorkoutExercise`
+  (`queries/logging.ts`) left the outgoing exercise's per-set `set_weights`
+  overrides on the slot, so the first set showed the old planned weight (reps
+  predicted off it) until "reset to prescription". Now clears `set_weights` on swap.
+  Test: `__tests__/replace-exercise.test.ts`.
+- **PH29 (page-switch "double layer label").** The bottom nav drew two `■` position
+  markers during a route transition (`usePathname` lags the commit → previous tab
+  still `active` while the tapped tab is `pending`). `BottomNav.tsx` now lifts a
+  single `anyPending` signal so the source tab yields its marker to the tapped tab;
+  exactly one `■` shows. (Instant-switch latency is server-compute-bound → WS-J perf.)
+- **PH36 (bodyweight-only model/increment).** Engine half already correct under
+  engine_params v16 (reps-only at fixed bodyweight; increment inert). Closed the UI
+  gap: the Exercise page now hides the "Load step" increment control for
+  `bodyweight_only` lifts (loadable/assisted keep it — there the step rounds the
+  added/assist weight).
+- **PH34 (meso-stats "planned sets").** Future weeks materialize lazily, so
+  `v_meso_week_sets` had no rows for them; the stats UI fell back to the static
+  planner baseline while the MCP tool reported `null` (two surfaces disagreeing).
+  Owner ruled "autoregulated projection." New pure `projectWeekSets`
+  (`queries/volume-projection.ts`) carries the last materialized week's set count
+  forward, deload-scaled (mirrors the engine's set carry-forward under neutral
+  feedback — there is no forward MEV→MAV→MRV ramp, T-A5 unbuilt), seeded by the
+  planner baseline only when a group never materialized. Wired into both shared
+  surfaces (`buildVolumeMatrix` + `get_muscle_group_volume`, new `projected` status)
+  so they read one definition. Pure TS, no migration. Tests:
+  `volume-projection.test.ts` + updated `stats.test.ts`/`read-tools.test.ts`.
+
+Full suite green (560, +8), typecheck + lint clean.

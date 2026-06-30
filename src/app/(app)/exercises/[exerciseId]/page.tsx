@@ -5,7 +5,7 @@ import { getExerciseHistory } from "@/lib/queries/history";
 import { getExerciseOverview } from "@/lib/queries/exercises";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
-import { toEngineEquipment } from "@/lib/engine";
+import { toEngineEquipment, coerceLoadType } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
@@ -107,6 +107,14 @@ export default async function ExerciseDetailPage({
   const defaultStep =
     activeParams.params.rounding[toEngineEquipment(exercise.equipment_type)] ?? 5;
 
+  // The load-step (weight-increment) control is meaningless for bodyweight-only
+  // lifts — the engine progresses them on reps at fixed bodyweight and never adds
+  // load, so the increment is inert. Hide the control rather than surface a
+  // setting that does nothing (PH36). Loadable/assisted keep it: there the step
+  // rounds the added/assist weight.
+  const loadType = coerceLoadType(exercise.load_type, exercise.equipment_type);
+  const showLoadStep = loadType !== "bodyweight_only";
+
   const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]));
   const primary = (links ?? []).find((l) => l.role === "primary");
   const secondary = (links ?? []).filter((l) => l.role === "secondary");
@@ -138,11 +146,13 @@ export default async function ExerciseDetailPage({
         >
           ‹ EXERCISES
         </Link>
-        <ExerciseSettingsMenu
-          exerciseId={exercise.id}
-          defaultStep={defaultStep}
-          override={incrementOverride}
-        />
+        {showLoadStep && (
+          <ExerciseSettingsMenu
+            exerciseId={exercise.id}
+            defaultStep={defaultStep}
+            override={incrementOverride}
+          />
+        )}
       </div>
       <div className="mt-3 flex items-end justify-between">
         <h1 className="text-[28px] font-extrabold leading-none tracking-[-0.02em]">
