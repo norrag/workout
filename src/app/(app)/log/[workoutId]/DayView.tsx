@@ -213,6 +213,15 @@ export function DayView({
   const [completeOpen, setCompleteOpen] = useState(false);
   const [dropPending, setDropPending] = useState<Record<string, boolean>>({});
 
+  // Remember the last active-meso day viewed so the Workout tab returns here
+  // instead of resetting to the current day (WS-J). Session-scoped, and gated to
+  // the active meso so browsing a past cycle's day doesn't hijack the tab.
+  useEffect(() => {
+    if (mesocycle.status === "active") {
+      sessionStorage.setItem("lastWorkoutId", workout.id);
+    }
+  }, [workout.id, mesocycle.status]);
+
   const commit: Commit = (fn) => startTransition(fn);
 
   // progress bar denominator excludes skipped slots; an exercise is "done"

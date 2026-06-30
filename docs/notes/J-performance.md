@@ -121,6 +121,24 @@ single-route (~38 kB) win, not the cause of "feels slow."
 
 ### Phase A — Interaction acknowledgment (primary track, runs first)
 
+**Shipped 2026-06-30 (return-to-tab + nav).** From owner feedback that the Workout tab
+reloads everything + resets to the current day on every tap, and the page-switch label
+still ghosted:
+- **Client Router Cache on** — `experimental.staleTimes { dynamic: 120, static: 300 }`
+  (`next.config.ts`). Returning to a previously-viewed `/workout`/`/log/[id]` within the
+  window is served from the client cache: instant, scroll restored, no server round-trip.
+  Owner-chosen 2-min window; own edits bust the cache via `revalidatePath`, so only rare
+  out-of-band prescription changes can be briefly stale (self-heal). Biggest lever for the
+  "switch back to where I was" feel; literal keep-alive assessed + rejected (major
+  rearchitecture for ~the same result).
+- **Workout tab returns to the last-viewed day** — `DayView` stamps a session-scoped
+  `lastWorkoutId` (active meso only); `BottomNav` links the Workout tab there and treats
+  `/log/*` as the Workout section.
+- **Nav label glitch removed** — stripped the `animate-pulse` loading animation (ghosts on
+  mobile); the ■ marker moves to the tapped tab optimistically (instant, no animation).
+- `setIncrementOverrideAction` also revalidates `/log/[workoutId]` so an override edit isn't
+  stale on a cached day.
+
 **Audit verdict (2026-06-30):** the app is broadly disciplined — the daily logging
 loop (set logging via `LogCheckbox`, weight/reps edit, all bottom sheets/menus open
 synchronously, `CompleteSheet`, every `useActionState` form, optimistic toggles) is
