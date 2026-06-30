@@ -12,6 +12,10 @@ import { getCyclesOverview, getMesoPlan, type CyclesOverview, type MesoPlan } fr
 import { getMesoProgressScores, type ExerciseProgressScore } from "@/lib/queries/stats";
 import { getMacroOverview, type MacroOverview } from "@/lib/queries/macro";
 import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  loadMesoSetProjection,
+  type ProjectedCell,
+} from "@/lib/queries/volume-projection";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
 import {
   listExercises,
@@ -582,6 +586,7 @@ export function formatMuscleGroupVolume(
   mesocycleId: string,
   rows: VMesoWeekSetsRow[],
   weeksTotal: number | null = null,
+  projected: ProjectedCell[] = [],
 ): Record<string, unknown> {
   const byGroup = new Map<
     string,
@@ -605,6 +610,23 @@ export function formatMuscleGroupVolume(
     });
     byGroup.set(key, entry);
   }
+  // projected (unmaterialized) future weeks per group → looked up where a real
+  // row is absent (PH34). Ensure groups that exist only in the projection (a
+  // meso that hasn't materialized any week) still appear.
+  const projectedByKey = new Map<
+    string,
+    Map<number, { projected_sets: number; is_deload: boolean }>
+  >();
+  for (const c of projected) {
+    const key = c.muscle_group_id ?? "unassigned";
+    if (!byGroup.has(key)) byGroup.set(key, { name: c.muscle_group, weeks: new Map() });
+    let m = projectedByKey.get(key);
+    if (!m) {
+      m = new Map();
+      projectedByKey.set(key, m);
+    }
+    m.set(c.week_number, { projected_sets: c.projected_sets, is_deload: c.is_deload });
+  }
   const maxGenerated = generatedWeeks.size > 0 ? Math.max(...generatedWeeks) : 0;
   // the week span to report: the meso's full planned length when known, else
   // however far generation has reached
@@ -614,14 +636,25 @@ export function formatMuscleGroupVolume(
     mesocycle_id: mesocycleId,
     weeks_total: weeksTotal,
     weeks_generated: [...generatedWeeks].sort((a, b) => a - b),
-    groups: [...byGroup.values()]
-      .map((g) => ({
+    groups: [...byGroup.entries()]
+      .map(([key, g]) => ({
         muscle_group: g.name,
         weeks: Array.from({ length: span }, (_, i) => i + 1).map((week_number) => {
           const cell = g.weeks.get(week_number);
           if (!cell) {
-            // explicit so an uneven mid-meso picture reads as "not built yet",
-            // not as a real zero-volume week (§5.10)
+            // no materialized row — fall back to the engine's set-count
+            // projection (PH34) for unmaterialized future weeks; only when even
+            // the projection has nothing does it read "not built yet" (§5.10).
+            const proj = projectedByKey.get(key)?.get(week_number);
+            if (proj) {
+              return {
+                week_number,
+                planned_sets: proj.projected_sets,
+                logged_sets: 0,
+                is_deload: proj.is_deload,
+                status: "projected" as const,
+              };
+            }
             return {
               week_number,
               planned_sets: null,
@@ -641,7 +674,7 @@ export function formatMuscleGroupVolume(
       }))
       .sort((a, b) => a.muscle_group.localeCompare(b.muscle_group)),
     note:
-      "Planned sets exist only for weeks the engine has already generated; the engine autoregulates forward, so weeks past weeks_generated show status not_yet_generated (planned_sets null) rather than a real zero.",
+      "Materialized weeks (status logged/planned) come from generated workouts. Weeks past weeks_generated show status projected: the engine's set-count projection — the last materialized week's autoregulated count carried forward, deload-scaled. It's a projection under neutral feedback (no forward set ramp), not a materialized plan; null/not_yet_generated only when even a projection has no basis.",
   };
 }
 
@@ -654,28 +687,33 @@ function registerGetMuscleGroupVolume(server: McpServer) {
       description:
         "Weekly hard sets per muscle group for a mesocycle — planned (from the " +
         "autoregulated plan) vs actually logged, per week, with deload weeks " +
-        "flagged. Weeks the engine hasn't generated yet are marked " +
-        "not_yet_generated (it autoregulates forward). The volume picture behind the meso.",
+        "flagged. Weeks the engine hasn't generated yet show status projected " +
+        "(the last materialized week's count carried forward, deload-scaled). " +
+        "The volume picture behind the meso.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data, error }, { data: meso, error: mesoError }] = await Promise.all([
-        client
-          .from("v_meso_week_sets")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("mesocycle_id", mesocycle_id),
-        client
-          .from("mesocycles")
-          .select("weeks")
-          .eq("id", mesocycle_id)
-          .eq("user_id", userId)
-          .maybeSingle(),
-      ]);
+      const [{ data, error }, { data: meso, error: mesoError }, projected] =
+        await Promise.all([
+          client
+            .from("v_meso_week_sets")
+            .select("*")
+            .eq("user_id", userId)
+            .eq("mesocycle_id", mesocycle_id),
+          client
+            .from("mesocycles")
+            .select("weeks")
+            .eq("id", mesocycle_id)
+            .eq("user_id", userId)
+            .maybeSingle(),
+          loadMesoSetProjection(client, userId, mesocycle_id),
+        ]);
       if (error) throw error;
       if (mesoError) throw mesoError;
-      return jsonResult(formatMuscleGroupVolume(mesocycle_id, data ?? [], meso?.weeks ?? null));
+      return jsonResult(
+        formatMuscleGroupVolume(mesocycle_id, data ?? [], meso?.weeks ?? null, projected),
+      );
     },
   );
 }

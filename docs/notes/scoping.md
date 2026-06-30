@@ -150,7 +150,13 @@ exercise is bodyweight-only (no external load)? Likely interacts with the
 per-exercise increment override (I13) and `seedMeso` (null weight). Start by
 reproducing with a bodyweight exercise; scope after. **triaged, needs repro.**
 
-## PH34 — Meso-stats "planned sets" off mid-meso · **Q→B / medium · needs-input**
+## PH34 — Meso-stats "planned sets" off mid-meso · **done (PR #84)**
+**Built** (owner ruled autoregulated projection): pure `projectWeekSets`
+(`queries/volume-projection.ts`) carries the last materialized week's set count
+forward, deload-scaled, for unmaterialized weeks; wired into `buildVolumeMatrix`
+(stats) and `get_muscle_group_volume` (MCP, `projected` status) — one definition,
+no SQL migration. Original scope below for the record.
+
 Confirmed a real defect rooted in **lazy week materialization**. `startMeso`
 (`queries/generation.ts:317-374`) creates microcycle rows for every week but
 `workout_exercises` only for week 1; future weeks are generated one at a time by

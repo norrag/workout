@@ -33,14 +33,20 @@ unrelated #48 open).
   step). Remaining gap was UI: the Exercise page surfaced the "Load step" control for
   bodyweight_only lifts where it does nothing. Fix: hide `ExerciseSettingsMenu` for
   `bodyweight_only` (loadable/assisted keep it).
-- **PH34 — needs-input (decision framed).** Confirmed a real bug: future weeks materialize
-  lazily (only after the prior week's same day completes), so `v_meso_week_sets` has no
-  rows for them; the stats UI substitutes the static planner baseline (ignores
-  autoregulation) while MCP `get_muscle_group_volume` reports `null` — the two shared
-  surfaces disagree. The fix needs an owner call on the "planned" definition for an
-  unmaterialized week (static baseline / autoregulated projection / count-only), then a
-  new append-only view migration read by both surfaces. Framed in `backlog.md`.
-- Green: `npm run test` 552 (+3), typecheck, lint.
+- **PH34 — done (PR #84).** Owner ruled **autoregulated projection**. Confirmed the
+  engine's set-count model is single-step (carry `previous.sets` forward + a ±1 feedback
+  nudge `index.ts:378` + deload scaling), with **no forward MEV→MAV→MRV ramp** (T-A5
+  unbuilt) — so an unmaterialized week (no feedback) faithfully projects to the last
+  materialized week's count carried forward, deload-scaled. Built pure `projectWeekSets`
+  + shared `loadPlannerBaseline`/`loadMesoSetProjection` (`queries/volume-projection.ts`),
+  rewired `buildVolumeMatrix` (stats) and `get_muscle_group_volume` (MCP, new `projected`
+  status) off the old baseline-vs-`null` split so both read one definition. **No SQL
+  migration** — the projection is pure TS from data the views already expose. Tests:
+  `volume-projection.test.ts` (6, carry-forward/deload/floor/baseline-seed/post-deload),
+  updated `stats.test.ts` + `read-tools.test.ts`. **Caveat relayed to owner:** the
+  projection is flat across accumulation weeks (honest, not a climbing ramp); a climbing
+  projection needs the unbuilt set ramp (T-A5).
+- Green: `npm run test` **560** (+8), typecheck, lint.
 
 ## 2026-06-30 — Session 14: reconcile merged PRs + harden the PR-sync process
 

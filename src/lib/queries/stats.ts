@@ -5,6 +5,12 @@ import type {
   MesocycleRow,
   VMesoWeekSetsRow,
 } from "@/lib/types/database";
+import { getActiveEngineParams } from "./generation";
+import {
+  loadPlannerBaseline,
+  projectWeekSets,
+  type ProjectedCell,
+} from "./volume-projection";
 
 type Client = SupabaseClient<Database>;
 
@@ -151,9 +157,9 @@ export function balanceCategory(
 
 /**
  * Build the 4.1 volume matrix. Completed weeks show logged sets, the active
- * week shows logged-so-far, generated future weeks show the autoregulated
- * plan, ungenerated weeks fall back to the planner baseline (deload weeks
- * stay empty until the engine sizes them).
+ * week shows logged-so-far, generated future weeks show the materialized
+ * autoregulated plan, and ungenerated future weeks (incl. deloads) show the
+ * engine's set-count projection (PH34) — see `projectWeekSets`.
  */
 export function buildVolumeMatrix(
   weeks: MesoStatsWeek[],
@@ -161,13 +167,22 @@ export function buildVolumeMatrix(
     VMesoWeekSetsRow,
     "week_number" | "muscle_group" | "planned_sets" | "logged_sets"
   >[],
-  baseline: Map<string, number>,
+  projected: ProjectedCell[],
 ): MesoVolume {
   const generatedWeeks = new Set(viewRows.map((r) => r.week_number));
+  const projectedByWeek = new Map<number, Map<string, number>>();
+  for (const c of projected) {
+    let m = projectedByWeek.get(c.week_number);
+    if (!m) {
+      m = new Map();
+      projectedByWeek.set(c.week_number, m);
+    }
+    m.set(c.muscle_group, c.projected_sets);
+  }
   const names = [
     ...new Set([
       ...viewRows.map((r) => r.muscle_group).filter((g): g is string => !!g),
-      ...baseline.keys(),
+      ...projected.map((c) => c.muscle_group),
     ]),
   ];
 
@@ -180,10 +195,9 @@ export function buildVolumeMatrix(
     if (week.status === "active")
       return { value: row?.logged_sets ?? 0, kind: "current" };
     if (row) return { value: row.planned_sets, kind: "planned" };
-    if (week.is_deload) return { value: null, kind: "empty" };
-    const base = baseline.get(name);
-    return base != null
-      ? { value: base, kind: "planned" }
+    const proj = projectedByWeek.get(week.week_number)?.get(name);
+    return proj != null
+      ? { value: proj, kind: "planned" }
       : { value: null, kind: "empty" };
   };
 
@@ -412,42 +426,22 @@ export async function getMesoStats(
   const currentWeek =
     weeks.find((w) => w.status === "active")?.week_number ?? null;
 
-  // planner baseline: weekly sets per group from the board structure
-  const { data: days, error: dayError } = await supabase
-    .from("meso_days")
-    .select("id")
-    .eq("mesocycle_id", mesoId);
-  if (dayError) throw dayError;
-  const baseline = new Map<string, number>();
-  if ((days ?? []).length > 0) {
-    const [
-      { data: groups, error: groupError },
-      { data: fills, error: fillError },
-      { data: mgs, error: mgError },
-    ] = await Promise.all([
-      supabase
-        .from("meso_day_groups")
-        .select("*")
-        .in("meso_day_id", (days ?? []).map((d) => d.id)),
-      supabase.from("meso_exercises").select("*").eq("mesocycle_id", mesoId),
-      supabase.from("muscle_groups").select("*"),
-    ]);
-    if (groupError) throw groupError;
-    if (fillError) throw fillError;
-    if (mgError) throw mgError;
-    const mgName = new Map((mgs ?? []).map((g) => [g.id, g.name]));
-    const groupById = new Map((groups ?? []).map((g) => [g.id, g]));
-    for (const fill of fills ?? []) {
-      const group = fill.meso_day_group_id
-        ? groupById.get(fill.meso_day_group_id)
-        : null;
-      const name = group ? mgName.get(group.muscle_group_id) : null;
-      if (!name) continue;
-      baseline.set(name, (baseline.get(name) ?? 0) + fill.initial_sets);
-    }
-  }
+  // future-week set projection (PH34): carry the last materialized week's
+  // autoregulated count forward (deload-scaled), seeded by the planner baseline
+  // where a group hasn't materialized. Shared with the MCP volume tool.
+  const [baseline, { params }] = await Promise.all([
+    loadPlannerBaseline(supabase, mesoId),
+    getActiveEngineParams(supabase),
+  ]);
+  const projected: ProjectedCell[] = projectWeekSets({
+    weeks,
+    viewRows: weekSets ?? [],
+    baseline,
+    deloadSetPct: params.deload.set_pct,
+    minSets: params.min_sets,
+  });
 
-  const volume = buildVolumeMatrix(weeks, weekSets ?? [], baseline);
+  const volume = buildVolumeMatrix(weeks, weekSets ?? [], projected);
   const balance = buildBalance(volume, weeks);
 
   // performance — top set per exercise per week needs set-level reps
