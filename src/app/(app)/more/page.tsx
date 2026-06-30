@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/queries/profiles";
 import { signOut } from "@/app/(auth)/actions";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ThemeToggle } from "./ThemeToggle";
 import { formatHeight } from "@/lib/units";
 
@@ -95,12 +96,12 @@ export default async function MorePage() {
       </Link>
 
       <form action={signOut} className="mt-6">
-        <button
-          type="submit"
+        <SubmitButton
+          pendingLabel="SIGNING OUT…"
           className="w-full border-[1.5px] border-ink py-3 text-center text-xs font-bold tracking-[0.12em]"
         >
           SIGN OUT
-        </button>
+        </SubmitButton>
       </form>
 
       <div className="mt-6 text-[9.5px] font-medium tracking-[0.12em] text-ink/45">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { RedeemForm } from "@/components/RedeemForm";
 import { startScratchDraftAction } from "../cycles/actions";
 
@@ -29,10 +30,7 @@ export function NewTemplateButton() {
         {/* Blank template = open the planner board (a fresh draft); build the
             split there, then SAVE AS TEMPLATE. */}
         <form action={startScratchDraftAction}>
-          <button
-            type="submit"
-            className="mt-4 flex w-full items-center gap-[13px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5 text-left"
-          >
+          <SubmitButton className="mt-4 flex w-full items-center gap-[13px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5 text-left">
             <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center bg-ink text-[13px] font-extrabold text-bg-base">
               T
             </div>
@@ -43,7 +41,7 @@ export function NewTemplateButton() {
               </div>
             </div>
             <div className="text-base font-bold">›</div>
-          </button>
+          </SubmitButton>
         </form>
 
         <div className="mt-[18px] border-t border-ink/15 pt-3 text-[10px] font-bold tracking-[0.14em] text-ink/55">

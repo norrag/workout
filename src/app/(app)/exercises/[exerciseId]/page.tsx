@@ -9,6 +9,7 @@ import { toEngineEquipment, coerceLoadType } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { ShareRow } from "@/components/ShareRow";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
 import { ExerciseSettingsMenu } from "./ExerciseSettingsMenu";
 
@@ -168,28 +169,13 @@ export default async function ExerciseDetailPage({
         {metaLine}
       </div>
 
-      {/* OVERVIEW | HISTORY tabs (3.1a/3.1b) */}
-      <div className="mt-4 flex border-[1.5px] border-ink">
-        {TABS.map((t, i) => {
-          const active = t === tab;
-          return (
-            <Link
-              key={t}
-              href={`/exercises/${exercise.id}?tab=${t}`}
-              className={`flex-1 py-2.5 text-center text-[10px] tracking-[0.1em] ${
-                active
-                  ? "bg-ink font-bold text-bg-base"
-                  : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
-              }`}
-            >
-              {t.toUpperCase()}
-            </Link>
-          );
-        })}
-      </div>
-
-      {tab === "overview" ? (
-        <>
+      {/* OVERVIEW | HISTORY tabs (3.1a/3.1b) — instant client-state toggle (both
+          panels' data is already fetched); `?tab=` still seeds the initial panel */}
+      <SegmentedTabs
+        labels={["OVERVIEW", "HISTORY"]}
+        initial={tab === "history" ? 1 : 0}
+        panels={[
+          <div key="overview">
           <div className="mt-3.5 flex items-baseline justify-between border-b-[1.5px] border-ink pb-2.5">
             <span className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
               LAST PERFORMED
@@ -310,12 +296,12 @@ export default async function ExerciseDetailPage({
           {exercise.user_id === user.id && (
             <ShareRow objectType="exercise" objectId={exercise.id} />
           )}
-        </>
-      ) : (
-        <div className="mt-5">
-          <ExerciseHistoryList entries={history} />
-        </div>
-      )}
+          </div>,
+          <div key="history" className="mt-5">
+            <ExerciseHistoryList entries={history} />
+          </div>,
+        ]}
+      />
     </div>
   );
 }

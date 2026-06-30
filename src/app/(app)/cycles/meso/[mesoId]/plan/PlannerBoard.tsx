@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState, useTransition } from "rea
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { HistorySheet } from "@/components/HistorySheet";
 import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
@@ -231,7 +232,7 @@ export function PlannerBoard({
   const [finalizing, setFinalizing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [discarding, setDiscarding] = useState(false);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
   const commit: Commit = (fn) => startTransition(fn);
 
   // ----- mutators -----------------------------------------------------------
@@ -574,7 +575,10 @@ export function PlannerBoard({
         })),
       };
     });
-    commit(() => saveMesoPlanAction({ meso_id: meso.id, days: payload }));
+    startTransition(async () => {
+      await saveMesoPlanAction({ meso_id: meso.id, days: payload });
+      setSaving(false);
+    });
   };
 
   useEffect(() => {
@@ -817,12 +821,12 @@ export function PlannerBoard({
       {hasExercise && (
         <form action={saveMesoAsTemplateAction} className="mt-6">
           <input type="hidden" name="meso_id" value={meso.id} />
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="SAVING…"
             className="w-full border-[1.5px] border-ink/40 py-3 text-center text-[11px] font-bold tracking-[0.1em] text-ink/70"
           >
             SAVE AS TEMPLATE
-          </button>
+          </SubmitButton>
         </form>
       )}
 
@@ -844,12 +848,12 @@ export function PlannerBoard({
           )}
           <form action={discardDraftAction} className="mt-3 text-center">
             <input type="hidden" name="meso_id" value={meso.id} />
-            <button
-              type="submit"
+            <SubmitButton
+              pendingLabel="DISCARDING…"
               className="text-[10px] font-bold tracking-[0.12em] text-accent"
             >
               DISCARD DRAFT
-            </button>
+            </SubmitButton>
           </form>
         </>
       ) : (
@@ -964,9 +968,10 @@ export function PlannerBoard({
             <button
               type="button"
               onClick={doSave}
-              className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+              disabled={pending}
+              className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-50"
             >
-              SAVE CHANGES
+              {pending ? "SAVING…" : "SAVE CHANGES"}
             </button>
           </div>
         </BottomSheet>

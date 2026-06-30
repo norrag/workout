@@ -610,7 +610,7 @@ function WorkoutOptionsMenu({
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [, startEnding] = useTransition();
+  const [ending, startEnding] = useTransition();
 
   const go = (href: string) => {
     setOpen(false);
@@ -724,9 +724,10 @@ function WorkoutOptionsMenu({
           <button
             type="button"
             onClick={endWorkout}
-            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+            disabled={ending}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-50"
           >
-            END WORKOUT
+            {ending ? "ENDING…" : "END WORKOUT"}
           </button>
         </div>
       </BottomSheet>
@@ -753,9 +754,10 @@ function WorkoutOptionsMenu({
           <button
             type="button"
             onClick={endMeso}
-            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+            disabled={ending}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-50"
           >
-            END MESOCYCLE
+            {ending ? "ENDING…" : "END MESOCYCLE"}
           </button>
         </div>
       </BottomSheet>

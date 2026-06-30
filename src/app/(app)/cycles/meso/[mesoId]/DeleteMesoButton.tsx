@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { deleteMesoAction } from "../../actions";
 
 /**
@@ -84,13 +85,13 @@ export function DeleteMesoButton({
           </button>
           <form action={deleteMesoAction}>
             <input type="hidden" name="meso_id" value={mesoId} />
-            <button
-              type="submit"
+            <SubmitButton
               disabled={hasHistory && !ack}
+              pendingLabel="DELETING…"
               className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
             >
               DELETE
-            </button>
+            </SubmitButton>
           </form>
         </div>
       </BottomSheet>
