@@ -41,7 +41,7 @@ import {
   getPrescriptionAudit,
   type PrescriptionAudit,
 } from "@/lib/queries/audit";
-import { getProfile } from "@/lib/queries/profiles";
+import { getProfile, updateProfile } from "@/lib/queries/profiles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { estimateE1rm } from "@/lib/engine";
 import type { EngineParams } from "@/lib/engine/params";
@@ -150,6 +150,32 @@ export async function amendSetAction(input: {
     rir_reported: parsed.rir_reported,
     // recompute the stored e1RM since weight/reps/RIR all changed
     e1rm: computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
+  });
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+}
+
+const bodyweightSchema = z.object({
+  workout_id: z.string().uuid(),
+  bodyweight: z.coerce.number().positive().max(1500),
+});
+
+/**
+ * T-I2: update the lifter's profile bodyweight from the day-view BW chip. The
+ * day-view value and the profile value are one and the same (owner ruling), so an
+ * inline edit here writes straight through to `profiles.bodyweight`. Going-forward
+ * logged sets capture this bodyweight; it is the effective-load base for bodyweight
+ * movements' live prediction.
+ */
+export async function updateBodyweightAction(input: {
+  workout_id: string;
+  bodyweight: number;
+}): Promise<void> {
+  const parsed = bodyweightSchema.parse(input);
+  const { supabase, user } = await requireUser();
+  await updateProfile(supabase, user.id, {
+    bodyweight: parsed.bodyweight,
+    bodyweight_updated_at: new Date().toISOString(),
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");

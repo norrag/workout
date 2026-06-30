@@ -80,6 +80,7 @@ describe("groupHistoryByMeso", () => {
     top_weight: 200,
     reps: "10, 10",
     e1rm: 266.7,
+    effective_load: null,
     is_deload: false,
     session_note: null,
   });

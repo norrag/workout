@@ -2,6 +2,45 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-06-26 (latest) — Group 2 / T-I2: bodyweight day-view UI + effective-load history flip
+
+The user-facing half of the bodyweight model (the engine + schema shipped in
+PR #80; migrations 002/003 applied to the live project this session). Owner rulings
+drove it: minimal shift, the user enters only the added/assist load, bodyweight is a
+display-only-but-inline-editable chip that writes straight through to the profile
+(the day-view value and the profile value are one and the same), and effective load
+is surfaced via the history tap-to-flip.
+
+- **Day view (`DayView.tsx`).** Bodyweight exercises get a `BodyweightChip` in the
+  header (next to the equipment label): `BW 125 LB` for only, `+ BW 125 LB` for
+  loadable, `− BW 125 LB` for assisted — tappable to an inline numeric edit that
+  calls `updateBodyweightAction` (→ `profiles.bodyweight`). The set row is unchanged
+  for loadable/assisted (the editable cell now *means* added/assist); for
+  **bodyweight_only** the weight cell is **read-only** (the load is the bodyweight,
+  seeded from the profile and logged as the set weight) and only reps are entered.
+  The live reps predictor and the P19 over/under marker now compute on **effective
+  load** (the prescription against current bodyweight; a logged set against the
+  bodyweight captured on that set).
+- **Plumbing.** `LoggedExercise` carries `load_type` + the profile `bodyweight`;
+  `getWorkoutDetail` resolves both. `updateBodyweightAction` (zod-validated) writes
+  the profile and revalidates the log + workout paths.
+- **History flip (#3, `history.ts` + `ExerciseHistoryList.tsx`).** For a bodyweight
+  exercise, `getExerciseHistory` computes a session-average **effective load** (reusing
+  `sessionAvgE1rm` over each set's effective load from its captured bodyweight), and
+  the list's tap-to-flip shows `EFF LOAD` in place of `E1RM` for those lifts. External
+  exercises are unchanged (flip still shows e1RM).
+- **Gating.** All of this keys off `exercises.load_type` (a real column) and is correct
+  whether or not v16 is active; v16 (still INACTIVE) only changes the *prescribed*
+  numbers. Build + typecheck + lint clean; suite green (557).
+- **Rule #8 deviation:** there is no mockup for bodyweight entry, so this UI is an
+  improvised minimal design per the owner's explicit direction (chip + read-only cell +
+  flip). Recorded here per the hard-rule-8 process.
+- **Remaining before legacy deletion (T-I4):** (1) a read-only **migration-audit** of
+  loadable/assisted historical entered weights (the dry run showed users logged *total*,
+  not *added* — e.g. Back Raise — so those anchors inflate under v16; migrate
+  per-exercise only where the data confirms it, never blindly); (2) **activate v16**
+  after a replay diff; (3) delete the legacy increment block + retire its params.
+
 ## 2026-06-26 (latest) — Group 2 / T-I2: bodyweight load-type model (gated engine_params v16)
 
 The last reason the legacy increment path survives is bodyweight movements: with no

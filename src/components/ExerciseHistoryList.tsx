@@ -21,10 +21,21 @@ function shortDate(iso: string): string {
  * an estimated-1RM view (the engine's stored per-set e1RM, averaged across the
  * session's working sets — N2), with a quick fade. The flip is list-wide;
  * default on load is always sets/reps.
+ *
+ * T-I2 (#3): for a bodyweight exercise the flip shows the session-average
+ * EFFECTIVE load (bodyweight ± entered) instead of e1RM — the load the engine
+ * actually trains, surfaced the same minimal way the e1RM is for other lifts.
  */
 export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [flipped, setFlipped] = useState(false);
+  // a bodyweight exercise carries a per-session effective load; the flip surfaces
+  // that in place of e1RM for these lifts.
+  const isBodyweight = entries.some((e) => e.effective_load != null);
+  const flipValue = isBodyweight
+    ? (e: HistoryEntry) => e.effective_load
+    : (e: HistoryEntry) => e.e1rm;
+  const flipLabel = isBodyweight ? "EFF LOAD" : "E1RM";
   const groups: { meso: string; rows: HistoryEntry[] }[] = [];
   for (const e of entries) {
     const last = groups.at(-1);
@@ -57,7 +68,11 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
                   role="button"
                   tabIndex={0}
                   aria-pressed={flipped}
-                  aria-label="Tap to toggle estimated 1RM"
+                  aria-label={
+                    isBodyweight
+                      ? "Tap to toggle effective load"
+                      : "Tap to toggle estimated 1RM"
+                  }
                   onClick={() => setFlipped((f) => !f)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -70,9 +85,9 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
                   <div key={flipped ? "e" : "w"} className="metric-fade numeral text-base font-bold">
                     {flipped ? (
                       <>
-                        {row.e1rm != null ? formatWeight(row.e1rm) : "—"} lb{" "}
+                        {flipValue(row) != null ? formatWeight(flipValue(row)!) : "—"} lb{" "}
                         <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/45">
-                          E1RM
+                          {flipLabel}
                         </span>
                       </>
                     ) : (
