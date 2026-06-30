@@ -150,6 +150,30 @@ exercise is bodyweight-only (no external load)? Likely interacts with the
 per-exercise increment override (I13) and `seedMeso` (null weight). Start by
 reproducing with a bodyweight exercise; scope after. **triaged, needs repro.**
 
+## PH34 — Meso-stats "planned sets" off mid-meso · **Q→B / medium · needs-input**
+Confirmed a real defect rooted in **lazy week materialization**. `startMeso`
+(`queries/generation.ts:317-374`) creates microcycle rows for every week but
+`workout_exercises` only for week 1; future weeks are generated one at a time by
+`generateDay` (`queries/progression.ts:319-374`) **only after the prior week's same
+day completes**. So `v_meso_week_sets`
+(`supabase/migrations/20260617000003_metric_truth_view_fixes.sql:119-149`, sums
+`prescribed_sets` per week×muscle_group) **has no rows for unmaterialized future
+weeks**. Two shared surfaces then diverge: `buildVolumeMatrix`/`buildBalance`
+(`queries/stats.ts:158-262`) substitute the static planner baseline
+(`meso_exercises.initial_sets`, ignores autoregulation) and the Balance "AVG SETS/WEEK
+— PLANNED" bar averages logged+planned together; the MCP `get_muscle_group_volume`
+(`mcp/tools/read.ts:586-645`) instead reports those weeks `null`/`not_yet_generated`.
+That mismatch is the "off from actual when partly complete" symptom and a
+CLAUDE.md "one definition of progress" violation. **Decision gate (owner):** what is
+"planned" for an unmaterialized week — (a) static planner baseline, (b) an
+**autoregulated projection** (needs a batch projector generalizing
+`projectNextPrescription`, `progression.ts:926`), or (c) count only materialized weeks
+and label the rest "not yet planned"? Then a **new append-only view migration** (+
+`security_invoker`/RLS test, hard rules #1/#2) read by **both** `stats.ts` and
+`read.ts`. Separate but adjacent: the view credits whole `prescribed_sets` to one
+`muscle_group_id` (no fractional 1.0/0.5 per doc 10 §2) — decide whether to fold the
+fractional rule in at the same rewrite. → **needs-input**, then medium build.
+
 ## PH33 — Scope admin MCP tools private · **F / small (optional)**
 `src/lib/mcp/tools/index.ts:53-60` registers all surfaces incl.
 `registerAdminTools` unconditionally; per-call gate `resolveAdmin`
@@ -176,5 +200,5 @@ fully satisfies the note (per-user isolation, machine-specific steps), then clos
 - **PH38** (first sets/reps wrong on switch-exercise) — bug; needs repro; likely
   related to the swap-in seeding path (see A: PR24).
 - **PH30** (LLM prescription analysis), **P21** (soreness-at-0-days rule),
-  **PH31/PH32** (e1RM storage + tap-to-flip), **PH34/PH37** (planned-sets def +
-  aggregate gains) — see workstreams B/C/H.
+  **PH31/PH32** (e1RM storage + tap-to-flip), **PH37** (aggregate gains) — see
+  workstreams B/C/H. (**PH34** now scoped above.)
