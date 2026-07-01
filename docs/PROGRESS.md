@@ -2,7 +2,49 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-06-26 (latest) — T-I4: retire the legacy increment model (WS-I complete)
+## 2026-07-01 (latest) — MCP mesocycle/macrocycle authoring (I12)
+
+Closes the connector's authoring gap: the LLM coach could read state and swap
+exercises within existing days, but couldn't build a plan **into the macro** the
+athlete runs. New/extended MCP write tools (all draft/append, engine still owns
+every prescribed number, every write audited, no `user_id` arg):
+
+- **`edit_mesocycle` gains `add_day` / `remove_day`** (pure `applyMesoEdits`
+  extended + golden-tested). `add_day` lays down a whole training day at once
+  (label/weekday + muscle-group blocks with exercises and starting sets), so an
+  empty/placeholder meso builds up to a complete multi-day plan without dozens of
+  per-exercise calls. The empty-meso guard now admits `add_day`. Returns the fresh
+  plan (new day/slot ids) so chained edits need no re-read (needs-doc #8).
+- **`place_mesocycle`** + **`create_mesocycle`/`duplicate_mesocycle` `macrocycle_id`
+  option** — author or attach a plan straight into a macro slot. Pure
+  `planMacroPlacement` (query `attachMesoToMacro`): fills the earliest `unplanned`
+  placeholder by default (absorbing it + inheriting its phase) or inserts at a
+  requested position. Rescues orphaned standalone drafts into context.
+- **`update_mesocycle`** — edit a meso's own header (name, phase, weeks, deload,
+  RIR ramp) in place (`updateMesocycleAttrs`); length/RIR/deload gated to
+  not-yet-started mesos, name/phase on any unfinished one.
+- **`duplicate_mesocycle`** — one-action clone of settings + board
+  (`duplicateMesocycle` over `copyMesoStructure`); loads reseed on activation.
+- **`manage_macrocycle_slots`** — add / remove (unplanned only) / reorder slots
+  (`manageMacroSlots`).
+- **`activate_mesocycle`** — the one real state change: `confirm="activate"` +
+  **sequential-within-a-macro gate** (`mesoActivationBlock`, wired into `startMeso`
+  so the app respects it too). A future block can't start until every earlier
+  block is completed/abandoned and none is active — so **planned mesos are seeded
+  from the latest prior-block results, never in advance** (a planned meso holds no
+  prescriptions until activation, so gating activation is the whole guarantee).
+- **`preview_mesocycle_volume`** — non-persisting weekly-sets-per-muscle vs
+  MEV/MAV/MRV projection (pure `weeklySetsByGroup` + `previewVolume`, by-block
+  counting matching `v_meso_week_sets`), over an existing meso or a proposed
+  `days` spec, so a draft self-checks before commit (needs-doc #7).
+
+Flow: the connector creates unapproved `planned` drafts the athlete opens, edits,
+and **approves by activating**. No schema change — all capability rides existing
+tables/statuses. New pure-function unit tests (edit day ops, placement, activation
+gate, volume preview); suite green (584), typecheck + lint clean. See
+[05-mcp-connector.md](05-mcp-connector.md) §Write.
+
+## 2026-06-26 — T-I4: retire the legacy increment model (WS-I complete)
 
 With v16 active, the legacy increment/regression progression is dead in production
 (rep-window + bodyweight + cold-start cover every live case), so this removes the code.

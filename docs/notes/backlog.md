@@ -40,7 +40,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | M8 | Stats unification: meso gets est-strength under performance; macro gets balance+performance via 3-way toggle | F | — | C | needs-input (meso est-strength present but owner wants its meaning clarified; macro part folds into a broader meso/macro stats redesign) |
 | M10 | Show only *unplanned* mesocycles on the macrocycle overview page | UX | — | D | needs-input |
 | I11 | Meso stats rework — include strength increases for all exercises | F | HIGH | C | triaged |
-| I12 | Address mesocycle management under a macrocycle | F | HIGH | D | triaged (needs design pass) |
+| I12 | Address mesocycle management under a macrocycle | F | HIGH | D | **advanced (PR #92):** MCP authoring shipped — build days into a meso (`edit_mesocycle` add_day/remove_day), place/attach into a macro slot, edit the meso header, duplicate, manage slots, gated `activate_mesocycle` + **sequential-activation invariant** (planned mesos seed only after prior blocks complete), non-persisting volume preview. Remaining: in-app planner UX for the same actions. See PROGRESS 2026-07-01 |
 | I14 | Raise complete-workout feedback slider resolution to match per-exercise feedback | F | HIGH | E | needs-input (scope) |
 | P16 | Meso overview buttons monotonous/ugly → overview↔stats page toggle | UX | LOW | C | needs-input |
 | P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | needs-input |

@@ -11,8 +11,10 @@ import {
   phaseLabel,
   placeholderName,
   planForMacro,
+  planMacroPlacement,
   profileToMacroProfile,
   reconcileMacroSlots,
+  type SlotMeso,
 } from "../macro";
 import type { MesocycleRow, ProfileRow } from "@/lib/types/database";
 
@@ -183,5 +185,83 @@ describe("reconcileMacroSlots", () => {
       removeIds: [],
       addCount: 0,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planMacroPlacement — where a placed meso lands & how the macro re-sequences
+// ---------------------------------------------------------------------------
+
+function slot(
+  id: string,
+  status: MesocycleRow["status"],
+  position: number | null,
+  phase: SlotMeso["phase"] = null,
+): SlotMeso {
+  return { id, status, position, phase };
+}
+
+describe("planMacroPlacement", () => {
+  it("fills the earliest unplanned slot when no position is given", () => {
+    const existing = [
+      slot("a", "completed", 1),
+      slot("b", "unplanned", 2, "intensification"),
+      slot("c", "unplanned", 3, "peak"),
+    ];
+    const plan = planMacroPlacement(existing, "new", null, null);
+    expect(plan.consumePlaceholderId).toBe("b");
+    expect(plan.targetPosition).toBe(2);
+    expect(plan.inheritedPhase).toBe("intensification");
+    expect(plan.resequence).toEqual([
+      { id: "a", position: 1 },
+      { id: "new", position: 2 },
+      { id: "c", position: 3 },
+    ]);
+  });
+
+  it("keeps the placed meso's own phase over the placeholder's", () => {
+    const existing = [slot("b", "unplanned", 1, "peak")];
+    const plan = planMacroPlacement(existing, "new", "accumulation", null);
+    expect(plan.inheritedPhase).toBe("accumulation");
+  });
+
+  it("consumes the placeholder sitting exactly at a requested position", () => {
+    const existing = [
+      slot("a", "planned", 1),
+      slot("b", "unplanned", 2, "peak"),
+    ];
+    const plan = planMacroPlacement(existing, "new", null, 2);
+    expect(plan.consumePlaceholderId).toBe("b");
+    expect(plan.targetPosition).toBe(2);
+    expect(plan.resequence).toEqual([
+      { id: "a", position: 1 },
+      { id: "new", position: 2 },
+    ]);
+  });
+
+  it("inserts and shifts when the requested slot has no placeholder (grows the macro)", () => {
+    const existing = [slot("a", "planned", 1), slot("b", "planned", 2)];
+    const plan = planMacroPlacement(existing, "new", null, 2);
+    expect(plan.consumePlaceholderId).toBeNull();
+    expect(plan.targetPosition).toBe(2);
+    expect(plan.resequence).toEqual([
+      { id: "a", position: 1 },
+      { id: "new", position: 2 },
+      { id: "b", position: 3 },
+    ]);
+  });
+
+  it("appends when there are no open slots and no position", () => {
+    const existing = [slot("a", "completed", 1), slot("b", "active", 2)];
+    const plan = planMacroPlacement(existing, "new", null, null);
+    expect(plan.consumePlaceholderId).toBeNull();
+    expect(plan.targetPosition).toBe(3);
+    expect(plan.resequence.at(-1)).toEqual({ id: "new", position: 3 });
+  });
+
+  it("places into an empty macro", () => {
+    const plan = planMacroPlacement([], "new", null, null);
+    expect(plan.targetPosition).toBe(1);
+    expect(plan.resequence).toEqual([{ id: "new", position: 1 }]);
   });
 });

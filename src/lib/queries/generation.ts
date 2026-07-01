@@ -257,6 +257,39 @@ export const getActiveEngineParams = cache(async function getActiveEngineParams(
 });
 
 /**
+ * Whether a positioned meso in a macro may be activated yet. Sequential blocks:
+ * a meso only starts once every earlier-positioned sibling is completed/abandoned
+ * and no sibling is currently active — so its prescriptions are seeded from the
+ * latest results of the prior blocks, never in advance of them (planned mesos
+ * hold no prescriptions until activation, so this is the whole guarantee). Pure.
+ */
+export function mesoActivationBlock(
+  siblings: { position: number | null; status: string }[],
+  position: number | null,
+): { blocked: boolean; reason: string } {
+  if (siblings.some((s) => s.status === "active"))
+    return {
+      blocked: true,
+      reason:
+        "another mesocycle in this macrocycle is currently active — finish it before starting this one.",
+    };
+  if (position == null) return { blocked: false, reason: "" };
+  const earlier = siblings.filter(
+    (s) =>
+      s.position != null &&
+      s.position < position &&
+      s.status !== "completed" &&
+      s.status !== "abandoned",
+  ).length;
+  if (earlier > 0)
+    return {
+      blocked: true,
+      reason: `${earlier} earlier mesocycle(s) in this macrocycle aren't complete yet — finish them first so this block's prescriptions use their latest results.`,
+    };
+  return { blocked: false, reason: "" };
+}
+
+/**
  * Activate a planned meso: build the full microcycle ramp and the week-1
  * workouts from the planner board (07 Phase 2 — `seedMeso`/`rirRamp`).
  */
@@ -276,6 +309,22 @@ export async function startMeso(
   );
   if (!hasExercise)
     return { error: "Fill at least one exercise slot before starting." };
+
+  // sequential activation within a macro: don't start a future block while an
+  // earlier one is unfinished (or another is live). A planned meso has no
+  // prescriptions yet, so gating activation is what keeps them from being
+  // seeded off stale, pre-completion state.
+  if (meso.macrocycle_id) {
+    const { data: siblings, error: sibErr } = await supabase
+      .from("mesocycles")
+      .select("position, status")
+      .eq("macrocycle_id", meso.macrocycle_id)
+      .eq("user_id", userId)
+      .neq("id", meso.id);
+    if (sibErr) throw sibErr;
+    const gate = mesoActivationBlock(siblings ?? [], meso.position);
+    if (gate.blocked) return { error: gate.reason };
+  }
 
   const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
   const goal = await resolveMesoGoal(supabase, meso.macrocycle_id);
