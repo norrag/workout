@@ -4,14 +4,14 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-01 — Session 27: R2 — clean-DB migrations fixed; guardrail chain revived (PR #<n>)
+## 2026-07-01 — Session 27: R2 — clean-DB migrations fixed; guardrail chain revived (PR #96)
 
 Reconciliation sweep: **PR #95 merged** → archived **R1** and **R8** to
 `archive.md` ("Swept 2026-07-01 — review top two merged"). Picked the next item
 in the review's attack order: **R2** (the guardrail revival everything else
 relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
 
-- **R2 — done (PR #<n>).** The chain now reproduces a working DB from zero;
+- **R2 — done (PR #96).** The chain now reproduces a working DB from zero;
   verified on a scratch Postgres 16 with a simulated Supabase bootstrap (no
   Docker in the sandbox), one transaction per file + `seed.sql`. Three breaks,
   three fixes (detail in PROGRESS 2026-07-01):
