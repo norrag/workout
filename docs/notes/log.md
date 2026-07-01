@@ -4,6 +4,42 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-01 — Session 28: R17 + R16 — field usability, shipped together (PR #98)
+
+Reconciliation sweep: no-op (only the stale unrelated #48 open; no `done (PR #n)`
+rows live — session 27's sweep PR #97 already merged). Picked the next items in
+the review's attack order: **R17 + R16** (the two destructive-failure modes; the
+review says ship together). Branch `claude/notes-review-prioritize-1ore6l`.
+
+- **R17 — done (PR #98).** No sheet write can reach the `(app)` error boundary
+  anymore (that unmount was what destroyed typed input): the shared day-view
+  `commit` (all ~14 menu ops) catches + toasts, on the argument that a failed
+  write with no revalidation leaves the view already-rolled-back; NoteSheet /
+  FeedbackSheet save in their own transition and close only on success (typed
+  note + sliders survive failure, SAVING… label); CompleteSheet, END WORKOUT /
+  END MESOCYCLE, and AddExerciseSheet ADD keep their sheet open on failure;
+  logged-set amends go through `runLog` (spinner/shake/retry-on-next-blur).
+  Fetch-on-open sheets (History / Replace / AddExercise) get the
+  PrescriptionDetailSheet catch + stale-guard + a shared `FetchRetry` RETRY
+  state instead of a permanent "Loading…". The meso page finally reads the
+  `?error=template` param `saveMesoAsTemplateAction` has always redirected to
+  (was silent), and that submit got the Phase-A `SubmitButton` treatment —
+  closing one R19 bullet (row annotated; R19 stays triaged with 2 bullets).
+  `(app)/error.tsx` no longer claims "Nothing was lost".
+- **R16 — done (PR #98).** `doSave` catches: a failed `saveMesoPlanAction`
+  keeps the staged `workDays` and the confirm sheet open (one-tap retry)
+  instead of remount-and-discard. New `useNavigationGuard`
+  (`components/ui/useNavigationGuard.ts`): while `editing && dirty`, in-app
+  anchor clicks are intercepted capture-phase (before Next's Link), browser
+  back is absorbed via a history sentinel, tab close gets native beforeunload;
+  all land in the discard-confirm sheet, which now carries the intercepted
+  destination. Pure `shouldGuardNavigation` rule unit-tested (5 tests).
+  R3 (the server half — non-atomic `saveMesoPlan`) stays open, next up.
+- Green: **614 tests (+5)**, typecheck, lint, production build (`/log`
+  first-load unchanged at 125 kB). No engine/schema/query change.
+- Next per the attack order: **R3 + R4** (write integrity), then R20
+  (observability). R6/R14 owner decisions still queued.
+
 ## 2026-07-01 — Session 27: R2 — clean-DB migrations fixed; guardrail chain revived (PR #96)
 
 Reconciliation sweep: **PR #95 merged** → archived **R1** and **R8** to
