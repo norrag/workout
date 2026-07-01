@@ -51,6 +51,39 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | PH37 | Aggregate strength gains per muscle group over macro/meso/all-time | F | — | C | inbox |
 | PH39 | How fast does e1RM recency decay? (Pulldown e1RM 110.1 but did 115×11 on May 22) | Q | — | A | answered → T-A1 |
 | N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
+| R1 | Share redemption is a cross-user copy primitive: `shares_grantee_accept` lets a grantee rewrite `object_id`; service-role copy never verifies owner | B | HIGH | K | triaged |
+| R2 | Guardrails dead: migrations don't apply to a clean DB + RLS test suite stale (dropped `units` col, params v5 assertion) → CI red since ~06-20, checks not required, PRs merge over it | B | HIGH | K | triaged |
+| R3 | Non-atomic plan/param writes: `saveMesoPlan` delete-then-insert can wipe an (active) plan — reachable from MCP `edit_mesocycle`/`create_mesocycle` input-validation gaps (PR #92 surface); `startMeso` half-apply = permanently unstartable meso; `generateDay` poisoned empty day; `activateEngineParams` can leave ZERO active params app-wide; missing uniques let races duplicate days/sets | B | HIGH | K | triaged |
+| R4 | Plan regeneration cascade-deletes logged history (`regenerateOpenWorkouts` skips the logged-set check; `logSet`'s status flip silently swallowed → hard-rule-#5 breach path) | B | HIGH | K | triaged |
+| R5 | Completion lock bypassable/asymmetric (completed→in_progress flip; `workout_exercises`/`workout_feedback` mutable post-completion; sets insertable into completed workouts) + child INSERT policies skip parent-ownership (feedback-slot squat) | B | MED | K | triaged |
+| R6 | Workout dates & week rollups computed in UTC — evening sessions land on tomorrow's date in history/PRs/weekly rollups; 6 divergent `shortDate` copies | B | MED | K | needs-input (canonical local-day rule: profile tz vs client-supplied date) |
+| R7 | Service worker caches authed pages/RSC ~24h, never purged on sign-out (stale prescriptions offline + shared-device privacy; contradicts online-only) | B | MED | K | triaged |
+| R8 | Engine: joint-pain 3/3 still ADDS a set — doc 10's one hard safety gate unenforced on set additions; no −set response to pain 3 exists | B | HIGH | G | triaged |
+| R9 | `analyze_exercise_progress`: any phase with ≤3 sessions reads "improving", even a strict decline (every phase start asserts improvement) | B | MED | G | triaged |
+| R10 | Replay re-runs seed decisions without `bodyweight` → every bodyweight-lift seed diffs spuriously, corrupting the params tuning loop | B | MED | G | triaged |
+| R11 | Reconcile's unbounded `engine_decisions` fetch truncates at the PostgREST row cap → open rows misclassified decision-less and re-seeded off the prior-meso peak | B | MED | G | triaged |
+| R12 | Custom bodyweight exercises stored `load_type='external'` forever (wrong e1RM/effective-load math; app + MCP) + MCP create/search equipment as bare string + dup muscle-group crash leaves orphan exercise | B | MED | G | triaged |
+| R13 | SetRow re-sync effect clobbers in-progress typing after background weight writes / auto-match — wrong reps can get logged | B | MED | G | triaged |
+| R14 | Volume counting is primary-only (1.0/0) — doc 10's locked fractional 1.0/0.5 + RIR≤4 hard-set rule unimplemented; false below-MEV calls, permissive MRV/ceiling. Implement fractionally or amend doc 10. Informs I11/PH37/M8 | D | MED | C | needs-input |
+| R15 | Second concurrently-active meso possible — sequential-activation invariant only covers same-macro siblings; `get_current_state` silently picks newest; tool description overstates the guarantee | B | MED | D | triaged |
+| R16 | PlannerBoard staged edits: one failed save (throws to boundary, remounts, discards session) or one stray navigation (`dirty` only guards CANCEL) = total loss. Client half of R3's flow; ship with WS-J Phase-A #1 | B | MED | D | triaged |
+| R17 | Sheet writes fail destructively: Note/Feedback/Complete close optimistically then error boundary wipes typed input while error page claims "Nothing was lost"; fetch-on-open sheets stuck on "Loading…"; save-as-template fails silently | B | HIGH | E | triaged |
+| R18 | Modal a11y + touch: no focus management/Escape/trap on any sheet/menu; LOG checkbox 21px & ⋮/▲▼ below-minimum targets; `maximumScale:1` kills pinch-zoom. Scopes doc-07 Phase-7 a11y audit | UX | MED | E | triaged |
+| R19 | Small defect sweep: no `not-found.tsx` (Workout tab can 404 via stale `lastWorkoutId`); CompleteSheet totals contradict header progress; meso-page SAVE AS TEMPLATE missed the SubmitButton sweep | UX | LOW | E | triaged |
+| R20 | Zero production error observability — reconcile/generation/MCP failures swallowed (silently stale prescriptions); no `global-error.tsx`/`(auth)` boundary; SENTRY_DSN pending but unread | F | HIGH | L | triaged |
+| R21 | Coverage gaps: Playwright e2e suite absent (dead `test:e2e` script; docs claim it exists); no write-pipeline integration tests (`generation`/`logging` untested I/O); golden meso only covers no-anchor v10 shape, not live v16 | F | MED | L | triaged (integration tests blocked on R2) |
+| R22 | Env vars unvalidated at boot — missing/typo'd var passes build (CI placeholders), fails as request-time 500s inside @supabase/ssr | F | LOW | L | triaged |
+| R23 | Repo hygiene: 2 unused-but-live server actions (attack surface), dead exports/components (NumberStepper stale-closure), dead `v_muscle_group_volume` view, dep nits (analyzer major, tsx, dependabot) | F | LOW | L | triaged |
+| R24 | Engine guardrail batch: no cross-field param invariants (inverted rep window activatable); `e1rmFactor` non-monotonic for cutoff>10; no-anchor "hold" rounds the held load up; stale retire-flag comment; Option-A reprices down on ramp-hold weeks (design nit — flag to owner) | B | LOW | G | triaged |
+| R25 | MCP polish: audit-write failure inverts a committed write's result (agent retries → duplicate drafts); dual error contracts + unwrapped resources; `MCP_JWT_AUDIENCE` step missing from runbook; tool-surface consolidation (~4–5 tools) | F | LOW | K | triaged |
+
+> **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
+> appendix). Evidence, file:line scoping, and a suggested attack order live in
+> [`docs/reviews/2026-07-01-repo-review.md`](../reviews/2026-07-01-repo-review.md)
+> — that doc is the scoping record for these IDs (no separate `scoping.md`
+> entries). Workstreams **K** (integrity & security hardening) and **L**
+> (delivery guardrails & observability) are new; roster in
+> [`README.md`](./README.md#workstreams).
 
 ## Open follow-up tasks
 
@@ -151,3 +184,23 @@ add the next batch below the last, never edit a prior one.
 #### Engine / prescription corrections
 - **N2** — "E1rm in history should average the stat over all session sets — appears to take max"
 - **N3** — "Decision: an active workout should definitely not play into live prescriptions. Right now, if the first set of a current exercise ends up being your recency-weighted best set, then all subsequent sets immediately anchor on it. Since, at that moment, only one set is logged, then that set is the average of all sets in your best session, therefore all remaining sets get updated to the same weight. Prescriptions and predictions should only look at previous workouts, not the current one. The current workout becomes canonical once it's marked as complete, with feedback. It's fine if the current sets post to history live as they're done, but prescriptions should be limited to previous workouts"
+
+### Batch 3 — full-surface repo review (2026-07-01, Claude-initiated at the owner's request)
+
+Unlike prior batches, these items did not arrive as owner field notes — the owner
+asked for a proactive review. Verbatim request:
+
+> "Please analyze and review this repo for issues and opportunities for
+> significant and impactful improvements to performance, useability, UI/UX,
+> streamlining, fixes or any other element you may identify, regardless of how
+> ambitious the tasks may be. Review the open notes section for existing efforts
+> as well. Identify areas for significant improvements, and incorporate these
+> findings into the notes section appropriately."
+
+The findings themselves (items **R1–R25**) are Claude's, produced by five
+parallel domain reviews (engine/analysis, data layer/DB/RLS, UI/app routes,
+MCP/API/PWA, cross-cutting tooling) with the top claims re-verified against the
+code. Full evidence + scoping:
+[`docs/reviews/2026-07-01-repo-review.md`](../reviews/2026-07-01-repo-review.md).
+Already-tracked ground (WS-J perf, T-A1, Phase-A gaps, doc-07 open phases) was
+excluded rather than re-filed.
