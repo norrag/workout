@@ -51,6 +51,10 @@ relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
     first time ever — all 29 RLS tests pass against a from-scratch stack;
     `checks` green too. The hard-rule-#1 guardrail is live. Owner step:
     make both checks required after merge (runbook).
+  - **PR #96 MERGED** same session → end-of-session archival sweep ran:
+    R2 row swept to `archive.md` ("Swept 2026-07-01 (later) — R2 merged").
+    T-R2 stays open in the follow-up table. Sweep shipped as its own small
+    docs PR (a merged PR can't sweep its own row).
   - End-state checks: 26/26 tables RLS-on; stock data identical to hosted
     (330 exercises / 352 links / 8 templates); single active params v10;
     `ensure_rls` proven to auto-enable RLS on a new table.
