@@ -11,6 +11,19 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-01 (later) — R2 merged (PR #96)
+
+Session 27 shipped the guardrail revival; PR #96 is merged and its CI run was
+the proof (first green `rls-tests` in the repo's history). Raw text stays in
+the backlog appendix (Batch 3); full fix-by-fix record in PROGRESS 2026-07-01
+and the Session 27 log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R2 | Guardrails dead: migrations don't apply to a clean DB + stale RLS suite → CI red since ~06-20, checks not required | B | K | **done — merged (PR #96; stale assertions via PR #95).** Six masked breaks fixed: `is_admin()` ordering (recorded rule-#2 deviation), muscle-group seed-order (`20260611000002`), hosted-only `rls_auto_enable()`+`ensure_rls` captured (`20260619000002`), duplicate version `20260616000001` (adherence_rule → `000004`), missing table grants (`20260701000003`, matches hosted posture; RLS stays the gate), stale escalation assertion (42501). Reconciliation migrations applied to hosted as verified no-ops. **CI green: 29/29 RLS tests on a from-scratch stack.** Spawned **T-R2** (open). Owner step: make `checks`+`rls-tests` required on `main` (runbook). |
+
+---
+
 ## Swept 2026-07-01 — review top two merged (PR #95)
 
 Session 26 shipped the repo review's suggested first slice (R1 + R8); PR #95 is
