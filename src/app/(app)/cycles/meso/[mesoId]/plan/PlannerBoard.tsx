@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { useToast } from "@/components/ui/Toast";
+import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { HistorySheet } from "@/components/HistorySheet";
 import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
@@ -231,9 +233,17 @@ export function PlannerBoard({
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [discarding, setDiscarding] = useState(false);
+  // discard-confirm destination: set = the sheet is open, and DISCARD leaves
+  // to this href (CANCEL button, an intercepted link, or back → detail page)
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
   const commit: Commit = (fn) => startTransition(fn);
+
+  const detailHref = `/cycles/meso/${meso.id}`;
+  // R16: while edits are staged, any navigation (BottomNav tap, header link,
+  // browser back, tab close) must confirm before the working copy is dropped
+  useNavigationGuard(editing && dirty, (href) => setLeaveTo(href ?? detailHref));
 
   // ----- mutators -----------------------------------------------------------
   const atDayLimit = days.length >= MAX_DAYS;
@@ -576,8 +586,15 @@ export function PlannerBoard({
       };
     });
     startTransition(async () => {
-      await saveMesoPlanAction({ meso_id: meso.id, days: payload });
-      setSaving(false);
+      // a failed save must NOT throw to the error boundary — that remounts the
+      // board and discards the entire staged session (R16). Keep `workDays`
+      // and the confirm sheet so SAVE CHANGES is a one-tap retry.
+      try {
+        await saveMesoPlanAction({ meso_id: meso.id, days: payload });
+        setSaving(false);
+      } catch {
+        toast("Couldn't save the plan — your changes are still here, try again");
+      }
     });
   };
 
@@ -862,7 +879,9 @@ export function PlannerBoard({
           <div className="mx-auto flex max-w-md items-center gap-2.5">
             <button
               type="button"
-              onClick={() => (dirty ? setDiscarding(true) : router.push(`/cycles/meso/${meso.id}`))}
+              onClick={() =>
+                dirty ? setLeaveTo(detailHref) : router.push(detailHref)
+              }
               className="flex-[0_0_auto] border-[1.5px] border-ink px-5 py-3.5 text-[12px] font-bold tracking-[0.1em]"
             >
               CANCEL
@@ -977,29 +996,29 @@ export function PlannerBoard({
         </BottomSheet>
       )}
 
-      {/* discard confirm */}
-      {discarding && (
+      {/* discard confirm — CANCEL button or any intercepted navigation (R16) */}
+      {leaveTo != null && (
         <BottomSheet
           open
-          onClose={() => setDiscarding(false)}
+          onClose={() => setLeaveTo(null)}
           title="Discard changes?"
           subtitle="UNSAVED EDITS WILL BE LOST"
         >
           <p className="text-[12.5px] leading-[1.5] text-ink/75">
             Your changes to this plan haven&apos;t been saved. Discard them and
-            go back?
+            leave?
           </p>
           <div className="mt-6 flex items-center justify-end gap-2.5">
             <button
               type="button"
-              onClick={() => setDiscarding(false)}
+              onClick={() => setLeaveTo(null)}
               className="px-4 py-3 text-[13px] font-semibold text-ink/60"
             >
               Keep editing
             </button>
             <button
               type="button"
-              onClick={() => router.push(`/cycles/meso/${meso.id}`)}
+              onClick={() => router.push(leaveTo)}
               className="border-[1.5px] border-accent px-8 py-3 text-[13px] font-bold tracking-[0.08em] text-accent"
             >
               DISCARD

@@ -28,7 +28,8 @@ export default function AppError({
           SOMETHING WENT WRONG
         </div>
         <p className="mt-3 text-sm leading-relaxed text-ink">
-          That action didn&apos;t go through. Nothing was lost — try again.
+          That action didn&apos;t go through — anything you&apos;d just typed
+          may need re-entering. Try again.
         </p>
         <button
           type="button"

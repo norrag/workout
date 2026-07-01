@@ -2,7 +2,60 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-01 (latest) — R2: guardrails revived — clean-DB migrations fixed, hosted drift reconciled
+## 2026-07-01 (latest) — R17 + R16: sheet writes fail soft; planner staged edits survive failure & navigation
+
+The two field-usability failure modes from the 2026-07-01 review
+([R17/R16](reviews/2026-07-01-repo-review.md#3--client-resilience--ux)): a
+rejected server action inside any sheet's save threw out of the transition to
+the `(app)` error boundary, unmounting the page and destroying the typed input
+it then claimed was safe ("Nothing was lost"); and one failed save or stray
+navigation discarded a whole PlannerBoard staged editing session. No engine,
+schema, or query change — client resilience only.
+
+- **Day-view writes can no longer reach the error boundary (R17).**
+  - The shared `commit` helper (all ~14 fire-and-forget menu ops: move/add
+    set/skip/delete/reset/unskip/remove/replace…) now catches and toasts
+    ("That change didn't save — check your connection"). On failure the server
+    never changed and no revalidation ran, so the untouched view *is* the
+    rollback.
+  - **NoteSheet / FeedbackSheet close only after their write lands** (own
+    transition, SAVING… label): a failure keeps the sheet open with the typed
+    note / slider values intact and toasts. `commit` prop dropped.
+  - **CompleteSheet** `finish()` catches: notes + the three session sliders
+    survive a failed complete; navigation happens only on success. Same for
+    **END WORKOUT / END MESOCYCLE** (confirm sheet stays open on failure) and
+    AddExerciseSheet's ADD (selection kept).
+  - **Logged-set amends route through `runLog`** (box spinner + shake + toast,
+    like logging writes); `edited` stays set on failure so the next blur
+    retries.
+  - **Fetch-on-open sheets can no longer wedge on "Loading…"**: HistorySheet,
+    ReplaceSheet, and AddExerciseSheet get the PrescriptionDetailSheet
+    catch + stale-response guard and a shared `FetchRetry` state (new
+    `components/ui/FetchRetry.tsx`) with a RETRY button.
+  - **SAVE AS TEMPLATE failure is no longer silent**: the meso detail page now
+    reads the `?error=template` param the action has always redirected to and
+    renders the failure inline; the submit also got the Phase-A `SubmitButton`
+    pending treatment (closes that R19 bullet).
+  - **`(app)/error.tsx` copy fixed** — no longer claims "Nothing was lost"
+    (false whenever local state unmounted); now says re-entry may be needed.
+- **PlannerBoard staged edits survive failure and navigation (R16).**
+  - `doSave` catches: a failed `saveMesoPlanAction` keeps `workDays` (the whole
+    staged session) and the confirm sheet open — SAVE CHANGES is a one-tap
+    retry — instead of throwing to the boundary, remounting, and
+    reinitializing from props.
+  - **New `useNavigationGuard` hook** (`components/ui/useNavigationGuard.ts`):
+    while `editing && dirty`, in-app anchor clicks (BottomNav, header links)
+    are intercepted in the capture phase, browser back is absorbed via a
+    history sentinel, and tab close gets the native beforeunload prompt. All
+    routes land in the existing discard-confirm sheet, which now carries the
+    intercepted destination ("Discard them and leave?") — DISCARD proceeds,
+    Keep editing stays. The pure interception rule (`shouldGuardNavigation`:
+    in-app hrefs only; hash/download/new-tab/scheme-qualified pass through) is
+    unit-tested.
+- Green: 614 tests (+5), typecheck, lint, production build (`/log` first-load
+  unchanged at 125 kB).
+
+## 2026-07-01 — R2: guardrails revived — clean-DB migrations fixed, hosted drift reconciled
 
 Hard rule #1's enforcement gate (the CI `rls-tests` job) had never run: the
 migration chain could not apply to a clean database, so `supabase start` died

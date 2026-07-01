@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { FetchRetry } from "@/components/ui/FetchRetry";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import type { HistoryEntry } from "@/lib/queries/history";
 import { getExerciseHistoryAction } from "@/app/(app)/log/actions";
@@ -21,14 +22,27 @@ export function HistorySheet({
   onClose: () => void;
 }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!target) {
-      setEntries(null);
-      return;
-    }
-    getExerciseHistoryAction(target.exercise_id).then(setEntries);
-  }, [target]);
+    setEntries(null);
+    setFailed(false);
+    if (!target) return;
+    // catch + stale-guard so a rejected fetch shows RETRY instead of a
+    // permanent "Loading…" (R17; mirrors PrescriptionDetailSheet)
+    let active = true;
+    getExerciseHistoryAction(target.exercise_id)
+      .then((e) => {
+        if (active) setEntries(e);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [target, attempt]);
 
   if (!target) return null;
 
@@ -39,7 +53,9 @@ export function HistorySheet({
       title="History"
       subtitle={`${target.exercise_name.toUpperCase()} — ${target.equipment_type.toUpperCase()}`}
     >
-      {entries === null ? (
+      {failed ? (
+        <FetchRetry onRetry={() => setAttempt((a) => a + 1)} />
+      ) : entries === null ? (
         <p className="py-4 text-sm text-ink/45">Loading…</p>
       ) : (
         <ExerciseHistoryList entries={entries} />
