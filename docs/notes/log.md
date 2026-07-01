@@ -47,6 +47,10 @@ relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
      WITH CHECK rejection errors with 42501 (the hosted-verified behavior
      from the 06-22 recursion-fix probe). Assertion fixed + strengthened
      (role verified unchanged after the attempt).
+  - **CI GREEN (run 4, commit 4e05683):** `rls-tests` succeeded for the
+    first time ever — all 29 RLS tests pass against a from-scratch stack;
+    `checks` green too. The hard-rule-#1 guardrail is live. Owner step:
+    make both checks required after merge (runbook).
   - End-state checks: 26/26 tables RLS-on; stock data identical to hosted
     (330 exercises / 352 links / 8 templates); single active params v10;
     `ensure_rls` proven to auto-enable RLS on a new table.

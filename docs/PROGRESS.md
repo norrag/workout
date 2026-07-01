@@ -70,6 +70,15 @@ perf_rls_initplan_and_fk_indexes` initplan-wrapped ~54 policies
 (`auth.uid()` → `(select auth.uid())`) and added 23 FK indexes that the repo
 chain doesn't reproduce — performance-only, no semantic difference.
 
+A sixth, non-migration break surfaced once the suite finally executed
+(28/29): the role-escalation test asserted a silent 0-row update, but the
+WITH CHECK rejection errors with 42501 — the hosted-verified behavior.
+Assertion fixed and strengthened (role re-read after the attempt).
+
+**Outcome: CI fully green on PR #96** — the first successful `rls-tests` run
+in the repo's history (29/29 against a from-scratch stack), `checks` green
+alongside. Hard rule #1's enforcement gate is live.
+
 **Remaining / external (runbook updated):** make the two CI jobs (`checks`,
 `rls-tests`) **required status checks** on `main` — GitHub repo settings, no
 MCP surface for it.
