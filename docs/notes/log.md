@@ -8,7 +8,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 Built the connector's plan-into-a-macro authoring surface (from a needs doc the owner
 relayed from the LLM coach). Advances **I12** (was `triaged (needs design pass)`) — the
-MCP side now ships; row set to `advanced (PR #_, branch claude/mcp-mesocycle-creation-i4nica)`
+MCP side now ships; row set to `advanced (PR #92)`
 with the remaining in-app planner UX called out. New/extended tools: `edit_mesocycle`
 `add_day`/`remove_day` (build a whole day, or a plan from an empty meso, in one call);
 `place_mesocycle` + `create_mesocycle`/`duplicate_mesocycle` `macrocycle_id` (author/attach
