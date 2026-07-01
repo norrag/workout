@@ -22,8 +22,9 @@ const DEVICES = [
   { w: 428, h: 926, dpr: 3 },
   { w: 393, h: 852, dpr: 3 },
   { w: 430, h: 932, dpr: 3 },
-  { w: 402, h: 874, dpr: 3 },
-  { w: 440, h: 956, dpr: 3 },
+  { w: 402, h: 874, dpr: 3 }, // 16 Pro / 17 / 17 Pro
+  { w: 440, h: 956, dpr: 3 }, // 16 Pro Max / 17 Pro Max
+  { w: 420, h: 912, dpr: 3 }, // iPhone Air
 ];
 const THEMES = { light: "#f4f0e6", dark: "#14110c" };
 
