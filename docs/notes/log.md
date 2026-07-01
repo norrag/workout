@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-01 — Session 25: full-surface repo review → items R1–R25 (Batch 3)
+## 2026-07-01 — Session 25: full-surface repo review → items R1–R25 (Batch 3) (PR #94)
 
 Reconciliation sweep: no-op (same state as Session 24 — I12 `advanced (PR #92)`
 intentionally live, N1 in-progress). Owner asked for a proactive whole-repo review
