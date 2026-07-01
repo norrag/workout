@@ -60,21 +60,27 @@ domain, or an Auth-config change** is a human step.
 | Run the local Supabase stack | `supabase start`; needed for `npm run test:rls` and Playwright e2e (the sandbox has no local stack). |
 | Apply OAuth config locally | Add `[auth.oauth_server]` to `supabase/config.toml` (see connector setup doc). |
 
-### Migration reconciliation — clean-DB apply is broken (security audit 2026-06-20)
+### ~~Migration reconciliation — clean-DB apply is broken~~ (RESOLVED 2026-07-01, R2)
 
-The `rls-tests` CI job (and any fresh `supabase db reset`) **fails to apply the
-migrations**, which means the RLS regression guardrail for hard rule #1 does not
-run. Two causes, both needing a human because the safe fix edits **applied**
-migrations (hard rule #2) and/or depends on the **hosted** function body that a
-Claude session can't read. See [../14-security-audit.md](../14-security-audit.md)
-findings 3 & 4.
+No longer a manual step — the premise ("a Claude session can't read the hosted
+function body") stopped holding once the Supabase MCP could run read-only SQL.
+Fixed in-repo: `is_admin()` reordered after `public.profiles` in the initial
+migration (end-state identical; deviation recorded in `docs/PROGRESS.md`), the
+hosted `rls_auto_enable()` + `ensure_rls` event trigger captured verbatim as
+`20260619000002_rls_auto_enable.sql`, and the seed-order dependency fixed by
+`20260611000002_seed_muscle_groups.sql`. The full chain + seed is verified to
+apply to a clean database. Remaining human step: **make the CI checks
+required** (next section).
 
-| Problem | Where | Fix (human) |
+### Make the CI jobs required status checks (GitHub repo settings)
+
+CI is only a guardrail if red blocks the merge — PRs #92/#93 merged over a
+permanently-red `rls-tests`. GitHub MCP is scoped to repo *contents*, not
+settings, so a human must toggle branch protection:
+
+| Operation | Where | Notes |
 |---|---|---|
-| `is_admin()` defined before `public.profiles` → `relation "public.profiles" does not exist` aborts the first migration | `supabase/migrations/20260611000001_initial_schema.sql` | Move the `is_admin()` `create` to **after** `create table public.profiles` (or wrap so its body isn't validated early). End-state is identical; the hosted DB already has it, so hosted is unaffected. |
-| `rls_auto_enable()` is `revoke`d but never `CREATE`d in any migration (lives only in the hosted DB — out-of-band, rule-#2 violation) | `supabase/migrations/20260620000001_*`, `20260620000002_*` | Capture the hosted function in a committed migration **before** `0620` with `SECURITY DEFINER … SET search_path = ''`, **or** drop the dangling `revoke` lines if the function is abandoned. Reconcile hosted ↔ version control. |
-
-Until reconciled, `npm run test:rls` cannot pass in CI or locally.
+| Require `checks` + `rls-tests` to pass before merging into `main` | Repo → Settings → Branches → add branch protection rule for `main` (or Settings → Rules → Rulesets) → "Require status checks to pass" → select **`checks`** and **`rls-tests`** | Do this only after the R2 PR is merged and both jobs are green on `main`, otherwise every PR is instantly blocked. |
 
 ### Apply `20260620000006_exercise_param_overrides` to hosted (doc 14 phase 3)
 

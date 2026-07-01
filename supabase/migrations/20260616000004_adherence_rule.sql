@@ -1,4 +1,8 @@
--- 20260616000001 — adherence rule fix
+-- 20260616000004 — adherence rule fix
+-- (renamed from 20260616000001 on 2026-07-01 [R2]: the version collided with
+-- exercise_feedback_soreness — the CLI tracking table PKs on version, so a
+-- clean-DB apply aborted after applying both files. 000004 also matches the
+-- true hosted apply order: soreness → auto-match → per-set → adherence.)
 --
 -- Adherence = attended / due over WORKING (non-deload) weeks, counting only
 -- *decided* days: `completed` (attended) and `skipped` (missed). Days that are

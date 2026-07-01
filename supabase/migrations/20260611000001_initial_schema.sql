@@ -15,21 +15,6 @@ begin
 end;
 $$;
 
--- security definer so policies can check the caller's role without
--- recursing into profiles' own RLS
-create or replace function public.is_admin()
-returns boolean
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'admin'
-  );
-$$;
-
 -- ---------------------------------------------------------------------------
 -- profiles (1:1 with auth.users)
 -- ---------------------------------------------------------------------------
@@ -59,6 +44,25 @@ create policy "profiles_update_own" on public.profiles
 
 create trigger profiles_updated_at before update on public.profiles
   for each row execute function public.set_updated_at();
+
+-- security definer so policies can check the caller's role without
+-- recursing into profiles' own RLS
+-- (defined after public.profiles: LANGUAGE sql bodies are validated at create
+-- time, so a clean-DB apply aborts if the table doesn't exist yet. Reordered
+-- 2026-07-01 [R2]; end-state identical, hosted DB unaffected — deviation from
+-- append-only recorded in docs/PROGRESS.md.)
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
 
 -- auto-create a profile row on signup
 create or replace function public.handle_new_user()

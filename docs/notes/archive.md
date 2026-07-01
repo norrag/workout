@@ -11,6 +11,20 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-01 — review top two merged (PR #95)
+
+Session 26 shipped the repo review's suggested first slice (R1 + R8); PR #95 is
+merged and both changes are verified live. Raw text stays in the backlog
+appendix (Batch 3); full evidence in
+[`docs/reviews/2026-07-01-repo-review.md`](../reviews/2026-07-01-repo-review.md).
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R1 | Share redemption is a cross-user copy primitive (`shares_grantee_accept` lets a grantee rewrite `object_id`; service-role copy never verifies owner) | B | K | **done — merged (PR #95).** Migration `20260701000002` drops `shares_grantee_accept` (**applied live + probe-verified**: grantee UPDATE touches 0 rows; grantee SELECT + owner control intact). Defense in depth: `acceptShareCode` asserts every copied object is owned by `share.owner_id` (stock exercises excepted), also closing the owner-side re-point surface. New `shares` RLS describe block + 5 mocked-service ownership tests. |
+| R8 | Engine: joint-pain 3/3 still ADDS a set — doc 10's one hard safety gate unenforced on set additions | B | G | **done — merged (PR #95).** New gated `pain_cut_gate` param: pain ≥ 2 vetoes set additions, pain 3 forces −1 set + a substitution note, regardless of workload/pump. engine_params **v17 applied + ACTIVATED** after a clean replay (zero set-count diffs; only the pre-existing R10 bodyweight-seed artifact). Table-driven `pain-gate.test.ts` + bounds property invariant + v17 hash guard. |
+
+---
+
 ## Swept 2026-06-30 (later) — bug sweep (PR #84)
 
 Session 15 closed the open Workstream-G/adjacent bugs in one PR, now merged. Raw

@@ -4,6 +4,66 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-01 — Session 27: R2 — clean-DB migrations fixed; guardrail chain revived (PR #96)
+
+Reconciliation sweep: **PR #95 merged** → archived **R1** and **R8** to
+`archive.md` ("Swept 2026-07-01 — review top two merged"). Picked the next item
+in the review's attack order: **R2** (the guardrail revival everything else
+relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
+
+- **R2 — done (PR #96).** The chain now reproduces a working DB from zero;
+  verified on a scratch Postgres 16 with a simulated Supabase bootstrap (no
+  Docker in the sandbox), one transaction per file + `seed.sql`. Three breaks,
+  three fixes (detail in PROGRESS 2026-07-01):
+  1. `is_admin()` reordered after `profiles` in the initial migration (LANGUAGE
+     sql body validated at create time). Recorded rule-#2 deviation — reorder
+     only, end-state identical to hosted (normalized def match verified).
+  2. **New `20260611000002_seed_muscle_groups.sql`** — the 12 muscle-group rows
+     lived only in seed.sql (runs *after* migrations), but 0615-6 joins them to
+     link the stock library (silently 0 links on clean DB) and 0617-2 hard-fails
+     seeding templates. This second break was masked by the first — found only
+     because the scratch run got past `is_admin`.
+  3. **New `20260619000002_rls_auto_enable.sql`** — captured the hosted-only
+     function + `ensure_rls` event trigger verbatim (read via MCP
+     `pg_get_functiondef`, which voids the runbook's "human-only" rationale);
+     guarded/idempotent, grants left to 0620 (end-state ACL = hosted). Both new
+     migrations **applied to hosted via MCP as recorded no-ops**.
+  4. **Version collision** (caught by the PR's own first CI run, not the
+     scratch harness): two files shared prefix `20260616000001` and the CLI
+     tracking table PKs on version → renamed `adherence_rule` to
+     `20260616000004` (= true hosted order). Harness now simulates the
+     tracking table; full chain re-verified post-reorder.
+  5. **Missing table grants** (caught by the suite's first-ever execution —
+     CI run 2): no migration GRANTs on tables; hosted rode on postgres
+     default privileges, the CI local stack has none → "permission denied
+     for table macrocycles" pre-RLS. New end-of-chain
+     `20260701000003_table_grants.sql` reproduces hosted's posture (ALL on
+     tables/sequences to the three roles + default privileges; functions
+     untouched so the 0620 revokes stand; RLS default-deny stays the gate).
+     Verified on scratch with zero simulated defaults; hosted no-op
+     (relacl identical before/after).
+  6. **Stale escalation assertion** (CI run 3 — 28/29 tests passed): the
+     role-escalation test expected a silent 0-row update (`[]`), but the
+     WITH CHECK rejection errors with 42501 (the hosted-verified behavior
+     from the 06-22 recursion-fix probe). Assertion fixed + strengthened
+     (role verified unchanged after the attempt).
+  - **CI GREEN (run 4, commit 4e05683):** `rls-tests` succeeded for the
+    first time ever — all 29 RLS tests pass against a from-scratch stack;
+    `checks` green too. The hard-rule-#1 guardrail is live. Owner step:
+    make both checks required after merge (runbook).
+  - End-state checks: 26/26 tables RLS-on; stock data identical to hosted
+    (330 exercises / 352 links / 8 templates); single active params v10;
+    `ensure_rls` proven to auto-enable RLS on a new table.
+- **T-R2 filed (ready).** Full hosted↔clean-DB diff surfaced the remaining
+  drift: out-of-band hosted migration `20260620115322` initplan-wrapped ~54
+  policies + added 23 FK indexes the repo chain doesn't reproduce. Perf-only;
+  own PR (mechanical but security-sensitive).
+- **Runbook updated:** migration-reconciliation section marked RESOLVED; new
+  human step added — make `checks`+`rls-tests` **required status checks** on
+  `main` *after* this PR merges green (GitHub MCP has no settings surface).
+- R21 note updated (integration tests unblock on merge). Next per the attack
+  order: **R17+R16** (field usability), then R3+R4 (write integrity).
+
 ## 2026-07-01 — Session 26: R1 + R8 — the review's top two, shipped live (PR #95)
 
 Reconciliation sweep: no-op (no `done (PR #n)` rows live; I12 `advanced (PR #92)`
