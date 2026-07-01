@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-01 — Session 24: WS-J Phase 1 — client bundle & render slice
+## 2026-07-01 — Session 24: WS-J Phase 1 — client bundle & render slice (PR #93)
 
 Reconciliation sweep: no-op (only PR-linked live row is I12 `advanced (PR #92)`,
 merged but intentionally live — in-app planner UX remains). Picked the next J slice

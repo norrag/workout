@@ -217,8 +217,8 @@ Shared helpers (fix many at once):
 - **Extract `ExerciseBlock` into a `React.memo` subcomponent** with narrowed props
   so logging one set doesn't re-render the whole day tree.
 
-**Shipped 2026-07-01 (Phase 1 slice).** `/log/[workoutId]` + `/workout` **142 →
-125 kB** First Load JS (−17 kB gz). What the chunk fingerprinting showed: the
+**Shipped 2026-07-01 (Phase 1 slice, PR #93).** `/log/[workoutId]` + `/workout`
+**142 → 125 kB** First Load JS (−17 kB gz). What the chunk fingerprinting showed: the
 ~24 kB engine delta was mostly **zod itself** (12.7 kB gz) — pulled in because
 `reps.ts`/`e1rm.ts` run `engineParamsSchema.parse` inside every exported
 function — plus the params/schema layer (4.7 kB gz).
