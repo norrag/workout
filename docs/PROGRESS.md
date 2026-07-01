@@ -2,7 +2,58 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-01 (latest) — R1 share-redemption lockdown + R8 joint-pain set gate (engine_params v17, ACTIVATED)
+## 2026-07-01 (latest) — R2: guardrails revived — clean-DB migrations fixed, hosted drift reconciled
+
+Hard rule #1's enforcement gate (the CI `rls-tests` job) had never run: the
+migration chain could not apply to a clean database, so `supabase start` died
+before a single RLS test executed and every Actions run since ~06-20 concluded
+red. This slice makes the chain reproduce a working database from zero
+(verified end-to-end on a scratch Postgres 16 with a simulated Supabase
+bootstrap) and reconciles the out-of-band hosted objects into version control.
+Fixes, in chain order:
+
+- **`20260611000001_initial_schema.sql` — `is_admin()` moved after
+  `create table public.profiles`.** `LANGUAGE sql` bodies are validated at
+  creation, so defining the function before its referenced table aborted the
+  very first migration. **Deliberate deviation from hard rule #2** (edited an
+  applied migration): reorder only, end-state byte-identical (verified: same
+  normalized definition as hosted), hosted unaffected, and no append-only fix
+  exists — a later migration cannot un-break an earlier one's failure. This is
+  the runbook's own prescribed fix (manual-operations.md, 2026-06-20 entry).
+- **`20260611000002_seed_muscle_groups.sql` (new).** The 12 canonical
+  muscle-group rows lived only in `seed.sql`, which runs *after* migrations —
+  but `20260615000006` joins them to link the 330 stock exercises (silently
+  linking zero on a clean DB) and `20260617000002` hard-fails seeding stock
+  templates. Same guarded insert as seed.sql; recorded no-op on hosted
+  (applied via MCP for tracking).
+- **`20260619000002_rls_auto_enable.sql` (new).** `public.rls_auto_enable()` +
+  the `ensure_rls` event trigger existed only on hosted (created out-of-band
+  ~06-20 — itself the rule-#2 violation the review flagged), yet
+  `20260620000001/2` REVOKE on the function → dangling reference on a clean DB.
+  Function body transcribed verbatim from hosted `pg_get_functiondef`;
+  event-trigger creation guarded (`if not exists`), grants left to the 0620
+  migrations (end-state ACL matches hosted exactly: postgres + service_role).
+  Applied to hosted via MCP as a recorded no-op.
+
+**Clean-DB verification** (scratch PG16, roles + `auth.uid()/role()/users`
+stub, one transaction per file, then `seed.sql`): all 51 migrations apply
+clean; 26/26 tables RLS-enabled; **330 stock exercises with 352 muscle-group
+links and 8 stock templates — identical counts to hosted**; single active
+`engine_params` v10 (matches the suite's repaired `≥ 10` assertion); the
+`ensure_rls` trigger provably auto-enables RLS on a newly created table. The
+stale-assertion half of R2 shipped in PR #95.
+
+**Remaining hosted↔repo drift found while diffing (filed as T-R2, not taken
+here):** the out-of-band hosted migration `20260620115322
+perf_rls_initplan_and_fk_indexes` initplan-wrapped ~54 policies
+(`auth.uid()` → `(select auth.uid())`) and added 23 FK indexes that the repo
+chain doesn't reproduce — performance-only, no semantic difference.
+
+**Remaining / external (runbook updated):** make the two CI jobs (`checks`,
+`rls-tests`) **required status checks** on `main` — GitHub repo settings, no
+MCP surface for it.
+
+## 2026-07-01 — R1 share-redemption lockdown + R8 joint-pain set gate (engine_params v17, ACTIVATED)
 
 The top two items from the 2026-07-01 repo review
 ([reviews/2026-07-01-repo-review.md](reviews/2026-07-01-repo-review.md)) — small
