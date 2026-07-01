@@ -33,6 +33,15 @@ relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
      tracking table PKs on version → renamed `adherence_rule` to
      `20260616000004` (= true hosted order). Harness now simulates the
      tracking table; full chain re-verified post-reorder.
+  5. **Missing table grants** (caught by the suite's first-ever execution —
+     CI run 2): no migration GRANTs on tables; hosted rode on postgres
+     default privileges, the CI local stack has none → "permission denied
+     for table macrocycles" pre-RLS. New end-of-chain
+     `20260701000003_table_grants.sql` reproduces hosted's posture (ALL on
+     tables/sequences to the three roles + default privileges; functions
+     untouched so the 0620 revokes stand; RLS default-deny stays the gate).
+     Verified on scratch with zero simulated defaults; hosted no-op
+     (relacl identical before/after).
   - End-state checks: 26/26 tables RLS-on; stock data identical to hosted
     (330 exercises / 352 links / 8 templates); single active params v10;
     `ensure_rls` proven to auto-enable RLS on a new table.

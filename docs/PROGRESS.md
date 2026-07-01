@@ -43,6 +43,18 @@ Fixes, in chain order:
   true hosted apply order (soreness → auto-match → per-set → adherence);
   content-safe — the other 0616 files define no views, and the final
   `v_meso_summary`/`v_macro_summary` state was re-verified post-reorder.
+- **`20260701000003_table_grants.sql` (new — fifth break, surfaced by the
+  suite's first-ever execution):** no migration ever GRANTed on tables; the
+  chain silently relied on environment default privileges. Hosted has them
+  (postgres-stamped ALL for anon/authenticated/service_role on every table),
+  the CI local stack does not → `permission denied for table macrocycles` in
+  `beforeAll`, before RLS was even evaluated. The migration reproduces
+  hosted's grant posture explicitly (schema usage + ALL on tables/sequences +
+  matching default privileges) — **not a loosening**: RLS default-deny remains
+  the gate, and functions are deliberately untouched so the 0620 revokes
+  stand. Verified on the scratch chain with zero simulated defaults
+  (end-state ACLs match hosted; function ACLs unchanged); applied to hosted
+  via MCP as a recorded no-op (relacl byte-identical before/after).
 
 **Clean-DB verification** (scratch PG16, roles + `auth.uid()/role()/users`
 stub, one transaction per file, then `seed.sql`): all 51 migrations apply
