@@ -36,9 +36,15 @@ intentionally live, N1 in-progress). Picked the review's suggested attack order:
   replay artifact — R10 stays open); live history has pain ≥ 2 twice, pain 3
   never, so activation changes nothing retroactively and only bites when pain
   recurs. Open prescriptions re-stamp on next view via the freshness reconcile.
-- Green: **609 tests (+21)**, typecheck, lint. Next per the attack order: **R2**
-  (revive the migrations/RLS/CI guardrails — also unblocks the new shares RLS
-  tests actually running), then R17+R16.
+- **R2 — advanced (PR #95).** Folded in the stale-assertion half since this PR
+  already edits `rls.test.ts`: the recursion-guard test now updates
+  `display_name` (not the dropped `units` column) and the engine-params read
+  asserts one active row at version ≥ 10 instead of the long-stale `=== 5` pin.
+  Remaining (own PR): clean-DB migration ordering, commit `rls_auto_enable()`,
+  make the CI jobs required checks.
+- Green: **609 tests (+21)**, typecheck, lint. Next per the attack order: finish
+  **R2** (revive the migrations/RLS/CI guardrails — also unblocks the new shares
+  RLS tests actually running), then R17+R16.
 
 ## 2026-07-01 — Session 25: full-surface repo review → items R1–R25 (Batch 3) (PR #94)
 

@@ -103,15 +103,16 @@ describe("profiles", () => {
 
   it("owners can update a benign field without policy recursion", async () => {
     // guards the profiles_update_own recursion fix (42P17): the WITH CHECK must
-    // not re-query profiles, or every owner update errors out.
+    // not re-query profiles, or every owner update errors out. (Was `units`,
+    // dropped by 20260623120000_imperial_units_only — R2 stale-assertion repair.)
     const { data, error } = await alice
       .from("profiles")
-      .update({ units: "kg" })
+      .update({ display_name: "Alice" })
       .eq("id", aliceId)
-      .select("units")
+      .select("display_name")
       .maybeSingle();
     expect(error).toBeNull();
-    expect(data?.units).toBe("kg");
+    expect(data?.display_name).toBe("Alice");
   });
 
   it("other users cannot change someone else's settings", async () => {
@@ -579,13 +580,17 @@ describe("design-pivot tables (0002)", () => {
 
 describe("engine tables", () => {
   it("authenticated users can read engine params", async () => {
+    // `.single()` also asserts exactly ONE active row. The version is not
+    // pinned: the migration chain activates v10 (v11+ ship INACTIVE; live
+    // activation happens via the admin MCP tool, not a migration), so pinning
+    // goes stale on every activation — the old `=== 5` did exactly that (R2).
     const { data, error } = await bob
       .from("engine_params")
       .select("version, is_active")
       .eq("is_active", true)
       .single();
     expect(error).toBeNull();
-    expect(data!.version).toBe(5);
+    expect(data!.version).toBeGreaterThanOrEqual(10);
   });
 
   it("non-admins cannot write engine params", async () => {
