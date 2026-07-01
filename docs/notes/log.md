@@ -28,6 +28,11 @@ relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
      `pg_get_functiondef`, which voids the runbook's "human-only" rationale);
      guarded/idempotent, grants left to 0620 (end-state ACL = hosted). Both new
      migrations **applied to hosted via MCP as recorded no-ops**.
+  4. **Version collision** (caught by the PR's own first CI run, not the
+     scratch harness): two files shared prefix `20260616000001` and the CLI
+     tracking table PKs on version → renamed `adherence_rule` to
+     `20260616000004` (= true hosted order). Harness now simulates the
+     tracking table; full chain re-verified post-reorder.
   - End-state checks: 26/26 tables RLS-on; stock data identical to hosted
     (330 exercises / 352 links / 8 templates); single active params v10;
     `ensure_rls` proven to auto-enable RLS on a new table.

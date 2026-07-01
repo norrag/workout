@@ -34,6 +34,15 @@ Fixes, in chain order:
   event-trigger creation guarded (`if not exists`), grants left to the 0620
   migrations (end-state ACL matches hosted exactly: postgres + service_role).
   Applied to hosted via MCP as a recorded no-op.
+- **`20260616000001_adherence_rule.sql` → renamed `20260616000004`** (fourth
+  break, surfaced by the PR's first CI run): its version prefix collided with
+  `20260616000001_exercise_feedback_soreness.sql`, and the CLI's
+  `supabase_migrations.schema_migrations` PKs on version — both files applied,
+  then the second tracking insert aborted the reset. The scratch harness
+  hadn't modeled the tracking table (now it does). 000004 also matches the
+  true hosted apply order (soreness → auto-match → per-set → adherence);
+  content-safe — the other 0616 files define no views, and the final
+  `v_meso_summary`/`v_macro_summary` state was re-verified post-reorder.
 
 **Clean-DB verification** (scratch PG16, roles + `auth.uid()/role()/users`
 stub, one transaction per file, then `seed.sql`): all 51 migrations apply
