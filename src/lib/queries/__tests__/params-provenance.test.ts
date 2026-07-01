@@ -147,6 +147,35 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v17 is a complete, replayable snapshot matching the migration hash", () => {
+    // v17 = v16 + pain_cut_gate (R8: doc 10 §3 step 0 — the joint-pain hard gate
+    // on set counts). The field is `.optional()`, so v16/earlier rows are
+    // byte-identical and the new row stays replayable.
+    const v17 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+    });
+    const p = resolveProvenance(v17 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "72b58d846a4b1ea372cfbbc2f0fd9ee98d36f7ca5ef3de3b86ec463e133f433e",
+    );
+  });
+
+  it("pain_cut_gate is absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("pain_cut_gate");
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("bodyweight_model is absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("bodyweight_model");
     expect(

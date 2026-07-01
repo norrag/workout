@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS, prescribe, engineParamsSchema } from "../index";
 import type { EngineInputs } from "../types";
+import { V17_PARAMS } from "./helpers";
 
 const params = DEFAULT_ENGINE_PARAMS;
 
@@ -83,6 +84,20 @@ describe("hard bounds hold over randomized inputs", () => {
         continue;
       const out = prescribe(inputs, params);
       expect(out.weight!).toBeLessThanOrEqual(inputs.previous!.weight!);
+    }
+  });
+
+  it("no set increase under the pain gate; a cut at pain_cut_gate (v17, doc 10 §3 step 0)", () => {
+    for (const inputs of cases) {
+      const pain = inputs.exerciseFeedback?.jointPain ?? 0;
+      if (inputs.week.isDeload || pain < V17_PARAMS.pain_gate) continue;
+      const out = prescribe(inputs, V17_PARAMS);
+      expect(out.sets).toBeLessThanOrEqual(inputs.previous!.sets);
+      if (pain >= V17_PARAMS.pain_cut_gate!) {
+        expect(out.sets).toBeLessThanOrEqual(
+          Math.max(V17_PARAMS.min_sets, inputs.previous!.sets - 1),
+        );
+      }
     }
   });
 

@@ -251,6 +251,18 @@ export const engineParamsSchema = z.object({
   // the weight-0 → null-anchor → legacy path, exactly as today.
   bodyweight_model: z.boolean().optional(),
 
+  // ----- R8 — joint-pain hard gate on set counts (doc 10 §3 step 0) -------------
+  // Same `.optional()` discipline (absent ⇒ prior behavior, no fingerprint churn).
+  //
+  // Doc 10 labels joint pain the ONE hard safety gate, but pain only ever blocked
+  // LOAD increases (`pain_gate`); `setDelta` was computed with no reference to
+  // pain, so pain 3/3 with an easy workload + strong pump still ADDED a set.
+  // PRESENT ⇒ step 0 runs first: pain ≥ `pain_gate` vetoes any set addition, and
+  // pain ≥ `pain_cut_gate` cuts a set and suggests substitution — regardless of
+  // workload/pump. ABSENT ⇒ legacy: joint pain never modulates set counts
+  // (pre-v17 rows replay byte-identically). v17 sets it to 3 (the scale's "high").
+  pain_cut_gate: z.number().int().min(1).max(3).optional(),
+
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
   // fixed −%, carries genuine regression — doc 13 §4.3).

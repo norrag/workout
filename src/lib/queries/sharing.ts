@@ -84,6 +84,10 @@ export interface AcceptResult {
  * cross-user FKs (07 risks). Runs on the service client because the grantee
  * can't read the owner's rows; every write is explicitly scoped to the
  * redeeming user.
+ *
+ * R1: because the copy bypasses RLS, every copied object is asserted to belong
+ * to `share.owner_id` (stock exercises excepted) — a share row whose
+ * `object_id` was re-pointed at a third user's row copies nothing.
  */
 export async function acceptShareCode(
   service: Client,
@@ -115,17 +119,32 @@ export async function acceptShareCode(
   let objectId: string;
   let name: string;
   if (share.object_type === "exercise") {
-    const copied = await copyExercise(service, granteeId, share.object_id);
+    const copied = await copyExercise(
+      service,
+      granteeId,
+      share.owner_id,
+      share.object_id,
+    );
     if (!copied) return fail("The shared exercise no longer exists.");
     objectId = copied.id;
     name = copied.name;
   } else if (share.object_type === "template") {
-    const copied = await copyTemplate(service, granteeId, share.object_id);
+    const copied = await copyTemplate(
+      service,
+      granteeId,
+      share.owner_id,
+      share.object_id,
+    );
     if (!copied) return fail("The shared template no longer exists.");
     objectId = copied.id;
     name = copied.name;
   } else {
-    const copied = await copyMesocycle(service, granteeId, share.object_id);
+    const copied = await copyMesocycle(
+      service,
+      granteeId,
+      share.owner_id,
+      share.object_id,
+    );
     if (!copied) return fail("The shared mesocycle no longer exists.");
     objectId = copied.id;
     name = copied.name;
@@ -142,11 +161,14 @@ export async function acceptShareCode(
 
 /**
  * Stock exercises pass through untouched; custom exercises copy once per
- * grantee (dedupe on `source_exercise_id`).
+ * grantee (dedupe on `source_exercise_id`). Custom exercises copy only when
+ * the sharing owner actually owns them (R1) — this also covers fills inside a
+ * shared template/meso, which may only reference stock or the owner's own.
  */
 async function copyExercise(
   service: Client,
   granteeId: string,
+  ownerId: string,
   exerciseId: string,
 ): Promise<{ id: string; name: string } | null> {
   const { data: source, error } = await service
@@ -157,6 +179,7 @@ async function copyExercise(
   if (error) throw error;
   if (!source) return null;
   if (source.user_id === null || source.user_id === granteeId) return source;
+  if (source.user_id !== ownerId) return null;
 
   const { data: existing, error: dedupeError } = await service
     .from("exercises")
@@ -206,6 +229,7 @@ async function copyExercise(
 async function copyTemplate(
   service: Client,
   granteeId: string,
+  ownerId: string,
   templateId: string,
 ): Promise<{ id: string; name: string } | null> {
   const { data: source, error } = await service
@@ -215,6 +239,9 @@ async function copyTemplate(
     .maybeSingle();
   if (error) throw error;
   if (!source) return null;
+  // R1: only the owner's own template may be copied (stock templates can't be
+  // code-shared — createShareCode requires ownership).
+  if (source.user_id !== ownerId) return null;
 
   const { data: existing, error: dedupeError } = await service
     .from("templates")
@@ -295,7 +322,12 @@ async function copyTemplate(
     }
 
     for (const fill of fills ?? []) {
-      const exercise = await copyExercise(service, granteeId, fill.exercise_id);
+      const exercise = await copyExercise(
+        service,
+        granteeId,
+        ownerId,
+        fill.exercise_id,
+      );
       if (!exercise) continue;
       const { error: fillCopyError } = await service
         .from("template_exercises")
@@ -324,6 +356,7 @@ async function copyTemplate(
 async function copyMesocycle(
   service: Client,
   granteeId: string,
+  ownerId: string,
   mesoId: string,
 ): Promise<{ id: string; name: string } | null> {
   const { data: source, error } = await service
@@ -333,6 +366,8 @@ async function copyMesocycle(
     .maybeSingle();
   if (error) throw error;
   if (!source) return null;
+  // R1: only the owner's own mesocycle may be copied.
+  if (source.user_id !== ownerId) return null;
 
   const { data: copy, error: copyError } = await service
     .from("mesocycles")
@@ -404,7 +439,12 @@ async function copyMesocycle(
       if (fillError) throw fillError;
 
       for (const fill of fills ?? []) {
-        const exercise = await copyExercise(service, granteeId, fill.exercise_id);
+        const exercise = await copyExercise(
+          service,
+          granteeId,
+          ownerId,
+          fill.exercise_id,
+        );
         if (!exercise) continue;
         const { error: fillCopyError } = await service
           .from("meso_exercises")

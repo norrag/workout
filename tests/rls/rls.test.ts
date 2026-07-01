@@ -43,6 +43,7 @@ async function signUpUser(email: string): Promise<SupabaseClient> {
 let alice: SupabaseClient;
 let bob: SupabaseClient;
 let aliceId: string;
+let bobId: string;
 let aliceMacroId: string;
 
 beforeAll(async () => {
@@ -50,6 +51,7 @@ beforeAll(async () => {
   alice = await signUpUser(`alice-${stamp}@rls.test`);
   bob = await signUpUser(`bob-${stamp}@rls.test`);
   aliceId = (await alice.auth.getUser()).data.user!.id;
+  bobId = (await bob.auth.getUser()).data.user!.id;
 
   const { data, error } = await alice
     .from("macrocycles")
@@ -183,6 +185,101 @@ describe("exercises and templates", () => {
       .single();
     expect(error).toBeNull();
     expect(data!.template_days.length).toBeGreaterThan(0);
+  });
+});
+
+describe("shares (R1 lockdown)", () => {
+  let shareId: string;
+  const objectId = crypto.randomUUID();
+
+  beforeAll(async () => {
+    // alice mints a share and (via her owner policy) marks bob the grantee —
+    // the accepted-share state the dropped grantee-update policy used to cover.
+    const { data, error } = await alice
+      .from("shares")
+      .insert({
+        owner_id: aliceId,
+        grantee_id: bobId,
+        object_type: "mesocycle",
+        object_id: objectId,
+        share_code: crypto.randomUUID().slice(0, 8).toUpperCase(),
+        accepted_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    shareId = data.id;
+  });
+
+  it("the grantee can read their share", async () => {
+    const { data } = await bob.from("shares").select("id").eq("id", shareId);
+    expect(data).toEqual([{ id: shareId }]);
+  });
+
+  it("the grantee cannot re-point the share at another object", async () => {
+    const { data } = await bob
+      .from("shares")
+      .update({ object_id: crypto.randomUUID() })
+      .eq("id", shareId)
+      .select();
+    expect(data).toEqual([]);
+    // and the row is untouched
+    const { data: after } = await alice
+      .from("shares")
+      .select("object_id")
+      .eq("id", shareId)
+      .single();
+    expect(after!.object_id).toBe(objectId);
+  });
+
+  it("the grantee cannot update the share at all (no grantee update policy)", async () => {
+    const { data } = await bob
+      .from("shares")
+      .update({ accepted_at: null })
+      .eq("id", shareId)
+      .select();
+    expect(data).toEqual([]);
+  });
+
+  it("the grantee cannot delete the share", async () => {
+    const { data } = await bob
+      .from("shares")
+      .delete()
+      .eq("id", shareId)
+      .select();
+    expect(data).toEqual([]);
+  });
+
+  it("the owner keeps full control", async () => {
+    const { data, error } = await alice
+      .from("shares")
+      .update({ expires_at: new Date().toISOString() })
+      .eq("id", shareId)
+      .select("id");
+    expect(error).toBeNull();
+    expect(data).toEqual([{ id: shareId }]);
+  });
+
+  it("non-parties cannot see the share", async () => {
+    // bob is the grantee; a share where he is neither owner nor grantee is
+    // invisible to him
+    const { data: foreign, error } = await alice
+      .from("shares")
+      .insert({
+        owner_id: aliceId,
+        grantee_id: null,
+        object_type: "template",
+        object_id: crypto.randomUUID(),
+        share_code: crypto.randomUUID().slice(0, 8).toUpperCase(),
+      })
+      .select()
+      .single();
+    expect(error).toBeNull();
+    const { data } = await bob
+      .from("shares")
+      .select("*")
+      .eq("id", foreign!.id);
+    expect(data).toEqual([]);
   });
 });
 
