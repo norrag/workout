@@ -4,6 +4,20 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-01 — Session 23: I12 — MCP mesocycle/macrocycle authoring
+
+Built the connector's plan-into-a-macro authoring surface (from a needs doc the owner
+relayed from the LLM coach). Advances **I12** (was `triaged (needs design pass)`) — the
+MCP side now ships; row set to `advanced (PR #_, branch claude/mcp-mesocycle-creation-i4nica)`
+with the remaining in-app planner UX called out. New/extended tools: `edit_mesocycle`
+`add_day`/`remove_day` (build a whole day, or a plan from an empty meso, in one call);
+`place_mesocycle` + `create_mesocycle`/`duplicate_mesocycle` `macrocycle_id` (author/attach
+into a slot); `update_mesocycle` (header edit); `duplicate_mesocycle`; `manage_macrocycle_slots`;
+gated `activate_mesocycle` with the **sequential-activation invariant** (planned mesos seed only
+after prior blocks complete — wired into `startMeso` so the app respects it too);
+`preview_mesocycle_volume` (non-persisting MEV/MAV/MRV check). No schema change; suite green
+(584), typecheck + lint clean. Detail in PROGRESS 2026-07-01 + 05-mcp-connector.md §Write.
+
 ## 2026-06-30 — Session 22: WS-J — iOS PWA launch screens (the pre-document gap)
 
 #89 merged + owner-verified ("in general it looks good"); the remaining black is the iOS

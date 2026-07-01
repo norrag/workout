@@ -200,7 +200,11 @@ fully satisfies the note (per-user isolation, machine-specific steps), then clos
 ---
 
 ## Items still needing their own scoping pass (not yet researched)
-- **I12** (mesocycle management under a macrocycle) — large; needs a design pass.
+- **I12** (mesocycle management under a macrocycle) — **MCP authoring side shipped**
+  (PROGRESS 2026-07-01, branch `claude/mcp-mesocycle-creation-i4nica`): day-level
+  meso building, macro placement/attach, header edit, duplicate, slot management,
+  gated sequential activation, volume preview. Remaining scope is the **in-app**
+  planner UX for the same operations.
 - **PH29** (page-switch slowness + double-label glitch) — perf/UX; needs repro +
   a look at the app-shell label/loading animation.
 - **PH38** (first sets/reps wrong on switch-exercise) — bug; needs repro; likely

@@ -11,11 +11,12 @@ import {
   type PlanDayInput,
 } from "@/lib/queries/cycles";
 import { regenerateOpenWorkouts } from "@/lib/queries/generation";
-import { listMuscleGroups } from "@/lib/queries/exercises";
+import { listMuscleGroups, getMusclesForExercises } from "@/lib/queries/exercises";
 import { resolveSession, type McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
 import { resolveMuscleGroupIds } from "./write";
+import { formatMesoPlan } from "./read";
 
 /**
  * Stage 4 (12 §Stage 4) — `edit_mesocycle`. The first *structural* write on an
@@ -71,6 +72,12 @@ export interface EditDay {
   groups: EditGroup[];
 }
 
+/** One muscle-group block of an added day (names already resolved to ids). */
+export interface ResolvedDayGroup {
+  muscle_group_id: string;
+  exercises: { exercise_id: string; sets?: number }[];
+}
+
 /** A muscle-group-resolved edit (the tool maps `muscle_group` name → id first). */
 export type ResolvedEdit =
   | {
@@ -83,7 +90,15 @@ export type ResolvedEdit =
   | { op: "remove_exercise"; slot_id: string }
   | { op: "swap_exercise"; slot_id: string; new_exercise_id: string }
   | { op: "reorder_day"; day_number: number; ordered_slot_ids: string[] }
-  | { op: "set_baseline_sets"; slot_id: string; sets: number };
+  | { op: "set_baseline_sets"; slot_id: string; sets: number }
+  | {
+      op: "add_day";
+      day_number: number | null;
+      label: string | null;
+      weekday: number | null;
+      groups: ResolvedDayGroup[];
+    }
+  | { op: "remove_day"; day_number: number };
 
 export type ApplyResult =
   | { ok: true; days: PlanDayInput[]; touched: number[]; summaries: string[] }
@@ -202,6 +217,64 @@ export function applyMesoEdits(input: EditDay[], ops: ResolvedEdit[]): ApplyResu
         loc.fill.initial_sets = op.sets;
         touched.add(loc.day.day_number);
         summaries.push(`set day ${loc.day.day_number} baseline to ${op.sets} set(s)`);
+        break;
+      }
+      case "add_day": {
+        // pick the smallest free 1..7 when unspecified (mirrors addMesoDay), so a
+        // later add can't push a day past the 7-day week ceiling
+        const taken = new Set(days.map((d) => d.day_number));
+        let dayNumber = op.day_number ?? 0;
+        if (dayNumber === 0) {
+          for (let n = 1; n <= 7; n++)
+            if (!taken.has(n)) {
+              dayNumber = n;
+              break;
+            }
+          if (dayNumber === 0)
+            return { ok: false, error: "a week can hold at most 7 training days." };
+        } else if (taken.has(dayNumber)) {
+          return {
+            ok: false,
+            error: `day ${dayNumber} already exists — remove it first or add without a day_number.`,
+          };
+        }
+        let dayPos = 0;
+        const newDay: EditDay = {
+          day_number: dayNumber,
+          label: op.label,
+          weekday: op.weekday,
+          groups: op.groups.map((g, gi) => {
+            const groupId = `__new_g_${counter++}`;
+            changedGroups.add(groupId);
+            return {
+              group_id: groupId,
+              muscle_group_id: g.muscle_group_id,
+              position: gi + 1,
+              exercise_slots: g.exercises.length,
+              fills: g.exercises.map((ex, i) => ({
+                slot_id: `__new_${counter++}`,
+                exercise_id: ex.exercise_id,
+                initial_sets: ex.sets ?? DEFAULT_BASELINE_SETS,
+                day_position: ++dayPos,
+                slot_number: i + 1,
+              })),
+            };
+          }),
+        };
+        days.push(newDay);
+        touched.add(dayNumber);
+        summaries.push(
+          `added day ${dayNumber} (${op.groups.reduce((n, g) => n + g.exercises.length, 0)} exercise(s))`,
+        );
+        break;
+      }
+      case "remove_day": {
+        const idx = days.findIndex((d) => d.day_number === op.day_number);
+        if (idx < 0)
+          return { ok: false, error: `no day ${op.day_number} in this mesocycle.` };
+        days.splice(idx, 1);
+        touched.add(op.day_number);
+        summaries.push(`removed day ${op.day_number}`);
         break;
       }
       case "reorder_day": {
@@ -336,12 +409,42 @@ const setSetsOp = z.object({
   slot_id: z.string().uuid(),
   sets: z.number().int().min(1).max(10),
 });
+const addDayOp = z.object({
+  op: z.literal("add_day"),
+  // omit day_number to take the next free slot (1..7); a week holds at most 7
+  day_number: z.number().int().min(1).max(7).nullable().optional(),
+  label: z.string().max(40).nullable().optional(),
+  weekday: z.number().int().min(1).max(7).nullable().optional(),
+  groups: z
+    .array(
+      z.object({
+        muscle_group: z.string().min(1),
+        exercises: z
+          .array(
+            z.object({
+              exercise_id: z.string().uuid(),
+              sets: z.number().int().min(1).max(10).optional(),
+            }),
+          )
+          .min(1)
+          .max(10),
+      }),
+    )
+    .min(1)
+    .max(20),
+});
+const removeDayOp = z.object({
+  op: z.literal("remove_day"),
+  day_number: z.number().int().min(1).max(7),
+});
 const operationSchema = z.discriminatedUnion("op", [
   addOp,
   removeOp,
   swapOp,
   reorderOp,
   setSetsOp,
+  addDayOp,
+  removeDayOp,
 ]);
 type Operation = z.infer<typeof operationSchema>;
 
@@ -355,15 +458,20 @@ export function registerEditMesocycle(server: McpServer) {
       description:
         "Restructure a PLANNED or ACTIVE mesocycle by applying one or more " +
         "operations to its planner board (get the slot_id / day_number ids from " +
-        "get_mesocycle first). Operations: add_exercise (day_number + muscle_group " +
-        "name + exercise_id, optional sets), remove_exercise (slot_id), " +
-        "swap_exercise (slot_id + new_exercise_id), reorder_day (day_number + " +
-        "ordered_slot_ids covering that whole day), set_baseline_sets (slot_id + " +
-        "sets). You edit STRUCTURE and the week-1 baseline set count only — the " +
-        "engine still computes every load/rep/per-week set count and ramps the " +
-        "edited structure forward. For an active meso, only days that are neither " +
-        "completed nor in progress this week can be edited; completed/in-progress " +
-        "workouts and all logged sets are never touched (hard rules #3/#5).",
+        "get_mesocycle first). Operations: add_day (lay down a WHOLE training day " +
+        "at once — optional day_number/label/weekday + its muscle_group blocks, " +
+        "each with exercises and optional starting sets; omit day_number to take " +
+        "the next free slot), remove_day (day_number), add_exercise (day_number + " +
+        "muscle_group name + exercise_id, optional sets), remove_exercise " +
+        "(slot_id), swap_exercise (slot_id + new_exercise_id), reorder_day " +
+        "(day_number + ordered_slot_ids covering that whole day), set_baseline_sets " +
+        "(slot_id + sets). add_day lets you build an empty/placeholder meso up to a " +
+        "complete multi-day plan in one call. You edit STRUCTURE and the week-1 " +
+        "baseline set count only — the engine still computes every load/rep/per-week " +
+        "set count and ramps the edited structure forward. For an active meso, only " +
+        "days that are neither completed nor in progress this week can be edited; " +
+        "completed/in-progress workouts and all logged sets are never touched " +
+        "(hard rules #3/#5).",
       inputSchema: {
         mesocycle_id: z.string().uuid(),
         operations: z.array(operationSchema).min(1).max(20),
@@ -390,16 +498,26 @@ export function registerEditMesocycle(server: McpServer) {
         });
 
       const plan = await getMesoPlan(client, args.mesocycle_id);
-      if (!plan || plan.days.length === 0)
+      if (!plan) return jsonResult({ ok: false, error: "Mesocycle not found." });
+      // an empty/placeholder meso is only editable via add_day — that's exactly
+      // how it's built out from zero days into a real plan (Tier-1 core gap).
+      const hasAddDay = args.operations.some((o) => o.op === "add_day");
+      if (plan.days.length === 0 && !hasAddDay)
         return jsonResult({
           ok: false,
-          error: "this mesocycle has no planned days to edit.",
+          error:
+            "this mesocycle has no days yet — use an add_day operation to build one.",
         });
 
       // resolve muscle-group names (add ops) up front so a typo fails cleanly
-      const addNames = args.operations
-        .filter((o): o is z.infer<typeof addOp> => o.op === "add_exercise")
-        .map((o) => o.muscle_group);
+      const addNames = [
+        ...args.operations
+          .filter((o): o is z.infer<typeof addOp> => o.op === "add_exercise")
+          .map((o) => o.muscle_group),
+        ...args.operations
+          .filter((o): o is z.infer<typeof addDayOp> => o.op === "add_day")
+          .flatMap((o) => o.groups.map((g) => g.muscle_group)),
+      ];
       const byName = new Map<string, string>();
       if (addNames.length > 0) {
         const res = resolveMuscleGroupIds(addNames, await listMuscleGroups(client));
@@ -419,7 +537,9 @@ export function registerEditMesocycle(server: McpServer) {
               ? [o.exercise_id]
               : o.op === "swap_exercise"
                 ? [o.new_exercise_id]
-                : [],
+                : o.op === "add_day"
+                  ? o.groups.flatMap((g) => g.exercises.map((e) => e.exercise_id))
+                  : [],
           ),
         ),
       ];
@@ -450,9 +570,11 @@ export function registerEditMesocycle(server: McpServer) {
         const statusByDay = await activeWeekStatusByDay(client, args.mesocycle_id);
         const targetDays = new Set<number>();
         for (const o of args.operations) {
-          if (o.op === "add_exercise" || o.op === "reorder_day")
+          if (o.op === "add_exercise" || o.op === "reorder_day" || o.op === "remove_day")
             targetDays.add(o.day_number);
-          else {
+          else if (o.op === "add_day") {
+            if (o.day_number != null) targetDays.add(o.day_number);
+          } else {
             const dn = slotDay.get(o.slot_id);
             if (dn != null) targetDays.add(dn);
           }
@@ -471,17 +593,28 @@ export function registerEditMesocycle(server: McpServer) {
       }
 
       // resolve muscle_group → id and run the pure transform
-      const resolved: ResolvedEdit[] = args.operations.map((o) =>
-        o.op === "add_exercise"
-          ? {
-              op: "add_exercise" as const,
-              day_number: o.day_number,
-              muscle_group_id: byName.get(o.muscle_group)!,
-              exercise_id: o.exercise_id,
-              sets: o.sets,
-            }
-          : o,
-      );
+      const resolved: ResolvedEdit[] = args.operations.map((o) => {
+        if (o.op === "add_exercise")
+          return {
+            op: "add_exercise" as const,
+            day_number: o.day_number,
+            muscle_group_id: byName.get(o.muscle_group)!,
+            exercise_id: o.exercise_id,
+            sets: o.sets,
+          };
+        if (o.op === "add_day")
+          return {
+            op: "add_day" as const,
+            day_number: o.day_number ?? null,
+            label: o.label ?? null,
+            weekday: o.weekday ?? null,
+            groups: o.groups.map((g) => ({
+              muscle_group_id: byName.get(g.muscle_group)!,
+              exercises: g.exercises,
+            })),
+          };
+        return o;
+      });
       const result = applyMesoEdits(toEditDays(plan), resolved);
       if (!result.ok) return jsonResult({ ok: false, error: result.error });
       if (result.touched.length === 0)
@@ -501,6 +634,16 @@ export function registerEditMesocycle(server: McpServer) {
         }
       }
 
+      // return the fresh plan (new day_id/slot_id references) so a chain of edits
+      // doesn't need a get_mesocycle round-trip between steps (needs-doc #8)
+      const fresh = await getMesoPlan(client, args.mesocycle_id);
+      const freshRoles = fresh
+        ? await getMusclesForExercises(
+            client,
+            fresh.days.flatMap((d) => d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id))),
+          )
+        : new Map();
+
       const summary = `edited mesocycle "${meso.name}" — ${result.summaries.length} change(s) on day(s) ${
         result.touched.join(", ") || "—"
       }`;
@@ -511,6 +654,7 @@ export function registerEditMesocycle(server: McpServer) {
         touched_days: result.touched,
         changes: result.summaries,
         regenerated_open_workouts: regenerated,
+        plan: formatMesoPlan(fresh, freshRoles),
         summary:
           meso.status === "active"
             ? `${summary}. Open (not-started) workouts were brought in line with the new structure; completed/in-progress days and all logged sets are untouched — the engine ramps the edited baseline forward.`

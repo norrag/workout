@@ -9,6 +9,7 @@ import {
   updateMacrocycle,
   getMacroDeletionImpact,
   deleteMacrocycle,
+  attachMesoToMacro,
   type EditMacroInput,
 } from "@/lib/queries/macro";
 import {
@@ -172,7 +173,10 @@ function registerCreateMesocycle(server: McpServer) {
         "(groups-first: days → muscle-group blocks → exercises, exercise ids from " +
         "search_exercises). Pass exactly one of template_id or days. You set the " +
         "RIR ramp; the engine computes the actual loads/reps/sets when the meso is " +
-        "started. Standalone (not attached to a macro slot — do that in-app).",
+        "started. Pass macrocycle_id (and optional position) to author it straight " +
+        "into a macro slot — filling the earliest open slot by default; omit it for " +
+        "a standalone draft you can place later with place_mesocycle. The meso lands " +
+        "PLANNED (an unapproved draft) for the athlete to open, edit, and activate.",
       inputSchema: {
         name: z.string().min(1).max(80),
         weeks: z.number().int().min(3).max(8),
@@ -181,6 +185,8 @@ function registerCreateMesocycle(server: McpServer) {
         rir_end: z.number().int().min(0).max(6).optional(),
         template_id: z.string().uuid().optional(),
         days: z.array(mesoDaySchema).min(1).max(7).optional(),
+        macrocycle_id: z.string().uuid().optional(),
+        position: z.number().int().min(1).max(24).optional(),
       },
     },
     async (
@@ -192,6 +198,8 @@ function registerCreateMesocycle(server: McpServer) {
         rir_end?: number;
         template_id?: string;
         days?: z.infer<typeof mesoDaySchema>[];
+        macrocycle_id?: string;
+        position?: number;
       },
       extra: McpExtra,
     ) => {
@@ -204,6 +212,30 @@ function registerCreateMesocycle(server: McpServer) {
           ok: false,
           error: "pass exactly one of template_id (start from a template) or days (build from scratch).",
         });
+
+      // optionally author straight into a macro slot; returns a placement note or
+      // an error that leaves the created meso standing as a standalone draft
+      const placeIntoMacro = async (
+        mesoId: string,
+      ): Promise<
+        | { ok: true; note: string; position?: number }
+        | { ok: false; error: string }
+      > => {
+        if (!args.macrocycle_id) return { ok: true, note: "" };
+        const res = await attachMesoToMacro(
+          client,
+          userId,
+          mesoId,
+          args.macrocycle_id,
+          args.position ?? null,
+        );
+        if (!res.ok)
+          return {
+            ok: false,
+            error: `created the meso, but placing it into the macro failed: ${res.error} It's a standalone planned draft — place it with place_mesocycle.`,
+          };
+        return { ok: true, note: ` in the macrocycle at position ${res.position}`, position: res.position };
+      };
 
       // --- start-from-template path (§5.9): templates are discoverable via
       // search_templates but had no execution path; wire that here.
@@ -225,16 +257,21 @@ function registerCreateMesocycle(server: McpServer) {
         });
         await applyTemplateToMeso(client, userId, meso.id, args.template_id);
 
-        const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk) from template "${detail.template.name}" as planned`;
+        const placed = await placeIntoMacro(meso.id);
+        if (!placed.ok)
+          return jsonResult({ ok: false, mesocycle_id: meso.id, error: placed.error });
+
+        const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk) from template "${detail.template.name}" as planned${placed.note}`;
         await recordMcpWrite(
           userId,
           CREATE_MESOCYCLE,
-          { name: args.name, weeks: args.weeks, template_id: args.template_id },
+          { name: args.name, weeks: args.weeks, template_id: args.template_id, macrocycle_id: args.macrocycle_id },
           summary,
         );
         return jsonResult({
           ok: true,
           mesocycle_id: meso.id,
+          position: placed.position,
           summary: `${summary}. Review and start it in-app; the engine sets the numbers on activation.`,
         });
       }
@@ -281,11 +318,16 @@ function registerCreateMesocycle(server: McpServer) {
       });
       await saveMesoPlan(client, userId, meso.id, planDays);
 
-      const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk, ${days.length} day/wk) as planned`;
+      const placed = await placeIntoMacro(meso.id);
+      if (!placed.ok)
+        return jsonResult({ ok: false, mesocycle_id: meso.id, error: placed.error });
+
+      const summary = `drafted mesocycle "${args.name}" (${args.weeks} wk, ${days.length} day/wk) as planned${placed.note}`;
       await recordMcpWrite(userId, CREATE_MESOCYCLE, args, summary);
       return jsonResult({
         ok: true,
         mesocycle_id: meso.id,
+        position: placed.position,
         summary: `${summary}. Review and start it in-app; the engine sets the numbers on activation.`,
       });
     },

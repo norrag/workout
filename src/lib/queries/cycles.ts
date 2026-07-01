@@ -194,6 +194,95 @@ export async function finalizeDraftMeso(
   if (error) throw error;
 }
 
+// ---------------------------------------------------------------------------
+// edit a mesocycle's own top-level attributes (MCP `update_mesocycle`, 05 §Write).
+// Structure lives on the planner board (saveMesoPlan / edit_mesocycle); this is
+// the meso's own header: name, length, RIR ramp, deload flag, phase. The engine
+// re-derives numbers from these on activation (or, for an active meso, the
+// read-path freshness reconcile picks up RIR/deload changes) — never the LLM.
+// ---------------------------------------------------------------------------
+
+export interface MesoAttrPatch {
+  name?: string;
+  weeks?: number;
+  includes_deload?: boolean;
+  rir_start?: number;
+  rir_end?: number;
+  phase?: MesocycleRow["phase"];
+}
+
+export interface MesoAttrResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Editable-in-place meso header. `name`/`phase` can change on any meso that
+ * isn't finished; length/RIR/deload only while the meso hasn't been started
+ * (draft/unplanned/planned) — once active its microcycles are materialized and
+ * changing week count would desync them. Completed/abandoned mesos are frozen.
+ */
+export async function updateMesocycleAttrs(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+  patch: MesoAttrPatch,
+): Promise<MesoAttrResult> {
+  const { data: meso, error } = await supabase
+    .from("mesocycles")
+    .select("id, status")
+    .eq("id", mesoId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!meso) return { ok: false, error: "Mesocycle not found." };
+  if (meso.status === "completed" || meso.status === "abandoned")
+    return {
+      ok: false,
+      error: `a ${meso.status} mesocycle is frozen — its history is immutable.`,
+    };
+
+  const touchesShape =
+    patch.weeks !== undefined ||
+    patch.includes_deload !== undefined ||
+    patch.rir_start !== undefined ||
+    patch.rir_end !== undefined;
+  const notStarted =
+    meso.status === "draft" ||
+    meso.status === "unplanned" ||
+    meso.status === "planned";
+  if (touchesShape && !notStarted)
+    return {
+      ok: false,
+      error:
+        "length / RIR ramp / deload can only change before a mesocycle is started; edit exercises with edit_mesocycle instead.",
+    };
+
+  const update: Partial<
+    Pick<
+      MesocycleRow,
+      "name" | "phase" | "weeks" | "includes_deload" | "rir_start" | "rir_end"
+    >
+  > = {};
+  if (patch.name !== undefined) update.name = patch.name;
+  if (patch.phase !== undefined) update.phase = patch.phase;
+  if (patch.weeks !== undefined) update.weeks = patch.weeks;
+  if (patch.includes_deload !== undefined)
+    update.includes_deload = patch.includes_deload;
+  if (patch.rir_start !== undefined) update.rir_start = patch.rir_start;
+  if (patch.rir_end !== undefined) update.rir_end = patch.rir_end;
+  if (Object.keys(update).length === 0)
+    return { ok: false, error: "no attributes to update were provided." };
+
+  const { error: updErr } = await supabase
+    .from("mesocycles")
+    .update(update)
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (updErr) throw updErr;
+  return { ok: true };
+}
+
 export interface SlotFill extends MesoExerciseRow {
   exercise_name: string;
 }
@@ -462,6 +551,40 @@ export async function copyMesoStructure(
     .update({ days_per_week: Math.max(1, dayPlans.length) })
     .eq("id", targetMesoId);
   if (updateError) throw updateError;
+}
+
+/**
+ * Duplicate a source mesocycle into a fresh `planned` meso — its settings (weeks,
+ * deload, RIR ramp) and its whole planner board, copied via `copyMesoStructure`
+ * (loads are NOT carried; the engine reseeds on activation). "Run last block back
+ * with a few tweaks" as one action; the copy lands standalone and the caller may
+ * then place it into a macro slot. Returns the new meso.
+ */
+export async function duplicateMesocycle(
+  supabase: Client,
+  userId: string,
+  sourceMesoId: string,
+  overrides: { name?: string } = {},
+): Promise<{ meso: MesocycleRow | null; error: string | null }> {
+  const { data: source, error } = await supabase
+    .from("mesocycles")
+    .select("name, weeks, includes_deload, rir_start, rir_end")
+    .eq("id", sourceMesoId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!source) return { meso: null, error: "Source mesocycle not found." };
+
+  const meso = await createMesocycle(supabase, userId, {
+    name: overrides.name ?? `${source.name} II`,
+    weeks: source.weeks,
+    includes_deload: source.includes_deload,
+    rir_start: source.rir_start,
+    rir_end: source.rir_end,
+    status: "planned",
+  });
+  await copyMesoStructure(supabase, userId, sourceMesoId, meso.id);
+  return { meso, error: null };
 }
 
 export async function addMesoDay(

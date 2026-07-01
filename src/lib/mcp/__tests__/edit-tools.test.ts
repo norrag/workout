@@ -254,3 +254,98 @@ describe("edit_mesocycle tool", () => {
     ).rejects.toThrow(/authenticated session/i);
   });
 });
+
+// --- applyMesoEdits: add_day / remove_day ----------------------------------
+
+describe("applyMesoEdits — add_day", () => {
+  it("lays down a whole new day at the next free slot in one op", () => {
+    const r = applyMesoEdits(plan(), [
+      {
+        op: "add_day",
+        day_number: null,
+        label: "Pull",
+        weekday: 5,
+        groups: [
+          {
+            muscle_group_id: "mg-back",
+            exercises: [
+              { exercise_id: "e-pullup", sets: 4 },
+              { exercise_id: "e-row2" },
+            ],
+          },
+          { muscle_group_id: "mg-biceps", exercises: [{ exercise_id: "e-curl" }] },
+        ],
+      },
+    ]);
+    // day 1 and 2 exist ⇒ next free is 3
+    const d3 = day(r, 3);
+    expect(d3.label).toBe("Pull");
+    expect(d3.weekday).toBe(5);
+    expect(d3.groups).toHaveLength(2);
+    const back = d3.groups.find((g) => g.muscle_group_id === "mg-back")!;
+    expect(back.fills.map((f) => f.exercise_id)).toEqual(["e-pullup", "e-row2"]);
+    expect(back.fills[0].initial_sets).toBe(4);
+    expect(back.fills[1].initial_sets).toBe(3); // default baseline
+    // flat day order runs 1..3 across both groups
+    expect(d3.groups.flatMap((g) => g.fills.map((f) => f.day_position)).sort()).toEqual([1, 2, 3]);
+    expect(ok(r).touched).toEqual([3]);
+  });
+
+  it("builds a plan from an empty meso (the core Tier-1 case)", () => {
+    const r = applyMesoEdits([], [
+      {
+        op: "add_day",
+        day_number: null,
+        label: "Full body",
+        weekday: 1,
+        groups: [{ muscle_group_id: "mg-chest", exercises: [{ exercise_id: "e-bench" }] }],
+      },
+    ]);
+    expect(ok(r).days).toHaveLength(1);
+    expect(day(r, 1).groups[0].fills[0].exercise_id).toBe("e-bench");
+  });
+
+  it("rejects an explicit day_number that already exists", () => {
+    const r = applyMesoEdits(plan(), [
+      { op: "add_day", day_number: 1, label: null, weekday: null, groups: [{ muscle_group_id: "mg-chest", exercises: [{ exercise_id: "e-x" }] }] },
+    ]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/day 1 already exists/);
+  });
+
+  it("rejects a day when the week is already full", () => {
+    const full: EditDay[] = Array.from({ length: 7 }, (_, i) => ({
+      day_number: i + 1,
+      label: null,
+      weekday: null,
+      groups: [
+        {
+          group_id: `g${i}`,
+          muscle_group_id: "mg-chest",
+          position: 1,
+          exercise_slots: 1,
+          fills: [{ slot_id: `s${i}`, exercise_id: "e", initial_sets: 3, day_position: 1, slot_number: 1 }],
+        },
+      ],
+    }));
+    const r = applyMesoEdits(full, [
+      { op: "add_day", day_number: null, label: null, weekday: null, groups: [{ muscle_group_id: "mg-back", exercises: [{ exercise_id: "e-x" }] }] },
+    ]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/at most 7/);
+  });
+});
+
+describe("applyMesoEdits — remove_day", () => {
+  it("drops a whole day", () => {
+    const r = applyMesoEdits(plan(), [{ op: "remove_day", day_number: 2 }]);
+    expect(ok(r).days.map((d) => d.day_number)).toEqual([1]);
+    expect(ok(r).touched).toEqual([2]);
+  });
+
+  it("rejects removing a day that does not exist", () => {
+    const r = applyMesoEdits(plan(), [{ op: "remove_day", day_number: 6 }]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/no day 6/);
+  });
+});

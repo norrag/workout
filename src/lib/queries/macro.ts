@@ -13,6 +13,7 @@ import type {
   MacrocycleRow,
   MacroGoalType,
   MesocycleRow,
+  MesoPhase,
   ProfileRow,
   VMacroSummaryRow,
 } from "@/lib/types/database";
@@ -401,6 +402,306 @@ export async function planUnplannedMeso(
     .eq("id", mesoId)
     .eq("status", "unplanned");
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// place a mesocycle into a macro slot & manage a macro's slots (MCP authoring,
+// 05 §Write). The connector can author a plan into the macro timeline instead
+// of only ever producing a standalone draft the human must place by hand.
+// ---------------------------------------------------------------------------
+
+export interface SlotMeso {
+  id: string;
+  status: MesocycleRow["status"];
+  position: number | null;
+  phase: MesoPhase | null;
+}
+
+export interface PlacementPlan {
+  /** the position the placed meso lands in (1-based) */
+  targetPosition: number;
+  /** an unplanned placeholder whose slot the placed meso takes (deleted), or null */
+  consumePlaceholderId: string | null;
+  /** phase the placed meso inherits when it has none of its own */
+  inheritedPhase: MesoPhase | null;
+  /** final, contiguous positions for every meso on the macro incl. the placed one */
+  resequence: { id: string; position: number }[];
+}
+
+/**
+ * Pure: decide where a meso lands when placed into a macro and how the macro's
+ * remaining mesos re-sequence. `existing` is the macro's current mesos EXCLUDING
+ * the one being placed, in any order. With no requested position the meso fills
+ * the earliest unplanned placeholder (or appends); a placeholder sitting exactly
+ * at the target slot is consumed (deleted) and its phase inherited so the plan
+ * matches the macro's intent for that slot. With a requested position that has
+ * no placeholder, the meso is inserted and later mesos shift down (grow the macro).
+ */
+export function planMacroPlacement(
+  existing: SlotMeso[],
+  placedMesoId: string,
+  placedPhase: MesoPhase | null,
+  requestedPosition: number | null,
+): PlacementPlan {
+  const sorted = [...existing].sort(
+    (a, b) => (a.position ?? 99) - (b.position ?? 99) || a.id.localeCompare(b.id),
+  );
+  const placeholders = sorted.filter((m) => m.status === "unplanned");
+
+  const consume =
+    requestedPosition != null
+      ? (placeholders.find((m) => m.position === requestedPosition) ?? null)
+      : (placeholders[0] ?? null);
+
+  const remaining = sorted.filter((m) => m.id !== consume?.id);
+  const target =
+    requestedPosition != null
+      ? Math.min(Math.max(1, requestedPosition), remaining.length + 1)
+      : (consume?.position ?? remaining.length + 1);
+
+  const ordered = remaining.map((m) => m.id);
+  const insertAt = Math.min(target - 1, ordered.length);
+  ordered.splice(insertAt, 0, placedMesoId);
+
+  return {
+    targetPosition: insertAt + 1,
+    consumePlaceholderId: consume?.id ?? null,
+    inheritedPhase: placedPhase ?? consume?.phase ?? null,
+    resequence: ordered.map((id, i) => ({ id, position: i + 1 })),
+  };
+}
+
+export interface AttachResult {
+  ok: boolean;
+  error?: string;
+  position?: number;
+  consumed_placeholder?: boolean;
+}
+
+/**
+ * Attach an existing standalone `planned`/`draft` mesocycle into a macrocycle at
+ * a chosen (or the next open) slot. A `draft` is finalized to `planned` on the
+ * way in — it stays a review-and-approve plan, never auto-activated. Logged
+ * history is untouchable: only a plan-only meso can be placed.
+ */
+export async function attachMesoToMacro(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+  macroId: string,
+  requestedPosition: number | null,
+): Promise<AttachResult> {
+  const { data: meso, error: mesoErr } = await supabase
+    .from("mesocycles")
+    .select("id, status, phase, macrocycle_id")
+    .eq("id", mesoId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (mesoErr) throw mesoErr;
+  if (!meso) return { ok: false, error: "Mesocycle not found." };
+  if (meso.macrocycle_id)
+    return {
+      ok: false,
+      error:
+        "That mesocycle already belongs to a macrocycle — reorder it with manage_macrocycle_slots instead.",
+    };
+  if (meso.status !== "planned" && meso.status !== "draft")
+    return {
+      ok: false,
+      error: `Only a planned or draft mesocycle can be placed into a macrocycle (this one is ${meso.status}).`,
+    };
+
+  const { data: macro, error: macroErr } = await supabase
+    .from("macrocycles")
+    .select("id")
+    .eq("id", macroId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (macroErr) throw macroErr;
+  if (!macro) return { ok: false, error: "Macrocycle not found." };
+
+  const { data: siblings, error: sibErr } = await supabase
+    .from("mesocycles")
+    .select("id, status, position, phase")
+    .eq("macrocycle_id", macroId)
+    .eq("user_id", userId);
+  if (sibErr) throw sibErr;
+
+  const plan = planMacroPlacement(
+    (siblings ?? []) as SlotMeso[],
+    mesoId,
+    meso.phase,
+    requestedPosition,
+  );
+
+  if (plan.consumePlaceholderId) {
+    const { error } = await supabase
+      .from("mesocycles")
+      .delete()
+      .eq("id", plan.consumePlaceholderId)
+      .eq("user_id", userId)
+      .eq("status", "unplanned");
+    if (error) throw error;
+  }
+
+  const { error: attachErr } = await supabase
+    .from("mesocycles")
+    .update({
+      macrocycle_id: macroId,
+      position: plan.targetPosition,
+      phase: plan.inheritedPhase,
+      status: "planned",
+    })
+    .eq("id", mesoId)
+    .eq("user_id", userId);
+  if (attachErr) throw attachErr;
+
+  await applyResequence(supabase, userId, plan.resequence);
+
+  return {
+    ok: true,
+    position: plan.targetPosition,
+    consumed_placeholder: plan.consumePlaceholderId != null,
+  };
+}
+
+/** Rewrite each meso's `position`, re-aligning auto-generated placeholder names. */
+async function applyResequence(
+  supabase: Client,
+  userId: string,
+  resequence: { id: string; position: number }[],
+): Promise<void> {
+  if (resequence.length === 0) return;
+  const { data: rows, error } = await supabase
+    .from("mesocycles")
+    .select("id, name, status")
+    .in(
+      "id",
+      resequence.map((r) => r.id),
+    )
+    .eq("user_id", userId);
+  if (error) throw error;
+  const byId = new Map((rows ?? []).map((r) => [r.id, r]));
+  for (const r of resequence) {
+    const row = byId.get(r.id);
+    if (!row) continue;
+    const name = placeholderName(row.name, row.status, r.position);
+    const { error: updErr } = await supabase
+      .from("mesocycles")
+      .update({ position: r.position, name })
+      .eq("id", r.id)
+      .eq("user_id", userId);
+    if (updErr) throw updErr;
+  }
+}
+
+export type MacroSlotAction =
+  | { action: "add" }
+  | { action: "remove"; mesocycle_id: string }
+  | { action: "reorder"; ordered_ids: string[] };
+
+export interface SlotActionResult {
+  ok: boolean;
+  error?: string;
+  summary?: string;
+}
+
+/**
+ * Add, remove, or reorder a macrocycle's mesocycle slots. Only unplanned
+ * placeholders can be added or removed; reorder rewrites every slot's position
+ * from the given full ordering. Planned/active/completed mesos and their logged
+ * history are never destroyed — a remove targeting one is refused.
+ */
+export async function manageMacroSlots(
+  supabase: Client,
+  userId: string,
+  macroId: string,
+  op: MacroSlotAction,
+  mesoLengthWeeks: number,
+): Promise<SlotActionResult> {
+  const { data: macro, error: macroErr } = await supabase
+    .from("macrocycles")
+    .select("id")
+    .eq("id", macroId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (macroErr) throw macroErr;
+  if (!macro) return { ok: false, error: "Macrocycle not found." };
+
+  const { data: mesos, error: mesoErr } = await supabase
+    .from("mesocycles")
+    .select("id, status, position, phase, name")
+    .eq("macrocycle_id", macroId)
+    .eq("user_id", userId)
+    .order("position", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (mesoErr) throw mesoErr;
+  const ordered = mesos ?? [];
+
+  if (op.action === "add") {
+    const nextPos = Math.max(0, ...ordered.map((m) => m.position ?? 0)) + 1;
+    const { error } = await supabase.from("mesocycles").insert({
+      user_id: userId,
+      macrocycle_id: macroId,
+      position: nextPos,
+      phase: null,
+      name: `Mesocycle ${nextPos}`,
+      weeks: mesoLengthWeeks,
+      days_per_week: 1,
+      includes_deload: true,
+      rir_start: 3,
+      rir_end: 0,
+      status: "unplanned" as const,
+      template_id: null,
+      start_date: null,
+    });
+    if (error) throw error;
+    return { ok: true, summary: `added an unplanned slot at position ${nextPos}` };
+  }
+
+  if (op.action === "remove") {
+    const target = ordered.find((m) => m.id === op.mesocycle_id);
+    if (!target) return { ok: false, error: "That slot is not in this macrocycle." };
+    if (target.status !== "unplanned")
+      return {
+        ok: false,
+        error: `Only an unplanned placeholder can be removed (this one is ${target.status}). Delete a planned meso with delete_mesocycle, or leave started/completed history alone.`,
+      };
+    const { error } = await supabase
+      .from("mesocycles")
+      .delete()
+      .eq("id", op.mesocycle_id)
+      .eq("user_id", userId)
+      .eq("status", "unplanned");
+    if (error) throw error;
+    await applyResequence(
+      supabase,
+      userId,
+      ordered
+        .filter((m) => m.id !== op.mesocycle_id)
+        .map((m, i) => ({ id: m.id, position: i + 1 })),
+    );
+    return { ok: true, summary: "removed an unplanned slot" };
+  }
+
+  // reorder
+  const currentIds = new Set(ordered.map((m) => m.id));
+  const wanted = op.ordered_ids;
+  if (
+    wanted.length !== ordered.length ||
+    !wanted.every((id) => currentIds.has(id)) ||
+    new Set(wanted).size !== wanted.length
+  )
+    return {
+      ok: false,
+      error: `reorder must list each of this macrocycle's ${ordered.length} slot id(s) exactly once.`,
+    };
+  await applyResequence(
+    supabase,
+    userId,
+    wanted.map((id, i) => ({ id, position: i + 1 })),
+  );
+  return { ok: true, summary: "reordered the macrocycle slots" };
 }
 
 // ---------------------------------------------------------------------------

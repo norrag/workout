@@ -4,6 +4,7 @@ import { registerGetCurrentState } from "./get-current-state";
 import { registerReadTools } from "./read";
 import { registerCoachingTools } from "./coaching";
 import { registerWriteTools } from "./write";
+import { registerAuthoringTools } from "./authoring";
 import { registerAdminTools } from "./admin";
 import { toolError } from "../envelope";
 
@@ -56,5 +57,6 @@ export function registerTools(server: McpServer) {
   registerReadTools(guarded);
   registerCoachingTools(guarded);
   registerWriteTools(guarded);
+  registerAuthoringTools(guarded);
   registerAdminTools(guarded);
 }
