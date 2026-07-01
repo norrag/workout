@@ -34,8 +34,9 @@ export const IOS_LAUNCH_SCREENS: IosLaunchScreen[] = [
   { w: 428, h: 926, dpr: 3 }, // 12-14 Pro Max / Plus
   { w: 393, h: 852, dpr: 3 }, // 14 Pro / 15 / 15 Pro / 16
   { w: 430, h: 932, dpr: 3 }, // 15 Plus / 15 Pro Max / 16 Plus
-  { w: 402, h: 874, dpr: 3 }, // 16 Pro
-  { w: 440, h: 956, dpr: 3 }, // 16 Pro Max
+  { w: 402, h: 874, dpr: 3 }, // 16 Pro / 17 / 17 Pro
+  { w: 440, h: 956, dpr: 3 }, // 16 Pro Max / 17 Pro Max
+  { w: 420, h: 912, dpr: 3 }, // iPhone Air
 ];
 
 export type LaunchTheme = "light" | "dark";
