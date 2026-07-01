@@ -4,6 +4,46 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-01 — Session 25: full-surface repo review → items R1–R25 (Batch 3)
+
+Reconciliation sweep: no-op (same state as Session 24 — I12 `advanced (PR #92)`
+intentionally live, N1 in-progress). Owner asked for a proactive whole-repo review
+("issues and opportunities for significant and impactful improvements…
+regardless of how ambitious") with findings folded into this area.
+
+Ran five parallel domain reviews (engine/analysis, data layer/DB/RLS, UI/app
+routes, MCP/API/middleware/PWA, cross-cutting tooling), each briefed to exclude
+already-tracked ground (WS-J, Phase-A gaps, T-A1, doc-07 open phases). Re-verified
+the top claims directly (shares policy SQL + copy path, pain-gate code,
+regeneration delete branches). Result: **25 new items (R1–R25)** filed under two
+new workstreams **K** (integrity & security hardening) and **L** (delivery
+guardrails & observability) plus existing C/D/E/G. Evidence + file:line scoping in
+[`docs/reviews/2026-07-01-repo-review.md`](../reviews/2026-07-01-repo-review.md)
+(serves as the scoping record; no separate `scoping.md` entries).
+
+Headlines, by severity:
+- **R1 (HIGH, security):** share redemption = cross-user copy primitive
+  (grantee can rewrite `object_id`; service-role copy never checks the owner).
+- **R2 (HIGH):** the hard-rule-#1 guardrail is dead — migrations don't apply to a
+  clean DB (documented since 06-20, unfixed) + the RLS suite has stale
+  assertions; **every CI run since ~06-20 is red** and checks aren't required.
+- **R3/R4 (HIGH):** `saveMesoPlan` delete-then-insert can wipe an active plan
+  (reachable from the new PR-#92 MCP authoring input gaps); regeneration can
+  cascade-delete logged history (hard-rule-#5 breach path).
+- **R8 (HIGH, engine safety):** joint-pain 3/3 still *adds* a set — doc 10's one
+  hard safety gate unenforced on set additions (verified by execution).
+- **R17 (HIGH, UX):** sheet writes fail destructively — typed notes/feedback
+  destroyed by the error boundary while the error page claims "Nothing was lost".
+- **R20 (HIGH):** zero production error observability; reconcile failures =
+  silently stale prescriptions.
+- Needs-input: **R6** (canonical local-day rule for UTC date drift) and **R14**
+  (implement doc 10's fractional 1.0/0.5 volume counting vs amend the doc —
+  changes every Balance/MEV/MRV number; informs I11/PH37/M8).
+
+Suggested attack order: R1+R8 (small diffs, worst consequences) → R2 (revives the
+guardrails) → R17+R16 (field usability) → R3+R4 (write integrity) → R20
+(observability). Owner decisions queued: R6, R14 (+ the R24 ramp-hold design nit).
+
 ## 2026-07-01 — Session 24: WS-J Phase 1 — client bundle & render slice (PR #93)
 
 Reconciliation sweep: no-op (only PR-linked live row is I12 `advanced (PR #92)`,
