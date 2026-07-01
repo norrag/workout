@@ -2,7 +2,45 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-01 (latest) — MCP mesocycle/macrocycle authoring (I12)
+## 2026-07-01 (latest) — WS-J Phase 1: client bundle & render slice
+
+The measured client-side slice of the performance workstream
+([notes/J-performance.md](notes/J-performance.md), N1). Headline: the daily-loop
+routes **`/log/[workoutId]` + `/workout` drop 142 → 125 kB First Load JS (−17 kB
+gz)** — the engine schema layer *and zod itself* leave the client bundle.
+
+- **Zod-free predictor core (`engine/predict.ts`).** The day view's live math
+  (`predictRepsAtWeight`, `estimateE1rm`, the §S3 factor/inverse helpers) moved
+  into a core module keyed on the validated `engine_params.e1rm` slice, with
+  **type-only** imports — no runtime zod. `e1rm.ts`/`reps.ts` keep their exact
+  public signatures as parse-then-delegate wrappers, so every server/engine
+  caller still validates at the boundary (hard rule #6) and outputs are
+  byte-identical (`predict.test.ts` asserts core ≡ wrapped on both param
+  generations + a static import guard so the chunk can't silently regress).
+  Bonus: `recencyWeightedE1rm` now parses params **once per anchor build**
+  instead of once per historical sample.
+- **DayView leaf imports** (`engine/predict` + `engine/load` + type-only
+  params) — the engine barrel (prescribe/macro/rules/summary) is server-only on
+  the logging path. Macro create/edit forms leaf-import `engine/macro` likewise.
+- **Render-path cost fixes.** The per-render zod parse per set row is gone by
+  construction; the future-row rep prediction (bisection) and the P19
+  over/under e1RM markers are `useMemo`ized per row; day-level progress counts
+  memoized. **Measure-first correction:** the planned "debounce the weight
+  input" was moot — prediction fires on blur, not per keystroke; the real
+  per-keystroke cost was re-rendering all blocks, fixed by:
+- **`ExerciseBlock` is `React.memo`** with stable id/exercise-taking callbacks
+  from `DayView` (functional `setState` updates, no stale closures) — opening a
+  menu / typing in one block no longer re-renders every other block's rows.
+- **Lazy sheets:** `HistorySheet` + `PrescriptionDetailSheet` load via
+  `next/dynamic` (both render null until opened).
+
+Left in place (recorded): the in-file DayView sheets (Note/Replace/Add/Feedback/
+Complete) stay in the route chunk — splitting them is file surgery with modest
+return (route chunk is 16.6 kB gz total); PlannerBoard untouched (its draft-path
+acknowledgment rework is the tracked follow-up and shouldn't ride with this).
+Green: 588 tests (+4), typecheck, lint, production build.
+
+## 2026-07-01 — MCP mesocycle/macrocycle authoring (I12)
 
 Closes the connector's authoring gap: the LLM coach could read state and swap
 exercises within existing days, but couldn't build a plan **into the macro** the

@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
@@ -9,22 +17,39 @@ import { SnapSlider } from "@/components/ui/SnapSlider";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
-import { HistorySheet } from "@/components/HistorySheet";
-import { PrescriptionDetailSheet } from "@/components/PrescriptionDetailSheet";
+import dynamic from "next/dynamic";
+
+// Secondary reveal surfaces (WS-J): both render null until opened, so their
+// code (fetch + list rendering) loads lazily in a separate chunk instead of
+// riding in the day view's first-load JS.
+const HistorySheet = dynamic(() =>
+  import("@/components/HistorySheet").then((m) => m.HistorySheet),
+);
+const PrescriptionDetailSheet = dynamic(() =>
+  import("@/components/PrescriptionDetailSheet").then(
+    (m) => m.PrescriptionDetailSheet,
+  ),
+);
 import type {
   LoggedExercise,
   NavWeek,
   WorkoutDetail,
 } from "@/lib/queries/logging";
+// WS-J bundle split: import the zod-free predictor core + load helpers directly
+// so the client chunk never pulls the engine barrel (prescribe/macro/rules) or
+// zod. `params` arrives already validated by the server (getActiveEngineParams).
 import {
   predictRepsAtWeight,
   estimateE1rm,
+  type E1rmConfig,
+} from "@/lib/engine/predict";
+import {
   effectiveLoad,
   isBodyweightLoad,
   coerceLoadType,
   type LoadType,
-  type EngineParams,
-} from "@/lib/engine";
+} from "@/lib/engine/load";
+import type { EngineParams } from "@/lib/engine/params";
 import { formatWeight } from "@/lib/units";
 import {
   addSetAction,
@@ -222,31 +247,99 @@ export function DayView({
     }
   }, [workout.id, mesocycle.status]);
 
-  const commit: Commit = (fn) => startTransition(fn);
+  const commit: Commit = useCallback((fn) => startTransition(fn), []);
 
   // progress bar denominator excludes skipped slots; an exercise is "done"
   // when every planned slot is either logged or skipped (fig 1.1/1.3)
-  const loggedSets = exercises.reduce((n, we) => n + we.sets.length, 0);
-  const totalSets = exercises
-    .filter((we) => we.status !== "skipped")
-    .reduce((n, we) => {
-      const planned = plannedSetCount(we);
-      const skipped = we.skipped_set_numbers.filter((s) => s <= planned).length;
-      return n + Math.max(0, planned - skipped);
-    }, 0);
+  const { loggedSets, totalSets, allDone } = useMemo(() => {
+    const logged = exercises.reduce((n, we) => n + we.sets.length, 0);
+    const total = exercises
+      .filter((we) => we.status !== "skipped")
+      .reduce((n, we) => {
+        const planned = plannedSetCount(we);
+        const skipped = we.skipped_set_numbers.filter(
+          (s) => s <= planned,
+        ).length;
+        return n + Math.max(0, planned - skipped);
+      }, 0);
+    return {
+      loggedSets: logged,
+      totalSets: total,
+      allDone: exercises.length > 0 && exercises.every(exerciseDone),
+    };
+  }, [exercises]);
 
-  const allDone = exercises.length > 0 && exercises.every(exerciseDone);
-
-  const groupSiblings = (we: LoggedExercise) =>
-    exercises.filter(
-      (x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id,
-    );
+  const groupSiblings = useCallback(
+    (we: LoggedExercise) =>
+      exercises.filter(
+        (x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id,
+      ),
+    [exercises],
+  );
   // first to be completed in its group → recovery/soreness prompt
-  const isFirstOfGroup = (we: LoggedExercise) =>
-    groupSiblings(we).every((x) => !exerciseDone(x));
+  const isFirstOfGroup = useCallback(
+    (we: LoggedExercise) => groupSiblings(we).every((x) => !exerciseDone(x)),
+    [groupSiblings],
+  );
   // group fully done (this exercise closed it) → joint pain + pump + workload
-  const isLastOfGroup = (we: LoggedExercise) =>
-    groupSiblings(we).every(exerciseDone);
+  const isLastOfGroup = useCallback(
+    (we: LoggedExercise) => groupSiblings(we).every(exerciseDone),
+    [groupSiblings],
+  );
+
+  // Stable, id/exercise-taking handlers so `ExerciseBlock` (React.memo) skips
+  // re-rendering the untouched blocks when one block's menu/sheet state moves
+  // (WS-J render-scope). Data changes replace `exercises`, so blocks re-render
+  // on real updates regardless.
+  const openExerciseMenu = useCallback(
+    (id: string) => setMenuFor((cur) => (cur === id ? null : id)),
+    [],
+  );
+  const closeExerciseMenu = useCallback(() => setMenuFor(null), []);
+  const openSetMenu = useCallback(
+    (weId: string, setNumber: number) =>
+      setSetMenu((cur) =>
+        cur?.weId === weId && cur.setNumber === setNumber
+          ? null
+          : { weId, setNumber },
+      ),
+    [],
+  );
+  const closeSetMenu = useCallback(() => setSetMenu(null), []);
+  const openHistory = useCallback(
+    (we: LoggedExercise) => setHistoryFor(we),
+    [],
+  );
+  const openAudit = useCallback((we: LoggedExercise) => setAuditFor(we), []);
+  const openReplace = useCallback(
+    (we: LoggedExercise) => setReplaceFor(we),
+    [],
+  );
+  const openNote = useCallback(
+    (we: LoggedExercise, origin: NoteOrigin) => setNoteSheet({ we, origin }),
+    [],
+  );
+  const openFeedback = useCallback(
+    (we: LoggedExercise) => setFeedbackFor(we),
+    [],
+  );
+  const toggleDrop = useCallback(
+    (id: string) => setDropPending((cur) => ({ ...cur, [id]: !cur[id] })),
+    [],
+  );
+  const handleLogged = useCallback(
+    (we: LoggedExercise, wasLastPlannedSet: boolean) => {
+      // only prompt on the first (soreness) and group-closing (joint pain +
+      // pump + workload) exercises — middle ones don't auto-ask
+      if (
+        wasLastPlannedSet &&
+        !we.feedback &&
+        (isFirstOfGroup(we) || isLastOfGroup(we))
+      )
+        setFeedbackFor(we);
+    },
+    [isFirstOfGroup, isLastOfGroup],
+  );
 
   return (
     <div>
@@ -275,40 +368,23 @@ export function DayView({
           we={we}
           index={i}
           readOnly={readOnly}
-          params={params}
+          e1rmCfg={params.e1rm}
           microTargetRir={microcycle.target_rir}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
           dropPending={dropPending[we.id] ?? false}
           isLast={i === exercises.length - 1}
-          onOpenMenu={() => setMenuFor(menuFor === we.id ? null : we.id)}
-          onCloseMenu={() => setMenuFor(null)}
-          onOpenSetMenu={(setNumber) =>
-            setSetMenu(
-              setMenu?.weId === we.id && setMenu.setNumber === setNumber
-                ? null
-                : { weId: we.id, setNumber },
-            )
-          }
-          onCloseSetMenu={() => setSetMenu(null)}
-          onHistory={() => setHistoryFor(we)}
-          onAudit={() => setAuditFor(we)}
-          onReplace={() => setReplaceFor(we)}
-          onNote={(origin) => setNoteSheet({ we, origin })}
-          onFeedback={() => setFeedbackFor(we)}
-          onToggleDrop={() =>
-            setDropPending((cur) => ({ ...cur, [we.id]: !cur[we.id] }))
-          }
-          onLogged={(wasLast) => {
-            // only prompt on the first (soreness) and group-closing (joint
-            // pain + pump + workload) exercises — middle ones don't auto-ask
-            if (
-              wasLast &&
-              !we.feedback &&
-              (isFirstOfGroup(we) || isLastOfGroup(we))
-            )
-              setFeedbackFor(we);
-          }}
+          onOpenMenu={openExerciseMenu}
+          onCloseMenu={closeExerciseMenu}
+          onOpenSetMenu={openSetMenu}
+          onCloseSetMenu={closeSetMenu}
+          onHistory={openHistory}
+          onAudit={openAudit}
+          onReplace={openReplace}
+          onNote={openNote}
+          onFeedback={openFeedback}
+          onToggleDrop={toggleDrop}
+          onLogged={handleLogged}
           commit={commit}
         />
       ))}
@@ -778,11 +854,11 @@ function WorkoutOptionsMenu({
 // exercise block + set grid (fig 1.1)
 // ---------------------------------------------------------------------------
 
-function ExerciseBlock({
+const ExerciseBlock = memo(function ExerciseBlock({
   we,
   index,
   readOnly,
-  params,
+  e1rmCfg,
   microTargetRir,
   menuOpen,
   setMenuTarget,
@@ -804,23 +880,23 @@ function ExerciseBlock({
   we: LoggedExercise;
   index: number;
   readOnly: boolean;
-  params: EngineParams;
+  e1rmCfg: E1rmConfig;
   microTargetRir: number;
   menuOpen: boolean;
   setMenuTarget: number | null;
   dropPending: boolean;
   isLast: boolean;
-  onOpenMenu: () => void;
+  onOpenMenu: (weId: string) => void;
   onCloseMenu: () => void;
-  onOpenSetMenu: (setNumber: number) => void;
+  onOpenSetMenu: (weId: string, setNumber: number) => void;
   onCloseSetMenu: () => void;
-  onHistory: () => void;
-  onAudit: () => void;
-  onReplace: () => void;
-  onNote: (origin: NoteOrigin) => void;
-  onFeedback: () => void;
-  onToggleDrop: () => void;
-  onLogged: (wasLastPlannedSet: boolean) => void;
+  onHistory: (we: LoggedExercise) => void;
+  onAudit: (we: LoggedExercise) => void;
+  onReplace: (we: LoggedExercise) => void;
+  onNote: (we: LoggedExercise, origin: NoteOrigin) => void;
+  onFeedback: (we: LoggedExercise) => void;
+  onToggleDrop: (weId: string) => void;
+  onLogged: (we: LoggedExercise, wasLastPlannedSet: boolean) => void;
   commit: Commit;
 }) {
   const skipped = we.status === "skipped";
@@ -855,7 +931,7 @@ function ExerciseBlock({
             type="button"
             aria-label={`${we.exercise_name} note`}
             className={iconBtn}
-            onClick={() => onNote("menu")}
+            onClick={() => onNote(we, "menu")}
           >
             <svg width="14" height="14" viewBox="0 0 14 14">
               <path
@@ -874,7 +950,7 @@ function ExerciseBlock({
               />
             </svg>
           </button>
-          <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={onHistory}>
+          <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={() => onHistory(we)}>
             <svg width="14" height="14" viewBox="0 0 14 14">
               <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
               <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
@@ -884,7 +960,7 @@ function ExerciseBlock({
             type="button"
             ref={menuBtnRef}
             aria-label={`${we.exercise_name} menu`}
-            onClick={onOpenMenu}
+            onClick={() => onOpenMenu(we.id)}
             className={`${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`}
           >
             …
@@ -915,7 +991,7 @@ function ExerciseBlock({
             <button
               type="button"
               aria-label="edit pinned note"
-              onClick={() => onNote("pinned")}
+              onClick={() => onNote(we, "pinned")}
               className="-my-1 shrink-0 px-1.5 py-1 text-ink/55"
             >
               <PencilGlyph />
@@ -928,7 +1004,7 @@ function ExerciseBlock({
           type="button"
           disabled={readOnly}
           aria-label="edit session note"
-          onClick={() => onNote("session")}
+          onClick={() => onNote(we, "session")}
           className="mt-[7px] flex w-full items-start justify-between gap-2 border-l-2 border-ink/35 py-[5px] pl-2.5 text-left text-[11px] font-medium text-ink/60 disabled:cursor-default"
         >
           <span>NOTE — {we.feedback.notes}</span>
@@ -966,16 +1042,16 @@ function ExerciseBlock({
                 setNumber={setNumber}
                 state={state}
                 readOnly={readOnly}
-                params={params}
+                e1rmCfg={e1rmCfg}
                 targetRir={we.target_rir ?? microTargetRir}
                 logged={logged ?? null}
                 isLastRow={setNumber === plannedSets}
                 dropPending={dropPending}
                 menuOpen={setMenuTarget === setNumber}
-                onOpenMenu={() => onOpenSetMenu(setNumber)}
+                onOpenMenu={() => onOpenSetMenu(we.id, setNumber)}
                 onCloseMenu={onCloseSetMenu}
-                onToggleDrop={onToggleDrop}
-                onLogged={() => onLogged(setNumber >= plannedSets)}
+                onToggleDrop={() => onToggleDrop(we.id)}
+                onLogged={() => onLogged(we, setNumber >= plannedSets)}
                 commit={commit}
               />
             );
@@ -1004,7 +1080,7 @@ function ExerciseBlock({
             aria-label={`${we.exercise_name} prescription detail`}
             onClick={() => {
               onCloseMenu();
-              onAudit();
+              onAudit(we);
             }}
             className="flex w-full items-start justify-between gap-2 border-b border-ink/10 px-4 py-2 text-left text-[11px] leading-[1.45] text-ink/60"
           >
@@ -1027,7 +1103,7 @@ function ExerciseBlock({
           trailing={we.pinned_note || we.feedback?.notes ? "›" : undefined}
           onClick={() => {
             onCloseMenu();
-            onNote("menu");
+            onNote(we, "menu");
           }}
         />
         {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
@@ -1036,7 +1112,7 @@ function ExerciseBlock({
             trailing="›"
             onClick={() => {
               onCloseMenu();
-              onReplace();
+              onReplace(we);
             }}
           />
         ) : (
@@ -1088,7 +1164,7 @@ function ExerciseBlock({
               label={we.feedback ? "Edit feedback" : "Add feedback"}
               onClick={() => {
                 onCloseMenu();
-                onFeedback();
+                onFeedback(we);
               }}
             />
             {nextSetNumber !== 0 && (
@@ -1152,7 +1228,7 @@ function ExerciseBlock({
       </AnchoredMenu>
     </div>
   );
-}
+});
 
 /**
  * Menu card anchored to a trigger button, fixed to the viewport so it never
@@ -1281,7 +1357,7 @@ function SetRow({
   setNumber,
   state,
   readOnly,
-  params,
+  e1rmCfg,
   targetRir,
   logged,
   isLastRow,
@@ -1297,7 +1373,7 @@ function SetRow({
   setNumber: number;
   state: "logged" | "skipped" | "next" | "future";
   readOnly: boolean;
-  params: EngineParams;
+  e1rmCfg: E1rmConfig;
   targetRir: number;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
   isLastRow: boolean;
@@ -1329,11 +1405,14 @@ function SetRow({
   // reps that land on the target RIR at a given weight, from the recency-
   // weighted strength anchor (doc 11); null when there's no usable history. For
   // bodyweight movements the anchor is on EFFECTIVE load, so convert first.
-  const predictReps = (w: number): number | null => {
-    const eff = isBw ? effectiveLoad(loadType, w, bw) : w;
-    if (eff == null || eff <= 0) return null;
-    return predictRepsAtWeight(anchor, eff, targetRir, params);
-  };
+  const predictReps = useCallback(
+    (w: number): number | null => {
+      const eff = isBw ? effectiveLoad(loadType, w, bw) : w;
+      if (eff == null || eff <= 0) return null;
+      return predictRepsAtWeight(anchor, eff, targetRir, e1rmCfg);
+    },
+    [isBw, loadType, bw, anchor, targetRir, e1rmCfg],
+  );
 
   const initialWeight =
     logged?.weight ??
@@ -1465,6 +1544,15 @@ function SetRow({
 
   const staticCells = state === "future" || state === "skipped";
 
+  // static (future/skipped) rows show the reps that hit target RIR at the
+  // planned weight — memoized so a parent re-render (menu/sheet state) doesn't
+  // re-run the bisection for every row (WS-J)
+  const staticPredictedReps = useMemo(
+    () =>
+      staticCells && staticWeight != null ? predictReps(staticWeight) : null,
+    [staticCells, staticWeight, predictReps],
+  );
+
   // P19: a logged set gets a small marker for whether it landed above or below
   // its prescription, compared by e1RM so it accounts for both the reps hit and
   // the RIR left in reserve (more reps OR closer to failure => above). Null when
@@ -1473,33 +1561,42 @@ function SetRow({
   // for bodyweight movements the e1RM compares on EFFECTIVE load: the prescription
   // against the current bodyweight, the logged set against the bodyweight captured
   // on that set (historical honesty).
-  const prescribedEff = isBw
-    ? effectiveLoad(loadType, prescribedWeight ?? 0, bw)
-    : prescribedWeight;
-  const prescriptionE1rm =
-    prescribedEff != null && prescribedEff > 0 && prescribedReps != null
-      ? (estimateE1rm(prescribedEff, prescribedReps, targetRir, params)?.value ??
-        null)
-      : null;
-  const loggedEff =
-    state === "logged" && logged
-      ? isBw
-        ? effectiveLoad(loadType, logged.weight, logged.bodyweight ?? bw)
-        : logged.weight
-      : null;
-  const loggedE1rm =
-    state === "logged" && logged && loggedEff != null && loggedEff > 0
-      ? (estimateE1rm(loggedEff, logged.reps, logged.rir_reported, params)
-          ?.value ?? null)
-      : null;
-  const performance: "over" | "under" | null =
-    prescriptionE1rm != null && loggedE1rm != null && prescriptionE1rm > 0
+  const performance = useMemo<"over" | "under" | null>(() => {
+    if (state !== "logged" || !logged) return null;
+    const prescribedEff = isBw
+      ? effectiveLoad(loadType, prescribedWeight ?? 0, bw)
+      : prescribedWeight;
+    const prescriptionE1rm =
+      prescribedEff != null && prescribedEff > 0 && prescribedReps != null
+        ? (estimateE1rm(prescribedEff, prescribedReps, targetRir, e1rmCfg)
+            ?.value ?? null)
+        : null;
+    const loggedEff = isBw
+      ? effectiveLoad(loadType, logged.weight, logged.bodyweight ?? bw)
+      : logged.weight;
+    const loggedE1rm =
+      loggedEff != null && loggedEff > 0
+        ? (estimateE1rm(loggedEff, logged.reps, logged.rir_reported, e1rmCfg)
+            ?.value ?? null)
+        : null;
+    return prescriptionE1rm != null && loggedE1rm != null && prescriptionE1rm > 0
       ? loggedE1rm > prescriptionE1rm * 1.015
         ? "over"
         : loggedE1rm < prescriptionE1rm * 0.985
           ? "under"
           : null
       : null;
+  }, [
+    state,
+    logged,
+    isBw,
+    loadType,
+    bw,
+    prescribedWeight,
+    prescribedReps,
+    targetRir,
+    e1rmCfg,
+  ]);
 
   return (
     <div
@@ -1524,9 +1621,7 @@ function SetRow({
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
             {/* future rows show the reps that hit target RIR at the planned
                 weight, falling back to the prescription without an anchor */}
-            {(staticWeight != null ? predictReps(staticWeight) : null) ??
-              prescribedReps ??
-              "—"}
+            {staticPredictedReps ?? prescribedReps ?? "—"}
           </div>
         </>
       ) : (

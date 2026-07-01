@@ -4,7 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-01 — Session 23: I12 — MCP mesocycle/macrocycle authoring
+## 2026-07-01 — Session 24: WS-J Phase 1 — client bundle & render slice (PR #93)
+
+Reconciliation sweep: no-op (only PR-linked live row is I12 `advanced (PR #92)`,
+merged but intentionally live — in-app planner UX remains). Picked the next J slice
+per `J-performance.md`: Phase 1 client bundle/render (the planner draft-path rework
+stays its own isolated follow-up).
+
+- **`/log` + `/workout`: 142 → 125 kB First Load JS (−17 kB gz).** Chunk
+  fingerprinting showed the "engine" delta was mostly **zod itself** (12.7 kB gz,
+  present only because `reps.ts`/`e1rm.ts` parse params inside every exported
+  function) + the params/schema layer (4.7 kB).
+- **`engine/predict.ts`** — zod-free predictor core (type-only imports, keyed on the
+  validated `params.e1rm` slice); `e1rm.ts`/`reps.ts` keep byte-identical public
+  APIs as parse-then-delegate wrappers (hard rule #6 intact). `predict.test.ts`:
+  core ≡ wrapper on two param generations + a static no-runtime-zod import guard.
+  Server bonus: `recencyWeightedE1rm` parses once per anchor, not per sample.
+- **DayView render path:** future-row predictions + P19 markers `useMemo`ized;
+  `ExerciseBlock` → `React.memo` with stable id-taking callbacks (functional
+  updates) so one block's menu/typing doesn't re-render the rest; day progress
+  counts memoized; `HistorySheet`/`PrescriptionDetailSheet` via `next/dynamic`.
+- **Measure-first corrections recorded:** the planned weight-input debounce was
+  moot (prediction fires on blur, not per keystroke); `ExerciseBlock` already
+  existed — the gap was memo + stable props, not extraction.
+- Green: 588 tests (+4), typecheck, lint, production build. N1 stays in-progress
+  (remaining: Phase 2 #5/#6/#7 caching; planner draft-path optimistic; Phase 3).
 
 Built the connector's plan-into-a-macro authoring surface (from a needs doc the owner
 relayed from the LLM coach). Advances **I12** (was `triaged (needs design pass)`) — the
