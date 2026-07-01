@@ -54,6 +54,14 @@ export const V16_PARAMS: EngineParams = {
   bodyweight_model: true,
 };
 
+/** v17 = v16 plus the joint-pain hard gate on set counts (R8, doc 10 §3 step 0):
+ *  pain ≥ pain_gate vetoes set additions; pain ≥ pain_cut_gate cuts a set and
+ *  suggests substitution. Mirrors `20260701000001_engine_params_v17_pain_set_gate`. */
+export const V17_PARAMS: EngineParams = {
+  ...V16_PARAMS,
+  pain_cut_gate: 3,
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

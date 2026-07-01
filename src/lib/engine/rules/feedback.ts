@@ -34,7 +34,22 @@ export function modulateFromFeedback(
   const pumpGood = fb?.pump != null && fb.pump >= params.set_add_pump_min;
   const pumpLow = fb?.pump != null && fb.pump <= params.pump_low;
 
-  if (workloadHot) {
+  // doc 10 §3 step 0 (gated on `pain_cut_gate`, v17+): joint pain is the hard
+  // safety gate and runs FIRST — pain at/above `pain_cut_gate` cuts a set and
+  // flags substitution; pain at/above `pain_gate` vetoes any addition, both
+  // regardless of workload/pump. ABSENT ⇒ legacy: pain never touches set counts.
+  const painCuts =
+    params.pain_cut_gate != null &&
+    fb?.jointPain != null &&
+    fb.jointPain >= params.pain_cut_gate;
+  const painVetoesAdd = params.pain_cut_gate != null && painGated;
+
+  if (painCuts) {
+    setDelta = -1;
+    notes.push(
+      `joint pain ${fb!.jointPain}/3: set removed — consider substituting this exercise`,
+    );
+  } else if (workloadHot) {
     setDelta = -1;
     notes.push(`workload ${fb!.workload}/10 past just right: set removed`);
   } else if (
@@ -44,8 +59,12 @@ export function modulateFromFeedback(
     (inputs.muscleGroupWeeklySets === null ||
       inputs.muscleGroupWeeklySets < params.mg_set_ceiling)
   ) {
-    setDelta = 1;
-    notes.push(`workload ${fb!.workload}/10 easy with strong pump: set added`);
+    if (painVetoesAdd) {
+      notes.push(`joint pain ${fb!.jointPain}/3: set addition vetoed`);
+    } else {
+      setDelta = 1;
+      notes.push(`workload ${fb!.workload}/10 easy with strong pump: set added`);
+    }
   } else if (pumpLow && workloadOnTarget) {
     // dose is right but the stimulus isn't landing — selection, not load
     notes.push("low pump at the right workload: consider a different exercise");

@@ -4,6 +4,48 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-01 — Session 26: R1 + R8 — the review's top two, shipped live (PR #95)
+
+Reconciliation sweep: no-op (no `done (PR #n)` rows live; I12 `advanced (PR #92)`
+intentionally live, N1 in-progress). Picked the review's suggested attack order:
+**R1 + R8** (small diffs, worst consequences). Branch
+`claude/notes-review-prioritize-diew7r`.
+
+- **R1 — done (PR #95).** Share redemption is no longer a cross-user copy
+  primitive. Migration `20260701000002` drops `shares_grantee_accept` (RLS can't
+  scope columns; no client path updates shares — redemption runs on the service
+  client, so the policy's only real use was the exploit). **Applied live** and
+  probe-verified: a simulated grantee UPDATE (authenticated role + JWT sub)
+  touches 0 rows; grantee SELECT + owner control intact. Defense in depth:
+  `acceptShareCode` now asserts every copied object is owned by
+  `share.owner_id` (stock exercises excepted) — also closes the owner-side
+  rewrite surface (`shares_owner_all` allowed re-pointing one's own share at a
+  victim uuid; the insert path was already ownership-checked but the update
+  path wasn't). New `shares` RLS describe block (grantee read-only; runs once
+  R2 revives the job) + 5 mocked-service ownership tests in `sharing.test.ts`.
+- **R8 — done (PR #95), v17 ACTIVATED.** Doc 10 §3 step 0 is now enforced:
+  new optional `pain_cut_gate` param (v11–v16 `.optional()` discipline — absent
+  ⇒ legacy, pre-v17 decisions replay byte-identically); with it present the
+  feedback rule runs pain first — pain ≥ `pain_gate` (2) vetoes set additions,
+  pain ≥ `pain_cut_gate` (3) forces −1 set + a substitution note, regardless of
+  workload/pump. Table-driven `pain-gate.test.ts` (13) + a bounds property
+  invariant (no set increase under the gate over 500 randomized inputs) + v17
+  hash guard. Migration `20260701000001` (v17 INACTIVE) **applied**, then
+  **activated** after replay verification: v16-sourced decisions show zero
+  set-count diffs (the only 2 diffs are the pre-existing R10 bodyweight-seed
+  replay artifact — R10 stays open); live history has pain ≥ 2 twice, pain 3
+  never, so activation changes nothing retroactively and only bites when pain
+  recurs. Open prescriptions re-stamp on next view via the freshness reconcile.
+- **R2 — advanced (PR #95).** Folded in the stale-assertion half since this PR
+  already edits `rls.test.ts`: the recursion-guard test now updates
+  `display_name` (not the dropped `units` column) and the engine-params read
+  asserts one active row at version ≥ 10 instead of the long-stale `=== 5` pin.
+  Remaining (own PR): clean-DB migration ordering, commit `rls_auto_enable()`,
+  make the CI jobs required checks.
+- Green: **609 tests (+21)**, typecheck, lint. Next per the attack order: finish
+  **R2** (revive the migrations/RLS/CI guardrails — also unblocks the new shares
+  RLS tests actually running), then R17+R16.
+
 ## 2026-07-01 — Session 25: full-surface repo review → items R1–R25 (Batch 3) (PR #94)
 
 Reconciliation sweep: no-op (same state as Session 24 — I12 `advanced (PR #92)`

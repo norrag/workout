@@ -2,7 +2,55 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-01 (latest) — WS-J Phase 1: client bundle & render slice
+## 2026-07-01 (latest) — R1 share-redemption lockdown + R8 joint-pain set gate (engine_params v17, ACTIVATED)
+
+The top two items from the 2026-07-01 repo review
+([reviews/2026-07-01-repo-review.md](reviews/2026-07-01-repo-review.md)) — small
+diffs, worst consequences.
+
+- **R1 — share redemption is no longer a cross-user copy primitive.** Two
+  layers, both live:
+  - Migration `20260701000002_shares_grantee_lockdown` (**applied**) drops the
+    `shares_grantee_accept` policy. RLS can't scope columns, so the policy let a
+    grantee rewrite `object_id`/`object_type` on their share row via PostgREST
+    and re-submit the code — the service-role copy would then exfiltrate any
+    object uuid into their account. No client path updates shares (redemption
+    runs on the service client), so the policy had no legitimate consumer.
+    Verified live: a simulated grantee UPDATE touches 0 rows; grantee SELECT and
+    owner control unchanged.
+  - `acceptShareCode` (`queries/sharing.ts`) now asserts every copied object is
+    owned by `share.owner_id` (stock exercises excepted) before copying — closing
+    the remaining owner-side rewrite surface (`shares_owner_all` lets an owner
+    re-point their own share at a victim's uuid). Copy fns take the owner id;
+    template/meso fills may only reference stock or the owner's own exercises.
+  - Tests: 5 mocked-service `acceptShareCode` ownership tests
+    (`sharing.test.ts`) + a new `shares` RLS suite (`tests/rls/rls.test.ts`) —
+    grantee can read but not update/delete, owner keeps control, non-parties see
+    nothing. (The RLS job itself is still dead pending R2.)
+- **R8 — joint pain now gates set counts (doc 10 §3 step 0).** The one hard
+  safety gate only ever blocked *load*; `setDelta` ignored pain entirely, so
+  pain 3/3 with an easy workload + strong pump **added a set**. New optional
+  `pain_cut_gate` param (same `.optional()` gating discipline as
+  v11–v16; absent ⇒ legacy, so historical rows replay byte-identically). With it
+  present, `modulateFromFeedback` runs the pain check first: pain ≥ `pain_gate`
+  (2) vetoes any set addition ("set addition vetoed"); pain ≥ `pain_cut_gate`
+  (3) forces a −1 set cut with a substitution suggestion, regardless of
+  workload/pump. Tests: table-driven `pain-gate.test.ts` (13 cases incl. legacy
+  replay behavior + end-to-end prescribe), a new bounds property invariant (no
+  set increase under the gate; a cut at pain 3), v17 hash guard.
+- **engine_params v17 shipped and ACTIVATED** (migration `20260701000001`,
+  applied; activated via `activate_engine_params` after replay verification).
+  Replay: v16-sourced decisions show **zero set-count diffs** (the only 2 diffs
+  are the known R10 bodyweight-seed replay artifact, pre-existing); live
+  feedback history has pain ≥ 2 only twice and pain 3 never, so activation is
+  behaviorally identical on all recorded history and only changes future
+  prescriptions when pain ≥ 2 recurs. Open prescriptions re-verify on next view
+  via the freshness reconcile (params-version token change).
+
+Suite 609 green (+21), typecheck + lint clean. Backlog rows R1/R8 updated in
+[notes/backlog.md](notes/backlog.md).
+
+## 2026-07-01 — WS-J Phase 1: client bundle & render slice
 
 The measured client-side slice of the performance workstream
 ([notes/J-performance.md](notes/J-performance.md), N1). Headline: the daily-loop
