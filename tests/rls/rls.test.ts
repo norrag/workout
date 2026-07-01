@@ -83,12 +83,22 @@ describe("profiles", () => {
   });
 
   it("owners cannot escalate their own role", async () => {
-    const { data } = await alice
+    // the escalation is rejected by profiles_update_own's WITH CHECK, which
+    // surfaces as a 42501 error (null data), not a silent 0-row update —
+    // matches the hosted-verified behavior (2026-06-22 recursion-fix probe)
+    const { data, error } = await alice
       .from("profiles")
       .update({ role: "admin" })
       .eq("id", aliceId)
       .select();
-    expect(data).toEqual([]);
+    expect(data).toBeNull();
+    expect(error?.code).toBe("42501");
+    const { data: after } = await alice
+      .from("profiles")
+      .select("role")
+      .eq("id", aliceId)
+      .maybeSingle();
+    expect(after?.role).toBe("user");
   });
 
   it("owners can toggle their own auto-match-weights setting", async () => {

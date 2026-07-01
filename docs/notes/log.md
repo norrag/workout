@@ -42,6 +42,11 @@ relies on). Branch `claude/notes-review-prioritize-rz0rkh`.
      untouched so the 0620 revokes stand; RLS default-deny stays the gate).
      Verified on scratch with zero simulated defaults; hosted no-op
      (relacl identical before/after).
+  6. **Stale escalation assertion** (CI run 3 — 28/29 tests passed): the
+     role-escalation test expected a silent 0-row update (`[]`), but the
+     WITH CHECK rejection errors with 42501 (the hosted-verified behavior
+     from the 06-22 recursion-fix probe). Assertion fixed + strengthened
+     (role verified unchanged after the attempt).
   - End-state checks: 26/26 tables RLS-on; stock data identical to hosted
     (330 exercises / 352 links / 8 templates); single active params v10;
     `ensure_rls` proven to auto-enable RLS on a new table.
