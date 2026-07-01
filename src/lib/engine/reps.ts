@@ -8,25 +8,20 @@
  * "at this weight, how many reps lands on the target RIR?" and the converse,
  * "at these reps, what RIR does this weight imply?"
  *
- * All math reuses the §1 effective-reps model (`e1rm.ts`); all tunables come
- * from `engine_params.e1rm`. No I/O, no clock, no randomness.
+ * All math reuses the §1 effective-reps model (`predict.ts`, zod-free — WS-J
+ * client-bundle split); all tunables come from `engine_params.e1rm`. No I/O, no
+ * clock, no randomness. This module is the validating public API: each function
+ * parses the raw params once at the boundary and delegates to the core.
  */
 import { engineParamsSchema, type EngineParams } from "./params";
 import {
-  e1rmFactor,
-  e1rmFromEffectiveReps,
-  estimateE1rm,
+  effectiveRepsForE1rm as effectiveRepsForE1rmCore,
+  predictRepsAtWeight as predictRepsAtWeightCore,
+  weightForRepsAtRir as weightForRepsAtRirCore,
+  impliedRirAtReps as impliedRirAtRepsCore,
+  estimateE1rm as estimateE1rmCore,
   type E1rmConfidence,
-} from "./e1rm";
-
-/** Forward e1RM at a given effective-rep count (shared §S3 switch with e1rm.ts). */
-function e1rmAtEffectiveReps(
-  weight: number,
-  effectiveReps: number,
-  cfg: EngineParams["e1rm"],
-): number {
-  return e1rmFromEffectiveReps(weight, effectiveReps, cfg);
-}
+} from "./predict";
 
 /**
  * Invert the averaged e1RM curve: the effective reps at which `weight` yields
@@ -40,19 +35,7 @@ export function effectiveRepsForE1rm(
   rawParams: EngineParams,
 ): number {
   const params = engineParamsSchema.parse(rawParams);
-  const cfg = params.e1rm;
-  if (e1rm <= 0 || weight <= 0) return 0;
-  if (weight >= e1rm) return 0; // at or above estimated 1RM: ≤ 1 rep
-  let lo = 0;
-  let hi = 35.9; // Brzycki blows up at 37; cap inside the valid band
-  // e1RM grows without bound as reps→36; if even hi can't reach e1rm, return hi
-  if (e1rmAtEffectiveReps(weight, hi, cfg) < e1rm) return hi;
-  for (let i = 0; i < 40; i += 1) {
-    const mid = (lo + hi) / 2;
-    if (e1rmAtEffectiveReps(weight, mid, cfg) < e1rm) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
+  return effectiveRepsForE1rmCore(e1rm, weight, params.e1rm);
 }
 
 /**
@@ -68,10 +51,7 @@ export function predictRepsAtWeight(
   rawParams: EngineParams,
 ): number | null {
   const params = engineParamsSchema.parse(rawParams);
-  if (e1rm == null || e1rm <= 0 || weight <= 0) return null;
-  const effReps = effectiveRepsForE1rm(e1rm, weight, params);
-  const reps = Math.round(effReps - targetRir * params.e1rm.rir_offset);
-  return Math.max(1, reps);
+  return predictRepsAtWeightCore(e1rm, weight, targetRir, params.e1rm);
 }
 
 /**
@@ -88,13 +68,7 @@ export function weightForRepsAtRir(
   rawParams: EngineParams,
 ): number | null {
   const params = engineParamsSchema.parse(rawParams);
-  if (e1rm == null || e1rm <= 0 || reps <= 0) return null;
-  const eff = reps + targetRir * params.e1rm.rir_offset;
-  // same §S3 switch as the forward estimate (e1rm.ts e1rmFactor), so choosing a
-  // load for target reps inverts exactly the curve used to score a logged set.
-  const k = e1rmFactor(eff, params.e1rm);
-  if (k <= 0) return null;
-  return e1rm / k;
+  return weightForRepsAtRirCore(e1rm, reps, targetRir, params.e1rm);
 }
 
 /**
@@ -109,10 +83,7 @@ export function impliedRirAtReps(
   rawParams: EngineParams,
 ): number | null {
   const params = engineParamsSchema.parse(rawParams);
-  if (e1rm == null || e1rm <= 0 || weight <= 0 || reps <= 0) return null;
-  const effReps = effectiveRepsForE1rm(e1rm, weight, params);
-  const rir = (effReps - reps) / (params.e1rm.rir_offset || 1);
-  return Math.max(0, Math.round(rir));
+  return impliedRirAtRepsCore(e1rm, weight, reps, params.e1rm);
 }
 
 /** One historical working set feeding the recency-weighted anchor. */
@@ -165,9 +136,12 @@ export function recencyWeightedE1rm(
   samples: E1rmSample[],
   rawParams: EngineParams,
 ): E1rmAnchor | null {
+  // parse once for the whole sample set (WS-J: was one parse per sample via
+  // the estimateE1rm wrapper), then run the zod-free core per sample
   const params = engineParamsSchema.parse(rawParams);
-  const halflife = params.e1rm.recency_halflife_days;
-  const method = params.e1rm.anchor_method;
+  const cfg = params.e1rm;
+  const halflife = cfg.recency_halflife_days;
+  const method = cfg.anchor_method;
 
   const entries: {
     value: number;
@@ -176,7 +150,7 @@ export function recencyWeightedE1rm(
     sessionKey?: string | null;
   }[] = [];
   for (const s of samples) {
-    const est = estimateE1rm(s.weight, s.reps, s.targetRir, params);
+    const est = estimateE1rmCore(s.weight, s.reps, s.targetRir, cfg);
     if (!est) continue;
     const recency = Math.pow(0.5, Math.max(0, s.ageDays) / halflife);
     if (recency <= 0) continue;
@@ -228,7 +202,7 @@ export function recencyWeightedE1rm(
     bestEntry.sessionKey == null
       ? [bestEntry]
       : entries.filter((e) => e.sessionKey === bestEntry.sessionKey);
-  const cw = params.e1rm.session_value_confidence_weights;
+  const cw = cfg.session_value_confidence_weights;
   let mean: number;
   if (cw) {
     let weightedSum = 0;

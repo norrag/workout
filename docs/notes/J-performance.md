@@ -217,6 +217,37 @@ Shared helpers (fix many at once):
 - **Extract `ExerciseBlock` into a `React.memo` subcomponent** with narrowed props
   so logging one set doesn't re-render the whole day tree.
 
+**Shipped 2026-07-01 (Phase 1 slice).** `/log/[workoutId]` + `/workout` **142 →
+125 kB** First Load JS (−17 kB gz). What the chunk fingerprinting showed: the
+~24 kB engine delta was mostly **zod itself** (12.7 kB gz) — pulled in because
+`reps.ts`/`e1rm.ts` run `engineParamsSchema.parse` inside every exported
+function — plus the params/schema layer (4.7 kB gz).
+- **`engine/predict.ts`** — zod-free predictor core (type-only imports), keyed on
+  the validated `params.e1rm` slice. `e1rm.ts`/`reps.ts` unchanged public APIs =
+  parse-then-delegate wrappers (boundary validation intact, hard rule #6);
+  `predict.test.ts` asserts core ≡ wrapper outputs + a **static import guard**
+  (no runtime `zod`/`./params` import in `predict.ts`/`load.ts` — the bundle win
+  can't silently regress). Server bonus: `recencyWeightedE1rm` parses once per
+  anchor build, not once per historical sample.
+- **DayView** leaf-imports `engine/predict`+`engine/load`; macro forms leaf-import
+  `engine/macro`; the engine barrel is server-only on the client paths.
+- **Measure-first corrections to this phase's plan:** (a) the weight-input
+  *debounce* was moot — the predictor fires on **blur**, not per keystroke; the
+  actual render-path waste was a zod parse per engine call per row per render
+  (future-row predictions + P19 markers recompute every render). Fixed by the
+  zod-free core + per-row `useMemo` on both. (b) `ExerciseBlock` already existed
+  as a subcomponent; the work was `React.memo` + converting DayView's inline
+  closures to stable id/exercise-taking `useCallback`s (functional updates) so
+  one block's menu/typing no longer re-renders every other block.
+- **Lazy sheets:** `HistorySheet` + `PrescriptionDetailSheet` via `next/dynamic`
+  (both render null until opened; no exit-animation risk).
+- **Not taken (recorded):** splitting the in-file DayView sheets
+  (Note/Replace/Add/Feedback/Complete) out of the 16.6 kB-gz route chunk — file
+  surgery, modest return; PlannerBoard lazy-loading — deferred to ride with the
+  tracked draft-path acknowledgment rework, not this slice. `/cycles/new` +
+  `/cycles/macro/edit` stay ~127 kB: their forms legitimately run
+  `planMacrocycle` (zod-validated inputs) client-side for the live preview.
+
 ### Phase 2 — Server load, egress & caching (ranked from the measured audit, 2026-06-30)
 Ranked server-side wins from the Phase 0 query/caching audit (Supabase advisors +
 code). Build order: #1 → #3/#4 → #8 → #6/#7 → migrations (#2/#9/#10).
@@ -298,7 +329,8 @@ live, don't pre-materialize); engine-stays-pure is not a bottleneck.
   own role/admin status), the leaked-password toggle (dashboard-only), and the unused-index /
   `shares` multi-policy INFO/WARN noise (dropping/rewriting riskier than the benefit).
 - **Still deferred:** #5/#6/#7 caching (`revalidateTag` + `unstable_cache` stable reads +
-  `select` narrowing — need tagging first); engine code-split off the `/log` client bundle.
+  `select` narrowing — need tagging first). The engine code-split off the `/log` client
+  bundle shipped 2026-07-01 (see Phase 1).
 
 ### Phase 3 — Streaming & structural cleanup (optional)
 - Suspense streaming on heavy server pages using `DayViewSkeleton`.

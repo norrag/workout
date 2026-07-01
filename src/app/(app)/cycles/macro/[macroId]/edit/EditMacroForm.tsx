@@ -2,15 +2,17 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+// WS-J bundle split: leaf import so the client chunk carries only the macro
+// planner, not the whole engine barrel (prescribe/rules/summary).
 import {
   planMacrocycle,
   suggestMesoLength,
-  type EngineParams,
   type MacroGoal,
   type MacroPlan,
   type MacroProfile,
   type MacroRange,
-} from "@/lib/engine";
+} from "@/lib/engine/macro";
+import type { EngineParams } from "@/lib/engine/params";
 import type { MacroGoalType } from "@/lib/types/database";
 import { editMacrocycleAction, type FormState } from "../../../actions";
 import type { MacroEditImpact } from "@/lib/queries/macro";
