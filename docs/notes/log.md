@@ -37,6 +37,11 @@ review says ship together). Branch `claude/notes-review-prioritize-1ore6l`.
   R3 (the server half — non-atomic `saveMesoPlan`) stays open, next up.
 - Green: **614 tests (+5)**, typecheck, lint, production build (`/log`
   first-load unchanged at 125 kB). No engine/schema/query change.
+- **PR #98 MERGED** same session (all checks green, incl. `rls-tests`) →
+  end-of-session archival sweep ran: R17 + R16 rows swept to `archive.md`
+  ("Swept 2026-07-01 (evening)"). Sweep shipped as its own small docs PR (a
+  merged PR can't sweep its own row). On-device failure-path spot check
+  (e.g. airplane-mode a note save) is the owner's final confirmation.
 - Next per the attack order: **R3 + R4** (write integrity), then R20
   (observability). R6/R14 owner decisions still queued.
 

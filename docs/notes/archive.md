@@ -11,6 +11,21 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-01 (evening) — R17 + R16 field usability merged (PR #98)
+
+Session 28 shipped the review's two destructive-failure UX items together (per
+its attack order); PR #98 merged with all checks green (incl. the revived
+`rls-tests`). Raw text stays in the backlog appendix (Batch 3); full record in
+PROGRESS 2026-07-01 and the Session 28 log entry. On-device failure-path spot
+check (e.g. airplane-mode a note save) remains the owner's final confirmation.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R17 | Sheet writes fail destructively: Note/Feedback/Complete close optimistically then error boundary wipes typed input while error page claims "Nothing was lost"; fetch-on-open sheets stuck on "Loading…"; save-as-template fails silently | B | E | **done — merged (PR #98).** No sheet write can reach the error boundary: shared `commit` (~14 menu ops) catches + toasts; Note/Feedback/Complete/End/Add close only after the write lands (failure keeps typed input + SAVING…/retry); amends via `runLog`; fetch-on-open sheets (History/Replace/AddExercise) get catch + stale-guard + shared `FetchRetry`; `?error=template` finally read by the meso page (+ SubmitButton — an R19 bullet); error-page copy honest. |
+| R16 | PlannerBoard staged edits: one failed save (throws to boundary, remounts, discards session) or one stray navigation (`dirty` only guards CANCEL) = total loss | B | D | **done — merged (PR #98).** `doSave` catches — staged `workDays` + confirm sheet survive for one-tap retry. New `useNavigationGuard` (capture-phase link intercept, history-sentinel back absorb, native beforeunload) routes all dirty-state navigation through the discard-confirm sheet with the intercepted destination; pure `shouldGuardNavigation` rule unit-tested. **R3 (server half — non-atomic `saveMesoPlan`) stays open in the live index.** |
+
+---
+
 ## Swept 2026-07-01 (later) — R2 merged (PR #96)
 
 Session 27 shipped the guardrail revival; PR #96 is merged and its CI run was
