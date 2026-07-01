@@ -17,6 +17,7 @@ import { SnapSlider } from "@/components/ui/SnapSlider";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
+import { FetchRetry } from "@/components/ui/FetchRetry";
 import dynamic from "next/dynamic";
 
 // Secondary reveal surfaces (WS-J): both render null until opened, so their
@@ -222,6 +223,7 @@ export function DayView({
   const { workout, microcycle, mesocycle, exercises } = detail;
   const readOnly = workout.status === "completed" || workout.status === "skipped";
   const [, startTransition] = useTransition();
+  const toast = useToast();
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [setMenu, setSetMenu] = useState<{
     weId: string;
@@ -247,7 +249,22 @@ export function DayView({
     }
   }, [workout.id, mesocycle.status]);
 
-  const commit: Commit = useCallback((fn) => startTransition(fn), []);
+  // Every fire-and-forget write (menu ops: move/add set/skip/replace/remove…)
+  // routes through here. A rejected action must NOT escape the transition — it
+  // would reach the (app) error boundary, unmount the page, and destroy every
+  // sheet's typed state (R17). On failure the server never changed and no
+  // revalidation ran, so the view is already rolled back — just say so quietly.
+  const commit: Commit = useCallback(
+    (fn) =>
+      startTransition(async () => {
+        try {
+          await fn();
+        } catch {
+          toast("That change didn't save — check your connection");
+        }
+      }),
+    [toast],
+  );
 
   // progress bar denominator excludes skipped slots; an exercise is "done"
   // when every planned slot is either logged or skipped (fig 1.1/1.3)
@@ -405,7 +422,6 @@ export function DayView({
         sheet={noteSheet}
         workoutId={workout.id}
         onClose={() => setNoteSheet(null)}
-        commit={commit}
       />
       <ReplaceSheet
         we={replaceFor}
@@ -449,7 +465,6 @@ export function DayView({
         withSoreness={feedbackFor ? isFirstOfGroup(feedbackFor) : false}
         withGroupScope={feedbackFor ? isLastOfGroup(feedbackFor) : false}
         onClose={() => setFeedbackFor(null)}
-        commit={commit}
       />
       <CompleteSheet
         open={completeOpen}
@@ -691,6 +706,7 @@ function WorkoutOptionsMenu({
   mesoActive: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
@@ -702,18 +718,28 @@ function WorkoutOptionsMenu({
     router.push(href);
   };
 
+  // a failed end keeps the confirm sheet open for retry instead of throwing to
+  // the error boundary (R17)
   const endWorkout = () =>
     startEnding(async () => {
-      const res = await endWorkoutAction({ workout_id: workoutId });
-      setConfirm(null);
-      router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+      try {
+        const res = await endWorkoutAction({ workout_id: workoutId });
+        setConfirm(null);
+        router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+      } catch {
+        toast("Couldn't end the workout — check your connection");
+      }
     });
 
   const endMeso = () =>
     startEnding(async () => {
-      await endMesocycleAction({ workout_id: workoutId, meso_id: mesoId });
-      setConfirm(null);
-      router.push(`/cycles/meso/${mesoId}`);
+      try {
+        await endMesocycleAction({ workout_id: workoutId, meso_id: mesoId });
+        setConfirm(null);
+        router.push(`/cycles/meso/${mesoId}`);
+      } catch {
+        toast("Couldn't end the mesocycle — check your connection");
+      }
     });
 
   return (
@@ -1528,17 +1554,22 @@ function SetRow({
         },
       );
     } else if (state === "logged" && logged && edited.current) {
-      commit(() =>
-        amendSetAction({
-          workout_id: we.workout_id,
-          set_id: logged.id,
-          weight: w,
-          reps: r,
-          rir_reported: logged.rir_reported,
-        }),
+      // runLog (not commit) so an amend failure rolls back with the box shake +
+      // toast; `edited` stays set on failure so the next blur retries
+      runLog(
+        () =>
+          amendSetAction({
+            workout_id: we.workout_id,
+            set_id: logged.id,
+            weight: w,
+            reps: r,
+            rir_reported: logged.rir_reported,
+          }),
+        () => {
+          edited.current = false;
+        },
       );
       if (w !== logged.weight) persistPlannedWeight(w);
-      edited.current = false;
     }
   };
 
@@ -1864,12 +1895,10 @@ function NoteSheet({
   sheet,
   workoutId,
   onClose,
-  commit,
 }: {
   sheet: { we: LoggedExercise; origin: NoteOrigin } | null;
   workoutId: string;
   onClose: () => void;
-  commit: Commit;
 }) {
   const we = sheet?.we ?? null;
   const origin = sheet?.origin ?? "menu";
@@ -1884,6 +1913,10 @@ function NoteSheet({
 
   const [note, setNote] = useState(originText);
   const [pinned, setPinned] = useState(originBucket === "pinned");
+  // saving runs in the sheet's own transition: the sheet only closes AFTER the
+  // write lands, so a failure keeps the typed note on screen for retry (R17)
+  const [saving, startSaving] = useTransition();
+  const toast = useToast();
   if (!we) return null;
 
   const body = note.trim();
@@ -1892,49 +1925,51 @@ function NoteSheet({
   const noop = !body && originText.trim() === "";
 
   const save = () => {
-    commit(async () => {
-      if (!body) {
-        if (originBucket === "pinned")
-          await clearPinnedNoteAction({
+    startSaving(async () => {
+      try {
+        if (!body) {
+          if (originBucket === "pinned")
+            await clearPinnedNoteAction({
+              workout_id: wid,
+              exercise_id: we.exercise_id,
+            });
+          else
+            await saveSessionNoteAction({
+              workout_id: wid,
+              workout_exercise_id: we.id,
+              note: null,
+            });
+        } else if (pinned) {
+          await savePinnedNoteAction({
             workout_id: wid,
             exercise_id: we.exercise_id,
+            body,
           });
-        else
+          // moved up from a session note → clear the session copy
+          if (originBucket === "session" && we.feedback?.notes)
+            await saveSessionNoteAction({
+              workout_id: wid,
+              workout_exercise_id: we.id,
+              note: null,
+            });
+        } else {
           await saveSessionNoteAction({
             workout_id: wid,
             workout_exercise_id: we.id,
-            note: null,
+            note: body,
           });
-        return;
-      }
-      if (pinned) {
-        await savePinnedNoteAction({
-          workout_id: wid,
-          exercise_id: we.exercise_id,
-          body,
-        });
-        // moved up from a session note → clear the session copy
-        if (originBucket === "session" && we.feedback?.notes)
-          await saveSessionNoteAction({
-            workout_id: wid,
-            workout_exercise_id: we.id,
-            note: null,
-          });
-      } else {
-        await saveSessionNoteAction({
-          workout_id: wid,
-          workout_exercise_id: we.id,
-          note: body,
-        });
-        // moved down from the pinned note → unpin it
-        if (originBucket === "pinned")
-          await clearPinnedNoteAction({
-            workout_id: wid,
-            exercise_id: we.exercise_id,
-          });
+          // moved down from the pinned note → unpin it
+          if (originBucket === "pinned")
+            await clearPinnedNoteAction({
+              workout_id: wid,
+              exercise_id: we.exercise_id,
+            });
+        }
+        onClose();
+      } catch {
+        toast("Couldn't save the note — check your connection");
       }
     });
-    onClose();
   };
 
   return (
@@ -1987,11 +2022,11 @@ function NoteSheet({
         </button>
         <button
           type="button"
-          disabled={noop}
+          disabled={noop || saving}
           onClick={save}
           className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
         >
-          {!body && originText ? "CLEAR" : "SAVE"}
+          {saving ? "SAVING…" : !body && originText ? "CLEAR" : "SAVE"}
         </button>
       </div>
     </BottomSheet>
@@ -2014,17 +2049,32 @@ function ReplaceSheet({
   const [candidates, setCandidates] = useState<ReplacementCandidate[] | null>(
     null,
   );
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [search, setSearch] = useState("");
   // #4: repeat the substitution on the same day in future incomplete weeks
   const [repeat, setRepeat] = useState(false);
 
   useEffect(() => {
     setCandidates(null);
+    setFailed(false);
     setSearch("");
     setRepeat(false);
     if (!we?.muscle_group_id) return;
-    listReplacementCandidatesAction(we.muscle_group_id).then(setCandidates);
-  }, [we]);
+    // catch + stale-guard so a rejected fetch shows RETRY instead of a
+    // permanent "Loading…" (R17; mirrors PrescriptionDetailSheet)
+    let active = true;
+    listReplacementCandidatesAction(we.muscle_group_id)
+      .then((c) => {
+        if (active) setCandidates(c);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [we, attempt]);
 
   if (!we) return null;
   const q = search.trim().toLowerCase();
@@ -2071,7 +2121,9 @@ function ReplaceSheet({
       </button>
 
       <div className="mt-3.5 max-h-[42dvh] overflow-y-auto">
-        {candidates === null ? (
+        {failed ? (
+          <FetchRetry onRetry={() => setAttempt((a) => a + 1)} />
+        ) : candidates === null ? (
           <p className="py-4 text-sm text-ink/45">Loading…</p>
         ) : visible.length === 0 ? (
           <p className="py-4 text-sm text-ink/45">No matches.</p>
@@ -2134,18 +2186,34 @@ function AddExerciseSheet({
   const [equip, setEquip] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [repeat, setRepeat] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   useEffect(() => {
     if (!open) return;
     setData(null);
+    setFailed(false);
     setSearch("");
     setMg(null);
     setEquip(null);
     setSelected(new Set());
     setRepeat(false);
-    listAddExerciseCandidatesAction().then(setData);
-  }, [open]);
+    // catch + stale-guard so a rejected fetch shows RETRY instead of a
+    // permanent "Loading…" (R17)
+    let active = true;
+    listAddExerciseCandidatesAction()
+      .then((d) => {
+        if (active) setData(d);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, attempt]);
 
   if (!open) return null;
 
@@ -2170,13 +2238,18 @@ function AddExerciseSheet({
   const add = () => {
     if (selected.size === 0) return;
     const ids = [...selected];
+    // close only on success — a failure keeps the picked selection for retry
     startTransition(async () => {
-      await addWorkoutExercisesAction({
-        workout_id: workoutId,
-        exercise_ids: ids,
-        propagate: repeat,
-      });
-      onClose();
+      try {
+        await addWorkoutExercisesAction({
+          workout_id: workoutId,
+          exercise_ids: ids,
+          propagate: repeat,
+        });
+        onClose();
+      } catch {
+        toast("Couldn't add the exercises — check your connection");
+      }
     });
   };
 
@@ -2243,7 +2316,9 @@ function AddExerciseSheet({
       )}
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
-        {data === null ? (
+        {failed ? (
+          <FetchRetry onRetry={() => setAttempt((a) => a + 1)} />
+        ) : data === null ? (
           <p className="py-4 text-sm text-ink/45">Loading…</p>
         ) : visible.length === 0 ? (
           <p className="py-4 text-sm text-ink/45">No matches.</p>
@@ -2337,7 +2412,6 @@ function FeedbackSheet({
   withSoreness,
   withGroupScope,
   onClose,
-  commit,
 }: {
   we: LoggedExercise | null;
   workoutId: string;
@@ -2345,7 +2419,6 @@ function FeedbackSheet({
   withSoreness: boolean;
   withGroupScope: boolean;
   onClose: () => void;
-  commit: Commit;
 }) {
   // prefill from any existing feedback (editing) — the sheet is keyed per
   // exercise so these initial values are correct on each open
@@ -2359,6 +2432,10 @@ function FeedbackSheet({
   );
   const [workloadInfo, setWorkloadInfo] = useState(true);
   const [pumpInfo, setPumpInfo] = useState(false);
+  // close only after the write lands — a failure keeps the slider values on
+  // screen for retry instead of throwing to the error boundary (R17)
+  const [saving, startSaving] = useTransition();
+  const toast = useToast();
 
   if (!we) return null;
   const mg = we.muscle_group || "Session";
@@ -2542,26 +2619,30 @@ function FeedbackSheet({
         </button>
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || saving}
           onClick={() => {
-            commit(() =>
-              saveFeedbackAction({
-                workout_id: workoutId,
-                workout_exercise_id: we.id,
-                joint_pain: showGroup ? pain : null,
-                muscle_group_id:
-                  showGroup || showSoreness ? we.muscle_group_id : null,
-                pump: showGroup ? pump : null,
-                workload: showGroup ? workload : null,
-                soreness: showSoreness ? soreness : null,
-                soreness_days: showSoreness ? sorenessDays : null,
-              }),
-            );
-            onClose();
+            startSaving(async () => {
+              try {
+                await saveFeedbackAction({
+                  workout_id: workoutId,
+                  workout_exercise_id: we.id,
+                  joint_pain: showGroup ? pain : null,
+                  muscle_group_id:
+                    showGroup || showSoreness ? we.muscle_group_id : null,
+                  pump: showGroup ? pump : null,
+                  workload: showGroup ? workload : null,
+                  soreness: showSoreness ? soreness : null,
+                  soreness_days: showSoreness ? sorenessDays : null,
+                });
+                onClose();
+              } catch {
+                toast("Couldn't save feedback — check your connection");
+              }
+            });
           }}
           className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-40"
         >
-          SAVE
+          {saving ? "SAVING…" : "SAVE"}
         </button>
       </div>
     </BottomSheet>
@@ -2600,6 +2681,7 @@ function CompleteSheet({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [notes, setNotes] = useState("");
   const [fatigue, setFatigue] = useState(2);
   const [effort, setEffort] = useState(2);
@@ -2620,17 +2702,23 @@ function CompleteSheet({
   const skippedCount = exercises.length - loggedExercises.length;
 
   // single action: save session feedback, complete, advance, then move on.
-  // The engine recalculation is silent (09 2026-06-13 §2).
+  // The engine recalculation is silent (09 2026-06-13 §2). On failure the sheet
+  // stays open — notes + the three sliders are local state, so throwing to the
+  // error boundary would destroy them (R17).
   const finish = () =>
     startCompleting(async () => {
-      const res = await completeWorkoutAction({
-        workout_id: workout.id,
-        notes: notes.trim() || null,
-        overall_fatigue: fatigue,
-        effort_rating: effort,
-        performance_rating: performance,
-      });
-      router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+      try {
+        const res = await completeWorkoutAction({
+          workout_id: workout.id,
+          notes: notes.trim() || null,
+          overall_fatigue: fatigue,
+          effort_rating: effort,
+          performance_rating: performance,
+        });
+        router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+      } catch {
+        toast("Couldn't complete the workout — check your connection");
+      }
     });
 
   return (

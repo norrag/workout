@@ -5,6 +5,7 @@ import { getMesoDeletionImpact, getMesoPlan } from "@/lib/queries/cycles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { saveMesoAsTemplateAction } from "../../actions";
 import { ShareRow } from "@/components/ShareRow";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { StartMesoForm } from "./StartMesoForm";
 import { DeleteMesoButton } from "./DeleteMesoButton";
 
@@ -13,10 +14,14 @@ const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 /** Meso detail (fig 2.2): RIR ramp matrix with day-completion states. */
 export default async function MesoDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ mesoId: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { mesoId } = await params;
+  // saveMesoAsTemplateAction lands back here with ?error=template on failure
+  const { error: actionError } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -281,12 +286,17 @@ export default async function MesoDetailPage({
       {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
         <form action={saveMesoAsTemplateAction}>
           <input type="hidden" name="meso_id" value={meso.id} />
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="SAVING…"
             className="mt-2.5 w-full border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70"
           >
             SAVE AS TEMPLATE
-          </button>
+          </SubmitButton>
+          {actionError === "template" && (
+            <p className="mt-1.5 text-[11px] leading-normal text-accent">
+              Couldn&apos;t save this plan as a template — try again.
+            </p>
+          )}
         </form>
       )}
       {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
