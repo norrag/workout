@@ -4,6 +4,18 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 34 (cont.): PR #112 merged + archival sweep
+
+- **PR #112 MERGED.** End-of-session archival sweep ran: **R20 swept to
+  `archive.md`** ("Swept 2026-07-02 (night)"), live index trimmed. Sweep
+  shipped as its own small docs PR (a merged PR can't sweep its own row);
+  branch restarted from the merged main per the follow-up rule.
+- Reminder for the owner (external, manual-operations): set **`SENTRY_DSN`**
+  in Vercel to turn on Sentry delivery — the structured console floor is
+  already live in production logs.
+- Next per the attack order: **T-R2** (ready, own PR — hosted migration
+  transcription); then R5/R7 (MED, WS-K).
+
 ## 2026-07-02 — Session 34: R20 — production error observability (PR #112)
 
 Reconciliation sweep: no-op (PR #111 was itself the R3/R4 sweep; no `done`

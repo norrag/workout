@@ -11,6 +11,21 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (night) — R20 observability merged (PR #112)
+
+Session 34 shipped the review's HIGH observability item; PR #112 merged with
+all checks green. No schema change, no new dependency. Raw text stays in the
+backlog appendix (Batch 3); full record in PROGRESS 2026-07-02 (latest) and the
+Session 34 log entry. 07 Phase 7 "Error handling/observability" is ticked.
+Remaining external step: set `SENTRY_DSN` in Vercel (manual-operations row
+updated — the structured console floor is live regardless).
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R20 | Zero production error observability — reconcile/generation/MCP failures swallowed (silently stale prescriptions); no `global-error.tsx`/`(auth)` boundary; SENTRY_DSN pending but unread | F | L | **done — merged (PR #112).** One `reportError()` funnel (`src/lib/observability/`): structured `[report:<scope>]` console line always (Vercel logs capture pre-config) + dependency-free Sentry envelope delivery when `SENTRY_DSN` is set (no SDK — client bundle is a live N1 concern; pure wire-format builders, never throws). `instrumentation.ts` `onRequestError` global server capture; the 5 deliberate swallow sites (freshness reconcile, seed decisions, complete/end week generation, workout-tab catch-up) + MCP tool guard report before degrading; new root `global-error.tsx` + `(auth)/error.tsx` boundaries; same-origin-guarded, zod-capped pre-auth `/api/client-error` intake. 713 tests (+20); end-to-end probed against a mock ingest. |
+
+---
+
 ## Swept 2026-07-02 (evening) — R3 + R4 write integrity merged (PR #110)
 
 Session 33 shipped the review's write-integrity pair (attack order after
