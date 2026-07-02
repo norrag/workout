@@ -19,7 +19,17 @@ const archivo = localFont({
 export const metadata: Metadata = {
   title: "workout",
   description: "Periodized workout tracking with RIR-based progression",
-  manifest: "/manifest.webmanifest",
+  // Version-tagged so iOS re-reads the manifest on the next add-to-home-screen
+  // instead of serving a stale cached copy. iOS caches the manifest per-URL and
+  // binds the standalone `scope` at install time; when the scope changed (adding
+  // "/" so every route stays standalone — see manifest.webmanifest), the bare
+  // "/manifest.webmanifest" URL could still resolve to the pre-scope copy iOS
+  // had cached, so re-adding kept opening non-workout routes in the in-app
+  // browser. A new query key forces a cache-missing fetch of the corrected
+  // manifest. Bump MANIFEST_VERSION whenever the manifest's install-time fields
+  // (scope / start_url / id / display) change. `id` stays "/" so this is an
+  // update to the same app, not a duplicate install.
+  manifest: "/manifest.webmanifest?v=2",
   icons: {
     icon: [
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -31,6 +41,12 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "workout",
+  },
+  // Next 15 emits only the standard `mobile-web-app-capable`; iOS < 16.4 (and
+  // WebKit's legacy standalone path) still keys off `apple-mobile-web-app-capable`,
+  // so emit it explicitly to keep the app installing standalone everywhere.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
   },
 };
 
