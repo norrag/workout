@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useScrollLock } from "@/components/ui/useScrollLock";
+import { useModalA11y } from "@/components/ui/useModalA11y";
 
 /**
  * Drives a mount + slide-up/down transition for a bottom sheet controlled by
@@ -50,7 +51,11 @@ export function BottomSheet({
   children: ReactNode;
 }) {
   const { render, shown } = useSheetTransition(open);
+  const panelRef = useRef<HTMLDivElement>(null);
   useScrollLock(render);
+  // Escape closes, focus moves in on open / back to the opener on close, and
+  // Tab stays inside while open (R18)
+  useModalA11y(render, panelRef, onClose);
   if (!render) return null;
   const panelClass = fullHeight
     ? "absolute inset-x-0 bottom-0 top-[max(1rem,env(safe-area-inset-top))] flex flex-col border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6"
@@ -63,10 +68,12 @@ export function BottomSheet({
         aria-hidden
       />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`${panelClass} transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
+        tabIndex={-1}
+        className={`${panelClass} focus:outline-none transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
       >
         <div className="flex items-baseline justify-between">
           <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">

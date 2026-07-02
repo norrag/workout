@@ -4,6 +4,42 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 29: R13 + R18 + R19 — the UI/UX cluster (workstream E/G day-view surface)
+
+Reconciliation sweep: no-op (session 28's sweep PR #99 already merged; no
+`done (PR #n)` rows live). Owner steered this session toward "documented UI
+issues and things that impact user experience" — picked the three open
+UX-facing items sharing the day-view surface over the attack order's R3+R4
+(write integrity, now next up). Branch `claude/notes-review-priorities-zx5f1v`.
+
+- **R13 — done.** The SetRow re-sync effect no longer clobbers in-progress
+  typing: split into an own-logged-set effect (always adopts — it's the row's
+  own write echoing back) and a planned-input effect (`set_weights`/bodyweight
+  changes adopt only while the row has no uncommitted edits). The rule is pure
+  + unit-tested (`day-rules.ts::adoptServerRowState`). Closes the client-side
+  cousin of N3: an auto-match fan-out or blur-persisted weight revalidating
+  0.5–2s later could silently replace typed reps right before LOG.
+- **R18 — done.** New shared `useModalA11y` (focus in/restore, Tab trap,
+  Escape via a top-most-overlay stack) wired into BottomSheet (~18 sheets),
+  CompleteSheet (also gained role="dialog"/aria-modal), and AnchoredMenu
+  (menuitem roles + ↑/↓/Home/End). Tap targets to the WCAG 24px floor with
+  visuals unchanged: LOG checkbox button fills its 44×32 cell (21px box stays
+  the visual), per-set ⋮ → 24×32, planner ▲▼ → 24×24 (rule-8 note in
+  PROGRESS: arrows sit ~5px further apart — the only visible delta).
+  `maximumScale:1` dropped — pinch-zoom restored. The full doc-07 Phase-7
+  a11y audit remains its own phase item; this closes the scoped defects.
+- **R19 — done (all 3 bullets).** New `(app)/not-found.tsx` ledger card inside
+  the app shell (10+ `notFound()` sites dead-ended on Next's unstyled default);
+  landing there clears the stale session `lastWorkoutId` so the Workout tab
+  can't 404 forever after its meso is deleted. CompleteSheet totals now share
+  the header's skipped-slot-excluded math via pure `day-rules.ts::daySetTotals`
+  (unit-tested); the third bullet (SAVE AS TEMPLATE SubmitButton) had already
+  shipped with R17/PR #98.
+- Green: **629 tests (+15)**, typecheck, lint, production build (`/log`
+  first-load 126 kB, +1 kB = the a11y hook). No engine/schema/query change.
+- Next per the attack order: **R3 + R4** (write integrity), then R20
+  (observability). R6/R14 owner decisions still queued.
+
 ## 2026-07-01 — Session 28: R17 + R16 — field usability, shipped together (PR #98)
 
 Reconciliation sweep: no-op (only the stale unrelated #48 open; no `done (PR #n)`

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { useScrollLock } from "@/components/ui/useScrollLock";
+import { focusablesIn, useModalA11y } from "@/components/ui/useModalA11y";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
@@ -52,6 +53,12 @@ import {
 } from "@/lib/engine/load";
 import type { EngineParams } from "@/lib/engine/params";
 import { formatWeight } from "@/lib/units";
+import {
+  adoptServerRowState,
+  daySetTotals,
+  exerciseDone,
+  plannedSetCount,
+} from "./day-rules";
 import {
   addSetAction,
   addWorkoutExercisesAction,
@@ -185,28 +192,9 @@ type Commit = (fn: () => Promise<void>) => void;
  * to the session note; "pinned"/"session" edit that specific existing note. */
 type NoteOrigin = "menu" | "pinned" | "session";
 
-/** Planned slot count, widened to cover any logged/skipped beyond it. */
-function plannedSetCount(we: LoggedExercise): number {
-  const maxLogged = we.sets.length
-    ? Math.max(...we.sets.map((s) => s.set_number))
-    : 0;
-  const maxSkipped = we.skipped_set_numbers.length
-    ? Math.max(...we.skipped_set_numbers)
-    : 0;
-  return Math.max(we.prescribed_sets ?? 1, maxLogged, maxSkipped);
-}
-
-/** Every planned slot resolved (logged or skipped), or the whole exercise skipped. */
-function exerciseDone(we: LoggedExercise): boolean {
-  if (we.status === "skipped") return true;
-  const planned = plannedSetCount(we);
-  const logged = new Set(we.sets.map((s) => s.set_number));
-  const skipped = new Set(we.skipped_set_numbers);
-  for (let n = 1; n <= planned; n += 1) {
-    if (!logged.has(n) && !skipped.has(n)) return false;
-  }
-  return true;
-}
+// day-rules.ts holds the pure set-progress math (plannedSetCount /
+// exerciseDone / daySetTotals) so the header progress bar and the Workout
+// Complete sheet read one definition, plus the R13 row-resync rule.
 
 /**
  * Day view (fig 1.1) — the Workout tab itself. Brand row, meso track,
@@ -269,19 +257,8 @@ export function DayView({
   // progress bar denominator excludes skipped slots; an exercise is "done"
   // when every planned slot is either logged or skipped (fig 1.1/1.3)
   const { loggedSets, totalSets, allDone } = useMemo(() => {
-    const logged = exercises.reduce((n, we) => n + we.sets.length, 0);
-    const total = exercises
-      .filter((we) => we.status !== "skipped")
-      .reduce((n, we) => {
-        const planned = plannedSetCount(we);
-        const skipped = we.skipped_set_numbers.filter(
-          (s) => s <= planned,
-        ).length;
-        return n + Math.max(0, planned - skipped);
-      }, 0);
     return {
-      loggedSets: logged,
-      totalSets: total,
+      ...daySetTotals(exercises),
       allDone: exercises.length > 0 && exercises.every(exerciseDone),
     };
   }, [exercises]);
@@ -1103,6 +1080,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
         {we.notes && (
           <button
             type="button"
+            role="menuitem"
             aria-label={`${we.exercise_name} prescription detail`}
             onClick={() => {
               onCloseMenu();
@@ -1281,6 +1259,31 @@ function AnchoredMenu({
   const cardRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
+  // Escape closes, focus lands on the first row and returns to the trigger on
+  // close, Tab stays inside (R18); ↑/↓/Home/End walk the rows per the menu
+  // pattern (rows are role="menuitem" via MenuRow)
+  useModalA11y(open, cardRef, onClose, { initialFocus: "first" });
+  const onMenuKeyDown = (e: React.KeyboardEvent) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+    const card = cardRef.current;
+    if (!card) return;
+    const items = focusablesIn(card).filter(
+      (el) => el.getAttribute("role") === "menuitem",
+    );
+    if (items.length === 0) return;
+    e.preventDefault();
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? items.length - 1
+          : e.key === "ArrowDown"
+            ? (current + 1 + items.length) % items.length
+            : (current - 1 + items.length) % items.length;
+    items[next].focus();
+  };
+
   useEffect(() => {
     if (!open) {
       setPos(null);
@@ -1324,6 +1327,7 @@ function AnchoredMenu({
         ref={cardRef}
         role="menu"
         aria-label={label}
+        onKeyDown={onMenuKeyDown}
         style={{
           top: pos?.top ?? 0,
           left: pos?.left ?? 0,
@@ -1354,6 +1358,7 @@ function MenuRow({
   return (
     <button
       type="button"
+      role="menuitem"
       disabled={disabled}
       onClick={onClick}
       className={`flex w-full items-center justify-between border-b border-ink/10 px-4 py-[13px] text-left text-sm last:border-b-0 ${
@@ -1490,15 +1495,30 @@ function SetRow({
     });
   };
 
-  // re-sync when the server state for this row changes (incl. an auto-match or
-  // edited planned weight landing via set_weights)
+  // re-sync when this row's own logged set changes (a log/unlog/amend
+  // confirmation echoing back) — always adopt the server state
   useEffect(() => {
+    if (!adoptServerRowState("own-logged-set", edited.current)) return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     edited.current = false;
     repsManual.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logged?.id, logged?.weight, logged?.reps, plannedWeight, we.bodyweight]);
+  }, [logged?.id, logged?.weight, logged?.reps]);
+
+  // re-sync when a background write changes the row's planned inputs (an
+  // auto-match fan-out or a persisted weight edit landing via set_weights, or
+  // a bodyweight edit) — but never over uncommitted typing: the revalidation
+  // lands seconds after the write, and resetting here is what silently
+  // replaced reps the user was mid-typing (R13). Their explicit values win;
+  // an untouched row still adopts the fan-out.
+  useEffect(() => {
+    if (!adoptServerRowState("planned-input", edited.current)) return;
+    setWeight(formatWeight(initialWeight));
+    setReps(String(initialReps));
+    repsManual.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plannedWeight, we.bodyweight]);
 
   // denser rows (09 §5): 32px box, 14px value, 21px log box
   const cellBase =
@@ -1635,12 +1655,14 @@ function SetRow({
         isLastRow ? "" : "border-b border-ink/15"
       }`}
     >
+      {/* 24×32px target overflowing the 20px column into the gaps — the glyph
+          itself was a ~10px target (R18) */}
       <button
         type="button"
         ref={menuBtnRef}
         aria-label={`set ${setNumber} menu`}
         onClick={onOpenMenu}
-        className={`text-center text-base leading-[0.5] ${menuOpen ? "font-bold text-ink" : "text-ink/40"}`}
+        className={`-ml-0.5 flex h-8 w-6 items-center justify-center text-base leading-[0.5] ${menuOpen ? "font-bold text-ink" : "text-ink/40"}`}
       >
         ⋮
       </button>
@@ -1738,7 +1760,8 @@ function SetRow({
           </div>
         </>
       )}
-      {/* LOG column — ≥44px-wide tap target around the 21px visual box */}
+      {/* LOG column — the checkbox button itself fills the 44×32 cell (R18);
+          the visual stays the 21px box */}
       <div className="flex h-8 items-center justify-center">
         {state === "logged" || state === "next" ? (
           <LogCheckbox
@@ -2688,17 +2711,20 @@ function CompleteSheet({
   const [performance, setPerformance] = useState(2);
   const [completing, startCompleting] = useTransition();
   const { render, shown } = useSheetTransition(open);
+  const panelRef = useRef<HTMLDivElement>(null);
   const sliderValue = { fatigue, effort, performance };
   const setSlider = { fatigue: setFatigue, effort: setEffort, performance: setPerformance };
   useScrollLock(render);
+  // same keyboard/focus contract as BottomSheet (R18) — this sheet is bespoke
+  // (its own header layout), so it wires the hook itself
+  useModalA11y(render, panelRef, onClose);
   if (!render) return null;
 
   const { workout, microcycle, exercises } = detail;
   const loggedExercises = exercises.filter((we) => we.sets.length > 0);
-  const loggedSets = exercises.reduce((n, we) => n + we.sets.length, 0);
-  const totalSets = exercises
-    .filter((we) => we.status !== "skipped")
-    .reduce((n, we) => n + Math.max(we.prescribed_sets ?? 1, we.sets.length), 0);
+  // same skipped-slot-excluded math as the header progress bar (day-rules.ts) —
+  // the sheet once said "2 / 4" under a header reading 100% (R19)
+  const { loggedSets, totalSets } = daySetTotals(exercises);
   const skippedCount = exercises.length - loggedExercises.length;
 
   // single action: save session feedback, complete, advance, then move on.
@@ -2729,7 +2755,12 @@ function CompleteSheet({
         aria-hidden
       />
       <div
-        className={`absolute inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-6 transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`week ${microcycle.week_number} day ${workout.day_number} complete`}
+        tabIndex={-1}
+        className={`absolute inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-6 focus:outline-none transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
       >
         <div className="flex items-baseline justify-between">
           <div className="text-[30px] font-extrabold tracking-[-0.02em]">
