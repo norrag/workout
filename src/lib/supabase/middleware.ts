@@ -58,5 +58,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Signed-in users get the Workout tab AT "/" — a rewrite, not a redirect,
+  // so the address stays "/". iOS 26.5 scopes an installed web app to the page
+  // it was added from (the manifest `scope` member is not honored), and a
+  // signed-in user could historically only ever add from /workout because "/"
+  // redirected there — scoping the app to /workout and opening every other
+  // route in the in-app browser. With the app living at "/", the added-from
+  // page, manifest start_url, and scope all agree on "/" under every scope
+  // derivation iOS uses. Do not turn this back into a redirect.
+  if (user && pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/workout";
+    const rewritten = NextResponse.rewrite(url, { request });
+    for (const cookie of supabaseResponse.cookies.getAll()) {
+      rewritten.cookies.set(cookie);
+    }
+    return rewritten;
+  }
+
   return supabaseResponse;
 }

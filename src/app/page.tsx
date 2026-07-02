@@ -7,6 +7,11 @@ export default async function LandingPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // Signed-in traffic normally never reaches this page: the middleware
+  // rewrites "/" to /workout while keeping the address "/" (the installed-PWA
+  // scope on iOS is derived from the added-from page, so the app must live at
+  // "/" — see lib/supabase/middleware.ts). This redirect is only a fallback
+  // for requests the middleware didn't cover.
   if (user) redirect("/workout");
 
   return (

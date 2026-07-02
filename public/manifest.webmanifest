@@ -3,7 +3,7 @@
   "short_name": "workout",
   "description": "Periodized workout tracking with RIR-based progression",
   "id": "/",
-  "start_url": "/workout",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F4F0E6",
