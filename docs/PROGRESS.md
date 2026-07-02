@@ -2,7 +2,37 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — R20: production error observability — one reportError funnel, error boundaries everywhere, dependency-free Sentry wiring
+## 2026-07-02 (latest) — T-R2: the out-of-band hosted migration captured in the repo chain
+
+The last known hosted↔repo drift (filed as T-R2 during the R2 clean-DB diff):
+hosted ran `20260620115322_perf_rls_initplan_and_fk_indexes` out-of-band on
+2026-06-20 (56 RLS policies initplan-wrapped — `auth.uid()`/`auth.role()`/
+`is_admin()` → scalar subqueries — plus 23 FK covering indexes), and the repo
+chain never reproduced it. Performance-only; the 2026-07-01 full hosted↔clean
+diff confirmed no semantic difference. Now transcribed into
+`supabase/migrations/20260620115322_perf_rls_initplan_and_fk_indexes.sql` at
+its true position in the chain (between `20260620000006` and `20260622220627`),
+so a clean boot replays hosted history exactly.
+
+- **Byte-exact transcription, not a re-authoring:** the file is the hosted
+  `supabase_migrations.schema_migrations.statements[1]` blob verbatim, pulled
+  base64-encoded and decoded — **md5 `25446aa1…` and length 12,981 match the
+  hosted record exactly**. No header comment added; provenance lives here and
+  in the PR.
+- **Hosted unaffected by design:** version `20260620115322` is already
+  recorded in hosted `schema_migrations`, so `db push`/CLI sync treats the new
+  file as applied. Nothing was executed against the live DB.
+- **Clean-DB replay statically validated** (no Docker in this session — the
+  from-scratch application runs in CI's `rls-tests` job, which boots local
+  Supabase and applies the whole chain): all 56 `ALTER POLICY` targets are
+  created by earlier migrations (the one drop/recreate —
+  `logged_sets_update_own` in `20260615000002` — lands before this slot); all
+  23 indexed columns exist by this point in the chain; no index-name
+  collisions with earlier migrations.
+- With this, the repo chain and hosted are fully reconciled — the R2 diff's
+  "remaining drift" note below is closed.
+
+## 2026-07-02 — R20: production error observability — one reportError funnel, error boundaries everywhere, dependency-free Sentry wiring
 
 The review's HIGH observability item (attack order after R3/R4): the failure
 modes the app is *designed around* — freshness reconcile returning stored

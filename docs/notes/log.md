@@ -4,6 +4,26 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 34 (cont. 2): T-R2 — hosted migration captured (PR #114)
+
+PR #113 (the R20 sweep) merged. Continued with the next `ready` item —
+**T-R2** — on the same branch restarted from main, **PR #114**.
+
+- **T-R2 — done.** `20260620115322_perf_rls_initplan_and_fk_indexes.sql`
+  transcribed **byte-exact** from hosted
+  `supabase_migrations.schema_migrations.statements[1]` (base64 → decode;
+  **md5 + length match the hosted record**) at its true position in the chain.
+  Hosted untouched — the version is already recorded there, so sync treats it
+  as applied. Clean-DB replay statically validated (all 56 ALTER'd policies
+  created earlier in the chain; the `logged_sets_update_own` drop/recreate
+  lands at `20260615000002`, before the slot; all 23 indexed columns exist;
+  no index-name collisions). No Docker this session — CI `rls-tests`
+  (from-scratch stack + full chain) is the executable verification gate.
+- Repo chain ↔ hosted now **fully reconciled**; the R2 diff's remaining-drift
+  note is closed.
+- **Next per the attack order:** R5/R7 (MED, WS-K); then R9–R12 (WS-G) /
+  R21 (now fully unblocked — the chain boots clean end-to-end).
+
 ## 2026-07-02 — Session 34 (cont.): PR #112 merged + archival sweep
 
 - **PR #112 MERGED.** End-of-session archival sweep ran: **R20 swept to
