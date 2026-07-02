@@ -11,6 +11,21 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (late 3) — R9 + R10 analysis fixes merged (PR #117)
+
+Session 35 (cont. 3) shipped the next two WS-G items; PR #117 merged with all
+checks green. TS-only (no schema/engine change — both fixes sit outside
+`src/lib/engine/`; the replay fix makes the harness faithful, it changes no
+engine output). Full record in PROGRESS 2026-07-02 and the Session 35
+(cont. 3) log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R9 | `analyze_exercise_progress`: any phase with ≤3 sessions reads "improving", even a strict decline (every phase start asserts improvement) | B | G | **done — merged (PR #117).** Short phases (no prior baseline) read the trend within the window — latest vs first, tolerance-banded (declining/improving/plateau); longer phases take the same branches as before. New 4-case trend test; the flat day-slot series still reads plateau, never declining. |
+| R10 | Replay re-runs seed decisions without `bodyweight` → every bodyweight-lift seed diffs spuriously, corrupting the params tuning loop | B | G | **done — merged (PR #117).** `replay_decisions`' seed branch passes the stored `bodyweight` to `seedMeso`; regression test replays a v16 bodyweight seed unchanged (verified failing without the fix, and it asserts a real priced load so it can't pass vacuously). |
+
+---
+
 ## Swept 2026-07-02 (late 2) — R5 + R7 hardening merged (PR #116)
 
 Session 35 (cont. 2) shipped the next two WS-K items; PR #116 merged with all
