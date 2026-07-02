@@ -26,13 +26,16 @@ export const metadata: Metadata = {
   // keep opening non-/workout routes in the in-app browser. A query-string bust
   // (?v=2) proved unreliable — caches may normalize/strip queries — so version
   // the *pathname*. To change any install-time field (scope / start_url / id /
-  // display): bump this to manifest-v4.webmanifest, add the new file, and KEEP
-  // the old file in place (stale cached HTML still requests it; a 404 there
-  // makes iOS fall back to no-manifest legacy mode, which is worse). `id` stays
-  // "/" in every version so re-adds update the same app, not a duplicate.
-  // The guard test (src/lib/pwa/__tests__/manifest.test.ts) enforces all of
-  // this: link resolves to a real file, all manifest copies stay identical.
-  manifest: "/manifest-v3.webmanifest",
+  // display): bump to the next manifest-vN.webmanifest, add the new file, and
+  // KEEP every old file in place with identical content (stale cached HTML
+  // still requests them; a 404 there makes iOS fall back to no-manifest legacy
+  // mode, which is worse). `id` stays "/" in every version so re-adds update
+  // the same app, not a duplicate. start_url must stay "/" — iOS 26.5 scopes
+  // the installed app to the page it was added from and ignores the `scope`
+  // member, so the app lives at "/" (middleware rewrites it to the Workout
+  // tab). The guard test (src/lib/pwa/__tests__/manifest.test.ts) enforces all
+  // of this: link resolves to a real file, all manifest copies stay identical.
+  manifest: "/manifest-v4.webmanifest",
   icons: {
     icon: [
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

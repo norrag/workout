@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // canon tab bar — docs/08-design-decisions.md §2. `match` is the set of path
-// prefixes that count as "on this tab" (the Workout tab owns both `/workout` and
-// the `/log/[id]` day view).
+// prefixes that count as "on this tab" (the Workout tab owns "/" — where the
+// middleware serves the day view for signed-in users — plus `/workout` and the
+// `/log/[id]` day view). "/" is matched exactly, not as a prefix.
 const items = [
-  { id: "/workout", label: "Workout", match: ["/workout", "/log"] },
+  { id: "/workout", label: "Workout", match: ["/", "/workout", "/log"] },
   { id: "/cycles", label: "Cycles", match: ["/cycles"] },
   { id: "/templates", label: "Templates", match: ["/templates"] },
   { id: "/exercises", label: "Exercises", match: ["/exercises"] },
@@ -39,7 +40,11 @@ export function BottomNav() {
   }, [pathname]);
 
   const committed =
-    items.find((i) => i.match.some((m) => pathname?.startsWith(m)))?.id ?? null;
+    items.find((i) =>
+      i.match.some((m) =>
+        m === "/" ? pathname === "/" : pathname?.startsWith(m),
+      ),
+    )?.id ?? null;
 
   // clear the optimistic override once the committed route reaches the tapped tab
   useEffect(() => {

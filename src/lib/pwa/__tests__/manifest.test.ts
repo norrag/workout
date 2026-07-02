@@ -4,14 +4,20 @@ import { describe, expect, it } from "vitest";
 
 // Regression guards for the iOS-standalone "browser bars" bug (2026-07-02).
 //
-// Two failure modes are pinned here:
+// Three failure modes are pinned here:
 //
-// 1. SCOPE. iOS binds the manifest `scope` to the installed app and treats any
-//    navigation outside it as leaving the app — it opens the in-app Safari
-//    browser (URL bar + share/reload chrome) instead of staying standalone.
-//    The scope must stay "/" so every route is covered.
+// 1. START_URL IS THE REAL SCOPE ON iOS. iOS 26.5 scopes an installed web app
+//    to the page it was added from and does NOT honor the manifest `scope`
+//    member (observed on-device: with scope "/" and start_url "/workout",
+//    every route except /workout opened in the in-app browser with the ✕
+//    returning to /workout). A signed-in user can only add from where "/"
+//    lands them, so the app must LIVE at "/": start_url stays "/" and the
+//    middleware rewrites (not redirects) "/" to the Workout tab.
 //
-// 2. STALE MANIFEST AT INSTALL. iOS caches the manifest and the cache survives
+// 2. SCOPE. Kept explicit at "/" anyway for spec-conforming platforms: any
+//    navigation outside it is treated as leaving the app.
+//
+// 3. STALE MANIFEST AT INSTALL. iOS caches the manifest and the cache survives
 //    deleting the home-screen icon, so a re-add can install from a pre-fix
 //    copy. The defense is a PATH-versioned manifest link (query-string busts
 //    can be stripped by cache normalization): to change any install-time field
@@ -98,8 +104,8 @@ describe("PWA manifest", () => {
       expect(manifest.id).toBe("/");
     });
 
-    it("keeps the launch target inside scope", () => {
-      expect(manifest.start_url?.startsWith(manifest.scope ?? "")).toBe(true);
+    it("launches at the root — iOS derives the app scope from it", () => {
+      expect(manifest.start_url).toBe("/");
     });
 
     it("stays standalone", () => {
