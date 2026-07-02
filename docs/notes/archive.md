@@ -11,6 +11,20 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (later) — owner decision batch (Batch 4): terminal items
+
+Session 30 processed the owner's decisions on every open `needs-input` item
+(backlog appendix Batch 4). Two items reached a terminal state and are swept
+here; the rest were decided-and-kept-live as `ready`/`deferred` rows (see the
+Session 30 `log.md` entry). Raw text stays in the backlog appendix.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| M10 | Show only *unplanned* mesocycles on the macrocycle overview page | UX | D | **wontfix (owner 2026-07-02).** "Eh, drop that. Leave unplanned mesos there as they are. Drop this idea." The macro timeline keeps showing all mesos (matches doc 09's full chronological ledger). |
+| T-A6 | Seed a new meso from the recency anchor / rep high-water-mark, not just the top-weight PR | F | A | **done — resolved by WS-I (owner-confirmed 2026-07-02).** The prior-peak × back-off seed was retired entirely (PRs #72/#80/#81/#82); seed precedence is now confident recency anchor → user `initial_*` → unseeded/prompt, which delivers what T-A6 asked for. Owner: "Yes, I believe this is addressed and T-A6 can be closed." |
+
+---
+
 ## Swept 2026-07-02 — R13 + R18 + R19 UI/UX cluster merged (PR #100)
 
 Session 29 shipped the three open UX-facing items on the day-view surface (per

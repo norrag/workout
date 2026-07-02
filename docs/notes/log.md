@@ -4,6 +4,79 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 30: owner decision batch (Batch 4) — 17 needs-input items resolved
+
+Reconciliation sweep: no-op (Session 29 already merged PR #100 and swept R13/R18/R19;
+no `done (PR #n)` rows live). This session was **notes-only** — no code changed. Claude
+had compiled every open `needs-input` item into a fill-in Word doc last turn; the owner
+returned it with a decision per item. Captured the verbatim responses as **backlog
+appendix Batch 4** and folded the decisions into every row + detail file. Owner will
+merge these notes and start building in a new session.
+
+**Decisions applied (17 items):**
+- **Stats cluster (WS-C):**
+  - **T-A1** → ready: standardize on the **engine e1RM formula** everywhere (retire
+    the last raw-Epley `v_exercise_overview.best_e1rm`). **Stats show the undecayed /
+    best-ever value**; **recency decay is reserved for prescriptions only**. Keep the
+    30-day half-life (confirm it's MCP-tunable). Answers PH39.
+  - **M8** → ready: build the macro **Overview|Balance|Performance** stats screen
+    **without a mockup** (rule-8 deviation to record); meso Performance est-strength
+    confirmed. Build the meso side *through* **P16**.
+  - **I11** → ready (HIGH): est-strength %-change per exercise for **every exercise
+    logged ≥3× in the meso** (excludes subbed-in/inconsistent lifts).
+  - **PH37** → ready: muscle-group strength-gain rollup at **macro + meso** scopes;
+    **all-time dropped** (no natural home).
+  - **T-A2** → ready: **exclude deloads from strength-progress scoring**; keep them in
+    volume + PR stats; denote where relevant.
+  - **R14** → ready: implement **fractional 1.0/0.5** volume counting **and** the
+    **RIR≤4 hard-set** rule per doc 10 (no spec amendment). Foundational — **sequence
+    before** the stats rework since it moves every Balance/MEV/MRV number.
+- **Engine (WS-A/G):**
+  - **T-A5** → **deferred**: keep the ±1 model; don't amend doc 10 (graded ramp stays a
+    future option). Owner idea: expose training style (±1 vs graded ramp) as a
+    **setting / macrocycle-type selection** down the road.
+  - **T-A6** → **closed/archived** (owner confirmed WS-I resolved it).
+  - **R24** hold-week reprice-down: **logged for future investigation** (owner sees the
+    concern — a decayed anchor makes a "hold" drift down; matters most for **cut/maintain**
+    macro types); no fix decided. Row annotated, stays triaged.
+- **Day-view / nav UX (WS-E):**
+  - **P17** → ready: option 2 (no back button in the Workout-tab day view). Spawned
+    **N4** (deep-link return-to-origin — back from "view exercise" should land on the day
+    view, not the exercises list).
+  - **P18** → ready: hide the **set-type menu affordance only**; leave the drop-set model
+    dormant.
+  - **M10** → **wontfix/archived** ("leave unplanned mesos as they are").
+- **Meso surface (WS-C/D):**
+  - **P16** → ready (**large**): meso page reworked to an **Overview|Volume|Performance**
+    toggle (absorbs the MESO STATS button) + a **read-only planner-board Overview** +
+    a day-view-style header (calendar button w/ clickable days → day/plan view, share
+    button, ⋮ menu for edit/save-template/delete). Full spec in `scoping.md`. Subsumes
+    M8's meso side; naming of the "VOLUME" vs "BALANCE" tab flagged for build.
+- **Feature scope (WS-E/F/H):**
+  - **I14** → ready (HIGH): **unify all feedback sliders to one 0–10 scale** and
+    **rescale existing persisted data** (needs a data migration + engine/golden updates).
+  - **PH30** → **deferred**: LLM stays an *explanation layer over* the deterministic
+    engine (session-note-aware, verbose rationale, light PT advice via MCP), never a
+    replacement. Parked.
+  - **PH33** → ready: hide admin tools from `tools/list` for non-admins (visibility only;
+    denial already enforced).
+  - **P21** → decided (store explicit 0) → **verify** current behavior already does so.
+- **Data correctness (WS-K):**
+  - **R6** → ready: use the **client-supplied local date** at record time; consolidate the
+    6 `shortDate` copies.
+
+**Files touched:** `backlog.md` (index rows, follow-up table, new **N4**, appendix Batch 4),
+`archive.md` (swept **M10** wontfix + **T-A6** done), `A-engine-metrics.md` (T-A1/T-A2/T-A5/T-A6
+follow-up rows), `scoping.md` (M8/M10/I14/P16/P17/N4/P18/PH33 + the blockers note), `README.md`
+(WS-H roster). No code/schema/engine change; no tests run.
+
+**Suggested build order for the next session** (dependencies first): **R14** (fractional
+volume — unblocks the stats numbers) → **T-A1 + T-A2** (e1RM standardization + deload
+exclusion — the metric definitions) → **I11 / PH37 / M8 / P16** (the stats + meso-surface
+rework, which all consume the above) in a coherent WS-C push. Independent quick wins in
+parallel: **P17+N4**, **P18**, **PH33**, **R6**, **P21** (verify). **I14** (HIGH) is
+self-contained but carries a data migration — its own PR.
+
 ## 2026-07-02 — Session 29 (cont.): PR #100 merged + owner revert + archival sweep
 
 - **maximumScale revert (owner ruling).** The R18 pinch-zoom bullet dropped

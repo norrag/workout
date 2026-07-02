@@ -37,36 +37,36 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | S6 | Does adding a set manually transfer to future plans? | Q | — | A | answered |
 | S7 | How is the number of sets planned? | Q | — | A | answered → T-A5 |
 | S8 | When/why/how does the engine add or remove sets/reps? | Q | — | A | answered (see S7 + S4) |
-| M8 | Stats unification: meso gets est-strength under performance; macro gets balance+performance via 3-way toggle | F | — | C | needs-input (meso est-strength present but owner wants its meaning clarified; macro part folds into a broader meso/macro stats redesign) |
-| M10 | Show only *unplanned* mesocycles on the macrocycle overview page | UX | — | D | needs-input |
-| I11 | Meso stats rework — include strength increases for all exercises | F | HIGH | C | triaged |
+| M8 | Stats unification: meso gets est-strength under performance; macro gets overview+balance+performance 3-way toggle | F | — | C | **decided (2026-07-02) → ready:** meso Performance est-strength confirmed present/wanted; build the macro 3-way stats screen (Overview\|Balance\|Performance) — owner OK'd designing it **without a mockup** (rule-8 deviation to record). Overlaps P16 (meso toggle), I11, PH37 |
+| I11 | Meso stats rework — est-strength %-change for all exercises | F | HIGH | C | **decided (2026-07-02) → ready:** est-strength %-change per exercise for **every exercise logged ≥3× in the meso** (excludes subbed-in/inconsistent lifts); uses the engine e1RM (undecayed, per T-A1), deloads excluded (T-A2) |
 | I12 | Address mesocycle management under a macrocycle | F | HIGH | D | **advanced (PR #92):** MCP authoring shipped — build days into a meso (`edit_mesocycle` add_day/remove_day), place/attach into a macro slot, edit the meso header, duplicate, manage slots, gated `activate_mesocycle` + **sequential-activation invariant** (planned mesos seed only after prior blocks complete), non-persisting volume preview. Remaining: in-app planner UX for the same actions. See PROGRESS 2026-07-01 |
-| I14 | Raise complete-workout feedback slider resolution to match per-exercise feedback | F | HIGH | E | needs-input (scope) |
-| P16 | Meso overview buttons monotonous/ugly → overview↔stats page toggle | UX | LOW | C | needs-input |
-| P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | needs-input |
-| P18 | Remove the set-type option from the set menu | UX | LOW | E | needs-input (spec conflict) |
-| P21 | Should soreness be recorded when user reports 0 days sore? | D | LOW | H | needs-input |
-| PH30 | Expanded weekly prescription explanation — LLM API for brief analysis? | D | — | H | needs-input |
-| PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | LOW | H | needs-input (likely low/wontfix) |
-| PH37 | Aggregate strength gains per muscle group over macro/meso/all-time | F | — | C | inbox |
+| I14 | Raise complete-workout feedback slider resolution to match per-exercise feedback | F | HIGH | E | **decided (2026-07-02) → ready:** unify **all** feedback sliders to one 0–10 scale and **rescale existing persisted data** to match. Touches engine reads + golden tests (hard rule #3) + a data migration |
+| P16 | Meso page rework: Overview\|Volume\|Performance toggle + planner-style overview + header actions | UX | MED | C/D | **decided (2026-07-02) → ready (large):** meso page gets an Overview\|Volume\|Performance toggle (absorbs the separate MESO STATS button); Overview becomes a **read-only planner-board view**; calendar + share get their own header buttons, edit/save-template/delete move to a ⋮ menu; header styled like the day-view header. Detail in `scoping.md` |
+| P17 | Remove page back-button when day dropdown selects a new day | UX | LOW | E | **decided (2026-07-02) → ready:** option 2 — the day navigator lives inside the Workout tab, no back button on the day view. Spawned **N4** (deep-link return-to-origin) |
+| P18 | Remove the set-type option from the set menu | UX | LOW | E | **decided (2026-07-02) → ready:** hide the menu affordance only; leave the drop-set data model dormant (owner may revisit drop-sets once the UX is worked out) |
+| P21 | Should soreness be recorded when user reports 0 days sore? | D | LOW | H | **decided (2026-07-02):** store an explicit 0 (real recorded value); owner "fine as is" → **verify** current behavior already records 0 (no-op if so) |
+| PH30 | Expanded weekly prescription explanation — LLM narrative layer | D | — | H | **deferred (2026-07-02):** not now. Refined vision: LLM does **not** replace the engine — it's an explanation layer over it (uses session notes, explains the engine's decision verbosely, light PT-style advice via MCP tools). Parked |
+| PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | LOW | H | **decided (2026-07-02) → ready:** hide admin tools from `tools/list` for non-admins (not security — owner doesn't want non-admins seeing tools they can't use). Denial already enforced; list-visibility only |
+| PH37 | Aggregate strength gains per muscle group over macro/meso | F | — | C | **decided (2026-07-02) → ready:** macro + meso scopes only (**all-time dropped** — no natural home); muscle-group rollup of I11's per-exercise numbers, placed in the macro/meso Performance surfaces |
 | PH39 | How fast does e1RM recency decay? (Pulldown e1RM 110.1 but did 115×11 on May 22) | Q | — | A | answered → T-A1 |
 | N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
 | R3 | Non-atomic plan/param writes: `saveMesoPlan` delete-then-insert can wipe an (active) plan — reachable from MCP `edit_mesocycle`/`create_mesocycle` input-validation gaps (PR #92 surface); `startMeso` half-apply = permanently unstartable meso; `generateDay` poisoned empty day; `activateEngineParams` can leave ZERO active params app-wide; missing uniques let races duplicate days/sets | B | HIGH | K | triaged |
 | R4 | Plan regeneration cascade-deletes logged history (`regenerateOpenWorkouts` skips the logged-set check; `logSet`'s status flip silently swallowed → hard-rule-#5 breach path) | B | HIGH | K | triaged |
 | R5 | Completion lock bypassable/asymmetric (completed→in_progress flip; `workout_exercises`/`workout_feedback` mutable post-completion; sets insertable into completed workouts) + child INSERT policies skip parent-ownership (feedback-slot squat) | B | MED | K | triaged |
-| R6 | Workout dates & week rollups computed in UTC — evening sessions land on tomorrow's date in history/PRs/weekly rollups; 6 divergent `shortDate` copies | B | MED | K | needs-input (canonical local-day rule: profile tz vs client-supplied date) |
+| R6 | Workout dates & week rollups computed in UTC — evening sessions land on tomorrow's date in history/PRs/weekly rollups; 6 divergent `shortDate` copies | B | MED | K | **decided (2026-07-02) → ready:** use the **client-supplied local date** at record time (option b — store the session at whatever date it was on the client); consolidate the 6 `shortDate` copies into one |
+| N4 | Back button should return to origin — deep-linking day view → "view exercise" → back lands on the exercises list, not the day view you came from | UX | — | E | **ready (2026-07-02):** surfaced in the P17 decision (deep-link option 3). Preserve/return the originating route on back so you land where you came from |
 | R7 | Service worker caches authed pages/RSC ~24h, never purged on sign-out (stale prescriptions offline + shared-device privacy; contradicts online-only) | B | MED | K | triaged |
 | R9 | `analyze_exercise_progress`: any phase with ≤3 sessions reads "improving", even a strict decline (every phase start asserts improvement) | B | MED | G | triaged |
 | R10 | Replay re-runs seed decisions without `bodyweight` → every bodyweight-lift seed diffs spuriously, corrupting the params tuning loop | B | MED | G | triaged |
 | R11 | Reconcile's unbounded `engine_decisions` fetch truncates at the PostgREST row cap → open rows misclassified decision-less and re-seeded off the prior-meso peak | B | MED | G | triaged |
 | R12 | Custom bodyweight exercises stored `load_type='external'` forever (wrong e1RM/effective-load math; app + MCP) + MCP create/search equipment as bare string + dup muscle-group crash leaves orphan exercise | B | MED | G | triaged |
-| R14 | Volume counting is primary-only (1.0/0) — doc 10's locked fractional 1.0/0.5 + RIR≤4 hard-set rule unimplemented; false below-MEV calls, permissive MRV/ceiling. Implement fractionally or amend doc 10. Informs I11/PH37/M8 | D | MED | C | needs-input |
+| R14 | Volume counting is primary-only (1.0/0) — doc 10's fractional 1.0/0.5 + RIR≤4 hard-set rule unimplemented; false below-MEV calls, permissive MRV/ceiling. Informs I11/PH37/M8 | D→F | MED | C | **decided (2026-07-02) → ready:** implement fractional **1.0/0.5** counting **and** the **RIR≤4 hard-set** rule per doc 10 (do **not** amend the spec). Changes every Balance/MEV/MRV number — sequence **before** the stats rework (I11/PH37/M8) |
 | R15 | Second concurrently-active meso possible — sequential-activation invariant only covers same-macro siblings; `get_current_state` silently picks newest; tool description overstates the guarantee | B | MED | D | triaged |
 | R20 | Zero production error observability — reconcile/generation/MCP failures swallowed (silently stale prescriptions); no `global-error.tsx`/`(auth)` boundary; SENTRY_DSN pending but unread | F | HIGH | L | triaged |
 | R21 | Coverage gaps: Playwright e2e suite absent (dead `test:e2e` script; docs claim it exists); no write-pipeline integration tests (`generation`/`logging` untested I/O); golden meso only covers no-anchor v10 shape, not live v16 | F | MED | L | triaged (was blocked on R2 — unblocked once the R2 PR merges: local stack boots from the repo chain) |
 | R22 | Env vars unvalidated at boot — missing/typo'd var passes build (CI placeholders), fails as request-time 500s inside @supabase/ssr | F | LOW | L | triaged |
 | R23 | Repo hygiene: 2 unused-but-live server actions (attack surface), dead exports/components (NumberStepper stale-closure), dead `v_muscle_group_volume` view, dep nits (analyzer major, tsx, dependabot) | F | LOW | L | triaged |
-| R24 | Engine guardrail batch: no cross-field param invariants (inverted rep window activatable); `e1rmFactor` non-monotonic for cutoff>10; no-anchor "hold" rounds the held load up; stale retire-flag comment; Option-A reprices down on ramp-hold weeks (design nit — flag to owner) | B | LOW | G | triaged |
+| R24 | Engine guardrail batch: no cross-field param invariants (inverted rep window activatable); `e1rmFactor` non-monotonic for cutoff>10; no-anchor "hold" rounds the held load up; stale retire-flag comment; **hold-week reprice-down** (owner 2026-07-02: real concern — a slightly-decayed anchor makes a "hold" on wk N+1 < wk N; **matters most for cut/maintain macro types meant to *preserve* strength**; logged for future investigation, no fix decided yet) | B | LOW | G | triaged |
 | R25 | MCP polish: audit-write failure inverts a committed write's result (agent retries → duplicate drafts); dual error contracts + unwrapped resources; `MCP_JWT_AUDIENCE` step missing from runbook; tool-surface consolidation (~4–5 tools) | F | LOW | K | triaged |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
@@ -88,11 +88,10 @@ in [`archive.md`](./archive.md).
 | ID | From | Title | Type | Status |
 |----|------|-------|------|--------|
 | T-R2 | R2 | Capture the out-of-band hosted migration `20260620115322_perf_rls_initplan_and_fk_indexes` in the repo chain: ~54 RLS policies initplan-wrapped (`auth.uid()` → `(select auth.uid())`) + 23 FK indexes exist on hosted only. Perf-only (no semantic diff — policy names/quals otherwise identical, verified by full hosted↔clean-DB diff 2026-07-01); mechanical but security-sensitive to transcribe, so own PR | F | ready |
-| T-A1 | S1/PH39 | Reconcile the two e1RM systems (engine anchor vs raw-Epley stats view); decide what screens show | D→F | **partially done (2026-06-26, via N2):** `v_exercise_history.e1rm` + Exercise-history flip view now use the engine per-set e1RM (`v_exercise_prs` already did). Remaining raw-Epley: `v_exercise_overview.best_e1rm`. Still needs the owner call on what each screen *shows* + the recency-decay framing (PH39). |
-| T-A2 | S3 | Decide + document deload handling in stats; skip deload sessions in `getMesoProgressScores` | D→B | needs-input |
+| T-A1 | S1/PH39 | Reconcile the two e1RM systems; decide what each screen shows | D→F | **decided (2026-07-02) → ready:** standardize on the **engine e1RM formula** everywhere (retire raw-Epley `v_exercise_overview.best_e1rm`). **Stats screens show the undecayed / best-ever value**; **recency decay stays for prescriptions only** (stats aren't meant to track strength-over-time via decay — that's the prescription's job). Keep the **30-day half-life**; **confirm it's MCP-tunable** for later stability tuning. Answers PH39. |
+| T-A2 | S3 | Decide + document deload handling in stats | D→B | **decided (2026-07-02) → ready:** **exclude deloads from strength-progress scoring** (`getMesoProgressScores`); keep them in total-volume + PR stats (they contribute little); denote deloads where relevant. |
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (realized via WS-I / T-I4, merged PR #82) |
-| T-A5 | S7 | Implement graded MEV→MAV→MRV ramp + MRV-stop auto-deload, or amend doc 10 to ±1 model | D→F | needs-input (sequenced in WS I) |
-| T-A6 | PR22/PR23 | Seed a new meso from the recency anchor / rep high-water-mark, not just top-weight PR | F | needs-input |
+| T-A5 | S7 | Graded MEV→MAV→MRV ramp + MRV-stop auto-deload | D→F | **deferred (2026-07-02):** keep the ±1 model for now (do **not** amend doc 10 — the graded ramp stays as a documented future option). Owner idea to revisit down the road: expose **training style** (this ±1 "German-style" ramp/deload vs. the graded MEV→MAV→MRV ramp) as a **setting or macrocycle-type selection**. Big overhaul; kept in orbit. |
 
 > **WS-I (T-I1–T-I5) complete & merged** — swept to [`archive.md`](./archive.md#swept-2026-06-30--reconcile-merged-build-prs) 2026-06-30. Bodyweight load-type model live (engine_params v16), legacy increment/regression + prior-peak seed retired. PRs #72 / #80 / #81 / #82.
 
@@ -197,3 +196,102 @@ code. Full evidence + scoping:
 [`docs/reviews/2026-07-01-repo-review.md`](../reviews/2026-07-01-repo-review.md).
 Already-tracked ground (WS-J perf, T-A1, Phase-A gaps, doc-07 open phases) was
 excluded rather than re-filed.
+
+### Batch 4 — owner decisions on the open needs-input items (2026-07-02)
+
+Claude compiled every open `needs-input` item into a fill-in Word doc; the owner
+returned it with a decision per item. Verbatim responses below (one block per
+item, in the doc's order). These resolve the decisions folded into the rows above
+and the follow-up table; the Session-30 `log.md` entry summarizes the deltas.
+
+- **T-A1 (e1RM systems).** "(a) Yes, makes sense to standardize the number
+  everywhere. Agreed. (b) No, the stats screen should show the undecayed number.
+  It's the prescription that should get see the decay, so that it accounts for
+  changing strength over time. Stats are not indended to do that. (c) Let's keep
+  30 days for now. I believe that is tunable in via MCP (it should be, if not).
+  If I need to update this for stability later I can do it there."
+- **M8 (stats unification).** "Yes, that's what I'm asking for on all relevant
+  exercises, see I11 response. Go ahead and design it without a mock up."
+- **I11 (meso strength for all exercises).** "Yes, I want est. strength % change
+  for 'all' exercises – see below. Define these by exercises which were logged at
+  least 3 time in the mesocycle. This will eliminate the inclusion of exercises
+  which were only subbed in or not done consistently."
+- **PH37 (aggregate per muscle group).** "Hm. We can probably drop the all-time
+  stat, mostly because we don't have a natural home for this. It doesn't really
+  make sense inside of a macrocycle overview and we don't really have another
+  place for it."
+- **T-A2 (deloads in stats).** "Definitely exclude deloads from strength progress
+  metrics. It's fine to count deloads towards total volume, though they'll
+  contribute little. It's fine to count deloads in PRs. Should never happen
+  realistically, but that's fine. Denoting deloads where relevant is fine."
+- **R14 (fractional volume).** "Yes, implement fractional counting per spec.
+  [amend spec?] No. [RIR≤4 hard-set rule?] Yes."
+- **T-A5 (graded ramp).** "Let's que this and keep it in orbit, but defer it for
+  now. It's a big overhaul with lots to think about, and much to get right, but I
+  think it could be a powerful option as an alternative to this more german-style
+  training ramp and deload. I am thinking down the road that this could be a
+  setting, or macrocycle type selection of some sort to choose the style of
+  training you want."
+- **T-A6 (new-meso seed).** "Yes, I believe this is addressed and T-A6 can be
+  closed."
+- **R24 (hold-week reprice-down).** "I see your point. Since the recency anchor
+  has moved slightly, it's also decayed slightly and therefore a 'hold' on week
+  N+1 is inherently less than the same anchor in week N. This should probably be
+  investigated and addressed. It may be rare in a typical cycle, but in some macro
+  types, such as a cut or maintain cycle, which is intended to preserve strength
+  rather than progress it, this could possibly be a concern – or maybe not, I'm
+  not entirely sure. I don't quite have an answer yet without more consideration
+  and investigation. But we should log that concern for future work."
+- **P17 (day-view back button).** "Well, my desire is that it does not appear on
+  the workout page at all really, since the day navigator is not really changing
+  'page' practically speaking – Its always in the workout day 'page', and you're
+  selecting the day you view, at least in practical effect – that leads me to #2.
+  But an additional improvement to an issue I had not logged yet would be solved
+  with #3 – to return back to where you were if you deep link through somewhere
+  else. e.g. if you click through the day view page to 'view exercise', the 'back'
+  button takes you back to the exercises page, not back to the workout day view
+  page that you came from. I would prefer it to go back to where you came from,
+  like #3." *(→ P17 = option 2; spawned N4 for the option-3 deep-link behavior.)*
+- **P18 (set-type menu).** "Well, I was saying to drop that because I don't think
+  we ever worked out the UI for drop sets and how they work. I may come back to
+  adding them, but it's more of a plus feature that I haven't worked out yet, not
+  something we need right now. So, I guess just drop the menu item. I wasn't even
+  aware we had a model for it."
+- **P16 (meso page rework).** "I think we should unify this similarly in layout to
+  what's described for the macrocycle page, with an overview, volume, performance
+  toggle. This will effectively pull out the existing meso stats button into the
+  toggles, eliminating that button. What remains in the overview portion of the
+  meso page could use a rework also. I would prefer to rework the overview page to
+  more of a 'plan' view which shows the exercise planner, and move all of the rest
+  of the buttons and functions (the calendar view, save template, share, edit,
+  delete) to the title header, which is styled in a similar fashion to the header
+  of the workout page for consistency and unification. — The calendar view would
+  get its own button in the header (similar to the notes/history button on day
+  view) which would drop down the calendar view. The days will be clickable and
+  take you to the corresponding day view if its an active cycle, or to the
+  corresponding plan view if it's planned. — The share function will also get its
+  own header button, along with calendar. — the rest of the functions will go into
+  a three dot menu drop down like in day views. — The overview page primary content
+  would be basically like the meso planner board, but in non-edit mode where you
+  can just view the plan and days. You can select edit from the header menu which
+  will take you to the planner board to edit."
+- **M10 (unplanned-only macro list).** "Eh, drop that. Leave unplanned mesos there
+  as they are. Drop this idea." *(→ wontfix.)*
+- **I14 (slider resolution).** "Unify it absolutely. Rescale the data appropriately
+  to match the new scale."
+- **PH30 (LLM explanation).** "Yeah, I'm not ready for this now. We'll leave it for
+  future investigation. The idea is not to replace the deterministic engine at all
+  – that would still drive it. The LLM layer would just serve as a different, more
+  dynamic explaination of the deterministic engine. It could, for instance,
+  incorporate session notes, and explain why the engine did what it did more
+  verbosely. There is also additional area for it to provide more
+  personal-trainer-esque advice, utilizing some of the MCP tools to give a short
+  rationale, or focused exercise advice."
+- **PH33 (admin-tool visibility).** "Yeah, it's not a security thing, but I don't
+  want other clients really to see them and ask why they cant use them too. I'd
+  rather they be visible to admin only."
+- **P21 (soreness at 0 days).** "Yeah, record it is fine. I was just thinking that
+  if saying that I was sore for zero days, how can I really grade my soreness if I
+  am simultaneously saying I never got sore? Whatever though, its fine as is."
+- **R6 (local-day rule).** "Um, I think B is perfectly fine in my opinion. It
+  should be stored at whatever date it was when the client recorded the session."
