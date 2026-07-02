@@ -4,6 +4,18 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 35 (cont. 4): PR #117 merged + archival sweep
+
+- **PR #117 MERGED** (all checks green). End-of-session archival sweep ran:
+  **R9 + R10 swept to `archive.md`** ("Swept 2026-07-02 (late 3)"), live index
+  trimmed. Sweep shipped as its own small docs PR (a merged PR can't sweep its
+  own rows); branch restarted from the merged main per the follow-up rule.
+- **Session 35 total: three build PRs merged** — #115 (T-R2), #116 (R5+R7,
+  migration `20260702000006` applied live), #117 (R9+R10) — plus this sweep.
+- **Next per the attack order:** R11 + R12 (MED, WS-G); R15 (MED, WS-D);
+  then the LOW tail (R21–R25). N1 (WS-J) and I12's in-app planner UX remain
+  the open HIGH-priority workstreams.
+
 ## 2026-07-02 — Session 35 (cont. 3): PR #116 merged + R9 + R10 — analysis honesty fixes (PR #117)
 
 - **PR #116 MERGED** (all checks green — `rls-tests` ran the 9 new
