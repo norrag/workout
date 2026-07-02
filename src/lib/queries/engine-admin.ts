@@ -120,8 +120,11 @@ export async function proposeEngineParams(
 }
 
 /**
- * Activate a version. A partial unique index enforces a single active row, so
- * we deactivate the current active row first, then flip the target on.
+ * Activate a version. A partial unique index enforces a single active row.
+ * R3: the deactivate + activate pair runs in ONE DB transaction
+ * (`activate_engine_params`, 20260702000005) — the old two-round-trip swap
+ * could fail between statements and leave ZERO active rows, which throws on
+ * every page/generation path app-wide until manually repaired.
  */
 export async function activateEngineParams(
   client: Client,
@@ -136,17 +139,10 @@ export async function activateEngineParams(
   if (!target) throw new Error(`engine_params version ${version} does not exist`);
   if (target.is_active) return;
 
-  const { error: deactivateError } = await client
-    .from("engine_params")
-    .update({ is_active: false })
-    .eq("is_active", true);
-  if (deactivateError) throw deactivateError;
-
-  const { error: activateError } = await client
-    .from("engine_params")
-    .update({ is_active: true })
-    .eq("version", version);
-  if (activateError) throw activateError;
+  const { error } = await client.rpc("activate_engine_params", {
+    p_version: version,
+  });
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------

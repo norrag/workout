@@ -815,70 +815,19 @@ export async function saveMesoPlan(
   mesoId: string,
   days: PlanDayInput[],
 ): Promise<void> {
-  // wholesale replace: dropping the days cascades groups + exercises (RLS
-  // scopes the meso to the owner). Nothing outside the planner tables
-  // references their ids — generated workouts key off day_number + values.
-  const { error: delError } = await supabase
-    .from("meso_days")
-    .delete()
-    .eq("mesocycle_id", mesoId);
-  if (delError) throw delError;
-
-  for (const day of days) {
-    const { data: dayRow, error: dayError } = await supabase
-      .from("meso_days")
-      .insert({
-        mesocycle_id: mesoId,
-        user_id: userId,
-        day_number: day.day_number,
-        label: day.label,
-        weekday: day.weekday,
-      })
-      .select()
-      .single();
-    if (dayError) throw dayError;
-
-    let position = 1;
-    for (const group of day.groups) {
-      const { data: groupRow, error: groupError } = await supabase
-        .from("meso_day_groups")
-        .insert({
-          meso_day_id: dayRow.id,
-          muscle_group_id: group.muscle_group_id,
-          position: position++,
-          exercise_slots: Math.max(group.exercise_slots, 1),
-        })
-        .select()
-        .single();
-      if (groupError) throw groupError;
-
-      if (group.fills.length > 0) {
-        const { error: fillError } = await supabase
-          .from("meso_exercises")
-          .insert(
-            group.fills.map((f) => ({
-              mesocycle_id: mesoId,
-              meso_day_group_id: groupRow.id,
-              day_of_week: null,
-              slot_number: f.slot_number,
-              // day-level order (across groups), not the group-local slot
-              position: f.day_position,
-              exercise_id: f.exercise_id,
-              initial_weight: null,
-              initial_reps: null,
-              initial_sets: f.initial_sets,
-            })),
-          );
-        if (fillError) throw fillError;
-      }
-    }
-  }
-
-  const { error: dpwError } = await supabase
-    .from("mesocycles")
-    .update({ days_per_week: Math.max(1, days.length) })
-    .eq("id", mesoId);
-  if (dpwError) throw dpwError;
+  // R3: the wholesale replace (delete days → cascade groups/exercises →
+  // re-insert) runs inside one DB transaction (`save_meso_plan`,
+  // 20260702000005) so a mid-flight failure can never leave the plan wiped or
+  // half-written — for an ACTIVE meso a wiped plan would cascade into open-
+  // workout regeneration. Identity comes from auth.uid() inside the function
+  // (SECURITY INVOKER + explicit meso-ownership guard); `userId` stays in the
+  // signature for call-site clarity only.
+  void userId;
+  const { error } = await supabase.rpc("save_meso_plan", {
+    p_mesocycle_id: mesoId,
+    p_days: days,
+  });
+  if (error) throw error;
 }
 
 export async function updateDayGroup(

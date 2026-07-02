@@ -290,8 +290,47 @@ export function mesoActivationBlock(
 }
 
 /**
+ * R4 (hard rule #5): which of the delete candidates are actually removable —
+ * anything carrying a logged set is preserved, because deleting it would
+ * cascade `logged_sets` and destroy logged history. A workout can genuinely be
+ * `planned` with sets on it (logSet's status flip is a separate statement), so
+ * the status guard alone is porous. Pure; exported for unit tests.
+ */
+export function withoutLoggedHistory<T extends { id: string }>(
+  candidates: T[],
+  idsWithLoggedSets: ReadonlySet<string>,
+): T[] {
+  return candidates.filter((c) => !idsWithLoggedSets.has(c.id));
+}
+
+/** The subset of the given ids that have at least one logged set, keyed by the
+ *  given denormalized `logged_sets` column. */
+async function idsWithLoggedSets(
+  supabase: Client,
+  column: "workout_id" | "workout_exercise_id",
+  ids: string[],
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("logged_sets")
+    .select(column)
+    .in(column, ids);
+  if (error) throw error;
+  return new Set(
+    (data ?? []).map((r) => (r as Record<string, string>)[column]),
+  );
+}
+
+/**
  * Activate a planned meso: build the full microcycle ramp and the week-1
  * workouts from the planner board (07 Phase 2 — `seedMeso`/`rirRamp`).
+ *
+ * R3: retry-safe. The old flow inserted microcycles first and flipped the meso
+ * `active` last; a mid-flight failure left a `planned` meso whose retry hit
+ * `unique (mesocycle_id, week_number)` — permanently unstartable with no
+ * cleanup path. A retry now upserts the ramp, prunes stale rows from an older
+ * attempt (guarded: never anything carrying logged history), skips
+ * already-seeded days, and completes the flip.
  */
 export async function startMeso(
   supabase: Client,
@@ -362,10 +401,11 @@ export async function startMeso(
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // microcycles for every week of the ramp; week 1 active
+  // microcycles for every week of the ramp; week 1 active. Upsert so a retry
+  // after a half-applied start converges instead of failing on the unique key.
   const { data: micros, error: microError } = await supabase
     .from("microcycles")
-    .insert(
+    .upsert(
       ramp.map((week) => ({
         mesocycle_id: meso.id,
         user_id: userId,
@@ -375,11 +415,43 @@ export async function startMeso(
         start_date: week.weekNumber === 1 ? today : null,
         status: week.weekNumber === 1 ? ("active" as const) : ("pending" as const),
       })),
+      { onConflict: "mesocycle_id,week_number" },
     )
     .select();
   if (microError) throw microError;
   const week1 = (micros ?? []).find((m) => m.week_number === 1);
   if (!week1) return { error: "Failed to create week 1." };
+
+  // prune weeks a prior (differently-shaped) attempt left beyond this ramp —
+  // guarded: never delete anything carrying logged history (hard rule #5)
+  const { data: staleMicros, error: staleError } = await supabase
+    .from("microcycles")
+    .select("id")
+    .eq("mesocycle_id", meso.id)
+    .gt("week_number", ramp.length);
+  if (staleError) throw staleError;
+  if (staleMicros && staleMicros.length > 0) {
+    const { count, error: lsError } = await supabase
+      .from("logged_sets")
+      .select("*", { count: "exact", head: true })
+      .in(
+        "microcycle_id",
+        staleMicros.map((m) => m.id),
+      );
+    if (lsError) throw lsError;
+    if ((count ?? 0) > 0)
+      return {
+        error: "logged sets exist beyond the planned weeks — this mesocycle can't be started.",
+      };
+    const { error: pruneError } = await supabase
+      .from("microcycles")
+      .delete()
+      .in(
+        "id",
+        staleMicros.map((m) => m.id),
+      );
+    if (pruneError) throw pruneError;
+  }
 
   const seedCtx: SeedCtx = {
     equipmentById,
@@ -395,28 +467,79 @@ export async function startMeso(
     anchorByExerciseId,
   };
 
+  // a half-applied prior attempt may have created some week-1 workouts
+  // already; skip fully-seeded days, adopt empty ones, create the rest
+  const { data: priorW1, error: priorW1Error } = await supabase
+    .from("workouts")
+    .select("id, day_number")
+    .eq("microcycle_id", week1.id);
+  if (priorW1Error) throw priorW1Error;
+
+  // ghost days a prior attempt created for a since-removed plan day — prune,
+  // with the same logged-history guard
+  const planDayNumbers = new Set(days.map((d) => d.day_number));
+  const ghosts = (priorW1 ?? []).filter((w) => !planDayNumbers.has(w.day_number));
+  if (ghosts.length > 0) {
+    const ghostsWithSets = await idsWithLoggedSets(
+      supabase,
+      "workout_id",
+      ghosts.map((w) => w.id),
+    );
+    const removable = withoutLoggedHistory(ghosts, ghostsWithSets);
+    if (removable.length > 0) {
+      const { error: ghostError } = await supabase
+        .from("workouts")
+        .delete()
+        .in(
+          "id",
+          removable.map((w) => w.id),
+        );
+      if (ghostError) throw ghostError;
+    }
+  }
+
+  const w1ByDay = new Map((priorW1 ?? []).map((w) => [w.day_number, w]));
+  const w1Populated = new Set<string>();
+  if (priorW1 && priorW1.length > 0) {
+    const { data: priorWes, error: priorWesError } = await supabase
+      .from("workout_exercises")
+      .select("workout_id")
+      .in(
+        "workout_id",
+        priorW1.map((w) => w.id),
+      );
+    if (priorWesError) throw priorWesError;
+    for (const we of priorWes ?? []) w1Populated.add(we.workout_id);
+  }
+
   // week-1 workouts in planner order, seeded per exercise
   for (const day of days) {
-    const { data: workout, error: workoutError } = await supabase
-      .from("workouts")
-      .insert({
-        microcycle_id: week1.id,
-        user_id: userId,
-        day_number: day.day_number,
-        scheduled_date: null,
-        performed_at: null,
-        status: "planned",
-        notes: null,
-      })
-      .select()
-      .single();
-    if (workoutError) throw workoutError;
+    const prior = w1ByDay.get(day.day_number);
+    if (prior && w1Populated.has(prior.id)) continue; // seeded by a prior attempt
+    let workoutId = prior?.id ?? null;
+    if (workoutId == null) {
+      const { data: workout, error: workoutError } = await supabase
+        .from("workouts")
+        .insert({
+          microcycle_id: week1.id,
+          user_id: userId,
+          day_number: day.day_number,
+          scheduled_date: null,
+          performed_at: null,
+          status: "planned",
+          notes: null,
+        })
+        .select()
+        .single();
+      if (workoutError) throw workoutError;
+      workoutId = workout.id;
+    }
 
     await persistSeededRows(
       supabase,
       userId,
-      buildDayExerciseRows(workout.id, day, seedCtx),
-      { workoutId: workout.id, microcycleId: week1.id, mesocycleId: meso.id },
+      buildDayExerciseRows(workoutId, day, seedCtx),
+      { workoutId, microcycleId: week1.id, mesocycleId: meso.id },
       params,
       paramsVersion,
     );
@@ -514,10 +637,28 @@ export async function regenerateOpenWorkouts(
       anchorByExerciseId,
     };
 
-    // 1. drop planned workouts whose day was removed from the plan
-    for (const w of workouts) {
-      if (w.status === "planned" && !planByDayNumber.has(w.day_number)) {
-        const { error } = await supabase.from("workouts").delete().eq("id", w.id);
+    // 1. drop planned workouts whose day was removed from the plan — but never
+    // one carrying logged sets (R4, hard rule #5): the delete would cascade
+    // logged_sets, and `planned` alone is porous because logSet's in_progress
+    // flip is a separate statement that can fail after the set is written.
+    const removedDays = workouts.filter(
+      (w) => w.status === "planned" && !planByDayNumber.has(w.day_number),
+    );
+    if (removedDays.length > 0) {
+      const daysWithSets = await idsWithLoggedSets(
+        supabase,
+        "workout_id",
+        removedDays.map((w) => w.id),
+      );
+      const removableDays = withoutLoggedHistory(removedDays, daysWithSets);
+      if (removableDays.length > 0) {
+        const { error } = await supabase
+          .from("workouts")
+          .delete()
+          .in(
+            "id",
+            removableDays.map((w) => w.id),
+          );
         if (error) throw error;
       }
     }
@@ -540,21 +681,28 @@ export async function regenerateOpenWorkouts(
       );
 
       if (!existing) {
-        // a newly added day → create a fresh planned workout, fully seeded
+        // a newly added day → create a fresh planned workout, fully seeded.
+        // ignoreDuplicates: a concurrent generation may have created the day
+        // since our read — the unique (microcycle_id, day_number) key makes
+        // that a silent no-row result instead of a duplicated week (R3).
         const { data: created, error: cErr } = await supabase
           .from("workouts")
-          .insert({
-            microcycle_id: micro.id,
-            user_id: userId,
-            day_number: day.day_number,
-            scheduled_date: null,
-            performed_at: null,
-            status: "planned",
-            notes: null,
-          })
+          .upsert(
+            {
+              microcycle_id: micro.id,
+              user_id: userId,
+              day_number: day.day_number,
+              scheduled_date: null,
+              performed_at: null,
+              status: "planned",
+              notes: null,
+            },
+            { onConflict: "microcycle_id,day_number", ignoreDuplicates: true },
+          )
           .select()
-          .single();
+          .maybeSingle();
         if (cErr) throw cErr;
+        if (!created) continue; // another writer owns this day now
         await persistSeededRows(
           supabase,
           userId,
@@ -575,17 +723,28 @@ export async function regenerateOpenWorkouts(
       const haveIds = new Set((wes ?? []).map((w) => w.exercise_id));
       const planIds = new Set(planExerciseIds);
 
-      // remove exercises no longer in the plan
+      // remove exercises no longer in the plan — same logged-history guard
+      // (R4): `removeWorkoutExercise` refuses when sets exist, and so does the
+      // regeneration path now. A kept row stays in `haveIds`, so it is never
+      // re-added either.
       const toRemove = (wes ?? []).filter((w) => !planIds.has(w.exercise_id));
       if (toRemove.length > 0) {
-        const { error } = await supabase
-          .from("workout_exercises")
-          .delete()
-          .in(
-            "id",
-            toRemove.map((w) => w.id),
-          );
-        if (error) throw error;
+        const wesWithSets = await idsWithLoggedSets(
+          supabase,
+          "workout_exercise_id",
+          toRemove.map((w) => w.id),
+        );
+        const removableWes = withoutLoggedHistory(toRemove, wesWithSets);
+        if (removableWes.length > 0) {
+          const { error } = await supabase
+            .from("workout_exercises")
+            .delete()
+            .in(
+              "id",
+              removableWes.map((w) => w.id),
+            );
+          if (error) throw error;
+        }
       }
 
       // add exercises new to the plan, seeded, appended after the max position.

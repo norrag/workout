@@ -304,6 +304,43 @@ describe("planCatchUp", () => {
     expect(gaps).toEqual([]);
   });
 
+  // R3: an EMPTY planned counterpart is a poisoned half-applied generation,
+  // not a generated day — it must read as a gap so the atomic
+  // insert_generated_day can adopt + fill it.
+  it("treats an empty planned counterpart as missing (poisoned-day heal)", () => {
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+      { id: "w4d1", microcycle_id: "m4", day_number: 1, status: "planned", has_exercises: false },
+    ]);
+    expect(gaps).toEqual([{ workoutId: "w3d1", week: 3, day: 1 }]);
+  });
+
+  it("a populated planned counterpart still counts as generated", () => {
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+      { id: "w4d1", microcycle_id: "m4", day_number: 1, status: "planned", has_exercises: true },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+
+  it("an empty NON-planned counterpart is untouched (started days are never re-generated)", () => {
+    // a skipped/completed day with no exercises is unusual but must not
+    // re-open — only `planned` empties are adoptable
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+      { id: "w4d1", microcycle_id: "m4", day_number: 1, status: "skipped", has_exercises: false },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+
+  it("rows without the flag keep the legacy meaning (exists ⇒ generated)", () => {
+    const gaps = planCatchUp(weeks, [
+      { id: "w3d1", microcycle_id: "m3", day_number: 1, status: "completed" },
+      { id: "w4d1", microcycle_id: "m4", day_number: 1, status: "planned" },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+
   it("orders gaps by week then day", () => {
     // each source's counterpart is absent (different days), so all are gaps
     const gaps = planCatchUp(weeks, [

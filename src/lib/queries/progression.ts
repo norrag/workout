@@ -251,7 +251,7 @@ interface WeekContext {
 async function generateDay(
   ctx: WeekContext,
   weekNWorkout: WorkoutRow,
-): Promise<{ workoutId: string; deltas: SummaryDelta[] }> {
+): Promise<{ workoutId: string | null; deltas: SummaryDelta[] }> {
   const dayWes = ctx.weekWes
     .filter((we) => we.workout_id === weekNWorkout.id)
     .sort((a, b) => a.position - b.position);
@@ -346,61 +346,51 @@ async function generateDay(
     };
   });
 
-  const { data: workout, error: workoutError } = await ctx.service
-    .from("workouts")
-    .insert({
-      microcycle_id: ctx.nextMicro.id,
-      user_id: ctx.userId,
-      day_number: weekNWorkout.day_number,
-      scheduled_date: null,
-      performed_at: null,
-      status: "planned",
-      notes: null,
-    })
-    .select()
-    .single();
-  if (workoutError) throw workoutError;
-
-  if (rows.length > 0) {
-    const { data: newWes, error: weError } = await ctx.service
-      .from("workout_exercises")
-      .insert(rows.map((r) => ({ ...r, workout_id: workout.id })))
-      .select();
-    if (weError) throw weError;
-
-    const weIdByPosition = new Map(
-      (newWes ?? []).map((we) => [we.position, we.id]),
-    );
-    const paramsHash = hashParams(ctx.params as unknown as Record<string, unknown>);
-    const codeSha = engineCodeSha();
-    const { error: decisionError } = await ctx.service
-      .from("engine_decisions")
-      .insert(
-        decisions.map((d, index) => ({
-          user_id: ctx.userId,
-          // workout_exercise_id = the generated (week-N+1) prescription target
-          workout_exercise_id: weIdByPosition.get(index + 1) ?? null,
-          // P0-4: persist source identity + cycle coordinates so a decision
-          // chains into history/explain without a re-lookup
-          exercise_id: d.exerciseId,
-          source_workout_exercise_id: d.sourceWeId,
-          workout_id: workout.id,
-          microcycle_id: ctx.nextMicro.id,
-          mesocycle_id: ctx.meso.id,
-          inputs: d.inputs as unknown as Record<string, unknown>,
-          output: d.output as unknown as Record<string, unknown>,
-          params_version: ctx.paramsVersion,
-          params_hash: paramsHash,
-          provenance: decisionProvenance(d.inputs, codeSha),
-          // week N→N+1 progression (doc 14 §6.2); the read-path recompute replays
-          // these through prescribe().
-          kind: "advance" as const,
-        })),
-      );
-    if (decisionError) throw decisionError;
+  // R3: workout + exercises + decisions land in ONE transaction
+  // (`insert_generated_day`, 20260702000005). The old three-insert sequence
+  // could fail after the workout insert and leave a poisoned empty planned day
+  // the catch-up scan forever treated as generated. The function also ADOPTS
+  // an existing empty planned (microcycle, day) row, healing any poisoned day,
+  // and returns created:false when the day is genuinely generated already
+  // (idempotent under races — unique (microcycle_id, day_number) backs it).
+  const paramsHash = hashParams(ctx.params as unknown as Record<string, unknown>);
+  const codeSha = engineCodeSha();
+  const { data: generated, error: genError } = await ctx.service.rpc(
+    "insert_generated_day",
+    {
+      p_mesocycle_id: ctx.meso.id,
+      p_workout: {
+        microcycle_id: ctx.nextMicro.id,
+        user_id: ctx.userId,
+        day_number: weekNWorkout.day_number,
+      },
+      p_exercises: rows,
+      p_decisions: decisions.map((d, index) => ({
+        // joins its generated week-N+1 row by position inside the function
+        position: index + 1,
+        user_id: ctx.userId,
+        // P0-4: persist source identity + cycle coordinates so a decision
+        // chains into history/explain without a re-lookup
+        exercise_id: d.exerciseId,
+        source_workout_exercise_id: d.sourceWeId,
+        inputs: d.inputs as unknown as Record<string, unknown>,
+        output: d.output as unknown as Record<string, unknown>,
+        params_version: ctx.paramsVersion,
+        params_hash: paramsHash,
+        provenance: decisionProvenance(d.inputs, codeSha),
+        // week N→N+1 progression (doc 14 §6.2); the read-path recompute replays
+        // these through prescribe().
+        kind: "advance" as const,
+      })),
+    },
+  );
+  if (genError) throw genError;
+  if (!generated?.created) {
+    // a concurrent writer generated this day between our check and the insert
+    return { workoutId: generated?.workout_id ?? null, deltas: [] };
   }
 
-  return { workoutId: workout.id, deltas };
+  return { workoutId: generated.workout_id, deltas };
 }
 
 /**
@@ -455,6 +445,11 @@ export interface CatchUpSource {
  * does not exist yet, in week→day order. These are the source days to re-run the
  * advance job on. A day is only a source when the following week actually exists
  * in the meso (so the final week never qualifies). Exported for unit tests.
+ *
+ * R3: an EMPTY planned counterpart (`has_exercises === false`) counts as
+ * missing — it is a poisoned day from a pre-20260702000005 half-applied
+ * generation, and the atomic `insert_generated_day` adopts + fills it. Rows
+ * without the flag keep the legacy meaning (exists ⇒ generated).
  */
 export function planCatchUp(
   weeks: { id: string; week_number: number }[],
@@ -463,6 +458,7 @@ export function planCatchUp(
     microcycle_id: string;
     day_number: number;
     status: string;
+    has_exercises?: boolean;
   }[],
 ): CatchUpSource[] {
   const weekByMicro = new Map(weeks.map((m) => [m.id, m.week_number]));
@@ -470,7 +466,9 @@ export function planCatchUp(
   const existing = new Set<string>();
   for (const w of workouts) {
     const wk = weekByMicro.get(w.microcycle_id);
-    if (wk != null) existing.add(`${wk}:${w.day_number}`);
+    if (wk == null) continue;
+    if (w.status === "planned" && w.has_exercises === false) continue;
+    existing.add(`${wk}:${w.day_number}`);
   }
   const gaps: CatchUpSource[] = [];
   for (const w of workouts) {
@@ -523,7 +521,30 @@ export async function getCatchUpSources(
     .eq("user_id", userId);
   if (workoutsError) throw workoutsError;
 
-  return planCatchUp(weeks, workouts ?? []);
+  // which workouts actually hold exercises — an empty planned day is a
+  // poisoned half-applied generation, and counts as a gap (R3)
+  const populated = await workoutIdsWithExercises(
+    service,
+    (workouts ?? []).map((w) => w.id),
+  );
+  return planCatchUp(
+    weeks,
+    (workouts ?? []).map((w) => ({ ...w, has_exercises: populated.has(w.id) })),
+  );
+}
+
+/** The subset of the given workout ids that have at least one exercise row. */
+async function workoutIdsWithExercises(
+  service: Client,
+  workoutIds: string[],
+): Promise<Set<string>> {
+  if (workoutIds.length === 0) return new Set();
+  const { data, error } = await service
+    .from("workout_exercises")
+    .select("workout_id")
+    .in("workout_id", workoutIds);
+  if (error) throw error;
+  return new Set((data ?? []).map((w) => w.workout_id));
 }
 
 export async function catchUpMesoGeneration(
@@ -779,8 +800,16 @@ export async function advanceWeekAfterWorkout(
     .eq("microcycle_id", nextMicro.id)
     .eq("user_id", userId);
   if (existingError) throw existingError;
+  // an EMPTY planned counterpart is a poisoned half-applied generation, not a
+  // generated day — let generateDay adopt + fill it atomically (R3)
+  const nextPopulated = await workoutIdsWithExercises(
+    service,
+    (existingNext ?? []).map((w) => w.id),
+  );
   const generatedDays = new Set(
-    (existingNext ?? []).map((w) => w.day_number),
+    (existingNext ?? [])
+      .filter((w) => !(w.status === "planned" && !nextPopulated.has(w.id)))
+      .map((w) => w.day_number),
   );
 
   let deltas: SummaryDelta[] = [];

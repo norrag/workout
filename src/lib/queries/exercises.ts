@@ -247,6 +247,24 @@ export async function listMuscleGroups(supabase: Client) {
   return data ?? [];
 }
 
+/** The subset of the given exercise ids that do NOT exist / aren't visible to
+ *  the caller (RLS-scoped). Validation input for the MCP plan-authoring tools
+ *  (R3): reject unknown ids up front instead of failing mid-save. */
+export async function findUnknownExerciseIds(
+  supabase: Client,
+  ids: string[],
+): Promise<string[]> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return [];
+  const { data, error } = await supabase
+    .from("exercises")
+    .select("id")
+    .in("id", unique);
+  if (error) throw error;
+  const known = new Set((data ?? []).map((e) => e.id));
+  return unique.filter((id) => !known.has(id));
+}
+
 // ---------------------------------------------------------------------------
 // exercise page overview (fig 3.1a) — lifetime aggregates from
 // v_exercise_overview + the est-1RM-across-the-current-macro bars (one

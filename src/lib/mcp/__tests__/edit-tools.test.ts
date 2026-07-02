@@ -313,6 +313,25 @@ describe("applyMesoEdits — add_day", () => {
     if (!r.ok) expect(r.error).toMatch(/day 1 already exists/);
   });
 
+  it("rejects a day listing the same muscle group twice (R3)", () => {
+    // two resolved blocks with one muscle_group_id would violate the
+    // meso_day_groups unique key at save time — refused up front
+    const r = applyMesoEdits(plan(), [
+      {
+        op: "add_day",
+        day_number: null,
+        label: null,
+        weekday: null,
+        groups: [
+          { muscle_group_id: "mg-back", exercises: [{ exercise_id: "e-row2" }] },
+          { muscle_group_id: "mg-back", exercises: [{ exercise_id: "e-pullup" }] },
+        ],
+      },
+    ]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/same muscle group twice/);
+  });
+
   it("rejects a day when the week is already full", () => {
     const full: EditDay[] = Array.from({ length: 7 }, (_, i) => ({
       day_number: i + 1,

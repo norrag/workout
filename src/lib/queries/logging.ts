@@ -404,39 +404,49 @@ export async function logSet(
     .single();
   if (mesoError) throw mesoError;
 
+  // R3: upsert on (workout_exercise_id, set_number) — a retried/double-tapped
+  // log converges onto ONE row (the newest values win) instead of inserting a
+  // blind duplicate that double-counts volume and PRs.
   const { data, error } = await supabase
     .from("logged_sets")
-    .insert({
-      workout_exercise_id: we.id,
-      user_id: userId,
-      exercise_id: we.exercise_id,
-      macrocycle_id: meso.macrocycle_id,
-      mesocycle_id: meso.id,
-      microcycle_id: micro.id,
-      workout_id: workout.id,
-      performed_at: new Date().toISOString(),
-      performed_on:
-        input.performed_on ?? new Date().toISOString().slice(0, 10),
-      set_number: input.set_number,
-      weight: input.weight,
-      reps: input.reps,
-      set_type: input.set_type,
-      rir_reported: input.rir_reported,
-      e1rm: input.e1rm,
-      bodyweight: input.bodyweight,
-      is_warmup: false,
-      notes: null,
-    })
+    .upsert(
+      {
+        workout_exercise_id: we.id,
+        user_id: userId,
+        exercise_id: we.exercise_id,
+        macrocycle_id: meso.macrocycle_id,
+        mesocycle_id: meso.id,
+        microcycle_id: micro.id,
+        workout_id: workout.id,
+        performed_at: new Date().toISOString(),
+        performed_on:
+          input.performed_on ?? new Date().toISOString().slice(0, 10),
+        set_number: input.set_number,
+        weight: input.weight,
+        reps: input.reps,
+        set_type: input.set_type,
+        rir_reported: input.rir_reported,
+        e1rm: input.e1rm,
+        bodyweight: input.bodyweight,
+        is_warmup: false,
+        notes: null,
+      },
+      { onConflict: "workout_exercise_id,set_number" },
+    )
     .select()
     .single();
   if (error) throw error;
 
-  // first set flips the workout in progress
-  await supabase
+  // first set flips the workout in progress. R4: surfaced, not swallowed — a
+  // silently-planned workout with logged sets used to be deletable by plan
+  // regeneration (that path now also checks for sets, but the flip must not
+  // fail silently: the client retries the log, and the upsert makes that safe).
+  const { error: flipError } = await supabase
     .from("workouts")
     .update({ status: "in_progress" })
     .eq("id", workout.id)
     .eq("status", "planned");
+  if (flipError) throw flipError;
 
   return data;
 }
@@ -1340,13 +1350,29 @@ export async function completeWorkout(
     if (setsError) throw setsError;
     loggedWeIds = new Set((sets ?? []).map((s) => s.workout_exercise_id));
   }
-  for (const we of wes ?? []) {
-    if (we.status !== "skipped") {
-      await supabase
-        .from("workout_exercises")
-        .update({ status: loggedWeIds.has(we.id) ? "completed" : "skipped" })
-        .eq("id", we.id);
-    }
+  // R4: batched + surfaced (the per-row awaits silently discarded their
+  // errors, so an exercise could stay `pending` under a completed workout —
+  // and the engine reads these statuses as week-N history)
+  const notSkipped = (wes ?? []).filter((w) => w.status !== "skipped");
+  const completedIds = notSkipped
+    .filter((w) => loggedWeIds.has(w.id))
+    .map((w) => w.id);
+  const skippedIds = notSkipped
+    .filter((w) => !loggedWeIds.has(w.id))
+    .map((w) => w.id);
+  if (completedIds.length > 0) {
+    const { error } = await supabase
+      .from("workout_exercises")
+      .update({ status: "completed" })
+      .in("id", completedIds);
+    if (error) throw error;
+  }
+  if (skippedIds.length > 0) {
+    const { error } = await supabase
+      .from("workout_exercises")
+      .update({ status: "skipped" })
+      .in("id", skippedIds);
+    if (error) throw error;
   }
 
   const { data: workout, error: workoutError } = await supabase

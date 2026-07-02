@@ -620,3 +620,214 @@ describe("engine tables", () => {
     expect(error).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// write integrity (R3/R4 — 20260702000005): atomic plan/param writes + the
+// race-duplication unique keys
+// ---------------------------------------------------------------------------
+
+describe("write integrity (R3/R4)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  /** A planned meso for alice plus the ids a plan payload needs. */
+  async function buildPlannedMeso() {
+    const { data: meso, error } = await service
+      .from("mesocycles")
+      .insert({
+        macrocycle_id: aliceMacroId,
+        user_id: aliceId,
+        name: "atomic-save",
+        weeks: 4,
+        days_per_week: 1,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    const { data: mg } = await service
+      .from("muscle_groups")
+      .select("id")
+      .limit(1)
+      .single();
+    const { data: stock } = await service
+      .from("exercises")
+      .select("id")
+      .is("user_id", null)
+      .limit(1)
+      .single();
+    return { mesoId: meso!.id as string, mgId: mg!.id as string, exId: stock!.id as string };
+  }
+
+  function planDays(mgId: string, exId: string) {
+    return [
+      {
+        day_number: 1,
+        label: "push",
+        weekday: null,
+        groups: [
+          {
+            muscle_group_id: mgId,
+            exercise_slots: 1,
+            fills: [
+              { slot_number: 1, exercise_id: exId, initial_sets: 3, day_position: 1 },
+            ],
+          },
+        ],
+      },
+    ];
+  }
+
+  it("save_meso_plan writes the owner's plan atomically", async () => {
+    const { mesoId, mgId, exId } = await buildPlannedMeso();
+    const { error } = await alice.rpc("save_meso_plan", {
+      p_mesocycle_id: mesoId,
+      p_days: planDays(mgId, exId),
+    });
+    expect(error).toBeNull();
+    const { data: days } = await alice
+      .from("meso_days")
+      .select("id, day_number")
+      .eq("mesocycle_id", mesoId);
+    expect(days).toHaveLength(1);
+    const { data: fills } = await alice
+      .from("meso_exercises")
+      .select("exercise_id")
+      .eq("mesocycle_id", mesoId);
+    expect(fills).toHaveLength(1);
+    const { data: meso } = await alice
+      .from("mesocycles")
+      .select("days_per_week")
+      .eq("id", mesoId)
+      .single();
+    expect(meso!.days_per_week).toBe(1);
+  });
+
+  it("save_meso_plan refuses another user's meso and leaves the plan intact", async () => {
+    const { mesoId, mgId, exId } = await buildPlannedMeso();
+    const { error: ownError } = await alice.rpc("save_meso_plan", {
+      p_mesocycle_id: mesoId,
+      p_days: planDays(mgId, exId),
+    });
+    expect(ownError).toBeNull();
+
+    const { error } = await bob.rpc("save_meso_plan", {
+      p_mesocycle_id: mesoId,
+      p_days: [],
+    });
+    expect(error).not.toBeNull();
+    // alice's plan is untouched — the refusal happened before the delete
+    const { data: days } = await alice
+      .from("meso_days")
+      .select("id")
+      .eq("mesocycle_id", mesoId);
+    expect(days).toHaveLength(1);
+  });
+
+  it("activate_engine_params refuses a non-admin and keeps exactly one active row", async () => {
+    const { data: before } = await bob
+      .from("engine_params")
+      .select("version")
+      .eq("is_active", true)
+      .single();
+
+    // v11 exists in the chain but ships inactive — a non-admin must not be
+    // able to flip it (RLS updates 0 rows → the function raises)
+    const { error } = await bob.rpc("activate_engine_params", { p_version: 11 });
+    expect(error).not.toBeNull();
+
+    const { data: after } = await bob
+      .from("engine_params")
+      .select("version")
+      .eq("is_active", true)
+      .single();
+    expect(after!.version).toBe(before!.version);
+  });
+
+  it("insert_generated_day is not callable by authenticated users", async () => {
+    const { error } = await alice.rpc("insert_generated_day", {
+      p_mesocycle_id: "00000000-0000-0000-0000-000000000000",
+      p_workout: {},
+      p_exercises: [],
+      p_decisions: [],
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("workouts are unique per (microcycle, day)", async () => {
+    const { mesoId } = await buildPlannedMeso();
+    const { data: micro } = await service
+      .from("microcycles")
+      .insert({
+        mesocycle_id: mesoId,
+        user_id: aliceId,
+        week_number: 1,
+        target_rir: 3,
+      })
+      .select()
+      .single();
+    const workout = {
+      microcycle_id: micro!.id,
+      user_id: aliceId,
+      day_number: 1,
+      status: "planned",
+    };
+    const { error: first } = await service.from("workouts").insert(workout);
+    expect(first).toBeNull();
+    const { error: dup } = await service.from("workouts").insert(workout);
+    expect(dup).not.toBeNull();
+    expect(dup!.code).toBe("23505");
+  });
+
+  it("logged sets are unique per (exercise, set_number)", async () => {
+    const { mesoId, exId } = await buildPlannedMeso();
+    const { data: micro } = await service
+      .from("microcycles")
+      .insert({
+        mesocycle_id: mesoId,
+        user_id: aliceId,
+        week_number: 1,
+        target_rir: 3,
+      })
+      .select()
+      .single();
+    const { data: workout } = await service
+      .from("workouts")
+      .insert({
+        microcycle_id: micro!.id,
+        user_id: aliceId,
+        day_number: 1,
+        status: "in_progress",
+      })
+      .select()
+      .single();
+    const { data: we } = await service
+      .from("workout_exercises")
+      .insert({
+        workout_id: workout!.id,
+        exercise_id: exId,
+        position: 1,
+        prescribed_sets: 3,
+      })
+      .select()
+      .single();
+    const set = {
+      workout_exercise_id: we!.id,
+      user_id: aliceId,
+      exercise_id: exId,
+      mesocycle_id: mesoId,
+      microcycle_id: micro!.id,
+      workout_id: workout!.id,
+      performed_at: new Date().toISOString(),
+      set_number: 1,
+      weight: 100,
+      reps: 8,
+      is_warmup: false,
+    };
+    const { error: first } = await service.from("logged_sets").insert(set);
+    expect(first).toBeNull();
+    const { error: dup } = await service.from("logged_sets").insert(set);
+    expect(dup).not.toBeNull();
+    expect(dup!.code).toBe("23505");
+  });
+});

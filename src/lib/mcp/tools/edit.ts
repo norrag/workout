@@ -11,7 +11,11 @@ import {
   type PlanDayInput,
 } from "@/lib/queries/cycles";
 import { regenerateOpenWorkouts } from "@/lib/queries/generation";
-import { listMuscleGroups, getMusclesForExercises } from "@/lib/queries/exercises";
+import {
+  findUnknownExerciseIds,
+  getMusclesForExercises,
+  listMuscleGroups,
+} from "@/lib/queries/exercises";
 import { resolveSession, type McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
@@ -237,6 +241,18 @@ export function applyMesoEdits(input: EditDay[], ops: ResolvedEdit[]): ApplyResu
             ok: false,
             error: `day ${dayNumber} already exists — remove it first or add without a day_number.`,
           };
+        }
+        // R3: two blocks resolving to the same muscle group (e.g. "Chest"/
+        // "chest") would violate the meso_day_groups unique key at save time —
+        // refuse up front instead
+        const seenGroups = new Set<string>();
+        for (const g of op.groups) {
+          if (seenGroups.has(g.muscle_group_id))
+            return {
+              ok: false,
+              error: `the added day lists the same muscle group twice — merge its exercises into one block.`,
+            };
+          seenGroups.add(g.muscle_group_id);
         }
         let dayPos = 0;
         const newDay: EditDay = {
@@ -543,20 +559,12 @@ export function registerEditMesocycle(server: McpServer) {
           ),
         ),
       ];
-      if (refIds.length > 0) {
-        const { data: exRows, error: exError } = await client
-          .from("exercises")
-          .select("id")
-          .in("id", refIds);
-        if (exError) throw exError;
-        const known = new Set((exRows ?? []).map((e) => e.id));
-        const unknown = refIds.filter((id) => !known.has(id));
-        if (unknown.length > 0)
-          return jsonResult({
-            ok: false,
-            error: `unknown or not-visible exercise id(s): ${unknown.join(", ")}.`,
-          });
-      }
+      const unknown = await findUnknownExerciseIds(client, refIds);
+      if (unknown.length > 0)
+        return jsonResult({
+          ok: false,
+          error: `unknown or not-visible exercise id(s): ${unknown.join(", ")}.`,
+        });
 
       // slot_id → day_number, for the target-day guard and op resolution
       const slotDay = new Map<string, number>();

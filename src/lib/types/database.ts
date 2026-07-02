@@ -622,6 +622,29 @@ export type Database = {
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      // R3 write integrity: atomic multi-statement writes live in the DB so a
+      // mid-flight failure can never half-apply (20260702000005).
+      save_meso_plan: {
+        Args: { p_mesocycle_id: string; p_days: unknown };
+        Returns: undefined;
+      };
+      activate_engine_params: {
+        Args: { p_version: number };
+        Returns: undefined;
+      };
+      insert_generated_day: {
+        Args: {
+          p_mesocycle_id: string;
+          p_workout: unknown;
+          p_exercises: unknown;
+          p_decisions: unknown;
+        };
+        Returns: {
+          workout_id: string | null;
+          created: boolean;
+          adopted?: boolean;
+        };
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
