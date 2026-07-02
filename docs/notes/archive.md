@@ -11,6 +11,23 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 — R13 + R18 + R19 UI/UX cluster merged (PR #100)
+
+Session 29 shipped the three open UX-facing items on the day-view surface (per
+the owner's steer toward documented UI issues); PR #100 merged. Raw text stays
+in the backlog appendix (Batch 3); full record in PROGRESS 2026-07-02 and the
+Session 29 log entry. On-device confirmation of the R13 flow (type reps, log a
+different set with auto-match on, confirm the typed value survives) remains the
+owner's final check.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R13 | SetRow re-sync effect clobbers in-progress typing after background weight writes / auto-match — wrong reps can get logged | B | G | **done — merged (PR #100).** Re-sync effect split: own-logged-set changes (log/unlog/amend echo) always adopt server state; planned-input changes (`set_weights`/bodyweight via auto-match fan-out or blur-persisted weight) adopt only while the row has no uncommitted typing — explicit input wins. Pure `day-rules.ts::adoptServerRowState`, unit-tested. Client-side cousin of the shipped N3. |
+| R18 | Modal a11y + touch: no focus management/Escape/trap on any sheet/menu; LOG checkbox 21px & ⋮/▲▼ below-minimum targets; `maximumScale:1` kills pinch-zoom. Scopes doc-07 Phase-7 a11y audit | UX | E | **done — merged (PR #100).** Shared `useModalA11y` (focus in/restore, Tab trap, Escape via overlay stack) wired into BottomSheet, CompleteSheet (+ its missing role=dialog), AnchoredMenu (menuitem roles + arrow-key nav). Tap targets to the WCAG 24px floor with visuals unchanged: LOG checkbox fills its 44×32 cell, per-set ⋮ 24×32, planner ▲▼ 24×24. **Zoom-cap bullet ruled wontfix** (owner 2026-07-02: installed-PWA native feel; `maximumScale:1` stays, ruling recorded on the viewport config). Full doc-07 Phase-7 logging-flow a11y audit remains its own phase item. |
+| R19 | Small defect sweep: no `not-found.tsx` (Workout tab can 404 via stale `lastWorkoutId`); CompleteSheet totals contradict header progress; SAVE AS TEMPLATE SubmitButton | UX | E | **done — merged (PR #100 + PR #98).** New `(app)/not-found.tsx` ledger card inside the app shell; landing there clears the stale session `lastWorkoutId` so the Workout tab can't 404 after its meso is deleted. CompleteSheet totals share the header's skipped-slot-excluded math via pure `day-rules.ts::daySetTotals` (unit-tested). The SAVE AS TEMPLATE SubmitButton bullet had shipped earlier with R17 (PR #98). All 3 bullets closed. |
+
+---
+
 ## Swept 2026-07-01 (evening) — R17 + R16 field usability merged (PR #98)
 
 Session 28 shipped the review's two destructive-failure UX items together (per

@@ -4,6 +4,21 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 29 (cont.): PR #100 merged + owner revert + archival sweep
+
+- **maximumScale revert (owner ruling).** The R18 pinch-zoom bullet dropped
+  `maximumScale:1`; the owner ruled the zoom cap **stays** (installed-PWA
+  native feel > the WCAG 1.4.4 concern). Reverted in `c2cc15c`; the ruling is
+  recorded on the viewport config, PROGRESS.md, and the R18 row so it isn't
+  re-"fixed". PR body updated.
+- **PR #100 MERGED** (main `e3e1775`). End-of-session archival sweep ran:
+  **R13 / R18 / R19 swept to `archive.md`** ("Swept 2026-07-02"), live index
+  trimmed. Branch restarted from the merged main for the sweep (a merged PR
+  can't sweep its own rows). R18's zoom-cap sub-bullet carried into the
+  archive as wontfix.
+- Next per the review's attack order: **R3 + R4** (write integrity), then R20
+  (observability). R6/R14 owner decisions still queued.
+
 ## 2026-07-02 — Session 29: R13 + R18 + R19 — the UI/UX cluster (workstream E/G day-view surface)
 
 Reconciliation sweep: no-op (session 28's sweep PR #99 already merged; no
