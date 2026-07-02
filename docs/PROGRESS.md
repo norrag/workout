@@ -2,7 +2,57 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — R3 + R4: write integrity — atomic plan/param writes, race-proof uniques, logged history never cascade-deleted
+## 2026-07-02 (latest) — R20: production error observability — one reportError funnel, error boundaries everywhere, dependency-free Sentry wiring
+
+The review's HIGH observability item (attack order after R3/R4): the failure
+modes the app is *designed around* — freshness reconcile returning stored
+numbers, week generation deferring to a page-open catch-up, seed-decision
+recording skipping rows — all degraded **silently** (`console.error` into a
+serverless void), and render errors outside `(app)` hit Next's raw screen.
+Now everything degrades *loudly* through one funnel. 07 Phase 7
+"Error handling/observability" ticked (DSN setting stays external).
+
+- **`src/lib/observability/`** — the funnel. `reportError(scope, error,
+  context)` / `reportEvent(...)`: always emits one structured, greppable
+  `console.error` line (Vercel function logs capture these with zero config —
+  the floor works before any env var is set), and when **`SENTRY_DSN`** is set
+  ships a Sentry **event envelope over plain fetch** (3s timeout, never
+  throws/rejects). Deliberately **no Sentry SDK**: the need is server-side
+  only, the client bundle is a live WS-J/N1 concern, and the envelope API is
+  three JSON lines — `sentry.ts` holds the pure DSN-parse/envelope builders
+  (unit-tested wire format), `report.ts` the impure assembly. A malformed or
+  missing DSN degrades to console-only.
+- **Global server capture** — `src/instrumentation.ts` `onRequestError`
+  (Next 15 hook): every unhandled error in server components, actions, route
+  handlers, and middleware reports with router kind/route type/path context.
+  The deliberate catches report themselves before swallowing (scopes:
+  `queries:freshness-reconcile`, `queries:record-seed-decisions`,
+  `actions:advance-week:complete|end`, `workout-tab:progression-catch-up`),
+  so "stale prescriptions" is now a pageable event, not a mystery.
+- **MCP tools** — the composition-root guard (`withErrorHandling`) reports
+  `mcp:tool` + tool name server-side before returning the structured
+  `toolError` envelope to the model (previously nothing was recorded).
+- **Client boundaries** — new root **`global-error.tsx`** (self-contained
+  html/body + inline ledger styling — it renders exactly when the root layout
+  is gone) and new **`(auth)/error.tsx`** (sign-in/onboarding previously fell
+  through to Next's raw screen); `(app)/error.tsx` kept. All three POST
+  through `postClientError` → **`/api/client-error`** → the same funnel.
+  The route is pre-auth by design (middleware public path — the auth/root
+  boundaries must report signed-out), guarded by the same-origin CSRF check +
+  a tight zod contract (enum'd boundary, hard length caps, client-side
+  truncation to match); junk is a 400, never an event.
+- **Verification:** 713 unit tests green (+20: DSN/envelope wire format,
+  reporter fetch behavior incl. never-reject + non-2xx + malformed-DSN paths,
+  intake schema + boundary-report capping), typecheck, lint, production
+  build. **End-to-end against a mock ingest** on the built app: valid report
+  → 204 + a correctly-formed envelope (auth query, three-line body, scope
+  tag, environment) received; cross-site → 403; junk/oversized → 400; ingest
+  down → 204 with the delivery failure itself logged (the reporter can't take
+  down the path it reports on).
+- External (manual-operations): set `SENTRY_DSN` in Vercel to turn on Sentry
+  delivery; until then the structured console floor is live on deploy.
+
+## 2026-07-02 — R3 + R4: write integrity — atomic plan/param writes, race-proof uniques, logged history never cascade-deleted
 
 The review's write-integrity pair (attack order after R17/R16). Four flows
 could half-apply, two delete branches could cascade logged history (a hard

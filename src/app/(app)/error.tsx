@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import {
+  boundaryReport,
+  postClientError,
+} from "@/lib/observability/post-client-error";
 
 /**
  * Route-level error boundary for the app segment. Without this, an unhandled
@@ -19,6 +23,7 @@ export default function AppError({
   useEffect(() => {
     // Surface for diagnostics; the digest ties this to the server log entry.
     console.error("app segment error", error);
+    postClientError(boundaryReport("app", error));
   }, [error]);
 
   return (

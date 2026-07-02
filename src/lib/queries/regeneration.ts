@@ -26,6 +26,7 @@ import {
 } from "./progression";
 import { getMesoPlan } from "./cycles";
 import { createServiceClient } from "@/lib/supabase/service";
+import { reportError } from "@/lib/observability/report";
 import { engineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
 import type {
@@ -1167,7 +1168,9 @@ export async function ensureFreshPrescriptions(
       activeParams,
     );
   } catch (error) {
-    console.error("prescription freshness reconcile failed", error);
+    // degrade to the stored numbers, but loudly (R20): a persistent failure
+    // here means silently stale prescriptions
+    await reportError("queries:freshness-reconcile", error, { userId, mesoId });
     return null;
   }
 }

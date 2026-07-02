@@ -50,6 +50,7 @@ import {
   type AdvanceResult,
 } from "@/lib/queries/progression";
 import { createServiceClient } from "@/lib/supabase/service";
+import { reportError } from "@/lib/observability/report";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -705,7 +706,11 @@ export async function completeWorkoutAction(input: {
       parsed.workout_id,
     );
   } catch (error) {
-    console.error("week generation failed after completion", error);
+    // degrade to the friendly fallback, but report (R20) — a persistent
+    // failure here means next week never generates until a page-open catch-up
+    await reportError("actions:advance-week:complete", error, {
+      workoutId: parsed.workout_id,
+    });
     result = {
       summary:
         "Feedback recorded. Next week's targets recalculate when you next open the app.",
@@ -742,7 +747,10 @@ export async function endWorkoutAction(input: {
       parsed.workout_id,
     );
   } catch (error) {
-    console.error("week generation failed after ending workout", error);
+    // same degrade-loudly contract as the completion path (R20)
+    await reportError("actions:advance-week:end", error, {
+      workoutId: parsed.workout_id,
+    });
     result = {
       summary:
         "Workout ended. Next week's targets recalculate when you next open the app.",

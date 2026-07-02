@@ -17,6 +17,10 @@ const PUBLIC_PATHS = [
   // blanket-redirected to /sign-in by the middleware.
   "/oauth/consent",
   "/api/oauth/decision",
+  // Client error intake (R20): the (auth) + root error boundaries must be able
+  // to report a crash from a signed-out state. Same-origin-guarded + zod-capped
+  // in the route itself; a redirect-to-/sign-in here would eat every report.
+  "/api/client-error",
 ];
 
 export async function updateSession(request: NextRequest) {
