@@ -4,11 +4,11 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-02 — Session 35: T-R2 — hosted perf migration transcribed into the chain (PR #114)
+## 2026-07-02 — Session 35: T-R2 — hosted perf migration transcribed into the chain (PR #115)
 
 Reconciliation sweep: no-op (PR #113 was itself the R20 sweep; no `done` rows
 live). Built the next item in the recorded attack order — **T-R2** (ready, own
-PR) — on branch `claude/review-outstanding-work-xmlmuc`, **PR #114**. Full
+PR) — on branch `claude/review-outstanding-work-xmlmuc`, **PR #115**. Full
 record in PROGRESS 2026-07-02 (latest).
 
 - **T-R2 — done.** New `supabase/migrations/20260620115322_perf_rls_initplan_
