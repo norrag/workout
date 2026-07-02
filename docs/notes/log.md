@@ -26,8 +26,11 @@ UX-facing items sharing the day-view surface over the attack order's R3+R4
   visuals unchanged: LOG checkbox button fills its 44×32 cell (21px box stays
   the visual), per-set ⋮ → 24×32, planner ▲▼ → 24×24 (rule-8 note in
   PROGRESS: arrows sit ~5px further apart — the only visible delta).
-  `maximumScale:1` dropped — pinch-zoom restored. The full doc-07 Phase-7
-  a11y audit remains its own phase item; this closes the scoped defects.
+  The `maximumScale:1` bullet was **ruled against mid-PR (owner,
+  2026-07-02)**: the cap stays — installed-PWA native feel outranks the
+  WCAG 1.4.4 concern; ruling recorded on the viewport config. The full
+  doc-07 Phase-7 a11y audit remains its own phase item; this closes the
+  scoped defects.
 - **R19 — done (all 3 bullets).** New `(app)/not-found.tsx` ledger card inside
   the app shell (10+ `notFound()` sites dead-ended on Next's unstyled default);
   landing there clears the stale session `lastWorkoutId` so the Workout tab

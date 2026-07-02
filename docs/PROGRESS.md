@@ -34,9 +34,11 @@ and its overlays. No engine, schema, or query change.
   20×14 → 24×24 each, absorbed into row padding via negative margins
   (**rule-8 note:** the arrow glyphs sit ~5px further apart vertically —
   the only visible delta, required to meet the 24px floor).
-- **Pinch-zoom re-enabled (R18):** dropped `maximumScale: 1` from the viewport
-  — real WCAG 1.4.4 harm with a 9–11px tracked-caps type scale; iOS ignored
-  the cap anyway, so it only punished Android/PWA users.
+- **Pinch-zoom cap kept (R18 bullet ruled against, owner 2026-07-02).** The
+  review flagged `maximumScale: 1` as WCAG 1.4.4 harm and this PR briefly
+  dropped it, but the owner ruled to keep the cap: the app is an installed
+  PWA and pinch-zoom breaks the native feel. Reverted in the same PR; the
+  ruling is recorded on the viewport config so it isn't re-"fixed".
 - **404s land on a ledger card inside the app shell (R19).** New
   `(app)/not-found.tsx` (**rule-8 note:** no mockup exists for a 404 card;
   styled after the `(app)/error.tsx` precedent) — previously 10+ `notFound()`

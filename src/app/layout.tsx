@@ -41,9 +41,10 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-  // no maximumScale: pinch-zoom must stay available (WCAG 1.4.4) — the tracked
-  // 9–11px caps labels are unreadable for low-vision users without it (R18).
-  // iOS ignores the cap anyway; capping only punished Android/PWA.
+  // Owner ruling (2026-07-02, PR #100): keep the zoom cap — this is an
+  // installed PWA and pinch-zoom breaks the native feel. Do not remove for
+  // WCAG 1.4.4 without a new owner decision (R18 flagged it; ruled against).
+  maximumScale: 1,
   viewportFit: "cover",
 };
 
