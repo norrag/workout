@@ -2,29 +2,55 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Regression guard for the iOS-standalone "browser bars" bug (2026-07-02).
+// Regression guards for the iOS-standalone "browser bars" bug (2026-07-02).
 //
-// iOS 16.4+ enforces the Web App Manifest `scope` for home-screen PWAs: any
-// navigation to a URL OUTSIDE scope is treated as leaving the app and opens in
-// the in-app Safari browser (visible URL bar + share/reload chrome) instead of
-// staying standalone. With no explicit `scope`, iOS derives a narrow one around
-// `start_url` (`/workout`), so every sibling route (`/cycles`, `/exercises`, …)
-// fell outside it and popped the browser chrome. An explicit root scope keeps
-// the whole app standalone. Do not narrow `scope` below the routes it must
-// cover without a matching device retest.
+// Two failure modes are pinned here:
+//
+// 1. SCOPE. iOS binds the manifest `scope` to the installed app and treats any
+//    navigation outside it as leaving the app — it opens the in-app Safari
+//    browser (URL bar + share/reload chrome) instead of staying standalone.
+//    The scope must stay "/" so every route is covered.
+//
+// 2. STALE MANIFEST AT INSTALL. iOS caches the manifest and the cache survives
+//    deleting the home-screen icon, so a re-add can install from a pre-fix
+//    copy. The defense is a PATH-versioned manifest link (query-string busts
+//    can be stripped by cache normalization): to change any install-time field
+//    (scope/start_url/id/display), bump the linked path to the next version,
+//    add the new file, and keep every old file in place — a 404 on a stale
+//    cached HTML's manifest link drops iOS to no-manifest legacy mode. All
+//    copies must stay byte-identical so the old path never serves different
+//    install semantics than the new one.
 
 const repoRoot = path.resolve(__dirname, "../../../..");
 
-function loadManifest() {
-  const raw = readFileSync(
-    path.join(repoRoot, "public/manifest.webmanifest"),
+type Manifest = {
+  scope?: string;
+  start_url?: string;
+  display?: string;
+  id?: string;
+};
+
+function manifestFiles(): string[] {
+  return readdirSync(path.join(repoRoot, "public"))
+    .filter((f) => f.endsWith(".webmanifest"))
+    .sort();
+}
+
+function loadManifest(file: string): Manifest {
+  return JSON.parse(
+    readFileSync(path.join(repoRoot, "public", file), "utf8"),
+  ) as Manifest;
+}
+
+/** The manifest href the root layout actually links (Metadata.manifest). */
+function linkedManifestHref(): string {
+  const layout = readFileSync(
+    path.join(repoRoot, "src/app/layout.tsx"),
     "utf8",
   );
-  return JSON.parse(raw) as {
-    scope?: string;
-    start_url?: string;
-    display?: string;
-  };
+  const m = layout.match(/manifest:\s*"([^"]+)"/);
+  if (!m) throw new Error("root layout no longer declares Metadata.manifest");
+  return m[1];
 }
 
 // Every top-level route the app can navigate to lives under src/app/(app).
@@ -35,25 +61,55 @@ function appRouteRoots(): string[] {
     .map((e) => `/${e.name}`);
 }
 
-describe("PWA manifest scope", () => {
-  const manifest = loadManifest();
+describe("PWA manifest", () => {
+  const files = manifestFiles();
 
-  it("declares an explicit scope", () => {
-    expect(manifest.scope).toBeDefined();
+  it("has at least the original and one versioned manifest", () => {
+    expect(files).toContain("manifest.webmanifest");
+    expect(files.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("scopes the whole app to root so no route breaks standalone on iOS", () => {
-    expect(manifest.scope).toBe("/");
+  it("keeps every manifest copy byte-identical", () => {
+    const contents = files.map((f) =>
+      readFileSync(path.join(repoRoot, "public", f), "utf8"),
+    );
+    for (const c of contents) expect(c).toBe(contents[0]);
   });
 
-  it("keeps the launch target inside scope", () => {
-    const scope = manifest.scope ?? "";
-    expect(manifest.start_url?.startsWith(scope)).toBe(true);
+  it("links a path-versioned manifest (no query-string busting)", () => {
+    const href = linkedManifestHref();
+    expect(href.includes("?")).toBe(false);
+    expect(href).toMatch(/^\/manifest-v\d+\.webmanifest$/);
   });
 
-  it("covers every top-level app route", () => {
-    const scope = manifest.scope ?? "";
-    const outside = appRouteRoots().filter((r) => !r.startsWith(scope));
-    expect(outside).toEqual([]);
+  it("links a manifest file that exists", () => {
+    const href = linkedManifestHref();
+    expect(files).toContain(href.slice(1));
+  });
+
+  describe.each(files)("%s", (file) => {
+    const manifest = loadManifest(file);
+
+    it("scopes the whole app to root so no route breaks iOS standalone", () => {
+      expect(manifest.scope).toBe("/");
+    });
+
+    it("keeps a stable id so re-adds update the same app", () => {
+      expect(manifest.id).toBe("/");
+    });
+
+    it("keeps the launch target inside scope", () => {
+      expect(manifest.start_url?.startsWith(manifest.scope ?? "")).toBe(true);
+    });
+
+    it("stays standalone", () => {
+      expect(manifest.display).toBe("standalone");
+    });
+
+    it("covers every top-level app route", () => {
+      const scope = manifest.scope ?? "";
+      const outside = appRouteRoots().filter((r) => !r.startsWith(scope));
+      expect(outside).toEqual([]);
+    });
   });
 });

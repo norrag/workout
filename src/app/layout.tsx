@@ -19,17 +19,20 @@ const archivo = localFont({
 export const metadata: Metadata = {
   title: "workout",
   description: "Periodized workout tracking with RIR-based progression",
-  // Version-tagged so iOS re-reads the manifest on the next add-to-home-screen
-  // instead of serving a stale cached copy. iOS caches the manifest per-URL and
-  // binds the standalone `scope` at install time; when the scope changed (adding
-  // "/" so every route stays standalone — see manifest.webmanifest), the bare
-  // "/manifest.webmanifest" URL could still resolve to the pre-scope copy iOS
-  // had cached, so re-adding kept opening non-workout routes in the in-app
-  // browser. A new query key forces a cache-missing fetch of the corrected
-  // manifest. Bump MANIFEST_VERSION whenever the manifest's install-time fields
-  // (scope / start_url / id / display) change. `id` stays "/" so this is an
-  // update to the same app, not a duplicate install.
-  manifest: "/manifest.webmanifest?v=2",
+  // PATH-versioned so iOS re-reads the manifest on the next add-to-home-screen
+  // instead of installing from a stale cached copy. iOS caches the manifest and
+  // binds the standalone `scope` at install time; the cache survives deleting
+  // the home-screen icon, so a re-add can silently reuse a pre-fix manifest and
+  // keep opening non-/workout routes in the in-app browser. A query-string bust
+  // (?v=2) proved unreliable — caches may normalize/strip queries — so version
+  // the *pathname*. To change any install-time field (scope / start_url / id /
+  // display): bump this to manifest-v4.webmanifest, add the new file, and KEEP
+  // the old file in place (stale cached HTML still requests it; a 404 there
+  // makes iOS fall back to no-manifest legacy mode, which is worse). `id` stays
+  // "/" in every version so re-adds update the same app, not a duplicate.
+  // The guard test (src/lib/pwa/__tests__/manifest.test.ts) enforces all of
+  // this: link resolves to a real file, all manifest copies stay identical.
+  manifest: "/manifest-v3.webmanifest",
   icons: {
     icon: [
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
