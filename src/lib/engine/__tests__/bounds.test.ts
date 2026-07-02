@@ -52,9 +52,10 @@ function randomInputs(r: () => number): EngineInputs {
       workload: int(0, 10),
     },
     workoutFeedback: {
-      overallFatigue: int(0, 4),
-      effortRating: int(0, 4),
-      performanceRating: int(0, 4),
+      // I14: session sliders share the 0–10 scale
+      overallFatigue: int(0, 10),
+      effortRating: int(0, 10),
+      performanceRating: int(0, 10),
     },
     muscleGroupWeeklySets: int(0, 25),
     weekPeak: { weight, reps, sets, targetRir },

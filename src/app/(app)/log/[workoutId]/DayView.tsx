@@ -2574,9 +2574,10 @@ function CompleteSheet({
   const router = useRouter();
   const toast = useToast();
   const [notes, setNotes] = useState("");
-  const [fatigue, setFatigue] = useState(2);
-  const [effort, setEffort] = useState(2);
-  const [performance, setPerformance] = useState(2);
+  // I14: session sliders share the per-exercise 0–10 scale; 5 is the midpoint
+  const [fatigue, setFatigue] = useState(5);
+  const [effort, setEffort] = useState(5);
+  const [performance, setPerformance] = useState(5);
   const [completing, startCompleting] = useTransition();
   const { render, shown } = useSheetTransition(open);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -2671,9 +2672,9 @@ function CompleteSheet({
             <div key={s.key} className="mt-3.5">
               <div className="text-[13px] font-bold">{s.title}</div>
               <div className="mt-2">
+                {/* I14: default 0–10 — one scale with the per-exercise sliders */}
                 <SnapSlider
                   label={s.title}
-                  max={4}
                   value={sliderValue[s.key]}
                   onChange={setSlider[s.key]}
                   leftLabel={s.left}

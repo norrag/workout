@@ -169,6 +169,32 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v18 is a complete, replayable snapshot matching the migration hash", () => {
+    // v18 = v17 with the session-dampen thresholds rescaled onto the unified
+    // 0–10 slider scale (I14: fatigue 3→8, performance 1→3; stored
+    // workout_feedback rescaled round(x × 2.5) in the same migration). Value
+    // change inside existing fields — no shape bump; older rows stay valid
+    // under the widened .max(10) bounds and replay their own 0–4 inputs.
+    const v18 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+      session_fatigue_dampen_threshold: 8,
+      session_performance_dampen_threshold: 3,
+    });
+    const p = resolveProvenance(v18 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "fede4627ed64d19b5134e0bb055d500007496a0fc6aee6b0964335d56f91acbd",
+    );
+  });
+
   it("pain_cut_gate is absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("pain_cut_gate");
     expect(

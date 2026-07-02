@@ -2,7 +2,48 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — WS-C consumers: meso page rework (P16), macro stats tabs (M8), strength trends (I11/PH37) + P17/N4 nav + R6 local-day dates
+## 2026-07-02 (latest) — I14: one 0–10 scale for every feedback slider (engine_params v18, ACTIVATED)
+
+The complete-workout session sliders (overall fatigue / effort / performance)
+were 0–4 while the per-exercise sliders (pump / workload / soreness) were
+0–10. Owner ruling (2026-07-02): "Unify it absolutely. Rescale the data
+appropriately to match the new scale." Own PR per the build order — it
+carries a data migration.
+
+- **Migration `20260702000004` (applied live + verified).** Three coupled
+  moves in ONE transaction: (1) stored `workout_feedback` values rescaled
+  `round(x × 2.5)` — 0→0, 1→3, 2→5, 3→8, 4→10 — with the three CHECKs
+  widened to 0..10 (verified live: all 28 rows map exactly, counts
+  identical); (2) **engine_params v18** = v17 with the session-dampen
+  thresholds on the same scale (`session_fatigue_dampen_threshold` 3→8,
+  `session_performance_dampen_threshold` 1→3) — the same trip points on the
+  rescaled data, so engine behavior is unchanged for equivalent inputs;
+  (3) **v18 ACTIVATED in the migration** — a recorded deviation from the
+  v11–v17 ship-inactive discipline, because the rescale and the threshold
+  flip are inseparable (rescaled data under v17's thresholds would dampen
+  every mid-scale session; unrescaled data under v18's would never dampen).
+- **Replay unaffected**: historical decisions re-run their own stored 0–4
+  inputs against their own stored params row; the widened `.max(10)` bounds
+  (params + engine input schema) keep old rows/inputs valid. **Caveat
+  (documented):** diffing old decisions *against v18* mixes scales (0–4
+  stored inputs vs 0–10 thresholds) and shows spurious dampen diffs — same
+  class of artifact as the known R10 bodyweight replay gap; future decisions
+  read the rescaled table and are consistent.
+- **UI/validation:** `CompleteSheet` sliders drop `max={4}` (inherit the 0–10
+  default), defaults 2→5 (the new midpoint); `completeSchema` + engine
+  `workoutFeedbackInputSchema` widened to 0–10; MCP `FEEDBACK_SCALES` legend
+  updated (also fixed the stale `soreness: "0–3"` entry — storage/UI have
+  been 0–10 since 06-16).
+- **Tests (hard rule #3): 660 green (+5).** New `session-scale.test.ts`: an
+  exhaustive equivalence property (every old 0–4 rating pair classifies
+  identically after `round(x × 2.5)` under v18) + the §S5 dampener semantics
+  restated on the new scale (fatigued-but-strong reprices up; both-signals
+  holds; the 5/5/5 sheet default never dampens). `V18_PARAMS` in the engine
+  test helpers; v18 provenance hash guarded in `params-provenance.test.ts`;
+  bounds property generators widened to 0–10. DEFAULT (v10) untouched — its
+  pinned hash stands.
+
+## 2026-07-02 — WS-C consumers: meso page rework (P16), macro stats tabs (M8), strength trends (I11/PH37) + P17/N4 nav + R6 local-day dates
 
 The consumer half of the Session-31 foundation: every screen the Batch-4
 decisions redesigned, on the R14/T-A1/T-A2 metric definitions. Design deltas

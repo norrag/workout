@@ -62,6 +62,16 @@ export const V17_PARAMS: EngineParams = {
   pain_cut_gate: 3,
 };
 
+/** v18 = v17 with the session-dampen thresholds rescaled onto the unified 0–10
+ *  slider scale (I14: fatigue ≥ 3-of-4 → ≥ 8-of-10; performance ≤ 1-of-4 →
+ *  ≤ 3-of-10; stored data rescaled round(x × 2.5) in the same migration).
+ *  Mirrors `20260702000004_i14_session_feedback_scale`. */
+export const V18_PARAMS: EngineParams = {
+  ...V17_PARAMS,
+  session_fatigue_dampen_threshold: 8,
+  session_performance_dampen_threshold: 3,
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

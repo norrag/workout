@@ -4,6 +4,26 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 32 (cont.): I14 slider unification (PR #105, stacked on #104)
+
+Same session, own PR per the build order (it carries a data migration). Branch
+`claude/i14-slider-unification-rh81n2`, **stacked on the PR #104 branch** so the
+shared docs files don't conflict; GitHub retargets it to main when #104 merges.
+Migration `20260702000004` **applied live + verified**.
+
+- **I14 — done.** All feedback sliders on one 0–10 scale: session sliders drop
+  0–4 (UI max + defaults 2→5, zod + engine input bounds widened);
+  stored `workout_feedback` rescaled round(x×2.5) (28 rows, exact map
+  verified live); **engine_params v18** (thresholds 8/3 — same trip points on
+  the rescaled data) **ACTIVATED in the migration** — recorded deviation from
+  ship-inactive: the rescale and the thresholds are inseparable. Replay of old
+  decisions unaffected (stored inputs + stored params); diffing old decisions
+  *against v18* mixes scales — documented caveat. MCP scale legend updated
+  (incl. the stale soreness "0–3"). New `session-scale.test.ts` (exhaustive
+  0–4→0–10 equivalence + §S5 on the new scale); v18 provenance hash guarded.
+  **660 tests (+5)**, typecheck, lint, build green.
+- **Next:** R3+R4 (write integrity) per the review's attack order; T-R2 ready.
+
 ## 2026-07-02 — Session 32: Batch-4 build 2 — the WS-C consumers + nav/date fixes (PR #104)
 
 Reconciliation sweep: **PR #103 merged** → archived **R14 / P18 / P21 / PH33 /

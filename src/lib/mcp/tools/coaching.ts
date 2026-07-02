@@ -241,7 +241,7 @@ export function formatRecentSessions(sessions: RecentSession[]): Record<string, 
       session_feedback: s.feedback,
       notes: s.notes,
     })),
-    note: "Feedback ratings are the user's own 0–4 session ratings (fatigue / effort / performance).",
+    note: "Feedback ratings are the user's own 0–10 session ratings (fatigue / effort / performance; unified scale since I14).",
   };
 }
 

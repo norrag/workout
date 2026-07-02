@@ -30,10 +30,13 @@ export const exerciseFeedbackInputSchema = z.object({
   workload: z.number().int().min(0).max(10).nullable(),
 });
 
+// I14 (2026-07-02): session sliders unified onto the per-exercise 0–10 scale.
+// Stored rows were rescaled round(x × 2.5) (0→0, 1→3, 2→5, 3→8, 4→10); pre-I14
+// decisions replay their own 0–4 inputs, which stay valid under the wider bound.
 export const workoutFeedbackInputSchema = z.object({
-  overallFatigue: z.number().int().min(0).max(4).nullable(),
-  effortRating: z.number().int().min(0).max(4).nullable(),
-  performanceRating: z.number().int().min(0).max(4).nullable(),
+  overallFatigue: z.number().int().min(0).max(10).nullable(),
+  effortRating: z.number().int().min(0).max(10).nullable(),
+  performanceRating: z.number().int().min(0).max(10).nullable(),
 });
 
 export const prescriptionSchema = z.object({

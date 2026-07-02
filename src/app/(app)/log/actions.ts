@@ -661,9 +661,10 @@ export async function moveExerciseUpAction(input: {
 const completeSchema = z.object({
   workout_id: z.string().uuid(),
   notes: z.string().max(2000).nullable(),
-  overall_fatigue: z.coerce.number().int().min(0).max(4).nullable(),
-  effort_rating: z.coerce.number().int().min(0).max(4).nullable(),
-  performance_rating: z.coerce.number().int().min(0).max(4).nullable(),
+  // I14: session sliders share the per-exercise 0–10 scale
+  overall_fatigue: z.coerce.number().int().min(0).max(10).nullable(),
+  effort_rating: z.coerce.number().int().min(0).max(10).nullable(),
+  performance_rating: z.coerce.number().int().min(0).max(10).nullable(),
 });
 
 export async function completeWorkoutAction(input: {
