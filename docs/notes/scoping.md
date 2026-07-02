@@ -30,7 +30,10 @@ Owner dropped this: "Leave unplanned mesos there as they are. Drop this idea." T
 "MESOCYCLE TIMELINE" (`macro/[macroId]/page.tsx` L191–269) keeps rendering **all**
 mesos (matches doc 09's full chronological ledger). Row swept to `archive.md`.
 
-## M8 — Stats unification (meso est-strength; macro 3-way toggle) · **decided → ready**
+## M8 — Stats unification (meso est-strength; macro 3-way toggle) · **DONE (PR #104, 2026-07-02)**
+Shipped: macro page OVERVIEW|BALANCE|PERFORMANCE toggle (`getMacroStats` +
+reused BalanceView/StrengthProgressSection); meso side through P16. Tab naming
+reconciled to BALANCE (09 2026-07-02 §1). Original scope below for the record.
 - "Est-strength under meso Performance" — **already present** in `PerformanceView`
   (`src/components/stats/MesoStatsViews.tsx:252-304`); owner confirmed this is what
   was meant. **Note:** the meso stats surface itself is being reworked by **P16**
@@ -69,7 +72,11 @@ the "add a note icon left of history" (I15) **already exists**. The unclear icon
 for a clearer inline SVG pencil matching the icon-row style; confirm fig 1.1
 fidelity. **I15 is likely a no-op (already done); PH42 is the real, ready task.**
 
-## P16 — Meso page rework: toggle + planner-style overview + header actions · **UX / large · decided 2026-07-02**
+## P16 — Meso page rework: toggle + planner-style overview + header actions · **DONE (PR #104, 2026-07-02)**
+Shipped as specced below (`MesoHeader.tsx` + `MesoPlanView.tsx` + the toggle;
+`/stats` route redirects; ⋮ menu holds edit/save-template/delete; the "VOLUME"
+label question resolved to **BALANCE** — 09 2026-07-02 §1). Original scope
+below for the record.
 `src/app/(app)/cycles/meso/[mesoId]/page.tsx` (`MesoDetailPage`): today a vertical
 stack of near-identical `border border-ink/35` rows (EDIT/GO-TO L239–263, MESO
 STATS link L271–276 with a **stale "VOLUME" label**, SAVE AS TEMPLATE L277–287,
@@ -98,7 +105,8 @@ whole meso page to mirror the macro page + day-view patterns —
 (fig 2.5). Record rule-8 deviations (no exact mockup for the reworked header/menu)
 in `docs/PROGRESS.md`. → **ready (large; sequence the stats content after R14).**
 
-## P17 — Remove back-button when day dropdown picks a new day · **UX / small · decided 2026-07-02**
+## P17 — Remove back-button when day dropdown picks a new day · **DONE (PR #104, 2026-07-02)**
+Shipped: `/log/[workoutId]` renders no back link. Original scope below.
 Back link `src/app/(app)/log/[workoutId]/page.tsx:45-50` (`‹ WORKOUT`); navigator
 `DayHeader` in `DayView.tsx` L268–476, day-chip `Link` L432–438. The `/workout`
 root has no back button, but navigating to `/log/{workoutId}` **unconditionally**
@@ -108,7 +116,9 @@ the Workout tab; the day view shows **no back button** (selecting a day isn't a
 **N4** below (return-to-origin when you deep-link out to "view exercise" and back).
 → **ready.**
 
-## N4 — Back navigation should return to origin (deep-link) · **UX / small · new 2026-07-02**
+## N4 — Back navigation should return to origin (deep-link) · **DONE (PR #104, 2026-07-02)**
+Shipped: "View exercise" carries `?from=/log/<id>`; the exercise page
+validates the path and points its back control there. Original scope below.
 Surfaced in the P17 decision (owner's "option 3" for deep-links). When you click
 through the day view to **"view exercise"** (`/exercises/[id]`), the back control
 returns to the **exercises list**, not the day view you came from. **Fix:** carry

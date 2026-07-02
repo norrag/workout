@@ -372,6 +372,10 @@ export async function logSet(
      *  bodyweight movements. Captured here, locked once the workout completes (amend
      *  never rewrites it). Null when the profile has no bodyweight set. */
     bodyweight: number | null;
+    /** R6: the client-local calendar day (YYYY-MM-DD) the set was performed.
+     *  Day-grain reads (history/PRs/rollups) bucket on this; absent/null falls
+     *  back to the server's UTC day (the pre-R6 behavior). */
+    performed_on?: string | null;
   },
 ): Promise<LoggedSetRow> {
   // denormalized cycle stamps come from the workout chain
@@ -411,6 +415,8 @@ export async function logSet(
       microcycle_id: micro.id,
       workout_id: workout.id,
       performed_at: new Date().toISOString(),
+      performed_on:
+        input.performed_on ?? new Date().toISOString().slice(0, 10),
       set_number: input.set_number,
       weight: input.weight,
       reps: input.reps,

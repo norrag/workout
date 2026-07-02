@@ -285,6 +285,7 @@ export async function updateMesocycleAttrs(
 
 export interface SlotFill extends MesoExerciseRow {
   exercise_name: string;
+  exercise_equipment: string;
 }
 
 export interface PlannedGroup extends MesoDayGroupRow {
@@ -350,14 +351,19 @@ export async function getMesoPlan(
   }
 
   const exerciseIds = [...new Set((fills ?? []).map((f) => f.exercise_id))];
-  let exerciseNames = new Map<string, string>();
+  let exerciseMeta = new Map<string, { name: string; equipment: string }>();
   if (exerciseIds.length > 0) {
     const { data, error } = await supabase
       .from("exercises")
-      .select("id, name")
+      .select("id, name, equipment_type")
       .in("id", exerciseIds);
     if (error) throw error;
-    exerciseNames = new Map((data ?? []).map((e) => [e.id, e.name]));
+    exerciseMeta = new Map(
+      (data ?? []).map((e) => [
+        e.id,
+        { name: e.name, equipment: e.equipment_type },
+      ]),
+    );
   }
 
   const mgNameById = new Map((muscleGroups ?? []).map((g) => [g.id, g.name]));
@@ -380,7 +386,9 @@ export async function getMesoPlan(
             .filter((f) => f.meso_day_group_id === g.id)
             .map((f) => ({
               ...f,
-              exercise_name: exerciseNames.get(f.exercise_id) ?? "",
+              exercise_name: exerciseMeta.get(f.exercise_id)?.name ?? "",
+              exercise_equipment:
+                exerciseMeta.get(f.exercise_id)?.equipment ?? "",
             })),
         })),
     })),

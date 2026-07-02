@@ -104,6 +104,23 @@ describe("weightWeekMuscleSets (R14, doc 10 §2 fractional counting)", () => {
       planned_sets: 4,
     });
   });
+
+  it("weekOf remaps rows onto a global week axis and drops unmapped rows (M8)", () => {
+    // two mesos, both week 1 — the macro fold remaps m2's week onto slot 5
+    const out = weightWeekMuscleSets(
+      [
+        roleRow({ mesocycle_id: "m1", week_number: 1, logged_hard_sets: 4 }),
+        roleRow({ mesocycle_id: "m2", week_number: 1, logged_hard_sets: 6 }),
+        roleRow({ mesocycle_id: "orphan", week_number: 1, logged_hard_sets: 9 }),
+      ],
+      W,
+      (r) =>
+        r.mesocycle_id === "m1" ? 1 : r.mesocycle_id === "m2" ? 5 : undefined,
+    );
+    expect(out).toHaveLength(2);
+    expect(out.find((r) => r.week_number === 1)?.logged_sets).toBe(4);
+    expect(out.find((r) => r.week_number === 5)?.logged_sets).toBe(6);
+  });
 });
 
 describe("projectWeekSets", () => {

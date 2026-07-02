@@ -1,27 +1,46 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoDeletionImpact, getMesoPlan } from "@/lib/queries/cycles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
-import { saveMesoAsTemplateAction } from "../../actions";
-import { ShareRow } from "@/components/ShareRow";
-import { SubmitButton } from "@/components/ui/SubmitButton";
+import { getMesoStats } from "@/lib/queries/stats";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import {
+  BalanceView,
+  PerformanceView,
+} from "@/components/stats/MesoStatsViews";
 import { StartMesoForm } from "./StartMesoForm";
-import { DeleteMesoButton } from "./DeleteMesoButton";
+import {
+  MesoHeader,
+  type MesoCalendarCell,
+  type MesoCalendarWeek,
+} from "./MesoHeader";
+import { MesoPlanView, type PlanViewDay } from "./MesoPlanView";
 
 const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-/** Meso detail (fig 2.2): RIR ramp matrix with day-completion states. */
+const VIEWS = ["overview", "balance", "performance"] as const;
+type View = (typeof VIEWS)[number];
+
+/**
+ * Meso page (P16 rework, 2026-07-02): day-view-style header (calendar
+ * dropdown · share · ⋮ menu) over an OVERVIEW | BALANCE | PERFORMANCE toggle.
+ * Overview = the planner board read-only; Balance/Performance = the meso
+ * stats views (absorbs the old MESO STATS button + /stats screen).
+ */
 export default async function MesoDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ mesoId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; view?: string }>;
 }) {
   const { mesoId } = await params;
   // saveMesoAsTemplateAction lands back here with ?error=template on failure
-  const { error: actionError } = await searchParams;
+  const { error: actionError, view: viewParam } = await searchParams;
+  const view: View = VIEWS.includes(viewParam as View)
+    ? (viewParam as View)
+    : "overview";
   const supabase = await createClient();
   const {
     data: { user },
@@ -32,7 +51,11 @@ export default async function MesoDetailPage({
   if (!plan) notFound();
   const { meso, days } = plan;
 
-  const deletion = await getMesoDeletionImpact(supabase, user.id, mesoId);
+  const [deletion, stats] = await Promise.all([
+    getMesoDeletionImpact(supabase, user.id, mesoId),
+    getMesoStats(supabase, user.id, mesoId),
+  ]);
+  if (!stats) notFound();
 
   const { data: micros, error: microError } = await supabase
     .from("microcycles")
@@ -65,9 +88,6 @@ export default async function MesoDetailPage({
         .sort((a, b) => a.day_number - b.day_number)[0]
     : null;
 
-  const dayCols = days.length > 0 ? days : [null];
-  const gridCols = { gridTemplateColumns: `44px 52px repeat(${dayCols.length}, 1fr)` };
-
   // ramp values for planned mesos (no microcycles yet). The deload RIR comes from
   // the active engine params (so the preview tracks tuning, e.g. v15's 6); working
   // weeks from the meso's own ramp.
@@ -87,7 +107,7 @@ export default async function MesoDetailPage({
           isDeload: m.is_deload,
           targetRir: m.target_rir,
           status: m.status,
-          microId: m.id,
+          microId: m.id as string | null,
         }))
       : Array.from({ length: meso.weeks }, (_, i) => {
           const isDeload = meso.includes_deload && i === meso.weeks - 1;
@@ -97,216 +117,195 @@ export default async function MesoDetailPage({
             isDeload,
             targetRir: previewRir(i, isDeload),
             status: "unbuilt" as const,
-            microId: null,
+            microId: null as string | null,
           };
         });
-
   const deloadRow = weekRows.find((w) => w.isDeload);
 
-  return (
-    <div>
-      <Link
-        href="/cycles"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
-      >
-        ‹ CYCLES
-      </Link>
-      <div className="mt-3 flex items-end justify-between">
-        <h1 className="text-[27px] font-extrabold leading-none tracking-[-0.02em]">
-          {meso.name}
-        </h1>
-        {meso.status === "active" ? (
-          <div className="border-[1.5px] border-accent px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-accent">
-            CURRENT
-          </div>
-        ) : (
-          <div className="border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink/55">
-            {meso.status.toUpperCase()}
-          </div>
-        )}
-      </div>
-      <div className="mt-2 text-[10.5px] font-medium tracking-[0.1em] text-ink/55">
-        <span className="numeral">{meso.weeks}</span> WEEKS ·{" "}
-        <span className="numeral">{days.length}</span> DAYS/WK
-        {meso.includes_deload ? " · DELOAD" : ""}
-      </div>
+  // the header calendar (was the page-body ramp matrix) — day cells link to
+  // the day view when materialized, else the read-only planned-day view
+  const dayCols = days.length > 0 ? days : [];
+  const calendar: MesoCalendarWeek[] = weekRows.map((week) => {
+    const isCurrent = week.status === "active";
+    const cells: MesoCalendarCell[] = dayCols.map((day) => {
+      const workout = week.microId
+        ? allWorkouts.find(
+            (w) =>
+              w.microcycle_id === week.microId &&
+              w.day_number === day.day_number,
+          )
+        : null;
+      const header = day.weekday
+        ? (WEEKDAY_LABELS[day.weekday] ?? `D${day.day_number}`)
+        : `D${day.day_number}`;
+      if (workout?.status === "completed")
+        return {
+          dayNumber: day.day_number,
+          header,
+          state: "done",
+          href: `/log/${workout.id}`,
+        };
+      if (isCurrent && workout && nextWorkout?.id === workout.id)
+        return {
+          dayNumber: day.day_number,
+          header,
+          state: "next",
+          href: `/log/${workout.id}`,
+        };
+      if (isCurrent && workout)
+        return {
+          dayNumber: day.day_number,
+          header,
+          state: "current",
+          href: `/log/${workout.id}`,
+        };
+      return {
+        dayNumber: day.day_number,
+        header,
+        state: "planned",
+        href: `/cycles/meso/${meso.id}/planned/${week.weekNumber}/${day.day_number}`,
+      };
+    });
+    return {
+      key: week.key,
+      weekNumber: week.weekNumber,
+      isDeload: week.isDeload,
+      targetRir: week.targetRir,
+      cells,
+      isCurrent,
+      isComplete: week.status === "completed",
+      isUnbuilt: week.status === "unbuilt",
+    };
+  });
 
-      {/* ramp matrix */}
-      <div className="mt-5 border-t-[1.5px] border-ink">
-        <div
-          className="grid items-center gap-1.5 pb-[5px] pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50"
-          style={gridCols}
+  // whole-grid completion share for the header progress bar (weeks × days —
+  // lazily-materialized future workouts count toward the denominator)
+  const plannedGrid = weekRows.length * days.length;
+  const completedCount = allWorkouts.filter(
+    (w) => w.status === "completed",
+  ).length;
+  const progressPct =
+    plannedGrid > 0 ? Math.round((completedCount / plannedGrid) * 100) : 0;
+
+  // macro context for the header's top-right label
+  let contextLabel = "STANDALONE";
+  if (meso.macrocycle_id) {
+    const { data: macro, error: macroError } = await supabase
+      .from("macrocycles")
+      .select("name")
+      .eq("id", meso.macrocycle_id)
+      .maybeSingle();
+    if (macroError) throw macroError;
+    contextLabel = macro?.name ?? "STANDALONE";
+  }
+
+  const hasFills = days.some((d) => d.groups.some((g) => g.fills.length > 0));
+
+  // read-only plan view rows: flat day order across groups (planner board #2)
+  const planDays: PlanViewDay[] = days.map((day) => {
+    const dayPosById = new Map<string, number>();
+    day.groups
+      .flatMap((g, gi) =>
+        g.fills.map((f, si) => ({
+          id: f.id,
+          pos: f.position ?? 0,
+          gi,
+          slot: f.slot_number ?? si + 1,
+        })),
+      )
+      .sort((a, b) => a.pos - b.pos || a.gi - b.gi || a.slot - b.slot)
+      .forEach((x, idx) => dayPosById.set(x.id, idx + 1));
+    return {
+      id: day.id,
+      day_number: day.day_number,
+      label: day.label,
+      weekday: day.weekday,
+      fills: day.groups.flatMap((g) =>
+        g.fills.map((f, i) => ({
+          id: f.id,
+          exercise_name: f.exercise_name,
+          equipment: f.exercise_equipment,
+          initial_sets: f.initial_sets,
+          muscle_group: g.muscle_group,
+          day_position: dayPosById.get(f.id) ?? i + 1,
+        })),
+      ),
+      openSlots: day.groups
+        .map((g) => ({
+          muscle_group: g.muscle_group,
+          count: Math.max(0, g.exercise_slots - g.fills.length),
+        }))
+        .filter((s) => s.count > 0),
+    };
+  });
+
+  const metaLine = `${meso.weeks} WEEKS · ${days.length} DAYS/WK${meso.includes_deload ? " · DELOAD" : ""}`;
+
+  const overviewPanel = (
+    <div key="overview">
+      {meso.status === "active" && nextWorkout && currentMicro ? (
+        <Link
+          href={`/log/${nextWorkout.id}`}
+          className="mt-4 block bg-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em] text-bg-base"
         >
-          <div>WK</div>
-          <div>RIR</div>
-          {dayCols.map((day, i) => (
-            <div key={day?.id ?? i} className="text-center">
-              {day?.weekday
-                ? WEEKDAY_LABELS[day.weekday]
-                : `D${day?.day_number ?? i + 1}`}
-            </div>
-          ))}
+          GO TO W{currentMicro.week_number}·D{nextWorkout.day_number}
+        </Link>
+      ) : meso.status === "planned" ? (
+        <div className="mt-4">
+          <StartMesoForm mesoId={meso.id} />
         </div>
-        {weekRows.map((week, wi) => {
-          const isCurrent = week.status === "active";
-          const isComplete = week.status === "completed";
-          const isLast = wi === weekRows.length - 1;
-          return (
-            <div
-              key={week.key}
-              className={`grid items-center gap-1.5 border-t border-ink/15 py-1.5 ${
-                isLast ? "border-b-[1.5px] border-b-ink pb-2.5" : ""
-              }`}
-              style={gridCols}
-            >
-              <div
-                className={`text-[15px] font-bold ${isComplete || isCurrent ? "" : "text-ink/50"} ${week.isDeload ? "text-[13px] tracking-[0.06em]" : ""}`}
-              >
-                {week.isDeload ? "DL" : week.weekNumber}
-              </div>
-              <div
-                className={`numeral text-xs ${
-                  isCurrent
-                    ? "font-bold text-accent"
-                    : isComplete
-                      ? "font-semibold text-ink/60"
-                      : "font-semibold text-ink/45"
-                }`}
-              >
-                {week.targetRir}
-              </div>
-              {dayCols.map((day, di) => {
-                const workout = week.microId
-                  ? allWorkouts.find(
-                      (w) =>
-                        w.microcycle_id === week.microId &&
-                        w.day_number === day?.day_number,
-                    )
-                  : null;
-                const done = workout?.status === "completed";
-                const isNextCell =
-                  isCurrent && workout && nextWorkout?.id === workout.id;
-                if (done)
-                  return (
-                    <Link
-                      key={day?.id ?? di}
-                      href={`/log/${workout!.id}`}
-                      className="flex h-[38px] items-center justify-center bg-ink text-xs text-bg-base"
-                    >
-                      ✓
-                    </Link>
-                  );
-                if (isNextCell)
-                  return (
-                    <Link
-                      key={day?.id ?? di}
-                      href={`/log/${workout.id}`}
-                      className="flex h-[38px] items-center justify-center border-2 border-accent text-[9.5px] font-bold tracking-[0.06em] text-accent"
-                    >
-                      D{day?.day_number}
-                    </Link>
-                  );
-                if (isCurrent && workout)
-                  return (
-                    <Link
-                      key={day?.id ?? di}
-                      href={`/log/${workout.id}`}
-                      className="flex h-[38px] items-center justify-center border border-ink/35 text-[9.5px] font-medium text-ink/50"
-                    >
-                      D{day?.day_number}
-                    </Link>
-                  );
-                const cellClass = `flex h-[38px] items-center justify-center text-[9px] font-medium tracking-[0.06em] text-ink/40 ${week.isDeload || week.status === "unbuilt" ? "border border-dashed border-ink/35" : "border border-ink/[0.22]"}`;
-                // empty/future cell → read-only planned day (basic exercises)
-                return day ? (
-                  <Link
-                    key={day.id}
-                    href={`/cycles/meso/${meso.id}/planned/${week.weekNumber}/${day.day_number}`}
-                    className={cellClass}
-                  >
-                    D{day.day_number}
-                  </Link>
-                ) : (
-                  <div key={di} className={cellClass} />
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex justify-between text-[9.5px] font-medium tracking-[0.1em] text-ink/50">
-        <span>
-          RAMP {meso.rir_start} → {meso.rir_end} RIR
-        </span>
-        {deloadRow && (
-          <span>
-            DELOAD W{deloadRow.weekNumber} — {deloadRow.targetRir} RIR
-          </span>
-        )}
-      </div>
+      ) : null}
 
-      <div className="mt-5 flex gap-2.5">
-        {/* Once any set is logged the plan is locked here — edits (add/remove/
-            reorder/substitute) are made directly from the workout page so the
-            engine and logged history stay consistent. */}
-        {!deletion.hasHistory && (
-          <Link
-            href={`/cycles/meso/${meso.id}/plan`}
-            className="flex-1 border-[1.5px] border-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em]"
-          >
-            {meso.status === "planned" ? "EDIT PLAN" : "EDIT WEEKS"}
-          </Link>
-        )}
-        {meso.status === "active" && nextWorkout && currentMicro ? (
-          <Link
-            href={`/log/${nextWorkout.id}`}
-            className="flex-1 bg-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em] text-bg-base"
-          >
-            GO TO W{currentMicro.week_number}·D{nextWorkout.day_number}
-          </Link>
-        ) : meso.status === "planned" ? (
-          <div className="flex-1">
-            <StartMesoForm mesoId={meso.id} />
-          </div>
-        ) : null}
-      </div>
+      <MesoPlanView days={planDays} />
+
       {deletion.hasHistory && (
-        <p className="mt-2 text-[11px] leading-normal text-ink/55">
+        <p className="mt-4 text-[11px] leading-normal text-ink/55">
           This mesocycle has logged workouts, so its plan is locked here. Adjust
           exercises, order, or substitutions from the workout page — changes carry
           forward to the same day in future weeks.
         </p>
       )}
-      <Link
-        href={`/cycles/meso/${meso.id}/stats`}
-        className="mt-2.5 block border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70"
-      >
-        MESO STATS — VOLUME · BALANCE · PERFORMANCE ›
-      </Link>
-      {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
-        <form action={saveMesoAsTemplateAction}>
-          <input type="hidden" name="meso_id" value={meso.id} />
-          <SubmitButton
-            pendingLabel="SAVING…"
-            className="mt-2.5 w-full border border-ink/35 py-3 text-center text-[11px] font-semibold tracking-[0.1em] text-ink/70"
-          >
-            SAVE AS TEMPLATE
-          </SubmitButton>
-          {actionError === "template" && (
-            <p className="mt-1.5 text-[11px] leading-normal text-accent">
-              Couldn&apos;t save this plan as a template — try again.
-            </p>
-          )}
-        </form>
-      )}
-      {days.some((d) => d.groups.some((g) => g.fills.length > 0)) && (
-        <ShareRow objectType="mesocycle" objectId={meso.id} />
-      )}
-      <DeleteMesoButton
+    </div>
+  );
+
+  return (
+    <div>
+      <MesoHeader
         mesoId={meso.id}
         mesoName={meso.name}
-        loggedSets={deletion.loggedSets}
+        status={meso.status}
+        contextLabel={contextLabel}
+        metaLine={metaLine}
+        rampLine={`RAMP ${meso.rir_start} → ${meso.rir_end} RIR`}
+        deloadLine={
+          deloadRow
+            ? `DELOAD W${deloadRow.weekNumber} — ${deloadRow.targetRir} RIR`
+            : null
+        }
+        progressPct={progressPct}
+        calendar={calendar}
+        hasFills={hasFills}
         hasHistory={deletion.hasHistory}
+        loggedSets={deletion.loggedSets}
+      />
+
+      {actionError === "template" && (
+        <p className="mt-3 text-[11px] leading-normal text-accent">
+          Couldn&apos;t save this plan as a template — try again from the header
+          menu.
+        </p>
+      )}
+
+      {/* segmented control — instant client-state toggle (all panels' data is
+          already fetched); `?view=` still seeds the initial panel for deep-links */}
+      <SegmentedTabs
+        labels={["OVERVIEW", "BALANCE", "PERFORMANCE"]}
+        initial={view === "performance" ? 2 : view === "balance" ? 1 : 0}
+        panels={[
+          overviewPanel,
+          <BalanceView key="balance" balance={stats.balance} />,
+          <PerformanceView key="performance" stats={stats} />,
+        ]}
       />
     </div>
   );

@@ -8,7 +8,15 @@ import type {
 } from "@/lib/types/database";
 import { getProfile } from "@/lib/queries/profiles";
 import { getCyclesOverview, getMesoPlan, type CyclesOverview, type MesoPlan } from "@/lib/queries/cycles";
-import { getMesoProgressScores, type ExerciseProgressScore } from "@/lib/queries/stats";
+import {
+  getMesoProgressScores,
+  getProgressScores,
+  buildStrengthProgress,
+  MIN_PROGRESS_SESSIONS,
+  type ExerciseProgressScore,
+  type MuscleGroupProgress,
+  type StrengthProgress,
+} from "@/lib/queries/stats";
 import { getMacroOverview, type MacroOverview } from "@/lib/queries/macro";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
@@ -43,7 +51,12 @@ import {
   round1,
   type EnvelopeOpts,
 } from "../envelope";
-import { scoreProgress, classifyDayEmphasis, type MuscleRole } from "@/lib/engine";
+import {
+  scoreProgress,
+  classifyDayEmphasis,
+  volumeCountingWeights,
+  type MuscleRole,
+} from "@/lib/engine";
 
 /**
  * Slice 2 read/analysis tools (07 Phase 6). Thin, zod-validated wrappers over
@@ -301,6 +314,7 @@ function registerGetMesocycle(server: McpServer) {
 export function formatMesoSummary(
   row: VMesoSummaryRow | null,
   scores: ExerciseProgressScore[],
+  muscleProgress: MuscleGroupProgress[] = [],
 ): Record<string, unknown> {
   if (!row) {
     return { found: false, summary: "No mesocycle summary is visible for that id." };
@@ -367,14 +381,24 @@ export function formatMesoSummary(
         first_e1rm_estimate: first,
         last_e1rm_estimate: last,
         e1rm_change_pct: scoreProgress(first, last),
+        sessions: s.sessions,
       };
     }),
+    // PH37: role-weighted rollup of the qualifying (≥3-session) scores —
+    // matches the in-app STRENGTH BY MUSCLE GROUP section
+    muscle_group_progress: muscleProgress.map((m) => ({
+      muscle_group: m.muscle_group,
+      e1rm_change_pct: m.score_pct,
+      lifts: m.lifts,
+    })),
     // name the window so this metric is not confused with the lifetime change on
     // analyze_exercise_progress (§5.2)
     metric_definitions: {
       e1rm_change_pct:
         "(last e1RM − first e1RM) / first e1RM, within this mesocycle only (first → last non-deload session of the block; deload sessions are recovery, not signal — T-A2)",
       window: "this mesocycle",
+      sessions: "non-deload sessions with an e1RM — the trend's data points",
+      muscle_group_progress: `role-weighted mean (primary 1.0 / secondary 0.5, engine_params.volume) of e1rm_change_pct over exercises with ≥${MIN_PROGRESS_SESSIONS} sessions — the in-app display applies the same ≥${MIN_PROGRESS_SESSIONS}-session rule (I11)`,
     },
     note: "e1RM values are estimates; adherence counts decided days over working (non-deload) weeks. Deload sessions are excluded from progress_scores but still count toward volume and PRs. For the lifetime trend of one exercise use analyze_exercise_progress.",
   };
@@ -394,7 +418,7 @@ function registerGetMesoSummary(server: McpServer) {
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data: row, error }, scores] = await Promise.all([
+      const [{ data: row, error }, scores, { params }] = await Promise.all([
         client
           .from("v_meso_summary")
           .select("*")
@@ -402,8 +426,15 @@ function registerGetMesoSummary(server: McpServer) {
           .eq("mesocycle_id", mesocycle_id)
           .maybeSingle(),
         getMesoProgressScores(client, userId, mesocycle_id),
+        getActiveEngineParams(client),
       ]);
       if (error) throw error;
+      // PH37: muscle rollup on the same counting weights as the app
+      const strength = await buildStrengthProgress(
+        client,
+        scores,
+        volumeCountingWeights(params),
+      );
       const dataQuality = row
         ? feedbackCoverage(
             {
@@ -415,7 +446,7 @@ function registerGetMesoSummary(server: McpServer) {
             row.sessions_due,
           )
         : null;
-      return jsonResult(formatMesoSummary(row, scores), {
+      return jsonResult(formatMesoSummary(row, scores, strength.muscles), {
         dataQuality,
       });
     },
@@ -424,7 +455,10 @@ function registerGetMesoSummary(server: McpServer) {
 
 // --- get_macrocycle_summary ------------------------------------------------
 
-export function formatMacroSummary(overview: MacroOverview | null): Record<string, unknown> {
+export function formatMacroSummary(
+  overview: MacroOverview | null,
+  strength: StrengthProgress | null = null,
+): Record<string, unknown> {
   if (!overview) {
     return { found: false, summary: "No macrocycle with that id is visible to the user." };
   }
@@ -458,6 +492,34 @@ export function formatMacroSummary(overview: MacroOverview | null): Record<strin
       sessions_logged: stats.sessionsLogged,
       adherence_pct: stats.adherencePct,
     },
+    // I11/PH37 at macro scope — same rules as get_mesocycle_summary, window =
+    // the whole macrocycle. Matches the in-app macro Performance tab (M8).
+    ...(strength
+      ? {
+          progress_scores: strength.exercises.map((s) => {
+            const first = round1(s.first_e1rm);
+            const last = round1(s.last_e1rm);
+            return {
+              exercise_id: s.exercise_id,
+              exercise_name: s.exercise_name,
+              first_e1rm_estimate: first,
+              last_e1rm_estimate: last,
+              e1rm_change_pct: scoreProgress(first, last),
+              sessions: s.sessions,
+            };
+          }),
+          muscle_group_progress: strength.muscles.map((m) => ({
+            muscle_group: m.muscle_group,
+            e1rm_change_pct: m.score_pct,
+            lifts: m.lifts,
+          })),
+          metric_definitions: {
+            e1rm_change_pct: `first → last non-deload session within this macrocycle; only exercises with ≥${MIN_PROGRESS_SESSIONS} such sessions are listed (I11)`,
+            muscle_group_progress:
+              "role-weighted mean (primary 1.0 / secondary 0.5, engine_params.volume) of the listed exercises' e1rm_change_pct (PH37)",
+          },
+        }
+      : {}),
     note: "Targets and strength change are estimates personalized to the profile.",
   };
 }
@@ -487,7 +549,20 @@ function registerGetMacroSummary(server: McpServer) {
         profile,
         params,
       );
-      return jsonResult(formatMacroSummary(overview));
+      let strength: StrengthProgress | null = null;
+      if (overview) {
+        const scores = await getProgressScores(
+          client,
+          userId,
+          overview.mesos.map((m) => m.id),
+        );
+        strength = await buildStrengthProgress(
+          client,
+          scores,
+          volumeCountingWeights(params),
+        );
+      }
+      return jsonResult(formatMacroSummary(overview, strength));
     },
   );
 }

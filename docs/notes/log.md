@@ -4,6 +4,50 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 32: Batch-4 build 2 — the WS-C consumers + nav/date fixes (PR #104)
+
+Reconciliation sweep: **PR #103 merged** → archived **R14 / P18 / P21 / PH33 /
+T-A1 / T-A2** to `archive.md` ("Swept 2026-07-02 (build 1)"). Then built the
+Session-31 build order's consumer half on branch
+`claude/ws-c-consumers-p16-rework-rh81n2`, **PR #104**. The R6 migration
+**applied live** and probe-verified. Full record in PROGRESS 2026-07-02
+(latest) + the new dated design-changelog entry (09 2026-07-02 session 6).
+
+- **I11 — done.** Per-exercise est-strength %-change (≥3 non-deload sessions,
+  engine e1RM undecayed, deloads excluded) on the meso + macro Performance
+  tabs; progress scores now carry `sessions` and generalize to macro scope
+  (`getProgressScores`). Live check: 18/24 exercises qualify in one active
+  meso — the subbed-in exclusion bites as intended.
+- **PH37 — done.** STRENGTH BY MUSCLE GROUP — role-weighted rollup
+  (primary 1.0 / secondary 0.5, the R14 counting weights) of I11's qualifying
+  scores; meso + macro scopes; both MCP summaries expose it.
+- **M8 — done.** Macro page gains OVERVIEW|BALANCE|PERFORMANCE; Balance
+  reuses the meso fold over a concatenated week axis (materialized weeks
+  only); Performance = I11/PH37. Tab naming reconciled to **BALANCE** on both
+  surfaces (owner said "volume" in P16 / "balance" in M8; 09 had retired the
+  Volume tab name — recorded in 09 2026-07-02 §1).
+- **P16 — done (the large one).** Meso page reworked: day-view-style sticky
+  header (calendar dropdown = the old week×day matrix, share sheet, ⋮ menu
+  with edit/save-template/delete, whole-grid progress bar) over the same
+  three-way toggle; Overview = read-only planner board (`MesoPlanView`);
+  `/cycles/meso/[id]/stats` now redirects into the toggle; `AnchoredMenu`/
+  `MenuRow` extracted to `components/ui/`; `DeleteMesoButton` folded into the
+  header menu and deleted.
+- **P17 + N4 — done.** Day view has no back button (option 2); "View
+  exercise" carries `?from=/log/<id>` and the exercise page returns to the
+  originating day view.
+- **R6 — done.** `logged_sets.performed_on` (client-local day) migration
+  `20260702000003` applied live (10,821 rows backfilled to their old UTC
+  bucket, 0 diverging — reads unchanged until new sets), day view sends
+  `localDayIso()` at log time, `v_exercise_history` re-bucketed; the 6
+  `shortDate` copies collapsed into `lib/dates.ts`.
+- Green: **655 tests (+11)**, typecheck, lint, production build. Docs:
+  PROGRESS entry, 09 dated entry (P16/M8/I11/PH37/P17/N4 + rule-8
+  deviations + tab naming), backlog rows stamped, scoping synced.
+- **Next:** **I14** (slider unification 0–10 + data rescale — own PR, next in
+  this session if capacity allows); then R3+R4 (write integrity) per the
+  review's attack order; T-R2 still ready.
+
 ## 2026-07-02 — Session 31: Batch-4 build 1 — the metric-definition foundation (PR #103)
 
 Reconciliation sweep: no-op (only stale unrelated #48 open; no `done (PR #n)` rows

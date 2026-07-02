@@ -13,7 +13,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { useScrollLock } from "@/components/ui/useScrollLock";
-import { focusablesIn, useModalA11y } from "@/components/ui/useModalA11y";
+import { useModalA11y } from "@/components/ui/useModalA11y";
+import { AnchoredMenu, MenuRow } from "@/components/ui/AnchoredMenu";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
@@ -53,6 +54,7 @@ import {
 } from "@/lib/engine/load";
 import type { EngineParams } from "@/lib/engine/params";
 import { formatWeight } from "@/lib/units";
+import { localDayIso, shortDateWithWeekday } from "@/lib/dates";
 import {
   adoptServerRowState,
   daySetTotals,
@@ -178,12 +180,9 @@ function BodyweightChip({
 }
 import type { AddExerciseCandidate } from "@/lib/queries/exercises";
 
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
+// R6: one date-display definition — see lib/dates.ts
 function shortDate(iso: string | null): string {
-  const d = iso ? new Date(`${iso.slice(0, 10)}T12:00:00`) : new Date();
-  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return shortDateWithWeekday(iso ?? localDayIso());
 }
 
 type Commit = (fn: () => Promise<void>) => void;
@@ -746,7 +745,7 @@ function WorkoutOptionsMenu({
         <MenuRow
           label="Mesocycle stats"
           trailing="STATS"
-          onClick={() => go(`/cycles/meso/${mesoId}/stats`)}
+          onClick={() => go(`/cycles/meso/${mesoId}?view=balance`)}
         />
         {mesoActive && (
           <MenuRow
@@ -1099,7 +1098,11 @@ const ExerciseBlock = memo(function ExerciseBlock({
           trailing="›"
           onClick={() => {
             onCloseMenu();
-            router.push(`/exercises/${we.exercise_id}`);
+            // N4: carry the origin so the exercise page's back control returns
+            // here, not to the exercises list
+            router.push(
+              `/exercises/${we.exercise_id}?from=/log/${we.workout_id}`,
+            );
           }}
         />
         <MenuRow
@@ -1239,145 +1242,8 @@ const ExerciseBlock = memo(function ExerciseBlock({
  * runs off-screen: opens below the trigger when there's room, otherwise flips
  * above it (fig 1.2/1.3). Carries the offset hard shadow + ink scrim.
  */
-function AnchoredMenu({
-  open,
-  triggerRef,
-  align = "right",
-  width = 248,
-  label,
-  onClose,
-  children,
-}: {
-  open: boolean;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
-  align?: "left" | "right";
-  width?: number;
-  label: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-
-  // Escape closes, focus lands on the first row and returns to the trigger on
-  // close, Tab stays inside (R18); ↑/↓/Home/End walk the rows per the menu
-  // pattern (rows are role="menuitem" via MenuRow)
-  useModalA11y(open, cardRef, onClose, { initialFocus: "first" });
-  const onMenuKeyDown = (e: React.KeyboardEvent) => {
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
-    const card = cardRef.current;
-    if (!card) return;
-    const items = focusablesIn(card).filter(
-      (el) => el.getAttribute("role") === "menuitem",
-    );
-    if (items.length === 0) return;
-    e.preventDefault();
-    const current = items.indexOf(document.activeElement as HTMLElement);
-    const next =
-      e.key === "Home"
-        ? 0
-        : e.key === "End"
-          ? items.length - 1
-          : e.key === "ArrowDown"
-            ? (current + 1 + items.length) % items.length
-            : (current - 1 + items.length) % items.length;
-    items[next].focus();
-  };
-
-  useEffect(() => {
-    if (!open) {
-      setPos(null);
-      return;
-    }
-    const place = () => {
-      const trigger = triggerRef.current;
-      const card = cardRef.current;
-      if (!trigger || !card) return;
-      const t = trigger.getBoundingClientRect();
-      const h = card.offsetHeight;
-      const margin = 8;
-      const belowTop = t.bottom + 4;
-      const fitsBelow = belowTop + h <= window.innerHeight - margin;
-      const top = fitsBelow
-        ? belowTop
-        : Math.max(margin, t.top - 4 - h);
-      let left = align === "right" ? t.right - width : t.left;
-      left = Math.min(
-        Math.max(margin, left),
-        window.innerWidth - width - margin,
-      );
-      setPos({ top, left });
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [open, triggerRef, align, width]);
-
-  useScrollLock(open);
-
-  if (!open) return null;
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-40 bg-ink/35"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        ref={cardRef}
-        role="menu"
-        aria-label={label}
-        onKeyDown={onMenuKeyDown}
-        style={{
-          top: pos?.top ?? 0,
-          left: pos?.left ?? 0,
-          width,
-          visibility: pos ? "visible" : "hidden",
-        }}
-        className="fixed z-50 border-[1.5px] border-ink bg-bg-base shadow-menu"
-      >
-        {children}
-      </div>
-    </>
-  );
-}
-
-function MenuRow({
-  label,
-  trailing,
-  destructive = false,
-  disabled = false,
-  onClick,
-}: {
-  label: string;
-  trailing?: string;
-  destructive?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex w-full items-center justify-between border-b border-ink/10 px-4 py-[13px] text-left text-sm last:border-b-0 ${
-        destructive
-          ? "font-bold text-accent"
-          : disabled
-            ? "font-semibold text-ink/35"
-            : "font-semibold text-ink"
-      }`}
-    >
-      <span>{label}</span>
-      {trailing && (
-        <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/40">
-          {trailing}
-        </span>
-      )}
-    </button>
-  );
-}
+// AnchoredMenu + MenuRow moved to components/ui/AnchoredMenu.tsx (shared with
+// the meso header, P16).
 
 // ---------------------------------------------------------------------------
 // set row — editable LB/REPS cells + LOG checkbox; ⋮ opens the set menu (1.3)
@@ -1567,6 +1433,9 @@ function SetRow({
             reps: r,
             rir_reported: null,
             set_type: dropPending ? "drop" : "straight",
+            // R6: the set's calendar day as this device sees it — evening
+            // sessions must not land on tomorrow's UTC date
+            performed_on: localDayIso(),
           }),
         () => {
           if (dropPending) onToggleDrop();

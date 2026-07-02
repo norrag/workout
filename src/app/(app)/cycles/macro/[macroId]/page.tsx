@@ -3,7 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMacroOverview, phaseLabel } from "@/lib/queries/macro";
+import { getMacroStats } from "@/lib/queries/stats";
 import { getProfile } from "@/lib/queries/profiles";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { BalanceView } from "@/components/stats/MesoStatsViews";
+import { StrengthProgressSection } from "@/components/stats/StrengthProgress";
 import type { MacroRange } from "@/lib/engine";
 import type { MacroGoalType, MesocycleRow } from "@/lib/types/database";
 import { formatWeight } from "@/lib/units";
@@ -81,13 +85,28 @@ function TimelineMark({ meso, pos }: { meso: MesocycleRow; pos: number }) {
   );
 }
 
-/** Macrocycle Overview (fig 2.2): goal, realistic target, timeline, stats. */
+const VIEWS = ["overview", "balance", "performance"] as const;
+type View = (typeof VIEWS)[number];
+
+/**
+ * Macrocycle page (fig 2.2 + M8, 2026-07-02): goal, realistic target,
+ * timeline and stats on OVERVIEW, plus the same BALANCE | PERFORMANCE tabs
+ * the meso page carries — the macro-scope muscle-volume view and the
+ * est-strength trends (I11/PH37). No mockup exists for the two stats tabs
+ * (owner-approved rule-8 deviation); they reuse the meso stats views.
+ */
 export default async function MacroOverviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ macroId: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const { macroId } = await params;
+  const { view: viewParam } = await searchParams;
+  const view: View = VIEWS.includes(viewParam as View)
+    ? (viewParam as View)
+    : "overview";
   const supabase = await createClient();
   const {
     data: { user },
@@ -98,13 +117,10 @@ export default async function MacroOverviewPage({
   if (!profile) redirect("/onboarding");
   const { params: engineParams } = await getActiveEngineParams(supabase);
 
-  const overview = await getMacroOverview(
-    supabase,
-    user.id,
-    macroId,
-    profile,
-    engineParams,
-  );
+  const [overview, macroStats] = await Promise.all([
+    getMacroOverview(supabase, user.id, macroId, profile, engineParams),
+    getMacroStats(supabase, user.id, macroId),
+  ]);
   if (!overview) notFound();
   const { macro, mesos, plan, stats } = overview;
 
@@ -156,6 +172,13 @@ export default async function MacroOverviewPage({
         {months === 1 ? "" : "S"}
       </div>
 
+      {/* M8: the meso page's three-way toggle at macro scope — instant
+          client-state switch, `?view=` seeds deep links */}
+      <SegmentedTabs
+        labels={["OVERVIEW", "BALANCE", "PERFORMANCE"]}
+        initial={view === "performance" ? 2 : view === "balance" ? 1 : 0}
+        panels={[
+          <div key="overview">
       {/* realistic target (engine output) */}
       <div className="mt-4 border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
         <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
@@ -294,8 +317,8 @@ export default async function MacroOverviewPage({
           />
         </div>
         <div className="mt-[9px] text-[10px] leading-normal text-ink/55">
-          Per-meso detail in each meso&apos;s{" "}
-          <strong className="text-ink">STATS</strong> tab.
+          Per-meso detail on each meso&apos;s{" "}
+          <strong className="text-ink">BALANCE · PERFORMANCE</strong> tabs.
         </div>
       </div>
 
@@ -305,6 +328,24 @@ export default async function MacroOverviewPage({
       >
         EDIT MACROCYCLE
       </Link>
+          </div>,
+          <div key="balance">
+            <BalanceView balance={macroStats.balance} />
+            {macroStats.hasVolume && (
+              <p className="mt-2 text-[9px] leading-normal tracking-[0.04em] text-ink/45">
+                AVERAGED OVER LOGGED &amp; PLANNED WEEKS ACROSS THIS MACROCYCLE
+                — UNBUILT FUTURE WEEKS EXCLUDED
+              </p>
+            )}
+          </div>,
+          <div key="performance">
+            <StrengthProgressSection
+              strength={macroStats.strength}
+              scopeLabel="THIS MACROCYCLE"
+            />
+          </div>,
+        ]}
+      />
     </div>
   );
 }
