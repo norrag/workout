@@ -72,6 +72,13 @@ hosted `rls_auto_enable()` + `ensure_rls` event trigger captured verbatim as
 apply to a clean database. Remaining human step: **make the CI checks
 required** (next section).
 
+> **Drift fully closed (2026-07-02, T-R2):** the last out-of-band hosted
+> migration (`20260620115322_perf_rls_initplan_and_fk_indexes` — initplan
+> policy wraps + 23 FK indexes) is now transcribed verbatim into the repo
+> chain; clean-DB end state is hash-identical to hosted on all public
+> policies and indexes. No hosted action was needed (its version row already
+> exists there).
+
 ### Make the CI jobs required status checks (GitHub repo settings)
 
 CI is only a guardrail if red blocks the merge — PRs #92/#93 merged over a

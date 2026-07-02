@@ -2,7 +2,54 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — R20: production error observability — one reportError funnel, error boundaries everywhere, dependency-free Sentry wiring
+## 2026-07-02 (latest) — T-R2: hosted perf migration `20260620115322` transcribed into the chain
+
+The last known hosted↔repo drift (found by R2's full end-state diff, filed as
+T-R2): the out-of-band hosted migration `20260620115322
+perf_rls_initplan_and_fk_indexes` — 56 RLS policies initplan-wrapped
+(`auth.uid()`/`auth.role()`/`is_admin()` → scalar subqueries, evaluated once
+per query instead of once per row) plus 23 FK covering indexes — existed only
+on the hosted project. A clean-DB build (CI `rls-tests`, any future
+environment) reproduced the *semantics* but not the *plans*: same policy
+decisions, per-row function re-evaluation and unindexed FK scans.
+
+- **`supabase/migrations/20260620115322_perf_rls_initplan_and_fk_indexes.sql`
+  (new).** Body transcribed **verbatim** from hosted
+  `supabase_migrations.schema_migrations.statements[1]` — fetched base64-encoded
+  and decoded, never retyped; md5 `25446aa1f8021cce51116c3cfdbe088d` verified
+  identical on both sides (the header documents this; strip it with
+  `tail -c +918` to re-verify). Placed at the version hosted recorded, so it
+  sorts into its true position: after the 0620 hardening/feature migrations,
+  before the 06-22 profiles-recursion fix.
+- **Two deliberate time-capsule references** (called out in the file header):
+  it wraps `shares_grantee_accept` (dropped later by `20260701000002`, R1) and
+  restores the *recursive* `profiles_update_own` WITH CHECK as of 06-20
+  (replaced later by `20260622220627`). Replaying them mid-chain is correct —
+  it is exactly what hosted lived through, and both are superseded by the same
+  later migrations on both sides.
+- **No hosted apply, no owner step.** Hosted already has the version row —
+  this PR only makes version control tell the truth. No table/column change →
+  no type regen; perf-only → no policy gains or loses rows.
+
+### Verified
+
+Scratch-PG16 harness (the R2 approach — no Docker in this sandbox; simulated
+Supabase bootstrap: `auth` schema/functions, anon/authenticated/service_role
+roles, CLI tracking table, zero default privileges):
+
+- Full chain + `seed.sql` applies from zero with the new file: 26/26 tables
+  RLS-on, 330 stock exercises, 56 policies, 105 public indexes.
+- **End-state hash parity with hosted:** aggregate md5 over every public
+  policy row (table, name, cmd, roles, qual, with_check) and every public
+  index definition, computed with the identical query on both databases —
+  policies `15f40291…` = hosted, indexes `037f0d6d…` = hosted.
+- **Negative control:** the chain re-run *without* the file produces a
+  diverging policy hash and exactly 23 fewer indexes (82 vs 105) — the file
+  closes precisely the documented drift, nothing else.
+- `npm run typecheck`, `npm run lint`, `npm run test` (713) green — SQL-only
+  change; CI's `rls-tests` exercises the chain + RLS suite on the PR.
+
+## 2026-07-02 — R20: production error observability — one reportError funnel, error boundaries everywhere, dependency-free Sentry wiring
 
 The review's HIGH observability item (attack order after R3/R4): the failure
 modes the app is *designed around* — freshness reconcile returning stored

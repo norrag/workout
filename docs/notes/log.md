@@ -4,6 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 35: T-R2 — hosted perf migration transcribed into the chain (PR #115)
+
+Reconciliation sweep: no-op (PR #113 was itself the R20 sweep; no `done` rows
+live). Built the next item in the recorded attack order — **T-R2** (ready, own
+PR) — on branch `claude/review-outstanding-work-xmlmuc`, **PR #115**. Full
+record in PROGRESS 2026-07-02 (latest).
+
+- **T-R2 — done.** New `supabase/migrations/20260620115322_perf_rls_initplan_
+  and_fk_indexes.sql`: the out-of-band hosted migration transcribed **verbatim**
+  (body pulled from hosted `supabase_migrations.schema_migrations.statements`
+  as base64, decoded, md5-verified `25446aa1…` — zero hand-transcription) at
+  its true chain position. 56 `ALTER POLICY` initplan wraps + 23 FK covering
+  indexes. Two time-capsule references documented in the header
+  (`shares_grantee_accept`, pre-recursion-fix `profiles_update_own`) — both
+  superseded later in the chain exactly as on hosted. **No hosted apply
+  needed** (the version row already exists there).
+- **Verification (scratch-PG16 harness, R2-style — no Docker in this
+  sandbox):** full chain + seed applies from zero (26/26 tables RLS-on, 330
+  stock exercises); end-state **hash parity with hosted** on all 56 policy
+  rows (qual/with_check/roles/cmd) and all 105 public indexes — same
+  aggregate md5 both sides; **negative control** re-ran the chain without the
+  file → policy hash diverges and exactly 23 indexes go missing. Typecheck,
+  lint, unit suite green (SQL-only change).
+- **Next per the attack order:** R5 + R7 (MED, WS-K); R9–R12/R15 behind them.
+
 ## 2026-07-02 — Session 34 (cont.): PR #112 merged + archival sweep
 
 - **PR #112 MERGED.** End-of-session archival sweep ran: **R20 swept to
