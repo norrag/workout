@@ -138,6 +138,38 @@ describe("analyzeComparableProgress", () => {
     expect(out.stalled).toBe(true);
   });
 
+  it("reads a short phase's trend within the window instead of asserting improvement (R9)", () => {
+    // ≤ window points: rolling == best, prior is empty — before R9 every
+    // short phase (i.e. every phase start) reported "improving"
+    const decline = analyzeComparableProgress([
+      session({ performed_on: "2026-05-01", e1rm: 120 }),
+      session({ performed_on: "2026-05-08", e1rm: 110 }),
+      session({ performed_on: "2026-05-15", e1rm: 100 }),
+    ]);
+    expect(decline.trend).toBe("declining");
+
+    const climb = analyzeComparableProgress([
+      session({ performed_on: "2026-05-01", e1rm: 100 }),
+      session({ performed_on: "2026-05-08", e1rm: 110 }),
+      session({ performed_on: "2026-05-15", e1rm: 120 }),
+    ]);
+    expect(climb.trend).toBe("improving");
+
+    const flat = analyzeComparableProgress([
+      session({ performed_on: "2026-05-01", e1rm: 100 }),
+      session({ performed_on: "2026-05-08", e1rm: 101 }),
+      session({ performed_on: "2026-05-15", e1rm: 100 }),
+    ]);
+    expect(flat.trend).toBe("plateau");
+
+    // two points are enough for an honest within-window read
+    const twoPointDrop = analyzeComparableProgress([
+      session({ performed_on: "2026-05-01", e1rm: 120 }),
+      session({ performed_on: "2026-05-08", e1rm: 100 }),
+    ]);
+    expect(twoPointDrop.trend).toBe("declining");
+  });
+
   it("does not read an alternating day-slot sawtooth as declining (12 §Stage 3 #1)", () => {
     const saw = (date: string, e1rm: number) =>
       session({ performed_on: date, e1rm, confidence: "moderate" });

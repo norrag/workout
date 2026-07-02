@@ -213,7 +213,14 @@ export function replayDecisions(
               parsed.data.user,
               parsed.data.week.targetRir,
               effectiveCandidate,
-              { goalType: parsed.data.goalType, anchor: parsed.data.strengthAnchor },
+              {
+                goalType: parsed.data.goalType,
+                anchor: parsed.data.strengthAnchor,
+                // R10: stored seed inputs carry the lifter's bodyweight; omitting
+                // it made every bodyweight-lift seed replay as the deferred
+                // null-weight prescription → a spurious diff on every candidate.
+                bodyweight: parsed.data.bodyweight,
+              },
             )
           : prescribe(parsed.data, effectiveCandidate);
     } catch {

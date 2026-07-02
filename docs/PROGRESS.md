@@ -2,7 +2,43 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — R5 + R7: completion-lock hardening + service-worker cache trim
+## 2026-07-02 (latest) — R9 + R10: analysis-surface honesty fixes
+
+Two small MED items from the review's engine/analysis cluster (workstream G),
+both on the MCP admin/coaching surface that exists to keep trend reads honest.
+
+- **R9 — `analyzeComparableProgress` short-phase trend.**
+  With ≤ `window` (3) estimable sessions, `recent` covers every point so
+  `rolling === best` (the declining branch was unreachable) and `prior` is
+  empty (the plateau branch was skipped) — every phase start reported
+  `improving`, even a strict decline like `[120, 110, 100]`. Since each goal
+  change resets the phase, the first sessions of every phase were structurally
+  optimistic. Fix in `src/lib/analysis/comparability.ts`: when there is no
+  prior baseline, read the trend within the window — latest vs first,
+  tolerance-banded (declining / improving / plateau). Longer phases are
+  untouched (same branches as before). A new 4-case trend test in
+  `comparability.test.ts` (strict decline, climb, flat, two-point drop); the
+  alternating day-slot
+  regression (flat series → plateau, never declining) still holds.
+- **R10 — `replay_decisions` drops `bodyweight` on seed replays.**
+  Stored seed decisions carry the lifter's `bodyweight` in their inputs
+  (doc 14 §3 derived input), and `seedMeso` needs it under the live v16
+  bodyweight model — but the replay's seed branch didn't pass it, so every
+  bodyweight-lift seed replayed as the deferred null-weight prescription and
+  diffed as `changed` against ANY candidate params, corrupting the tuning
+  loop doc 04 calls primary. One-line fix in `src/lib/mcp/tools/admin.ts`
+  (+ rationale comment); regression test in `admin-tools.test.ts` replays a
+  v16 bodyweight seed unchanged — **verified failing without the fix** (the
+  test also asserts the seed prices a real load, so it can't pass vacuously).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (715, +2) green. No
+schema/engine change (both fixes are outside `src/lib/engine/`; stored
+decisions replay byte-identically — the fix makes the replay *harness*
+faithful, it does not change any engine output).
+
+## 2026-07-02 — R5 + R7: completion-lock hardening + service-worker cache trim
 
 The next two items in the repo review's attack order (both MED, workstream K —
 integrity & security hardening). Migration `20260702000006` **applied live +

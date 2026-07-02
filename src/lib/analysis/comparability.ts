@@ -281,7 +281,18 @@ export function analyzeComparableProgress(
   } else if (rolling < best * (1 - tol / 100)) {
     // the recent peak sits meaningfully below the phase best → genuine decline
     trend = "declining";
-  } else if (priorBest != null && rolling <= priorBest * tolFactor) {
+  } else if (priorBest == null) {
+    // R9: with ≤ window points the rolling max IS the phase best (the branch
+    // above can never fire) and there is no prior baseline, so every short
+    // phase used to read "improving" — even a strict decline. Until a
+    // baseline exists, read the trend within the window: latest vs first.
+    trend =
+      latestRaw < firstRaw * (1 - tol / 100)
+        ? "declining"
+        : latestRaw > firstRaw * tolFactor
+          ? "improving"
+          : "plateau";
+  } else if (rolling <= priorBest * tolFactor) {
     // recent peak fails to clear the prior peak → plateau
     trend = "plateau";
   } else {
