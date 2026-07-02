@@ -4,6 +4,50 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 31: Batch-4 build 1 — the metric-definition foundation (PR #103)
+
+Reconciliation sweep: no-op (only stale unrelated #48 open; no `done (PR #n)` rows
+live). Followed Session 30's suggested build order — the dependency-first foundation
+that unblocks the WS-C stats/meso rework — plus the independent quick wins that fit.
+Branch `claude/review-prioritize-work-egj0xt`, **PR #103**. Both migrations
+**applied live** and probe-verified.
+
+- **R14 — done (PR #103).** Fractional 1.0/0.5 volume counting + the RIR≤4
+  hard-set rule (doc 10 §2). New role-grain view `v_meso_week_muscle_sets`
+  (facts per meso×week×muscle×role, hard-set rule baked at the doc default:
+  rir ≤ 4 or unreported, warm-ups never count) + ONE shared pure fold
+  (`engine/volume.ts::fractionalSetCount`, weights from new optional
+  `volume.direct/indirect` params keys — v11+ `.optional()` discipline, stored
+  rows stay replayable) consumed by: stats matrix/Balance, MCP volume/balance/
+  preview tools, the PH34 projection + planner baseline, and the engine's
+  weekly-set ceiling input (fractional `muscleGroupWeeklySets`; derived input →
+  no fingerprint churn). Live parity check: primary counts = old view exactly
+  (43=43); secondaries add the missing compound credit; 0 all-time sets above
+  RIR 4 (no retroactive bite). **Recorded deviation:** `counting_max_rir` /
+  `warmups_count` are view-baked doc defaults, not live params (SQL can't read
+  versioned params; a param the counting SQL can't honor would silently lie).
+  Old `v_meso_week_sets` + dead `v_muscle_group_volume` → retire with R23.
+- **T-A1 — done (PR #103).** Engine e1RM everywhere:
+  `v_exercise_overview`/`v_meso_summary` `best_e1rm` = max stored per-set
+  engine e1RM; new `v_exercise_history.best_set_e1rm` (REP-PR comparisons now
+  set-grain, closing the avg-vs-best inflation from the 06-26 change); stats
+  inline raw Epley + dead `epleyE1rm` deleted — raw Epley survives nowhere.
+  Stats undecayed; decay prescription-only. **Half-life confirmed MCP-tunable**
+  (`e1rm.recency_halflife_days: 30` in the active v17 row). Answers PH39.
+- **T-A2 — done (PR #103).** `getMesoProgressScores` skips deload-microcycle
+  sessions; volume + PR stats keep deloads; denoted in MCP notes.
+- **Quick wins:** **P18 done** (set-type menu row hidden, model dormant);
+  **PH33 done** (admin tools hidden from `tools/list` via a role-filter wrap of
+  the SDK handler; call-time denial unchanged); **P21 done — verified no-op**
+  (explicit 0 already stored for `soreness_days`).
+- Green: **644 tests (+15)**, typecheck, lint, production build (`/log` 126 kB
+  unchanged). Docs: PROGRESS entry, root `CLAUDE.md` shared-views line →
+  `v_meso_week_muscle_sets`, rows/scoping/A-detail synced.
+- **Next per the build order:** the WS-C consumers — **I11 + PH37 + M8** (stats
+  screens on the new definitions) and **P16** (meso surface, large); **I14**
+  (slider unification, own PR — data migration); **P17+N4**, **R6** remain
+  ready. R3+R4 (write integrity) still queued from the review's attack order.
+
 ## 2026-07-02 — Session 30: owner decision batch (Batch 4) — 17 needs-input items resolved
 
 Reconciliation sweep: no-op (Session 29 already merged PR #100 and swept R13/R18/R19;

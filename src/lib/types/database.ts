@@ -466,6 +466,7 @@ export type VExerciseHistoryRow = {
   top_weight: number | null;
   e1rm: number | null;
   avg_rir_reported: number | null;
+  best_set_e1rm: number | null;
 }
 
 export type VMuscleGroupVolumeRow = {
@@ -489,6 +490,22 @@ export type VMesoWeekSetsRow = {
   muscle_group: string | null;
   planned_sets: number | null;
   logged_sets: number;
+}
+
+/** R14: role-grain weekly-set facts for fractional volume counting (doc 10 §2).
+ * Counts are UNWEIGHTED per role; apply engine/volume.ts::fractionalSetCount. */
+export type VMesoWeekMuscleSetsRow = {
+  user_id: string;
+  mesocycle_id: string;
+  week_number: number;
+  is_deload: boolean;
+  muscle_group_id: string | null;
+  muscle_group: string | null;
+  role: "primary" | "secondary";
+  planned_sets: number | null;
+  logged_sets: number;
+  /** non-warmup sets at rir_reported ≤ 4 or unreported — the §2 hard-set rule */
+  logged_hard_sets: number;
 }
 
 export type VExercisePrsRow = {
@@ -595,6 +612,7 @@ export type Database = {
       v_muscle_group_volume: { Row: VMuscleGroupVolumeRow; Relationships: [] };
       v_meso_summary: { Row: VMesoSummaryRow; Relationships: [] };
       v_meso_week_sets: { Row: VMesoWeekSetsRow; Relationships: [] };
+      v_meso_week_muscle_sets: { Row: VMesoWeekMuscleSetsRow; Relationships: [] };
       v_exercise_prs: { Row: VExercisePrsRow; Relationships: [] };
       v_macro_summary: { Row: VMacroSummaryRow; Relationships: [] };
       v_exercise_overview: { Row: VExerciseOverviewRow; Relationships: [] };

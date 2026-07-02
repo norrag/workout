@@ -116,13 +116,14 @@ the originating route (referrer param / client state) so back lands where you ca
 from. Pairs with P17 (P17 removes the in-tab back button; N4 fixes back for the
 genuine deep-link case). → **ready.**
 
-## P18 — Remove the set-type option from the set menu · **UX / trivial · decided 2026-07-02**
+## P18 — Remove the set-type option from the set menu · **UX / trivial · DONE (PR #103, 2026-07-02)**
 `DayView.tsx` `SetRow` menu L1439–1443 (Add-below / **Set type** / Skip / Delete);
 "Set type" toggles `dropPending` STRAIGHT↔DROP, consumed as `set_type` at log time
 (L1272) with a DROP badge (L1405–1409). **Decision:** **hide the menu affordance
 only** — leave the `set_type` data model dormant (owner: drop-set UX was never
 worked out; may revisit later). Existing DROP badges/data stay intact; just remove
-the menu item. Record the deviation in `docs/PROGRESS.md`. → **ready (trivial).**
+the menu item. Record the deviation in `docs/PROGRESS.md`. → **shipped PR #103**
+(menu row hidden; model dormant; PROGRESS 2026-07-02).
 
 ## P20 — Live-filter exercise search · **UX / small**
 `src/app/(app)/exercises/page.tsx` (`ExercisesPage`): text search is
@@ -215,7 +216,7 @@ and label the rest "not yet planned"? Then a **new append-only view migration** 
 `muscle_group_id` (no fractional 1.0/0.5 per doc 10 §2) — decide whether to fold the
 fractional rule in at the same rewrite. → **needs-input**, then medium build.
 
-## PH33 — Scope admin MCP tools private · **F / small (optional)**
+## PH33 — Scope admin MCP tools private · **F / small · DONE (PR #103, 2026-07-02)**
 `src/lib/mcp/tools/index.ts:53-60` registers all surfaces incl.
 `registerAdminTools` unconditionally; per-call gate `resolveAdmin`
 (`admin.ts:38-46`) throws unless `profile.role === "admin"`, plus RLS
@@ -224,9 +225,9 @@ depth) but **listable** to everyone. Doc 05 says "hidden/denied" — denied is
 satisfied. Hiding from `tools/list` for non-admins is a small cosmetic
 improvement, not spec-required. **Decision (2026-07-02):** owner wants them
 **admin-only visible** ("not a security thing, but I don't want other clients
-really to see them and ask why they cant use them too"). → **ready:** filter
-`registerAdminTools`' surfaces out of `tools/list` for non-admins (keep the
-per-call `resolveAdmin` denial as-is). Low priority.
+really to see them and ask why they cant use them too"). → **shipped PR #103:**
+`mcp/visibility.ts` wraps the SDK tools/list handler with a `profiles.role`
+filter (per-call `resolveAdmin` denial unchanged).
 
 ## I13 — Per-exercise, per-user weight increment · **verify-done**
 Shipped 2026-06-21 (PROGRESS.md): `exercise_param_overrides.weight_increment`

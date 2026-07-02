@@ -5,7 +5,6 @@ import type {
   ExerciseNoteRow,
   ProfileRow,
   VMesoSummaryRow,
-  VMesoWeekSetsRow,
 } from "@/lib/types/database";
 import { getProfile } from "@/lib/queries/profiles";
 import { getCyclesOverview, getMesoPlan, type CyclesOverview, type MesoPlan } from "@/lib/queries/cycles";
@@ -15,6 +14,7 @@ import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
   loadMesoSetProjection,
   type ProjectedCell,
+  type WeightedWeekSets,
 } from "@/lib/queries/volume-projection";
 import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
 import {
@@ -373,10 +373,10 @@ export function formatMesoSummary(
     // analyze_exercise_progress (§5.2)
     metric_definitions: {
       e1rm_change_pct:
-        "(last e1RM − first e1RM) / first e1RM, within this mesocycle only (first → last logged session of the block)",
+        "(last e1RM − first e1RM) / first e1RM, within this mesocycle only (first → last non-deload session of the block; deload sessions are recovery, not signal — T-A2)",
       window: "this mesocycle",
     },
-    note: "e1RM values are estimates; adherence counts decided days over working (non-deload) weeks. For the lifetime trend of one exercise use analyze_exercise_progress.",
+    note: "e1RM values are estimates; adherence counts decided days over working (non-deload) weeks. Deload sessions are excluded from progress_scores but still count toward volume and PRs. For the lifetime trend of one exercise use analyze_exercise_progress.",
   };
 }
 
@@ -584,7 +584,7 @@ function registerGetExerciseHistory(server: McpServer) {
 
 export function formatMuscleGroupVolume(
   mesocycleId: string,
-  rows: VMesoWeekSetsRow[],
+  rows: WeightedWeekSets[],
   weeksTotal: number | null = null,
   projected: ProjectedCell[] = [],
 ): Record<string, unknown> {
@@ -674,7 +674,7 @@ export function formatMuscleGroupVolume(
       }))
       .sort((a, b) => a.muscle_group.localeCompare(b.muscle_group)),
     note:
-      "Materialized weeks (status logged/planned) come from generated workouts. Weeks past weeks_generated show status projected: the engine's set-count projection — the last materialized week's autoregulated count carried forward, deload-scaled. It's a projection under neutral feedback (no forward set ramp), not a materialized plan; null/not_yet_generated only when even a projection has no basis.",
+      "Counts are fractional direct-equivalent sets (doc 10 §2): 1.0 per primary + 0.5 per secondary muscle of each exercise; logged_sets counts hard sets only (non-warmup, RIR ≤ 4 or unreported). Materialized weeks (status logged/planned) come from generated workouts. Weeks past weeks_generated show status projected: the engine's set-count projection — the last materialized week's autoregulated count carried forward, deload-scaled. It's a projection under neutral feedback (no forward set ramp), not a materialized plan; null/not_yet_generated only when even a projection has no basis.",
   };
 }
 
@@ -687,20 +687,19 @@ function registerGetMuscleGroupVolume(server: McpServer) {
       description:
         "Weekly hard sets per muscle group for a mesocycle — planned (from the " +
         "autoregulated plan) vs actually logged, per week, with deload weeks " +
-        "flagged. Weeks the engine hasn't generated yet show status projected " +
+        "flagged. Fractional counting (doc 10 §2): 1.0 per primary + 0.5 per " +
+        "secondary muscle; logged counts hard sets only (RIR ≤ 4 or unreported). " +
+        "Weeks the engine hasn't generated yet show status projected " +
         "(the last materialized week's count carried forward, deload-scaled). " +
         "The volume picture behind the meso.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [{ data, error }, { data: meso, error: mesoError }, projected] =
+      // the projection loader also folds the role-grain view into fractional
+      // per-(week, muscle) numbers (R14) — one query path, one definition
+      const [{ data: meso, error: mesoError }, { projected, weighted }] =
         await Promise.all([
-          client
-            .from("v_meso_week_sets")
-            .select("*")
-            .eq("user_id", userId)
-            .eq("mesocycle_id", mesocycle_id),
           client
             .from("mesocycles")
             .select("weeks")
@@ -709,10 +708,9 @@ function registerGetMuscleGroupVolume(server: McpServer) {
             .maybeSingle(),
           loadMesoSetProjection(client, userId, mesocycle_id),
         ]);
-      if (error) throw error;
       if (mesoError) throw mesoError;
       return jsonResult(
-        formatMuscleGroupVolume(mesocycle_id, data ?? [], meso?.weeks ?? null, projected),
+        formatMuscleGroupVolume(mesocycle_id, weighted, meso?.weeks ?? null, projected),
       );
     },
   );

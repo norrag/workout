@@ -218,7 +218,7 @@ function registerGetTrainingOverview(server: McpServer) {
             scales: scaleLegend("overall_fatigue", "rir"),
             samples: { active_meso_fatigue_sessions: activeSummary?.n_overall_fatigue ?? 0 },
             estimates: E1RM_ESTIMATE_NOTE,
-            note: "key_lift_trend change_pct is the within-active-mesocycle e1RM change. " + FEEDBACK_HISTORY_NOTE,
+            note: "key_lift_trend change_pct is the within-active-mesocycle e1RM change (deload sessions excluded from the trend). " + FEEDBACK_HISTORY_NOTE,
           },
         },
       );
@@ -591,7 +591,7 @@ export function formatMuscleBalance(
     weekly_sets_per_muscle: perMuscle,
     advisory: advisoryParts.join(" "),
     landmarks_legend: {
-      basis: `weekly direct-equivalent sets vs MEV/MAV/MRV, scaled for an ${experience} lifter`,
+      basis: `weekly direct-equivalent sets (fractional 1.0/0.5 counting, hard sets only — doc 10 §2) vs MEV/MAV/MRV, scaled for an ${experience} lifter`,
       mev: "minimum effective volume (productive floor)",
       mav: "maximum adaptive volume (top of the productive work zone)",
       mrv: "maximum recoverable volume (ceiling)",

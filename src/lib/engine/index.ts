@@ -65,10 +65,14 @@ export {
   muscleVolumeLandmark,
   classifyVolume,
   assessMuscleVolume,
+  volumeCountingWeights,
+  fractionalSetCount,
   type ExperienceLevel,
   type VolumeZone,
   type VolumeLandmark,
   type VolumeAssessment,
+  type VolumeCountingWeights,
+  type RoleSetCount,
 } from "./volume";
 export {
   pplCategory,
@@ -658,10 +662,8 @@ export function scoreProgress(
   return Math.round(((latestE1rm - earliestE1rm) / earliestE1rm) * 1000) / 10;
 }
 
-/** Epley estimated 1RM. */
-export function epleyE1rm(weight: number, reps: number): number {
-  return weight * (1 + reps / 30);
-}
+// (epleyE1rm removed with T-A1 — raw single-formula Epley is retired
+// everywhere; the engine's estimateE1rm/e1rm.ts is the one formula.)
 
 function clampSets(sets: number, params: EngineParams): number {
   return Math.min(params.max_sets_per_exercise, Math.max(params.min_sets, sets));

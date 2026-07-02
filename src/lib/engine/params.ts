@@ -507,6 +507,19 @@ export const engineParamsSchema = z.object({
         intermediate: z.number().positive(),
         advanced: z.number().positive(),
       }),
+      // §2 fractional counting weights (R14): a working set credits `direct`
+      // to each of the exercise's primary muscles and `indirect` to each
+      // secondary (`exercise_muscle_groups.role`). Optional with the v11–v17
+      // `.optional()` discipline so every stored row stays byte-replayable;
+      // absent ⇒ the doc-10 defaults 1.0 / 0.5 (see `volumeCountingWeights`).
+      // The §2 hard-set rule companions (`counting_max_rir` = 4,
+      // `warmups_count` = false) are enforced structurally in the shared
+      // volume view (`v_meso_week_muscle_sets` — warmups filtered, hard sets
+      // = rir_reported ≤ 4 or unreported) rather than carried here: a param
+      // the SQL cannot read would silently diverge from the numbers actually
+      // served. Changing those two means a view migration.
+      direct: z.number().positive().optional(),
+      indirect: z.number().min(0).optional(),
     })
     .default({
       landmarks: {

@@ -1,14 +1,80 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, VMesoWeekSetsRow } from "@/lib/types/database";
+import type { Database, VMesoWeekMuscleSetsRow } from "@/lib/types/database";
+import {
+  fractionalSetCount,
+  volumeCountingWeights,
+  type VolumeCountingWeights,
+} from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
 
 type Client = SupabaseClient<Database>;
 
 /**
+ * Weighted weekly set numbers per (week × muscle group) — the shape every
+ * volume surface consumes. Produced from the role-grain
+ * `v_meso_week_muscle_sets` facts by `weightWeekMuscleSets` (R14, doc 10 §2):
+ * planned/logged counts credit 1.0 per primary + 0.5 per secondary muscle
+ * link (weights from `engine_params.volume.direct/indirect`), and the logged
+ * side counts *hard* sets only (non-warmup, rir ≤ 4 or unreported — baked in
+ * the view). Field names/types deliberately mirror the legacy
+ * `v_meso_week_sets` row so the matrix/projection pipeline is unchanged.
+ */
+export interface WeightedWeekSets {
+  week_number: number;
+  is_deload: boolean;
+  muscle_group_id: string | null;
+  muscle_group: string | null;
+  planned_sets: number | null;
+  logged_sets: number;
+}
+
+/**
+ * Fold role-grain view rows into fractional per-(week, muscle) numbers.
+ * Pure: one definition of weekly volume shared by the stats matrix/balance,
+ * the MCP volume + balance tools, and the set projection.
+ */
+export function weightWeekMuscleSets(
+  rows: VMesoWeekMuscleSetsRow[],
+  weights: VolumeCountingWeights,
+): WeightedWeekSets[] {
+  const byCell = new Map<string, { row: WeightedWeekSets; planned: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[]; logged: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[] }>();
+  for (const r of rows) {
+    const key = `${r.week_number}:${r.muscle_group_id ?? r.muscle_group ?? "unassigned"}`;
+    let cell = byCell.get(key);
+    if (!cell) {
+      cell = {
+        row: {
+          week_number: r.week_number,
+          is_deload: r.is_deload,
+          muscle_group_id: r.muscle_group_id,
+          muscle_group: r.muscle_group,
+          planned_sets: null,
+          logged_sets: 0,
+        },
+        planned: [],
+        logged: [],
+      };
+      byCell.set(key, cell);
+    }
+    if (r.planned_sets != null)
+      cell.planned.push({ role: r.role, sets: r.planned_sets });
+    cell.logged.push({ role: r.role, sets: r.logged_hard_sets });
+  }
+  return [...byCell.values()].map((cell) => ({
+    ...cell.row,
+    planned_sets:
+      cell.planned.length > 0
+        ? fractionalSetCount(cell.planned, weights)
+        : null,
+    logged_sets: fractionalSetCount(cell.logged, weights),
+  }));
+}
+
+/**
  * Projected planned sets for an unmaterialized meso week × muscle group (PH34).
  *
  * Future weeks are materialized lazily — `workout_exercises` rows are only
- * created once the prior week's same day is completed — so `v_meso_week_sets`
+ * created once the prior week's same day is completed — so the weekly-set view
  * has no rows for them and the meso-stats "planned" figure used to fall back to
  * the static planner baseline (UI) or `null` (MCP), which disagree and ignore
  * autoregulation. The owner's ruling (2026-06-30) is to show the engine's own
@@ -34,7 +100,7 @@ export interface ProjectedCell {
 export interface BaselineSeed {
   muscle_group: string;
   muscle_group_id: string | null;
-  /** planner-board weekly sets for the group (sum of `initial_sets`). */
+  /** planner-board fractional weekly sets for the group (weighted `initial_sets`). */
   sets: number;
 }
 
@@ -46,11 +112,13 @@ export interface BaselineSeed {
  * already baked in its own feedback), falling back to the planner baseline when
  * a group has never materialized. Mirrors `prescribe()`'s set logic
  * (`engine/index.ts` carry-forward + `rules/deload.ts`) under neutral feedback.
+ * Counts are fractional since R14 — deload scaling rounds to 1 dp so half-set
+ * credits survive the scale.
  */
 export function projectWeekSets(args: {
   weeks: { week_number: number; is_deload: boolean }[];
   viewRows: Pick<
-    VMesoWeekSetsRow,
+    WeightedWeekSets,
     "week_number" | "muscle_group_id" | "muscle_group" | "planned_sets"
   >[];
   baseline: BaselineSeed[];
@@ -99,7 +167,10 @@ export function projectWeekSets(args: {
     let running = g.sets;
     for (const w of future) {
       if (w.is_deload) {
-        running = Math.max(minSets, Math.round(running * deloadSetPct));
+        running = Math.max(
+          minSets,
+          Math.round(running * deloadSetPct * 10) / 10,
+        );
       }
       cells.push({
         week_number: w.week_number,
@@ -114,13 +185,17 @@ export function projectWeekSets(args: {
 }
 
 /**
- * Planner-board weekly sets per muscle group (sum of `meso_exercises.initial_sets`
- * over the board), the seed of last resort for the projection. Shared by the
- * stats query and the MCP volume tool so both read one definition.
+ * Planner-board fractional weekly sets per muscle group, the seed of last
+ * resort for the projection. R14: each slot's `initial_sets` credit every
+ * muscle its exercise links, weighted primary/secondary; slots whose exercise
+ * has no links fall back to the planner group they sit in (direct weight).
+ * Shared by the stats query and the MCP volume tool so both read one
+ * definition.
  */
 export async function loadPlannerBaseline(
   supabase: Client,
   mesoId: string,
+  weights: VolumeCountingWeights,
 ): Promise<BaselineSeed[]> {
   const { data: days, error: dayError } = await supabase
     .from("meso_days")
@@ -145,43 +220,77 @@ export async function loadPlannerBaseline(
   if (fillError) throw fillError;
   if (mgError) throw mgError;
 
+  const { data: links, error: linkError } = await supabase
+    .from("exercise_muscle_groups")
+    .select("exercise_id, muscle_group_id, role")
+    .in("exercise_id", [
+      ...new Set((fills ?? []).map((f) => f.exercise_id)),
+    ]);
+  if (linkError) throw linkError;
+  const rolesByExercise = new Map<
+    string,
+    { muscle_group_id: string; role: "primary" | "secondary" }[]
+  >();
+  for (const l of links ?? []) {
+    const arr = rolesByExercise.get(l.exercise_id) ?? [];
+    arr.push({ muscle_group_id: l.muscle_group_id, role: l.role });
+    rolesByExercise.set(l.exercise_id, arr);
+  }
+
   const mgName = new Map((mgs ?? []).map((g) => [g.id, g.name]));
   const groupById = new Map((groups ?? []).map((g) => [g.id, g]));
   const byName = new Map<string, BaselineSeed>();
+  const credit = (
+    muscleGroupId: string,
+    amount: number,
+  ) => {
+    const name = mgName.get(muscleGroupId);
+    if (!name) return;
+    const cur = byName.get(name) ?? {
+      muscle_group: name,
+      muscle_group_id: muscleGroupId,
+      sets: 0,
+    };
+    cur.sets = Math.round((cur.sets + amount) * 100) / 100;
+    byName.set(name, cur);
+  };
   for (const fill of fills ?? []) {
     const group = fill.meso_day_group_id
       ? groupById.get(fill.meso_day_group_id)
       : null;
     if (!group) continue;
-    const name = mgName.get(group.muscle_group_id);
-    if (!name) continue;
-    const cur = byName.get(name) ?? {
-      muscle_group: name,
-      muscle_group_id: group.muscle_group_id,
-      sets: 0,
-    };
-    cur.sets += fill.initial_sets;
-    byName.set(name, cur);
+    const roles = rolesByExercise.get(fill.exercise_id);
+    if (roles && roles.length > 0) {
+      for (const r of roles) {
+        credit(
+          r.muscle_group_id,
+          fill.initial_sets *
+            (r.role === "primary" ? weights.direct : weights.indirect),
+        );
+      }
+    } else {
+      credit(group.muscle_group_id, fill.initial_sets * weights.direct);
+    }
   }
   return [...byName.values()];
 }
 
 /**
  * Full I/O assembler for the MCP volume tool: loads the meso's weeks, the
- * materialized view rows, the planner baseline, and active engine params, then
- * runs the pure projection. The stats query assembles the same inputs inline
- * (it already has most loaded) and calls `projectWeekSets` directly.
+ * role-grain view rows (weighted here), the planner baseline, and active engine
+ * params, then runs the pure projection. The stats query assembles the same
+ * inputs inline (it already has most loaded) and calls `projectWeekSets`
+ * directly.
  */
 export async function loadMesoSetProjection(
   supabase: Client,
   userId: string,
   mesoId: string,
-): Promise<ProjectedCell[]> {
+): Promise<{ projected: ProjectedCell[]; weighted: WeightedWeekSets[] }> {
   const [
     { data: meso, error: mesoError },
     { data: micros, error: microError },
     { data: viewRows, error: viewError },
-    baseline,
     { params },
   ] = await Promise.all([
     supabase
@@ -196,16 +305,19 @@ export async function loadMesoSetProjection(
       .eq("user_id", userId)
       .order("week_number"),
     supabase
-      .from("v_meso_week_sets")
-      .select("week_number, muscle_group_id, muscle_group, planned_sets")
+      .from("v_meso_week_muscle_sets")
+      .select("*")
       .eq("user_id", userId)
       .eq("mesocycle_id", mesoId),
-    loadPlannerBaseline(supabase, mesoId),
     getActiveEngineParams(supabase),
   ]);
   if (mesoError) throw mesoError;
   if (microError) throw microError;
   if (viewError) throw viewError;
+
+  const weights = volumeCountingWeights(params);
+  const weighted = weightWeekMuscleSets(viewRows ?? [], weights);
+  const baseline = await loadPlannerBaseline(supabase, mesoId, weights);
 
   // weeks: prefer the real microcycles; synthesize from the meso length when a
   // meso hasn't been started (no micros yet), so a planned-but-unstarted meso
@@ -218,11 +330,12 @@ export async function loadMesoSetProjection(
           is_deload: (meso?.includes_deload ?? false) && i === (meso?.weeks ?? 0) - 1,
         }));
 
-  return projectWeekSets({
+  const projected = projectWeekSets({
     weeks,
-    viewRows: viewRows ?? [],
+    viewRows: weighted,
     baseline,
     deloadSetPct: params.deload.set_pct,
     minSets: params.min_sets,
   });
+  return { projected, weighted };
 }

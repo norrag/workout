@@ -73,8 +73,11 @@ export const engineInputsSchema = z.object({
   actualSets: z.array(loggedSetInputSchema).default([]),
   exerciseFeedback: exerciseFeedbackInputSchema.nullable().default(null),
   workoutFeedback: workoutFeedbackInputSchema.nullable().default(null),
-  // current weekly working sets for the exercise's primary muscle group
-  muscleGroupWeeklySets: z.number().int().min(0).nullable().default(null),
+  // current weekly working sets for the exercise's assigned muscle group.
+  // Fractional since R14 (doc 10 §2): sets credit 1.0 per primary + 0.5 per
+  // secondary muscle link, so the ceiling gate sees direct-equivalent volume
+  // (pre-R14 decisions stored integers — still valid under this schema).
+  muscleGroupWeeklySets: z.number().min(0).nullable().default(null),
   // peak (heaviest) working prescription of the meso, for deload sizing
   weekPeak: prescriptionSchema.nullable().default(null),
   // recency-weighted strength anchor (e1RM + its confidence) for rep-window

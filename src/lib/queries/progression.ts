@@ -5,14 +5,17 @@ import {
   prescribe,
   resolveEffectiveParams,
   toEngineEquipment,
+  volumeCountingWeights,
   type EngineInputs,
   type EngineParams,
   type E1rmAnchor,
   type ExerciseParamOverride,
   type Prescription,
   type SummaryDelta,
+  type VolumeCountingWeights,
 } from "@/lib/engine";
 import { getExerciseE1rmAnchors } from "./logging";
+import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
   buildConfigInputs,
   computeDepFingerprint,
@@ -154,19 +157,46 @@ export function buildEngineInputs(args: {
   };
 }
 
-/** Planned weekly working sets per muscle group across a week's exercises. */
+/**
+ * Planned weekly working sets per muscle group (id-keyed) across a week's
+ * exercises — the engine's set-add ceiling input. Fractional since R14
+ * (doc 10 §2): each slot credits `direct` (default 1.0) to every muscle its
+ * exercise links as primary and `indirect` (default 0.5) to every secondary,
+ * so the `mg_set_ceiling` gate sees direct-equivalent volume. Exercises with
+ * no muscle links (or when no roles map is supplied — legacy callers/tests)
+ * fall back to crediting the slot's assigned group at the direct weight.
+ */
 export function weeklySetsByGroup(
   wes: WorkoutExerciseRow[],
+  rolesByExercise?: Map<
+    string,
+    { muscleGroupId: string; role: "primary" | "secondary" }[]
+  >,
+  weights: VolumeCountingWeights = { direct: 1.0, indirect: 0.5 },
 ): Map<string, number> {
   const out = new Map<string, number>();
+  const credit = (groupId: string, amount: number) =>
+    out.set(groupId, round2((out.get(groupId) ?? 0) + amount));
   for (const we of wes) {
-    if (!we.muscle_group_id || we.status === "skipped") continue;
-    out.set(
-      we.muscle_group_id,
-      (out.get(we.muscle_group_id) ?? 0) + (we.prescribed_sets ?? 0),
-    );
+    if (we.status === "skipped") continue;
+    const sets = we.prescribed_sets ?? 0;
+    const roles = rolesByExercise?.get(we.exercise_id);
+    if (roles && roles.length > 0) {
+      for (const r of roles) {
+        credit(
+          r.muscleGroupId,
+          sets * (r.role === "primary" ? weights.direct : weights.indirect),
+        );
+      }
+    } else if (we.muscle_group_id) {
+      credit(we.muscle_group_id, sets * weights.direct);
+    }
   }
   return out;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 /** Heaviest prescription of the meso so far, per exercise (deload sizing). */
@@ -694,6 +724,12 @@ export async function advanceWeekAfterWorkout(
     userId,
     exerciseIds,
   );
+  // R14: each exercise's muscle links (id + role) so the weekly-set ceiling
+  // input counts fractionally (1.0 primary / 0.5 secondary), not by-slot only
+  const rolesByExercise = await getMuscleRoleIdsForExercises(
+    service,
+    exerciseIds,
+  );
 
   const setsByWe = new Map<string, LoggedSetRow[]>();
   for (const s of sets ?? []) {
@@ -720,7 +756,11 @@ export async function advanceWeekAfterWorkout(
     workoutFeedbackByWorkout: new Map(
       (workoutFeedback ?? []).map((f) => [f.workout_id, f]),
     ),
-    mgWeeklySets: weeklySetsByGroup(weekWes),
+    mgWeeklySets: weeklySetsByGroup(
+      weekWes,
+      rolesByExercise,
+      volumeCountingWeights(params),
+    ),
     peaks: peakByExercise(mesoWes ?? [], micro.target_rir),
     anchorsByExercise,
     equipmentByExercise: new Map(
@@ -1106,6 +1146,11 @@ export async function projectNextPrescription(
     [exerciseId],
     params,
   );
+  // R14: fractional weekly-set ceiling input (mirrors generateDay)
+  const weekRoles = await getMuscleRoleIdsForExercises(
+    supabase,
+    weekWes.map((we) => we.exercise_id),
+  );
   const inputs = buildEngineInputs({
     we: sourceWe,
     sets: setsByWe.get(sourceWe.id) ?? [],
@@ -1121,7 +1166,11 @@ export async function projectNextPrescription(
     equipmentType: exercise.equipment_type,
     profile,
     muscleGroupWeeklySets: sourceWe.muscle_group_id
-      ? (weeklySetsByGroup(weekWes).get(sourceWe.muscle_group_id) ?? null)
+      ? (weeklySetsByGroup(
+          weekWes,
+          weekRoles,
+          volumeCountingWeights(params),
+        ).get(sourceWe.muscle_group_id) ?? null)
       : null,
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,

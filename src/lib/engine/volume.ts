@@ -13,6 +13,54 @@ export type ExperienceLevel = (typeof experienceLevels)[number];
 
 export type VolumeZone = "below_mev" | "optimal" | "high" | "above_mrv";
 
+// ---------------------------------------------------------------------------
+// §2 fractional volume counting (R14)
+// ---------------------------------------------------------------------------
+
+export interface VolumeCountingWeights {
+  /** credit per primary-muscle link (doc 10 §2 `volume.direct`, default 1.0) */
+  direct: number;
+  /** credit per secondary-muscle link (`volume.indirect`, default 0.5) */
+  indirect: number;
+}
+
+/**
+ * The counting weights from params, with the doc 10 §2 defaults applied when
+ * the (optional, v11+ discipline) keys are absent. Pure.
+ */
+export function volumeCountingWeights(
+  params: EngineParams,
+): VolumeCountingWeights {
+  return {
+    direct: params.volume.direct ?? 1.0,
+    indirect: params.volume.indirect ?? 0.5,
+  };
+}
+
+export interface RoleSetCount {
+  role: "primary" | "secondary";
+  sets: number;
+}
+
+/**
+ * Fold per-role set counts into one fractional direct-equivalent number
+ * (doc 10 §2): Σ sets × (primary ⇒ direct, secondary ⇒ indirect), rounded to
+ * 2 dp so tuned weights can't leak float noise into displayed cells. Pure —
+ * every weekly-sets surface (stats matrix/balance, MCP volume + balance tools,
+ * the engine's ceiling input) must count through this one definition.
+ */
+export function fractionalSetCount(
+  entries: readonly RoleSetCount[],
+  weights: VolumeCountingWeights,
+): number {
+  const raw = entries.reduce(
+    (n, e) =>
+      n + e.sets * (e.role === "primary" ? weights.direct : weights.indirect),
+    0,
+  );
+  return Math.round(raw * 100) / 100;
+}
+
 export interface VolumeLandmark {
   /** minimum effective volume — the productive floor */
   mev: number;

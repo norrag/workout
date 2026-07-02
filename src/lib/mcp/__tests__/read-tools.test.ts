@@ -4,9 +4,9 @@ import type {
   ProfileRow,
   TemplateRow,
   VMesoSummaryRow,
-  VMesoWeekSetsRow,
 } from "@/lib/types/database";
 import type { CyclesOverview, MesoPlan } from "@/lib/queries/cycles";
+import type { WeightedWeekSets } from "@/lib/queries/volume-projection";
 import type { MacroOverview } from "@/lib/queries/macro";
 import type { HistoryEntry } from "@/lib/queries/history";
 import type {
@@ -535,10 +535,8 @@ describe("formatExerciseHistory", () => {
 
 describe("formatMuscleGroupVolume", () => {
   it("groups by muscle and sorts weeks", () => {
-    const rows: VMesoWeekSetsRow[] = [
+    const rows: WeightedWeekSets[] = [
       {
-        user_id: "u1",
-        mesocycle_id: "m1",
         week_number: 2,
         is_deload: false,
         muscle_group_id: "g1",
@@ -547,8 +545,6 @@ describe("formatMuscleGroupVolume", () => {
         logged_sets: 11,
       },
       {
-        user_id: "u1",
-        mesocycle_id: "m1",
         week_number: 1,
         is_deload: false,
         muscle_group_id: "g1",
@@ -566,9 +562,7 @@ describe("formatMuscleGroupVolume", () => {
 
   it("labels weeks past generation as not_yet_generated, not zero (§5.10)", () => {
     // a 5-week meso where only weeks 1–3 of chest have been generated
-    const rows: VMesoWeekSetsRow[] = [1, 2, 3].map((week_number) => ({
-      user_id: "u1",
-      mesocycle_id: "m1",
+    const rows: WeightedWeekSets[] = [1, 2, 3].map((week_number) => ({
       week_number,
       is_deload: false,
       muscle_group_id: "g1",
@@ -589,9 +583,7 @@ describe("formatMuscleGroupVolume", () => {
 
   it("shows projected sets for unmaterialized weeks when a projection is given (PH34)", () => {
     // weeks 1–3 generated; the projection supplies the unmaterialized 4–5.
-    const rows: VMesoWeekSetsRow[] = [1, 2, 3].map((week_number) => ({
-      user_id: "u1",
-      mesocycle_id: "m1",
+    const rows: WeightedWeekSets[] = [1, 2, 3].map((week_number) => ({
       week_number,
       is_deload: false,
       muscle_group_id: "g1",

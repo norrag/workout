@@ -1,15 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { scoreProgress, pplCategory } from "@/lib/engine";
+import { scoreProgress, pplCategory, volumeCountingWeights } from "@/lib/engine";
 import type {
   Database,
   MesocycleRow,
-  VMesoWeekSetsRow,
 } from "@/lib/types/database";
 import { getActiveEngineParams } from "./generation";
 import {
   loadPlannerBaseline,
   projectWeekSets,
+  weightWeekMuscleSets,
   type ProjectedCell,
+  type WeightedWeekSets,
 } from "./volume-projection";
 
 type Client = SupabaseClient<Database>;
@@ -17,13 +18,16 @@ type Client = SupabaseClient<Database>;
 /**
  * Progress scoring v1 (07 Phase 4): per-exercise e1RM trend across a meso,
  * read from `v_exercise_history` so the UI and MCP report the same numbers.
+ * Deload sessions are excluded from the trend (T-A2, owner 2026-07-02): a
+ * deliberately light week is recovery, not regression — it must not depress
+ * the first→last score. Deloads still count toward volume and PR stats.
  */
 export interface ExerciseProgressScore {
   exercise_id: string;
   exercise_name: string;
   first_e1rm: number | null;
   last_e1rm: number | null;
-  /** percentage e1RM change first → last session of the meso */
+  /** percentage e1RM change first → last non-deload session of the meso */
   score_pct: number | null;
 }
 
@@ -32,13 +36,25 @@ export async function getMesoProgressScores(
   userId: string,
   mesoId: string,
 ): Promise<ExerciseProgressScore[]> {
-  const { data, error } = await supabase
-    .from("v_exercise_history")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("mesocycle_id", mesoId)
-    .order("performed_on");
+  const [{ data, error }, { data: micros, error: microError }] =
+    await Promise.all([
+      supabase
+        .from("v_exercise_history")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("mesocycle_id", mesoId)
+        .order("performed_on"),
+      supabase
+        .from("microcycles")
+        .select("id, is_deload")
+        .eq("mesocycle_id", mesoId)
+        .eq("user_id", userId),
+    ]);
   if (error) throw error;
+  if (microError) throw microError;
+  const deloadMicroIds = new Set(
+    (micros ?? []).filter((m) => m.is_deload).map((m) => m.id),
+  );
 
   const byExercise = new Map<
     string,
@@ -46,6 +62,7 @@ export async function getMesoProgressScores(
   >();
   for (const row of data ?? []) {
     if (row.e1rm == null) continue;
+    if (deloadMicroIds.has(row.microcycle_id)) continue;
     const cur = byExercise.get(row.exercise_id);
     if (!cur) {
       byExercise.set(row.exercise_id, {
@@ -69,7 +86,7 @@ export async function getMesoProgressScores(
 
 // ---------------------------------------------------------------------------
 // meso stats (figs 4.1–4.3) — volume / balance / performance, one definition
-// of progress: everything reads v_meso_week_sets, v_exercise_history and
+// of progress: everything reads v_meso_week_muscle_sets, v_exercise_history and
 // v_exercise_prs (07 conventions)
 // ---------------------------------------------------------------------------
 
@@ -160,11 +177,13 @@ export function balanceCategory(
  * week shows logged-so-far, generated future weeks show the materialized
  * autoregulated plan, and ungenerated future weeks (incl. deloads) show the
  * engine's set-count projection (PH34) — see `projectWeekSets`.
+ * Cells are fractional since R14 (doc 10 §2 1.0/0.5 counting; logged cells
+ * count hard sets only) — `weightWeekMuscleSets` produces the rows.
  */
 export function buildVolumeMatrix(
   weeks: MesoStatsWeek[],
   viewRows: Pick<
-    VMesoWeekSetsRow,
+    WeightedWeekSets,
     "week_number" | "muscle_group" | "planned_sets" | "logged_sets"
   >[],
   projected: ProjectedCell[],
@@ -210,7 +229,9 @@ export function buildVolumeMatrix(
     const vals = groups.map((g) => g.cells[i]);
     if (vals.every((c) => c.kind === "empty")) return { value: null, kind: "empty" };
     return {
-      value: vals.reduce((n, c) => n + (c.value ?? 0), 0),
+      // fractional cells: round the column sum to 1 dp so 0.5-credits can't
+      // accumulate float noise in the totals row
+      value: Math.round(vals.reduce((n, c) => n + (c.value ?? 0), 0) * 10) / 10,
       kind: vals[0]?.kind ?? "empty",
     };
   });
@@ -222,8 +243,10 @@ export function buildVolumeMatrix(
     const rows = viewRows.filter(
       (r) => r.week_number === weeks[activeIdx].week_number,
     );
-    currentLogged = rows.reduce((n, r) => n + r.logged_sets, 0);
-    currentPlanned = rows.reduce((n, r) => n + (r.planned_sets ?? 0), 0);
+    currentLogged =
+      Math.round(rows.reduce((n, r) => n + r.logged_sets, 0) * 10) / 10;
+    currentPlanned =
+      Math.round(rows.reduce((n, r) => n + (r.planned_sets ?? 0), 0) * 10) / 10;
   }
 
   return { groups, totals, currentLogged, currentPlanned };
@@ -234,9 +257,10 @@ function sumCells(cells: VolumeCell[]): number {
 }
 
 /**
- * Balance (4.2): average planned sets per non-deload week per group — the
+ * Balance (4.2): average fractional sets per non-deload week per group — the
  * push/pull/legs cards sum their groups; the note states the push:pull ratio
- * and the lowest-volume group.
+ * and the lowest-volume group. Averages keep 1 dp since R14 (half-set credits
+ * are real signal against MEV/MAV/MRV, not rounding noise).
  */
 export function buildBalance(volume: MesoVolume, weeks: MesoStatsWeek[]): MesoBalance {
   const idx = weeks
@@ -244,6 +268,7 @@ export function buildBalance(volume: MesoVolume, weeks: MesoStatsWeek[]): MesoBa
     .filter(({ w }) => !w.is_deload)
     .map(({ i }) => i);
 
+  const round1 = (n: number) => Math.round(n * 10) / 10;
   const bars = volume.groups
     .map((g) => {
       const vals = idx
@@ -252,7 +277,7 @@ export function buildBalance(volume: MesoVolume, weeks: MesoStatsWeek[]): MesoBa
         .map((c) => c.value as number);
       return {
         name: g.name,
-        avg: vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
+        avg: vals.length > 0 ? round1(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
       };
     })
     .sort((a, b) => b.avg - a.avg);
@@ -260,7 +285,7 @@ export function buildBalance(volume: MesoVolume, weeks: MesoStatsWeek[]): MesoBa
   const byCat = { push: 0, pull: 0, legs: 0 };
   for (const bar of bars) {
     const cat = balanceCategory(bar.name);
-    if (cat) byCat[cat] += bar.avg;
+    if (cat) byCat[cat] = round1(byCat[cat] + bar.avg);
   }
 
   const ratio = byCat.pull > 0 ? byCat.push / byCat.pull : null;
@@ -387,8 +412,9 @@ export async function getMesoStats(
 
   const [
     { data: micros, error: microError },
-    { data: weekSets, error: weekSetsError },
+    { data: weekMuscleSets, error: weekSetsError },
     { data: history, error: historyError },
+    { params },
   ] = await Promise.all([
     supabase
       .from("microcycles")
@@ -396,7 +422,7 @@ export async function getMesoStats(
       .eq("mesocycle_id", mesoId)
       .order("week_number"),
     supabase
-      .from("v_meso_week_sets")
+      .from("v_meso_week_muscle_sets")
       .select("*")
       .eq("user_id", userId)
       .eq("mesocycle_id", mesoId),
@@ -406,10 +432,17 @@ export async function getMesoStats(
       .eq("user_id", userId)
       .eq("mesocycle_id", mesoId)
       .order("performed_on"),
+    getActiveEngineParams(supabase),
   ]);
   if (microError) throw microError;
   if (weekSetsError) throw weekSetsError;
   if (historyError) throw historyError;
+
+  // R14: fold the role-grain facts into fractional per-(week, muscle) numbers
+  // (1.0 primary / 0.5 secondary; logged = hard sets) — one shared definition
+  // with the MCP volume/balance tools.
+  const weights = volumeCountingWeights(params);
+  const weekSets = weightWeekMuscleSets(weekMuscleSets ?? [], weights);
 
   const weeks: MesoStatsWeek[] =
     (micros ?? []).length > 0
@@ -429,19 +462,16 @@ export async function getMesoStats(
   // future-week set projection (PH34): carry the last materialized week's
   // autoregulated count forward (deload-scaled), seeded by the planner baseline
   // where a group hasn't materialized. Shared with the MCP volume tool.
-  const [baseline, { params }] = await Promise.all([
-    loadPlannerBaseline(supabase, mesoId),
-    getActiveEngineParams(supabase),
-  ]);
+  const baseline = await loadPlannerBaseline(supabase, mesoId, weights);
   const projected: ProjectedCell[] = projectWeekSets({
     weeks,
-    viewRows: weekSets ?? [],
+    viewRows: weekSets,
     baseline,
     deloadSetPct: params.deload.set_pct,
     minSets: params.min_sets,
   });
 
-  const volume = buildVolumeMatrix(weeks, weekSets ?? [], projected);
+  const volume = buildVolumeMatrix(weeks, weekSets, projected);
   const balance = buildBalance(volume, weeks);
 
   // performance — top set per exercise per week needs set-level reps
@@ -474,7 +504,9 @@ export async function getMesoStats(
       week_number: Number(key.split(":")[1]),
       weight: s.weight,
       reps: s.reps,
-      e1rm: s.weight * (1 + s.reps / 30),
+      // T-A1: the stored per-set engine e1RM, not raw Epley (null for
+      // bodyweight sets — ranks at 0, same as raw Epley's weight×… did)
+      e1rm: s.e1rm ?? 0,
     });
   }
   const keyLifts = buildKeyLifts(topSets, weeks, currentWeek);
@@ -561,7 +593,10 @@ export async function getMesoStats(
       const cur = priorBest.get(row.exercise_id);
       priorBest.set(row.exercise_id, {
         weight: Math.max(cur?.weight ?? 0, row.top_weight ?? 0),
-        e1rm: Math.max(cur?.e1rm ?? 0, row.e1rm ?? 0),
+        // T-A1: compare set-grain engine numbers — the session's best per-set
+        // e1RM, not the session average (which understated the prior bar and
+        // inflated REP PR detection)
+        e1rm: Math.max(cur?.e1rm ?? 0, row.best_set_e1rm ?? 0),
       });
     }
   }
@@ -587,7 +622,8 @@ export async function getMesoStats(
         weight: best.weight,
         reps: best.reps,
         coordinate: `W${microWeek.get(best.microcycle_id) ?? "?"}·D${workoutDay.get(best.workout_id) ?? "?"}`,
-        e1rm: best.weight * (1 + best.reps / 30),
+        // T-A1: stored per-set engine e1RM (0 when null, e.g. bodyweight)
+        e1rm: best.e1rm ?? 0,
       };
     })
     .filter((b): b is NonNullable<typeof b> => b !== null);

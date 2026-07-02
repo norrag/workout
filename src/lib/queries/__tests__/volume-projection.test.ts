@@ -6,7 +6,12 @@
  * carry-forward set logic under neutral feedback (no future-week feedback).
  */
 import { describe, expect, it } from "vitest";
-import { projectWeekSets, type BaselineSeed } from "../volume-projection";
+import {
+  projectWeekSets,
+  weightWeekMuscleSets,
+  type BaselineSeed,
+} from "../volume-projection";
+import type { VMesoWeekMuscleSetsRow } from "@/lib/types/database";
 
 const weeks = [
   { week_number: 1, is_deload: false },
@@ -22,6 +27,84 @@ function row(
 ) {
   return { week_number, muscle_group, muscle_group_id: muscle_group, planned_sets };
 }
+
+function roleRow(
+  overrides: Partial<VMesoWeekMuscleSetsRow>,
+): VMesoWeekMuscleSetsRow {
+  return {
+    user_id: "u1",
+    mesocycle_id: "m1",
+    week_number: 1,
+    is_deload: false,
+    muscle_group_id: "chest",
+    muscle_group: "chest",
+    role: "primary",
+    planned_sets: null,
+    logged_sets: 0,
+    logged_hard_sets: 0,
+    ...overrides,
+  };
+}
+
+describe("weightWeekMuscleSets (R14, doc 10 §2 fractional counting)", () => {
+  const W = { direct: 1.0, indirect: 0.5 };
+
+  it("weights primary 1.0 and secondary 0.5 into one row per (week, muscle)", () => {
+    const out = weightWeekMuscleSets(
+      [
+        roleRow({ role: "primary", planned_sets: 8, logged_hard_sets: 6 }),
+        roleRow({ role: "secondary", planned_sets: 4, logged_hard_sets: 4 }),
+      ],
+      W,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      week_number: 1,
+      muscle_group: "chest",
+      planned_sets: 10, // 8 + 4×0.5
+      logged_sets: 8, // 6 + 4×0.5
+    });
+  });
+
+  it("logged counts read logged_hard_sets (the §2 RIR≤4 rule), not all sets", () => {
+    const out = weightWeekMuscleSets(
+      [roleRow({ role: "primary", logged_sets: 5, logged_hard_sets: 3 })],
+      W,
+    );
+    expect(out[0].logged_sets).toBe(3);
+  });
+
+  it("keeps planned null when no contributing row has a planned count", () => {
+    const out = weightWeekMuscleSets(
+      [roleRow({ role: "primary", planned_sets: null, logged_hard_sets: 2 })],
+      W,
+    );
+    expect(out[0].planned_sets).toBeNull();
+    expect(out[0].logged_sets).toBe(2);
+  });
+
+  it("separates weeks and muscles; carries is_deload through", () => {
+    const out = weightWeekMuscleSets(
+      [
+        roleRow({ week_number: 1, planned_sets: 6 }),
+        roleRow({
+          week_number: 2,
+          is_deload: true,
+          muscle_group: "back",
+          muscle_group_id: "back",
+          planned_sets: 4,
+        }),
+      ],
+      W,
+    );
+    expect(out).toHaveLength(2);
+    expect(out.find((r) => r.muscle_group === "back")).toMatchObject({
+      week_number: 2,
+      is_deload: true,
+      planned_sets: 4,
+    });
+  });
+});
 
 describe("projectWeekSets", () => {
   it("carries the last materialized week's count forward across working weeks", () => {
@@ -46,7 +129,8 @@ describe("projectWeekSets", () => {
       minSets: 2,
     });
     const w4 = out.find((c) => c.week_number === 4 && c.muscle_group === "quads");
-    expect(w4).toMatchObject({ projected_sets: 3, is_deload: true }); // round(5 × 0.5) = 3
+    // R14: fractional counts survive deload scaling (1 dp) — 5 × 0.5 = 2.5
+    expect(w4).toMatchObject({ projected_sets: 2.5, is_deload: true });
   });
 
   it("floors the deload count at min_sets", () => {

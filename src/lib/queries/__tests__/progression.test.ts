@@ -100,7 +100,7 @@ describe("engineGoal", () => {
 });
 
 describe("weeklySetsByGroup", () => {
-  it("sums prescribed sets per muscle group, ignoring skipped exercises", () => {
+  it("sums prescribed sets per muscle group, ignoring skipped exercises (no roles → slot fallback)", () => {
     const sets = weeklySetsByGroup([
       we({ id: "a", prescribed_sets: 3 }),
       we({ id: "b", workout_id: "w-2", prescribed_sets: 4 }),
@@ -110,6 +110,57 @@ describe("weeklySetsByGroup", () => {
     ]);
     expect(sets.get("mg-1")).toBe(7);
     expect(sets.get("mg-2")).toBe(5);
+  });
+
+  it("counts fractionally via exercise muscle roles (R14, doc 10 §2)", () => {
+    // ex-1 = bench-like: chest primary, delts + triceps secondary;
+    // ex-2 = pushdown-like: triceps primary
+    const roles = new Map<
+      string,
+      { muscleGroupId: string; role: "primary" | "secondary" }[]
+    >([
+      [
+        "ex-1",
+        [
+          { muscleGroupId: "chest", role: "primary" },
+          { muscleGroupId: "delts", role: "secondary" },
+          { muscleGroupId: "triceps", role: "secondary" },
+        ],
+      ],
+      ["ex-2", [{ muscleGroupId: "triceps", role: "primary" }]],
+    ]);
+    const sets = weeklySetsByGroup(
+      [
+        we({ id: "a", exercise_id: "ex-1", prescribed_sets: 4 }),
+        we({ id: "b", exercise_id: "ex-2", muscle_group_id: "triceps", prescribed_sets: 3 }),
+      ],
+      roles,
+      { direct: 1.0, indirect: 0.5 },
+    );
+    expect(sets.get("chest")).toBe(4); // 4 × 1.0
+    expect(sets.get("delts")).toBe(2); // 4 × 0.5
+    expect(sets.get("triceps")).toBe(5); // 4 × 0.5 + 3 × 1.0
+  });
+
+  it("falls back to the slot's group (direct weight) for an exercise with no links", () => {
+    const sets = weeklySetsByGroup(
+      [we({ id: "a", exercise_id: "ex-unlinked", prescribed_sets: 3 })],
+      new Map(),
+      { direct: 1.0, indirect: 0.5 },
+    );
+    expect(sets.get("mg-1")).toBe(3);
+  });
+
+  it("skipped slots contribute nothing even with roles", () => {
+    const roles = new Map<
+      string,
+      { muscleGroupId: string; role: "primary" | "secondary" }[]
+    >([["ex-1", [{ muscleGroupId: "chest", role: "primary" }]]]);
+    const sets = weeklySetsByGroup(
+      [we({ id: "a", exercise_id: "ex-1", prescribed_sets: 4, status: "skipped" })],
+      roles,
+    );
+    expect(sets.size).toBe(0);
   });
 });
 
