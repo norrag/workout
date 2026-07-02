@@ -4,6 +4,55 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 35 (cont. 2): R5 + R7 — completion-lock hardening + SW cache trim (PR #116)
+
+Continued per the attack order on the restarted branch — **R5 + R7** (both MED,
+WS-K), **PR #116**. Full record in PROGRESS 2026-07-02 (latest). Migration
+`20260702000006` applied live + verified.
+
+- **R5 — done.** Migration `20260702000006_completion_lock_hardening`: the
+  completion lock now covers the whole session surface, and child INSERTs
+  verify parent ownership (FK checks bypass RLS). Workouts: update only while
+  planned/in_progress (no completed→in_progress resurrection, no notes
+  rewrites), insert only 'planned' into an owned micro, delete only planned
+  rows with no logged sets (hard rule #5 at the DB layer). workout_exercises
+  (the engine's `previous` + the volume counts): insert/update/delete gated on
+  an open parent, delete also requires an empty slot. logged_sets INSERT gated
+  open-parent + slot-belongs-to-workout. workout_feedback: bare FOR ALL →
+  full open-parent lock (dampener no longer editable after the engine consumed
+  it). exercise_feedback: INSERT + UPDATE WITH CHECK gain the owned-open
+  parent EXISTS — the **feedback-slot squat** (unique `workout_exercise_id`
+  squatted by a stranger, permanently blocking the victim's feedback) is
+  closed. microcycles: no reopening completed weeks, insert into owned meso
+  only, delete only history-free weeks. **Authed write-path inventory first**
+  (agent sweep of queries/actions/MCP): completion writes land BEFORE the
+  status flip, startMeso/regenerate touch only planned+history-free rows, no
+  path leaves completed/skipped — nothing legitimate is blocked.
+- **R7 — done.** `sw.ts` drops Serwist's `defaultCache` (NetworkFirst-cached
+  documents/RSC/`/api/` for ~24h) for static-asset-only caching; anything
+  else is NetworkOnly. Offline navigations now get a precached ledger
+  `/~offline` interstitial (new route, public path, `additionalPrecacheEntries`)
+  instead of silently stale prescriptions — online-only per hard rule #9.
+  Auth screens mount `ClearClientCaches`: purge every non-precache
+  CacheStorage cache (kills pages cached by previous SW versions on shared
+  devices) + drop the `lastWorkoutId` session pointer.
+- **Verification:** scratch-PG16 chain green (68 policies); **29 policy
+  probes** (12 expected 42501 rejections, all legitimate flows pass — incl.
+  the logSet upsert and the pre-flip completion sequence); **9 new RLS suite
+  tests** (describe "completion-lock hardening (R5)") for CI; typecheck, lint,
+  unit suite, production build green; built `sw.js` inspected (no document
+  caching, fallback wired).
+
+## 2026-07-02 — Session 35 (cont.): PR #115 merged + archival sweep
+
+- **PR #115 MERGED** (all checks green — `rls-tests` rebuilt the chain with the
+  transcribed file). Archival sweep ran: **T-R2 swept to `archive.md`**
+  ("Swept 2026-07-02 (late)"), follow-up table trimmed; branch restarted from
+  the merged main. Sweep rides with the next build PR (session-start
+  reconciliation pattern).
+- Continuing in-session with the next items per the attack order: **R5 + R7**
+  (MED, WS-K).
+
 ## 2026-07-02 — Session 35: T-R2 — hosted perf migration transcribed into the chain (PR #115)
 
 Reconciliation sweep: no-op (PR #113 was itself the R20 sweep; no `done` rows

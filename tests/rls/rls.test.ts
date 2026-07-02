@@ -405,6 +405,314 @@ describe("logged history (completion lock)", () => {
   });
 });
 
+describe("completion-lock hardening (R5)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  /** Full meso→micro→workout→exercise chain for alice (service role). */
+  async function buildChain(
+    workoutStatus: "planned" | "in_progress" | "completed",
+  ) {
+    const { data: meso, error } = await service
+      .from("mesocycles")
+      .insert({
+        macrocycle_id: aliceMacroId,
+        user_id: aliceId,
+        name: "r5",
+        weeks: 4,
+        days_per_week: 2,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    const { data: micro } = await service
+      .from("microcycles")
+      .insert({
+        mesocycle_id: meso!.id,
+        user_id: aliceId,
+        week_number: 1,
+        target_rir: 3,
+      })
+      .select()
+      .single();
+    const { data: workout } = await service
+      .from("workouts")
+      .insert({
+        microcycle_id: micro!.id,
+        user_id: aliceId,
+        day_number: 1,
+        status: workoutStatus,
+      })
+      .select()
+      .single();
+    const { data: stock } = await service
+      .from("exercises")
+      .select("id")
+      .is("user_id", null)
+      .limit(1)
+      .single();
+    const { data: we } = await service
+      .from("workout_exercises")
+      .insert({ workout_id: workout!.id, exercise_id: stock!.id, position: 1 })
+      .select()
+      .single();
+    return {
+      mesoId: meso!.id as string,
+      microId: micro!.id as string,
+      workoutId: workout!.id as string,
+      weId: we!.id as string,
+      stockId: stock!.id as string,
+    };
+  }
+
+  it("a completed workout cannot be reopened or annotated", async () => {
+    const { workoutId } = await buildChain("completed");
+
+    // both updates are filtered by USING → silent 0-row no-ops
+    await alice
+      .from("workouts")
+      .update({ status: "in_progress" })
+      .eq("id", workoutId);
+    await alice.from("workouts").update({ notes: "rewrite" }).eq("id", workoutId);
+
+    const { data: after } = await alice
+      .from("workouts")
+      .select("status, notes")
+      .eq("id", workoutId)
+      .single();
+    expect(after?.status).toBe("completed");
+    expect(after?.notes).toBeNull();
+  });
+
+  it("completing an in_progress workout still works", async () => {
+    const { workoutId } = await buildChain("in_progress");
+    const { error } = await alice
+      .from("workouts")
+      .update({ status: "completed", performed_at: new Date().toISOString() })
+      .eq("id", workoutId);
+    expect(error).toBeNull();
+    const { data } = await alice
+      .from("workouts")
+      .select("status")
+      .eq("id", workoutId)
+      .single();
+    expect(data?.status).toBe("completed");
+  });
+
+  it("workout inserts must target an owned microcycle and enter as planned", async () => {
+    const { microId } = await buildChain("planned");
+
+    // fabricated completed history is rejected
+    const { error: fabricated } = await alice.from("workouts").insert({
+      microcycle_id: microId,
+      user_id: aliceId,
+      day_number: 5,
+      status: "completed",
+    });
+    expect(fabricated?.code).toBe("42501");
+
+    // bob cannot insert into alice's week even claiming his own user_id
+    const { error: foreign } = await bob.from("workouts").insert({
+      microcycle_id: microId,
+      user_id: bobId,
+      day_number: 6,
+      status: "planned",
+    });
+    expect(foreign?.code).toBe("42501");
+
+    // alice's own planned insert passes
+    const { error: ok } = await alice.from("workouts").insert({
+      microcycle_id: microId,
+      user_id: aliceId,
+      day_number: 7,
+      status: "planned",
+    });
+    expect(ok).toBeNull();
+  });
+
+  it("prescriptions on a completed workout are locked; planned days stay editable", async () => {
+    const done = await buildChain("completed");
+    const open = await buildChain("planned");
+
+    await alice
+      .from("workout_exercises")
+      .update({ prescribed_weight: 999 })
+      .eq("id", done.weId);
+    const { data: locked } = await alice
+      .from("workout_exercises")
+      .select("prescribed_weight")
+      .eq("id", done.weId)
+      .single();
+    expect(locked?.prescribed_weight).toBeNull();
+
+    const { error: editable } = await alice
+      .from("workout_exercises")
+      .update({ prescribed_weight: 42 })
+      .eq("id", open.weId);
+    expect(editable).toBeNull();
+  });
+
+  it("no new sets or exercise slots can enter a completed workout", async () => {
+    const { workoutId, weId, stockId, mesoId, microId } =
+      await buildChain("completed");
+
+    const { error: slot } = await alice.from("workout_exercises").insert({
+      workout_id: workoutId,
+      exercise_id: stockId,
+      position: 2,
+    });
+    expect(slot?.code).toBe("42501");
+
+    const { error: set } = await alice.from("logged_sets").insert({
+      workout_exercise_id: weId,
+      user_id: aliceId,
+      exercise_id: stockId,
+      macrocycle_id: aliceMacroId,
+      mesocycle_id: mesoId,
+      microcycle_id: microId,
+      workout_id: workoutId,
+      set_number: 1,
+      weight: 100,
+      reps: 8,
+    });
+    expect(set?.code).toBe("42501");
+  });
+
+  it("a logged set's exercise slot must belong to the same workout", async () => {
+    const a = await buildChain("in_progress");
+    const b = await buildChain("in_progress");
+
+    const { error } = await alice.from("logged_sets").insert({
+      workout_exercise_id: b.weId, // slot from another workout
+      user_id: aliceId,
+      exercise_id: a.stockId,
+      macrocycle_id: aliceMacroId,
+      mesocycle_id: a.mesoId,
+      microcycle_id: a.microId,
+      workout_id: a.workoutId,
+      set_number: 1,
+      weight: 100,
+      reps: 8,
+    });
+    expect(error?.code).toBe("42501");
+  });
+
+  it("session feedback locks when the workout completes", async () => {
+    const { workoutId, weId } = await buildChain("in_progress");
+
+    // feedback lands while the session is open (the app saves pre-flip)
+    const { error: wf } = await alice.from("workout_feedback").insert({
+      workout_id: workoutId,
+      user_id: aliceId,
+      overall_fatigue: 5,
+    });
+    expect(wf).toBeNull();
+    const { error: ef } = await alice.from("exercise_feedback").insert({
+      workout_exercise_id: weId,
+      user_id: aliceId,
+      pump: 2,
+    });
+    expect(ef).toBeNull();
+
+    await service
+      .from("workouts")
+      .update({ status: "completed" })
+      .eq("id", workoutId);
+
+    // the dampener is no longer editable or deletable
+    await alice
+      .from("workout_feedback")
+      .update({ overall_fatigue: 0 })
+      .eq("workout_id", workoutId);
+    await alice.from("workout_feedback").delete().eq("workout_id", workoutId);
+    const { data: kept } = await alice
+      .from("workout_feedback")
+      .select("overall_fatigue")
+      .eq("workout_id", workoutId)
+      .single();
+    expect(kept?.overall_fatigue).toBe(5);
+
+    // and late feedback on the completed session is rejected outright
+    const { error: late } = await alice.from("exercise_feedback").insert({
+      workout_exercise_id: weId,
+      user_id: aliceId,
+      pump: 0,
+    });
+    expect(late?.code).toBe("42501");
+  });
+
+  it("a stranger cannot squat a feedback slot", async () => {
+    const { workoutId, weId } = await buildChain("in_progress");
+
+    // exercise_feedback is UNIQUE (workout_exercise_id): before R5, bob could
+    // insert a row keyed to alice's slot and permanently block her feedback
+    const { error: efSquat } = await bob.from("exercise_feedback").insert({
+      workout_exercise_id: weId,
+      user_id: bobId,
+      pump: 2,
+    });
+    expect(efSquat?.code).toBe("42501");
+
+    const { error: wfSquat } = await bob.from("workout_feedback").insert({
+      workout_id: workoutId,
+      user_id: bobId,
+      overall_fatigue: 1,
+    });
+    expect(wfSquat?.code).toBe("42501");
+
+    // alice's own feedback still lands
+    const { error: own } = await alice.from("exercise_feedback").insert({
+      workout_exercise_id: weId,
+      user_id: aliceId,
+      pump: 2,
+    });
+    expect(own).toBeNull();
+  });
+
+  it("a completed week cannot be reopened; a logged week cannot be deleted", async () => {
+    const { mesoId, microId, workoutId, weId, stockId } =
+      await buildChain("in_progress");
+    await service.from("logged_sets").insert({
+      workout_exercise_id: weId,
+      user_id: aliceId,
+      exercise_id: stockId,
+      macrocycle_id: aliceMacroId,
+      mesocycle_id: mesoId,
+      microcycle_id: microId,
+      workout_id: workoutId,
+      set_number: 1,
+      weight: 100,
+      reps: 8,
+    });
+    await service
+      .from("microcycles")
+      .update({ status: "completed" })
+      .eq("id", microId);
+
+    await alice
+      .from("microcycles")
+      .update({ status: "active" })
+      .eq("id", microId);
+    await alice.from("microcycles").delete().eq("id", microId);
+    const { data: micro } = await alice
+      .from("microcycles")
+      .select("status")
+      .eq("id", microId)
+      .single();
+    expect(micro?.status).toBe("completed");
+
+    // and bob cannot add weeks to alice's meso
+    const { error: foreign } = await bob.from("microcycles").insert({
+      mesocycle_id: mesoId,
+      user_id: bobId,
+      week_number: 9,
+      target_rir: 3,
+    });
+    expect(foreign?.code).toBe("42501");
+  });
+});
+
 describe("design-pivot tables (0002)", () => {
   it("exclusions and pinned notes are owner-only", async () => {
     const { data: stock } = await alice

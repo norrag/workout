@@ -2,7 +2,89 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — T-R2: hosted perf migration `20260620115322` transcribed into the chain
+## 2026-07-02 (latest) — R5 + R7: completion-lock hardening + service-worker cache trim
+
+The next two items in the repo review's attack order (both MED, workstream K —
+integrity & security hardening). Migration `20260702000006` **applied live +
+verified**; advisors show no new lints.
+
+### R5 — the completion lock now covers the whole session surface
+
+`20260702000005` closed the app-side write-integrity holes; this closes the
+**RLS-side** ones (docs/reviews/2026-07-01-repo-review.md §R5). Until now the
+lock covered only logged_sets/exercise_feedback update+delete: a client could
+flip a completed workout back to in_progress (re-opening every locked set),
+rewrite `prescribed_*`/`set_weights`/`status` on completed workouts (exactly
+what the engine reads as `previous` and what the volume views count), edit the
+`workout_feedback` dampener after the engine consumed it, insert new sets into
+completed workouts, and — because FK checks bypass RLS — squat a victim's
+`exercise_feedback` slot (UNIQUE `workout_exercise_id`) knowing only a uuid.
+
+- **Migration `20260702000006_completion_lock_hardening.sql`** (initplan-
+  wrapped quals): workouts update only while planned/in_progress + insert only
+  'planned' into an owned microcycle + delete only planned-and-history-free
+  (hard rule #5 at the DB layer); workout_exercises insert/update/delete gated
+  on an owned open parent (delete also requires an empty slot); logged_sets
+  INSERT gated open-parent + slot-must-belong-to-workout; workout_feedback
+  bare FOR ALL → full open-parent lock; exercise_feedback INSERT/UPDATE WITH
+  CHECK gain the owned-open-parent EXISTS (squat + re-pointing closed; UPDATE
+  USING widened to planned|in_progress to match); microcycles no reopening
+  completed weeks / insert into owned meso only / delete history-free only.
+- **Audit before design:** every authed write path was inventoried
+  (queries/actions/MCP, client traced to its creation). The load-bearing
+  facts: completion writes (workout_exercises status batch, workout_feedback
+  save) land **before** the workout flips — `completeWorkoutAction` even
+  documents the expectation; startMeso/regenerateOpenWorkouts touch only
+  planned, history-free rows; the week-advance/generation/reconcile paths run
+  on the service role (bypass, unaffected); **no app path transitions a
+  workout out of completed/skipped**. Nothing legitimate is blocked.
+- **Not RLS-expressible transitions** (e.g. in_progress→skipped vs →completed
+  matrices) were deliberately not modeled with triggers — the USING gate
+  (source must be open) + WITH CHECK (owner) is the whole invariant the app
+  relies on.
+
+### R7 — service worker: static assets only, offline interstitial, sign-out purge
+
+`sw.ts` used Serwist's `defaultCache` verbatim, which NetworkFirst-cached
+same-origin **documents, RSC payloads, and `/api/` GETs for ~24h**: a dropped
+connection silently served day-old prescriptions (the app is online-only —
+hard rule #9), and a shared device kept the previous user's rendered pages in
+CacheStorage after sign-out.
+
+- **`sw.ts`**: runtime caching now = hashed `/_next/static` (CacheFirst 30d) +
+  same-origin static images (SWR 30d — icons, splash) + an explicit
+  NetworkOnly catch-all. Verified in the built `public/sw.js`: zero
+  `NetworkFirst` handlers, no `pages`/`pages-rsc`/`apis` caches.
+- **`/~offline`** (new static route, ledger card, middleware public path,
+  precached via `additionalPrecacheEntries`): offline navigations get an
+  honest interstitial + RETRY instead of stale content, via Serwist
+  `fallbacks` on the document destination.
+- **`ClearClientCaches`** (mounted in the `(auth)` layout): every auth-screen
+  mount — sign-out lands there, so do expired sessions and a shared device's
+  next user — deletes all non-precache CacheStorage caches (kills pages cached
+  by previous SW versions) and drops the `lastWorkoutId` session pointer. The
+  precache is spared (build assets + the offline fallback only).
+
+### Verified
+
+- Scratch-PG16 chain from zero: green with the new migration (68 policies).
+  **29 policy probes** under simulated JWTs: 12 expected 42501 rejections
+  (resurrection, fabricated history, foreign-parent inserts, slot squat,
+  re-pointing, completed-workout inserts) and every legitimate flow passing —
+  completion sequence in app order, planned-day edits, the logSet upsert
+  (insert + ON CONFLICT update), pre-flip feedback.
+- **9 new RLS suite tests** (`describe("completion-lock hardening (R5)")`) so
+  CI enforces the behaviors; existing suite unaffected (its authed writes to
+  these tables sit in the unchanged logged_sets update/delete policies).
+- **Hosted:** migration applied via MCP; live per-table policy state
+  hash-identical to the verified scratch chain (24 policies, same md5); live
+  0-row probe — a simulated owner session cannot resurrect their latest
+  completed workout but still reads it; security advisors unchanged (only the
+  three known, intentional WARNs).
+- `npm run typecheck`, `npm run lint`, `npm run test` (713), production build
+  green; `/~offline` prerenders static (605 B, 105 kB first load).
+
+## 2026-07-02 — T-R2: hosted perf migration `20260620115322` transcribed into the chain
 
 The last known hosted↔repo drift (found by R2's full end-state diff, filed as
 T-R2): the out-of-band hosted migration `20260620115322

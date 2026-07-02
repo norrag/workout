@@ -13,6 +13,12 @@ const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
+  // R7: the offline interstitial must be in the precache for sw.ts's document
+  // fallback to serve it. A fresh revision each build re-fetches it (its HTML
+  // references build-hashed assets).
+  additionalPrecacheEntries: [
+    { url: "/~offline", revision: crypto.randomUUID() },
+  ],
 });
 
 // Security headers applied to every response (07 Phase 7 — security pass).
