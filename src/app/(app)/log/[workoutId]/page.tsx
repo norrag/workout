@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkoutDetail } from "@/lib/queries/logging";
@@ -43,14 +42,10 @@ export default async function LogWorkoutPage({
     if (!detail) notFound();
   }
 
+  // P17 (owner 2026-07-02, option 2): no back button here — the day navigator
+  // lives inside the Workout tab, so selecting a day isn't a "page" change.
   return (
     <div>
-      <Link
-        href="/workout"
-        className="mb-3 block text-[10px] font-medium tracking-[0.12em] text-ink/55"
-      >
-        ‹ WORKOUT
-      </Link>
       <DayView detail={detail} params={engineParams} />
     </div>
   );

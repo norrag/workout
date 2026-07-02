@@ -359,13 +359,14 @@ describe("formatMesoSummary", () => {
         first_e1rm: 300,
         last_e1rm: 315,
         score_pct: 5,
+        sessions: 4,
       },
     ]);
     expect(out.adherence_pct).toBe(Math.round((15 / 16) * 100));
     expect(out.best_e1rm_estimate).toBe(315);
     expect(out.working_reps).toBe(2400);
     const scores = out.progress_scores as Record<string, unknown>[];
-    expect(scores[0]).toMatchObject({ e1rm_change_pct: 5 });
+    expect(scores[0]).toMatchObject({ e1rm_change_pct: 5, sessions: 4 });
   });
 
   it("exposes both adherence denominators (due vs full block)", () => {
@@ -405,6 +406,7 @@ describe("formatMesoSummary", () => {
           first_e1rm: 33.33333333,
           last_e1rm: 27.0,
           score_pct: -15.9, // raw-float pct that disagrees with the displayed values
+          sessions: 3,
         },
       ],
     );

@@ -1,5 +1,6 @@
 import { formatWeight } from "@/lib/units";
 import type { MesoStats } from "@/lib/queries/stats";
+import { StrengthProgressSection } from "./StrengthProgress";
 
 // Shared renderers for the meso-stats views (figs 4.1–4.3) — used by the
 // stats screen and the Workout-tab resting state (08 §2).
@@ -119,8 +120,9 @@ export function VolumeView({ stats }: { stats: MesoStats }) {
 // 4.2 — balance: push/pull/legs cards, per-muscle bars, balance check
 // ---------------------------------------------------------------------------
 
-export function BalanceView({ stats }: { stats: MesoStats }) {
-  const { balance } = stats;
+// Takes the balance block directly (not the whole MesoStats) so the macro
+// stats screen (M8) can render the same view at macrocycle scope.
+export function BalanceView({ balance }: { balance: MesoStats["balance"] }) {
   const max = Math.max(1, ...balance.bars.map((b) => b.avg));
   const cards = [
     { label: "PUSH", value: balance.push },
@@ -303,6 +305,12 @@ export function PerformanceView({ stats }: { stats: MesoStats }) {
           </div>
         </div>
       )}
+
+      {/* I11 + PH37: per-exercise est-strength trend + muscle-group rollup */}
+      <StrengthProgressSection
+        strength={performance.strength}
+        scopeLabel="THIS MESO"
+      />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         <div className="pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">

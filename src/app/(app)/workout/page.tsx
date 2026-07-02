@@ -123,7 +123,7 @@ export default async function WorkoutPage() {
               LAST MESO — {restingSummary.name.toUpperCase()}
             </div>
             <Link
-              href={`/cycles/meso/${restingSummary.mesocycle_id}/stats`}
+              href={`/cycles/meso/${restingSummary.mesocycle_id}?view=balance`}
               className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
             >
               ALL STATS ›

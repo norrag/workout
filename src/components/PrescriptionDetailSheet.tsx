@@ -5,6 +5,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { PrescriptionAudit } from "@/lib/queries/audit";
 import { getPrescriptionAuditAction } from "@/app/(app)/log/actions";
 import { formatPrescription } from "@/lib/units";
+import { shortDate } from "@/lib/dates";
 
 export interface PrescriptionDetailTarget {
   workoutExerciseId: string;
@@ -181,8 +182,3 @@ export function PrescriptionDetailSheet({
   );
 }
 
-/** Compact local date (mirrors the day-view shortDate style). */
-function shortDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}

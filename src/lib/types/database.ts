@@ -306,6 +306,9 @@ export type LoggedSetRow = {
   microcycle_id: string;
   workout_id: string;
   performed_at: string;
+  /** R6: client-local calendar day the set was performed (YYYY-MM-DD). Written
+   *  by the client at log time; pre-R6 rows carry their old UTC bucket. */
+  performed_on: string | null;
   set_number: number;
   weight: number;
   reps: number;

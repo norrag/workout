@@ -42,6 +42,69 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-02 (session 6) — Meso page rework (P16) + macro stats tabs (M8) + strength trends (I11/PH37)
+
+Owner-decided rework of the cycle surfaces (decisions verbatim in
+`docs/notes/backlog.md` appendix Batch 4). No mockups exist for these — the
+owner explicitly approved designing them from the existing patterns (recorded
+rule-8 deviation); fidelity anchors are the day-view header (1.1), the planner
+board (2.5), and the meso stats views (4.1/4.2).
+
+### 1. Meso page = header + `OVERVIEW | BALANCE | PERFORMANCE` toggle — `RETROFIT`, `NET-NEW`
+- **Change.** The meso detail page's button stack (EDIT / GO TO / MESO STATS /
+  SAVE AS TEMPLATE / SHARE / DELETE) is replaced by:
+  - a **day-view-style sticky header** (back link + macro context; title;
+    meta + status badge; orange **completion progress bar** over the planned
+    week×day grid) carrying three header actions — a **calendar button** that
+    drops down the week × day matrix (the old page-body RIR ramp matrix; days
+    clickable → day view when materialized, read-only planned view otherwise),
+    a **share button** (opens the share-code sheet), and a **⋮ menu** holding
+    *Edit plan/weeks* (locked once history exists, as before), *Save as
+    template*, and *Delete mesocycle*;
+  - a top-level **`OVERVIEW | BALANCE | PERFORMANCE`** segmented toggle.
+    **OVERVIEW** renders the planner board **read-only** (day tabs + the flat
+    ordered exercise list; editing goes through the ⋮ menu → planner board);
+    GO TO / START stays its primary action. **BALANCE / PERFORMANCE** are the
+    meso stats views, absorbed from the standalone screen.
+- **Tab naming.** The owner's P16 wording said "volume" for the middle tab;
+  his M8 wording said "balance" for the same view at macro scope. Reconciled
+  to **BALANCE** on both surfaces — this file's 2026-06-14 §4 already retired
+  "Volume" as a tab name for exactly this content, and M8's whole point is
+  meso/macro naming unification.
+- **Affected figures.** 2.2-old territory (meso detail), 4.1/4.2 (now panels
+  of the meso page; `/cycles/meso/[id]/stats` redirects into the toggle).
+- **Impact.** `RETROFIT` + `NET-NEW`. The "MESO STATS" button and screen are
+  gone; deep links redirect.
+
+### 2. Macro page gains the same three-way toggle (M8) — `NET-NEW`
+- **Change.** Macrocycle Overview (2.2) gets `OVERVIEW | BALANCE |
+  PERFORMANCE`. OVERVIEW keeps the existing content (realistic target,
+  timeline, stat tiles, edit). **BALANCE** = the 4.1 balance view at macro
+  scope (fractional sets averaged over materialized weeks across the macro's
+  mesos; unbuilt future weeks excluded — no cross-meso projection).
+  **PERFORMANCE** = the strength-trend sections below.
+- **Impact.** `NET-NEW`; macro stats stay on the macro page per the
+  2026-06-13 §6 "contextual stats, no tab" rule.
+
+### 3. Est-strength trends: per-exercise list + muscle rollup (I11/PH37) — `NET-NEW`, `DATA`
+- **Change.** Both Performance tabs gain **EST. STRENGTH — ALL EXERCISES**
+  (every exercise **logged ≥3 non-deload sessions** in the window — owner's
+  rule, excludes subbed-in lifts; first → last engine e1RM with the signed
+  %-change) and **STRENGTH BY MUSCLE GROUP** (role-weighted mean of those
+  %-changes — primary 1.0 / secondary 0.5 via `engine_params.volume`, the doc
+  10 §2 counting weights). Deloads excluded per T-A2; values undecayed per
+  T-A1. Same numbers surface on MCP `get_mesocycle_summary` /
+  `get_macrocycle_summary`.
+- **Impact.** `NET-NEW`, `DATA` (shared query folds; no schema change).
+
+### 4. Day view loses its back button (P17) + deep-link return (N4) — `RETROFIT`
+- **Change.** `/log/[workoutId]` no longer renders `‹ WORKOUT` — the day
+  navigator lives inside the Workout tab, so selecting a day isn't a page
+  change (owner, option 2). "View exercise" from the day view now carries its
+  origin: the exercise page's back control returns to that day view
+  (`‹ WORKOUT`), not the exercises list.
+- **Affected figures.** 1.1, 3.1a.
+
 ## 2026-06-15 (session 5) — Logging-flow review on device (product)
 
 First hands-on review of the deployed logging flow. Several interaction fixes plus two net-new

@@ -11,6 +11,25 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (build 1) — metric-definition foundation merged (PR #103)
+
+Session 31 built the Batch-4 dependency-first foundation (fractional volume +
+e1RM standardization + deload exclusion) plus the fitting quick wins; PR #103
+merged. Raw text stays in the backlog appendix; full record in PROGRESS
+2026-07-02 and the Session 31 log entry. Both migrations were applied live and
+probe-verified before merge.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R14 | Volume counting is primary-only — doc 10's fractional 1.0/0.5 + RIR≤4 hard-set rule unimplemented | D→F | C | **done — merged (PR #103).** Role-grain `v_meso_week_muscle_sets` (applied live) + one shared fold (`engine/volume.ts::fractionalSetCount`, tunable `volume.direct/indirect`) across stats/MCP/projection/engine ceiling input; RIR≤4-or-unreported hard-set rule baked in the view. Recorded deviation: `counting_max_rir`/`warmups_count` are view-baked doc defaults, not live params. Old `v_meso_week_sets` + dead `v_muscle_group_volume` retire with R23. |
+| P18 | Remove the set-type option from the set menu | UX | E | **done — merged (PR #103).** Menu affordance hidden; drop-set data model (`set_type`, DROP badge) left dormant per the owner's ruling. |
+| P21 | Should soreness be recorded when user reports 0 days sore? | D | H | **done — merged (PR #103), verified no-op.** Current behavior already stores an explicit 0 (`soreness_days` picker gates on `=== null`; 0 is a real value through save). |
+| PH33 | Scope admin MCP tools as private (hidden from non-admins) | F | H | **done — merged (PR #103).** `mcp/visibility.ts` wraps the SDK tools/list handler with a `profiles.role` filter; per-call `resolveAdmin` denial unchanged; fails open to visible-but-denied if SDK internals shift. |
+| T-A1 | Reconcile the two e1RM systems; decide what each screen shows | D→F | A | **done — merged (PR #103).** Engine e1RM everywhere: `v_exercise_overview`/`v_meso_summary` `best_e1rm` = max stored per-set engine e1RM; `v_exercise_history.best_set_e1rm` added; raw Epley retired (`epleyE1rm` deleted). Stats show undecayed values; decay stays prescription-only; 30-day half-life confirmed MCP-tunable (`e1rm.recency_halflife_days`, v17). Answers PH39. |
+| T-A2 | Decide + document deload handling in stats | D→B | A | **done — merged (PR #103).** `getMesoProgressScores` skips deload-microcycle sessions; volume + PR stats keep deloads; denoted in the MCP metric definitions/notes. |
+
+---
+
 ## Swept 2026-07-02 (later) — owner decision batch (Batch 4): terminal items
 
 Session 30 processed the owner's decisions on every open `needs-input` item

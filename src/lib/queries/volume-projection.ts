@@ -32,19 +32,26 @@ export interface WeightedWeekSets {
  * Fold role-grain view rows into fractional per-(week, muscle) numbers.
  * Pure: one definition of weekly volume shared by the stats matrix/balance,
  * the MCP volume + balance tools, and the set projection.
+ *
+ * `weekOf` optionally remaps a row onto a different week axis (the macro
+ * stats concatenate weeks across mesocycles, where raw week numbers collide);
+ * rows it maps to `undefined` are dropped. Default: the row's own week.
  */
 export function weightWeekMuscleSets(
   rows: VMesoWeekMuscleSetsRow[],
   weights: VolumeCountingWeights,
+  weekOf?: (row: VMesoWeekMuscleSetsRow) => number | undefined,
 ): WeightedWeekSets[] {
   const byCell = new Map<string, { row: WeightedWeekSets; planned: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[]; logged: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[] }>();
   for (const r of rows) {
-    const key = `${r.week_number}:${r.muscle_group_id ?? r.muscle_group ?? "unassigned"}`;
+    const week = weekOf ? weekOf(r) : r.week_number;
+    if (week == null) continue;
+    const key = `${week}:${r.muscle_group_id ?? r.muscle_group ?? "unassigned"}`;
     let cell = byCell.get(key);
     if (!cell) {
       cell = {
         row: {
-          week_number: r.week_number,
+          week_number: week,
           is_deload: r.is_deload,
           muscle_group_id: r.muscle_group_id,
           muscle_group: r.muscle_group,

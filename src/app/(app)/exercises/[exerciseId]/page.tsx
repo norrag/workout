@@ -52,11 +52,17 @@ export default async function ExerciseDetailPage({
   searchParams,
 }: {
   params: Promise<{ exerciseId: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; from?: string }>;
 }) {
   const { exerciseId } = await params;
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, from } = await searchParams;
   const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "overview";
+
+  // N4: a day-view deep link ("View exercise") carries its origin so back
+  // returns to the workout you came from, not the exercises list. Only a
+  // same-app /log/<id> path is honored.
+  const backToWorkout =
+    from && /^\/log\/[A-Za-z0-9-]+$/.test(from) ? from : null;
 
   const supabase = await createClient();
   const {
@@ -142,10 +148,10 @@ export default async function ExerciseDetailPage({
     <div>
       <div className="flex items-center justify-between">
         <Link
-          href="/exercises"
+          href={backToWorkout ?? "/exercises"}
           className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
         >
-          ‹ EXERCISES
+          {backToWorkout ? "‹ WORKOUT" : "‹ EXERCISES"}
         </Link>
         {showLoadStep && (
           <ExerciseSettingsMenu

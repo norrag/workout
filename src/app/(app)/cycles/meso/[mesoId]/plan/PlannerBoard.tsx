@@ -10,6 +10,7 @@ import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { HistorySheet } from "@/components/HistorySheet";
 import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
+import { shortDateWithYear as shortDate } from "@/lib/dates";
 import { groupByRegion, moveInOrder, planGroupExercises } from "@/lib/planner/groups";
 import {
   addDayAction,
@@ -171,12 +172,6 @@ function nextDayNumber(used: number[]): number | null {
   const taken = new Set(used);
   for (let n = 1; n <= MAX_DAYS; n++) if (!taken.has(n)) return n;
   return null;
-}
-
-function shortDate(iso: string): string {
-  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
-  return `${d.getDate()} ${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
 }
 
 /** Planner board (figs 2.4/2.5/2.6b/2.7).

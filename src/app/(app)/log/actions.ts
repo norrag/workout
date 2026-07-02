@@ -82,6 +82,12 @@ const logSetSchema = z.object({
   reps: z.coerce.number().int().min(0).max(100),
   rir_reported: z.coerce.number().int().min(0).max(10).nullable(),
   set_type: z.enum(["straight", "drop"]),
+  // R6: the client-local calendar day — the session's date as the lifter saw
+  // it (an evening set must not land on tomorrow's UTC date)
+  performed_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
 });
 
 export async function logSetAction(input: {
@@ -92,6 +98,7 @@ export async function logSetAction(input: {
   reps: number;
   rir_reported: number | null;
   set_type: "straight" | "drop";
+  performed_on?: string | null;
 }): Promise<void> {
   const parsed = logSetSchema.parse(input);
   const { supabase, user } = await requireUser();
@@ -110,6 +117,7 @@ export async function logSetAction(input: {
     // T-I2/#4: capture the lifter's bodyweight at log time (effective-load base for
     // bodyweight movements); locked once the workout completes.
     bodyweight: profile?.bodyweight ?? null,
+    performed_on: parsed.performed_on ?? null,
   });
   // auto-match (doc 11): carry the logged weight onto the remaining unlogged
   // sets. Done here (after the insert excludes this set) to avoid a client race.

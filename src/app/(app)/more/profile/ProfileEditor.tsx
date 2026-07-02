@@ -9,6 +9,7 @@ import {
   inchesToFeetInches,
   feetInchesToInches,
 } from "@/lib/units";
+import { shortDate } from "@/lib/dates";
 import {
   addExclusionAction,
   clearBodyFatAction,
@@ -63,11 +64,6 @@ const BODY_FAT_BANDS = [
   { mid: 35, label: "35%+" },
 ] as const;
 
-function shortDate(iso: string): string {
-  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
-  return `${d.getDate()} ${months[d.getMonth()]}`;
-}
 
 /** Profile (fig 4.5): data rows, experience, equipment access, exclusions. */
 export function ProfileEditor({

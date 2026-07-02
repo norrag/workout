@@ -1,8 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { scoreProgress, pplCategory, volumeCountingWeights } from "@/lib/engine";
+import {
+  scoreProgress,
+  pplCategory,
+  volumeCountingWeights,
+  type VolumeCountingWeights,
+} from "@/lib/engine";
 import type {
   Database,
   MesocycleRow,
+  VExerciseHistoryRow,
 } from "@/lib/types/database";
 import { getActiveEngineParams } from "./generation";
 import {
@@ -27,40 +33,43 @@ export interface ExerciseProgressScore {
   exercise_name: string;
   first_e1rm: number | null;
   last_e1rm: number | null;
-  /** percentage e1RM change first → last non-deload session of the meso */
+  /** percentage e1RM change first → last non-deload session of the window */
   score_pct: number | null;
+  /** non-deload sessions with an e1RM — the points the trend is computed over */
+  sessions: number;
 }
 
-export async function getMesoProgressScores(
-  supabase: Client,
-  userId: string,
-  mesoId: string,
-): Promise<ExerciseProgressScore[]> {
-  const [{ data, error }, { data: micros, error: microError }] =
-    await Promise.all([
-      supabase
-        .from("v_exercise_history")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("mesocycle_id", mesoId)
-        .order("performed_on"),
-      supabase
-        .from("microcycles")
-        .select("id, is_deload")
-        .eq("mesocycle_id", mesoId)
-        .eq("user_id", userId),
-    ]);
-  if (error) throw error;
-  if (microError) throw microError;
-  const deloadMicroIds = new Set(
-    (micros ?? []).filter((m) => m.is_deload).map((m) => m.id),
-  );
+/**
+ * An exercise "counts" for the strength lists once it has this many trend
+ * points (I11, owner 2026-07-02: "logged at least 3 times in the mesocycle" —
+ * excludes subbed-in / inconsistent lifts). Sessions are counted the same way
+ * the trend is computed: non-deload, with a stored e1RM.
+ */
+export const MIN_PROGRESS_SESSIONS = 3;
 
+/** The I11 display rule: enough sessions to trend, and a computable score. */
+export function qualifyingScores(
+  scores: ExerciseProgressScore[],
+): ExerciseProgressScore[] {
+  return scores.filter(
+    (s) => s.sessions >= MIN_PROGRESS_SESSIONS && s.score_pct != null,
+  );
+}
+
+/** Pure first→last e1RM fold shared by the meso and macro scopes (rows must
+ *  arrive ordered by performed_on; deload sessions are skipped — T-A2). */
+export function foldProgressScores(
+  rows: Pick<
+    VExerciseHistoryRow,
+    "exercise_id" | "exercise_name" | "microcycle_id" | "e1rm"
+  >[],
+  deloadMicroIds: Set<string>,
+): ExerciseProgressScore[] {
   const byExercise = new Map<
     string,
-    { name: string; first: number | null; last: number | null }
+    { name: string; first: number | null; last: number | null; sessions: number }
   >();
-  for (const row of data ?? []) {
+  for (const row of rows) {
     if (row.e1rm == null) continue;
     if (deloadMicroIds.has(row.microcycle_id)) continue;
     const cur = byExercise.get(row.exercise_id);
@@ -69,9 +78,11 @@ export async function getMesoProgressScores(
         name: row.exercise_name,
         first: row.e1rm,
         last: row.e1rm,
+        sessions: 1,
       });
     } else {
       cur.last = row.e1rm;
+      cur.sessions += 1;
     }
   }
 
@@ -81,7 +92,156 @@ export async function getMesoProgressScores(
     first_e1rm: v.first,
     last_e1rm: v.last,
     score_pct: scoreProgress(v.first, v.last),
+    sessions: v.sessions,
   }));
+}
+
+/** Progress scores across one or more mesocycles (macro scope = all its mesos). */
+export async function getProgressScores(
+  supabase: Client,
+  userId: string,
+  mesoIds: string[],
+): Promise<ExerciseProgressScore[]> {
+  if (mesoIds.length === 0) return [];
+  const [{ data, error }, { data: micros, error: microError }] =
+    await Promise.all([
+      supabase
+        .from("v_exercise_history")
+        .select("*")
+        .eq("user_id", userId)
+        .in("mesocycle_id", mesoIds)
+        .order("performed_on"),
+      supabase
+        .from("microcycles")
+        .select("id, is_deload")
+        .in("mesocycle_id", mesoIds)
+        .eq("user_id", userId),
+    ]);
+  if (error) throw error;
+  if (microError) throw microError;
+  const deloadMicroIds = new Set(
+    (micros ?? []).filter((m) => m.is_deload).map((m) => m.id),
+  );
+  return foldProgressScores(data ?? [], deloadMicroIds);
+}
+
+export async function getMesoProgressScores(
+  supabase: Client,
+  userId: string,
+  mesoId: string,
+): Promise<ExerciseProgressScore[]> {
+  return getProgressScores(supabase, userId, [mesoId]);
+}
+
+// ---------------------------------------------------------------------------
+// PH37 — strength gains rolled up per muscle group (meso + macro scopes)
+// ---------------------------------------------------------------------------
+
+export interface MuscleGroupProgress {
+  muscle_group: string;
+  /** role-weighted mean of the qualifying exercises' e1RM %-changes */
+  score_pct: number | null;
+  /** contributing exercises */
+  lifts: number;
+}
+
+export interface ExerciseMuscleLink {
+  exercise_id: string;
+  muscle_group: string;
+  role: "primary" | "secondary";
+}
+
+/**
+ * Roll per-exercise e1RM %-changes (I11) up to muscle groups: each exercise
+ * credits every muscle it's linked to, weighted by role through the same
+ * `engine_params.volume.direct/indirect` weights the volume counting uses
+ * (doc 10 §2) — a primary link counts 1.0, a secondary 0.5. Pure.
+ */
+export function rollupMuscleProgress(
+  scores: ExerciseProgressScore[],
+  links: ExerciseMuscleLink[],
+  weights: VolumeCountingWeights,
+): MuscleGroupProgress[] {
+  const byExercise = new Map(scores.map((s) => [s.exercise_id, s]));
+  const byGroup = new Map<string, { weighted: number; weightSum: number; lifts: number }>();
+  for (const link of links) {
+    const score = byExercise.get(link.exercise_id);
+    if (!score || score.score_pct == null) continue;
+    const w = link.role === "primary" ? weights.direct : weights.indirect;
+    if (w <= 0) continue;
+    let cur = byGroup.get(link.muscle_group);
+    if (!cur) {
+      cur = { weighted: 0, weightSum: 0, lifts: 0 };
+      byGroup.set(link.muscle_group, cur);
+    }
+    cur.weighted += score.score_pct * w;
+    cur.weightSum += w;
+    cur.lifts += 1;
+  }
+  return [...byGroup.entries()]
+    .map(([muscle_group, v]) => ({
+      muscle_group,
+      score_pct:
+        v.weightSum > 0 ? Math.round((v.weighted / v.weightSum) * 10) / 10 : null,
+      lifts: v.lifts,
+    }))
+    .sort(
+      (a, b) => (b.score_pct ?? -Infinity) - (a.score_pct ?? -Infinity),
+    );
+}
+
+/** Muscle links (with group names + roles) for a set of exercises. */
+export async function getExerciseMuscleLinks(
+  supabase: Client,
+  exerciseIds: string[],
+): Promise<ExerciseMuscleLink[]> {
+  if (exerciseIds.length === 0) return [];
+  const [{ data: links, error }, { data: groups, error: groupError }] =
+    await Promise.all([
+      supabase
+        .from("exercise_muscle_groups")
+        .select("exercise_id, muscle_group_id, role")
+        .in("exercise_id", exerciseIds),
+      supabase.from("muscle_groups").select("id, name"),
+    ]);
+  if (error) throw error;
+  if (groupError) throw groupError;
+  const nameById = new Map((groups ?? []).map((g) => [g.id, g.name]));
+  return (links ?? []).flatMap((l) => {
+    const muscle_group = nameById.get(l.muscle_group_id);
+    if (!muscle_group) return [];
+    return [
+      {
+        exercise_id: l.exercise_id,
+        muscle_group,
+        role: (l.role === "secondary" ? "secondary" : "primary") as
+          | "primary"
+          | "secondary",
+      },
+    ];
+  });
+}
+
+/** The I11 + PH37 strength block for one scope (meso or macro). */
+export interface StrengthProgress {
+  /** qualifying exercises (≥3 non-deload sessions), best score first */
+  exercises: ExerciseProgressScore[];
+  muscles: MuscleGroupProgress[];
+}
+
+export async function buildStrengthProgress(
+  supabase: Client,
+  scores: ExerciseProgressScore[],
+  weights: VolumeCountingWeights,
+): Promise<StrengthProgress> {
+  const exercises = qualifyingScores(scores).sort(
+    (a, b) => (b.score_pct ?? 0) - (a.score_pct ?? 0),
+  );
+  const links = await getExerciseMuscleLinks(
+    supabase,
+    exercises.map((s) => s.exercise_id),
+  );
+  return { exercises, muscles: rollupMuscleProgress(exercises, links, weights) };
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +309,8 @@ export interface MesoPerformance {
   macroLiftName: string | null;
   macroChart: MacroChartBar[];
   prs: MesoPr[];
+  /** I11 + PH37: per-exercise e1RM %-change (≥3 sessions) + muscle rollup */
+  strength: StrengthProgress;
 }
 
 export interface MesoStats {
@@ -260,9 +422,14 @@ function sumCells(cells: VolumeCell[]): number {
  * Balance (4.2): average fractional sets per non-deload week per group — the
  * push/pull/legs cards sum their groups; the note states the push:pull ratio
  * and the lowest-volume group. Averages keep 1 dp since R14 (half-set credits
- * are real signal against MEV/MAV/MRV, not rounding noise).
+ * are real signal against MEV/MAV/MRV, not rounding noise). `scope` only
+ * changes the note's wording ("this meso" / "this macrocycle" — M8).
  */
-export function buildBalance(volume: MesoVolume, weeks: MesoStatsWeek[]): MesoBalance {
+export function buildBalance(
+  volume: MesoVolume,
+  weeks: MesoStatsWeek[],
+  scope = "this meso",
+): MesoBalance {
   const idx = weeks
     .map((w, i) => ({ w, i }))
     .filter(({ w }) => !w.is_deload)
@@ -292,7 +459,7 @@ export function buildBalance(volume: MesoVolume, weeks: MesoStatsWeek[]): MesoBa
   const lowest = bars.filter((b) => b.avg > 0).at(-1);
   const parts: string[] = [];
   if (ratio != null)
-    parts.push(`Push : pull is ${ratio.toFixed(1)} : 1 this meso.`);
+    parts.push(`Push : pull is ${ratio.toFixed(1)} : 1 ${scope}.`);
   if (lowest)
     parts.push(
       `${capitalize(lowest.name)} carries the lowest weekly volume at ${lowest.avg} sets.`,
@@ -474,6 +641,18 @@ export async function getMesoStats(
   const volume = buildVolumeMatrix(weeks, weekSets, projected);
   const balance = buildBalance(volume, weeks);
 
+  // I11 + PH37: per-exercise e1RM %-change over the meso (≥3 non-deload
+  // sessions) + the role-weighted muscle-group rollup, folded from the same
+  // history rows fetched above — one definition with the MCP summary tools.
+  const deloadMicroIds = new Set(
+    (micros ?? []).filter((m) => m.is_deload).map((m) => m.id),
+  );
+  const strength = await buildStrengthProgress(
+    supabase,
+    foldProgressScores(history ?? [], deloadMicroIds),
+    weights,
+  );
+
   // performance — top set per exercise per week needs set-level reps
   const microWeek = new Map((micros ?? []).map((m) => [m.id, m.week_number]));
   const { data: sets, error: setsError } = await supabase
@@ -644,6 +823,96 @@ export async function getMesoStats(
     currentWeek,
     volume,
     balance,
-    performance: { keyLifts, macroLiftName, macroChart, prs },
+    performance: { keyLifts, macroLiftName, macroChart, prs, strength },
   };
+}
+
+// ---------------------------------------------------------------------------
+// macro stats (M8) — Balance + Performance at macrocycle scope. Same views,
+// same folds as the meso stats: v_meso_week_muscle_sets weighted through
+// engine_params.volume + v_exercise_history first→last scores, concatenated
+// across the macro's mesocycles.
+// ---------------------------------------------------------------------------
+
+export interface MacroStatsData {
+  balance: MesoBalance;
+  /** true when at least one materialized week exists to average over */
+  hasVolume: boolean;
+  strength: StrengthProgress;
+}
+
+export async function getMacroStats(
+  supabase: Client,
+  userId: string,
+  macroId: string,
+): Promise<MacroStatsData> {
+  const { data: mesos, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select("id, position, created_at")
+    .eq("user_id", userId)
+    .eq("macrocycle_id", macroId)
+    .order("position", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (mesoError) throw mesoError;
+  const mesoIds = (mesos ?? []).map((m) => m.id);
+  const empty: MacroStatsData = {
+    balance: { push: 0, pull: 0, legs: 0, bars: [], note: "" },
+    hasVolume: false,
+    strength: { exercises: [], muscles: [] },
+  };
+  if (mesoIds.length === 0) return empty;
+
+  const [
+    { data: micros, error: microError },
+    { data: weekMuscleSets, error: weekSetsError },
+    scores,
+    { params },
+  ] = await Promise.all([
+    supabase
+      .from("microcycles")
+      .select("id, mesocycle_id, week_number, is_deload, status")
+      .eq("user_id", userId)
+      .in("mesocycle_id", mesoIds)
+      .order("week_number"),
+    supabase
+      .from("v_meso_week_muscle_sets")
+      .select("*")
+      .eq("user_id", userId)
+      .in("mesocycle_id", mesoIds),
+    getProgressScores(supabase, userId, mesoIds),
+    getActiveEngineParams(supabase),
+  ]);
+  if (microError) throw microError;
+  if (weekSetsError) throw weekSetsError;
+
+  const weights = volumeCountingWeights(params);
+  const strength = await buildStrengthProgress(supabase, scores, weights);
+
+  // Concatenate materialized weeks across mesos (meso position order, then
+  // week number) into one global week axis so the meso balance fold applies
+  // unchanged. Unmaterialized future weeks are skipped — no cross-meso
+  // projection; the macro average is honest to what exists.
+  const mesoOrder = new Map(mesoIds.map((id, i) => [id, i]));
+  const orderedMicros = [...(micros ?? [])].sort(
+    (a, b) =>
+      (mesoOrder.get(a.mesocycle_id) ?? 0) - (mesoOrder.get(b.mesocycle_id) ?? 0) ||
+      a.week_number - b.week_number,
+  );
+  const globalWeekByMicro = new Map<string, number>();
+  const weeks: MesoStatsWeek[] = orderedMicros.map((m, i) => {
+    globalWeekByMicro.set(`${m.mesocycle_id}:${m.week_number}`, i + 1);
+    return {
+      week_number: i + 1,
+      is_deload: m.is_deload,
+      status: m.status,
+    };
+  });
+  if (weeks.length === 0) return { ...empty, strength };
+
+  const weekSets = weightWeekMuscleSets(weekMuscleSets ?? [], weights, (row) =>
+    globalWeekByMicro.get(`${row.mesocycle_id}:${row.week_number}`),
+  );
+  const volume = buildVolumeMatrix(weeks, weekSets, []);
+  const balance = buildBalance(volume, weeks, "across this macrocycle");
+  return { balance, hasVolume: volume.groups.length > 0, strength };
 }

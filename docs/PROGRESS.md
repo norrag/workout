@@ -2,7 +2,99 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — metric-definition foundation: fractional volume counting (R14), engine e1RM everywhere (T-A1), deloads out of progress scoring (T-A2) + P18/PH33 quick wins
+## 2026-07-02 (latest) — WS-C consumers: meso page rework (P16), macro stats tabs (M8), strength trends (I11/PH37) + P17/N4 nav + R6 local-day dates
+
+The consumer half of the Session-31 foundation: every screen the Batch-4
+decisions redesigned, on the R14/T-A1/T-A2 metric definitions. Design deltas
+recorded as a dated entry in `09-design-changelog.md` (2026-07-02 session 6).
+The R6 migration is **applied to live** and probe-verified.
+
+- **I11 — per-exercise est-strength %-change.** `stats.ts` progress scores now
+  count their trend points (`sessions` = non-deload sessions with an e1RM) and
+  generalize to any meso set (`getProgressScores`); the display rule is the
+  owner's **≥3 sessions** (`MIN_PROGRESS_SESSIONS` + `qualifyingScores` —
+  excludes subbed-in/inconsistent lifts). Values are the stored engine e1RM
+  (undecayed, T-A1), first → last non-deload session (T-A2). Rendered as
+  **EST. STRENGTH — ALL EXERCISES** on the meso + macro Performance tabs
+  (`components/stats/StrengthProgress.tsx`), with first→last e1RM + session
+  count as the sub-label and an honesty footnote (e1RM is an estimate).
+  **Live check:** the rule bites — e.g. 18 of 24 exercises qualify in one
+  active meso (6 subbed-in excluded), 15 of 17 in another.
+- **PH37 — strength by muscle group (meso + macro scopes; all-time dropped
+  per owner).** Pure `rollupMuscleProgress`: each qualifying exercise credits
+  every linked muscle, weighted by role through the SAME
+  `engine_params.volume.direct/indirect` weights the volume counting uses
+  (doc 10 §2 — one weighting definition). Rendered under the exercise list on
+  both Performance tabs; exposed on MCP `get_mesocycle_summary` +
+  `get_macrocycle_summary` as `muscle_group_progress` (+ `sessions` on
+  `progress_scores`, macro summary gains macro-scope `progress_scores`) so
+  the connector reports the app's numbers.
+- **M8 — macro stats unification.** The macro page gains the same
+  **OVERVIEW | BALANCE | PERFORMANCE** toggle (owner OK'd building without a
+  mockup — **rule-8 deviation**; modeled on the meso stats views + SegmentedTabs
+  grammar). BALANCE reuses the 4.1 BalanceView at macro scope: new
+  `getMacroStats` concatenates materialized weeks across the macro's mesos
+  onto a global week axis (`weightWeekMuscleSets` gained an optional `weekOf`
+  remap) and runs the SAME `buildVolumeMatrix`/`buildBalance` folds — no
+  cross-meso projection (unbuilt future weeks excluded, footnoted honest).
+  The meso side of M8 ships through P16 (below). Meso est-strength under
+  Performance confirmed present.
+- **P16 — meso page rework (large).** `cycles/meso/[mesoId]` is now a
+  **day-view-style sticky header + OVERVIEW | BALANCE | PERFORMANCE toggle**:
+  - **Header** (`MesoHeader.tsx`): back link + macro-context caps; title;
+    meta line + status badge; the day-view **orange progress bar** showing
+    completed workouts over the whole planned week×day grid. Header actions:
+    **calendar** (drops down the old page-body RIR/week×day matrix — same
+    cell states, days link to `/log/[id]` or the read-only planned route),
+    **share** (sheet wrapping the existing ShareRow), and the **⋮ menu**
+    (Edit plan/weeks — still locked once history exists, trailing LOCKED;
+    Save as template — in-menu pending state, still lands `?error=template`
+    on failure; Delete — the old confirm sheet with the logged-history
+    acknowledgement, `DeleteMesoButton.tsx` folded in and deleted).
+  - **OVERVIEW** = read-only planner board (`MesoPlanView.tsx`): day tabs +
+    the flat ordered exercise list (badge · group · equipment · start sets),
+    open slots as dashed rows; GO TO W·D / START MESOCYCLE stays on top.
+    `getMesoPlan` fills now carry `exercise_equipment` for the sub-labels.
+  - **BALANCE / PERFORMANCE** = the meso stats views; the standalone
+    `/cycles/meso/[id]/stats` screen is now a **redirect** into the toggle
+    (day-view ⋮ menu + Workout-tab resting link repointed). `BalanceView`
+    takes the balance block directly so macro can reuse it.
+  - **Rule-8 deviation recorded:** no mockup exists for the reworked
+    header/menu/read-only board (owner-approved); anchors are the day-view
+    header, planner board, and meso stats figures. **Tab naming:** owner said
+    "volume" (P16) and "balance" (M8) for the same view — reconciled to
+    **BALANCE** on both surfaces (09 2026-06-14 §4 had already retired the
+    "Volume" tab name; unification is M8's point). Recorded in 09.
+  - `AnchoredMenu`/`MenuRow` extracted from `DayView.tsx` to
+    `components/ui/AnchoredMenu.tsx` (shared by the day view + meso header).
+- **P17 — day-view back button removed** (owner option 2: the day navigator
+  lives inside the Workout tab; selecting a day isn't a page change).
+- **N4 — deep-link return-to-origin.** "View exercise" from the day view
+  carries `?from=/log/<id>`; the exercise page's back control validates the
+  same-app path and returns `‹ WORKOUT` to the originating day view instead
+  of the exercises list. Client-state tabs preserve the param.
+- **R6 — client-local workout dates + one date-display definition.**
+  Migration `20260702000003` (**applied live**): new
+  `logged_sets.performed_on date` — the client's calendar day, sent by the
+  day view at log time (`localDayIso()` → `logSetAction.performed_on`,
+  zod-validated) — and `v_exercise_history` re-bucketed on it, so evening
+  sessions stop landing on tomorrow's UTC date in history/PRs/session
+  grouping. Pre-R6 rows backfill to their old UTC bucket (true local day is
+  unrecoverable; **verified live: 10,821/10,821 rows backfilled, 0 diverging**
+  — history reads unchanged until new sets arrive). Amends keep the original
+  day. The **6 divergent `shortDate` copies** collapse into `lib/dates.ts`
+  (`dateAtLocalNoon`: date-only → local-noon anchor, timestamps → real
+  instant in local time): DayView, ExerciseHistoryList, PrescriptionDetailSheet
+  (was raw-parse, drift-prone), ExercisesBrowser (was raw-parse `MM/DD/YY` —
+  now the ledger `15 JUN '26` format, a deliberate display change),
+  ProfileEditor, PlannerBoard. No policy change needed (column add on an
+  RLS-enabled table; owner-scoped row policies cover it).
+- Green: **655 tests (+11: progress fold/qualifying/rollup, balance scope
+  wording, weekOf remap, dates)**, typecheck, lint, production build (`/log`
+  unchanged at 126 kB; meso page 6.75 kB route). Engine untouched (the new
+  folds are query-layer; weights read the existing params keys).
+
+## 2026-07-02 — metric-definition foundation: fractional volume counting (R14), engine e1RM everywhere (T-A1), deloads out of progress scoring (T-A2) + P18/PH33 quick wins
 
 The Batch-4 owner decisions unblocked the metric-definition work that the
 whole WS-C stats/meso rework (I11 / PH37 / M8 / P16) consumes — this ships

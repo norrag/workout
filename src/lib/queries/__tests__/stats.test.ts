@@ -10,6 +10,11 @@ import {
   buildKeyLifts,
   buildPrs,
   buildVolumeMatrix,
+  foldProgressScores,
+  qualifyingScores,
+  rollupMuscleProgress,
+  MIN_PROGRESS_SESSIONS,
+  type ExerciseProgressScore,
   type MesoStatsWeek,
 } from "../stats";
 import type { ProjectedCell } from "../volume-projection";
@@ -188,5 +193,143 @@ describe("templateEmphasis", () => {
     expect(templateEmphasis(["chest", "back", "biceps"])).toBe("upper");
     expect(templateEmphasis(["quads", "glutes"])).toBe("lower");
     expect(templateEmphasis(["abs"])).toBe("other");
+  });
+});
+
+// --- I11/PH37: progress-score fold, qualifying rule, muscle rollup ----------
+
+function historyRow(
+  exercise_id: string,
+  microcycle_id: string,
+  e1rm: number | null,
+) {
+  return {
+    exercise_id,
+    exercise_name: exercise_id.toUpperCase(),
+    microcycle_id,
+    e1rm,
+  };
+}
+
+describe("foldProgressScores", () => {
+  it("takes first → last non-deload session and counts the trend points", () => {
+    const scores = foldProgressScores(
+      [
+        historyRow("bench", "w1", 200),
+        historyRow("bench", "w2", 205),
+        historyRow("bench", "w3", 210),
+        historyRow("bench", "dl", 180), // deload — excluded from trend AND count
+      ],
+      new Set(["dl"]),
+    );
+    expect(scores).toEqual([
+      {
+        exercise_id: "bench",
+        exercise_name: "BENCH",
+        first_e1rm: 200,
+        last_e1rm: 210,
+        score_pct: 5,
+        sessions: 3,
+      },
+    ]);
+  });
+
+  it("skips sessions without an e1RM (bodyweight) entirely", () => {
+    const scores = foldProgressScores(
+      [
+        historyRow("row", "w1", null),
+        historyRow("row", "w2", 100),
+        historyRow("row", "w3", 110),
+      ],
+      new Set(),
+    );
+    expect(scores[0]).toMatchObject({ first_e1rm: 100, sessions: 2 });
+  });
+});
+
+describe("qualifyingScores (I11 — logged ≥3× in the window)", () => {
+  const score = (
+    id: string,
+    sessions: number,
+    score_pct: number | null = 4,
+  ): ExerciseProgressScore => ({
+    exercise_id: id,
+    exercise_name: id,
+    first_e1rm: 100,
+    last_e1rm: 104,
+    score_pct,
+    sessions,
+  });
+
+  it("keeps only exercises with enough sessions and a computable score", () => {
+    const out = qualifyingScores([
+      score("consistent", MIN_PROGRESS_SESSIONS),
+      score("subbed-in", 1),
+      score("two-timer", 2),
+      score("no-score", 5, null),
+    ]);
+    expect(out.map((s) => s.exercise_id)).toEqual(["consistent"]);
+  });
+});
+
+describe("rollupMuscleProgress (PH37)", () => {
+  const W = { direct: 1.0, indirect: 0.5 };
+  const scores: ExerciseProgressScore[] = [
+    {
+      exercise_id: "bench",
+      exercise_name: "Bench",
+      first_e1rm: 200,
+      last_e1rm: 220,
+      score_pct: 10,
+      sessions: 4,
+    },
+    {
+      exercise_id: "fly",
+      exercise_name: "Fly",
+      first_e1rm: 60,
+      last_e1rm: 62,
+      score_pct: 4,
+      sessions: 3,
+    },
+  ];
+
+  it("role-weights each exercise's %-change into its muscle groups", () => {
+    const out = rollupMuscleProgress(
+      scores,
+      [
+        { exercise_id: "bench", muscle_group: "chest", role: "primary" },
+        { exercise_id: "bench", muscle_group: "triceps", role: "secondary" },
+        { exercise_id: "fly", muscle_group: "chest", role: "primary" },
+      ],
+      W,
+    );
+    // chest: (10×1.0 + 4×1.0) / 2.0 = 7; triceps: only bench's secondary = 10
+    expect(out).toEqual([
+      { muscle_group: "triceps", score_pct: 10, lifts: 1 },
+      { muscle_group: "chest", score_pct: 7, lifts: 2 },
+    ]);
+  });
+
+  it("ignores links to exercises without a score and unknown exercises", () => {
+    const out = rollupMuscleProgress(
+      scores,
+      [
+        { exercise_id: "ghost", muscle_group: "back", role: "primary" },
+        { exercise_id: "bench", muscle_group: "chest", role: "primary" },
+      ],
+      W,
+    );
+    expect(out).toEqual([{ muscle_group: "chest", score_pct: 10, lifts: 1 }]);
+  });
+});
+
+describe("buildBalance scope wording (M8)", () => {
+  const rows = [viewRow(1, "chest", 10, 10), viewRow(1, "back", 8, 8)];
+  it("names the window in the note", () => {
+    const volume = buildVolumeMatrix(weeks, rows, []);
+    expect(buildBalance(volume, weeks).note).toContain("this meso");
+    expect(
+      buildBalance(volume, weeks, "across this macrocycle").note,
+    ).toContain("across this macrocycle");
   });
 });
