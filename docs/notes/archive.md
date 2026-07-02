@@ -11,6 +11,22 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (evening) — R3 + R4 write integrity merged (PR #110)
+
+Session 33 shipped the review's write-integrity pair (attack order after
+R17/R16); PR #110 merged with all checks green (incl. `rls-tests` on a
+from-scratch stack — also verified locally pre-push, a first since R2 revived
+the suite). Migration `20260702000005` applied live + verified before merge.
+Raw text stays in the backlog appendix (Batch 3); full record in PROGRESS
+2026-07-02 (latest) and the Session 33 log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R3 | Non-atomic plan/param writes: `saveMesoPlan` delete-then-insert can wipe an (active) plan; `startMeso` half-apply = permanently unstartable meso; `generateDay` poisoned empty day; `activateEngineParams` can leave ZERO active params app-wide; missing uniques let races duplicate days/sets | B | K | **done — merged (PR #110).** `save_meso_plan` (ownership-guarded) / `activate_engine_params` / service-only `insert_generated_day` DB functions — one transaction each (migration `20260702000005`); `insert_generated_day` also adopts+fills poisoned empty days and `planCatchUp` flags them as gaps; `startMeso` retry-safe (recorded deviation: seed math stays pure-TS per rule 3); unique keys `workouts (microcycle_id, day_number)` + `logged_sets (workout_exercise_id, set_number)` with `logSet` upsert semantics — 11 live retry-storm duplicate groups (15 excess rows) deduped in the migration (recorded rule-5 deviation, newest kept); MCP `create_mesocycle` validates dup days/groups + exercise existence before any write + orphan-draft compensation; `edit_mesocycle add_day` rejects same-group-twice days. |
+| R4 | Plan regeneration cascade-deletes logged history (`regenerateOpenWorkouts` skips the logged-set check; `logSet`'s status flip silently swallowed → hard-rule-#5 breach path) | B | K | **done — merged (PR #110).** Both delete branches exclude anything with logged sets (pure `withoutLoggedHistory`, the `removeWorkoutExercise` pattern; kept rows stay in `haveIds` so they aren't re-added); `logSet` status-flip error surfaced; `completeWorkout` per-exercise statuses batched + error-checked. |
+
+---
+
 ## Swept 2026-07-02 (build 2) — WS-C consumers + I14 merged (PRs #104, #105)
 
 Session 32 shipped the Batch-4 consumer half (stats screens + meso surface +
