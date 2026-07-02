@@ -1265,9 +1265,11 @@ export async function saveSessionNote(
 
 /**
  * Session feedback (fig 1.5, redesigned per 09 2026-06-14 §1): overall
- * fatigue / effort / performance 0–4. The engine uses it as a session-level
- * dampener (10 §3). Saved while the workout is still `in_progress`, before
- * completion flips the status, so the next-week job can read it.
+ * fatigue / effort / performance 0–10 (unified with the per-exercise sliders
+ * since I14; pre-I14 0–4 rows were rescaled round(x × 2.5)). The engine uses
+ * it as a session-level dampener (10 §3). Saved while the workout is still
+ * `in_progress`, before completion flips the status, so the next-week job
+ * can read it.
  */
 export async function saveWorkoutFeedback(
   supabase: Client,

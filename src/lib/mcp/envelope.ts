@@ -18,14 +18,17 @@ export const MCP_SCHEMA_VERSION = 1;
  * has to guess what "pump: 7" means. Surfaced wherever averages or raw ratings
  * are reported.
  */
+// I14 (2026-07-02): every slider is 0–10 — the session sliders moved off 0–4
+// and stored values were rescaled round(x × 2.5). (The soreness entry also
+// previously misstated 0–3; it has been 0–10 in storage and UI since 06-16.)
 export const FEEDBACK_SCALES = {
   joint_pain: "0–3 (0 none, 3 sharp)",
   pump: "0–10",
   workload: "0–10 (5 = just right)",
-  soreness: "0–3",
-  overall_fatigue: "0–4",
-  effort_rating: "0–4",
-  performance_rating: "0–4",
+  soreness: "0–10",
+  overall_fatigue: "0–10",
+  effort_rating: "0–10",
+  performance_rating: "0–10",
   rir: "reps in reserve (lower = closer to failure)",
 } as const;
 

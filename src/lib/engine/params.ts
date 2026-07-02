@@ -131,9 +131,12 @@ export const engineParamsSchema = z.object({
   min_sets: z.number().int().min(1),
   max_sets_per_exercise: z.number().int().min(1),
   mg_set_ceiling: z.number().int().min(1),
-  // session-level dampening
-  session_fatigue_dampen_threshold: z.number().int().min(0).max(4),
-  session_performance_dampen_threshold: z.number().int().min(0).max(4),
+  // session-level dampening. Bounds widened 4 → 10 with I14 (the session
+  // sliders were unified onto the per-exercise 0–10 scale; v18 carries the
+  // rescaled thresholds 8/3). Old rows (3/1 on the 0–4 scale) stay valid —
+  // they are read only for replaying their own 0–4-scale stored inputs.
+  session_fatigue_dampen_threshold: z.number().int().min(0).max(10),
+  session_performance_dampen_threshold: z.number().int().min(0).max(10),
   deload: z.object({
     load_pct: z.number().min(0.3).max(0.9),
     set_pct: z.number().min(0.3).max(1),
