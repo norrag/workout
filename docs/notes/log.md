@@ -4,6 +4,16 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 33 (cont.): PR #110 merged + archival sweep
+
+- **PR #110 MERGED** (all checks green, incl. `rls-tests`). End-of-session
+  archival sweep ran: **R3 + R4 swept to `archive.md`** ("Swept 2026-07-02
+  (evening)"), live index trimmed. Sweep shipped as its own small docs PR
+  (a merged PR can't sweep its own rows); branch restarted from the merged
+  main per the follow-up rule.
+- Next per the attack order: **R20** (observability, HIGH); **T-R2** still
+  ready (own PR); R5/R7 (MED, WS-K) behind them.
+
 ## 2026-07-02 — Session 33: R3 + R4 — write integrity (PR #110)
 
 Reconciliation sweep: **PRs #104 + #105 merged** → archived **M8 / I11 / I14 /
