@@ -52,6 +52,36 @@ export async function listExercises(
 }
 
 /**
+ * Muscle-group *ids* + roles for a set of exercises, keyed by exercise id —
+ * the id-keyed sibling of `getMusclesForExercises` for callers that aggregate
+ * by muscle_group_id (the engine's weekly-set ceiling input, R14 fractional
+ * counting). RLS gates visibility on the anon/user client; the progression
+ * paths call it on the service client with explicit user scoping upstream.
+ */
+export async function getMuscleRoleIdsForExercises(
+  supabase: Client,
+  exerciseIds: string[],
+): Promise<Map<string, { muscleGroupId: string; role: "primary" | "secondary" }[]>> {
+  const map = new Map<
+    string,
+    { muscleGroupId: string; role: "primary" | "secondary" }[]
+  >();
+  const ids = [...new Set(exerciseIds)];
+  if (ids.length === 0) return map;
+  const { data, error } = await supabase
+    .from("exercise_muscle_groups")
+    .select("exercise_id, muscle_group_id, role")
+    .in("exercise_id", ids);
+  if (error) throw error;
+  for (const l of data ?? []) {
+    const arr = map.get(l.exercise_id) ?? [];
+    arr.push({ muscleGroupId: l.muscle_group_id, role: l.role });
+    map.set(l.exercise_id, arr);
+  }
+  return map;
+}
+
+/**
  * Muscle roles (name + primary/secondary) for a set of exercises, keyed by
  * exercise id. Powers the connector's per-day PPL classification (12 §2) —
  * fractional 1.0/0.5 volume counting needs each exercise's own roles, not just

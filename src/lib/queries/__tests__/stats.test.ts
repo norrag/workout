@@ -122,11 +122,12 @@ describe("buildBalance", () => {
     ];
     const volume = buildVolumeMatrix(weeks, rows, []);
     const balance = buildBalance(volume, weeks);
-    // chest avg over W1 logged 10, W2 logged 5, W3 — no projection → 2 weeks
-    expect(balance.push).toBe(8);
+    // chest avg over W1 logged 10, W2 logged 5, W3 — no projection → 2 weeks.
+    // R14: fractional counting keeps 1 dp — (10+5)/2 = 7.5, no integer rounding
+    expect(balance.push).toBe(7.5);
     expect(balance.pull).toBe(5);
-    expect(balance.legs).toBe(3);
-    expect(balance.note).toContain("Push : pull is 1.6 : 1");
+    expect(balance.legs).toBe(2.5);
+    expect(balance.note).toContain("Push : pull is 1.5 : 1");
     expect(balance.note).toContain("Quads");
   });
 });

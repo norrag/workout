@@ -2,7 +2,81 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — R13 + R18 + R19: set-row typing safe from background writes; modal a11y + tap targets; styled 404
+## 2026-07-02 (latest) — metric-definition foundation: fractional volume counting (R14), engine e1RM everywhere (T-A1), deloads out of progress scoring (T-A2) + P18/PH33 quick wins
+
+The Batch-4 owner decisions unblocked the metric-definition work that the
+whole WS-C stats/meso rework (I11 / PH37 / M8 / P16) consumes — this ships
+that foundation first, per the Session-30 build order. Both migrations
+**applied to live** and verified against real data.
+
+- **R14 — fractional 1.0/0.5 volume counting + the RIR≤4 hard-set rule
+  (doc 10 §2, previously unimplemented).** New role-grain view
+  `v_meso_week_muscle_sets` (migration `20260702000001`) exposes weekly
+  planned/logged/**hard**-logged set facts per (meso, week, muscle group,
+  **role**), crediting every muscle an exercise links via
+  `exercise_muscle_groups` (slot-group fallback for unlinked exercises). The
+  1.0/0.5 weights are applied in ONE shared pure fold —
+  `engine/volume.ts::fractionalSetCount` + `volumeCountingWeights`, reading
+  the new optional `engine_params.volume.direct/indirect` keys (v11+
+  `.optional()` discipline: absent ⇒ 1.0/0.5, every stored row stays
+  byte-replayable) — consumed by the stats volume matrix + Balance
+  (`weightWeekMuscleSets`), the MCP volume/balance tools, the set projection
+  (PH34; deload scaling now keeps 1 dp), the planner baseline, the
+  `preview_mesocycle_volume` tool, and the **engine's weekly-set ceiling
+  input** (`weeklySetsByGroup` in progression/regeneration/standalone paths;
+  `EngineInputs.muscleGroupWeeklySets` loosened from `.int()` to fractional —
+  a derived input, excluded from freshness fingerprints, so no staleness
+  cascade). Balance/matrix cells now show halves (e.g. `7.5`).
+  **Verified live:** primary-role counts exactly reproduce the old view's
+  totals (43 = 43 on the active meso W1); secondary rows add the
+  previously-invisible compound credit; zero all-time sets exceed RIR 4, so
+  the hard-set gate changes nothing retroactively.
+  **Spec deviation (recorded):** doc 10 §8's `volume.counting_max_rir` /
+  `volume.warmups_count` are NOT live engine params — SQL can't read
+  versioned params, so both are baked into the view at their doc defaults
+  (rir ≤ 4 or unreported; warm-ups never count) and documented on the params
+  schema; a param the engine can't honor would silently diverge from the
+  numbers actually served. Changing them = a view migration. The old
+  `v_meso_week_sets` + dead `v_muscle_group_volume` stay for the
+  apply→deploy window; retirement folded into R23.
+- **T-A1 — one e1RM system (owner: engine formula everywhere, undecayed for
+  stats, decay is prescription-only).** Migration `20260702000002`:
+  `v_exercise_overview.best_e1rm` + `v_meso_summary.best_e1rm` now read
+  `max(logged_sets.e1rm)` (the stored per-set engine estimate, PH31) instead
+  of recomputing raw Epley; `v_exercise_history` gains `best_set_e1rm`
+  (session-best per-set engine e1RM) so PR logic compares set-grain engine
+  numbers — the meso-stats REP-PR check now uses it instead of the session
+  *average* (which understated the prior bar). `getMesoStats`' two inline
+  raw-Epley computations read the stored `e1rm`; dead `epleyE1rm` deleted
+  from the engine. Raw single-formula Epley now survives nowhere.
+  **Verified live:** 219 overview rows, none lost e1RM; engine values average
+  ~1.10× raw Epley (effective-reps credit — expected); `best_set_e1rm ≥
+  e1rm` on all 4,454 session rows. **Confirmed the 30-day recency half-life
+  is MCP-tunable** (`e1rm.recency_halflife_days: 30` present in the active
+  v17 params row; `propose_engine_params` edits it) — decay itself untouched,
+  still prescription-only (answers PH39).
+- **T-A2 — deloads excluded from strength-progress scoring.**
+  `getMesoProgressScores` skips sessions in deload microcycles (a
+  deliberately light week is recovery, not regression); volume + PR stats
+  keep deload work. Denoted in the MCP metric definitions/notes
+  (get_mesocycle_summary, get_training_overview).
+- **P18 — set-type menu affordance hidden** (owner: drop-set UX never worked
+  out). The data model (`set_type`, the DROP marker on logged sets) stays
+  dormant for a future drop-set feature.
+- **PH33 — admin tools hidden from `tools/list` for non-admins.** New
+  `mcp/visibility.ts` wraps the SDK's stock tools/list handler with a
+  `profiles.role` filter (visibility only — `resolveAdmin` call-time denial
+  remains the boundary; if a future SDK upgrade breaks the capture, it fails
+  open to visible-but-denied). Exercised against real SDK internals in
+  `visibility.test.ts`.
+- **P21 — verified, no change needed:** a "0 days sore" report already
+  stores explicit `0` (the picker uses `=== null` gating, so 0 is a real
+  recorded value through `saveFeedback` → `exercise_feedback.soreness_days`).
+- Green: **644 tests (+15 new: fractional fold, counting weights, role-based
+  weekly sets, PH33 visibility)**, typecheck, lint, production build (`/log`
+  unchanged at 126 kB).
+
+## 2026-07-02 — R13 + R18 + R19: set-row typing safe from background writes; modal a11y + tap targets; styled 404
 
 Three UI/UX items from the 2026-07-01 review
 ([R13/R18/R19](reviews/2026-07-01-repo-review.md)) — the day-view logging loop

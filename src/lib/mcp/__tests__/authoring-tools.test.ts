@@ -4,7 +4,8 @@ import { mesoActivationBlock } from "@/lib/queries/generation";
 import { weeklySetsByGroup, previewVolume } from "../tools/authoring";
 
 // ---------------------------------------------------------------------------
-// weeklySetsByGroup — by-block weekly-set aggregation (matches v_meso_week_sets)
+// weeklySetsByGroup — weekly-set aggregation (fractional via roles since R14;
+// by-block fallback when no roles are supplied, as in these legacy-shape cases)
 // ---------------------------------------------------------------------------
 
 describe("weeklySetsByGroup", () => {

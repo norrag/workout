@@ -1830,11 +1830,10 @@ function SetRow({
         )}
         {!readOnly && (state === "next" || state === "future") && (
           <>
-            <MenuRow
-              label="Set type"
-              trailing={`${dropPending ? "DROP" : "STRAIGHT"} ›`}
-              onClick={onToggleDrop}
-            />
+            {/* P18 (owner 2026-07-02): the "Set type" row is hidden — the
+                drop-set UX was never worked out. The data model (set_type,
+                dropPending, the DROP marker on already-logged sets) stays
+                dormant for a future drop-set feature. */}
             <MenuRow
               label="Skip set"
               onClick={() => {

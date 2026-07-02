@@ -724,3 +724,16 @@ export function registerAdminTools(server: McpServer) {
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
 }
+
+/** Every role-gated tool this module registers — the roster the tools/list
+ *  visibility filter hides from non-admins (PH33). */
+export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
+  LIST_ENGINE_PARAMS,
+  GET_ENGINE_PARAMS,
+  PROPOSE_ENGINE_PARAMS,
+  ACTIVATE_ENGINE_PARAMS,
+  GET_ENGINE_DECISIONS,
+  REPLAY_DECISIONS,
+  SIMULATE_PRESCRIPTIONS,
+  DISCARD_ENGINE_PARAMS,
+]);

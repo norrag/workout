@@ -1,7 +1,12 @@
 import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { assessMuscleVolume, type ExperienceLevel } from "@/lib/engine";
+import {
+  assessMuscleVolume,
+  volumeCountingWeights,
+  type ExperienceLevel,
+  type VolumeCountingWeights,
+} from "@/lib/engine";
 import { getProfile } from "@/lib/queries/profiles";
 import {
   getActiveEngineParams,
@@ -65,21 +70,49 @@ export interface GroupSets {
 }
 
 /**
- * Aggregate a plan's slots into weekly working sets per muscle group — the
- * by-block count `v_meso_week_sets` uses (a slot's sets credit the group it sits
- * in), summed across the week's days. Pure.
+ * Aggregate a plan's slots into fractional weekly working sets per muscle
+ * group (doc 10 §2, R14): when a slot's exercise roles are known, its
+ * `initial_sets` credit 1.0 to each primary and 0.5 to each secondary muscle
+ * (weights from `engine_params.volume`); slots without roles (proposed `days`
+ * specs with no exercise ids, or unlinked exercises) credit the block's group
+ * at the direct weight — matching the weekly-volume view's fallback. Pure.
  */
 export function weeklySetsByGroup(
   days: {
-    groups: { muscle_group: string; fills: { initial_sets: number | null }[] }[];
+    groups: {
+      muscle_group: string;
+      fills: { initial_sets: number | null; exercise_id?: string | null }[];
+    }[];
   }[],
+  rolesByExercise: Map<
+    string,
+    { name: string; role: "primary" | "secondary" }[]
+  > = new Map(),
+  weights: VolumeCountingWeights = { direct: 1.0, indirect: 0.5 },
 ): GroupSets[] {
   const byGroup = new Map<string, number>();
+  const credit = (group: string, amount: number) =>
+    byGroup.set(
+      group,
+      Math.round(((byGroup.get(group) ?? 0) + amount) * 100) / 100,
+    );
   for (const day of days)
-    for (const g of day.groups) {
-      const sets = g.fills.reduce((n, f) => n + (f.initial_sets ?? 0), 0);
-      byGroup.set(g.muscle_group, (byGroup.get(g.muscle_group) ?? 0) + sets);
-    }
+    for (const g of day.groups)
+      for (const f of g.fills) {
+        const sets = f.initial_sets ?? 0;
+        const roles = f.exercise_id
+          ? rolesByExercise.get(f.exercise_id)
+          : undefined;
+        if (roles && roles.length > 0) {
+          for (const r of roles)
+            credit(
+              r.name,
+              sets * (r.role === "primary" ? weights.direct : weights.indirect),
+            );
+        } else {
+          credit(g.muscle_group, sets * weights.direct);
+        }
+      }
   return [...byGroup.entries()]
     .map(([muscle_group, sets]) => ({ muscle_group, sets }))
     .sort((a, b) => b.sets - a.sets);
@@ -444,8 +477,10 @@ function registerPreviewMesocycleVolume(server: McpServer) {
         "anything — so a draft self-checks before you commit it. Pass a " +
         "mesocycle_id to preview an existing plan, OR a `days` spec (each day's " +
         "muscle_group blocks with the exercises and their starting sets — the same " +
-        "shape create_mesocycle takes, exercise ids optional here). Sets credit the " +
-        "group they sit in, summed across the week (matching get_muscle_balance). " +
+        "shape create_mesocycle takes, exercise ids optional here). Counting is " +
+        "fractional (doc 10 §2): an existing plan's sets credit 1.0 per primary + " +
+        "0.5 per secondary muscle of each exercise (matching get_muscle_balance); " +
+        "a proposed `days` spec without exercise ids credits the block's group. " +
         "Advisory only (10 §9).",
       inputSchema: {
         mesocycle_id: z.string().uuid().optional(),
@@ -477,7 +512,18 @@ function registerPreviewMesocycleVolume(server: McpServer) {
       if (args.mesocycle_id != null) {
         const plan = await getMesoPlan(client, args.mesocycle_id);
         if (!plan) return jsonResult({ ok: false, error: "Mesocycle not found." });
-        groupSets = weeklySetsByGroup(planToGroupDays(plan));
+        // R14: fractional counting via each exercise's muscle roles
+        const roles = await getMusclesForExercises(
+          client,
+          plan.days.flatMap((d) =>
+            d.groups.flatMap((g) => g.fills.map((f) => f.exercise_id)),
+          ),
+        );
+        groupSets = weeklySetsByGroup(
+          planToGroupDays(plan),
+          roles,
+          volumeCountingWeights(params),
+        );
         source = args.mesocycle_id;
       } else {
         // resolve muscle-group names so a typo fails cleanly, then aggregate the
@@ -531,7 +577,10 @@ function planToGroupDays(plan: MesoPlan) {
   return plan.days.map((d) => ({
     groups: d.groups.map((g) => ({
       muscle_group: g.muscle_group,
-      fills: g.fills.map((f) => ({ initial_sets: f.initial_sets })),
+      fills: g.fills.map((f) => ({
+        initial_sets: f.initial_sets,
+        exercise_id: f.exercise_id,
+      })),
     })),
   }));
 }

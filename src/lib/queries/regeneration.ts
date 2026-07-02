@@ -6,12 +6,14 @@ import {
   rirRamp,
   seedMeso,
   toEngineEquipment,
+  volumeCountingWeights,
   type E1rmAnchor,
   type EngineInputs,
   type EngineParams,
   type ExerciseParamOverride,
   type Prescription,
 } from "@/lib/engine";
+import { getMuscleRoleIdsForExercises } from "./exercises";
 import type { Database, EngineDecisionKind } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "./logging";
 import { getActiveEngineParams } from "./generation";
@@ -854,7 +856,13 @@ export async function reconcilePrescriptions(
       }
     }
     // planned weekly sets per group, and heaviest meso prescription so far, both
-    // keyed off the SOURCE week (week N-1) like generateDay.
+    // keyed off the SOURCE week (week N-1) like generateDay. R14: the weekly-set
+    // count credits fractionally via each exercise's muscle links.
+    const regenRoles = await getMuscleRoleIdsForExercises(
+      service,
+      wes.map((we) => we.exercise_id),
+    );
+    const regenWeights = volumeCountingWeights(params);
     const wesByWeek = new Map<number, (typeof wes)[number][]>();
     for (const we of wes) {
       const w = workoutById.get(we.workout_id);
@@ -877,6 +885,8 @@ export async function reconcilePrescriptions(
       });
       const mgWeekly = weeklySetsByGroup(
         (wesByWeek.get(srcMicro.week_number) ?? []) as unknown as WorkoutExerciseRow[],
+        regenRoles,
+        regenWeights,
       );
       const peaks = peakByExercise(
         priorWeekWes as unknown as WorkoutExerciseRow[],

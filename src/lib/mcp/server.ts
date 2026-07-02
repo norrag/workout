@@ -2,6 +2,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTools } from "./tools";
 import { registerResources } from "./resources";
+import { scopeAdminToolVisibility } from "./visibility";
 
 export const MCP_SERVER_NAME = "workout";
 export const MCP_SERVER_VERSION = "0.1.0";
@@ -64,4 +65,7 @@ this, read the workout://coaching-guide resource.
 export function initializeMcpServer(server: McpServer) {
   registerTools(server);
   registerResources(server);
+  // PH33: admin tools are hidden from tools/list for non-admin sessions
+  // (visibility only — call-time denial is the boundary, in tools/admin.ts)
+  scopeAdminToolVisibility(server);
 }
