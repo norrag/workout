@@ -6,6 +6,7 @@ import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
 import { catchUpProgression } from "@/lib/queries/progression";
 import { ensureFreshPrescriptions } from "@/lib/queries/regeneration";
+import { reportError } from "@/lib/observability/report";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -54,15 +55,21 @@ export default async function WorkoutPage() {
   // but generation didn't run (e.g. completion raced or failed), run the
   // engine job now and re-read the position.
   if (state.mesocycle && !state.nextWorkout) {
+    const mesoId = state.mesocycle.id;
     try {
       const advanced = await catchUpProgression(
         createServiceClient(),
         user.id,
-        state.mesocycle.id,
+        mesoId,
       );
       if (advanced) state = await getCurrentState(supabase, user.id);
     } catch (error) {
-      console.error("progression catch-up failed", error);
+      // last-resort generation path — if this also fails the user is stuck on
+      // a closed week, so it must be visible in prod (R20)
+      await reportError("workout-tab:progression-catch-up", error, {
+        userId: user.id,
+        mesoId,
+      });
     }
   }
 

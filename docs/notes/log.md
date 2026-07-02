@@ -4,6 +4,32 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 34: R20 — production error observability (PR #112)
+
+Reconciliation sweep: no-op (PR #111 was itself the R3/R4 sweep; no `done`
+rows live). Built the next item in the review's attack order — **R20**
+(observability, HIGH) — on branch `claude/open-work-review-oym68j`, **PR #112**.
+Full record in PROGRESS 2026-07-02 (latest); 07 Phase 7 observability ticked.
+
+- **R20 — done.** New `src/lib/observability/`: `reportError()` funnel —
+  structured `[report:<scope>]` console line always (Vercel captures with no
+  config), plus **dependency-free Sentry envelope delivery** when `SENTRY_DSN`
+  is set (no SDK — deliberate, the client bundle is a live N1 concern; pure
+  wire-format builders, 3s timeout, never throws). `instrumentation.ts`
+  `onRequestError` catches every unhandled server error; the 5 deliberate
+  swallow sites (freshness reconcile, seed decisions, complete/end week
+  generation, workout-tab catch-up) + the MCP tool guard now report before
+  degrading; new root `global-error.tsx` + `(auth)/error.tsx` boundaries and
+  a same-origin-guarded, zod-capped pre-auth `/api/client-error` intake wired
+  to all three client boundaries.
+- **Verification:** 713 unit tests (+20), typecheck, lint, build; end-to-end
+  probe on the built app against a mock ingest (204/403/400 paths + a
+  correctly-formed envelope received; ingest-down still 204s).
+- **Remaining external:** set `SENTRY_DSN` in Vercel (manual-operations row
+  updated — console floor is live regardless).
+- **Next per the attack order:** **T-R2** (ready, own PR — hosted migration
+  transcription); then R5/R7 (MED, WS-K).
+
 ## 2026-07-02 — Session 33 (cont.): PR #110 merged + archival sweep
 
 - **PR #110 MERGED** (all checks green, incl. `rls-tests`). End-of-session

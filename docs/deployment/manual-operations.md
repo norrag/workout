@@ -50,7 +50,7 @@ domain, or an Auth-config change** is a human step.
 | Set/edit **Environment Variables** | Project → Settings → Environment Variables | See the env table in [mcp-connector-setup.md](mcp-connector-setup.md). Set for Production **and** Preview. |
 | **Git integration** (prod = `main`, preview = PRs) | Project → Settings → Git | Already connected. |
 | **Custom domain** | Project → Settings → Domains | Affects the connector endpoint URL + Supabase Site URL. Phase 7 launch step. |
-| Set **`SENTRY_DSN`** (observability) | Project → Settings → Environment Variables | Phase 7 observability: required before the Sentry wiring reports. Optional `MCP_RATE_LIMIT` overrides the 120 req/min connector default. |
+| Set **`SENTRY_DSN`** (observability) | Project → Settings → Environment Variables | Phase 7 observability (R20, wired 2026-07-02): the app-side wiring is live — every reported error already lands in Vercel function logs as a structured `[report:*]` line; setting the DSN additionally ships each one to Sentry (no SDK — direct envelope delivery). Malformed/unset DSN safely degrades to console-only. Optional `MCP_RATE_LIMIT` overrides the 120 req/min connector default. |
 | Run **Lighthouse PWA** + **a11y** audit | A real device / CI, not the sandbox | Phase 7 performance + accessibility pass (target PWA ≥ 90, logging-flow a11y). |
 
 ### Local machine (for `supabase start` / e2e / RLS tests)

@@ -7,6 +7,7 @@ import { registerWriteTools } from "./write";
 import { registerAuthoringTools } from "./authoring";
 import { registerAdminTools } from "./admin";
 import { toolError } from "../envelope";
+import { reportError } from "@/lib/observability/report";
 
 type RegisterTool = McpServer["registerTool"];
 type ToolHandler = Parameters<RegisterTool>[2];
@@ -26,6 +27,9 @@ function withErrorHandling(server: McpServer): McpServer {
       try {
         return await (handler as (...a: unknown[]) => unknown)(...args);
       } catch (err) {
+        // the structured result reaches the model; the server side previously
+        // recorded nothing (R20) — report before enveloping
+        await reportError("mcp:tool", err, { tool: name });
         return toolError(err);
       }
     }) as ToolHandler;

@@ -1,6 +1,7 @@
 import "server-only";
 import type { EngineInputs, EngineParams, Prescription } from "@/lib/engine";
 import { createServiceClient } from "@/lib/supabase/service";
+import { reportError } from "@/lib/observability/report";
 import { engineCodeSha, hashParams } from "./params-provenance";
 
 /**
@@ -118,8 +119,13 @@ export async function recordSeedDecisions(
     return inserts.length;
   } catch (e) {
     // non-fatal: the row keeps its stamped fingerprint but no decision, so the
-    // reconcile simply skips it (pre-phase-2 behavior). Never break the seed.
-    console.error("recordSeedDecisions failed (seed rows will be skipped by reconcile):", e);
+    // reconcile simply skips it (pre-phase-2 behavior). Never break the seed —
+    // but report it (R20): every skipped row is an audit-trail gap.
+    await reportError("queries:record-seed-decisions", e, {
+      userId,
+      mesocycleId: coords.mesocycleId,
+      rows: rows.length,
+    });
     return 0;
   }
 }
