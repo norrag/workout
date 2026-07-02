@@ -4,11 +4,15 @@ Codebase-grounded scope notes for the UI/feature/bug items, keyed by backlog ID.
 Each entry: where it lives, current behavior, rough size, and any blocker or open
 design question. Sizes: trivial / small / medium / large.
 
-> Two recurring blockers to settle with the owner before building:
-> - **Design-decision items (hard rule #8):** macro stats screen (M8), meso
->   `PLAN|STATS` toggle (P16), back-button condition (P17) have **no mockup**.
-> - **Spec-conflict items:** removing the set-type affordance (P18) touches a
->   documented per-set tracking-type feature (doc 09).
+> **Owner decisions received 2026-07-02 (backlog appendix Batch 4)** — the
+> recurring blockers below are now resolved; each entry carries its ruling:
+> - **Design-decision items (hard rule #8):** owner OK'd building the macro stats
+>   screen (M8) and the meso-page rework (P16) **without mockups** (record the
+>   rule-8 deviations); back-button condition (P17) decided (option 2 + spawned
+>   N4). Fidelity is still checked against fig 2.5 / the day-view header where they
+>   exist.
+> - **Spec-conflict items:** P18 — **hide the set-type menu affordance only**,
+>   leave the drop-set data model dormant (no spec change).
 
 ---
 
@@ -21,25 +25,25 @@ clamp on blur/submit. Three consumers must tolerate an interim empty/NaN: hidden
 `duration_months` (L101–105), live `planMacrocycle` (L87), meso-length
 auto-suggest `useEffect` (L77–79). **Ready to build.**
 
-## M10 — Show only *unplanned* mesos on macro overview · **UX / small**
-`src/app/(app)/cycles/macro/[macroId]/page.tsx` (`MacroOverviewPage`),
-"MESOCYCLE TIMELINE" L191–269 renders **all** mesos by `status`; unplanned rows
-already have an inline `+ PLAN` form (L234–248). Filtering to
-`status === "unplanned"` is small. **Open design question:** this conflicts with
-09's intended full chronological ledger — is the timeline being *replaced* by a
-"what's left to plan" list, or do we add a separate list? → **needs-input.**
+## M10 — Show only *unplanned* mesos on macro overview · **wontfix (2026-07-02)**
+Owner dropped this: "Leave unplanned mesos there as they are. Drop this idea." The
+"MESOCYCLE TIMELINE" (`macro/[macroId]/page.tsx` L191–269) keeps rendering **all**
+mesos (matches doc 09's full chronological ledger). Row swept to `archive.md`.
 
-## M8 — Stats unification (meso est-strength; macro 3-way toggle) · **mixed**
+## M8 — Stats unification (meso est-strength; macro 3-way toggle) · **decided → ready**
 - "Est-strength under meso Performance" — **already present** in `PerformanceView`
-  (`src/components/stats/MesoStatsViews.tsx:252-304`). Meso stats today is a
-  2-way `BALANCE | PERFORMANCE` control (`.../meso/[mesoId]/stats/page.tsx:70-87`).
-  → effectively **done**; confirm it's what the note meant.
+  (`src/components/stats/MesoStatsViews.tsx:252-304`); owner confirmed this is what
+  was meant. **Note:** the meso stats surface itself is being reworked by **P16**
+  (Overview|Volume|Performance toggle absorbing the standalone MESO STATS button) —
+  build M8's meso side *through* P16.
 - Macro `OVERVIEW | BALANCE | PERFORMANCE` toggle — **medium–large.** There is **no
   dedicated macro stats screen**; macro stats are 4 static inline tiles
   (`macro/[macroId]/page.tsx:271-292`, `buildMacroStats` in
   `queries/macro.ts:545-602`) and there are no balance/performance rollups at macro
-  scope. **Blocker:** no mockup figure exists ("there is no 4.3") → **needs-input**
-  (design decision per rule #8). Ties into workstream C.
+  scope. **Decision (2026-07-02):** owner OK'd **designing this screen without a
+  mockup** — record the rule-8 deviation in `docs/PROGRESS.md`, model the layout on
+  the meso stats views + the day-view header patterns. Ties into I11/PH37 (the
+  Performance-tab content) and R14 (fractional volume for the Balance tab).
 
 ## I14 — Unify complete-workout slider resolution · **F / medium**
 Both in `src/app/(app)/log/[workoutId]/DayView.tsx`; slider =
@@ -48,9 +52,13 @@ Both in `src/app/(app)/log/[workoutId]/DayView.tsx`; slider =
 `FeedbackSheet` (L1993–2229) uses **max=10 (0–10, 11 points)** plus discrete
 joint-pain (0–3) and days-sore (0–5). **Scope:** raise session sliders to the
 0–10 scale — but this touches **persisted values + engine reads + golden tests**
-(hard rule #3), so it's not purely cosmetic. **Open question:** unify everything
-to one scale, or just the three session sliders? Note: `FeedbackScale.tsx` exists
-but is unused. → **needs-input on scope, then ready.**
+(hard rule #3), so it's not purely cosmetic. **Decision (2026-07-02):** **unify
+everything to one 0–10 scale** ("Unify it absolutely") **and rescale existing
+persisted data** to match ("Rescale the data appropriately"). So this needs: a
+one-time **data migration** rescaling stored session-slider values (0–4 → 0–10,
+and any other off-scale fields), the engine reads/golden tests updated for the new
+range, and `FeedbackScale.tsx` (currently unused) likely becomes the shared
+control. → **ready (medium; includes a migration).**
 
 ## I15 / PH42 — Note icon & pencil glyph (these overlap) · **UX / trivial**
 `DayView.tsx` `ExerciseBlock` icon row L727–766: order L→R is already **note
@@ -61,33 +69,60 @@ the "add a note icon left of history" (I15) **already exists**. The unclear icon
 for a clearer inline SVG pencil matching the icon-row style; confirm fig 1.1
 fidelity. **I15 is likely a no-op (already done); PH42 is the real, ready task.**
 
-## P16 — Meso overview buttons monotonous → overview/stats toggle · **UX / medium**
-`src/app/(app)/cycles/meso/[mesoId]/page.tsx` (`MesoDetailPage`): a vertical stack
-of near-identical `border border-ink/35` rows (EDIT/GO-TO L239–263, MESO STATS
-link L271–276 with a **stale "VOLUME" label**, SAVE AS TEMPLATE L277–287, Share,
-Delete). A `PLAN | STATS` segmented pattern already exists in stats/page.tsx.
-**Open question:** 08/09 specify the meso surface should be the **planner board
-with a `PLAN | STATS` toggle (fig 2.5)** — the current standalone detail page
-diverges. Confirm whether to implement the documented toggle. → **needs-input.**
-Quick win regardless: fix the stale "VOLUME" label.
+## P16 — Meso page rework: toggle + planner-style overview + header actions · **UX / large · decided 2026-07-02**
+`src/app/(app)/cycles/meso/[mesoId]/page.tsx` (`MesoDetailPage`): today a vertical
+stack of near-identical `border border-ink/35` rows (EDIT/GO-TO L239–263, MESO
+STATS link L271–276 with a **stale "VOLUME" label**, SAVE AS TEMPLATE L277–287,
+Share, Delete). **Owner's decided design (verbatim in backlog Batch 4):** rework the
+whole meso page to mirror the macro page + day-view patterns —
+- **Top-level toggle `OVERVIEW | VOLUME | PERFORMANCE`** (owner's words) that
+  **absorbs the standalone MESO STATS button** into the toggle. This is the meso
+  home for M8's meso side + I11/PH37. *(Naming note: "VOLUME" is the owner's term
+  for what the current meso stats calls the **BALANCE** tab — the muscle-group
+  volume/balance view; confirm the final label at build. Doc 09 previously
+  "removed the Volume stats tab" — reconcile the wording with 08/09 before
+  shipping.)*
+- **OVERVIEW becomes a read-only "plan" view** — the meso **planner board rendered
+  in non-edit mode** (view the plan + days, not the current button stack).
+- **Header styled like the day-view header** (`DayView.tsx` header pattern) for
+  consistency, carrying the action affordances:
+  - **Calendar button** (like the notes/history button on day view) → drops down a
+    calendar view; **days are clickable** → the corresponding **day view** if the
+    cycle is active, or the corresponding **plan view** if it's planned.
+  - **Share button** gets its own header button alongside calendar.
+  - **⋮ menu** (like day view) holds the rest: **Edit** (→ opens the planner board
+    in edit mode), **Save as template**, **Delete**.
+- **Quick win regardless / independent:** fix the stale "VOLUME" label on the
+  current MESO STATS link if this ships incrementally.
+**Size:** large — subsumes M8 (meso side) and the meso surface direction from 08/09
+(fig 2.5). Record rule-8 deviations (no exact mockup for the reworked header/menu)
+in `docs/PROGRESS.md`. → **ready (large; sequence the stats content after R14).**
 
-## P17 — Remove back-button when day dropdown picks a new day · **UX / small**
+## P17 — Remove back-button when day dropdown picks a new day · **UX / small · decided 2026-07-02**
 Back link `src/app/(app)/log/[workoutId]/page.tsx:45-50` (`‹ WORKOUT`); navigator
 `DayHeader` in `DayView.tsx` L268–476, day-chip `Link` L432–438. The `/workout`
 root has no back button, but navigating to `/log/{workoutId}` **unconditionally**
-prepends `‹ WORKOUT`; it's route-determined, and the server component can't tell
-how you arrived. **Open question — pick one:** (1) drop the back link entirely
-(loses it for deep-links), (2) keep navigator links inside the `/workout` tab, or
-(3) pass a param/client state. → **needs-input.**
+prepends `‹ WORKOUT`. **Decision:** **option 2** — the day navigator lives inside
+the Workout tab; the day view shows **no back button** (selecting a day isn't a
+"page" change practically). Owner also surfaced a **new** deep-link concern →
+**N4** below (return-to-origin when you deep-link out to "view exercise" and back).
+→ **ready.**
 
-## P18 — Remove the set-type option from the set menu · **UX / small**
+## N4 — Back navigation should return to origin (deep-link) · **UX / small · new 2026-07-02**
+Surfaced in the P17 decision (owner's "option 3" for deep-links). When you click
+through the day view to **"view exercise"** (`/exercises/[id]`), the back control
+returns to the **exercises list**, not the day view you came from. **Fix:** carry
+the originating route (referrer param / client state) so back lands where you came
+from. Pairs with P17 (P17 removes the in-tab back button; N4 fixes back for the
+genuine deep-link case). → **ready.**
+
+## P18 — Remove the set-type option from the set menu · **UX / trivial · decided 2026-07-02**
 `DayView.tsx` `SetRow` menu L1439–1443 (Add-below / **Set type** / Skip / Delete);
 "Set type" toggles `dropPending` STRAIGHT↔DROP, consumed as `set_type` at log time
-(L1272) with a DROP badge (L1405–1409). **Blocker:** per-set tracking type is a
-**documented feature (doc 09)** — removing the data model conflicts with spec.
-Most likely the note wants only the **menu affordance hidden**, not the column
-dropped. Confirm + record deviation in `docs/PROGRESS.md`. → **needs-input** (then
-trivial).
+(L1272) with a DROP badge (L1405–1409). **Decision:** **hide the menu affordance
+only** — leave the `set_type` data model dormant (owner: drop-set UX was never
+worked out; may revisit later). Existing DROP badges/data stay intact; just remove
+the menu item. Record the deviation in `docs/PROGRESS.md`. → **ready (trivial).**
 
 ## P20 — Live-filter exercise search · **UX / small**
 `src/app/(app)/exercises/page.tsx` (`ExercisesPage`): text search is
@@ -187,8 +222,11 @@ fractional rule in at the same rewrite. → **needs-input**, then medium build.
 `public.is_admin()`. So admin tools are **denied at invocation** (defense in
 depth) but **listable** to everyone. Doc 05 says "hidden/denied" — denied is
 satisfied. Hiding from `tools/list` for non-admins is a small cosmetic
-improvement, not spec-required. → **needs-input** (is listing-visibility actually
-a problem?) — likely **low priority / near-wontfix.**
+improvement, not spec-required. **Decision (2026-07-02):** owner wants them
+**admin-only visible** ("not a security thing, but I don't want other clients
+really to see them and ask why they cant use them too"). → **ready:** filter
+`registerAdminTools`' surfaces out of `tools/list` for non-admins (keep the
+per-call `resolveAdmin` denial as-is). Low priority.
 
 ## I13 — Per-exercise, per-user weight increment · **verify-done**
 Shipped 2026-06-21 (PROGRESS.md): `exercise_param_overrides.weight_increment`
