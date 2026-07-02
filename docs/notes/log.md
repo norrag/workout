@@ -4,6 +4,39 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 33: R3 + R4 — write integrity (PR #110)
+
+Reconciliation sweep: **PRs #104 + #105 merged** → archived **M8 / I11 / I14 /
+P16 / P17 / PH37 / R6 / N4** to `archive.md` ("Swept 2026-07-02 (build 2)").
+Then built the next items in the review's attack order — **R3 + R4** (write
+integrity, both HIGH) — on branch `claude/open-work-review-x3yv06`, **PR #110**.
+Migration `20260702000005` **applied live + verified**; full record in
+PROGRESS 2026-07-02 (latest).
+
+- **R4 — done.** `regenerateOpenWorkouts`' two delete branches now exclude
+  anything carrying logged sets (pure `withoutLoggedHistory`); `logSet`'s
+  in_progress flip error surfaced; `completeWorkout` statuses batched +
+  error-checked. The hard-rule-#5 cascade path is closed from both ends.
+- **R3 — done.** Atomic DB functions for the three multi-statement flows
+  (`save_meso_plan` with an ownership guard, `activate_engine_params`,
+  service-only `insert_generated_day` which also ADOPTS poisoned empty days —
+  `planCatchUp` now flags them as gaps); `startMeso` made retry-safe instead
+  of transactional (seed math stays pure-TS, recorded deviation); unique keys
+  on `workouts (microcycle_id, day_number)` + `logged_sets
+  (workout_exercise_id, set_number)` with `logSet` upsert semantics — the
+  live DB's 11 retry-storm duplicate groups (15 excess rows, double-counted
+  volume) deduped in the migration (recorded rule-5 deviation, newest row
+  kept). MCP: `create_mesocycle` days path validates dup days/groups +
+  exercise existence up front, zod bounds, orphan-draft compensation;
+  `edit_mesocycle add_day` rejects same-group-twice days.
+- **Verification first:** Docker was available this session — the full
+  migration chain + the RLS suite (35 green, +6 new) ran on a from-scratch
+  local stack BEFORE the live apply; atomicity/adoption/guard behaviors
+  probed on both local and live. Unit suite **693 green (+15)**, typecheck,
+  lint, build.
+- **Next per the attack order:** R20 (observability, HIGH); T-R2 still ready
+  (own PR); R5/R7 (MED, WS-K) behind them.
+
 ## 2026-07-02 — Session 32 (cont.): I14 slider unification (PR #105, stacked on #104)
 
 Same session, own PR per the build order (it carries a data migration). Branch

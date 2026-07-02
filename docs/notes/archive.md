@@ -11,6 +11,28 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (build 2) — WS-C consumers + I14 merged (PRs #104, #105)
+
+Session 32 shipped the Batch-4 consumer half (stats screens + meso surface +
+nav/date fixes, PR #104) and the slider unification with its data migration
+(PR #105, stacked); both merged. Raw text stays in the backlog appendix; full
+record in PROGRESS 2026-07-02 and the two Session 32 log entries. Migrations
+`20260702000003` (R6 `performed_on`) and `20260702000004` (I14 rescale + v18
+activation) were applied live and verified before merge.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| M8 | Stats unification: meso gets est-strength under performance; macro gets overview+balance+performance 3-way toggle | F | C | **done — merged (PR #104).** Macro page gains OVERVIEW\|BALANCE\|PERFORMANCE (Balance = macro-scope 4.1 view over materialized weeks; Performance = I11/PH37 sections); meso side shipped through P16; tab naming reconciled to BALANCE on both (09 2026-07-02 §1); rule-8 no-mockup deviation recorded. |
+| I11 | Meso stats rework — est-strength %-change for all exercises | F | C | **done — merged (PR #104).** EST. STRENGTH — ALL EXERCISES on meso+macro Performance: %-change per exercise logged ≥3 non-deload sessions (engine e1RM, undecayed, deloads excluded); `sessions` exposed via MCP summaries. Live check: 18/24 exercises qualified in the active meso. |
+| I14 | Raise complete-workout feedback slider resolution to match per-exercise feedback | F | E | **done — merged (PR #105).** All sliders one 0–10 scale; stored `workout_feedback` rescaled round(x×2.5); **engine_params v18** (thresholds 8/3) ACTIVATED in migration `20260702000004` (recorded deviation — rescale and thresholds inseparable); exhaustive scale-equivalence test; applied live + verified. |
+| P16 | Meso page rework: Overview\|Volume\|Performance toggle + planner-style overview + header actions | UX | C/D | **done — merged (PR #104).** Day-view-style sticky header (calendar dropdown = week×day matrix with clickable days, share sheet, ⋮ menu = edit/save-template/delete, meso progress bar) + the three-way toggle; Overview = read-only planner board; `/stats` route redirects into the toggle. Deviations + tab naming in PROGRESS / 09 2026-07-02. |
+| P17 | Remove page back-button when day dropdown selects a new day | UX | E | **done — merged (PR #104).** `/log/[workoutId]` renders no back button (option 2 — the day navigator lives inside the Workout tab). |
+| PH37 | Aggregate strength gains per muscle group over macro/meso | F | C | **done — merged (PR #104).** STRENGTH BY MUSCLE GROUP on meso+macro Performance — role-weighted mean (primary 1.0 / secondary 0.5 via `engine_params.volume`) of I11's qualifying %-changes; `muscle_group_progress` on both MCP summaries; all-time dropped per owner. |
+| R6 | Workout dates & week rollups computed in UTC — evening sessions land on tomorrow's date | B | K | **done — merged (PR #104).** `logged_sets.performed_on` (client-local day; migration `20260702000003` applied live, 10,821 rows backfilled) written at log time; `v_exercise_history` re-bucketed on it; the 6 `shortDate` copies collapsed into `lib/dates.ts`. |
+| N4 | Back button should return to origin on deep-link (day view → view exercise → back) | UX | E | **done — merged (PR #104).** "View exercise" carries `?from=/log/<id>`; the exercise page back control validates the path and returns to the originating day view. |
+
+---
+
 ## Swept 2026-07-02 (build 1) — metric-definition foundation merged (PR #103)
 
 Session 31 built the Batch-4 dependency-first foundation (fractional volume +

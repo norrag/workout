@@ -21,6 +21,7 @@ import {
 } from "@/lib/queries/cycles";
 import {
   createCustomExercise,
+  findUnknownExerciseIds,
   listMuscleGroups,
   addExclusion,
   removeExclusionByExercise,
@@ -74,6 +75,35 @@ export function resolveMuscleGroupIds(
     else if (!missing.includes(name)) missing.push(name);
   }
   return { byName, missing };
+}
+
+/**
+ * R3: validate a hand-built day plan BEFORE anything is written. Two shapes
+ * zod can't see slip through name resolution and violate DB uniques mid-save:
+ * a repeated day_number (`meso_days` unique) and two group entries resolving
+ * to the same muscle group in one day — e.g. "Chest"/"chest" — (`meso_day_groups`
+ * unique). Pure; returns the refusal message or null.
+ */
+export function validateMesoDayPlan(
+  days: { day_number: number; groups: { muscle_group: string }[] }[],
+  idByName: Map<string, string>,
+): string | null {
+  const seenDays = new Set<number>();
+  for (const day of days) {
+    if (seenDays.has(day.day_number))
+      return `day_number ${day.day_number} appears more than once — one entry per day.`;
+    seenDays.add(day.day_number);
+    const seenGroups = new Map<string, string>();
+    for (const g of day.groups) {
+      const id = idByName.get(g.muscle_group);
+      if (!id) continue; // unknown names are reported separately
+      const first = seenGroups.get(id);
+      if (first != null)
+        return `day ${day.day_number} lists muscle group "${g.muscle_group}" twice (as "${first}") — merge its exercises into one block.`;
+      seenGroups.set(id, g.muscle_group);
+    }
+  }
+  return null;
 }
 
 // --- create_macrocycle -----------------------------------------------------
@@ -154,10 +184,14 @@ const mesoDaySchema = z.object({
               sets: z.number().int().min(1).max(10).optional(),
             }),
           )
-          .min(1),
+          .min(1)
+          // a muscle-group block holds at most 10 slots (DB check + planner cap);
+          // bound it here so an oversized request fails clean, not mid-save (R3)
+          .max(10),
       }),
     )
-    .min(1),
+    .min(1)
+    .max(20),
 });
 
 export const CREATE_MESOCYCLE = "create_mesocycle";
@@ -289,6 +323,23 @@ function registerCreateMesocycle(server: McpServer) {
           error: `unknown muscle group(s): ${missing.join(", ")}. Use exact library names.`,
         });
 
+      // R3: everything that could fail the save is validated BEFORE any write —
+      // duplicate day_numbers / same-group-twice-per-day (DB unique violations)
+      // and unknown exercise ids (mirrors edit_mesocycle's check)
+      const planError = validateMesoDayPlan(days, byName);
+      if (planError) return jsonResult({ ok: false, error: planError });
+      const unknown = await findUnknownExerciseIds(
+        client,
+        days.flatMap((d) =>
+          d.groups.flatMap((g) => g.exercises.map((e) => e.exercise_id)),
+        ),
+      );
+      if (unknown.length > 0)
+        return jsonResult({
+          ok: false,
+          error: `unknown or not-visible exercise id(s): ${unknown.join(", ")}.`,
+        });
+
       const meso = await createMesocycle(client, userId, {
         name: args.name,
         weeks: args.weeks,
@@ -316,7 +367,14 @@ function registerCreateMesocycle(server: McpServer) {
         })),
         };
       });
-      await saveMesoPlan(client, userId, meso.id, planDays);
+      try {
+        await saveMesoPlan(client, userId, meso.id, planDays);
+      } catch (e) {
+        // the save is atomic (R3), so a failure left an EMPTY draft — remove it
+        // rather than strand an orphan the model would recreate on retry
+        await client.from("mesocycles").delete().eq("id", meso.id);
+        throw e;
+      }
 
       const placed = await placeIntoMacro(meso.id);
       if (!placed.ok)

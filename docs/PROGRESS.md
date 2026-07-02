@@ -2,7 +2,79 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — I14: one 0–10 scale for every feedback slider (engine_params v18, ACTIVATED)
+## 2026-07-02 (latest) — R3 + R4: write integrity — atomic plan/param writes, race-proof uniques, logged history never cascade-deleted
+
+The review's write-integrity pair (attack order after R17/R16). Four flows
+could half-apply, two delete branches could cascade logged history (a hard
+rule #5 breach path), and two missing unique keys let retries/races duplicate
+data — the live DB already carried 11 duplicated (exercise, set) groups from
+logSet retry storms. Migration `20260702000005` **applied live + verified**;
+the whole chain + the new RLS tests also verified on a from-scratch local
+stack (Docker available in this session — first time the RLS suite ran
+pre-push since R2 revived it).
+
+- **R4 — regeneration can no longer delete logged history.**
+  `regenerateOpenWorkouts`' two delete branches (planned workout whose day
+  left the plan; workout_exercise dropped from the plan) now exclude anything
+  carrying a logged set (pure `withoutLoggedHistory` + one `in` query — the
+  `removeWorkoutExercise` pattern). The porous-status root cause is closed
+  from both ends: `logSet`'s in_progress flip error is **surfaced** (was
+  silently discarded — a set-carrying workout could stay `planned`), and
+  `completeWorkout`'s per-exercise status updates are batched into two
+  error-checked statements (were N fire-and-forget awaits).
+- **R3 — the four non-atomic flows:**
+  - `saveMesoPlan` → **`save_meso_plan()` DB function** (SECURITY INVOKER,
+    one transaction, explicit meso-ownership guard). A failing save now rolls
+    back to the pre-save plan — verified by probe (bad day-2 payload leaves
+    the day-1 plan intact); an active meso's plan can no longer be wiped.
+  - `activateEngineParams` → **`activate_engine_params()`** — deactivate +
+    activate in one transaction; a failed activation rolls back the
+    deactivation (probe: activating v999 raises, active row unchanged). The
+    ZERO-active-params app-wide outage mode is gone.
+  - week-N+1 generation → **`insert_generated_day()`** (service-role-only
+    EXECUTE): workout + exercises + decisions in one transaction, `on
+    conflict do nothing` on the new unique key, and it **adopts + fills an
+    empty planned day** — so the "poisoned day" a pre-fix half-apply left is
+    healed, not skipped. `planCatchUp`/`advanceWeekAfterWorkout` now treat an
+    empty planned counterpart as a gap (`has_exercises` flag; legacy callers
+    unchanged). Live DB had 0 poisoned days; none can form now.
+  - `startMeso` → **retry-safe** (recorded design deviation from the
+    review's suggested single-transaction function: the seed math must stay
+    in the pure TS engine — hard rule #3 — so the flow converges by retry
+    instead): microcycle ramp upserts on `(mesocycle_id, week_number)`, stale
+    extra weeks + ghost week-1 days from an older attempt are pruned (each
+    guarded by the logged-history check), fully-seeded days are skipped and
+    empty ones adopted. The "permanently unstartable meso" state is gone.
+- **Unique keys + retry semantics:** `workouts (microcycle_id, day_number)`
+  and `logged_sets (workout_exercise_id, set_number)`. `logSet` is now an
+  **upsert** on that key — a retried/double-tapped log converges onto one row
+  (newest values win) instead of double-counting volume/PRs.
+  `regenerateOpenWorkouts`' new-day insert uses `ignoreDuplicates` (a
+  concurrent generation owns the day; skip). **Recorded deviation from hard
+  rule #5:** the migration deletes 15 live duplicate rows (26 → 11 in the
+  duplicated groups, 10,811 → 10,796 total) — machine-cadence retry
+  artifacts (identical values 0.6–2s apart, e.g. six "sets" in 3.7s), kept
+  newest per group; they were inflating volume, not recording history.
+- **MCP validation before destruction (the reachable trigger, PR #92
+  surface):** `create_mesocycle`'s hand-built days path now rejects duplicate
+  day_numbers and two names resolving to one muscle group per day (pure
+  `validateMesoDayPlan`), checks exercise existence up front (shared
+  `findUnknownExerciseIds`, same message as `edit_mesocycle`), and bounds
+  exercises (≤10/group) + groups (≤20/day) in zod; a failed plan save deletes
+  the just-created empty draft instead of stranding an orphan for the model
+  to multiply. `edit_mesocycle add_day` rejects a same-group-twice day inside
+  the pure `applyMesoEdits` transform.
+- **Verification:** unit suite **693 green (+15)** (new
+  `write-integrity.test.ts`, `planCatchUp` poisoned-day cases, `add_day`
+  dup-group case), typecheck, lint, production build. **RLS suite 35 green
+  (+6)** on a from-scratch local stack (new: `save_meso_plan` owner-only +
+  cross-user refusal leaves the plan intact; `activate_engine_params`
+  non-admin refusal keeps exactly one active row; `insert_generated_day` not
+  callable by authenticated; both unique keys raise 23505). Live probes:
+  ownership guard raises for a no-session caller; failed activation leaves
+  v18 active; adopt path fills a poisoned day then no-ops on repeat.
+
+## 2026-07-02 — I14: one 0–10 scale for every feedback slider (engine_params v18, ACTIVATED)
 
 The complete-workout session sliders (overall fatigue / effort / performance)
 were 0–4 while the per-exercise sliders (pump / workload / soreness) were
