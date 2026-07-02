@@ -11,6 +11,20 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (late) — T-R2 hosted-migration transcription merged (PR #115)
+
+Session 35 shipped the follow-up table's last `ready` item; PR #115 merged with
+all checks green (`rls-tests` rebuilt the chain with the new file). SQL-only —
+no app change, no hosted apply (hosted already recorded the version). Full
+record in PROGRESS 2026-07-02 (latest) and the Session 35 log entry. The
+hosted↔repo drift R2 documented is now fully closed (runbook annotated).
+
+| ID | From | Title | Type | Resolution |
+|----|------|-------|------|------------|
+| T-R2 | R2 | Capture the out-of-band hosted migration `20260620115322_perf_rls_initplan_and_fk_indexes` in the repo chain (56 initplan-wrapped policies + 23 FK indexes, hosted-only) | F | **done — merged (PR #115).** Body transcribed verbatim from hosted `schema_migrations.statements` (base64-fetched, md5-verified `25446aa1…`), placed at its true chain position with the two time-capsule references documented (`shares_grantee_accept`, pre-fix `profiles_update_own` — both superseded later in the chain, as on hosted). Scratch-PG16 verification: chain applies from zero; end-state policy + index aggregate hashes identical to hosted (56 policies `15f40291…`, 105 indexes `037f0d6d…`); negative control without the file diverges by exactly the documented drift. |
+
+---
+
 ## Swept 2026-07-02 (night) — R20 observability merged (PR #112)
 
 Session 34 shipped the review's HIGH observability item; PR #112 merged with

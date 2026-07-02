@@ -21,6 +21,9 @@ const PUBLIC_PATHS = [
   // to report a crash from a signed-out state. Same-origin-guarded + zod-capped
   // in the route itself; a redirect-to-/sign-in here would eat every report.
   "/api/client-error",
+  // Offline fallback (R7): the service worker precaches this document at
+  // install time; a redirect-to-/sign-in would poison the cached fallback.
+  "/~offline",
 ];
 
 export async function updateSession(request: NextRequest) {
