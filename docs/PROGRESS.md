@@ -2,7 +2,58 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-01 (latest) — R17 + R16: sheet writes fail soft; planner staged edits survive failure & navigation
+## 2026-07-02 (latest) — R13 + R18 + R19: set-row typing safe from background writes; modal a11y + tap targets; styled 404
+
+Three UI/UX items from the 2026-07-01 review
+([R13/R18/R19](reviews/2026-07-01-repo-review.md)) — the day-view logging loop
+and its overlays. No engine, schema, or query change.
+
+- **A set row never overwrites typing with a background write (R13).** The
+  SetRow re-sync effect reset both cells whenever `set_weights` /
+  `bodyweight` changed — so the revalidation from a blur-persisted weight (or
+  an auto-match fan-out from logging another set) landed 0.5–2s later and
+  silently replaced reps the user was mid-typing; tap LOG without noticing and
+  wrong reps got logged. The effect is split: the row's **own logged-set**
+  changes (log/unlog/amend echo) always adopt server state; **planned-input**
+  changes adopt only while the row has no uncommitted typing (`edited` ref).
+  The rule is pure (`day-rules.ts` `adoptServerRowState`) and unit-tested.
+  Known tradeoff: a row you've typed in keeps your values over a later
+  auto-match/reset-to-prescription fan-out — explicit input wins; what you see
+  is what logs.
+- **Modal surfaces got the keyboard/focus contract (R18).** New shared
+  `useModalA11y` (`components/ui/useModalA11y.ts`): focus moves into the panel
+  on open and back to the opener on close, Tab cycles inside, Escape closes
+  (top-most overlay only, via a module stack). Wired into `BottomSheet` (all
+  ~18 sheets), the bespoke `CompleteSheet` (which also gained its missing
+  `role="dialog"`/`aria-modal`), and `AnchoredMenu` — whose rows are now real
+  `role="menuitem"`s with ↑/↓/Home/End navigation.
+- **Tap targets raised to the WCAG 2.2 floor without visual change (R18).**
+  The LOG checkbox (the most-tapped control in the app) was a 21px target: the
+  button now fills its 44×32 cell, the 21px box stays the visual. Per-set ⋮
+  ~10px → 24×32 (overflows its 20px column into the gaps). Planner ▲▼
+  20×14 → 24×24 each, absorbed into row padding via negative margins
+  (**rule-8 note:** the arrow glyphs sit ~5px further apart vertically —
+  the only visible delta, required to meet the 24px floor).
+- **Pinch-zoom cap kept (R18 bullet ruled against, owner 2026-07-02).** The
+  review flagged `maximumScale: 1` as WCAG 1.4.4 harm and this PR briefly
+  dropped it, but the owner ruled to keep the cap: the app is an installed
+  PWA and pinch-zoom breaks the native feel. Reverted in the same PR; the
+  ruling is recorded on the viewport config so it isn't re-"fixed".
+- **404s land on a ledger card inside the app shell (R19).** New
+  `(app)/not-found.tsx` (**rule-8 note:** no mockup exists for a 404 card;
+  styled after the `(app)/error.tsx` precedent) — previously 10+ `notFound()`
+  sites dead-ended on Next's unstyled default with no tab bar. Landing there
+  also clears the session `lastWorkoutId` pointer, closing the loop where the
+  Workout tab itself 404'd on every tap after the pointed-at meso was deleted.
+- **CompleteSheet totals agree with the header progress bar (R19).** The
+  set-progress math (`plannedSetCount`/`exerciseDone` + the skipped-slot-
+  excluded totals) moved to pure `day-rules.ts::daySetTotals`, shared by both
+  surfaces and unit-tested — the sheet could previously read "2 / 4" under a
+  header reading 100% because it ignored skipped set slots.
+- Green: 629 tests (+15), typecheck, lint, production build (`/log` first-load
+  126 kB, +1 kB for the a11y hook).
+
+## 2026-07-01 — R17 + R16: sheet writes fail soft; planner staged edits survive failure & navigation
 
 The two field-usability failure modes from the 2026-07-01 review
 ([R17/R16](reviews/2026-07-01-repo-review.md#3--client-resilience--ux)): a

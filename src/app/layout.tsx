@@ -41,6 +41,9 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  // Owner ruling (2026-07-02, PR #100): keep the zoom cap — this is an
+  // installed PWA and pinch-zoom breaks the native feel. Do not remove for
+  // WCAG 1.4.4 without a new owner decision (R18 flagged it; ruled against).
   maximumScale: 1,
   viewportFit: "cover",
 };

@@ -730,13 +730,16 @@ export function PlannerBoard({
                   key={fill.id}
                   className="flex items-center gap-3 border-b border-ink/[0.18] py-2.5 pl-0.5 last:border-b-0"
                 >
-                  <div className="flex flex-col">
+                  {/* ▲▼ were 20×14px targets (R18): each button is now 24×24,
+                      absorbed into the row's own padding/gap via negative
+                      margins so the visual layout is unchanged */}
+                  <div className="-mx-0.5 -my-2.5 flex flex-col">
                     <button
                       type="button"
                       aria-label={`move ${fill.exercise_name} up`}
                       disabled={idx <= 0}
                       onClick={() => moveDayExercise(activeDay.id, fill.id, -1)}
-                      className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                      className="flex h-6 w-6 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
                     >
                       ▲
                     </button>
@@ -745,7 +748,7 @@ export function PlannerBoard({
                       aria-label={`move ${fill.exercise_name} down`}
                       disabled={idx >= flat.length - 1}
                       onClick={() => moveDayExercise(activeDay.id, fill.id, 1)}
-                      className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                      className="flex h-6 w-6 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
                     >
                       ▼
                     </button>
