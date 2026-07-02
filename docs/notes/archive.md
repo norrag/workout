@@ -11,6 +11,21 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-02 (late 2) — R5 + R7 hardening merged (PR #116)
+
+Session 35 (cont. 2) shipped the next two WS-K items; PR #116 merged with all
+checks green (`rls-tests` ran the 9 new completion-lock tests against the
+migrated chain). Migration `20260702000006` applied live, per-table policy
+state hash-verified against the scratch chain. Full record in PROGRESS
+2026-07-02 and the Session 35 (cont. 2) log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R5 | Completion lock bypassable/asymmetric (completed→in_progress flip; `workout_exercises`/`workout_feedback` mutable post-completion; sets insertable into completed workouts) + child INSERT policies skip parent-ownership (feedback-slot squat) | B | K | **done — merged (PR #116).** Migration `20260702000006_completion_lock_hardening`: workouts update-open/insert-planned-own-micro/delete-planned-no-history; workout_exercises + workout_feedback + logged_sets INSERT + exercise_feedback INSERT/WITH CHECK gated on owned, planned/in_progress parents (slot squat closed); microcycles update-not-completed/insert-own-meso/delete-no-history. Authed write-path inventory first — completion writes land pre-flip, nothing legitimate blocked. 29 scratch probes + 9 RLS suite tests; applied live + hash-verified. |
+| R7 | Service worker caches authed pages/RSC ~24h, never purged on sign-out (stale prescriptions offline + shared-device privacy; contradicts online-only) | B | K | **done — merged (PR #116).** `sw.ts` runtime caching trimmed to static assets (documents/RSC/`/api/` NetworkOnly — built `sw.js` has zero NetworkFirst handlers); precached `/~offline` ledger interstitial served on offline navigations; `ClearClientCaches` on auth screens purges non-precache CacheStorage + the `lastWorkoutId` pointer. |
+
+---
+
 ## Swept 2026-07-02 (late) — T-R2 hosted-migration transcription merged (PR #115)
 
 Session 35 shipped the follow-up table's last `ready` item; PR #115 merged with

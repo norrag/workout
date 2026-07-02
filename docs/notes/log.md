@@ -4,6 +4,29 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-02 — Session 35 (cont. 3): PR #116 merged + R9 + R10 — analysis honesty fixes (PR #117)
+
+- **PR #116 MERGED** (all checks green — `rls-tests` ran the 9 new
+  completion-lock tests against the migrated chain). Archival sweep ran:
+  **R5 + R7 swept to `archive.md`** ("Swept 2026-07-02 (late 2)"), live index
+  trimmed; branch restarted from the merged main. Sweep rides with this PR.
+- Continued per the attack order — **R9 + R10** (both MED, WS-G), **PR #117**.
+- **R9 — done.** `analyzeComparableProgress` short-phase fix: with ≤ window
+  points the rolling max equals the phase best and there is no prior baseline,
+  so every phase start asserted "improving" — even a strict decline (the MCP
+  surface built to kill false trend reads). Now a short phase reads the trend
+  within the window (latest vs first, tolerance-banded → declining /
+  improving / plateau). New trend cases incl. `[120,110,100]` → declining
+  and the two-point drop; the flat day-slot series still reads plateau.
+- **R10 — done.** `replay_decisions`' seed branch now passes the stored
+  `bodyweight` to `seedMeso` — under the live v16 bodyweight model the replay
+  omitted it, so every bodyweight-lift seed replayed as the deferred
+  null-weight prescription and diffed spuriously against ANY candidate,
+  corrupting the doc-04 tuning loop. Regression test: a bodyweight seed
+  replays unchanged under v16 (verified failing without the fix).
+- **Next per the attack order:** R11 + R12 (MED, WS-G); R15 (MED, WS-D)
+  behind them; then the LOW tail (R21–R25).
+
 ## 2026-07-02 — Session 35 (cont. 2): R5 + R7 — completion-lock hardening + SW cache trim (PR #116)
 
 Continued per the attack order on the restarted branch — **R5 + R7** (both MED,

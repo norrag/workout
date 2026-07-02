@@ -7,6 +7,7 @@ import {
   type EngineParams,
 } from "@/lib/engine";
 import { buildSeedInputs } from "@/lib/queries/fingerprint";
+import { V16_PARAMS } from "@/lib/engine/__tests__/helpers";
 import type { DecisionRecord } from "@/lib/queries/engine-admin";
 import {
   deepMerge,
@@ -217,6 +218,47 @@ describe("replayDecisions", () => {
     );
     // dispatched to seedMeso → reproduces the stored output (unchanged).
     const outcome = replayDecisions([stored], DEFAULT_ENGINE_PARAMS as EngineParams);
+    expect(outcome.changed).toBe(0);
+    expect(outcome.outcomes.unchanged).toBe(1);
+    expect(outcome.errors).toBe(0);
+  });
+
+  it("replays a bodyweight seed with the stored bodyweight (R10)", () => {
+    // R10: stored seed inputs carry `bodyweight`; the replay used to drop it,
+    // so under the live bodyweight model every bodyweight-lift seed replayed
+    // as the deferred null-weight prescription and diffed spuriously.
+    const anchor = { value: 220, confidence: "high" as const };
+    const seedIn = buildSeedInputs({
+      equipmentType: "bodyweight",
+      loadType: "bodyweight_loadable",
+      profile: { experience_level: "intermediate" },
+      goal: "hypertrophy",
+      startRir: 3,
+      isDeload: false,
+      initial: null,
+      priorPeak: null,
+      strengthAnchor: anchor,
+      bodyweight: 180,
+    });
+    const seedOut = seedMeso(
+      null,
+      null,
+      { equipmentType: "bodyweight", loadType: "bodyweight_loadable" },
+      { experienceLevel: "intermediate" },
+      3,
+      V16_PARAMS,
+      { goalType: "hypertrophy", anchor, bodyweight: 180 },
+    );
+    // sanity: with the bodyweight present the seed prices a real load —
+    // if this were the deferred null-weight seed the test would prove nothing
+    expect(seedOut.weight).not.toBeNull();
+
+    const stored = decision(
+      seedIn as unknown as Record<string, unknown>,
+      seedOut as unknown as Record<string, unknown>,
+      "seed",
+    );
+    const outcome = replayDecisions([stored], V16_PARAMS);
     expect(outcome.changed).toBe(0);
     expect(outcome.outcomes.unchanged).toBe(1);
     expect(outcome.errors).toBe(0);
