@@ -2,7 +2,57 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R25: MCP polish (3 of 4)
+## 2026-07-03 (latest) — N5 + N11 + N7 + N8: Batch-5 quick fixes (day view, scroll lock, meso badges)
+
+The four scoped one-file items from the Batch 5 intake
+(`docs/notes/backlog.md`), shipped together per the recorded attack order.
+
+- **N5 — replace-exercise no longer leaves the old exercise's numbers on set 1.**
+  PH38's symptom back via a different mechanism: the server side was correct
+  (PR #84's `set_weights` clear intact, new prescription seeded synchronously) —
+  the stale value was retained client `useState` on the editable "next" row.
+  Neither the card key (`we.id`, stable through a replace) nor the row key
+  carried the exercise identity, and the planned-input re-sync effect's deps
+  (`plannedWeight`, `bodyweight`) don't change across a swap, so nothing
+  remounted or re-synced. Fix: the `SetRow` key now includes `we.exercise_id`,
+  so a replace remounts the rows and set 1 re-initializes from the new
+  prescription (sets 2+ were always prop-derived, hence first-set-only).
+- **N11 — deload sets no longer read ▼ at exactly-prescribed performance.**
+  The P19 over/under marker was RIR-asymmetric: the prescription side baked in
+  the week's target RIR while an unreported logged RIR (the quick LOG path
+  always writes `null`) defaulted to 0 effective-rep credit — so identical
+  weight+reps read as a big miss, worst on deloads (target RIR ≈ 6, the ramp's
+  max; working weeks carried a smaller version of the same skew). The rule now
+  compares both sides at the SAME RIR when unreported (`rir_reported ??
+  targetRir`), and is extracted to pure
+  `day-rules.ts::loggedSetMarker` (previously an untestable inline memo) with
+  6 new unit tests incl. the deload regression.
+- **N7 — sheets/menus restore the exact scroll position.** The shared
+  `useScrollLock` only set body `overflow:hidden`, which does not pin the
+  scroll offset on an installed iOS PWA — the soft keyboard shifted the
+  document and nothing put it back, so dismissing the note sheet landed the
+  page lower than where the user started. The lock now captures `scrollY` and
+  applies `position:fixed; top:-scrollY; width:100%`, and the release restores
+  the styles and `scrollTo`s the saved offset. One file; covers every
+  sheet/menu (all consumers ride the same hook). Scrollbar-padding
+  compensation and the stacked-overlay ref count unchanged.
+- **N8 — planned-meso badges + future-meso muting** (owner decision, Batch 5 +
+  same-day addendum; dated delta in 09 2026-07-03): `/cycles` `StatusMark`
+  planned → "PLANNED" text badge in CURRENT's geometry in ink (the checkbox
+  vocabulary is reserved for completion), macro timeline planned rows swap the
+  right-side progress bar for the same badge (numbered marks stay), and both
+  surfaces mute everything that isn't current/completed (names ink/50,
+  sublines ink/45; unplanned rows keep `+ PLAN` and their existing muting).
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (752, +6), production
+build (`/log` first-load 127 kB — `day-rules.ts` imports the zod-free
+`engine/predict` core only, so the WS-J bundle split holds) all green. No
+local stack in this sandbox: N5 (replace flow) and N7 (installed-iOS-PWA
+keyboard behavior) are flagged for the owner's on-device spot-check.
+
+## 2026-07-03 — R25: MCP polish (3 of 4)
 
 The MCP robustness batch (LOW, workstream K) minus the tool-surface
 consolidation, which is a deliberate design pass (not mechanical) and stays

@@ -41,11 +41,7 @@ import type {
 // WS-J bundle split: import the zod-free predictor core + load helpers directly
 // so the client chunk never pulls the engine barrel (prescribe/macro/rules) or
 // zod. `params` arrives already validated by the server (getActiveEngineParams).
-import {
-  predictRepsAtWeight,
-  estimateE1rm,
-  type E1rmConfig,
-} from "@/lib/engine/predict";
+import { predictRepsAtWeight, type E1rmConfig } from "@/lib/engine/predict";
 import {
   effectiveLoad,
   isBodyweightLoad,
@@ -59,6 +55,7 @@ import {
   adoptServerRowState,
   daySetTotals,
   exerciseDone,
+  loggedSetMarker,
   plannedSetCount,
 } from "./day-rules";
 import {
@@ -1039,7 +1036,11 @@ const ExerciseBlock = memo(function ExerciseBlock({
                   : "future";
             return (
               <SetRow
-                key={`${setNumber}-${logged?.id ?? "open"}`}
+                // exercise_id keys the row to the exercise occupying the slot:
+                // a replace keeps the workout_exercise row (same we.id) but must
+                // remount the editable "next" row, whose useState otherwise
+                // retains the OLD exercise's weight/reps on set 1 (N5)
+                key={`${we.exercise_id}-${setNumber}-${logged?.id ?? "open"}`}
                 we={we}
                 setNumber={setNumber}
                 state={state}
@@ -1474,38 +1475,25 @@ function SetRow({
   );
 
   // P19: a logged set gets a small marker for whether it landed above or below
-  // its prescription, compared by e1RM so it accounts for both the reps hit and
-  // the RIR left in reserve (more reps OR closer to failure => above). Null when
-  // there's no prescription or the set isn't logged; on-target (within a small
-  // band) shows no marker to keep the row quiet.
-  // for bodyweight movements the e1RM compares on EFFECTIVE load: the prescription
+  // its prescription (rule + the N11 equal-RIR comparison live in day-rules.ts).
+  // For bodyweight movements the e1RM compares on EFFECTIVE load: the prescription
   // against the current bodyweight, the logged set against the bodyweight captured
   // on that set (historical honesty).
   const performance = useMemo<"over" | "under" | null>(() => {
     if (state !== "logged" || !logged) return null;
-    const prescribedEff = isBw
-      ? effectiveLoad(loadType, prescribedWeight ?? 0, bw)
-      : prescribedWeight;
-    const prescriptionE1rm =
-      prescribedEff != null && prescribedEff > 0 && prescribedReps != null
-        ? (estimateE1rm(prescribedEff, prescribedReps, targetRir, e1rmCfg)
-            ?.value ?? null)
-        : null;
-    const loggedEff = isBw
-      ? effectiveLoad(loadType, logged.weight, logged.bodyweight ?? bw)
-      : logged.weight;
-    const loggedE1rm =
-      loggedEff != null && loggedEff > 0
-        ? (estimateE1rm(loggedEff, logged.reps, logged.rir_reported, e1rmCfg)
-            ?.value ?? null)
-        : null;
-    return prescriptionE1rm != null && loggedE1rm != null && prescriptionE1rm > 0
-      ? loggedE1rm > prescriptionE1rm * 1.015
-        ? "over"
-        : loggedE1rm < prescriptionE1rm * 0.985
-          ? "under"
-          : null
-      : null;
+    return loggedSetMarker({
+      prescribedEffectiveWeight: isBw
+        ? effectiveLoad(loadType, prescribedWeight ?? 0, bw)
+        : prescribedWeight,
+      prescribedReps,
+      loggedEffectiveWeight: isBw
+        ? effectiveLoad(loadType, logged.weight, logged.bodyweight ?? bw)
+        : logged.weight,
+      loggedReps: logged.reps,
+      loggedRir: logged.rir_reported,
+      targetRir,
+      e1rmCfg,
+    });
   }, [
     state,
     logged,

@@ -42,6 +42,34 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-03 — Planned-meso badge + future-meso muting (N8)
+
+Owner decision (verbatim in `docs/notes/backlog.md` appendix Batch 5 + the
+same-day addendum). The v2 mockup predates this — its fig 2.1 planned rows
+still show the empty checkbox; this entry supersedes that detail.
+
+- **Change (cycles list, fig 2.1):** planned mesocycles no longer render the
+  empty checkbox — they get a **"PLANNED" text badge** in CURRENT's exact
+  geometry (1.5px border, 8.5px/700/0.12em caps, 3px 7px padding) in **ink**
+  rather than accent (the owner's "white": ink renders cream-white under the
+  dark ledger inversion). The checkbox vocabulary is reserved for completion
+  (✓ filled box). Row muting widens from unplanned-only to **every future
+  meso**: planned + unplanned names at ink/50, sublines at ink/45 — only
+  current/completed render full ink. Applies to macro-grouped and standalone
+  rows alike.
+- **Change (macro overview timeline, fig 2.2):** the numbered `TimelineMark`
+  vocabulary stays, but **planned rows swap the right-side progress bar for
+  the same PLANNED badge** (a zero-progress bar on a not-yet-started block
+  carried no information); the same muting scheme applies (planned titles
+  ink/50, sublines ink/45; unplanned rows keep `+ PLAN` and their existing
+  muting; completed/active keep their bars).
+- **Rationale:** an empty checkbox reads "incomplete task", not "scheduled
+  block" — the badge names the state; muting keeps the current position the
+  loudest element on the ledger (08 §1: orange marks current position only).
+- **Affected figures:** 2.1, 2.2.
+- **Impact:** `RETROFIT` — shipped in the same PR (`cycles/page.tsx`
+  `StatusMark` + row muting; `cycles/macro/[macroId]/page.tsx` timeline).
+
 ## 2026-07-02 (session 6) — Meso page rework (P16) + macro stats tabs (M8) + strength trends (I11/PH37)
 
 Owner-decided rework of the cycle surfaces (decisions verbatim in
