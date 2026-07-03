@@ -6,7 +6,17 @@ import {
   listMuscleGroups,
   listPickerExercises,
 } from "@/lib/queries/exercises";
-import { PlannerBoard, type MacroContext } from "./PlannerBoard";
+import { getProfile } from "@/lib/queries/profiles";
+import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  muscleVolumeLandmark,
+  volumeCountingWeights,
+} from "@/lib/engine/volume";
+import {
+  PlannerBoard,
+  type MacroContext,
+  type VolumePreviewData,
+} from "./PlannerBoard";
 
 /** Planner board (fig 2.4): days as columns of muscle-group slots. */
 export default async function MesoPlanPage({
@@ -25,13 +35,23 @@ export default async function MesoPlanPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [plan, muscleGroups, exercises, { data: links, error: linkError }] =
-    await Promise.all([
-      getMesoPlan(supabase, mesoId),
-      listMuscleGroups(supabase),
-      listPickerExercises(supabase, user.id),
-      supabase.from("exercise_muscle_groups").select("exercise_id, muscle_group_id"),
-    ]);
+  const [
+    plan,
+    muscleGroups,
+    exercises,
+    { data: links, error: linkError },
+    profile,
+    { params: engineParams },
+  ] = await Promise.all([
+    getMesoPlan(supabase, mesoId),
+    listMuscleGroups(supabase),
+    listPickerExercises(supabase, user.id),
+    supabase
+      .from("exercise_muscle_groups")
+      .select("exercise_id, muscle_group_id, role"),
+    getProfile(supabase, user.id),
+    getActiveEngineParams(supabase),
+  ]);
   if (linkError) throw linkError;
   if (!plan) notFound();
 
@@ -44,6 +64,31 @@ export default async function MesoPlanPage({
     cur.push(link.muscle_group_id);
     groupIdsByExercise.set(link.exercise_id, cur);
   }
+
+  // I12: live weekly-set preview — the board re-folds its slots per edit with
+  // the shared R14 counting (roles + weights below); the landmark bands are
+  // resolved here so the client never touches the params schema.
+  const mgNameById = new Map(muscleGroups.map((g) => [g.id, g.name]));
+  const rolesByExercise: VolumePreviewData["rolesByExercise"] = {};
+  for (const link of links ?? []) {
+    const name = mgNameById.get(link.muscle_group_id);
+    if (!name) continue;
+    (rolesByExercise[link.exercise_id] ??= []).push({
+      name,
+      role: link.role as "primary" | "secondary",
+    });
+  }
+  const experience = profile?.experience_level ?? "intermediate";
+  const landmarks: VolumePreviewData["landmarks"] = {};
+  for (const g of muscleGroups) {
+    const lm = muscleVolumeLandmark(engineParams, g.name, experience);
+    if (lm) landmarks[g.name] = { mev: lm.mev, mrv: lm.mrv };
+  }
+  const volumePreview: VolumePreviewData = {
+    rolesByExercise,
+    landmarks,
+    weights: volumeCountingWeights(engineParams),
+  };
 
   // macro context strip (fig 2.5) — positioned mesos, no more slots
   let macroContext: MacroContext | null = null;
@@ -106,6 +151,7 @@ export default async function MesoPlanPage({
       <PlannerBoard
         plan={plan}
         macroContext={macroContext}
+        volumePreview={volumePreview}
         hasHistory={hasHistory}
         initialDayNumber={
           initialDayNumber && !Number.isNaN(initialDayNumber)

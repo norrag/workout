@@ -5,8 +5,8 @@ import {
   assessMuscleVolume,
   volumeCountingWeights,
   type ExperienceLevel,
-  type VolumeCountingWeights,
 } from "@/lib/engine";
+import { weeklySetsByGroup, type GroupSets } from "@/lib/plan/volume-preview";
 import { getProfile } from "@/lib/queries/profiles";
 import {
   getActiveEngineParams,
@@ -63,60 +63,13 @@ async function planSnapshot(
 }
 
 // --- volume preview (pure) -------------------------------------------------
+// The weekly-set fold relocated to `src/lib/plan/volume-preview.ts` (I12) so
+// the in-app planner board shares the same counting definition; re-exported
+// for existing callers. The landmark zoning stays here (it pulls the engine's
+// params-backed landmark read, which the client-safe fold must not).
 
-export interface GroupSets {
-  muscle_group: string;
-  sets: number;
-}
-
-/**
- * Aggregate a plan's slots into fractional weekly working sets per muscle
- * group (doc 10 §2, R14): when a slot's exercise roles are known, its
- * `initial_sets` credit 1.0 to each primary and 0.5 to each secondary muscle
- * (weights from `engine_params.volume`); slots without roles (proposed `days`
- * specs with no exercise ids, or unlinked exercises) credit the block's group
- * at the direct weight — matching the weekly-volume view's fallback. Pure.
- */
-export function weeklySetsByGroup(
-  days: {
-    groups: {
-      muscle_group: string;
-      fills: { initial_sets: number | null; exercise_id?: string | null }[];
-    }[];
-  }[],
-  rolesByExercise: Map<
-    string,
-    { name: string; role: "primary" | "secondary" }[]
-  > = new Map(),
-  weights: VolumeCountingWeights = { direct: 1.0, indirect: 0.5 },
-): GroupSets[] {
-  const byGroup = new Map<string, number>();
-  const credit = (group: string, amount: number) =>
-    byGroup.set(
-      group,
-      Math.round(((byGroup.get(group) ?? 0) + amount) * 100) / 100,
-    );
-  for (const day of days)
-    for (const g of day.groups)
-      for (const f of g.fills) {
-        const sets = f.initial_sets ?? 0;
-        const roles = f.exercise_id
-          ? rolesByExercise.get(f.exercise_id)
-          : undefined;
-        if (roles && roles.length > 0) {
-          for (const r of roles)
-            credit(
-              r.name,
-              sets * (r.role === "primary" ? weights.direct : weights.indirect),
-            );
-        } else {
-          credit(g.muscle_group, sets * weights.direct);
-        }
-      }
-  return [...byGroup.entries()]
-    .map(([muscle_group, sets]) => ({ muscle_group, sets }))
-    .sort((a, b) => b.sets - a.sets);
-}
+export { weeklySetsByGroup } from "@/lib/plan/volume-preview";
+export type { GroupSets } from "@/lib/plan/volume-preview";
 
 /**
  * Assess weekly sets per muscle group against the experience-scaled MEV/MAV/MRV

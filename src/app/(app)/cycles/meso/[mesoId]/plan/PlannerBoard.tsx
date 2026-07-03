@@ -12,6 +12,8 @@ import type { MesoPlan, PlannedDay } from "@/lib/queries/cycles";
 import type { MuscleGroupRow } from "@/lib/types/database";
 import { shortDateWithYear as shortDate } from "@/lib/dates";
 import { groupByRegion, moveInOrder, planGroupExercises } from "@/lib/planner/groups";
+import { weeklySetsByGroup } from "@/lib/plan/volume-preview";
+import type { VolumeCountingWeights } from "@/lib/engine/volume";
 import {
   addDayAction,
   addGroupsAction,
@@ -43,6 +45,19 @@ const WEEKDAYS = [
 export interface MacroContext {
   label: string;
   slots: { state: "filled" | "this" | "open" }[];
+}
+
+/** I12 — server-resolved inputs for the live weekly-set readout: exercise
+ *  muscle roles (R14 fractional credit), the params counting weights, and the
+ *  experience-scaled MEV/MRV band per muscle (resolved server-side so the
+ *  params schema stays out of this chunk). */
+export interface VolumePreviewData {
+  rolesByExercise: Record<
+    string,
+    { name: string; role: "primary" | "secondary" }[]
+  >;
+  landmarks: Record<string, { mev: number; mrv: number }>;
+  weights: VolumeCountingWeights;
 }
 
 export interface PickerExerciseLite {
@@ -184,6 +199,7 @@ export function PlannerBoard({
   macroContext,
   muscleGroups,
   exercises,
+  volumePreview = null,
   hasHistory = false,
   initialDayNumber = null,
 }: {
@@ -191,6 +207,7 @@ export function PlannerBoard({
   macroContext: MacroContext | null;
   muscleGroups: MuscleGroupRow[];
   exercises: PickerExerciseLite[];
+  volumePreview?: VolumePreviewData | null;
   hasHistory?: boolean;
   /** deep-link a specific day (e.g. from the Day View "Edit day") */
   initialDayNumber?: number | null;
@@ -628,6 +645,16 @@ export function PlannerBoard({
 
   const hasExercise = days.some((d) => d.groups.some((g) => g.fills.length > 0));
 
+  // I12: live weekly-set readout — the shared R14 fold over the CURRENT board
+  // state, so every stepper tap / added exercise moves the numbers instantly.
+  // Roles for a just-picked exercise arrive with the next revalidation; until
+  // then it credits its group at the direct weight (the fold's fallback).
+  const volumeRows = useMemo(() => {
+    if (!volumePreview || !hasExercise) return null;
+    const roles = new Map(Object.entries(volumePreview.rolesByExercise));
+    return weeklySetsByGroup(days, roles, volumePreview.weights);
+  }, [days, volumePreview, hasExercise]);
+
   return (
     <div className={editing ? "pb-24" : undefined}>
       {/* macro context strip */}
@@ -829,6 +856,59 @@ export function PlannerBoard({
         <p className="mt-4 text-sm text-ink/60">
           Add a training day to start planning the week.
         </p>
+      )}
+
+      {/* I12: weekly sets per muscle vs the MEV/MRV band — same fractional
+          counting as the Balance tab and the MCP preview (one definition) */}
+      {volumeRows && volumeRows.length > 0 && volumePreview && (
+        <div className="mt-6">
+          <div className="flex items-baseline justify-between">
+            <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+              WEEKLY SETS PER MUSCLE
+            </div>
+            <div className="text-[8.5px] font-medium tracking-[0.1em] text-ink/45">
+              {volumePreview.weights.direct.toFixed(1)} DIRECT ·{" "}
+              {volumePreview.weights.indirect.toFixed(1)} SECONDARY
+            </div>
+          </div>
+          <div className="mt-2 border-t border-ink/15">
+            {volumeRows.map((r) => {
+              const lm = volumePreview.landmarks[r.muscle_group];
+              const under = lm != null && r.sets < lm.mev;
+              const over = lm != null && r.sets > lm.mrv;
+              return (
+                <div
+                  key={r.muscle_group}
+                  className="flex items-baseline justify-between border-b border-ink/15 py-[7px]"
+                >
+                  <span className="label-caps text-[10px] font-semibold tracking-[0.1em] text-ink/75">
+                    {r.muscle_group}
+                  </span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="numeral text-[13px] font-bold">
+                      {r.sets % 1 === 0 ? r.sets : r.sets.toFixed(1)}
+                    </span>
+                    {lm != null && (
+                      <span
+                        className={`label-caps text-[8.5px] tracking-[0.08em] ${
+                          under || over
+                            ? "font-bold text-ink/80"
+                            : "font-medium text-ink/45"
+                        }`}
+                      >
+                        {under
+                          ? `UNDER MEV ${lm.mev}`
+                          : over
+                            ? `OVER MRV ${lm.mrv}`
+                            : `MEV ${lm.mev} · MRV ${lm.mrv}`}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* save as template (#7) — reusable split from the current plan. Saves the

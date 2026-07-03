@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries/macro";
 import { getProfile } from "@/lib/queries/profiles";
 import { EditMacroForm } from "./EditMacroForm";
+import { MacroBlocksEditor } from "./MacroBlocksEditor";
 
 const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
 
@@ -93,6 +94,17 @@ export default async function EditMacroPage({
           goal_notes: macro.goal_notes,
         }}
         impact={impact}
+      />
+
+      <MacroBlocksEditor
+        macroId={macroId}
+        blocks={mesos.map((m) => ({
+          id: m.id,
+          name: m.name,
+          status: m.status,
+          position: m.position,
+          phase: m.phase,
+        }))}
       />
     </div>
   );

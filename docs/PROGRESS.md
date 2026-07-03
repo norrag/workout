@@ -2,7 +2,50 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R21 coverage (golden v18 · integration · e2e) + N1 per-route skeletons + I12 in-app slices
+## 2026-07-03 (latest) — N13 first-set reset fix + I12 in-app planner UX completed
+
+Owner session (Batch 6): N1 skeletons confirmed on device; I12 design
+authorized ("rework as you see fit"); one new HIGH bug (N13).
+
+- **N13 — reset-to-prescription lands on the first set again.** The R13
+  typed-row guard was swallowing the reset echo on the editable row (the
+  override CLEARING arrives via the planned-input channel, and nothing
+  releases the typed flag on an unlogged row — set 1 is always typed-in
+  because typing is what surfaces the reset option). `adoptServerRowState`
+  gains a `prescription-reset` class: a plannedWeight value→null transition
+  always adopts and clears the flag; null→null (bodyweight edit mid-typing)
+  keeps the R13 protection. The N5 swap remount is untouched — both halves of
+  the "first set must be right" complaint now covered by explicit rules.
+- **I12 — the in-app surface now covers the whole MCP authoring set** (design
+  of record: 09 2026-07-03 session 4):
+  - *Place into macrocycle* (meso ⋮ menu, standalone planned): sheet rows
+    state the exact landing (`FILLS M2` — consumes the slot + inherits its
+    phase — or `ADDS AS M5`), computed with the same pure `planMacroPlacement`
+    the write path runs; lands on the macro timeline.
+  - *Edit details* (meso ⋮ menu, any non-frozen meso): finalize-sheet grammar;
+    name always, WEEKS 3–8 + START/END RIR (end clamped ≤ start) + deload
+    checkbox only before start; `updateMesocycleAttrs` guards re-checked
+    server-side.
+  - *BLOCKS* on the macro edit page: ▲▼ reorder on not-yet-started rows (a
+    move never crosses a started/completed block), ✕ on open slots only,
+    dashed + ADD BLOCK (inherits the macro's block length server-side).
+    Applies immediately; caption says so.
+  - *WEEKLY SETS PER MUSCLE* on the planner board: live fractional counts
+    over the current board state vs the experience-scaled MEV/MRV band;
+    out-of-band emphasized in ink (rule 7 — no accent). The R14 fold moved to
+    `src/lib/plan/volume-preview.ts` — **client-safe (type-only imports, no
+    zod)** so `/plan` holds 121 kB; `previewVolume` (params-backed landmark
+    zoning) stays server-side with the MCP tool re-exporting both for its
+    existing callers/tests. One counting definition across the board, the
+    Balance tab, and `preview_mesocycle_volume`.
+  - Deliberately left MCP-only: explicit-position placement, phase editing.
+    Seed-a-slot-from-template/copy was assessed and dropped — duplicate +
+    place composes to the same outcome.
+- Green: typecheck, lint, **754 tests (+1)**, production build (meso page
+  +1.4 kB, macro edit +0.9 kB, `/plan` +0.6 kB route JS; `/log` 127 kB
+  unchanged).
+
+## 2026-07-03 — R21 coverage (golden v18 · integration · e2e) + N1 per-route skeletons + I12 in-app slices
 
 The next items in the recorded order (PR #134): **R21** — the last full-weight
 review item — all three bullets; the **N1 Phase-A escalation** (per-route
