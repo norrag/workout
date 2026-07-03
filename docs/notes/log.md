@@ -4,6 +4,35 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 36 (cont. 5): PR #127 merged + R25 mechanical fixes (PR #129)
+
+- **PR #127 MERGED** (all checks green). No sweep: R24 stays live
+  (in-progress — the reprice-down investigation remains open); its row now
+  reads "mechanical fixes merged (PR #127)".
+- Note: enabling dependabot (R23) immediately opened **PRs #123–126**
+  (3 github-actions majors + 1 grouped npm minors batch) — left for the
+  owner to review; they consumed the #123–126 numbers, which is why the R24
+  PR landed as #127.
+- Continued the LOW tail — **R25, the 3 mechanical bullets** (LOW, WS-K),
+  **PR #129**. The tool-surface consolidation (+ full error-contract
+  convergence) stays open as a deliberate design pass — row narrowed.
+- **R25 (3/4) — done.** (a) `recordMcpWrite` never throws: every caller runs
+  it AFTER the mutation commits, so an audit failure inverted a successful
+  write into `isError` and a retrying agent duplicated drafts — now
+  log-and-return (`reportError("mcp:audit")`); 3 new tests incl. both
+  failure shapes. (b) Resource handlers (`profile`, `current-cycle`,
+  `coaching-guide`) wrapped in `guardResource`: report + rethrow a clean
+  structured message — the raw-Postgrest `[object Object]` path the tool
+  wrapper was built to kill is closed on the resource surface too.
+  (c) `MCP_JWT_AUDIENCE` enablement runbook step added to
+  `manual-operations.md` (until set, any project-issued user JWT is a valid
+  `/api/mcp` bearer — decode the connector token's `aud`, set the var,
+  redeploy, retest).
+- **Next per the attack order:** R21 (MED, testing infra — the last review
+  item at full weight); the R24/R25 remainders are parked design/investigation
+  items. N1 (WS-J) and I12's in-app planner UX remain the open HIGH-priority
+  workstreams.
+
 ## 2026-07-03 — Session 36 (cont. 4): PR #122 merged + R24 mechanical fixes (PR #127)
 
 - **PR #122 MERGED** (all checks green). Archival sweep ran: **R23 swept to
