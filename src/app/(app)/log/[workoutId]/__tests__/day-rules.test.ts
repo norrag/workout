@@ -201,4 +201,12 @@ describe("adoptServerRowState (R13)", () => {
   it("never adopts a planned-input change over uncommitted typing", () => {
     expect(adoptServerRowState("planned-input", true)).toBe(false);
   });
+
+  // N13: "Reset to prescription" reaches the editable row as its override
+  // clearing — it must land even on the typed-in row (that row's edit is what
+  // made the reset option appear in the first place)
+  it("always adopts a prescription reset, even over a typed-in row", () => {
+    expect(adoptServerRowState("prescription-reset", true)).toBe(true);
+    expect(adoptServerRowState("prescription-reset", false)).toBe(true);
+  });
 });
