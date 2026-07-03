@@ -2,7 +2,84 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — N5 + N11 + N7 + N8: Batch-5 quick fixes (day view, scroll lock, meso badges)
+## 2026-07-03 (latest) — N12 + N9 + N10 + N6: set-log latency/hang, Performance-tab reorg, pull-to-refresh
+
+The next slots in the recorded attack order: **N12** (the daily-loop pain, as
+the opening WS-J slice), **N9+N10** together, and **N6** riding along. All from
+the Batch 5 intake (`docs/notes/backlog.md`).
+
+- **N12 — set logging is fast and the spinner can never hang.** Two halves:
+  - *Latency.* `logSet`'s stamp chain (WE → workout → micro → meso, **4 serial
+    round-trips in front of every set write**) collapses into ONE embedded
+    PostgREST select (FK chain verified unambiguous; embed shape smoke-tested
+    against the live REST endpoint — the hand-authored DB types carry no
+    relationship metadata, so the result is typed via an explicit cast). The
+    `in_progress` flip is skipped once past `planned` (the status rides on the
+    same read; the `.eq status` guard keeps a concurrent first-set race
+    idempotent). And the **reconcile gate no longer busts on the first set of
+    a session**: the gate's completed-work watermark read every workout's
+    `updated_at`, so the log's own planned→in_progress flip invalidated the
+    signature and that log paid the full ~8-10-round-trip reconcile. The
+    watermark timestamp now reads **closed (completed/skipped) workouts only**
+    — the only status that feeds a prescription (N3) — while the row count
+    still spans all rows (generation/plan edits stay caught). Conservatism
+    test extended (`reconcile-gate.test.ts`, +1: the flip must NOT bust).
+    Note: the signature's key set changed, so every meso pays one full
+    reconcile on its first open after deploy, then the gate re-engages.
+  - *Hang.* The LOG box spinner was the row's `useTransition` pending flag,
+    which resolves only when the **revalidated RSC tree commits** — a stalled
+    revalidation fetch (or the app backgrounded mid-flight) pinned it forever
+    even though the write had landed (the reported symptom: navigate away and
+    back, and the set shows logged). The spinner now tracks the **server
+    action itself** bounded by a 15s watchdog, and the box acknowledges
+    checked/unchecked the moment the write confirms (`ack` state; taps are
+    ignored in the echo window; the revalidation echo remounts the row via its
+    `logged.id` key). A timeout surfaces as the shake + a "safe to try again"
+    toast — the R3 upsert makes the retry converge instead of duplicate.
+  - *Deferred (assessed, not built):* J-Phase-2 #5 (`revalidatePath` → tags)
+    still needs the #7 tagging/caching infra to pay off; #6 (narrow the
+    `getWorkoutDetail` `select("*")`s) was measured against the consumed
+    columns — `LoggedSetRow`/`WorkoutExerciseRow` are consumed nearly whole by
+    the day view, so narrowing buys bytes, not round trips. Recorded in
+    `J-performance.md`.
+- **N9 — macro Performance tab: muscle-group gain is the primary stat, with
+  per-group exercise drill-down.** `rollupMuscleProgress` already iterated the
+  per-exercise attribution and discarded it; it now carries
+  `contributors[]` (role + score per exercise, best first — an exercise linked
+  to several groups appears under each, fractional credit as designed). New
+  `MuscleStrengthSection` (client): full-width group rows, ▸/▾ disclosure to
+  the contributing exercises (first→last e1RM, sessions, `SECONDARY` marker).
+  The flat "ALL EXERCISES" list is **dropped at macro scope** (too many across
+  a macro — the owner's call); the meso tab keeps `StrengthProgressSection`
+  unchanged. MCP summaries unaffected (they project explicit fields).
+- **N10 — meso Performance tab trim.** "TOP SET BY WEEK — KEY LIFTS" and
+  "ACROSS MACRO — {lift} EST. 1RM" removed (macro-scope content on a meso
+  view): `buildKeyLifts`, the top-set fold, the chart query block and the
+  `KeyLift`/`MacroChartBar` types are deleted (~230 lines net). The
+  `contextLine`'s `MESO n OF m` position — previously a side effect of the
+  chart build via `keyLifts[0]` — is re-derived from the macro's meso ordering
+  (and now shows even when no key lift existed). Tab is now: est-strength
+  trend + PRS THIS MESO. 09 delta recorded (2026-07-03 session 2).
+- **N6 — pull-to-refresh across the app shell.** The installed standalone PWA
+  has no native PTR. New `PullToRefresh` client wrapper around the `(app)`
+  layout's children (the document is the scroll container; no cycles
+  sub-layout — one wrapper covers the day view and all of `/cycles/**`):
+  gesture arms only at `scrollY === 0`, resisted pull, release past 70px runs
+  `router.refresh()` in a transition with the travelling-gap square as the
+  indicator. `overscroll-behavior-y: contain` suppresses Android Chrome's
+  native PTR so the gesture can't double-fire.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (751 — +1 gate test, −2
+retired `buildKeyLifts` tests), production build with CI env (`/log` +
+`/workout` hold at 127 kB first-load; no bundle regression) all green. The
+`logSet` embed shape returned HTTP 200 against the live PostgREST endpoint
+(anonymous — a bad relationship would 400 regardless of rows). No local stack
+in this sandbox: the N12 on-device feel (set-log round-trip + no hung spinner)
+and the N6 gesture are flagged for the owner's spot-check.
+
+## 2026-07-03 — N5 + N11 + N7 + N8: Batch-5 quick fixes (day view, scroll lock, meso badges)
 
 The four scoped one-file items from the Batch 5 intake
 (`docs/notes/backlog.md`), shipped together per the recorded attack order.

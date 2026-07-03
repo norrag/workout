@@ -378,31 +378,41 @@ export async function logSet(
     performed_on?: string | null;
   },
 ): Promise<LoggedSetRow> {
-  // denormalized cycle stamps come from the workout chain
-  const { data: we, error: weError } = await supabase
+  // denormalized cycle stamps come from the workout chain, read as ONE embedded
+  // select (N12): this used to be 4 serial round-trips (WE → workout → micro →
+  // meso) in front of every single set write — the bulk of the logging latency.
+  // PostgREST resolves the FK chain server-side; the hand-authored DB types have
+  // no relationship metadata, so the embed shape is typed via the cast below.
+  const { data: weData, error: weError } = await supabase
     .from("workout_exercises")
-    .select("id, workout_id, exercise_id")
+    .select(
+      "id, workout_id, exercise_id, workout:workouts(id, microcycle_id, status, microcycle:microcycles(id, mesocycle_id, mesocycle:mesocycles(id, macrocycle_id)))",
+    )
     .eq("id", input.workout_exercise_id)
     .single();
   if (weError) throw weError;
-  const { data: workout, error: workoutError } = await supabase
-    .from("workouts")
-    .select("id, microcycle_id")
-    .eq("id", we.workout_id)
-    .single();
-  if (workoutError) throw workoutError;
-  const { data: micro, error: microError } = await supabase
-    .from("microcycles")
-    .select("id, mesocycle_id")
-    .eq("id", workout.microcycle_id)
-    .single();
-  if (microError) throw microError;
-  const { data: meso, error: mesoError } = await supabase
-    .from("mesocycles")
-    .select("id, macrocycle_id")
-    .eq("id", micro.mesocycle_id)
-    .single();
-  if (mesoError) throw mesoError;
+  const we = weData as unknown as {
+    id: string;
+    workout_id: string;
+    exercise_id: string;
+    workout: {
+      id: string;
+      microcycle_id: string;
+      status: WorkoutRow["status"];
+      microcycle: {
+        id: string;
+        mesocycle_id: string;
+        mesocycle: { id: string; macrocycle_id: string | null };
+      };
+    } | null;
+  };
+  const workout = we.workout;
+  const micro = workout?.microcycle;
+  const meso = micro?.mesocycle;
+  // the FK chain is NOT NULL end to end, so a missing embed means the parent row
+  // is gone (or RLS-hidden) — same failure the old serial .single()s threw on
+  if (!workout || !micro || !meso)
+    throw new Error("logSet: workout chain not found for workout_exercise");
 
   // R3: upsert on (workout_exercise_id, set_number) — a retried/double-tapped
   // log converges onto ONE row (the newest values win) instead of inserting a
@@ -441,12 +451,17 @@ export async function logSet(
   // silently-planned workout with logged sets used to be deletable by plan
   // regeneration (that path now also checks for sets, but the flip must not
   // fail silently: the client retries the log, and the upsert makes that safe).
-  const { error: flipError } = await supabase
-    .from("workouts")
-    .update({ status: "in_progress" })
-    .eq("id", workout.id)
-    .eq("status", "planned");
-  if (flipError) throw flipError;
+  // N12: skipped entirely once past `planned` (every set after the first) — the
+  // status read rode along on the stamp select. The `.eq status` guard keeps a
+  // concurrent first-set race idempotent.
+  if (workout.status === "planned") {
+    const { error: flipError } = await supabase
+      .from("workouts")
+      .update({ status: "in_progress" })
+      .eq("id", workout.id)
+      .eq("status", "planned");
+    if (flipError) throw flipError;
+  }
 
   return data;
 }

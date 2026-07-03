@@ -4,6 +4,54 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 39: N12 + N9 + N10 + N6 — WS-J logging slice + Performance-tab reorg + PTR (PR #132)
+
+Reconciliation sweep: PR #131 merged → **N5/N7/N8/N11 archived** (swept to
+`archive.md`, "Swept 2026-07-03 (later 4)"; N5+N7 stay flagged there for the
+owner's on-device spot-check). Then built the next two slots of the recorded
+attack order in one PR, branch `claude/outstanding-issues-review-r56zpv`.
+Full record in PROGRESS 2026-07-03 (latest); N9/N10's design delta is a dated
+09 entry (2026-07-03 session 2).
+
+- **N12 — done.** Latency: the `logSet` stamp chain (4 serial SELECTs before
+  every set write) is one embedded PostgREST read (smoke-tested against live
+  REST — 200, embeds resolve); the `in_progress` flip is skipped past
+  `planned`; the reconcile gate's completed-work watermark now reads
+  closed (completed/skipped) workouts only, so the first set of a session no
+  longer busts the gate (its own status flip was the buster) — conservatism
+  test extended, +1 case. Signature key set changed ⇒ each meso pays one full
+  reconcile on first open post-deploy, then the gate re-engages. Hang: the LOG
+  spinner tracks the server action (15s watchdog), acknowledges on
+  write-confirm via `ack` state, and the revalidation echo remounts the row;
+  timeout = shake + "safe to try again" (R3 upsert). Deferred-with-reasons:
+  J-Phase-2 #5 (needs #7's tagging), #6 (columns are ~fully consumed; bytes
+  not round trips) — recorded in `J-performance.md`.
+- **N9 — done.** `rollupMuscleProgress` keeps its per-exercise attribution as
+  `contributors[]` (role-tagged, best first; multi-group appearance = expected
+  fractional credit; +unit assertions); new client `MuscleStrengthSection`
+  renders group rows with ▸/▾ drill-down on the macro Performance panel; the
+  flat ALL-EXERCISES list is gone at macro scope. Meso tab component untouched;
+  MCP summaries project explicit fields, so nothing leaks there.
+- **N10 — done.** Key-lift grid + across-macro chart deleted from
+  `PerformanceView` and `stats.ts` (`buildKeyLifts`, top-set fold, chart query,
+  `KeyLift`/`MacroChartBar` types; 2 retired tests). The `contextLine` meso
+  position is re-derived from the macro's meso ordering — decoupled from
+  `keyLifts[0]` and now present even without a lead lift.
+- **N6 — done.** `PullToRefresh` wrapper in `(app)/layout.tsx` (document
+  scrolls → one wrapper covers day view + all `/cycles/**`): armed at
+  `scrollY === 0` only, resisted pull, threshold release → `router.refresh()`
+  in a transition, travelling-gap square indicator;
+  `overscroll-behavior-y: contain` kills Android's native PTR double-fire.
+- **Verified:** typecheck, lint, 751 tests (+1 gate, −2 retired), production
+  build with CI env — `/log` + `/workout` hold at 127 kB. No local stack;
+  N12 feel + N6 gesture flagged for the owner's on-device check.
+
+**Next:** R21 (MED — e2e/integration coverage, unblocked once the R2 chain
+boots locally) is the last review item at full weight; **I12 in-app planner
+UX** remains the open large HIGH; R24's hold-week reprice-down investigation
+and R25's tool-surface consolidation stay open (in-progress rows). N1 Phase-A
+per-route skeletons (the escalated 1-2s nav gap) is the next WS-J slice.
+
 ## 2026-07-03 — Session 38: N5 + N11 + N7 + N8 — the four scoped Batch-5 quick fixes (PR #131)
 
 Reconciliation sweep: no-op (PR #130, the Batch-5 intake, merged — it was

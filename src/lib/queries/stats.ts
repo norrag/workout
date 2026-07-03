@@ -137,12 +137,22 @@ export async function getMesoProgressScores(
 // PH37 — strength gains rolled up per muscle group (meso + macro scopes)
 // ---------------------------------------------------------------------------
 
+/** N9: one exercise's contribution to a muscle group's rollup number. */
+export interface MuscleGroupContributor extends ExerciseProgressScore {
+  /** how the exercise credits this group (primary 1.0 / secondary 0.5) */
+  role: "primary" | "secondary";
+}
+
 export interface MuscleGroupProgress {
   muscle_group: string;
   /** role-weighted mean of the qualifying exercises' e1RM %-changes */
   score_pct: number | null;
   /** contributing exercises */
   lifts: number;
+  /** N9: the exercises that rolled into this number, best score first —
+   *  the macro Performance drill-down. An exercise linked to several groups
+   *  appears under each (fractional credit is expected). */
+  contributors: MuscleGroupContributor[];
 }
 
 export interface ExerciseMuscleLink {
@@ -163,7 +173,15 @@ export function rollupMuscleProgress(
   weights: VolumeCountingWeights,
 ): MuscleGroupProgress[] {
   const byExercise = new Map(scores.map((s) => [s.exercise_id, s]));
-  const byGroup = new Map<string, { weighted: number; weightSum: number; lifts: number }>();
+  const byGroup = new Map<
+    string,
+    {
+      weighted: number;
+      weightSum: number;
+      lifts: number;
+      contributors: MuscleGroupContributor[];
+    }
+  >();
   for (const link of links) {
     const score = byExercise.get(link.exercise_id);
     if (!score || score.score_pct == null) continue;
@@ -171,12 +189,13 @@ export function rollupMuscleProgress(
     if (w <= 0) continue;
     let cur = byGroup.get(link.muscle_group);
     if (!cur) {
-      cur = { weighted: 0, weightSum: 0, lifts: 0 };
+      cur = { weighted: 0, weightSum: 0, lifts: 0, contributors: [] };
       byGroup.set(link.muscle_group, cur);
     }
     cur.weighted += score.score_pct * w;
     cur.weightSum += w;
     cur.lifts += 1;
+    cur.contributors.push({ ...score, role: link.role });
   }
   return [...byGroup.entries()]
     .map(([muscle_group, v]) => ({
@@ -184,6 +203,9 @@ export function rollupMuscleProgress(
       score_pct:
         v.weightSum > 0 ? Math.round((v.weighted / v.weightSum) * 10) / 10 : null,
       lifts: v.lifts,
+      contributors: [...v.contributors].sort(
+        (a, b) => (b.score_pct ?? -Infinity) - (a.score_pct ?? -Infinity),
+      ),
     }))
     .sort(
       (a, b) => (b.score_pct ?? -Infinity) - (a.score_pct ?? -Infinity),
@@ -279,35 +301,16 @@ export interface MesoBalance {
   note: string;
 }
 
-export interface KeyLiftWeekCell {
-  weight: number;
-  reps: number;
-  isCurrent: boolean;
-}
-
-export interface KeyLift {
-  exercise_id: string;
-  name: string;
-  badge: string | null;
-  cells: (KeyLiftWeekCell | null)[];
-}
-
-export interface MacroChartBar {
-  label: string;
-  e1rm: number | null;
-  state: "past" | "current" | "future";
-}
-
 export interface MesoPr {
   label: string;
   coordinate: string;
   kind: "ALL-TIME" | "REP PR";
 }
 
+// N10: the "TOP SET BY WEEK — KEY LIFTS" grid and the "ACROSS MACRO" chart were
+// retired from the meso Performance tab (macro-scope content on a meso view);
+// what remains is the strength block + PRs.
 export interface MesoPerformance {
-  keyLifts: KeyLift[];
-  macroLiftName: string | null;
-  macroChart: MacroChartBar[];
   prs: MesoPr[];
   /** I11 + PH37: per-exercise e1RM %-change (≥3 sessions) + muscle rollup */
   strength: StrengthProgress;
@@ -471,65 +474,6 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-interface TopSetRow {
-  exercise_id: string;
-  exercise_name: string;
-  week_number: number;
-  weight: number;
-  reps: number;
-  e1rm: number;
-}
-
-/** Key-lift grid (4.3): top set per week for the meso's biggest movers. */
-export function buildKeyLifts(
-  topSets: TopSetRow[],
-  weeks: MesoStatsWeek[],
-  currentWeek: number | null,
-  limit = 3,
-): KeyLift[] {
-  const byExercise = new Map<string, TopSetRow[]>();
-  for (const row of topSets) {
-    const cur = byExercise.get(row.exercise_id) ?? [];
-    cur.push(row);
-    byExercise.set(row.exercise_id, cur);
-  }
-
-  return [...byExercise.values()]
-    .sort(
-      (a, b) =>
-        Math.max(...b.map((r) => r.e1rm)) - Math.max(...a.map((r) => r.e1rm)),
-    )
-    .slice(0, limit)
-    .map((rows) => {
-      const cells = weeks.map((w) => {
-        const best = rows
-          .filter((r) => r.week_number === w.week_number)
-          .sort((a, b) => b.weight - a.weight || b.reps - a.reps)[0];
-        return best
-          ? {
-              weight: best.weight,
-              reps: best.reps,
-              isCurrent: w.week_number === currentWeek,
-            }
-          : null;
-      });
-      const w1 = cells[0];
-      const latest = [...cells].reverse().find((c) => c != null);
-      let badge: string | null = null;
-      if (w1 && latest && latest !== w1) {
-        const delta = latest.weight - w1.weight;
-        if (delta !== 0)
-          badge = `${delta > 0 ? "+" : "−"}${Math.abs(delta)} LB VS W1`;
-      }
-      return {
-        exercise_id: rows[0].exercise_id,
-        name: rows[0].exercise_name,
-        badge,
-        cells,
-      };
-    });
-}
-
 /**
  * PRs this meso (4.3): a lift PRs when its best set beats everything logged
  * before the meso — heavier top weight = ALL-TIME, better e1RM at or below
@@ -653,7 +597,7 @@ export async function getMesoStats(
     weights,
   );
 
-  // performance — top set per exercise per week needs set-level reps
+  // performance — the PR scan needs set-level reps/weights
   const microWeek = new Map((micros ?? []).map((m) => [m.id, m.week_number]));
   const { data: sets, error: setsError } = await supabase
     .from("logged_sets")
@@ -666,33 +610,9 @@ export async function getMesoStats(
   const exerciseNames = new Map(
     (history ?? []).map((h) => [h.exercise_id, h.exercise_name]),
   );
-  const topSets: TopSetRow[] = [];
-  const bestByExerciseWeek = new Map<string, (typeof sets)[number]>();
-  for (const s of sets ?? []) {
-    const week = microWeek.get(s.microcycle_id);
-    if (week == null) continue;
-    const key = `${s.exercise_id}:${week}`;
-    const cur = bestByExerciseWeek.get(key);
-    if (!cur || s.weight > cur.weight || (s.weight === cur.weight && s.reps > cur.reps))
-      bestByExerciseWeek.set(key, s);
-  }
-  for (const [key, s] of bestByExerciseWeek) {
-    topSets.push({
-      exercise_id: s.exercise_id,
-      exercise_name: exerciseNames.get(s.exercise_id) ?? "",
-      week_number: Number(key.split(":")[1]),
-      weight: s.weight,
-      reps: s.reps,
-      // T-A1: the stored per-set engine e1RM, not raw Epley (null for
-      // bodyweight sets — ranks at 0, same as raw Epley's weight×… did)
-      e1rm: s.e1rm ?? 0,
-    });
-  }
-  const keyLifts = buildKeyLifts(topSets, weeks, currentWeek);
 
-  // macro chart: best e1RM of the lead key lift per meso across the macro
-  let macroChart: MacroChartBar[] = [];
-  let macroLiftName: string | null = null;
+  // macro context for the header line (N10: the key-lift grid + across-macro
+  // chart left this view — the context caption is all that still needs the macro)
   let macroName: string | null = null;
   let mesoPosition: string | null = null;
   if (meso.macrocycle_id) {
@@ -702,12 +622,12 @@ export async function getMesoStats(
     ] = await Promise.all([
       supabase
         .from("macrocycles")
-        .select("*")
+        .select("name")
         .eq("id", meso.macrocycle_id)
         .maybeSingle(),
       supabase
         .from("mesocycles")
-        .select("*")
+        .select("id")
         .eq("macrocycle_id", meso.macrocycle_id)
         .order("position", { ascending: true, nullsFirst: false })
         .order("created_at"),
@@ -715,44 +635,9 @@ export async function getMesoStats(
     if (macroError) throw macroError;
     if (macroMesoError) throw macroMesoError;
     macroName = macro?.name ?? null;
-
-    const lead = keyLifts[0] ?? null;
     const orderedMesos = macroMesos ?? [];
-    if (lead && orderedMesos.length > 0) {
-      macroLiftName = lead.name;
-      const mesoIds = orderedMesos.map((m) => m.id);
-      let liftHistory: { mesocycle_id: string; e1rm: number | null }[] = [];
-      if (mesoIds.length > 0) {
-        const { data, error } = await supabase
-          .from("v_exercise_history")
-          .select("mesocycle_id, e1rm")
-          .eq("user_id", userId)
-          .eq("exercise_id", lead.exercise_id)
-          .in("mesocycle_id", mesoIds);
-        if (error) throw error;
-        liftHistory = data ?? [];
-      }
-      macroChart = orderedMesos.map((macroMeso, i) => {
-        if (macroMeso.id === meso.id)
-          mesoPosition = `MESO ${i + 1} OF ${orderedMesos.length}`;
-        const best = liftHistory
-          .filter((h) => h.mesocycle_id === macroMeso.id && h.e1rm != null)
-          .reduce<number | null>(
-            (max, h) => (max == null || h.e1rm! > max ? h.e1rm : max),
-            null,
-          );
-        return {
-          label: `M${i + 1}`,
-          e1rm: best != null ? Math.round(best) : null,
-          state:
-            macroMeso.id === meso.id
-              ? ("current" as const)
-              : best != null
-                ? ("past" as const)
-                : ("future" as const),
-        };
-      });
-    }
+    const idx = orderedMesos.findIndex((m) => m.id === meso.id);
+    if (idx >= 0) mesoPosition = `MESO ${idx + 1} OF ${orderedMesos.length}`;
   }
 
   // PRs this meso vs everything before it
@@ -823,7 +708,7 @@ export async function getMesoStats(
     currentWeek,
     volume,
     balance,
-    performance: { keyLifts, macroLiftName, macroChart, prs, strength },
+    performance: { prs, strength },
   };
 }
 

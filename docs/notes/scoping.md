@@ -273,7 +273,10 @@ finally triggers adoption. **Fix (pick one):** include `we.exercise_id` in the
 `SetRow` key (remount on swap — lowest risk), or add it to the re-sync deps
 (guard `adoptServerRowState` holds: `edited.current` is false on a fresh swap).
 
-## N6 — Pull-to-refresh · **F / small · ready**
+## N6 — Pull-to-refresh · **F / small · DONE (PR #132, 2026-07-03)**
+Shipped as scoped: `PullToRefresh` wrapper in `(app)/layout.tsx`, gesture gated
+to `scrollY === 0`, `router.refresh()` in a transition, plus
+`overscroll-behavior-y: contain`. Original scope below for the record.
 Nothing exists (no PTR component, no gesture handler, no
 `overscroll-behavior` anywhere). Native pull-to-refresh is gone because the app
 runs as an installed standalone PWA (`src/app/layout.tsx:55,59-71`). The shell
@@ -325,7 +328,10 @@ on future rows) for the white PLANNED badge; adopt the same muting scheme
 ink). Unplanned timeline rows keep `+ PLAN` (`:265-279`) as is. Check fig 2.x
 mockups (rule 8) before build.
 
-## N9 — Macro Performance: muscle-group primary + exercise drill-down · **F / medium · ready**
+## N9 — Macro Performance: muscle-group primary + exercise drill-down · **F / medium · DONE (PR #132, 2026-07-03)**
+Shipped as scoped (`contributors[]` on the rollup + new `MuscleStrengthSection`
+drill-down; components split so the meso side stayed independent). Original
+scope below for the record.
 Macro Performance tab renders only `StrengthProgressSection`
 (`macro/[macroId]/page.tsx:341-346`; component
 `src/components/stats/StrengthProgress.tsx:14-91`): flat per-exercise list (I11)
@@ -343,7 +349,10 @@ then a new expandable macro Performance layout (client expand/collapse,
 meso tab (`MesoStatsViews.tsx:310`) — branch by scope or split components so the
 meso side (N10) is trimmed independently. Ship with N10.
 
-## N10 — Meso Performance: drop top-sets-by-week + across-macro sections · **F / small-medium · ready**
+## N10 — Meso Performance: drop top-sets-by-week + across-macro sections · **F / small-medium · DONE (PR #132, 2026-07-03)**
+Shipped as scoped; the flagged `keyLifts[0]` → `contextLine` coupling was cut
+by re-deriving the meso position from the macro's meso ordering. Original
+scope below for the record.
 Both in `PerformanceView` (`src/components/stats/MesoStatsViews.tsx:198-336`):
 "TOP SET BY WEEK — KEY LIFTS" at `:208-253` (data `buildKeyLifts`,
 `stats.ts:483-531`, fed by a dedicated `logged_sets` top-set query+fold,
@@ -373,8 +382,13 @@ unreported — `logged.rir_reported ?? targetRir` on the logged side (or compute
 the prescribed side at the same assumed RIR). Consider extracting the memo into
 pure `day-rules.ts` so it's unit-testable (it isn't today).
 
-## N12 — Set logging slow; spinner sometimes never resolves · **B / medium · ready**
-Two compounding halves, both scoped:
+## N12 — Set logging slow; spinner sometimes never resolves · **B / medium · DONE (PR #132, 2026-07-03)**
+Shipped: stamp chain → 1 embedded read + conditional flip; gate watermark →
+closed-workouts-only (first set no longer busts it); spinner decoupled from the
+revalidation commit (action-tracked, 15s watchdog, `ack` + row-remount echo).
+`revalidatePath` narrowing (#5) and `select("*")` narrowing (#6) assessed and
+deferred with reasons — see `J-performance.md`. Original scope below for the
+record. Two compounding halves, both scoped:
 - **Latency:** `logSetAction` (`actions.ts:94-136`) → `logSet`
   (`logging.ts:359-452`) does **4 serial SELECTs** (WE→workout→micro→meso stamp
   chain, `:382-405`) before the upsert + a conditional `in_progress` flip

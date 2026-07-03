@@ -1,13 +1,13 @@
 /**
  * Pure-helper tests for the meso-stats screens (figs 4.1–4.3): the volume
- * matrix states, balance aggregation/copy, key-lift grid badges, and PR
- * detection. Data assembly itself is covered by integration smoke.
+ * matrix states, balance aggregation/copy, and PR detection. (The key-lift
+ * grid was retired by N10.) Data assembly itself is covered by integration
+ * smoke.
  */
 import { describe, expect, it } from "vitest";
 import {
   balanceCategory,
   buildBalance,
-  buildKeyLifts,
   buildPrs,
   buildVolumeMatrix,
   foldProgressScores,
@@ -134,29 +134,6 @@ describe("buildBalance", () => {
     expect(balance.legs).toBe(2.5);
     expect(balance.note).toContain("Push : pull is 1.5 : 1");
     expect(balance.note).toContain("Quads");
-  });
-});
-
-describe("buildKeyLifts", () => {
-  const topSets = [
-    { exercise_id: "hack", exercise_name: "Hack Squat", week_number: 1, weight: 240, reps: 10, e1rm: 320 },
-    { exercise_id: "hack", exercise_name: "Hack Squat", week_number: 2, weight: 250, reps: 8, e1rm: 316 },
-    { exercise_id: "curl", exercise_name: "Lying Leg Curl", week_number: 1, weight: 115, reps: 12, e1rm: 161 },
-  ];
-
-  it("ranks by best e1RM and renders the week grid with the +lb badge", () => {
-    const lifts = buildKeyLifts(topSets, weeks, 2);
-    expect(lifts[0].name).toBe("Hack Squat");
-    expect(lifts[0].badge).toBe("+10 LB VS W1");
-    expect(lifts[0].cells[0]).toEqual({ weight: 240, reps: 10, isCurrent: false });
-    expect(lifts[0].cells[1]).toEqual({ weight: 250, reps: 8, isCurrent: true });
-    expect(lifts[0].cells[2]).toBeNull();
-  });
-
-  it("shows no badge with a single logged week", () => {
-    const lifts = buildKeyLifts(topSets, weeks, 2);
-    expect(lifts[1].name).toBe("Lying Leg Curl");
-    expect(lifts[1].badge).toBeNull();
   });
 });
 
@@ -305,8 +282,22 @@ describe("rollupMuscleProgress (PH37)", () => {
     );
     // chest: (10×1.0 + 4×1.0) / 2.0 = 7; triceps: only bench's secondary = 10
     expect(out).toEqual([
-      { muscle_group: "triceps", score_pct: 10, lifts: 1 },
-      { muscle_group: "chest", score_pct: 7, lifts: 2 },
+      {
+        muscle_group: "triceps",
+        score_pct: 10,
+        lifts: 1,
+        contributors: [{ ...scores[0], role: "secondary" }],
+      },
+      {
+        muscle_group: "chest",
+        score_pct: 7,
+        lifts: 2,
+        // N9 drill-down: every rolled-in exercise is carried, best score first
+        contributors: [
+          { ...scores[0], role: "primary" },
+          { ...scores[1], role: "primary" },
+        ],
+      },
     ]);
   });
 
@@ -319,7 +310,14 @@ describe("rollupMuscleProgress (PH37)", () => {
       ],
       W,
     );
-    expect(out).toEqual([{ muscle_group: "chest", score_pct: 10, lifts: 1 }]);
+    expect(out).toEqual([
+      {
+        muscle_group: "chest",
+        score_pct: 10,
+        lifts: 1,
+        contributors: [{ ...scores[0], role: "primary" }],
+      },
+    ]);
   });
 });
 

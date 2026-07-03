@@ -438,10 +438,15 @@ interface MesoStaleInputs {
   overrideLatest: string | null;
   /** exercise-library watermark (equipment/load_type edits — rare; global) */
   exerciseLatest: string | null;
-  /** completed-work watermark: a completion/skip/advance bumps a workout's
-   *  `updated_at`; generation adds workout rows. count + latest catches both. */
+  /** completed-work watermark, split in two (N12): prescriptions depend only on
+   *  CLOSED sessions (N3 — an active workout never feeds a prescription), so the
+   *  timestamp side watches completed/skipped rows only. Watching every row's
+   *  `updated_at` made the first set of each session bust the gate — its own
+   *  `in_progress` flip bumped the watermark, so that log paid the full reconcile.
+   *  `workoutCount` still spans ALL rows: generation / plan edits add or remove
+   *  planned rows without closing anything, and count catches those. */
   workoutCount: number;
-  workoutLatest: string | null;
+  closedWorkoutLatest: string | null;
 }
 
 /** Stable signature of the meso-stale inputs (sha256 of canonical JSON). Pure, so
@@ -491,7 +496,7 @@ async function loadMesoStaleInputs(
   if (microRes.error) throw microRes.error;
 
   const microIds = (microRes.data ?? []).map((m) => m.id);
-  const [macroRes, workoutRes] = await Promise.all([
+  const [macroRes, workoutCountRes, closedRes] = await Promise.all([
     mesoRes.data.macrocycle_id
       ? service
           .from("macrocycles")
@@ -502,19 +507,26 @@ async function loadMesoStaleInputs(
     microIds.length > 0
       ? service
           .from("workouts")
-          .select("updated_at", { count: "exact" })
+          .select("id", { count: "exact", head: true })
           .in("microcycle_id", microIds)
           .eq("user_id", userId)
+      : Promise.resolve({ count: 0, error: null }),
+    // closed sessions only (N12): the first-set `in_progress` flip must not move
+    // this watermark — only a completion/skip changes any prescription input
+    microIds.length > 0
+      ? service
+          .from("workouts")
+          .select("updated_at")
+          .in("microcycle_id", microIds)
+          .eq("user_id", userId)
+          .in("status", ["completed", "skipped"])
           .order("updated_at", { ascending: false })
           .limit(1)
-      : Promise.resolve({
-          data: [] as { updated_at: string }[],
-          count: 0,
-          error: null,
-        }),
+      : Promise.resolve({ data: [] as { updated_at: string }[], error: null }),
   ]);
   if (macroRes.error) throw macroRes.error;
-  if (workoutRes.error) throw workoutRes.error;
+  if (workoutCountRes.error) throw workoutCountRes.error;
+  if (closedRes.error) throw closedRes.error;
 
   return {
     paramsVersion,
@@ -527,8 +539,8 @@ async function loadMesoStaleInputs(
     overrideCount: overrideRes.count ?? 0,
     overrideLatest: overrideRes.data?.[0]?.updated_at ?? null,
     exerciseLatest: exerciseRes.data?.[0]?.updated_at ?? null,
-    workoutCount: workoutRes.count ?? 0,
-    workoutLatest: workoutRes.data?.[0]?.updated_at ?? null,
+    workoutCount: workoutCountRes.count ?? 0,
+    closedWorkoutLatest: closedRes.data?.[0]?.updated_at ?? null,
   };
 }
 
