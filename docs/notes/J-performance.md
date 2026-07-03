@@ -164,9 +164,10 @@ top-value gap.
 > partial-prerender/prefetch of the loading shell; transition semantics), then
 > ship per-route `loading.tsx` skeletons for `/cycles`, `/cycles/macro/[id]`,
 > `/cycles/meso/[id]` + the other tabs, mirroring `DayViewSkeleton` (pulls
-> Phase 3's streaming item forward). Related discrete defect: **N12** (set-log
-> latency + hanging spinner) — scoped in `scoping.md` § N12; build with this
-> workstream's deferred #5/#6 caching items.
+> Phase 3's streaming item forward). The related discrete defect **N12**
+> (set-log latency + hanging spinner) shipped 2026-07-03 as its own slice —
+> see "Shipped 2026-07-03 (N12 slice)" under Phase 2; #5 remains deferred with
+> #7, #6 was assessed & dropped.
 
 Ranked gaps:
 1. **PlannerBoard draft-path mutations** (`PlannerBoard.tsx:234` discards `isPending`;
@@ -346,9 +347,30 @@ live, don't pre-materialize); engine-stays-pure is not a bottleneck.
   SECURITY DEFINER **function** WARNs (anti-recursion RLS helpers; return only the caller's
   own role/admin status), the leaked-password toggle (dashboard-only), and the unused-index /
   `shares` multi-policy INFO/WARN noise (dropping/rewriting riskier than the benefit).
-- **Still deferred:** #5/#6/#7 caching (`revalidateTag` + `unstable_cache` stable reads +
-  `select` narrowing — need tagging first). The engine code-split off the `/log` client
-  bundle shipped 2026-07-01 (see Phase 1).
+- **Still deferred:** #5/#7 caching (`revalidateTag` + `unstable_cache` stable reads —
+  #5 only pays once #7 makes reads cacheable; build them together). The engine code-split
+  off the `/log` client bundle shipped 2026-07-01 (see Phase 1).
+- **#6 (`select("*")` narrowing) — assessed & dropped (2026-07-03, N12 slice).** The two
+  flagged hot-path selects (`getWorkoutDetail`'s `logged_sets` / `workout_exercises`) feed
+  `LoggedSetRow`/`WorkoutExerciseRow` consumers in DayView that use nearly every column —
+  narrowing buys bytes (not round trips) at the cost of type churn across the day-view
+  surface. Not worth it; don't re-add without a measured egress problem.
+
+**Shipped 2026-07-03 (N12 slice — the set-log write path):**
+- **`logSet` stamp chain 4 serial round-trips → 1** embedded PostgREST read
+  (`workout_exercises` → `workouts` → `microcycles` → `mesocycles`), validated against the
+  live REST endpoint; the `in_progress` flip round-trip is skipped once the workout is past
+  `planned` (status rides on the same read).
+- **Reconcile gate survives the first set of a session.** The gate's completed-work
+  watermark read every workout's `updated_at`, so the log's own planned→in_progress flip
+  busted the signature and the first log of each session paid the full reconcile. The
+  timestamp side now reads closed (completed/skipped) workouts only — the only status that
+  feeds a prescription (N3); the row count still spans all rows (generation/plan edits stay
+  caught). One-time cost: the signature key set changed, so each meso runs one full
+  reconcile on its first open after deploy.
+- **LOG spinner decoupled from the revalidation commit** (the N12 hang): tracks the server
+  action with a 15s watchdog, acknowledges the box on write-confirm, row remounts on the
+  revalidation echo; timeout surfaces as a retryable shake+toast (R3 upsert converges).
 
 ### Phase 3 — Streaming & structural cleanup (optional)
 - Suspense streaming on heavy server pages using `DayViewSkeleton`.
