@@ -4,6 +4,27 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 36 (cont. 2): PR #120 merged + R22 — env validated at boot (PR #121)
+
+- **PR #120 MERGED** (all checks green — `rls-tests` ran the new single-active
+  constraint probe against the migrated chain). Archival sweep ran: **R15
+  swept to `archive.md`** ("Swept 2026-07-03 (later)"), live index trimmed;
+  branch restarted from the merged main. Sweep rides with this PR.
+- Continued into the LOW tail per the attack order — **R22** (LOW, WS-L),
+  **PR #121**. Full record in PROGRESS 2026-07-03 (latest).
+- **R22 — done.** New `src/lib/env.ts`: zod-validated public Supabase env,
+  parsed once, read by all four supabase factories + the MCP auth bridge (one
+  definition; trailing-slash normalization included). A missing/typo'd/
+  malformed var now throws one loud error naming every offending var instead
+  of a generic 500 from inside @supabase/ssr. `next.config.ts` asserts
+  presence at build/dev boot, so a Vercel misconfiguration can't ship at all
+  (CI placeholders still pass). Service-role key deliberately stays out of the
+  schema (hard rule #4 — confined to `service.ts`). 6 unit tests; build
+  verified both directions (placeholder env builds; missing env fails loudly).
+- **Next per the attack order:** R23–R25 (LOW tail), R21 (MED, bigger testing
+  infra). N1 (WS-J) and I12's in-app planner UX remain the open HIGH-priority
+  workstreams.
+
 ## 2026-07-03 — Session 36 (cont.): PR #119 merged + R15 — one live block per user (PR #120)
 
 - **PR #119 MERGED** (all checks green). Archival sweep ran: **R11 + R12 swept

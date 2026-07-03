@@ -2,6 +2,22 @@ import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
+// R22: fail the build/dev boot loudly when the public Supabase env is absent.
+// NEXT_PUBLIC_* values are inlined into client bundles at build time, so a
+// build without them ships a broken client that only fails at request time
+// (the runtime factories validate shape via src/lib/env.ts; this catches the
+// missing-entirely case before anything ships). CI provides placeholders.
+for (const key of [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+] as const) {
+  if (!process.env[key]) {
+    throw new Error(
+      `${key} is not set — the build would ship a client that 500s on every request (R22). Set it in .env.local / the Vercel project env.`,
+    );
+  }
+}
+
 // Bundle analyzer (perf Phase 0 — `docs/notes/J-performance.md`). Inert unless
 // ANALYZE=true, so it never affects normal/CI builds: `ANALYZE=true npm run build`
 // writes the per-route client/server treemaps under `.next/analyze/`.

@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { supabasePublicEnv } from "@/lib/env";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { Database } from "@/lib/types/database";
@@ -15,16 +16,13 @@ import type { Database } from "@/lib/types/database";
  * reserved for the few spots RLS can't cover (audit writes, admin cross-scope).
  */
 
+// one validated env definition (R22); supabasePublicEnv strips the trailing slash
 function supabaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not configured");
-  return url.replace(/\/$/, "");
+  return supabasePublicEnv().url;
 }
 
 function anonKey(): string {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is not configured");
-  return key;
+  return supabasePublicEnv().anonKey;
 }
 
 /** Supabase issues tokens with `iss = <url>/auth/v1`; JWKS is published there. */
