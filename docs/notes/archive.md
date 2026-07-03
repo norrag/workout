@@ -11,6 +11,18 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later 3) — R23 repo hygiene merged (PR #122)
+
+Session 36 (cont. 3) shipped the hygiene batch; PR #122 merged with all checks
+green. Migrations `20260703000002` + `20260703000003` applied live. Full
+record in PROGRESS 2026-07-03 and the Session 36 (cont. 3) log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R23 | Repo hygiene: 2 unused-but-live server actions (attack surface), dead exports/components (NumberStepper stale-closure), dead `v_muscle_group_volume` view, dep nits (analyzer major, tsx, dependabot) | F | L | **done — merged (PR #122).** Dead endpoints (`reorderGroupExercisesAction`+query, `saveProfileDetails`), dead exports (`listMacrocycles`, `setExerciseStatus`, `confidenceRank`), 7 barrel over-exports, 6 dead components deleted; `v_muscle_group_volume` **and** the superseded `v_meso_week_sets` retired (migrations `20260703000002/3`, applied live — resolves root CLAUDE.md's pending-retirement note); analyzer aligned to next-15, `tsx` devDep, dead vitest include dropped, dependabot added. |
+
+---
+
 ## Swept 2026-07-03 (later 2) — R22 env validation merged (PR #121)
 
 Session 36 (cont. 2) shipped the first of the LOW tail; PR #121 merged with

@@ -22,6 +22,7 @@ import {
   impliedRirAtReps,
 } from "../reps";
 import {
+  e1rmFactor,
   estimateE1rm as estimateE1rmCore,
   effectiveRepsForE1rm as effectiveRepsForE1rmCore,
   predictRepsAtWeight as predictRepsAtWeightCore,
@@ -88,5 +89,41 @@ describe("client-chunk import guard (WS-J)", () => {
     const src = readFileSync(join(engineDir, file), "utf8");
     expect(src).not.toMatch(RUNTIME_IMPORT);
     expect(src).not.toMatch(/require\(/);
+  });
+});
+
+describe("e1rmFactor monotonicity (R24)", () => {
+  // the rep-prediction bisection and the closed-form inverse both assume
+  // k(effReps) strictly increases; the schema caps brzycki_max_eff_reps at 10
+  // (the Epley/Brzycki crossing) so the switch can never jump k downward.
+  it("k(effReps) is strictly increasing under the capped cutoff (10)", () => {
+    const cfg = { brzycki_max_eff_reps: 10 };
+    let prev = e1rmFactor(0, cfg);
+    for (let r = 0.25; r <= 35.5; r += 0.25) {
+      const k = e1rmFactor(r, cfg);
+      expect(k).toBeGreaterThan(prev);
+      prev = k;
+    }
+  });
+
+  it("k(effReps) is monotonic (never decreasing) under the legacy absent-cutoff rule", () => {
+    const cfg = { brzycki_max_eff_reps: undefined };
+    let prev = e1rmFactor(0, cfg);
+    for (let r = 0.25; r <= 35.5; r += 0.25) {
+      const k = e1rmFactor(r, cfg);
+      expect(k).toBeGreaterThanOrEqual(prev);
+      prev = k;
+    }
+  });
+
+  it("asking for more reps never prescribes a heavier load (inverse consistency)", () => {
+    const cfg = DEFAULT_ENGINE_PARAMS.e1rm;
+    let prevW = Infinity;
+    for (let reps = 1; reps <= 20; reps += 1) {
+      const w = weightForRepsAtRirCore(200, reps, 2, cfg);
+      expect(w).not.toBeNull();
+      expect(w!).toBeLessThan(prevW);
+      prevW = w!;
+    }
   });
 });
