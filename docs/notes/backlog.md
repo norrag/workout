@@ -268,3 +268,63 @@ and the follow-up table; the Session-30 `log.md` entry summarizes the deltas.
   am simultaneously saying I never got sore? Whatever though, its fine as is."
 - **R6 (local-day rule).** "Um, I think B is perfectly fine in my opinion. It
   should be stored at whatever date it was when the client recorded the session."
+
+### Batch 5 — field notes (2026-07-03)
+
+- **N5** — HIGH — "When an exercise is replaced in the day view, it retains the
+  original weight and reps from the previous exercise (the exercise in the same
+  slot prior to the swap) for only the first set of the new exercise. Subsequent
+  sets of the replaced exercise show the correct prescriptions, but the first set
+  does not. If the user modifies the numbers on the first incorrect set (so as to
+  get the 'reset to prescription' option in the menu), then resetting to
+  prescription values correctly resets the first set to prescription values."
+- **N6** — MED — "Some, if not all, pages should have a pull up to refresh
+  ability to refresh the current page. This should be available at least on the
+  workout day view and cycles pages/subpages."
+- **N7** — MED — "When a note is added to an exercise in the day view, there is a
+  slightly annoying detail of behavior: When opening the note tray and clicking
+  the text field, it opens the device's keyboard, which pushes the entire app
+  page up by necessity. However when the keyboard and notes slider is eventually
+  dismissed, the page scroll position does not end up in the same position it was
+  when the user entered the notes. The end result is that after entering a note,
+  the user finds themselves in a scroll position on the page that is lower than
+  the place the started, and they must scroll back up to get to the original
+  position."
+- **N8** — HIGH — "Planned mesocycle badge should say 'planned', rather than have
+  a checkbox. The checkbox should only appear once completed. The current meso
+  has the orange 'CURRENT' badge. Planned should have a white badge similar the
+  current badge, and the unplanned mesos should keep their current '+ plan'
+  badge. Only completed or current sets should show in full white, future mesos
+  (planned and unplanned) should remain muted."
+- **N9** — HIGH — "Macro cycle performance page should be revised and reorganized
+  a bit. Don't love the individual exercises here. Muscle group stats makes more
+  sense viewing across the entire macros, while individual exercises are a bit
+  much since they span long periods so there can be many. A better organization
+  would be to display the muscle group strength gain as the primary statistic,
+  and allow the muscle groups to be clickable to drop down or display the subset
+  of exercise which rolled up to the muscle group statistic for more detail."
+- **N10** — HIGH — "The meso performance page can drop the key exercise top sets
+  by week section, and 'across macro' for the single exercise, since its a meso
+  view not macro view."
+- **N11** — MED — "Deload sets show the underperformed arrow even when performing
+  the prescribed weight and reps. These indicators should be displaying when the
+  user over or underperforms their prescriptions."
+- **N12** — HIGH — "In general logging sets can take a long time to submit,
+  typically at least several seconds. On occasion it will get hung up and the
+  spinner spins for an extended time and seemingly never completes, until I
+  switch pages and return to the day view page at which point it indicates
+  completed. This ruins the user experience and should never happen."
+- **N1 addendum** — MED — "Page loads and switches are still painfully slow at
+  times. Despite my efforts to get responsive changes, they have not been
+  successful. All too often I click/tap on a page or sub page, and for 1-2
+  seconds there is no indication the click was successful. By about 2 seconds, I
+  become unsure that I clicked the page correctly and begin tapping it again.
+  When any page is clicked in the app, ideal behavior would be that that page
+  would IMMEDIATELY switch and show an empty screen with animated placeholders
+  until the data loads. The workout day view page is the only page that does this
+  correctly when loading. Other pages should do this too; particularly the cycles
+  page and sub pages, but also pretty much every page." *(→ folded into N1 — this
+  is the WS-J north star restated with new evidence: the cycles pages' dead
+  1-2s gap disproves the Phase-A assumption that route navigations already paint
+  the `(app)/loading.tsx` skeleton. Logged as a Phase-A escalation, not a new
+  item.)*
