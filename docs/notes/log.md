@@ -4,6 +4,30 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 36 (cont.): PR #119 merged + R15 — one live block per user (PR #120)
+
+- **PR #119 MERGED** (all checks green). Archival sweep ran: **R11 + R12 swept
+  to `archive.md`** ("Swept 2026-07-03"), live index trimmed; branch restarted
+  from the merged main. Sweep rides with this PR.
+- Continued per the attack order — **R15** (MED, WS-D), **PR #120**. Full
+  record in PROGRESS 2026-07-03 (latest).
+- **R15 — done.** One live block per user, app gate + DB guarantee:
+  `startMeso` now blocks while ANY of the user's mesos is active (the old gate
+  only checked same-macro siblings, so a standalone/other-macro meso could go
+  live next to an in-flight block and `get_current_state`/the Workout tab
+  silently followed the newest); new partial unique index
+  `mesocycles_one_active_per_user` (migration `20260703000001`, **applied
+  live + verified**, no pre-existing violations) makes it race-safe — the
+  losing flip surfaces a friendly error (everything seeded pre-flip is
+  R3-retry-safe); `activate_mesocycle` tool description now states the
+  exclusive-activation contract instead of overstating the old one. Scratch
+  PG16 chain green from zero (60 migrations + seed, 26/26 RLS tables, index
+  present); 4-step SQL probe (second same-user activation → 23505, other
+  users unaffected, completion frees the slot); new RLS-suite test
+  ("single active meso (R15)") for CI.
+- **Next per the attack order:** the LOW tail (R21–R25). N1 (WS-J) and I12's
+  in-app planner UX remain the open HIGH-priority workstreams.
+
 ## 2026-07-03 — Session 36: R11 + R12 — reconcile pagination + custom-exercise load-type (PR #119)
 
 Reconciliation sweep: no-op (PR #118 was itself the R9+R10 sweep; no `done`

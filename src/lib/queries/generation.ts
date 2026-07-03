@@ -349,6 +349,24 @@ export async function startMeso(
   if (!hasExercise)
     return { error: "Fill at least one exercise slot before starting." };
 
+  // one live block per user (R15): never start a meso while ANY other meso is
+  // active — same macro, different macro, or standalone. The old gate only
+  // checked same-macro siblings, so a second block could go live and the
+  // Workout tab would silently follow the newest one. Backstopped by the
+  // partial unique index `mesocycles_one_active_per_user` (race-safe).
+  const { data: liveMesos, error: liveErr } = await supabase
+    .from("mesocycles")
+    .select("id, name")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .neq("id", meso.id)
+    .limit(1);
+  if (liveErr) throw liveErr;
+  if (liveMesos && liveMesos.length > 0)
+    return {
+      error: `another mesocycle ("${liveMesos[0].name}") is currently active — complete or abandon it before starting this one.`,
+    };
+
   // sequential activation within a macro: don't start a future block while an
   // earlier one is unfinished (or another is live). A planned meso has no
   // prescriptions yet, so gating activation is what keeps them from being
@@ -549,7 +567,17 @@ export async function startMeso(
     .from("mesocycles")
     .update({ status: "active", start_date: today })
     .eq("id", meso.id);
-  if (activateError) throw activateError;
+  if (activateError) {
+    // the one-active-per-user index (R15): a concurrent activation won the
+    // race between our gate check and this flip. Everything seeded above is
+    // retry-safe (R3) — finishing the other block and starting again converges.
+    if (activateError.code === "23505")
+      return {
+        error:
+          "another mesocycle just went active — complete or abandon it before starting this one.",
+      };
+    throw activateError;
+  }
 
   return { error: null };
 }
