@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-03 — Session 41: N13 fix + I12 completed (owner-authorized design) (PR #136)
+## 2026-07-03 — Session 41: N13 fix + I12 completed (owner-authorized design) (PR #137)
 
 Same session, continued after PRs #134/#135 merged. Owner handed over Batch 6
 in-chat (appendix): N1 skeletons **confirmed on device**; **I12 design
@@ -20,7 +20,7 @@ prescription broken on an exercise's first set.
   adopt + clear the typed flag); already-null transitions (bodyweight edit
   while typing) keep the R13 protection. Swap path (N5 remount key) verified
   intact. +1 unit test.
-- **I12 — done (PR #136 closes it).** The four remaining pieces built to
+- **I12 — done (PR #137 closes it).** The four remaining pieces built to
   Claude's design (09 2026-07-03 session 4 = design of record): **Place into
   macrocycle** sheet on standalone planned mesos (rows state `FILLS M2` /
   `ADDS AS M5` exactly, computed with the same pure `planMacroPlacement` the

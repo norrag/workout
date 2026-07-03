@@ -434,7 +434,7 @@ over existing, RLS-safe mutations. Gap table (in-app status as of PR #134):
 | Edit meso header after finalize (name/weeks/RIR/deload/phase) | `updateMesocycleAttrs` (cycles.ts:214) | **missing** — FinalizeSheet sets name+weeks at draft time only; RIR ramp read-only everywhere (no figure → design input) |
 | Plan-time volume preview (fractional weekly sets vs landmarks) | aggregation lives in `mcp/tools/authoring.ts:73` — **needs relocation to shared code** first | **missing** — Balance tab needs materialized weeks, so drafts/planned mesos show nothing |
 
-**Built 2026-07-03 (PR #136, owner-authorized design — 09 session-4 entry is
+**Built 2026-07-03 (PR #137, owner-authorized design — 09 session-4 entry is
 the design of record):** place-into-macro sheet (default placement; explicit
 position stays MCP-only), edit-details sheet (`updateMesocycleAttrs` guards),
 BLOCKS management on the macro edit page (`manageMacroSlots`), and the
