@@ -11,6 +11,22 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later 7) — I12 completed + N13 first-set reset fix merged (PR #137)
+
+Session 41 closed the last open HIGH feature and the Batch-6 bug in one PR;
+merged with all checks green while the session was live, so the sweep ran
+in-session. Full record in PROGRESS 2026-07-03 (latest) and the Session 41
+log entry; the four new surfaces' design of record is the 09 2026-07-03
+session-4 entry (owner-authorized design — no mockups existed, so the owner's
+field feedback is the acceptance check; reopen anything that doesn't hold up).
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| I12 | Address mesocycle management under a macrocycle | F | D | **done — merged (PR #137;** PR #92 MCP, PR #134 first slices**).** In-app now covers the whole MCP authoring set: Place-into-macrocycle sheet (exact landing per row — fills the open slot inheriting its phase, or appends), Edit-details sheet (name any time; weeks/RIR/deload until start), BLOCKS management on the macro edit page (▲▼ never crossing started history, ✕ on open slots, + ADD BLOCK), WEEKLY SETS PER MUSCLE live readout on the planner board (shared R14 fold in `lib/plan/volume-preview.ts`, MEV/MRV bands). Deliberately MCP-only: explicit-position placement, phase editing. |
+| N13 | Reset-to-prescription broken on the exercise's first set | B | G | **done — merged (PR #137).** R13-era root cause: the reset echo (override → null) arrived via the planned-input channel whose typed-row guard never releases on an unlogged row — and set 1 is necessarily typed-in. New `prescription-reset` class in `adoptServerRowState` always adopts + clears the flag; null→null transitions keep the R13 mid-typing protection; N5 swap remount verified intact. |
+
+---
+
 ## Swept 2026-07-03 (later 6) — R21 coverage suite merged (PR #134)
 
 Session 40 shipped R21 (all three bullets) alongside the N1 skeleton slice and
