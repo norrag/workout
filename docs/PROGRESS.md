@@ -2,7 +2,49 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R23: repo hygiene batch
+## 2026-07-03 (latest) — R24: engine guardrails (4 of 5)
+
+The engine guardrail batch (LOW, workstream G) minus the hold-week
+reprice-down bullet, which the owner explicitly parked ("no fix decided yet",
+2026-07-02) — the backlog row is narrowed to that remaining investigation.
+
+- **Cross-field param invariants** (`engineParamsSchema.superRefine`):
+  per-goal rep_window must satisfy `min ≤ target_low ≤ target_high ≤ max`,
+  and `min_sets ≤ max_sets_per_exercise`. Doc 04 requires the schema gate to
+  make a bad row unactivatable; shape checks alone let an inverted window
+  (degenerate Option-A clamp) through `propose/activate_engine_params`.
+  **Replay safety verified first:** a SQL invariant sweep over every hosted
+  `engine_params` row (v1–v18) found zero violations, so historical rows keep
+  parsing/replaying byte-identically.
+- **`brzycki_max_eff_reps` capped ≤ 10.** Above ~10 effective reps Brzycki >
+  Epley, so a tuned cutoff > 10 put a DOWNWARD jump in `k(effReps)` at the
+  switch — breaking the monotonicity the rep-prediction bisection and the
+  closed-form inverse assume (a cutoff of 14 made asking for more reps
+  prescribe a HEAVIER load). Every stored row is 10. Property tests pin
+  strict monotonicity under the capped cutoff, non-decrease under the legacy
+  absent-cutoff rule, and inverse consistency (more reps → strictly lighter).
+- **No-anchor hold holds exactly.** The safety-hold branch (T-I3/T-I5:
+  never invent numbers) fed the held load through `roundToStep`, so 27.5 lb
+  on a 5-lb step prescribed **30** while the rationale read "hold 27.5 lb"
+  (negative control: verified the old rounding produces 30). A held load is
+  a real, previously-handled weight — it now skips the final rounding.
+  Behavior note: stored decisions that rounded a held load will replay as
+  `changed` (honest — the stored number was fabricated); open rows heal on
+  their next reconcile-triggering input change.
+- **Stale retire-flag contract comments fixed** (`params.ts` +
+  `seedMeso`'s header): both still said "ABSENT/false ⇒ legacy prior-peak
+  back-off seed", but the legacy branch was deleted outright — the flag is
+  inert and retained only for historical-row parsing.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (743, +9) green — new
+`params-invariants.test.ts` (5 cases incl. accepts-defaults/v17), 3
+monotonicity/inverse property tests, the hold-verbatim regression test; the
+golden meso trace is unchanged (step-aligned loads are unaffected by the
+hold fix).
+
+## 2026-07-03 — R23: repo hygiene batch
 
 The dead-code/config sweep from the review (LOW, workstream L). Migrations
 `20260703000002` + `20260703000003` **applied live + verified**.

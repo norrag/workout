@@ -4,6 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 36 (cont. 4): PR #122 merged + R24 mechanical fixes (PR #127)
+
+- **PR #122 MERGED** (all checks green). Archival sweep ran: **R23 swept to
+  `archive.md`** ("Swept 2026-07-03 (later 3)"); branch restarted from the
+  merged main. Sweep rides with this PR.
+- Continued the LOW tail — **R24, the 4 mechanical fixes** (LOW, WS-G),
+  **PR #127**. The 5th bullet (hold-week reprice-down) stays open per the
+  owner's 2026-07-02 ruling ("no fix decided yet") — row narrowed to it.
+- **R24 (4/5) — done.** (a) `engineParamsSchema.superRefine`: rep_window
+  `min ≤ target_low ≤ target_high ≤ max` per goal + `min_sets ≤
+  max_sets_per_exercise` — a bad row can no longer be activated (doc 04);
+  verified every hosted row v1–v18 passes (SQL invariant sweep), so replay
+  is untouched. (b) `brzycki_max_eff_reps` capped ≤ 10 (the Epley/Brzycki
+  crossing) — a higher cutoff made k(effReps) non-monotonic (more reps →
+  heavier load); property tests pin monotonicity under both cutoff rules +
+  inverse consistency. (c) No-anchor hold skips `roundToStep` — 27.5 lb on a
+  5-lb step used to prescribe 30 with "hold 27.5 lb" in the rationale
+  (negative control: verified old rounding → 30); regression test holds
+  27.5 verbatim. (d) Stale `retire_prior_peak_seed` contract comments fixed
+  (params.ts + seedMeso header): the legacy branch is deleted, the flag
+  inert. 743 tests (+9), golden meso unchanged.
+- **Next per the attack order:** R25 (MCP polish, LOW, WS-K); R21 (MED,
+  testing infra). N1 (WS-J) and I12's in-app planner UX remain the open
+  HIGH-priority workstreams.
+
 ## 2026-07-03 — Session 36 (cont. 3): PR #121 merged + R23 — repo hygiene batch (PR #122)
 
 - **PR #121 MERGED** (all checks green). Archival sweep ran: **R22 swept to

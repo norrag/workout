@@ -288,6 +288,12 @@ export function prescribe(
     goalWindow != null &&
     confidenceAtLeast(anchor.confidence, params.reps_predict.min_confidence);
 
+  // R24: a no-anchor hold must hold EXACTLY — set on that branch to skip the
+  // final rounding (27.5 lb on a 5-lb step used to prescribe 30 with a
+  // rationale still reading "hold 27.5 lb": a fabricated +step on the one path
+  // whose whole point, per T-I3/T-I5, is never inventing numbers).
+  let heldNoAnchor = false;
+
   // rep-window reps follow the *rounded* weight, so resolve them after rounding
   let repWindow: {
     anchorValue: number;
@@ -360,6 +366,7 @@ export function prescribe(
     // below; the pain gate can only hold, never lift, so no extra bound is needed.
     weight = baseWeight;
     reps = baseReps;
+    heldNoAnchor = true;
     const gated = mod.painGated || mod.sessionDampened;
     reasons.unshift({
       rule: "load",
@@ -375,11 +382,11 @@ export function prescribe(
 
   sets = clampSets(sets + mod.setDelta, params);
 
-  let finalWeight = roundToStep(
-    weight,
-    inputs.exercise.equipmentType,
-    params,
-  );
+  // a held load is already a real, previously-handled weight — rounding it to
+  // the loadable step would move it (R24); everything else rounds as usual
+  let finalWeight = heldNoAnchor
+    ? weight
+    : roundToStep(weight, inputs.exercise.equipmentType, params);
   // rounding must never lift a gated/held weight above what was handled
   if ((mod.painGated || mod.sessionDampened) && finalWeight > baseWeight) {
     finalWeight = baseWeight;
@@ -546,12 +553,14 @@ function round2(n: number): number {
  * stays pure). It is a *derived* input, so it does not enter the freshness
  * fingerprint (doc 14 §3) — see buildSeedInputs/seedEngineInputs.
  *
- * §T-I5 (owner ruling 2026-06-25, WS-I): when `retire_prior_peak_seed` is set the
- * legacy `priorPeak × meso_seed_backoff_pct` branch is skipped entirely — it
- * fabricated a seed (carried `priorPeak.reps` verbatim off a never-performed
- * per-column-max set). Seed precedence is then strictly: confident anchor → the
- * user's plan `initial_*` (a manual seed) → UNSEEDED (null weight, prompt the user).
- * A prescription is never invented from a peak set. ABSENT / false ⇒ legacy.
+ * §T-I5 (owner ruling 2026-06-25, WS-I): the legacy `priorPeak ×
+ * meso_seed_backoff_pct` branch is DELETED outright (R24: it is gone for every
+ * params row, not gated on `retire_prior_peak_seed` — that flag is inert and
+ * retained only for historical-row parsing). It fabricated a seed (carried
+ * `priorPeak.reps` verbatim off a never-performed per-column-max set). Seed
+ * precedence is strictly: confident anchor → the user's plan `initial_*` (a
+ * manual seed) → UNSEEDED (null weight, prompt the user). A prescription is
+ * never invented from a peak set.
  */
 export function seedMeso(
   priorPeak: { weight: number | null; reps: number | null; sets: number } | null,

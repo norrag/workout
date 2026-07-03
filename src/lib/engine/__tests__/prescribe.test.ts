@@ -187,3 +187,23 @@ describe("prescribe — determinism", () => {
     expect(a).toEqual(b);
   });
 });
+
+describe("prescribe — no-anchor hold keeps the exact load (R24)", () => {
+  it("holds a non-step load verbatim — rounding must not fabricate a +step", () => {
+    // 27.5 lb on barbell's 5-lb step used to prescribe 30 while the rationale
+    // still read "hold 27.5 lb" — a fabricated +2.5 on the one path whose whole
+    // point (T-I3/T-I5) is never inventing numbers.
+    const out = prescribe(
+      baseInputs({
+        previous: { weight: 27.5, reps: 8, sets: 3, targetRir: 3 },
+        actualSets: [
+          { setNumber: 1, weight: 27.5, reps: 8, rirReported: 3, isWarmup: false },
+          { setNumber: 2, weight: 27.5, reps: 8, rirReported: 3, isWarmup: false },
+        ],
+      }),
+      params,
+    );
+    expect(out.weight).toBe(27.5);
+    expect(out.rationale).toMatch(/hold 27\.5 lb/i);
+  });
+});

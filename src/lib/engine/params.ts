@@ -216,10 +216,13 @@ export const engineParamsSchema = z.object({
   // ruled it fundamentally broken and never to be used again: a prescription is not
   // emitted at any cost — use real data when present, else defer to the user.
   //
-  // true ⇒ skip the prior-peak branch entirely; the seed precedence becomes
-  //   confident recency anchor (seed_from_anchor) → the user's own plan `initial_*`
-  //   (a manual seed) → UNSEEDED (null weight, prompt the user). Nothing is ever
-  //   fabricated from a peak set. ABSENT / false ⇒ legacy prior-peak back-off seed.
+  // The seed precedence is: confident recency anchor (seed_from_anchor) → the
+  // user's own plan `initial_*` (a manual seed) → UNSEEDED (null weight, prompt
+  // the user). Nothing is ever fabricated from a peak set. NOTE (R24): the
+  // legacy branch itself was DELETED from seedMeso when this shipped — the flag
+  // is now inert either way and retained only so historical rows parse with an
+  // unchanged materialization (`is_replayable`/`params_hash`); ABSENT/false no
+  // longer resurrects the prior-peak seed.
   // The param `meso_seed_backoff_pct` is left in the schema (historical rows still
   // carry it, so removing it would flip them non-replayable); its actual removal +
   // row migration is T-I4, where the whole legacy block is retired together.
@@ -335,7 +338,12 @@ export const engineParamsSchema = z.object({
       // the band where they agree). `.optional()` — ABSENT on every pre-v11 row,
       // so those parse byte-identically (replayability preserved) and the engine
       // falls back to the legacy `>= 36` Epley-only cutoff. v11 sets it to 10.
-      brzycki_max_eff_reps: z.number().positive().optional(),
+      // Capped at 10 (R24): the curves cross at ~10 effective reps; above it
+      // Brzycki > Epley, so a higher cutoff puts a DOWNWARD jump in k(effReps)
+      // at the switch — breaking the monotonicity the rep-prediction bisection
+      // and the closed-form inverse both assume (verified: cutoff 14 made
+      // asking for more reps prescribe a heavier load). Every stored row is 10.
+      brzycki_max_eff_reps: z.number().positive().max(10).optional(),
       // §S3: down-weight low-confidence sets in the `session_best` anchor *value*
       // (not just its label). A 20–30-rep burnout should contribute little to the
       // strength anchor. ABSENT ⇒ equal-weight session mean (legacy). v11 seeds
@@ -539,7 +547,33 @@ export const engineParamsSchema = z.object({
       },
       experience_scale: { beginner: 0.7, intermediate: 1.0, advanced: 1.1 },
     }),
-});
+})
+  // ----- R24: cross-field invariants ------------------------------------------
+  // Doc 04 requires the schema gate to make a bad row unactivatable, but shape
+  // checks alone let semantic nonsense through — an inverted rep window turns
+  // the Option-A clamp degenerate, and min_sets > max_sets_per_exercise makes
+  // clampSets contradictory. Verified before shipping: every stored
+  // engine_params row (v1–v18, hosted) satisfies these, so historical rows
+  // keep parsing and replaying byte-identically.
+  .superRefine((p, ctx) => {
+    if (p.min_sets > p.max_sets_per_exercise) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["min_sets"],
+        message: `min_sets (${p.min_sets}) must be ≤ max_sets_per_exercise (${p.max_sets_per_exercise})`,
+      });
+    }
+    for (const [goal, w] of Object.entries(p.rep_window)) {
+      if (!w) continue;
+      if (!(w.min <= w.target_low && w.target_low <= w.target_high && w.target_high <= w.max)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["rep_window", goal],
+          message: `rep_window.${goal} must satisfy min ≤ target_low ≤ target_high ≤ max (got ${w.min}/${w.target_low}/${w.target_high}/${w.max})`,
+        });
+      }
+    }
+  });
 
 export type EngineParams = z.infer<typeof engineParamsSchema>;
 
