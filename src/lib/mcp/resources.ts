@@ -6,6 +6,32 @@ import { resolveSession, type McpExtra } from "./session";
 import { formatCurrentState } from "./tools/get-current-state";
 import { formatProfile } from "./tools/read";
 import { COACHING_GUIDE } from "./coaching-guide";
+import { toStructuredError } from "./envelope";
+import { reportError } from "@/lib/observability/report";
+
+/**
+ * R25: resource handlers sit outside the tools' `withErrorHandling` wrapper, so
+ * a thrown Postgrest object used to reach the SDK raw and serialize as the
+ * opaque `[object Object]` that wrapper was built to kill. Resources have no
+ * `isError` result shape, so the guard reports the failure and rethrows a
+ * clean, structured message for the JSON-RPC error instead.
+ */
+function guardResource<A extends unknown[], R>(
+  name: string,
+  handler: (...args: A) => Promise<R> | R,
+): (...args: A) => Promise<R> {
+  return async (...args: A) => {
+    try {
+      return await handler(...args);
+    } catch (err) {
+      await reportError("mcp:resource", err, { resource: name });
+      const e = toStructuredError(err);
+      throw new Error(
+        `${e.code}: ${e.message}${e.detail ? ` (${e.detail})` : ""}`,
+      );
+    }
+  };
+}
 
 /**
  * Read-only resources for clients that prefer documents over tool calls
@@ -23,7 +49,7 @@ export function registerResources(server: McpServer) {
         "experience) — the same shape as get_profile.",
       mimeType: "application/json",
     },
-    async (uri: URL, extra: McpExtra) => {
+    guardResource("profile", async (uri: URL, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
       const payload = formatProfile(await getProfile(client, userId));
       return {
@@ -35,7 +61,7 @@ export function registerResources(server: McpServer) {
           },
         ],
       };
-    },
+    }),
   );
 
   server.registerResource(
@@ -48,7 +74,7 @@ export function registerResources(server: McpServer) {
         "with this week's target RIR.",
       mimeType: "application/json",
     },
-    async (uri: URL, extra: McpExtra) => {
+    guardResource("current-cycle", async (uri: URL, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
       const state = await getCurrentState(client, userId);
       const payload = formatCurrentState(state);
@@ -61,7 +87,7 @@ export function registerResources(server: McpServer) {
           },
         ],
       };
-    },
+    }),
   );
 
   // Static coaching depth (12 §Stage 1): the science-based paradigm + §9 honesty
@@ -80,7 +106,7 @@ export function registerResources(server: McpServer) {
         "Read it to interpret metrics the way the engine intends.",
       mimeType: "text/markdown",
     },
-    async (uri: URL) => ({
+    guardResource("coaching-guide", async (uri: URL) => ({
       contents: [
         {
           uri: uri.href,
@@ -88,6 +114,6 @@ export function registerResources(server: McpServer) {
           text: COACHING_GUIDE,
         },
       ],
-    }),
+    })),
   );
 }

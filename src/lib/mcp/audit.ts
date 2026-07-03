@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/service";
+import { reportError } from "@/lib/observability/report";
 
 /**
  * MCP write audit (05 §Safeguards, hard rule #4). Every MCP write records a row
@@ -19,12 +20,20 @@ export async function recordMcpWrite(
   args: unknown,
   summary: string,
 ): Promise<void> {
-  const service = createServiceClient();
-  const { error } = await service.from("mcp_write_audit").insert({
-    user_id: userId,
-    tool,
-    args_hash: hashArgs(args),
-    summary,
-  });
-  if (error) throw error;
+  // R25: every caller runs this AFTER its mutation has committed — a throw here
+  // inverted a successful write into an `isError` result, and a retrying agent
+  // would then duplicate the draft. The audit trail must not outrank the truth
+  // of the result: log the failure loudly and return.
+  try {
+    const service = createServiceClient();
+    const { error } = await service.from("mcp_write_audit").insert({
+      user_id: userId,
+      tool,
+      args_hash: hashArgs(args),
+      summary,
+    });
+    if (error) throw error;
+  } catch (err) {
+    await reportError("mcp:audit", err, { tool });
+  }
 }

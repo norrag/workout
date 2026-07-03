@@ -2,7 +2,36 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R24: engine guardrails (4 of 5)
+## 2026-07-03 (latest) — R25: MCP polish (3 of 4)
+
+The MCP robustness batch (LOW, workstream K) minus the tool-surface
+consolidation, which is a deliberate design pass (not mechanical) and stays
+open — the backlog row is narrowed to it (plus full error-contract
+convergence, which belongs with it).
+
+- **Audit failure no longer inverts a committed write.** Every write tool runs
+  `recordMcpWrite` AFTER its mutation commits; the audit insert throwing meant
+  the wrapper returned `isError` for a *successful* write — an agent retries
+  and duplicates the draft. `recordMcpWrite` now logs loudly
+  (`reportError("mcp:audit")`) and returns; the audit trail never outranks the
+  truth of the result. New `mcp/__tests__/audit.test.ts` (happy path + both
+  failure shapes resolve without throwing).
+- **Resource handlers guarded.** `withErrorHandling` only wrapped
+  `registerTool`; the three `registerResource` handlers could throw raw
+  Postgrest objects and reintroduce the opaque `[object Object]` the wrapper
+  was built to kill. New `guardResource` reports the failure and rethrows a
+  clean structured message (resources have no `isError` result shape).
+- **`MCP_JWT_AUDIENCE` has a runbook home.** The audience binding is opt-in
+  (auth.ts), but `manual-operations.md` never mentioned it — until set, ANY
+  project-issued user JWT is a valid `/api/mcp` bearer. Added the Vercel step
+  (decode the connector token's `aud` → set the var → redeploy → re-run the
+  connector test), with the fallback note if `aud` proves generic.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (746, +3) green.
+
+## 2026-07-03 — R24: engine guardrails (4 of 5)
 
 The engine guardrail batch (LOW, workstream G) minus the hold-week
 reprice-down bullet, which the owner explicitly parked ("no fix decided yet",
