@@ -4,6 +4,69 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 37: Batch 5 intake — 8 new items (N5–N12) + N1 escalation (PR #130)
+
+Reconciliation sweep: no-op (PR #129 merged; R24/R25 correctly stay live —
+in-progress with open remainders; no `done` rows). Owner handed over 9 field
+notes; ran the intake protocol. Verbatim capture = **backlog appendix Batch 5**;
+all actionable items scoped against the code at intake (3 parallel scoping
+passes; full file:line detail in `scoping.md` § Batch 5). Notes-only PR — no
+code changed.
+
+- **N5 (HIGH, B, WS-G, ready)** — replace-exercise leaves the old exercise's
+  numbers on set 1 only. **PH38's symptom returned via a different mechanism**:
+  the PR #84 `set_weights` clear is intact; the culprit is retained client
+  `useState` on the editable first row — its re-sync effect deps
+  (`plannedWeight`/`bodyweight`) don't change across a swap, and neither the
+  card key (`we.id`, stable through replace) nor the row key includes
+  `exercise_id`, so nothing remounts. Sets 2+ are prop-derived (always fresh).
+  Trivial-small fix, two options recorded.
+- **N6 (MED, F, WS-E, ready)** — pull-to-refresh. Doesn't exist; standalone-PWA
+  mode is why native PTR is gone. One shared wrapper in `(app)/layout.tsx`
+  (document is the scroll container; no cycles sub-layout) covers day view +
+  all `/cycles/**` at once.
+- **N7 (MED, UX, WS-E, ready)** — note-sheet scroll drift. Root cause:
+  `useScrollLock` never captures/restores `scrollY`; one-file fix covers every
+  sheet/menu.
+- **N8 (HIGH, UX, WS-D, ready)** — planned-meso badge: white PLANNED text badge
+  (CURRENT's style), checkbox only when completed, `+ PLAN` unchanged, mute
+  everything not current/completed. Maps to `/cycles` `StatusMark`; open
+  non-blocking question whether the macro timeline's numbered marks mirror the
+  badge swap or just the muting rule.
+- **N9 + N10 (HIGH, F, WS-C, ready — ship together)** — Performance-tab
+  reorg: macro tab promotes the muscle-group rollup to primary with per-group
+  exercise drill-down (rollup already sees the attribution, just discards it);
+  meso tab drops the key-lift top-sets grid + across-macro chart (net deletion;
+  `keyLifts[0]`→`contextLine` coupling flagged). Amends the PR #104 surfaces —
+  record a 09 changelog delta at build time.
+- **N11 (MED, B, WS-G, ready)** — deload ▼ at exactly-prescribed performance.
+  Root cause: RIR-asymmetric marker comparison (prescribed side uses target RIR
+  ≈6 on deloads; logged side `rir_reported: null` → 0). 1-3 line fix; extract
+  the memo to `day-rules.ts` for tests.
+- **N12 (HIGH, B, WS-J, ready)** — set-log latency + never-resolving spinner.
+  Latency: ~6 serial round-trips in `logSet` + the first set of each session
+  busting the reconcile gate (its own `in_progress` flip bumps the gate's
+  `workouts.updated_at` watermark) + double `revalidatePath`. Hang: the spinner
+  is transition-pending on the **revalidation commit**, not the write, with no
+  timeout. Build as a WS-J slice with N1 Phase-2 deferreds (#5/#6).
+- **N1 escalated** (9th note folded in, not a new row): 1-2s dead nav gaps
+  persist (cycles pages worst); owner's bar = immediate switch + skeleton
+  everywhere, day view is the only page doing it right. This **disproves the
+  Phase-A architecture note** that Link navs already paint the
+  `(app)/loading.tsx` fallback — logged in `J-performance.md` as the next
+  Phase-A action (verify on device, then per-route skeletons/streaming).
+- Housekeeping: pruned `scoping.md`'s stale "not yet researched" list
+  (PH29/PH38/PH31/PH32/PH37 all shipped).
+
+**Suggested attack order for the next build sessions:** the three scoped
+one-file bugs first — **N5 + N11** (both day-view, trivial) and **N7**
+(`useScrollLock`), plus **N8** (small, two badge components) — one PR could
+carry all four. Then **N12** as the opening WS-J slice (biggest daily-loop pain,
+HIGH), folding in N1's revalidation-narrowing deferreds. Then **N9+N10**
+together (Performance-tab rework, medium). **N6** (pull-to-refresh) rides
+whenever a day-view PR is open. R21 (MED) remains the last review item at full
+weight; I12 in-app planner UX still the open large HIGH.
+
 ## 2026-07-03 — Session 36 (cont. 5): PR #127 merged + R25 mechanical fixes (PR #129)
 
 - **PR #127 MERGED** (all checks green). No sweep: R24 stays live
