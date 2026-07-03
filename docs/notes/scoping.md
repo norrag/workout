@@ -250,7 +250,10 @@ fully satisfies the note (per-user isolation, machine-specific steps), then clos
 
 # Batch 5 (2026-07-03) — scoped at intake
 
-## N5 — Replace-exercise: first set keeps the old exercise's numbers · **B / trivial-small · ready**
+## N5 — Replace-exercise: first set keeps the old exercise's numbers · **B / trivial-small · DONE (PR #131, 2026-07-03)**
+Shipped via the first (lowest-risk) option below: the `SetRow` key now includes
+`we.exercise_id`, so a replace remounts the rows and set 1 re-initializes from
+the new prescription. Original scope below for the record.
 PH38's recurrence, but a **different mechanism** — the PR #84 fix
 (`replaceWorkoutExercise` clears `set_weights: {}` on swap,
 `src/lib/queries/logging.ts:756,763`) is intact, and the new prescription is
@@ -283,7 +286,9 @@ gated to `scrollTop === 0`, threshold + spinner, `router.refresh()` inside a
 `overscroll-behavior-y: contain` (`src/styles/globals.css:53`) to avoid gesture
 conflict.
 
-## N7 — Note-sheet scroll position drifts after keyboard · **UX / small · ready**
+## N7 — Note-sheet scroll position drifts after keyboard · **UX / small · DONE (PR #131, 2026-07-03)**
+Shipped exactly as scoped (`position:fixed` lock + exact restore; paddingRight
+compensation and `lockCount` kept). Original scope below for the record.
 Root cause: the shared scroll lock never saves/restores `scrollY`.
 `src/components/ui/useScrollLock.ts:11-33` only sets `body overflow:hidden` (+
 scrollbar padding); on an installed iOS PWA that doesn't pin the offset, so the
@@ -295,7 +300,10 @@ shifts the document and nothing restores it — `useModalA11y` restores focus wi
 `window.scrollTo(0, saved)`. Mind the existing `paddingRight` compensation and
 the `lockCount` ref-count for stacked overlays.
 
-## N8 — Meso badges: PLANNED badge, checkbox only when complete, mute future · **UX / small · ready**
+## N8 — Meso badges: PLANNED badge, checkbox only when complete, mute future · **UX / small · DONE (PR #131, 2026-07-03)**
+Shipped on both surfaces (badge in ink = the owner's "white" under the dark
+inversion); fig 2.1/2.2 delta recorded in 09 (2026-07-03 entry). Original
+scope below for the record.
 Meso statuses: `draft|unplanned|planned|active|completed|abandoned`
 (`src/lib/types/database.ts:191-197`). **The owner's description (orange CURRENT
 badge + checkbox) matches the `/cycles` list page**, `StatusMark`
@@ -347,7 +355,10 @@ chart's lead lift (`stats.ts:719-721`) and feeds `mesoPosition`/`contextLine`
 (`stats.ts:737,811-817`) — re-derive or drop `contextLine`'s meso-position bit
 when retiring `buildKeyLifts`. Ship with N9.
 
-## N11 — Deload sets show ▼ at exactly-prescribed performance · **B / trivial · ready**
+## N11 — Deload sets show ▼ at exactly-prescribed performance · **B / trivial · DONE (PR #131, 2026-07-03)**
+Shipped as scoped: marker extracted to pure `day-rules.ts::loggedSetMarker`,
+compares at equal RIR when unreported; 6 unit tests. Original scope below for
+the record.
 Marker memo: `DayView.tsx:1484-1519` (render `:1613-1626`), ±1.5% band. **The
 comparison is RIR-asymmetric:** prescription side
 `estimateE1rm(prescribedEff, prescribedReps, targetRir, …)` (`:1489-1493`) bakes

@@ -4,6 +4,47 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 38: N5 + N11 + N7 + N8 — the four scoped Batch-5 quick fixes (PR #131)
+
+Reconciliation sweep: no-op (PR #130, the Batch-5 intake, merged — it was
+notes-only with no `done` rows to sweep; R24/R25/I12 correctly stay live).
+Built the first slot of Session 37's suggested attack order — the four
+one-file items in a single PR, branch `claude/notes-n5-n11-n7-n8-jt2yyi`.
+Full record in PROGRESS 2026-07-03 (latest); N8's design delta recorded as a
+dated 09 entry (figs 2.1/2.2).
+
+- **N5 — done.** Went with the scoped lowest-risk option: the `SetRow` key now
+  carries `we.exercise_id`, so a replace remounts the rows and the editable
+  set-1 `useState` re-initializes from the new exercise's prescription. The
+  re-sync effects are untouched (R13 semantics preserved).
+- **N11 — done.** The P19 marker memo extracted to pure
+  `day-rules.ts::loggedSetMarker`; unreported RIR now compares at the week's
+  target RIR on both sides instead of defaulting the logged side to 0.
+  6 new unit tests (deload regression, working-week, over/under, reported-RIR
+  directions, null guards). Note: a *reported* RIR still counts — same
+  weight/reps at RIR 0 against a target of 3 correctly reads ▼.
+- **N7 — done.** `useScrollLock` rewritten to the `position:fixed` +
+  `top:-scrollY` pattern with exact restore on release; scrollbar-padding
+  compensation and the stacked-overlay ref count kept. Every sheet/menu rides
+  the same hook, so the fix is global.
+- **N8 — done.** `/cycles` `StatusMark`: planned → PLANNED text badge
+  (CURRENT's geometry in ink — the owner's "white" resolves to ink, which
+  renders cream-white under the dark ledger inversion); checkbox reserved for
+  completed; muting widened to planned + unplanned on macro-grouped AND
+  standalone rows. Macro timeline: numbered marks stay, planned rows swap the
+  progress bar for the badge, same muting adopted.
+- **Verified:** typecheck, lint, 752 tests (+6), production build (`/log`
+  127 kB — day-rules imports the zod-free predict core only). No local stack
+  in this sandbox; N5 + N7 flagged for the owner's on-device spot-check
+  (N7 is installed-iOS-PWA-specific).
+
+**Next per the Session-37 attack order:** **N12** (set-log latency + hanging
+spinner, HIGH) as the opening WS-J slice, folding in N1 Phase-2 deferreds
+#5/#6; then **N9+N10** (Performance-tab rework, ship together). **N6**
+(pull-to-refresh) rides whenever a day-view PR is open. R21 (MED) remains the
+last review item at full weight; I12 in-app planner UX still the open large
+HIGH.
+
 ## 2026-07-03 — Session 37: Batch 5 intake — 8 new items (N5–N12) + N1 escalation (PR #130)
 
 Reconciliation sweep: no-op (PR #129 merged; R24/R25 correctly stay live —

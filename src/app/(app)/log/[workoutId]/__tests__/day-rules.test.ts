@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine/params";
 import {
   adoptServerRowState,
   daySetTotals,
   exerciseDone,
+  loggedSetMarker,
   plannedSetCount,
   type SetProgressExercise,
 } from "../day-rules";
@@ -89,6 +91,100 @@ describe("daySetTotals", () => {
     const { loggedSets, totalSets } = daySetTotals(day);
     expect(loggedSets).toBe(totalSets);
     expect(day.every(exerciseDone)).toBe(true);
+  });
+});
+
+describe("loggedSetMarker (P19/N11)", () => {
+  const e1rmCfg = DEFAULT_ENGINE_PARAMS.e1rm;
+  const asPrescribed = {
+    prescribedEffectiveWeight: 100,
+    prescribedReps: 10,
+    loggedEffectiveWeight: 100,
+    loggedReps: 10,
+    e1rmCfg,
+  };
+
+  // the N11 regression: rir_reported defaulted to 0 while the prescription
+  // baked in the week's target RIR, so an exactly-as-prescribed quick-logged
+  // set read as a big miss — worst on deloads (the largest target RIR)
+  it("exactly-prescribed with unreported RIR shows no marker on a deload", () => {
+    expect(
+      loggedSetMarker({ ...asPrescribed, loggedRir: null, targetRir: 6 }),
+    ).toBeNull();
+  });
+
+  it("exactly-prescribed with unreported RIR shows no marker on a working week", () => {
+    expect(
+      loggedSetMarker({ ...asPrescribed, loggedRir: null, targetRir: 2 }),
+    ).toBeNull();
+  });
+
+  it("more reps than prescribed reads over, fewer reads under (unreported RIR)", () => {
+    expect(
+      loggedSetMarker({
+        ...asPrescribed,
+        loggedReps: 12,
+        loggedRir: null,
+        targetRir: 6,
+      }),
+    ).toBe("over");
+    expect(
+      loggedSetMarker({
+        ...asPrescribed,
+        loggedReps: 8,
+        loggedRir: null,
+        targetRir: 6,
+      }),
+    ).toBe("under");
+  });
+
+  // a REPORTED RIR still compares against the week's target: same weight/reps
+  // but nothing left in reserve means the set was harder than prescribed
+  it("reported RIR below target reads under; above target reads over", () => {
+    expect(
+      loggedSetMarker({ ...asPrescribed, loggedRir: 0, targetRir: 3 }),
+    ).toBe("under");
+    expect(
+      loggedSetMarker({ ...asPrescribed, loggedRir: 6, targetRir: 3 }),
+    ).toBe("over");
+  });
+
+  it("heavier load at the same reps and RIR reads over", () => {
+    expect(
+      loggedSetMarker({
+        ...asPrescribed,
+        loggedEffectiveWeight: 110,
+        loggedRir: null,
+        targetRir: 2,
+      }),
+    ).toBe("over");
+  });
+
+  it("returns null without a prescription or a working load", () => {
+    expect(
+      loggedSetMarker({
+        ...asPrescribed,
+        prescribedEffectiveWeight: null,
+        loggedRir: null,
+        targetRir: 2,
+      }),
+    ).toBeNull();
+    expect(
+      loggedSetMarker({
+        ...asPrescribed,
+        prescribedReps: null,
+        loggedRir: null,
+        targetRir: 2,
+      }),
+    ).toBeNull();
+    expect(
+      loggedSetMarker({
+        ...asPrescribed,
+        loggedEffectiveWeight: 0,
+        loggedRir: null,
+        targetRir: 2,
+      }),
+    ).toBeNull();
   });
 });
 

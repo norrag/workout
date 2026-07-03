@@ -228,6 +228,10 @@ export default async function MacroOverviewPage({
           {mesos.map((meso, i) => {
             const phase = phaseLabel(meso.phase);
             const isUnplanned = meso.status === "unplanned";
+            // N8: only current/completed render full ink — future mesos
+            // (planned and unplanned) stay muted
+            const muted =
+              meso.status !== "active" && meso.status !== "completed";
             const pos = meso.position ?? i + 1;
             const parts = (state: string) =>
               [`MESO ${pos}`, phase, state].filter(Boolean).join(" · ");
@@ -244,7 +248,7 @@ export default async function MacroOverviewPage({
                 <TimelineMark meso={meso} pos={pos} />
                 <div className="flex-1">
                   <div
-                    className={`text-[13px] font-bold ${isUnplanned ? "text-ink/50" : ""}`}
+                    className={`text-[13px] font-bold ${muted ? "text-ink/50" : ""}`}
                   >
                     {isUnplanned ? `Mesocycle ${pos}` : meso.name}
                   </div>
@@ -254,7 +258,9 @@ export default async function MacroOverviewPage({
                         ? "text-accent"
                         : isUnplanned
                           ? "text-ink/42"
-                          : "text-ink/50"
+                          : muted
+                            ? "text-ink/45"
+                            : "text-ink/50"
                     }`}
                   >
                     {sub}
@@ -284,15 +290,24 @@ export default async function MacroOverviewPage({
                 className="flex items-center gap-[11px]"
               >
                 {inner}
-                <div
-                  className={`h-1.5 w-[46px] flex-shrink-0 ${
-                    meso.status === "completed"
-                      ? "bg-ink"
-                      : meso.status === "active"
-                        ? "bg-accent"
-                        : "bg-ink/15"
-                  }`}
-                />
+                {/* N8 (owner, 2026-07-03 addendum): planned rows swap the
+                    progress bar for the PLANNED badge (CURRENT's geometry
+                    in ink); the bar stays for completed/active */}
+                {meso.status === "planned" ? (
+                  <div className="flex-shrink-0 border-[1.5px] border-ink px-[7px] py-[3px] text-[8.5px] font-bold tracking-[0.12em] text-ink">
+                    PLANNED
+                  </div>
+                ) : (
+                  <div
+                    className={`h-1.5 w-[46px] flex-shrink-0 ${
+                      meso.status === "completed"
+                        ? "bg-ink"
+                        : meso.status === "active"
+                          ? "bg-accent"
+                          : "bg-ink/15"
+                    }`}
+                  />
+                )}
               </Link>
             );
           })}

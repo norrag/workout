@@ -39,7 +39,20 @@ function StatusMark({ status }: { status: MesocycleRow["status"] }) {
         CURRENT
       </div>
     );
+  // N8: planned reads as a text badge (CURRENT's geometry in ink) — the
+  // checkbox vocabulary is reserved for completion
+  if (status === "planned")
+    return (
+      <div className="border-[1.5px] border-ink px-[7px] py-[3px] text-[8.5px] font-bold tracking-[0.12em] text-ink">
+        PLANNED
+      </div>
+    );
   return <div className="h-5 w-5 border-[1.5px] border-ink/35" />;
+}
+
+/** N8: only current/completed render full ink — future mesos stay muted. */
+function isFutureMeso(status: MesocycleRow["status"]): boolean {
+  return status !== "active" && status !== "completed";
 }
 
 function MesoSubline({ meso }: { meso: MesocycleRow }) {
@@ -83,16 +96,21 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
       </div>
     );
   }
+  const muted = isFutureMeso(meso.status);
   return (
     <Link
       href={`/cycles/meso/${meso.id}`}
       className="block border-b border-ink/[0.18] py-[11px] last:border-b-0"
     >
       <div className="flex items-center justify-between">
-        <div className="text-[15px] font-bold">{meso.name}</div>
+        <div className={`text-[15px] font-bold ${muted ? "text-ink/50" : ""}`}>
+          {meso.name}
+        </div>
         <StatusMark status={meso.status} />
       </div>
-      <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.08em] text-ink/55">
+      <div
+        className={`mt-[3px] text-[9.5px] font-medium tracking-[0.08em] ${muted ? "text-ink/45" : "text-ink/55"}`}
+      >
         <MesoSubline meso={meso} />
       </div>
     </Link>
@@ -101,14 +119,19 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
 
 /** A standalone meso row (no macro). */
 function StandaloneRow({ meso }: { meso: MesocycleRow }) {
+  const muted = isFutureMeso(meso.status);
   return (
     <Link
       href={`/cycles/meso/${meso.id}`}
       className="flex items-center justify-between border-b border-ink/[0.15] py-[11px] last:border-b-0"
     >
       <div>
-        <div className="text-[15px] font-bold">{meso.name}</div>
-        <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.08em] text-ink/55">
+        <div className={`text-[15px] font-bold ${muted ? "text-ink/50" : ""}`}>
+          {meso.name}
+        </div>
+        <div
+          className={`mt-[3px] text-[9.5px] font-medium tracking-[0.08em] ${muted ? "text-ink/45" : "text-ink/55"}`}
+        >
           {meso.weeks} WK · {meso.days_per_week} D/WK
         </div>
       </div>
