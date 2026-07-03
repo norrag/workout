@@ -4,6 +4,33 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 36 (cont. 3): PR #121 merged + R23 — repo hygiene batch (PR #122)
+
+- **PR #121 MERGED** (all checks green). Archival sweep ran: **R22 swept to
+  `archive.md`** ("Swept 2026-07-03 (later 2)"); branch restarted from the
+  merged main. Sweep rides with this PR.
+- Continued the LOW tail — **R23** (LOW, WS-L), **PR #122**. Full record in
+  PROGRESS 2026-07-03 (latest).
+- **R23 — done.** Dead code deleted: the 2 unused-but-live `"use server"`
+  POST endpoints (`reorderGroupExercisesAction` + its now-orphaned
+  `reorderGroupExercises` query, `saveProfileDetails` + schema/FormState);
+  dead exports `listMacrocycles`, `setExerciseStatus`, `confidenceRank`
+  (+ its private rank map); 6 unused UI components (Card, MenuCard,
+  FeedbackScale, NumberStepper — with its stale-closure bug, RirBadge,
+  WeekTrack); 7 engine-barrel over-exports trimmed (module exports intact).
+  Views: `v_muscle_group_volume` (dead since initial schema, wrong week
+  boundary/no fractional counting) **and** `v_meso_week_sets` (superseded by
+  the R14 role-grain view; root CLAUDE.md's "pending retirement with R23"
+  note resolved) retired via migrations `20260703000002` + `20260703000003`,
+  **both applied live**; row types + registry entries removed. Dep nits:
+  `@next/bundle-analyzer` aligned to next 15 majors, `tsx` now a real devDep
+  (scripts doc `npx tsx`), dead `tests/unit/**` vitest include removed,
+  `.github/dependabot.yml` added (weekly, grouped minors/patches).
+- **Next per the attack order:** R24 (engine guardrail batch, LOW, WS-G) and
+  R25 (MCP polish, LOW, WS-K); R21 (MED, testing infra) behind them. N1
+  (WS-J) and I12's in-app planner UX remain the open HIGH-priority
+  workstreams.
+
 ## 2026-07-03 — Session 36 (cont. 2): PR #120 merged + R22 — env validated at boot (PR #121)
 
 - **PR #120 MERGED** (all checks green — `rls-tests` ran the new single-active

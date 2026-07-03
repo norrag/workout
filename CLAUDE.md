@@ -47,5 +47,5 @@ npm run lint && npm run typecheck
 
 - snake_case in SQL; camelCase in TS; DB types generated, domain types in `src/lib/types/`.
 - Data access goes through `src/lib/queries/` — no inline supabase queries in components.
-- Stats screens and MCP must share the same views (`v_exercise_history`, `v_meso_summary`, `v_meso_week_muscle_sets` — role-grain facts weighted through `engine/volume.ts::fractionalSetCount`, one counting definition — `v_exercise_prs`, plus `v_exercise_overview` and `v_macro_summary` per the 09 deltas) — one definition of progress. (`v_meso_week_sets` is superseded, pending retirement with R23.)
+- Stats screens and MCP must share the same views (`v_exercise_history`, `v_meso_summary`, `v_meso_week_muscle_sets` — role-grain facts weighted through `engine/volume.ts::fractionalSetCount`, one counting definition — `v_exercise_prs`, plus `v_exercise_overview` and `v_macro_summary` per the 09 deltas) — one definition of progress. (`v_meso_week_sets` was retired with R23, migration `20260703000003`.)
 - Keep `main` deployable; vertical-slice PRs.
