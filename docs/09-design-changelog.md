@@ -42,6 +42,34 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-03 (session 2) — Performance-tab reorg: macro drill-down (N9) + meso trim (N10)
+
+Owner decisions (verbatim in `docs/notes/backlog.md` appendix Batch 5). Amends
+the Performance tabs introduced in the 2026-07-02 session-6 entry (M8/I11/PH37
+— still no mockups for these surfaces; the rule-8 deviation carries over).
+
+- **Change (macro Performance tab):** the **muscle-group strength gain is the
+  primary statistic** — full-width rows (group name + role-weighted % gain),
+  each **expandable** (▸/▾ disclosure) to the exercises that rolled into that
+  number (name, first→last e1RM, session count, % score, `SECONDARY` marker on
+  0.5-credit links). The **flat "ALL EXERCISES" list is dropped at macro
+  scope** — across a whole macro it grows too long to read; per-exercise detail
+  now lives inside its group. An exercise linked to several groups appears
+  under each (fractional credit is expected, footnoted on the section).
+- **Change (meso Performance tab):** the **"TOP SET BY WEEK — KEY LIFTS" grid
+  and the "ACROSS MACRO — {lift} EST. 1RM" chart are removed** (macro-scope
+  content on a meso view). The tab is now: est-strength trend (all exercises +
+  muscle rollup, unchanged) + PRS THIS MESO.
+- **Rationale:** muscle groups are the honest unit across a macro's many months
+  and exercise swaps; single-exercise macro charts belong to macro-scope
+  surfaces, not the meso tab.
+- **Affected figures:** 4.3 (meso Performance) and the (mockup-less) macro
+  stats Performance panel.
+- **Impact:** `RETROFIT` — shipped in the same PR (`MesoStatsViews.tsx`
+  `PerformanceView` trim; new `MuscleStrengthSection.tsx` on
+  `cycles/macro/[macroId]/page.tsx`; rollup carries `contributors[]` in
+  `queries/stats.ts`).
+
 ## 2026-07-03 — Planned-meso badge + future-meso muting (N8)
 
 Owner decision (verbatim in `docs/notes/backlog.md` appendix Batch 5 + the

@@ -1,4 +1,3 @@
-import { formatWeight } from "@/lib/units";
 import type { MesoStats } from "@/lib/queries/stats";
 import { StrengthProgressSection } from "./StrengthProgress";
 
@@ -192,120 +191,16 @@ export function BalanceView({ balance }: { balance: MesoStats["balance"] }) {
 }
 
 // ---------------------------------------------------------------------------
-// 4.3 — performance: top set by week, e1RM across macro, PRs this meso
+// 4.3 — performance: est-strength trend + PRs this meso. N10 (owner 2026-07-03)
+// dropped the "TOP SET BY WEEK — KEY LIFTS" grid and the "ACROSS MACRO" single-
+// exercise chart — macro-scope content on a meso view.
 // ---------------------------------------------------------------------------
 
 export function PerformanceView({ stats }: { stats: MesoStats }) {
-  const { weeks, performance } = stats;
-  const liftGrid = { gridTemplateColumns: `repeat(${weeks.length}, 1fr)` };
-  const chartMax = Math.max(
-    1,
-    ...performance.macroChart.map((b) => b.e1rm ?? 0),
-  );
+  const { performance } = stats;
 
   return (
     <div>
-      <div className="mt-[18px] border-t-[1.5px] border-ink pt-[9px]">
-        <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/50">
-          TOP SET BY WEEK — KEY LIFTS · LB
-        </div>
-        {performance.keyLifts.map((lift) => (
-          <div
-            key={lift.exercise_id}
-            className="border-b border-ink/15 py-2.5"
-          >
-            <div className="flex items-baseline justify-between">
-              <div className="text-sm font-bold">{lift.name}</div>
-              {lift.badge && (
-                <div className="border border-ink px-1.5 py-0.5 text-[9px] font-bold tracking-[0.1em]">
-                  {lift.badge}
-                </div>
-              )}
-            </div>
-            <div className="mt-2 grid gap-1.5" style={liftGrid}>
-              {lift.cells.map((cell, i) =>
-                cell ? (
-                  <div
-                    key={i}
-                    className={`numeral box-border text-center text-[11.5px] ${
-                      cell.isCurrent
-                        ? "border-2 border-accent py-1.5 font-bold text-accent"
-                        : "border border-ink/30 py-[7px] font-semibold"
-                    }`}
-                  >
-                    {formatWeight(cell.weight)} × {cell.reps}
-                  </div>
-                ) : (
-                  <div
-                    key={i}
-                    className="border border-dashed border-ink/30 py-[7px] text-center text-[11.5px] font-medium text-ink/40"
-                  >
-                    —
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-        ))}
-        {performance.keyLifts.length === 0 && (
-          <p className="py-3 text-sm text-ink/45">Nothing logged yet.</p>
-        )}
-      </div>
-
-      {performance.macroChart.length > 0 && performance.macroLiftName && (
-        <div className="mt-4">
-          <div className="flex justify-between text-[9px] font-semibold tracking-[0.12em] text-ink/50">
-            <span>
-              ACROSS MACRO — {performance.macroLiftName.toUpperCase()} EST. 1RM
-            </span>
-            {performance.macroChart.some((b) => b.state === "current") && (
-              <span className="font-bold text-accent">
-                {performance.macroChart.find((b) => b.state === "current")?.label}{" "}
-                TO DATE
-              </span>
-            )}
-          </div>
-          <div className="mt-2.5 flex items-stretch gap-2">
-            {performance.macroChart.map((bar) => (
-              <div key={bar.label} className="flex flex-1 flex-col gap-1">
-                <div
-                  className={`numeral text-center text-[11px] ${
-                    bar.state === "current"
-                      ? "font-bold text-accent"
-                      : bar.state === "past"
-                        ? "font-bold"
-                        : "font-medium text-ink/40"
-                  }`}
-                >
-                  {bar.e1rm != null ? formatWeight(bar.e1rm) : "—"}
-                </div>
-                <div className="flex h-12 items-end">
-                  {bar.state === "future" || bar.e1rm == null ? (
-                    <div className="box-border h-full w-full border border-dashed border-ink/30" />
-                  ) : (
-                    <div
-                      className={`w-full ${bar.state === "current" ? "box-border border-2 border-accent" : "bg-ink"}`}
-                      style={{
-                        height: `${Math.round((bar.e1rm / chartMax) * 84)}%`,
-                      }}
-                    />
-                  )}
-                </div>
-                <div
-                  className={`text-center text-[8.5px] tracking-[0.1em] ${
-                    bar.state === "current"
-                      ? "font-bold text-accent"
-                      : "font-semibold text-ink/55"
-                  }`}
-                >
-                  {bar.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* I11 + PH37: per-exercise est-strength trend + muscle-group rollup */}
       <StrengthProgressSection
         strength={performance.strength}

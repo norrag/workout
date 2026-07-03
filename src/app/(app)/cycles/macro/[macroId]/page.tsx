@@ -7,7 +7,7 @@ import { getMacroStats } from "@/lib/queries/stats";
 import { getProfile } from "@/lib/queries/profiles";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { BalanceView } from "@/components/stats/MesoStatsViews";
-import { StrengthProgressSection } from "@/components/stats/StrengthProgress";
+import { MuscleStrengthSection } from "@/components/stats/MuscleStrengthSection";
 import type { MacroRange } from "@/lib/engine";
 import type { MacroGoalType, MesocycleRow } from "@/lib/types/database";
 import { formatWeight } from "@/lib/units";
@@ -354,7 +354,10 @@ export default async function MacroOverviewPage({
             )}
           </div>,
           <div key="performance">
-            <StrengthProgressSection
+            {/* N9: muscle-group gain is the macro-scope primary stat; the
+                per-exercise detail lives in each group's drill-down (the flat
+                all-exercises list stays a meso-tab idiom) */}
+            <MuscleStrengthSection
               strength={macroStats.strength}
               scopeLabel="THIS MACROCYCLE"
             />
