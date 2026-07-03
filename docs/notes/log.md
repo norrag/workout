@@ -4,6 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 40: R21 (all 3 bullets) + N1 per-route skeletons + I12 scoping & first slices (PR #134)
+
+Reconciliation sweep: no-op (PRs #132/#133 merged; Session 39's in-session
+sweep already archived their rows; no `done` rows live). Worked the recorded
+order — **R21** (last full-weight review item), the **N1 Phase-A escalation**,
+and **I12** — on branch `claude/r21-i12-progress-o2pp6r`, **PR #134**. Full
+record in PROGRESS 2026-07-03 (latest); the I12 UI delta is a dated 09 entry
+(2026-07-03 session 3).
+
+- **R21 — done, all 3 bullets.** (a) v18 golden meso (`golden-meso-live.test.ts`):
+  anchored lifter simulated over 5 weeks + deload with the anchor recomputed
+  from the logged sets each week — pins the seed-from-anchor, the rep climb
+  bounded to the window, the anchor-based RIR-6 deload, and a
+  bodyweight_loadable effective-load scenario; every number hand-verified
+  before pinning. (b) `tests/integration/write-pipeline.test.ts` — the
+  activate/seed → log → complete → generate round-trip through the real query
+  layer + RPCs, riding the CI rls-tests job (skips nothing; hard-fails without
+  a stack, like the RLS suite). (c) Playwright e2e smoke + config + dedicated
+  CI e2e job — sign-in → START → log incl. the auto-prompted feedback sheet →
+  complete → asserts the engine-generated W2·D1. `test:e2e` is no longer dead.
+  No Docker in this sandbox → both stack suites verified via the PR's CI
+  (first run caught the fixture's `weeks: 2` vs the 3–8 schema check).
+- **N1 — per-route skeleton slice shipped** (row stays in-progress, WS-J).
+  Root cause recorded in `J-performance.md`: sibling navs never re-suspend the
+  group-level `(app)/loading.tsx` boundary — only routes with their OWN file
+  paint on tap, which is exactly the two that behaved. 9 routes got
+  layout-mirroring skeletons; `<Link>` prefetch carries the shells. Owner
+  device-check pending.
+- **I12 — advanced.** Full in-app-vs-MCP gap table now in `scoping.md` § I12
+  (helpers all exist; delta is pure UI). Shipped the two slices that fit the
+  existing design grammar: ⋮ menu **Duplicate mesocycle** + the **proactive
+  START gate** (disabled + reason via the same pure `mesoActivationBlock`).
+  Remaining pieces (attach-into-macro picker, header edit after finalize,
+  direct slot add/remove/reorder, plan-time volume preview) each lack a mockup
+  figure — queued for a design delta / owner input before building.
+- **Verified:** typecheck, lint, 753 unit tests (+2), production build. CI
+  (rls-tests incl. integration, e2e) is the merge gate for the stack suites.
+
+**Next:** the I12 remainder needs owner design input (4 pieces listed in
+`scoping.md`); N1 continues (device-verify the skeletons, then Phase-2 #5/#7
+caching or Phase-3 streaming as measured); R24 reprice-down investigation and
+R25 tool-surface consolidation stay parked.
+
 ## 2026-07-03 — Session 39 (cont.): PR #132 merged — in-session sweep
 
 PR #132 merged with all checks green while the session was still live, so the

@@ -415,12 +415,33 @@ record. Two compounding halves, both scoped:
 
 ---
 
+## I12 — in-app planner UX (scoped 2026-07-03, session 40)
+
+**MCP authoring side shipped** (PROGRESS 2026-07-01); the in-app delta was
+scoped this session against the code. Key finding: the MCP tools are thin
+wrappers over query-layer helpers (`queries/cycles.ts`, `queries/macro.ts`)
+that the app UI mostly doesn't call yet — the remaining work is **pure UI**
+over existing, RLS-safe mutations. Gap table (in-app status as of PR #134):
+
+| Operation | Helper (exists) | In-app status |
+|---|---|---|
+| Create/edit macro, engine, + PLAN a slot, planner board structure editing | — | **full** (figs 2.1–2.8) — richer than MCP |
+| Duplicate a meso | `duplicateMesocycle` (cycles.ts:560) | **done (PR #134):** ⋮ menu "Duplicate mesocycle" → new standalone planned meso |
+| Sequential-activation gate surfaced proactively | pure `mesoActivationBlock` (generation.ts:266) | **done (PR #134):** StartMesoForm renders disabled + reason (live block / unfinished earlier siblings); server still re-checks |
+| Attach a standalone meso into a macro position | `attachMesoToMacro` (macro.ts:487) | **missing** — all creation paths land standalone; `NewCycleButton` copy even steers users to + PLAN instead. Needs a macro+position picker (no mockup figure → needs a 09 delta or owner design input) |
+| Seed a macro slot from template/copy | `copyMesoStructure` / `applyTemplateToMeso` | **missing** — + PLAN always opens a blank board; template/copy sources exist only for standalone drafts |
+| Add/remove/reorder macro slots directly | `manageMacroSlots` (macro.ts:615) | **indirect only** (EditMacroForm duration/meso-length re-plan); no direct controls on the macro timeline; reorder has no UI at all (no figure → design input) |
+| Edit meso header after finalize (name/weeks/RIR/deload/phase) | `updateMesocycleAttrs` (cycles.ts:214) | **missing** — FinalizeSheet sets name+weeks at draft time only; RIR ramp read-only everywhere (no figure → design input) |
+| Plan-time volume preview (fractional weekly sets vs landmarks) | aggregation lives in `mcp/tools/authoring.ts:73` — **needs relocation to shared code** first | **missing** — Balance tab needs materialized weeks, so drafts/planned mesos show nothing |
+
+**Suggested next slices:** (1) attach-into-macro picker + duplicate-into-slot
+(one sheet covers both, reusing `attachMesoToMacro`); (2) meso header-edit
+sheet; (3) planner-board volume readout (move the authoring.ts aggregation
+into `queries/` per the one-counting-definition rule). All three need either a
+09 design delta or owner input first — **no mockup figure exists** for any of
+them (rule 8).
+
 ## Items still needing their own scoping pass (not yet researched)
-- **I12** (mesocycle management under a macrocycle) — **MCP authoring side shipped**
-  (PROGRESS 2026-07-01, branch `claude/mcp-mesocycle-creation-i4nica`): day-level
-  meso building, macro placement/attach, header edit, duplicate, slot management,
-  gated sequential activation, volume preview. Remaining scope is the **in-app**
-  planner UX for the same operations.
 - **PH30** (LLM prescription analysis) — deferred 2026-07-02; see workstream H.
 
 > Pruned 2026-07-03: PH29/PH38 (shipped PR #84), PH31/PH32 (shipped WS-B),

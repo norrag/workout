@@ -9,6 +9,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ShareRow } from "@/components/ShareRow";
 import {
   deleteMesoAction,
+  duplicateMesoAction,
   saveMesoAsTemplateAction,
 } from "../../actions";
 
@@ -74,6 +75,7 @@ export function MesoHeader({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [ack, setAck] = useState(false);
   const [savingTemplate, startTemplate] = useTransition();
+  const [duplicating, startDuplicate] = useTransition();
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   const iconBtn =
@@ -86,6 +88,17 @@ export function MesoHeader({
       // redirects to the new template on success, back here with
       // ?error=template on failure (the page renders the error line)
       await saveMesoAsTemplateAction(fd);
+      setMenuOpen(false);
+    });
+  };
+
+  const duplicate = () => {
+    startDuplicate(async () => {
+      const fd = new FormData();
+      fd.set("meso_id", mesoId);
+      // redirects to the duplicated meso on success, back here with
+      // ?error=duplicate on failure
+      await duplicateMesoAction(fd);
       setMenuOpen(false);
     });
   };
@@ -303,10 +316,17 @@ export function MesoHeader({
             router.push(`/cycles/meso/${mesoId}/plan`);
           }}
         />
+        {/* I12: one-tap re-run — settings + board copied into a fresh planned
+            meso (no loads; the engine reseeds on activation) */}
+        <MenuRow
+          label={duplicating ? "Duplicating…" : "Duplicate mesocycle"}
+          disabled={savingTemplate || duplicating}
+          onClick={duplicate}
+        />
         {hasFills && (
           <MenuRow
             label={savingTemplate ? "Saving template…" : "Save as template"}
-            disabled={savingTemplate}
+            disabled={savingTemplate || duplicating}
             onClick={saveTemplate}
           />
         )}

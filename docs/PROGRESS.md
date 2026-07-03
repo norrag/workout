@@ -2,7 +2,70 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — N12 + N9 + N10 + N6: set-log latency/hang, Performance-tab reorg, pull-to-refresh
+## 2026-07-03 (latest) — R21 coverage (golden v18 · integration · e2e) + N1 per-route skeletons + I12 in-app slices
+
+The next items in the recorded order (PR #134): **R21** — the last full-weight
+review item — all three bullets; the **N1 Phase-A escalation** (per-route
+skeletons); an **I12 scoping pass + first two in-app slices**.
+
+- **R21 — the coverage gaps are closed.**
+  - *Golden meso under the live params* (`engine/__tests__/golden-meso-live.test.ts`):
+    the production **v18** shape (helpers' `V18_PARAMS` ≡ the active hosted row)
+    simulated over a full 5-week + deload block with a lifter whose logged sets
+    feed `recencyWeightedE1rm` week to week. Pins: anchor seed (95 lb off a
+    hand-derivable e1RM-132 session_best anchor), the performed-reps climb down
+    the ramp **bounded to the gain window's 12**, the **anchor-based RIR-6
+    deload** (not legacy 55%-of-peak), and a `bodyweight_loadable` scenario
+    (effective-load pricing, added-weight prescription, deload to added 0).
+    Every expected row hand-verified before pinning; inline table, no snapshots.
+  - *Write-pipeline integration suite* (`tests/integration/write-pipeline.test.ts`,
+    `vitest.integration.config.ts`, `npm run test:integration`, riding the CI
+    rls-tests job after the policy suite): the real query layer against the real
+    schema/RLS/RPCs — createMesocycle → `save_meso_plan` RPC → `startMeso`
+    (activation, microcycle/workout seeding, deferred no-history seed with
+    fingerprint + params stamps, `kind:"seed"` decisions, and the R15
+    second-activation refusal) → `logSet` (embedded-chain stamps, `in_progress`
+    flip, R3 upsert convergence on retry) → feedback-then-complete (the RLS
+    completion-lock ordering) → `advanceWeekAfterWorkout` (week-2 generation
+    prescribed off the logged work, `kind:"advance"` decisions, idempotency,
+    microcycle rollover + week-2 activation).
+  - *Playwright e2e smoke* (`tests/e2e/smoke.spec.ts`, `playwright.config.ts`,
+    new CI `e2e` job): `npm run test:e2e` is real (the doc-02 "Playwright smoke"
+    claim is finally true). Mobile-viewport Chromium; fixture seeded through the
+    public API; the test signs in through the UI, taps START MESOCYCLE, logs
+    both sets (typing a starting weight into the deferred seed), completes the
+    auto-prompted feedback sheet, completes the workout, and asserts it lands on
+    the engine-generated **W2·D1**. Traces upload on failure.
+  - *Sandbox note:* no Docker here, so both stack-backed suites were verified
+    through the PR's CI (first run caught a real fixture bug: `weeks: 2` under
+    the 3–8 schema check).
+- **N1 (WS-J Phase A) — per-route loading skeletons.** Root cause of the 1-2s
+  dead nav gaps written up in `J-performance.md`: a `loading.tsx` boundary
+  belongs to its segment, and sibling navigations under `(app)` never re-suspend
+  the group-level boundary — which is why `/workout` + `/log/[workoutId]` (own
+  files) were the only pages acknowledging taps. Nine routes now carry
+  layout-mirroring skeletons (`/cycles`, macro, meso — also covers `/stats` —
+  planner board, planned day, exercises list + detail, templates, more) in the
+  `DayViewSkeleton` grammar; `<Link>` prefetch pulls the shells ahead of the
+  RSC data so they paint on tap. Owner to confirm on device.
+- **I12 — scoped + first slices.** Full in-app-vs-MCP gap table in
+  `scoping.md` § I12 (the query helpers all exist; the delta is pure UI).
+  Shipped: **Duplicate mesocycle** in the meso header ⋮ menu
+  (`duplicateMesoAction` → `duplicateMesocycle`; settings + board, no loads;
+  lands on the copy; `?error=duplicate` line) and the **proactive activation
+  gate** — `StartMesoForm` disables START and states the reason up front (live
+  block elsewhere / unfinished earlier siblings, computed with the same pure
+  `mesoActivationBlock` the server enforces; server re-checks on submit).
+  **Rule-8 deviation:** no mockup figure exists for either control; both reuse
+  the established menu-row/disabled-button grammar — recorded in 09 (2026-07-03
+  session 3). Remaining I12 pieces (attach-into-macro, header edit, slot
+  reorder, plan-time volume preview) need design input first.
+- Verified: typecheck, lint, **753 unit tests (+2)**, production build (route
+  sizes unchanged; `/log` holds 127 kB; the new loading files add no client JS
+  of note). The stack-backed suites verify in this PR's CI (`rls-tests` +
+  `e2e` jobs — the merge gate).
+
+## 2026-07-03 — N12 + N9 + N10 + N6: set-log latency/hang, Performance-tab reorg, pull-to-refresh
 
 The next slots in the recorded attack order: **N12** (the daily-loop pain, as
 the opening WS-J slice), **N9+N10** together, and **N6** riding along. All from

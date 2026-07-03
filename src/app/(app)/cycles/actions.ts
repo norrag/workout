@@ -11,6 +11,7 @@ import {
   copyMesoStructure,
   createDraftMeso,
   deleteMesocycle,
+  duplicateMesocycle,
   finalizeDraftMeso,
   removeDayGroup,
   removeMesoDay,
@@ -512,6 +513,20 @@ export async function startMesoAction(
   revalidatePath("/cycles");
   revalidatePath(`/cycles/meso/${mesoId}`);
   redirect("/workout");
+}
+
+/**
+ * Duplicate a mesocycle (I12): settings + planner board copied into a fresh
+ * standalone `planned` meso (no loads — the engine reseeds on activation).
+ * Lands on the new meso's page.
+ */
+export async function duplicateMesoAction(formData: FormData): Promise<void> {
+  const mesoId = z.string().uuid().parse(formData.get("meso_id"));
+  const { supabase, user } = await requireUser();
+  const { meso, error } = await duplicateMesocycle(supabase, user.id, mesoId);
+  if (error || !meso) redirect(`/cycles/meso/${mesoId}?error=duplicate`);
+  revalidatePath("/cycles");
+  redirect(`/cycles/meso/${meso.id}`);
 }
 
 // ---------------------------------------------------------------------------
