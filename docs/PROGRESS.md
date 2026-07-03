@@ -2,7 +2,50 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-02 (latest) — R9 + R10: analysis-surface honesty fixes
+## 2026-07-03 (latest) — R11 + R12: reconcile pagination + custom-exercise load-type honesty
+
+The next two items in the repo review's attack order (both MED, workstream G).
+
+- **R11 — reconcile's decision fetch can no longer truncate at the PostgREST
+  row cap.** The reconcile fetched **all** decisions for a meso's open rows
+  unbounded; decisions accumulate per row per recompute (hosted is at 641 and
+  climbing, max 38 per row), so past `max-rows` (1000) the oldest rows silently
+  dropped — an open row whose only decision was old was misclassified
+  decision-less and **backfilled as a fresh seed off the prior-meso peak**,
+  discarding its real in-meso progression. New
+  `latestDecisionsByRow(fetchPage, openRowIds)` in
+  `src/lib/queries/regeneration.ts`: fixed-size `.range()` pages in a stable
+  total order (`created_at desc, id desc` — created_at alone ties within a
+  batch insert), first occurrence per row wins (that IS the newest), early
+  exit once every open row is resolved. 5 new unit tests incl. the truncation
+  regression (a row whose only decision sits beyond page 1 still resolves) and
+  the early-exit call-count.
+- **R12 — custom bodyweight exercises get honest load-type math; MCP create/
+  search boundaries validate (hard rule #6).** `createCustomExercise` never set
+  `load_type`, so the column default (`'external'`) stuck forever — wrong
+  effective-load/e1RM math for any custom bodyweight movement (`coerceLoadType`
+  prefers a valid stored value). Now derives `load_type` via `toEngineLoadType`
+  at insert. The create vocabulary (new `src/lib/types/equipment.ts`, shared by
+  the app form, its zod action schema, and MCP `create_custom_exercise`) drops
+  load-ambiguous bare `"bodyweight"` for the three load-typed labels the stock
+  library already uses (`bodyweight only` / `bodyweight loadable` / `machine
+  assistance`). MCP `create_custom_exercise.equipment_type` and
+  `search_exercises.equipment` are now zod enums (were bare strings cast
+  `as EquipmentType` — a bad value surfaced as a raw Postgres check-constraint
+  error). Duplicate muscle groups are collapsed via `dedupeMuscleRoles`
+  (primary wins) — a dup used to unique-violate AFTER the exercise insert and
+  strand an orphan, muscle-less exercise; the link-insert failure path now also
+  removes the exercise row instead of stranding it. **No backfill migration:**
+  verified live — zero custom exercises and zero bare-`bodyweight` rows exist
+  on hosted.
+
+### Verified
+
+`npm run typecheck`, `npm run lint`, `npm run test` (728, +13) green. No
+schema change; engine untouched (`toEngineLoadType` was already the backfill
+rule — it's now applied at create time too).
+
+## 2026-07-02 — R9 + R10: analysis-surface honesty fixes
 
 Two small MED items from the review's engine/analysis cluster (workstream G),
 both on the MCP admin/coaching surface that exists to keep trend reads honest.

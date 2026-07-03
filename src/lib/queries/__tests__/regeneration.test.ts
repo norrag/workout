@@ -10,6 +10,7 @@ import {
 import {
   recomputeRow,
   advanceSourceKey,
+  latestDecisionsByRow,
   liveWeekRirUpdates,
   type RecomputeArgs,
 } from "../regeneration";
@@ -463,5 +464,74 @@ describe("liveWeekRirUpdates", () => {
   it("degrades gracefully (no updates) on an out-of-range meso instead of throwing", () => {
     const bad = { weeks: 99, includes_deload: true, rir_start: 3, rir_end: 0 };
     expect(liveWeekRirUpdates(micros, new Set(), bad, V15_PARAMS)).toEqual([]);
+  });
+});
+
+describe("latestDecisionsByRow (R11)", () => {
+  // page rows in the stable (created_at desc, id desc) order the fetch uses
+  const row = (id: string, we: string | null): import("../regeneration").DecisionPageRow => ({
+    id,
+    workout_exercise_id: we,
+    source_workout_exercise_id: null,
+    kind: "advance",
+    inputs: {},
+  });
+
+  /** fake page source over a fixed newest-first array, counting calls */
+  function pageSource(all: ReturnType<typeof row>[]) {
+    const calls: [number, number][] = [];
+    return {
+      calls,
+      fetch: async (from: number, to: number) => {
+        calls.push([from, to]);
+        return all.slice(from, to + 1);
+      },
+    };
+  }
+
+  it("keeps the NEWEST decision per row (first occurrence in page order)", async () => {
+    const src = pageSource([row("d3", "we1"), row("d2", "we1"), row("d1", "we2")]);
+    const latest = await latestDecisionsByRow(src.fetch, ["we1", "we2"], 10);
+    expect(latest.get("we1")!.id).toBe("d3");
+    expect(latest.get("we2")!.id).toBe("d1");
+  });
+
+  it("resolves a row whose ONLY decision sits beyond the first page (the truncation regression)", async () => {
+    // 5 newer decisions for we1 push we2's single old decision onto page 2 —
+    // the old unbounded fetch dropped it and we2 was re-seeded off the prior peak
+    const src = pageSource([
+      ...["d9", "d8", "d7", "d6", "d5"].map((id) => row(id, "we1")),
+      row("d1", "we2"),
+    ]);
+    const latest = await latestDecisionsByRow(src.fetch, ["we1", "we2"], 5);
+    expect(latest.get("we1")!.id).toBe("d9");
+    expect(latest.get("we2")!.id).toBe("d1");
+    expect(src.calls.length).toBe(2);
+  });
+
+  it("stops paging early once every open row is resolved", async () => {
+    const src = pageSource([
+      row("d4", "we1"),
+      row("d3", "we2"),
+      ...Array.from({ length: 20 }, (_, i) => row(`old${i}`, "we1")),
+    ]);
+    const latest = await latestDecisionsByRow(src.fetch, ["we1", "we2"], 2);
+    expect(latest.size).toBe(2);
+    expect(src.calls).toEqual([[0, 1]]); // both resolved on page 1 → no page 2
+  });
+
+  it("exhausts the set and leaves decision-less rows absent (seed-backfill input)", async () => {
+    const src = pageSource([row("d2", "we1"), row("d1", "we1")]);
+    const latest = await latestDecisionsByRow(src.fetch, ["we1", "we-none"], 2);
+    expect(latest.size).toBe(1);
+    expect(latest.has("we-none")).toBe(false);
+    // page 1 was full so it fetched one more (short) page, then stopped
+    expect(src.calls).toEqual([[0, 1], [2, 3]]);
+  });
+
+  it("ignores decisions for rows outside the requested set", async () => {
+    const src = pageSource([row("d2", "other"), row("d1", "we1"), row("d0", null)]);
+    const latest = await latestDecisionsByRow(src.fetch, ["we1"], 10);
+    expect([...latest.keys()]).toEqual(["we1"]);
   });
 });

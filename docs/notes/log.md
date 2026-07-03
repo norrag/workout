@@ -4,6 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 36: R11 + R12 — reconcile pagination + custom-exercise load-type (PR #119)
+
+Reconciliation sweep: no-op (PR #118 was itself the R9+R10 sweep; no `done`
+rows live). Built the next two items in the recorded attack order — **R11 +
+R12** (both MED, WS-G) — on branch `claude/review-outstanding-work-l9x34f`,
+**PR #119**. Full record in PROGRESS 2026-07-03 (latest).
+
+- **R11 — done.** Reconcile's decision fetch paged (`latestDecisionsByRow`,
+  stable `created_at desc, id desc` order, early exit) — the unbounded fetch
+  truncated at PostgREST `max-rows`, misclassifying old-decision rows as
+  decision-less → re-seeded off the prior-meso peak. Grounded live: hosted has
+  641 decisions (max 38/row) and climbing — this would have bitten soon.
+  5 new unit tests incl. the beyond-page-1 truncation regression.
+- **R12 — done.** `createCustomExercise` derives `load_type` at insert
+  (`toEngineLoadType`); create vocabulary (new `src/lib/types/equipment.ts`)
+  drops load-ambiguous bare `"bodyweight"` for the three load-typed labels
+  (app form + action schema + MCP); MCP `create_custom_exercise` /
+  `search_exercises` equipment args now zod enums (hard rule #6);
+  `dedupeMuscleRoles` + link-failure cleanup kill the orphan-exercise path.
+  **No backfill migration:** verified zero custom / bare-bodyweight rows on
+  hosted.
+- **Next per the attack order:** R15 (MED, WS-D); then the LOW tail
+  (R21–R25). N1 (WS-J) and I12's in-app planner UX remain the open
+  HIGH-priority workstreams.
+
 ## 2026-07-02 — Session 35 (cont. 4): PR #117 merged + archival sweep
 
 - **PR #117 MERGED** (all checks green). End-of-session archival sweep ran:

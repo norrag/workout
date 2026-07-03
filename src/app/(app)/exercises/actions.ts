@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createCustomExercise } from "@/lib/queries/exercises";
+import { customExerciseEquipment } from "@/lib/types/equipment";
 import { clearPinnedNote, savePinnedNote } from "@/lib/queries/logging";
 import {
   clearExerciseIncrementOverride,
@@ -84,17 +85,9 @@ export async function setIncrementOverrideAction(input: {
 
 const customExerciseSchema = z.object({
   name: z.string().min(1, "Name is required").max(80),
-  equipment_type: z.enum([
-    "dumbbell",
-    "barbell",
-    "machine",
-    "cable",
-    "smith",
-    "bodyweight",
-    "bands",
-    "kettlebell",
-    "other",
-  ]),
+  // the create vocabulary replaces bare "bodyweight" with the three load-typed
+  // labels so the exercise's load_type derives honestly on insert (R12)
+  equipment_type: z.enum(customExerciseEquipment),
   primary_muscle_group_id: z.string().uuid("Pick a primary muscle group"),
   secondary_muscle_group_ids: z.array(z.string().uuid()).max(4),
   description: z.string().max(500).nullable(),

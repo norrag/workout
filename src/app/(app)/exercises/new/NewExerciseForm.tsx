@@ -2,19 +2,8 @@
 
 import { useActionState, useState } from "react";
 import type { MuscleGroupRow } from "@/lib/types/database";
+import { customExerciseEquipment as EQUIPMENT } from "@/lib/types/equipment";
 import { createCustomExerciseAction, type FormState } from "../actions";
-
-const EQUIPMENT = [
-  "barbell",
-  "dumbbell",
-  "machine",
-  "cable",
-  "smith",
-  "bodyweight",
-  "bands",
-  "kettlebell",
-  "other",
-] as const;
 
 /** Create custom exercise (08 §4, described not mocked) — house-style form. */
 export function NewExerciseForm({

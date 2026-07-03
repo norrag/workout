@@ -265,11 +265,60 @@ interface OpenRow {
   paramsVersion: number | null;
 }
 
-interface LatestDecision {
+export interface LatestDecision {
   id: string;
   kind: EngineDecisionKind;
   sourceWorkoutExerciseId: string | null;
   inputs: Record<string, unknown>;
+}
+
+/** One page of the decision columns the reconcile needs (newest first). */
+export interface DecisionPageRow {
+  id: string;
+  workout_exercise_id: string | null;
+  source_workout_exercise_id: string | null;
+  kind: EngineDecisionKind;
+  inputs: Record<string, unknown>;
+}
+
+/**
+ * Latest decision per open row, fetched in fixed-size pages (R11). The old
+ * unbounded fetch silently truncated at the PostgREST `max-rows` cap (1000);
+ * decisions accumulate per row per recompute, so past the cap the OLDEST rows
+ * dropped — an open row whose only decision was old was misclassified
+ * decision-less and backfilled as a fresh seed off the prior-meso peak,
+ * discarding its real in-meso progression. Pages must arrive in a STABLE total
+ * order (created_at desc, id desc — created_at alone ties within a batch
+ * insert) so offset pagination neither skips nor duplicates rows; the loop
+ * stops early once every open row has its newest decision, or when a short
+ * page says the set is exhausted.
+ */
+export async function latestDecisionsByRow(
+  fetchPage: (from: number, to: number) => Promise<DecisionPageRow[]>,
+  openRowIds: readonly string[],
+  pageSize = 1000,
+): Promise<Map<string, LatestDecision>> {
+  const latest = new Map<string, LatestDecision>();
+  const wanted = new Set(openRowIds);
+  for (let from = 0; latest.size < wanted.size; from += pageSize) {
+    const page = await fetchPage(from, from + pageSize - 1);
+    for (const d of page) {
+      if (
+        d.workout_exercise_id &&
+        wanted.has(d.workout_exercise_id) &&
+        !latest.has(d.workout_exercise_id)
+      ) {
+        latest.set(d.workout_exercise_id, {
+          id: d.id,
+          kind: d.kind,
+          sourceWorkoutExerciseId: d.source_workout_exercise_id,
+          inputs: d.inputs,
+        });
+      }
+    }
+    if (page.length < pageSize) break;
+  }
+  return latest;
 }
 
 /** Recording-time provenance for a recomputed decision (doc 14 §6.1 step 4): the
@@ -638,25 +687,20 @@ export async function reconcilePrescriptions(
   if (loggedError) throw loggedError;
   const loggedWeIds = new Set((logged ?? []).map((s) => s.workout_exercise_id));
 
-  // 6. latest decision per open row (kind + source pointer + stored inputs).
-  //    A row with none is a pre-phase-2 seed → skip (doc 14 §6.2).
-  const { data: decisions, error: decisionsError } = await service
-    .from("engine_decisions")
-    .select("id, workout_exercise_id, source_workout_exercise_id, kind, inputs, created_at")
-    .in("workout_exercise_id", openWeIds)
-    .order("created_at", { ascending: false });
-  if (decisionsError) throw decisionsError;
-  const latestByWe = new Map<string, LatestDecision>();
-  for (const d of decisions ?? []) {
-    if (d.workout_exercise_id && !latestByWe.has(d.workout_exercise_id)) {
-      latestByWe.set(d.workout_exercise_id, {
-        id: d.id,
-        kind: d.kind,
-        sourceWorkoutExerciseId: d.source_workout_exercise_id,
-        inputs: d.inputs,
-      });
-    }
-  }
+  // 6. latest decision per open row (kind + source pointer + stored inputs),
+  //    paged in a stable order so the PostgREST row cap can never truncate the
+  //    set (R11). A row with none is a pre-phase-2 seed → backfilled below.
+  const latestByWe = await latestDecisionsByRow(async (from, to) => {
+    const { data, error } = await service
+      .from("engine_decisions")
+      .select("id, workout_exercise_id, source_workout_exercise_id, kind, inputs")
+      .in("workout_exercise_id", openWeIds)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as DecisionPageRow[];
+  }, openWeIds);
 
   // 7. config dimensions resolved once: profile, macro goal, equipment per exercise
   const [{ data: profile, error: profileError }, mesoGoal] = await Promise.all([

@@ -43,6 +43,7 @@ import {
   type ProjectedPrescription,
 } from "@/lib/queries/progression";
 import type { TemplateRow, EquipmentType } from "@/lib/types/database";
+import { equipmentTypeValues } from "@/lib/types/equipment";
 import { resolveSession, type McpExtra } from "../session";
 import {
   toolResult,
@@ -819,10 +820,12 @@ function registerSearchExercises(server: McpServer) {
       inputSchema: {
         search: z.string().optional(),
         equipment: z
-          .string()
+          .enum(equipmentTypeValues)
           .optional()
           .describe(
-            "equipment type to filter by (e.g. barbell, dumbbell, machine, cable, kettlebell, bodyweight)",
+            "stored equipment type to filter by — the library uses the finer " +
+              "bodyweight labels ('bodyweight only', 'bodyweight loadable', " +
+              "'machine assistance'), not bare 'bodyweight'",
           ),
         muscle_group: z
           .string()
@@ -831,13 +834,13 @@ function registerSearchExercises(server: McpServer) {
       },
     },
     async (
-      args: { search?: string; equipment?: string; muscle_group?: string },
+      args: { search?: string; equipment?: EquipmentType; muscle_group?: string },
       extra: McpExtra,
     ) => {
       const { client } = resolveSession(extra);
       let list = await listExercises(client, {
         search: args.search,
-        equipment: args.equipment as EquipmentType | undefined,
+        equipment: args.equipment,
       });
       if (args.muscle_group) {
         const needle = args.muscle_group.toLowerCase();
