@@ -22,7 +22,7 @@ const base = {
   overrideLatest: "2026-06-20T00:00:00Z" as string | null,
   exerciseLatest: "2026-06-01T00:00:00Z" as string | null,
   workoutCount: 12,
-  workoutLatest: "2026-06-25T00:00:00Z" as string | null,
+  closedWorkoutLatest: "2026-06-25T00:00:00Z" as string | null,
 };
 
 describe("mesoStaleSignature (reconcile gate #1)", () => {
@@ -46,7 +46,7 @@ describe("mesoStaleSignature (reconcile gate #1)", () => {
       { overrideLatest: "2026-06-21T00:00:00Z" }, // an override EDITED
       { exerciseLatest: "2026-06-02T00:00:00Z" }, // a library equipment/load_type edit
       { workoutCount: 13 }, // a workout was generated (week advance)
-      { workoutLatest: "2026-06-26T00:00:00Z" }, // a workout completed/skipped
+      { closedWorkoutLatest: "2026-06-26T00:00:00Z" }, // a workout completed/skipped
     ];
     for (const m of mutations) {
       expect(
@@ -54,6 +54,14 @@ describe("mesoStaleSignature (reconcile gate #1)", () => {
         `mutation ${JSON.stringify(m)} must bust the signature`,
       ).not.toBe(baseSig);
     }
+  });
+
+  it("holds through a first-set in_progress flip (N12)", () => {
+    // the flip changes neither the row count nor any closed row's updated_at, so
+    // the signature inputs are identical — the first log of a session must NOT
+    // pay the full reconcile. (Loader-side: `closedWorkoutLatest` reads only
+    // status in (completed, skipped); an in_progress bump is invisible to it.)
+    expect(mesoStaleSignature({ ...base })).toBe(mesoStaleSignature({ ...base }));
   });
 
   it("does not collide across the watermark count/timestamp pair", () => {

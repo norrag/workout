@@ -184,6 +184,32 @@ function shortDate(iso: string | null): string {
 
 type Commit = (fn: () => Promise<void>) => void;
 
+// N12: bound how long a set-log write may hold the row's spinner. A server
+// action promise settles with the action response; if the connection stalls it
+// can hang indefinitely — surface that as a retryable failure instead of an
+// eternal spinner. 15s is far beyond any healthy round-trip.
+const LOG_TIMEOUT_MS = 15_000;
+class LogTimeoutError extends Error {
+  constructor() {
+    super("log write timed out");
+  }
+}
+function withLogTimeout<T>(p: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new LogTimeoutError()), LOG_TIMEOUT_MS);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 /** Which note bucket the unified note sheet (09 §8) opened from. "menu" defaults
  * to the session note; "pinned"/"session" edit that specific existing note. */
 type NoteOrigin = "menu" | "pinned" | "session";
@@ -1340,24 +1366,42 @@ function SetRow({
   // once the user types their own reps, stop auto-predicting for this row
   const repsManual = useRef(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
-  // per-row transition so the LOG box spins in isolation; the write fires in the
-  // background and the box resolves via revalidatePath — no full-page refresh
-  const [logging, startLogging] = useTransition();
+  // per-row transition so the revalidation applies as a non-blocking background
+  // update. The spinner is deliberately NOT the transition's pending flag (N12):
+  // that resolves only when the revalidated RSC tree COMMITS client-side, so a
+  // stalled revalidation fetch (or the app backgrounded mid-flight) pinned the
+  // spinner forever even though the write had landed. Instead `saving` tracks
+  // the server action itself — bounded by a watchdog — and `ack` holds the box's
+  // resolved state until the server state echoes back and remounts the row (the
+  // row key carries `logged.id`).
+  const [, startLogging] = useTransition();
+  const [saving, setSaving] = useState(false);
+  const [ack, setAck] = useState<"logged" | "unlogged" | null>(null);
   const [logError, setLogError] = useState(false);
   const toast = useToast();
 
   // fire a logging write in the background: the box shows the perimeter spinner
-  // while it runs, resolves to its server state on success, or rolls back with a
-  // brief shake + a quiet toast on failure (online-only, no offline outbox)
+  // while the action runs, acknowledges as soon as the server confirms the write
+  // (not when the revalidation commits), or rolls back with a brief shake + a
+  // quiet toast on failure/timeout (online-only, no offline outbox)
   const runLog = (action: () => Promise<void>, onOk?: () => void) => {
     setLogError(false);
+    setSaving(true);
     startLogging(async () => {
       try {
-        await action();
+        await withLogTimeout(action());
         onOk?.();
-      } catch {
+      } catch (err) {
         setLogError(true);
-        toast("Couldn't save that set — check your connection");
+        // the upsert (R3) makes a retry after a timeout safe — a write that did
+        // land converges onto the same row instead of duplicating
+        toast(
+          err instanceof LogTimeoutError
+            ? "That save is taking too long — it's safe to try again"
+            : "Couldn't save that set — check your connection",
+        );
+      } finally {
+        setSaving(false);
       }
     });
   };
@@ -1439,6 +1483,9 @@ function SetRow({
             performed_on: localDayIso(),
           }),
         () => {
+          // N12: show the box checked the moment the server confirms the write;
+          // the revalidation echo remounts the row into its real logged state
+          setAck("logged");
           if (dropPending) onToggleDrop();
           onLogged();
         },
@@ -1622,8 +1669,8 @@ function SetRow({
       <div className="flex h-8 items-center justify-center">
         {state === "logged" || state === "next" ? (
           <LogCheckbox
-            checked={state === "logged"}
-            loading={logging}
+            checked={ack ? ack === "logged" : state === "logged"}
+            loading={saving}
             error={logError}
             readOnly={readOnly}
             ariaLabel={
@@ -1632,13 +1679,19 @@ function SetRow({
                 : `log set ${setNumber}`
             }
             onClick={() => {
+              // an acknowledged write is waiting for its revalidation echo (which
+              // remounts the row); ignore taps in that window — acting on the
+              // stale `state`/`logged` props would re-send the finished write
+              if (ack) return;
               if (state === "logged") {
                 if (logged)
-                  runLog(() =>
-                    unlogSetAction({
-                      workout_id: we.workout_id,
-                      set_id: logged.id,
-                    }),
+                  runLog(
+                    () =>
+                      unlogSetAction({
+                        workout_id: we.workout_id,
+                        set_id: logged.id,
+                      }),
+                    () => setAck("unlogged"),
                   );
               } else {
                 save();
