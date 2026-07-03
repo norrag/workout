@@ -2,7 +2,48 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R11 + R12: reconcile pagination + custom-exercise load-type honesty
+## 2026-07-03 (latest) — R15: one live block per user
+
+The next item in the repo review's attack order (MED, workstream D). Migration
+`20260703000001` **applied live + verified**; advisors show no new lints.
+
+- **The hole.** `startMeso`'s sequential-activation gate only ran when the meso
+  had a `macrocycle_id`, and only checked that macro's own siblings — a
+  standalone planned meso, or one in a *different* macro, activated while
+  another block was live. No DB constraint backed the invariant, and
+  `getCurrentState` silently picks the newest-created active meso, so the
+  in-flight block vanished from the Workout tab and `get_current_state`. The
+  `activate_mesocycle` tool description claimed activation was globally
+  sequential, so an agent with `confirm="activate"` would trip this unattended.
+- **App gate (user-wide).** `startMeso` now refuses to start while ANY of the
+  user's mesos is active — same macro, different macro, or standalone — naming
+  the live block in the error. The macro-position sequential gate is unchanged
+  behind it. Both the in-app start and MCP `activate_mesocycle` share this
+  single choke point.
+- **DB guarantee (race-safe).** New partial unique index
+  `mesocycles_one_active_per_user on mesocycles (user_id) where
+  status='active'` (migration `20260703000001_single_active_meso`) — two
+  concurrent activations can't both land; the losing status flip (23505) is
+  caught and surfaced as a friendly error. Everything seeded before the flip
+  is already retry-safe by design (R3), so finishing the other block and
+  re-starting converges. Verified on hosted before shipping: every user has
+  at most one active meso, so the index applied cleanly.
+- **Tool description** now states the exclusive-activation contract
+  ("only ONE active mesocycle — blocked while any block is live") instead of
+  overstating the old same-macro guarantee.
+
+### Verified
+
+Scratch-PG16 harness (no Docker in this sandbox): full chain + seed applies
+from zero (60 migrations, 26/26 tables RLS-on, 330 stock exercises, index
+present); 4-step SQL probe — first activation lands, a second same-user
+activation fails 23505 even across macros, another user's activation is
+unaffected, completing the live block frees the slot. New RLS-suite test
+("single active meso (R15)") runs the same probe in CI. Migration applied
+live (hosted index verified, advisors unchanged). `npm run typecheck`,
+`npm run lint`, `npm run test` (728) green.
+
+## 2026-07-03 — R11 + R12: reconcile pagination + custom-exercise load-type honesty
 
 The next two items in the repo review's attack order (both MED, workstream G).
 

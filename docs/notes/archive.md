@@ -11,6 +11,19 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 — R11 + R12 engine-I/O fixes merged (PR #119)
+
+Session 36 shipped the next two WS-G items; PR #119 merged with all checks
+green. TS-only (no schema change; the engine itself untouched). Full record in
+PROGRESS 2026-07-03 and the Session 36 log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R11 | Reconcile's unbounded `engine_decisions` fetch truncates at the PostgREST row cap → open rows misclassified decision-less and re-seeded off the prior-meso peak | B | G | **done — merged (PR #119).** `latestDecisionsByRow` pages the fetch in a stable (`created_at desc, id desc`) order with early exit once every open row has its newest decision; 5 unit tests incl. the beyond-page-1 truncation regression. Grounded live: hosted at 641 decisions (max 38/row) and climbing. |
+| R12 | Custom bodyweight exercises stored `load_type='external'` forever (wrong e1RM/effective-load math; app + MCP) + MCP create/search equipment as bare string + dup muscle-group crash leaves orphan exercise | B | G | **done — merged (PR #119).** `createCustomExercise` derives `load_type` via `toEngineLoadType` at insert; create vocabulary (new `src/lib/types/equipment.ts`, shared app form + action schema + MCP) drops load-ambiguous bare `"bodyweight"` for the three load-typed labels; MCP equipment args zod-enum'd (hard rule #6); `dedupeMuscleRoles` + link-failure cleanup kill the orphan path. No backfill needed — hosted verified to have zero custom / bare-bodyweight rows. |
+
+---
+
 ## Swept 2026-07-02 (late 3) — R9 + R10 analysis fixes merged (PR #117)
 
 Session 35 (cont. 3) shipped the next two WS-G items; PR #117 merged with all

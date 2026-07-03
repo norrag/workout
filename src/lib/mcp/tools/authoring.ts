@@ -414,12 +414,14 @@ function registerActivateMesocycle(server: McpServer) {
       description:
         "Turn a reviewed PLANNED mesocycle into the live block: the engine builds " +
         "the microcycle ramp and seeds week 1. This is the one real state change " +
-        "with consequences, so it requires confirm=\"activate\". Within a " +
-        "macrocycle it is sequential — a future block can't start until every " +
-        "earlier block is complete and none is currently active, so its " +
-        "prescriptions are seeded from the latest results, never in advance. " +
-        "Prefer letting the athlete activate in-app; use this only on explicit " +
-        "request.",
+        "with consequences, so it requires confirm=\"activate\". Activation is " +
+        "exclusive — the user can have only ONE active mesocycle, so this is " +
+        "blocked while any block is live (complete or abandon it first), " +
+        "whatever macrocycle it belongs to. Within a macrocycle it is also " +
+        "sequential — a future block can't start until every earlier block is " +
+        "complete, so its prescriptions are seeded from the latest results, " +
+        "never in advance. Prefer letting the athlete activate in-app; use this " +
+        "only on explicit request.",
       inputSchema: {
         mesocycle_id: z.string().uuid(),
         confirm: z.string(),

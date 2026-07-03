@@ -1139,3 +1139,61 @@ describe("write integrity (R3/R4)", () => {
     expect(dup!.code).toBe("23505");
   });
 });
+
+describe("single active meso (R15)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  async function plannedMeso(name: string): Promise<string> {
+    const { data, error } = await service
+      .from("mesocycles")
+      .insert({
+        // standalone (no macro) — exactly the path the old same-macro gate missed
+        user_id: aliceId,
+        name,
+        weeks: 4,
+        days_per_week: 2,
+        status: "planned",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data.id;
+  }
+
+  it("the partial unique index allows one active meso and rejects a second (any macro)", async () => {
+    const first = await plannedMeso("r15 first");
+    const second = await plannedMeso("r15 second");
+
+    const { error: firstFlip } = await service
+      .from("mesocycles")
+      .update({ status: "active" })
+      .eq("id", first);
+    expect(firstFlip).toBeNull();
+
+    // a second concurrent activation must fail at the DB even though the two
+    // mesos share no macrocycle — the app gate is user-wide, this is its backstop
+    const { error: secondFlip } = await service
+      .from("mesocycles")
+      .update({ status: "active" })
+      .eq("id", second);
+    expect(secondFlip).not.toBeNull();
+    expect(secondFlip!.code).toBe("23505");
+
+    // completing the live block frees the slot — the next activation succeeds
+    const { error: complete } = await service
+      .from("mesocycles")
+      .update({ status: "completed" })
+      .eq("id", first);
+    expect(complete).toBeNull();
+    const { error: thirdFlip } = await service
+      .from("mesocycles")
+      .update({ status: "active" })
+      .eq("id", second);
+    expect(thirdFlip).toBeNull();
+
+    // cleanup so other tests (and reruns) never see a lingering active meso
+    await service.from("mesocycles").delete().in("id", [first, second]);
+  });
+});
