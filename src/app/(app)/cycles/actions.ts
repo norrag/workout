@@ -21,10 +21,13 @@ import {
   setGroupExercises,
   updateDayGroup,
   updateMesoDay,
+  updateMesocycleAttrs,
 } from "@/lib/queries/cycles";
 import type { MesoDayRow } from "@/lib/types/database";
 import {
+  attachMesoToMacro,
   createMacrocycleWithMesos,
+  manageMacroSlots,
   planUnplannedMeso,
   updateMacrocycle,
 } from "@/lib/queries/macro";
@@ -513,6 +516,140 @@ export async function startMesoAction(
   revalidatePath("/cycles");
   revalidatePath(`/cycles/meso/${mesoId}`);
   redirect("/workout");
+}
+
+/**
+ * Place a standalone planned/draft meso into a macrocycle (I12): fills the
+ * earliest unplanned placeholder (consuming it and inheriting its phase) or
+ * appends after the last block — the same default `attachMesoToMacro` gives
+ * the MCP tool. Lands on the macro's timeline so the placement is visible.
+ */
+export async function placeMesoAction(input: {
+  meso_id: string;
+  macro_id: string;
+}): Promise<FormState> {
+  const parsed = z
+    .object({ meso_id: z.string().uuid(), macro_id: z.string().uuid() })
+    .parse(input);
+  const { supabase, user } = await requireUser();
+  const result = await attachMesoToMacro(
+    supabase,
+    user.id,
+    parsed.meso_id,
+    parsed.macro_id,
+    null,
+  );
+  if (!result.ok)
+    return { error: result.error ?? "Couldn't place the mesocycle." };
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/meso/${parsed.meso_id}`);
+  revalidatePath(`/cycles/macro/${parsed.macro_id}`);
+  redirect(`/cycles/macro/${parsed.macro_id}`);
+}
+
+const slotOpSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("add") }),
+  z.object({ action: z.literal("remove"), mesocycle_id: z.string().uuid() }),
+  z.object({
+    action: z.literal("reorder"),
+    ordered_ids: z.array(z.string().uuid()).min(1).max(50),
+  }),
+]);
+
+/**
+ * Direct block management on a macrocycle (I12): add an unplanned placeholder,
+ * remove one (planned/started blocks are refused by the helper), or reorder
+ * the timeline. Applies immediately — not staged with the edit form's re-plan.
+ */
+export async function manageMacroSlotsAction(input: {
+  macro_id: string;
+  op:
+    | { action: "add" }
+    | { action: "remove"; mesocycle_id: string }
+    | { action: "reorder"; ordered_ids: string[] };
+}): Promise<FormState> {
+  const parsed = z
+    .object({ macro_id: z.string().uuid(), op: slotOpSchema })
+    .parse(input);
+  const { supabase, user } = await requireUser();
+  // meso_length_weeks resolves server-side — a new placeholder inherits the
+  // macro's block length, never a client-supplied number
+  const { data: macro, error: macroErr } = await supabase
+    .from("macrocycles")
+    .select("meso_length_weeks")
+    .eq("id", parsed.macro_id)
+    .maybeSingle();
+  if (macroErr) throw macroErr;
+  if (!macro) return { error: "Macrocycle not found." };
+  const result = await manageMacroSlots(
+    supabase,
+    user.id,
+    parsed.macro_id,
+    parsed.op,
+    macro.meso_length_weeks,
+  );
+  if (!result.ok) return { error: result.error ?? "Couldn't update the blocks." };
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/macro/${parsed.macro_id}`);
+  revalidatePath(`/cycles/macro/${parsed.macro_id}/edit`);
+  return { error: null };
+}
+
+const mesoDetailsSchema = z
+  .object({
+    meso_id: z.string().uuid(),
+    name: z.string().min(1, "Name is required").max(80),
+    // shape fields ride only while the meso hasn't started (the sheet omits
+    // them once locked; updateMesocycleAttrs re-checks server-side)
+    weeks: z.coerce.number().int().min(3).max(8).optional(),
+    includes_deload: z.enum(["true", "false"]).optional(),
+    rir_start: z.coerce.number().int().min(0).max(5).optional(),
+    rir_end: z.coerce.number().int().min(0).max(5).optional(),
+  })
+  .refine(
+    (v) =>
+      v.rir_start === undefined ||
+      v.rir_end === undefined ||
+      v.rir_start >= v.rir_end,
+    { message: "The RIR ramp must descend (start ≥ end)." },
+  );
+
+/** The edit-details sheet closes itself on `saved` (no redirect — it edits in
+ *  place on the meso page and the revalidation refreshes the header). */
+export interface MesoDetailsState {
+  error: string | null;
+  saved?: boolean;
+}
+
+/** Edit the meso header in place (I12): name any time before completion;
+ *  weeks / RIR ramp / deload only before the meso starts. */
+export async function updateMesoDetailsAction(
+  _prev: MesoDetailsState,
+  formData: FormData,
+): Promise<MesoDetailsState> {
+  const raw = Object.fromEntries(
+    ["meso_id", "name", "weeks", "includes_deload", "rir_start", "rir_end"]
+      .map((k) => [k, formData.get(k)])
+      .filter(([, v]) => v != null),
+  );
+  const parsed = mesoDetailsSchema.safeParse(raw);
+  if (!parsed.success)
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const { supabase, user } = await requireUser();
+  const result = await updateMesocycleAttrs(supabase, user.id, parsed.data.meso_id, {
+    name: parsed.data.name,
+    weeks: parsed.data.weeks,
+    includes_deload:
+      parsed.data.includes_deload === undefined
+        ? undefined
+        : parsed.data.includes_deload === "true",
+    rir_start: parsed.data.rir_start,
+    rir_end: parsed.data.rir_end,
+  });
+  if (!result.ok) return { error: result.error ?? "Couldn't save the changes." };
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/meso/${parsed.data.meso_id}`);
+  return { error: null, saved: true };
 }
 
 /**

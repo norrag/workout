@@ -42,6 +42,46 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-03 (session 4) — I12 completes in-app: place-into-macro, edit details, block management, planner volume readout
+
+Owner authorization (2026-07-03, in-chat): *"I will take your design direction
+on these… You're authorized to rework in any way you see fit to produce a
+well-designed and intuitive end result."* No mockup figures exist for these
+four surfaces; each reuses established grammar and is recorded here as the
+design of record.
+
+- **Change (meso ⋮ menu → "Place into macrocycle").** On a **standalone
+  planned** meso only. Opens a bottom sheet listing the user's macrocycles —
+  name, goal + block count — each row stating exactly where the meso would
+  land: `FILLS M2` (consumes the earliest open slot, inheriting its phase) or
+  `ADDS AS M5` (appends). One tap places it and lands on the macro timeline.
+  Explicit position choice stays MCP-only (`place_mesocycle`); the default
+  placement is the overwhelmingly common case. Empty state links to the
+  macrocycle engine.
+- **Change (meso ⋮ menu → "Edit details").** Any non-frozen meso. A sheet in
+  the finalize-sheet grammar (fig 2.8): NAME always; WEEKS (3–8 segmented
+  row), START/END RIR rows (end clamped ≤ start), and a "final week is a
+  deload" checkbox — the shape controls render **only while the meso hasn't
+  started** (subtitle: `NAME ONLY — RAMP LOCKED ONCE STARTED` after). Closes
+  on save; server guards unchanged (`updateMesocycleAttrs`).
+- **Change (macro edit page → BLOCKS section).** Below the re-plan form: the
+  full timeline as rows (`M{n}`, name, status), with ▲▼ on not-yet-started
+  blocks (a move never crosses a started/completed row), ✕ on open slots
+  only, and a dashed `+ ADD BLOCK` appending a placeholder at the macro's
+  block length. Applies immediately (not staged with the form) — stated in
+  the caption.
+- **Change (planner board → WEEKLY SETS PER MUSCLE).** Between the day list
+  and SAVE AS TEMPLATE: fractional weekly sets per muscle over the CURRENT
+  board (updates live as sets/exercises change), each row showing the
+  experience-scaled band (`MEV 10 · MRV 22`), with `UNDER MEV n` / `OVER MRV
+  n` emphasized in ink when out of band (no accent — rule 7). Counting is
+  the shared R14 fold — relocated to `lib/plan/volume-preview.ts` so the
+  board, the Balance tab, and MCP `preview_mesocycle_volume` share one
+  definition. A just-added exercise credits its group at the direct weight
+  until its roles arrive with the revalidation.
+- **Affected figures.** 2.2-adjacent (macro edit), 2.5 (planner board), the
+  meso page header menu. All `RETROFIT`, shipped with this entry's build.
+
 ## 2026-07-03 (session 3) — Meso header menu: Duplicate; START gate surfaces proactively (I12)
 
 - **Change (meso ⋮ menu).** The mesocycle header's ⋮ menu (P16 grammar) gains a

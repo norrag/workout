@@ -4,6 +4,40 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 41: N13 fix + I12 completed (owner-authorized design) (PR #137)
+
+Same session, continued after PRs #134/#135 merged. Owner handed over Batch 6
+in-chat (appendix): N1 skeletons **confirmed on device**; **I12 design
+authorization** ("rework in any way you see fit"); **N13** — reset-to-
+prescription broken on an exercise's first set.
+
+- **N13 — done (HIGH, B, WS-G).** Root cause was R13-era, not N5: the reset
+  echo (`set_weights` cleared → `plannedWeight` null) arrives through the
+  planned-input re-sync channel, whose typed-row guard never releases on an
+  unlogged row — and set 1 is necessarily typed-in, since typing is what makes
+  the reset option appear. The override-CLEARING transition is now its own
+  `prescription-reset` class in `day-rules.ts::adoptServerRowState` (always
+  adopt + clear the typed flag); already-null transitions (bodyweight edit
+  while typing) keep the R13 protection. Swap path (N5 remount key) verified
+  intact. +1 unit test.
+- **I12 — done (PR #137 closes it).** The four remaining pieces built to
+  Claude's design (09 2026-07-03 session 4 = design of record): **Place into
+  macrocycle** sheet on standalone planned mesos (rows state `FILLS M2` /
+  `ADDS AS M5` exactly, computed with the same pure `planMacroPlacement` the
+  write uses; lands on the macro timeline); **Edit details** sheet (name any
+  time, weeks/RIR/deload segmented controls until start — finalize-sheet
+  grammar); **BLOCKS** section on the macro edit page (▲▼ on not-yet-started
+  rows, never crossing a locked one; ✕ on open slots; dashed + ADD BLOCK;
+  applies immediately); **WEEKLY SETS PER MUSCLE** live readout on the
+  planner board with MEV/MRV bands, out-of-band emphasized in ink. The R14
+  fold relocated to `lib/plan/volume-preview.ts` (client-safe, type-only
+  imports — `/plan` holds 121 kB) with `previewVolume` staying server-side;
+  MCP re-exports keep its callers/tests intact. Deliberately MCP-only:
+  explicit-position placement, phase editing.
+- **Verified:** typecheck, lint, 754 tests (+1), production build (meso page
+  +1.4 kB for two sheets; `/log` 127 kB unchanged). New surfaces flagged for
+  the owner's normal use — no mockup existed, so field feedback is the check.
+
 ## 2026-07-03 — Session 40 (cont.): PR #134 merged — in-session sweep
 
 PR #134 merged with all checks green while the session was live (the new e2e

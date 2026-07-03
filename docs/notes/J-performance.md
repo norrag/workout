@@ -182,9 +182,10 @@ layout-mirroring skeletons (DayViewSkeleton grammar) for 9 routes: `/cycles`,
 `/cycles/macro/[id]`, `/cycles/meso/[id]` (also covers `/stats`), the planner
 board, the planned-day preview, `/exercises`, `/exercises/[id]`, `/templates`,
 `/more`. The group-level file stays as the fallback for the remaining minor
-routes. **Owner to confirm on device** — if a dead gap persists anywhere, the
-remaining suspects are `router.push` navigations (no prefetch: PlannerBoard,
-MesoHeader calendar) and Suspense-streaming below the skeleton (Phase 3).
+routes. **Owner confirmed on device (2026-07-03): "all nav skeletons look
+good."** If a dead gap ever resurfaces, the remaining suspects are
+`router.push` navigations (no prefetch: PlannerBoard, MesoHeader calendar)
+and Suspense-streaming below the skeleton (Phase 3).
 
 Ranked gaps:
 1. **PlannerBoard draft-path mutations** (`PlannerBoard.tsx:234` discards `isPending`;

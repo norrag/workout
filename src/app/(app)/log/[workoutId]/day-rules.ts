@@ -70,12 +70,19 @@ export function daySetTotals(exercises: SetProgressExercise[]): {
  *   uncommitted typing. Once the user has typed in the row, their explicit
  *   values outrank the fan-out — resyncing here is what silently overwrote
  *   reps mid-entry and let wrong reps get logged.
+ * - `prescription-reset` (N13) — the row's planned-weight override was
+ *   CLEARED ("Reset to prescription"): always adopt. The reset is explicit
+ *   user intent, and the row it must land on is precisely the one whose edit
+ *   made the reset option appear — the typed-in-row guard that protects
+ *   against background fan-outs was silently swallowing the reset on set 1
+ *   (sets 2+ are prop-derived and always reset).
  */
 export function adoptServerRowState(
-  change: "own-logged-set" | "planned-input",
+  change: "own-logged-set" | "planned-input" | "prescription-reset",
   hasUncommittedEdits: boolean,
 ): boolean {
   if (change === "own-logged-set") return true;
+  if (change === "prescription-reset") return true;
   return !hasUncommittedEdits;
 }
 

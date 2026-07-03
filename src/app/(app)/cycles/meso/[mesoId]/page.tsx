@@ -6,6 +6,7 @@ import {
   getActiveEngineParams,
   mesoActivationBlock,
 } from "@/lib/queries/generation";
+import { planMacroPlacement, type SlotMeso } from "@/lib/queries/macro";
 import { getMesoStats } from "@/lib/queries/stats";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
@@ -17,6 +18,7 @@ import {
   MesoHeader,
   type MesoCalendarCell,
   type MesoCalendarWeek,
+  type PlaceTarget,
 } from "./MesoHeader";
 import { MesoPlanView, type PlanViewDay } from "./MesoPlanView";
 
@@ -204,6 +206,50 @@ export default async function MesoDetailPage({
 
   const hasFills = days.some((d) => d.groups.some((g) => g.fills.length > 0));
 
+  // I12: a standalone planned meso can be placed into a macrocycle — compute
+  // each macro's default landing spot with the same pure `planMacroPlacement`
+  // the write path uses, so the sheet's "FILLS M2 / ADDS AS M5" is exact.
+  let placeTargets: PlaceTarget[] | null = null;
+  if (!meso.macrocycle_id && meso.status === "planned") {
+    const { data: macros, error: macrosErr } = await supabase
+      .from("macrocycles")
+      .select("id, name, goal_type")
+      .order("created_at", { ascending: false });
+    if (macrosErr) throw macrosErr;
+    let allMacroMesos: Pick<
+      import("@/lib/types/database").MesocycleRow,
+      "id" | "macrocycle_id" | "status" | "position" | "phase"
+    >[] = [];
+    if ((macros ?? []).length > 0) {
+      const { data, error } = await supabase
+        .from("mesocycles")
+        .select("id, macrocycle_id, status, position, phase")
+        .in(
+          "macrocycle_id",
+          (macros ?? []).map((m) => m.id),
+        );
+      if (error) throw error;
+      allMacroMesos = data ?? [];
+    }
+    placeTargets = (macros ?? []).map((m) => {
+      const siblings = allMacroMesos.filter((x) => x.macrocycle_id === m.id);
+      const placement = planMacroPlacement(
+        siblings as SlotMeso[],
+        meso.id,
+        meso.phase,
+        null,
+      );
+      return {
+        id: m.id,
+        name: m.name,
+        goalType: m.goal_type,
+        position: placement.targetPosition,
+        consumesPlaceholder: placement.consumePlaceholderId != null,
+        blocks: siblings.length,
+      };
+    });
+  }
+
   // I12: surface the activation gates PROACTIVELY on a planned meso — the same
   // checks `startMeso` enforces (one live block per user, sequential order
   // within a macro), so the button explains itself instead of failing on tap.
@@ -317,6 +363,11 @@ export default async function MesoDetailPage({
         hasFills={hasFills}
         hasHistory={deletion.hasHistory}
         loggedSets={deletion.loggedSets}
+        weeks={meso.weeks}
+        rirStart={meso.rir_start}
+        rirEnd={meso.rir_end}
+        includesDeload={meso.includes_deload}
+        placeTargets={placeTargets}
       />
 
       {actionError === "template" && (

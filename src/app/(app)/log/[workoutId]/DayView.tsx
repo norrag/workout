@@ -1422,12 +1422,22 @@ function SetRow({
   // a bodyweight edit) — but never over uncommitted typing: the revalidation
   // lands seconds after the write, and resetting here is what silently
   // replaced reps the user was mid-typing (R13). Their explicit values win;
-  // an untouched row still adopts the fan-out.
+  // an untouched row still adopts the fan-out. The one exception (N13): a
+  // "Reset to prescription" echo arrives here as the override CLEARING
+  // (plannedWeight → null) — explicit user intent that must land even on the
+  // row they typed in, which is exactly the row whose edit made the reset
+  // option appear. Distinguished from "plannedWeight was already null" so a
+  // bodyweight edit can't clobber mid-typing on a never-overridden row.
+  const prevPlannedWeight = useRef(plannedWeight);
   useEffect(() => {
-    if (!adoptServerRowState("planned-input", edited.current)) return;
+    const cleared = prevPlannedWeight.current != null && plannedWeight == null;
+    prevPlannedWeight.current = plannedWeight;
+    const change = cleared ? ("prescription-reset" as const) : ("planned-input" as const);
+    if (!adoptServerRowState(change, edited.current)) return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     repsManual.current = false;
+    if (change === "prescription-reset") edited.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plannedWeight, we.bodyweight]);
 

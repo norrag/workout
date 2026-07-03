@@ -434,12 +434,14 @@ over existing, RLS-safe mutations. Gap table (in-app status as of PR #134):
 | Edit meso header after finalize (name/weeks/RIR/deload/phase) | `updateMesocycleAttrs` (cycles.ts:214) | **missing** — FinalizeSheet sets name+weeks at draft time only; RIR ramp read-only everywhere (no figure → design input) |
 | Plan-time volume preview (fractional weekly sets vs landmarks) | aggregation lives in `mcp/tools/authoring.ts:73` — **needs relocation to shared code** first | **missing** — Balance tab needs materialized weeks, so drafts/planned mesos show nothing |
 
-**Suggested next slices:** (1) attach-into-macro picker + duplicate-into-slot
-(one sheet covers both, reusing `attachMesoToMacro`); (2) meso header-edit
-sheet; (3) planner-board volume readout (move the authoring.ts aggregation
-into `queries/` per the one-counting-definition rule). All three need either a
-09 design delta or owner input first — **no mockup figure exists** for any of
-them (rule 8).
+**Built 2026-07-03 (PR #137, owner-authorized design — 09 session-4 entry is
+the design of record):** place-into-macro sheet (default placement; explicit
+position stays MCP-only), edit-details sheet (`updateMesocycleAttrs` guards),
+BLOCKS management on the macro edit page (`manageMacroSlots`), and the
+planner-board WEEKLY SETS readout (fold relocated to
+`lib/plan/volume-preview.ts` — one counting definition across board / Balance
+tab / MCP preview). I12 is closed; seed-slot-from-template/copy was assessed
+and left out (duplicate + place composes to the same outcome in two taps).
 
 ## Items still needing their own scoping pass (not yet researched)
 - **PH30** (LLM prescription analysis) — deferred 2026-07-02; see workstream H.
