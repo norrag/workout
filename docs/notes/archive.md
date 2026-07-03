@@ -11,6 +11,20 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later) — R15 single-active-meso merged (PR #120)
+
+Session 36 (cont.) shipped the next WS-D item; PR #120 merged with all checks
+green (`rls-tests` ran the new constraint probe against the migrated chain).
+Migration `20260703000001` applied live + verified (no pre-existing
+violations; advisors unchanged). Full record in PROGRESS 2026-07-03 and the
+Session 36 (cont.) log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R15 | Second concurrently-active meso possible — sequential-activation invariant only covers same-macro siblings; `get_current_state` silently picks newest; tool description overstates the guarantee | B | D | **done — merged (PR #120).** `startMeso` gate now user-wide (ANY active meso blocks, named in the error; macro-position gate unchanged behind it; in-app + MCP share the choke point); partial unique index `mesocycles_one_active_per_user` makes it race-safe (losing flip → friendly 23505 error; pre-flip seeding R3-retry-safe); `activate_mesocycle` description states the exclusive contract. Scratch-chain green + 4-step probe + RLS-suite test. |
+
+---
+
 ## Swept 2026-07-03 — R11 + R12 engine-I/O fixes merged (PR #119)
 
 Session 36 shipped the next two WS-G items; PR #119 merged with all checks

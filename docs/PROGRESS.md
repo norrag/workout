@@ -2,7 +2,37 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R15: one live block per user
+## 2026-07-03 (latest) — R22: environment validated at boot
+
+First of the LOW tail (workstream L — delivery guardrails). The Supabase
+client factories read `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` with non-null
+assertions; CI builds with placeholders, so a missing or typo'd Vercel var
+passed the build and failed opaquely as request-time 500s from inside
+`@supabase/ssr`.
+
+- **`src/lib/env.ts` (new).** Zod schema over the public Supabase env
+  (hard rule #6 at the config boundary), parsed once per runtime; throws one
+  loud error naming EVERY offending var (`missing` / `must be a URL` /
+  `must not be empty`). URL trailing slash normalized. All four factories
+  (`server`, `client`, `middleware`, `service`) + the MCP auth bridge
+  (`mcp/auth.ts`, which had its own duplicate checks) now read through it —
+  one definition. `NEXT_PUBLIC_*` stay static member expressions so Next
+  still inlines them into client bundles. The service-role key deliberately
+  stays out of the schema — hard rule #4 confines it to `service.ts`.
+- **Build-time assert (`next.config.ts`).** Fails the build/dev boot when
+  either public var is absent, so a Vercel misconfiguration can't ship a
+  client that 500s on every request. CI placeholders still pass (the runtime
+  schema validates shape, not reachability).
+
+### Verified
+
+6 new unit tests on the pure parse step (valid, placeholder-shape, missing
+var named, non-URL named, empty key, both-wrong reports both). Production
+build green with CI-style placeholder env; **negative control:** build without
+env fails at config load with the named-var error. `npm run typecheck`,
+`npm run lint`, `npm run test` (734, +6) green.
+
+## 2026-07-03 — R15: one live block per user
 
 The next item in the repo review's attack order (MED, workstream D). Migration
 `20260703000001` **applied live + verified**; advisors show no new lints.
