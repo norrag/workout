@@ -27,22 +27,24 @@ export async function listExercises(
   if (error) throw error;
   if (!exercises || exercises.length === 0) return [];
 
-  const ids = exercises.map((e) => e.id);
+  // Whole-library page: do NOT `.in()` on the id list — 330+ UUIDs make a
+  // ~12 kB query string, which the local stack's gateway rejects with a 414
+  // (hosted merely tolerates it). RLS already scopes the link table to
+  // stock + own rows; fetch it all and join in memory.
+  const idSet = new Set(exercises.map((e) => e.id));
   const [{ data: links, error: linkError }, { data: groups, error: mgError }] =
     await Promise.all([
-      supabase
-        .from("exercise_muscle_groups")
-        .select("*")
-        .in("exercise_id", ids),
+      supabase.from("exercise_muscle_groups").select("*"),
       supabase.from("muscle_groups").select("*"),
     ]);
   if (linkError) throw linkError;
   if (mgError) throw mgError;
 
   const groupById = new Map((groups ?? []).map((g) => [g.id, g.name]));
+  const visibleLinks = (links ?? []).filter((l) => idSet.has(l.exercise_id));
   return exercises.map((e) => ({
     ...e,
-    muscles: (links ?? [])
+    muscles: visibleLinks
       .filter((l) => l.exercise_id === e.id)
       .map((l) => ({
         id: l.muscle_group_id,

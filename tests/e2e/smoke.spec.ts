@@ -110,6 +110,15 @@ test.beforeAll(async () => {
 test("sign in → start meso → log workout with feedback → complete → next week generated", async ({
   page,
 }) => {
+  // surface browser-side failures in the CI log — selector timeouts alone
+  // don't say why a write never confirmed
+  page.on("console", (msg) => {
+    if (msg.type() === "error") console.log("[browser:error]", msg.text());
+  });
+  page.on("requestfailed", (req) => {
+    console.log("[requestfailed]", req.method(), req.url(), req.failure()?.errorText);
+  });
+
   // ---- sign in through the UI ----
   await page.goto("/sign-in");
   await page.locator('input[name="email"]').fill(EMAIL);
@@ -123,18 +132,22 @@ test("sign in → start meso → log workout with feedback → complete → next
   await page.waitForURL("**/workout");
 
   // W1·D1 day view with the seeded exercise's 2-set grid
-  await expect(page.getByText("W1·D1")).toBeVisible();
+  await expect(page.getByText("W1·D1").first()).toBeVisible();
 
   // ---- log set 1 (deferred seed: enter a starting weight) ----
+  // Blurring the weight field fires a background planned-weight persist,
+  // during which the LOG checkbox is a "saving" status span (whose label
+  // substring-matches getByLabel). Click via role=button so Playwright waits
+  // for the real, actionable control to come back.
   await page.getByLabel("set 1 weight").fill("100");
   await page.getByLabel("set 1 reps").fill("8");
-  await page.getByLabel("log set 1").click();
-  await expect(page.getByLabel("uncheck set 1")).toBeVisible();
+  await page.getByRole("button", { name: "log set 1" }).click();
+  await expect(page.getByRole("button", { name: "uncheck set 1" })).toBeVisible();
 
   // ---- log set 2 (row becomes editable after set 1 confirms) ----
   await page.getByLabel("set 2 weight").fill("100");
   await page.getByLabel("set 2 reps").fill("8");
-  await page.getByLabel("log set 2").click();
+  await page.getByRole("button", { name: "log set 2" }).click();
 
   // ---- exercise feedback auto-prompts after the exercise's last set ----
   const feedback = page.getByRole("dialog", { name: "Feedback" });
@@ -147,7 +160,7 @@ test("sign in → start meso → log workout with feedback → complete → next
   await expect(feedback).not.toBeVisible();
 
   // ---- complete the workout ----
-  await expect(page.getByLabel("uncheck set 2")).toBeVisible();
+  await expect(page.getByRole("button", { name: "uncheck set 2" })).toBeVisible();
   await page.getByRole("button", { name: "COMPLETE WORKOUT" }).click();
   const completeSheet = page.getByRole("dialog", { name: /complete/i });
   await expect(completeSheet).toBeVisible();
@@ -157,5 +170,5 @@ test("sign in → start meso → log workout with feedback → complete → next
 
   // ---- the engine generated week 2's counterpart; we land on it ----
   await page.waitForURL("**/log/**");
-  await expect(page.getByText("W2·D1")).toBeVisible();
+  await expect(page.getByText("W2·D1").first()).toBeVisible();
 });
