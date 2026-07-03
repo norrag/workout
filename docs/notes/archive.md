@@ -11,6 +11,23 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later 4) — N5 + N7 + N8 + N11 Batch-5 quick fixes merged (PR #131)
+
+Session 38 shipped the four scoped one-file Batch-5 items in one PR; PR #131
+merged with all checks green. Full record in PROGRESS 2026-07-03 and the
+Session 38 log entry; N8's design delta is a dated 09 entry (figs 2.1/2.2).
+N5 + N7 remain flagged for the owner's on-device spot-check (N7 is
+installed-iOS-PWA-specific) — reopen if the device check fails.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N5 | Replace-exercise leaves the OLD exercise's weight/reps on set 1 only (PH38's symptom, different mechanism: retained client `useState` on the editable first row) | B | G | **done — merged (PR #131).** `SetRow` key now includes `we.exercise_id`; a replace remounts the rows and set 1 re-initializes from the new prescription. Re-sync effects untouched (R13 semantics preserved). |
+| N7 | Note-sheet keyboard dismiss leaves page scroll lower than the start | UX | E | **done — merged (PR #131).** `useScrollLock` captures `scrollY` + applies `position:fixed; top:-scrollY; width:100%`; release restores styles and `scrollTo`s the saved offset. One file — covers every sheet/menu. |
+| N8 | Planned-meso badge: PLANNED text badge, checkbox only when completed, mute planned + unplanned | UX | D | **done — merged (PR #131).** `/cycles` `StatusMark` planned → ink PLANNED badge (CURRENT geometry); macro timeline planned rows swap the progress bar for the badge (numbered marks stay); muting widened on both surfaces. 09 delta recorded (figs 2.1/2.2). |
+| N11 | Deload sets show ▼ at exactly-prescribed weight+reps (RIR-asymmetric marker comparison) | B | G | **done — merged (PR #131).** Marker extracted to pure `day-rules.ts::loggedSetMarker`; unreported RIR compares both sides at the week's target RIR (`rir_reported ?? targetRir`). 6 unit tests incl. the deload regression. |
+
+---
+
 ## Swept 2026-07-03 (later 3) — R23 repo hygiene merged (PR #122)
 
 Session 36 (cont. 3) shipped the hygiene batch; PR #122 merged with all checks
