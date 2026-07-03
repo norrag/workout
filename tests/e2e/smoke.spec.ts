@@ -62,17 +62,17 @@ test.beforeAll(async () => {
   });
   if (!stock) throw new Error("seed data missing a stock external exercise");
 
-  // planned one-day meso, 2 weeks, one exercise × 2 sets
+  // planned one-day meso, 3 weeks (the schema floor), one exercise × 2 sets
   const { data: meso, error: mesoError } = await supabase
     .from("mesocycles")
     .insert({
       user_id: userId,
       name: "Smoke block",
-      weeks: 2,
+      weeks: 3,
       days_per_week: 1,
       includes_deload: false,
       rir_start: 2,
-      rir_end: 1,
+      rir_end: 0,
       status: "planned",
     })
     .select()

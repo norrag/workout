@@ -110,12 +110,13 @@ beforeAll(async () => {
 
 describe("write pipeline: activate/seed → log → complete → generate", () => {
   it("creates and plans a mesocycle through the save_meso_plan RPC", async () => {
+    // 3 weeks is the schema floor (`mesocycles_weeks_check`: 3–8)
     const meso = await createMesocycle(user, userId, {
       name: "Integration block",
-      weeks: 2,
+      weeks: 3,
       includes_deload: false,
       rir_start: 2,
-      rir_end: 1,
+      rir_end: 0,
     });
     mesoId = meso.id;
     expect(meso.status).toBe("planned");
@@ -169,7 +170,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
       .single();
     expect(meso?.status).toBe("active");
 
-    // one microcycle per week: week 1 active, week 2 pending
+    // one microcycle per week: week 1 active, the rest pending
     const { data: micros } = await user
       .from("microcycles")
       .select("id, week_number, status")
@@ -178,6 +179,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
     expect(micros?.map((m) => ({ week: m.week_number, status: m.status }))).toEqual([
       { week: 1, status: "active" },
       { week: 2, status: "pending" },
+      { week: 3, status: "pending" },
     ]);
 
     // week-1 workouts exist for both days, planned
@@ -225,10 +227,10 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
   it("startMeso refuses a second activation while a block is live (R15)", async () => {
     const second = await createMesocycle(user, userId, {
       name: "Second block",
-      weeks: 2,
+      weeks: 3,
       includes_deload: false,
       rir_start: 2,
-      rir_end: 1,
+      rir_end: 0,
     });
     await saveMesoPlan(user, userId, second.id, [
       {

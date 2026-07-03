@@ -2,7 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoDeletionImpact, getMesoPlan } from "@/lib/queries/cycles";
-import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  getActiveEngineParams,
+  mesoActivationBlock,
+} from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
@@ -201,6 +204,33 @@ export default async function MesoDetailPage({
 
   const hasFills = days.some((d) => d.groups.some((g) => g.fills.length > 0));
 
+  // I12: surface the activation gates PROACTIVELY on a planned meso — the same
+  // checks `startMeso` enforces (one live block per user, sequential order
+  // within a macro), so the button explains itself instead of failing on tap.
+  // `startMeso` re-checks on submit either way; this is UX, not the guard.
+  let startBlockReason: string | null = null;
+  if (meso.status === "planned") {
+    const { data: liveMesos, error: liveErr } = await supabase
+      .from("mesocycles")
+      .select("name")
+      .eq("status", "active")
+      .neq("id", meso.id)
+      .limit(1);
+    if (liveErr) throw liveErr;
+    if (liveMesos && liveMesos.length > 0) {
+      startBlockReason = `another mesocycle ("${liveMesos[0].name}") is currently active — complete or abandon it before starting this one.`;
+    } else if (meso.macrocycle_id) {
+      const { data: siblings, error: sibErr } = await supabase
+        .from("mesocycles")
+        .select("position, status")
+        .eq("macrocycle_id", meso.macrocycle_id)
+        .neq("id", meso.id);
+      if (sibErr) throw sibErr;
+      const gate = mesoActivationBlock(siblings ?? [], meso.position);
+      if (gate.blocked) startBlockReason = gate.reason;
+    }
+  }
+
   // read-only plan view rows: flat day order across groups (planner board #2)
   const planDays: PlanViewDay[] = days.map((day) => {
     const dayPosById = new Map<string, number>();
@@ -252,7 +282,7 @@ export default async function MesoDetailPage({
         </Link>
       ) : meso.status === "planned" ? (
         <div className="mt-4">
-          <StartMesoForm mesoId={meso.id} />
+          <StartMesoForm mesoId={meso.id} blockReason={startBlockReason} />
         </div>
       ) : null}
 
@@ -292,6 +322,12 @@ export default async function MesoDetailPage({
       {actionError === "template" && (
         <p className="mt-3 text-[11px] leading-normal text-accent">
           Couldn&apos;t save this plan as a template — try again from the header
+          menu.
+        </p>
+      )}
+      {actionError === "duplicate" && (
+        <p className="mt-3 text-[11px] leading-normal text-accent">
+          Couldn&apos;t duplicate this mesocycle — try again from the header
           menu.
         </p>
       )}
