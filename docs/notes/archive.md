@@ -11,6 +11,23 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later 6) — R21 coverage suite merged (PR #134)
+
+Session 40 shipped R21 (all three bullets) alongside the N1 skeleton slice and
+the I12 scoping + first slices; PR #134 merged with all checks green — the new
+CI e2e job and the integration suite ran green on the final commit — so the
+sweep ran in-session on a follow-up docs PR. Full record in PROGRESS
+2026-07-03 (latest) and the Session 40 log entry. I12 and N1 stay live
+(in-progress rows) — only R21 was completed outright. Bonus fix that rode
+along: the e2e surfaced a real 414 on `/exercises` (330-id `.in()` query
+string) — `listExercises` now joins the RLS-scoped link table in memory.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R21 | Coverage gaps: Playwright e2e suite absent (dead `test:e2e`); no write-pipeline integration tests; golden meso only covers no-anchor v10 shape | F | L | **done — merged (PR #134).** (a) `golden-meso-live.test.ts`: v18-params full-meso golden with a week-to-week `recencyWeightedE1rm` anchor — pins anchor seed, window-bounded rep climb, anchor-based RIR-6 deload, bodyweight_loadable effective-load pricing. (b) `tests/integration/write-pipeline.test.ts` (+config, `test:integration`, riding the CI rls-tests job): plan → `startMeso` seed → `logSet` upsert/flip → feedback → `completeWorkout` → `advanceWeekAfterWorkout` generation/rollover + the R15 refusal. (c) Playwright e2e smoke + CI e2e job: UI sign-in → START → log (incl. auto-prompted feedback sheet) → complete → asserts the engine-generated W2·D1. |
+
+---
+
 ## Swept 2026-07-03 (later 5) — N12 + N9 + N10 + N6 WS-J slice + Performance reorg merged (PR #132)
 
 Session 39 shipped the next two slots of the attack order plus N6; PR #132

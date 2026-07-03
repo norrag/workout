@@ -4,6 +4,23 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 40 (cont.): PR #134 merged — in-session sweep
+
+PR #134 merged with all checks green while the session was live (the new e2e
+job + integration suite passed on the final commit), so the reconciliation
+sweep ran in-session: **R21 archived** (`archive.md`, "Swept 2026-07-03
+(later 6)"). I12 (advanced — remainder needs owner design input) and N1
+(skeletons shipped, device-check pending) correctly stay live. Live index is
+now: I12, N1, PH30 (deferred), R24/R25 remainders. Docs-only follow-up PR
+(branch restarted from the merged main, same name).
+
+CI-iteration note for the record: the e2e run surfaced and fixed a real app
+bug before merge — `/exercises` 414'd on the local stack (330-id `.in()`
+query string in `listExercises`; hosted merely tolerated the oversized URI) —
+plus two harness fixes (fixture `weeks` floor, LOG click landing on the
+transient saving span). Exactly the class of regression R21 was filed to
+catch.
+
 ## 2026-07-03 — Session 40: R21 (all 3 bullets) + N1 per-route skeletons + I12 scoping & first slices (PR #134)
 
 Reconciliation sweep: no-op (PRs #132/#133 merged; Session 39's in-session
