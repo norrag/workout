@@ -11,6 +11,25 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later 5) — N12 + N9 + N10 + N6 WS-J slice + Performance reorg merged (PR #132)
+
+Session 39 shipped the next two slots of the attack order plus N6; PR #132
+merged with all checks green the same session, so the sweep ran in-session on
+a follow-up docs PR (a merged PR can't sweep its own rows). Full record in
+PROGRESS 2026-07-03 (latest) and the Session 39 log entry; N9/N10's design
+delta is the 09 2026-07-03 (session 2) entry. The N12 on-device feel (set-log
+round-trip + no hung spinner) and the N6 gesture remain flagged for the
+owner's spot-check — reopen if the device check fails.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N12 | Set logging takes seconds; spinner occasionally never resolves (write actually landed) | B | J | **done — merged (PR #132).** Latency: `logSet`'s 4 serial stamp SELECTs → 1 embedded read (live-validated); `in_progress` flip skipped past planned; reconcile-gate watermark reads closed workouts only, so the first set no longer busts the gate. Hang: spinner tracks the server action (15s watchdog), acknowledges on write-confirm, revalidation echo remounts the row; timeout = retryable shake+toast (R3 upsert converges). J-Phase-2 #5 deferred with #7; #6 assessed & dropped (bytes, not round trips). |
+| N9 | Macro Performance: muscle-group strength gain primary, per-group exercise drill-down; flat list dropped at macro scope | F | C | **done — merged (PR #132).** `rollupMuscleProgress` carries `contributors[]`; new `MuscleStrengthSection` (▸/▾ drill-down) on the macro Performance panel; meso tab untouched; MCP unaffected. 09 delta recorded. |
+| N10 | Meso Performance: drop TOP SET BY WEEK + ACROSS MACRO sections (macro-scope content on a meso view) | F | C | **done — merged (PR #132).** `buildKeyLifts` + top-set fold + chart query + types deleted (~230 lines net); `contextLine`'s meso position re-derived from the macro's meso ordering (decoupled from `keyLifts[0]`). |
+| N6 | Pull-to-refresh on day view + cycles pages (installed PWA = no native PTR) | F | E | **done — merged (PR #132).** One `PullToRefresh` wrapper in `(app)/layout.tsx` covers every page; armed at `scrollY === 0`, `router.refresh()` in a transition, travelling-gap indicator; `overscroll-behavior-y: contain` prevents Android double-fire. |
+
+---
+
 ## Swept 2026-07-03 (later 4) — N5 + N7 + N8 + N11 Batch-5 quick fixes merged (PR #131)
 
 Session 38 shipped the four scoped one-file Batch-5 items in one PR; PR #131

@@ -4,6 +4,15 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 39 (cont.): PR #132 merged — in-session sweep
+
+PR #132 merged with all checks green while the session was still live, so the
+reconciliation sweep ran immediately instead of waiting for the next session's
+resume protocol: **N12/N9/N10/N6 archived** (`archive.md`, "Swept 2026-07-03
+(later 5)"). Live index is now down to N1 (in-progress, WS-J), R21, R24/R25
+remainders, and I12. Docs-only follow-up PR (branch restarted from the merged
+main, same name).
+
 ## 2026-07-03 — Session 39: N12 + N9 + N10 + N6 — WS-J logging slice + Performance-tab reorg + PTR (PR #132)
 
 Reconciliation sweep: PR #131 merged → **N5/N7/N8/N11 archived** (swept to
