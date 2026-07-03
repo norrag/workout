@@ -30,9 +30,10 @@ code changed.
   sheet/menu.
 - **N8 (HIGH, UX, WS-D, ready)** — planned-meso badge: white PLANNED text badge
   (CURRENT's style), checkbox only when completed, `+ PLAN` unchanged, mute
-  everything not current/completed. Maps to `/cycles` `StatusMark`; open
-  non-blocking question whether the macro timeline's numbered marks mirror the
-  badge swap or just the muting rule.
+  everything not current/completed. Maps to `/cycles` `StatusMark`. The
+  macro-timeline question was **answered same-session (appendix Batch 5
+  addendum):** numbered marks stay; planned rows swap the right-side progress
+  bar for the PLANNED badge; both surfaces adopt the muting scheme.
 - **N9 + N10 (HIGH, F, WS-C, ready — ship together)** — Performance-tab
   reorg: macro tab promotes the muscle-group rollup to primary with per-group
   exercise drill-down (rollup already sees the attribution, just discards it);

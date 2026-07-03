@@ -47,7 +47,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N5 | Replace-exercise leaves the OLD exercise's weight/reps on **set 1 only** (sets 2+ correct; "reset to prescription" fixes it). PH38's symptom back with a **different mechanism**: the PR #84 fix (clear `set_weights` on swap) is intact and the new prescription seeds synchronously — the stale value is retained client `useState` on the editable "next" row, whose re-sync effect deps (`plannedWeight`, `bodyweight`) don't change across a swap. Root cause + 2 fix options (SetRow key or effect deps) in `scoping.md` | B | HIGH | G | ready |
 | N6 | Pull-to-refresh on at least the day view + cycles pages/subpages (installed PWA = no native PTR). Nothing exists; one shared client wrapper in `(app)/layout.tsx` (document scrolls; no cycles sub-layout) covers all pages at once — `router.refresh()` in a transition, gesture gated to `scrollTop === 0`. Scoped | F | MED | E | ready |
 | N7 | Day-view note sheet: after keyboard + sheet dismiss, page scroll lands LOWER than where the user started. Root cause: shared `useScrollLock` never saves/restores `scrollY` (body `overflow:hidden` doesn't pin offset on installed iOS PWA). One-file fix (`position:fixed` lock + restore) covers every sheet/menu. Scoped | UX | MED | E | ready |
-| N8 | Cycles meso badges: planned mesos should show a **white "PLANNED" text badge** (CURRENT's style, white), checkbox reserved for **completed** only, unplanned keep `+ PLAN`; only current/completed render full ink — planned + unplanned stay muted. Owner's description matches the `/cycles` `StatusMark` (today: empty checkbox for planned; muting only on unplanned). Non-blocking question: mirror onto the macro timeline's numbered marks too, or muting-rule only there? (default = latter). Scoped | UX | HIGH | D | ready |
+| N8 | Cycles meso badges: planned mesos show a **white "PLANNED" text badge** (CURRENT's style, white), checkbox reserved for **completed** only, unplanned keep `+ PLAN`; only current/completed render full ink — planned + unplanned stay muted. `/cycles` `StatusMark` is the main surface (today: empty checkbox for planned; muting only on unplanned). **Macro timeline decided (owner, 2026-07-03 addendum):** numbered marks stay, but planned mesos swap the right-side progress bar for the PLANNED badge + both surfaces adopt the muting scheme. Scoped | UX | HIGH | D | ready |
 | N9 | Macro Performance tab reorg: **muscle-group strength gain primary**, each group expandable to the exercises that rolled into it; drop the flat per-exercise list (too many across a macro). Rollup already iterates per-exercise attribution and discards it — extend `MuscleGroupProgress` with `contributors[]` + expandable UI. Shared component with the meso tab — split/branch so N10's trim is independent. Ship with N10 | F | HIGH | C | ready |
 | N10 | Meso Performance tab trim: drop "TOP SET BY WEEK — KEY LIFTS" and "ACROSS MACRO" single-exercise sections (macro-scope content on a meso view). Net deletion (~150-200 lines incl. `buildKeyLifts` + macro-chart query block); caution: `keyLifts[0]` also feeds `contextLine`/`mesoPosition`. Ship with N9 | F | HIGH | C | ready |
 | N11 | Deload sets show ▼ underperform arrow even at exactly-prescribed weight+reps. Root cause: RIR-asymmetric e1RM comparison — prescription side bakes in the week's target RIR (deload ≈ 6, the max), logged side gets `rir_reported: null` → treated as RIR 0, so identical performance reads as a big miss. Working weeks carry a smaller version of the same skew. 1-3 line fix (compare at equal RIR when unreported); extract the marker memo to `day-rules.ts` for tests | B | MED | G | ready |
@@ -336,3 +336,13 @@ and the follow-up table; the Session-30 `log.md` entry summarizes the deltas.
   1-2s gap disproves the Phase-A assumption that route navigations already paint
   the `(app)/loading.tsx` skeleton. Logged as a Phase-A escalation, not a new
   item.)*
+
+#### Batch 5 addendum — owner decision on N8 (2026-07-03, in-chat)
+
+> "On N8, the macro overview timeline is mostly fine, but swap the progress bar
+> and on future mesos for the planned back and adopt the same muting scheme"
+
+*(Read as: on the macro overview timeline, keep the numbered-mark vocabulary,
+but for future/planned mesos swap the right-side progress bar for the white
+PLANNED badge, and adopt the same muting scheme as `/cycles` — only
+current/completed in full ink.)*

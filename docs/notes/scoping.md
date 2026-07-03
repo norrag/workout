@@ -309,10 +309,12 @@ PROGRESS/PLANNED (`:232-241`), muting again unplanned-only (`:247,251-261`).
 **Changes:** `/cycles` `StatusMark`: planned → white "PLANNED" text badge
 (CURRENT's geometry, `border-ink`/white), checkbox reserved for completed;
 widen the muted branch to `planned` + `unplanned` (only active/completed full
-ink). **Open question for the owner (non-blocking):** mirror the same
-badge/muting scheme onto the macro timeline's numbered marks, or leave that
-surface's numbered-ledger style and only fix its muting rule? Default plan =
-apply the muting rule on both, badge swap on `/cycles` only. Check fig 2.x
+ink). **Macro timeline — decided (owner, 2026-07-03 addendum):** keep the
+numbered `TimelineMark` vocabulary, but for **planned** mesos swap the
+right-side progress bar (`macro/[macroId]/page.tsx:287-295` — today `bg-ink/15`
+on future rows) for the white PLANNED badge; adopt the same muting scheme
+(widen `:247,251-261` so planned + unplanned mute, only active/completed full
+ink). Unplanned timeline rows keep `+ PLAN` (`:265-279`) as is. Check fig 2.x
 mockups (rule 8) before build.
 
 ## N9 — Macro Performance: muscle-group primary + exercise drill-down · **F / medium · ready**
