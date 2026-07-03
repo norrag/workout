@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-03 — Session 38: N5 + N11 + N7 + N8 — the four scoped Batch-5 quick fixes (PR #__N__)
+## 2026-07-03 — Session 38: N5 + N11 + N7 + N8 — the four scoped Batch-5 quick fixes (PR #131)
 
 Reconciliation sweep: no-op (PR #130, the Batch-5 intake, merged — it was
 notes-only with no `done` rows to sweep; R24/R25/I12 correctly stay live).

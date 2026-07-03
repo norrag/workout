@@ -250,7 +250,7 @@ fully satisfies the note (per-user isolation, machine-specific steps), then clos
 
 # Batch 5 (2026-07-03) — scoped at intake
 
-## N5 — Replace-exercise: first set keeps the old exercise's numbers · **B / trivial-small · DONE (PR #__N__, 2026-07-03)**
+## N5 — Replace-exercise: first set keeps the old exercise's numbers · **B / trivial-small · DONE (PR #131, 2026-07-03)**
 Shipped via the first (lowest-risk) option below: the `SetRow` key now includes
 `we.exercise_id`, so a replace remounts the rows and set 1 re-initializes from
 the new prescription. Original scope below for the record.
@@ -286,7 +286,7 @@ gated to `scrollTop === 0`, threshold + spinner, `router.refresh()` inside a
 `overscroll-behavior-y: contain` (`src/styles/globals.css:53`) to avoid gesture
 conflict.
 
-## N7 — Note-sheet scroll position drifts after keyboard · **UX / small · DONE (PR #__N__, 2026-07-03)**
+## N7 — Note-sheet scroll position drifts after keyboard · **UX / small · DONE (PR #131, 2026-07-03)**
 Shipped exactly as scoped (`position:fixed` lock + exact restore; paddingRight
 compensation and `lockCount` kept). Original scope below for the record.
 Root cause: the shared scroll lock never saves/restores `scrollY`.
@@ -300,7 +300,7 @@ shifts the document and nothing restores it — `useModalA11y` restores focus wi
 `window.scrollTo(0, saved)`. Mind the existing `paddingRight` compensation and
 the `lockCount` ref-count for stacked overlays.
 
-## N8 — Meso badges: PLANNED badge, checkbox only when complete, mute future · **UX / small · DONE (PR #__N__, 2026-07-03)**
+## N8 — Meso badges: PLANNED badge, checkbox only when complete, mute future · **UX / small · DONE (PR #131, 2026-07-03)**
 Shipped on both surfaces (badge in ink = the owner's "white" under the dark
 inversion); fig 2.1/2.2 delta recorded in 09 (2026-07-03 entry). Original
 scope below for the record.
@@ -355,7 +355,7 @@ chart's lead lift (`stats.ts:719-721`) and feeds `mesoPosition`/`contextLine`
 (`stats.ts:737,811-817`) — re-derive or drop `contextLine`'s meso-position bit
 when retiring `buildKeyLifts`. Ship with N9.
 
-## N11 — Deload sets show ▼ at exactly-prescribed performance · **B / trivial · DONE (PR #__N__, 2026-07-03)**
+## N11 — Deload sets show ▼ at exactly-prescribed performance · **B / trivial · DONE (PR #131, 2026-07-03)**
 Shipped as scoped: marker extracted to pure `day-rules.ts::loggedSetMarker`,
 compares at equal RIR when unreported; 6 unit tests. Original scope below for
 the record.
