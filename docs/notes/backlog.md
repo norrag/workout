@@ -40,10 +40,18 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | I12 | Address mesocycle management under a macrocycle | F | HIGH | D | **advanced (PR #92):** MCP authoring shipped — build days into a meso (`edit_mesocycle` add_day/remove_day), place/attach into a macro slot, edit the meso header, duplicate, manage slots, gated `activate_mesocycle` + **sequential-activation invariant** (planned mesos seed only after prior blocks complete), non-persisting volume preview. Remaining: in-app planner UX for the same actions. See PROGRESS 2026-07-01 |
 | PH30 | Expanded weekly prescription explanation — LLM narrative layer | D | — | H | **deferred (2026-07-02):** not now. Refined vision: LLM does **not** replace the engine — it's an explanation layer over it (uses session notes, explains the engine's decision verbosely, light PT-style advice via MCP tools). Parked |
 | PH39 | How fast does e1RM recency decay? (Pulldown e1RM 110.1 but did 115×11 on May 22) | Q | — | A | answered → T-A1 |
-| N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
+| N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. **Escalated (2026-07-03, Batch 5):** owner reports 1-2s dead gaps on page taps persist, esp. cycles page + subpages — users double-tap in doubt; wants IMMEDIATE switch + skeleton on every nav (day view is the only page doing it right). Disproves the Phase-A assumption that route navs already paint the `(app)/loading.tsx` fallback — re-verify on device, then per-route skeletons/streaming (Phase 3 pulled forward). | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
 | R21 | Coverage gaps: Playwright e2e suite absent (dead `test:e2e` script; docs claim it exists); no write-pipeline integration tests (`generation`/`logging` untested I/O); golden meso only covers no-anchor v10 shape, not live v16 | F | MED | L | triaged (was blocked on R2 — unblocked once the R2 PR merges: local stack boots from the repo chain) |
 | R24 | Engine guardrail batch — **4 of 5 shipped (PR #127):** cross-field param invariants (superRefine + tests), `e1rmFactor` cutoff capped ≤ 10 (+ monotonicity property tests), no-anchor "hold" no longer rounds the held load, retire-flag comments fixed. **Remaining (open): hold-week reprice-down** (owner 2026-07-02: real concern — a slightly-decayed anchor makes a "hold" on wk N+1 < wk N; matters most for cut/maintain macro types meant to *preserve* strength; logged for future investigation, no fix decided yet) | B | LOW | G | **in-progress** — mechanical fixes merged (PR #127); reprice-down investigation open |
 | R25 | MCP polish — **3 of 4 shipped (PR #129):** audit-write failure no longer inverts a committed write (log-and-return + tests); resource handlers guarded (structured errors, no more raw `[object Object]`); `MCP_JWT_AUDIENCE` enablement step added to the runbook. **Remaining (open): tool-surface consolidation** (~4–5 overlapping tools — a deliberate design pass, not mechanical) + full dual-error-contract convergence (`{ok:false}` vs thrown→`isError`) | F | LOW | K | **in-progress** — mechanical fixes in PR #129; consolidation open |
+| N5 | Replace-exercise leaves the OLD exercise's weight/reps on **set 1 only** (sets 2+ correct; "reset to prescription" fixes it). PH38's symptom back with a **different mechanism**: the PR #84 fix (clear `set_weights` on swap) is intact and the new prescription seeds synchronously — the stale value is retained client `useState` on the editable "next" row, whose re-sync effect deps (`plannedWeight`, `bodyweight`) don't change across a swap. Root cause + 2 fix options (SetRow key or effect deps) in `scoping.md` | B | HIGH | G | ready |
+| N6 | Pull-to-refresh on at least the day view + cycles pages/subpages (installed PWA = no native PTR). Nothing exists; one shared client wrapper in `(app)/layout.tsx` (document scrolls; no cycles sub-layout) covers all pages at once — `router.refresh()` in a transition, gesture gated to `scrollTop === 0`. Scoped | F | MED | E | ready |
+| N7 | Day-view note sheet: after keyboard + sheet dismiss, page scroll lands LOWER than where the user started. Root cause: shared `useScrollLock` never saves/restores `scrollY` (body `overflow:hidden` doesn't pin offset on installed iOS PWA). One-file fix (`position:fixed` lock + restore) covers every sheet/menu. Scoped | UX | MED | E | ready |
+| N8 | Cycles meso badges: planned mesos show a **white "PLANNED" text badge** (CURRENT's style, white), checkbox reserved for **completed** only, unplanned keep `+ PLAN`; only current/completed render full ink — planned + unplanned stay muted. `/cycles` `StatusMark` is the main surface (today: empty checkbox for planned; muting only on unplanned). **Macro timeline decided (owner, 2026-07-03 addendum):** numbered marks stay, but planned mesos swap the right-side progress bar for the PLANNED badge + both surfaces adopt the muting scheme. Scoped | UX | HIGH | D | ready |
+| N9 | Macro Performance tab reorg: **muscle-group strength gain primary**, each group expandable to the exercises that rolled into it; drop the flat per-exercise list (too many across a macro). Rollup already iterates per-exercise attribution and discards it — extend `MuscleGroupProgress` with `contributors[]` + expandable UI. Shared component with the meso tab — split/branch so N10's trim is independent. Ship with N10 | F | HIGH | C | ready |
+| N10 | Meso Performance tab trim: drop "TOP SET BY WEEK — KEY LIFTS" and "ACROSS MACRO" single-exercise sections (macro-scope content on a meso view). Net deletion (~150-200 lines incl. `buildKeyLifts` + macro-chart query block); caution: `keyLifts[0]` also feeds `contextLine`/`mesoPosition`. Ship with N9 | F | HIGH | C | ready |
+| N11 | Deload sets show ▼ underperform arrow even at exactly-prescribed weight+reps. Root cause: RIR-asymmetric e1RM comparison — prescription side bakes in the week's target RIR (deload ≈ 6, the max), logged side gets `rir_reported: null` → treated as RIR 0, so identical performance reads as a big miss. Working weeks carry a smaller version of the same skew. 1-3 line fix (compare at equal RIR when unreported); extract the marker memo to `day-rules.ts` for tests | B | MED | G | ready |
+| N12 | Set logging takes seconds; spinner occasionally never resolves (write actually landed — page-switch-and-return shows it). Two scoped halves: **latency** (4 serial stamp SELECTs in `logSet`; the first set of every session busts the reconcile gate via its own `in_progress` flip bumping the gate's watermark; double `revalidatePath`) and **hang** (spinner = `useTransition` pending on the full revalidation commit, no timeout — a stalled RSC fetch pins it forever). Levers in `scoping.md`; build as a WS-J slice with N1 Phase-2 deferred items (#5/#6) | B | HIGH | J | ready |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -268,3 +276,73 @@ and the follow-up table; the Session-30 `log.md` entry summarizes the deltas.
   am simultaneously saying I never got sore? Whatever though, its fine as is."
 - **R6 (local-day rule).** "Um, I think B is perfectly fine in my opinion. It
   should be stored at whatever date it was when the client recorded the session."
+
+### Batch 5 — field notes (2026-07-03)
+
+- **N5** — HIGH — "When an exercise is replaced in the day view, it retains the
+  original weight and reps from the previous exercise (the exercise in the same
+  slot prior to the swap) for only the first set of the new exercise. Subsequent
+  sets of the replaced exercise show the correct prescriptions, but the first set
+  does not. If the user modifies the numbers on the first incorrect set (so as to
+  get the 'reset to prescription' option in the menu), then resetting to
+  prescription values correctly resets the first set to prescription values."
+- **N6** — MED — "Some, if not all, pages should have a pull up to refresh
+  ability to refresh the current page. This should be available at least on the
+  workout day view and cycles pages/subpages."
+- **N7** — MED — "When a note is added to an exercise in the day view, there is a
+  slightly annoying detail of behavior: When opening the note tray and clicking
+  the text field, it opens the device's keyboard, which pushes the entire app
+  page up by necessity. However when the keyboard and notes slider is eventually
+  dismissed, the page scroll position does not end up in the same position it was
+  when the user entered the notes. The end result is that after entering a note,
+  the user finds themselves in a scroll position on the page that is lower than
+  the place the started, and they must scroll back up to get to the original
+  position."
+- **N8** — HIGH — "Planned mesocycle badge should say 'planned', rather than have
+  a checkbox. The checkbox should only appear once completed. The current meso
+  has the orange 'CURRENT' badge. Planned should have a white badge similar the
+  current badge, and the unplanned mesos should keep their current '+ plan'
+  badge. Only completed or current sets should show in full white, future mesos
+  (planned and unplanned) should remain muted."
+- **N9** — HIGH — "Macro cycle performance page should be revised and reorganized
+  a bit. Don't love the individual exercises here. Muscle group stats makes more
+  sense viewing across the entire macros, while individual exercises are a bit
+  much since they span long periods so there can be many. A better organization
+  would be to display the muscle group strength gain as the primary statistic,
+  and allow the muscle groups to be clickable to drop down or display the subset
+  of exercise which rolled up to the muscle group statistic for more detail."
+- **N10** — HIGH — "The meso performance page can drop the key exercise top sets
+  by week section, and 'across macro' for the single exercise, since its a meso
+  view not macro view."
+- **N11** — MED — "Deload sets show the underperformed arrow even when performing
+  the prescribed weight and reps. These indicators should be displaying when the
+  user over or underperforms their prescriptions."
+- **N12** — HIGH — "In general logging sets can take a long time to submit,
+  typically at least several seconds. On occasion it will get hung up and the
+  spinner spins for an extended time and seemingly never completes, until I
+  switch pages and return to the day view page at which point it indicates
+  completed. This ruins the user experience and should never happen."
+- **N1 addendum** — MED — "Page loads and switches are still painfully slow at
+  times. Despite my efforts to get responsive changes, they have not been
+  successful. All too often I click/tap on a page or sub page, and for 1-2
+  seconds there is no indication the click was successful. By about 2 seconds, I
+  become unsure that I clicked the page correctly and begin tapping it again.
+  When any page is clicked in the app, ideal behavior would be that that page
+  would IMMEDIATELY switch and show an empty screen with animated placeholders
+  until the data loads. The workout day view page is the only page that does this
+  correctly when loading. Other pages should do this too; particularly the cycles
+  page and sub pages, but also pretty much every page." *(→ folded into N1 — this
+  is the WS-J north star restated with new evidence: the cycles pages' dead
+  1-2s gap disproves the Phase-A assumption that route navigations already paint
+  the `(app)/loading.tsx` skeleton. Logged as a Phase-A escalation, not a new
+  item.)*
+
+#### Batch 5 addendum — owner decision on N8 (2026-07-03, in-chat)
+
+> "On N8, the macro overview timeline is mostly fine, but swap the progress bar
+> and on future mesos for the planned back and adopt the same muting scheme"
+
+*(Read as: on the macro overview timeline, keep the numbered-mark vocabulary,
+but for future/planned mesos swap the right-side progress bar for the white
+PLANNED badge, and adopt the same muting scheme as `/cycles` — only
+current/completed in full ink.)*

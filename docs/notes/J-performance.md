@@ -150,6 +150,24 @@ paint a skeleton on commit (acknowledged). The genuinely-dead case is **same-rou
 `?param=` changes** — Next keeps the old UI mounted with no fallback. That's the
 top-value gap.
 
+> **⚠ Disproved in the field (owner, 2026-07-03 — backlog Batch 5, folded into
+> N1).** The owner reports 1-2 second dead gaps after tapping pages — worst on
+> the cycles page + subpages — with no visual acknowledgment, to the point of
+> doubting the tap and tapping again. Bar restated: **every page tap must
+> IMMEDIATELY switch and show animated placeholders until data loads**; the
+> workout day view is the only page doing this correctly today. So the
+> assumption above (Link navs paint the shared fallback on commit) does not
+> hold on device — likely because "on commit" is gated on the server response
+> for dynamically-rendered routes rather than firing on tap. **Next Phase-A
+> action:** reproduce on device, establish why the fallback isn't painting
+> (loading.tsx placement per route segment vs the group-level one; Next
+> partial-prerender/prefetch of the loading shell; transition semantics), then
+> ship per-route `loading.tsx` skeletons for `/cycles`, `/cycles/macro/[id]`,
+> `/cycles/meso/[id]` + the other tabs, mirroring `DayViewSkeleton` (pulls
+> Phase 3's streaming item forward). Related discrete defect: **N12** (set-log
+> latency + hanging spinner) — scoped in `scoping.md` § N12; build with this
+> workstream's deferred #5/#6 caching items.
+
 Ranked gaps:
 1. **PlannerBoard draft-path mutations** (`PlannerBoard.tsx:234` discards `isPending`;
    steppers/reorder/remove) — on a *draft* meso these `commit()` with no optimistic

@@ -248,16 +248,155 @@ fully satisfies the note (per-user isolation, machine-specific steps), then clos
 
 ---
 
+# Batch 5 (2026-07-03) — scoped at intake
+
+## N5 — Replace-exercise: first set keeps the old exercise's numbers · **B / trivial-small · ready**
+PH38's recurrence, but a **different mechanism** — the PR #84 fix
+(`replaceWorkoutExercise` clears `set_weights: {}` on swap,
+`src/lib/queries/logging.ts:756,763`) is intact, and the new prescription is
+seeded synchronously (`logging.ts:753-762`). The stale value is **retained client
+`useState`**: only the "next" row (set 1 of an unstarted exercise) renders
+editable state (`DayView.tsx:1336-1337`); sets 2+ are `staticCells` derived from
+props every render (`DayView.tsx:1465,1538-1547`) — hence first-set-only.
+Neither the card (`key={we.id}`, `DayView.tsx:360` — the WE row id survives a
+replace) nor the row (`key={`${setNumber}-${logged?.id ?? "open"}`}`,
+`DayView.tsx:1042`) remounts on swap, and the planned-input re-sync effect
+(`DayView.tsx:1381-1387`) deps are `[plannedWeight, we.bodyweight]` — both
+`null`/unchanged across the swap (no per-set overrides on an unstarted slot), so
+it never fires; `prescribedWeight/Reps/exercise_id` aren't in the deps. "Reset to
+prescription" fixes it only because the user's manual edit first writes
+`set_weights["1"]`, so the clear produces a real `plannedWeight` transition that
+finally triggers adoption. **Fix (pick one):** include `we.exercise_id` in the
+`SetRow` key (remount on swap — lowest risk), or add it to the re-sync deps
+(guard `adoptServerRowState` holds: `edited.current` is false on a fresh swap).
+
+## N6 — Pull-to-refresh · **F / small · ready**
+Nothing exists (no PTR component, no gesture handler, no
+`overscroll-behavior` anywhere). Native pull-to-refresh is gone because the app
+runs as an installed standalone PWA (`src/app/layout.tsx:55,59-71`). The shell
+has **no dedicated scroll container** — the document scrolls
+(`src/app/(app)/layout.tsx:15-22`), and there is no `cycles/layout.tsx`, so **one
+shared client component wrapped around `{children}` in `(app)/layout.tsx` covers
+the day view and the entire `/cycles/**` tree at once**: touchstart/move/end
+gated to `scrollTop === 0`, threshold + spinner, `router.refresh()` inside a
+`useTransition` for the pending cue (~60-100 lines). Optionally add
+`overscroll-behavior-y: contain` (`src/styles/globals.css:53`) to avoid gesture
+conflict.
+
+## N7 — Note-sheet scroll position drifts after keyboard · **UX / small · ready**
+Root cause: the shared scroll lock never saves/restores `scrollY`.
+`src/components/ui/useScrollLock.ts:11-33` only sets `body overflow:hidden` (+
+scrollbar padding); on an installed iOS PWA that doesn't pin the offset, so the
+soft keyboard (NoteSheet's `<textarea autoFocus>`, `DayView.tsx:1873-1881`)
+shifts the document and nothing restores it — `useModalA11y` restores focus with
+`preventScroll: true` (`useModalA11y.ts:96`) but not scroll. **Fix in one file
+(covers every sheet/menu):** `lock()` captures `window.scrollY` + applies
+`position:fixed; top:-scrollY; width:100%` to body; `unlock()` restores and
+`window.scrollTo(0, saved)`. Mind the existing `paddingRight` compensation and
+the `lockCount` ref-count for stacked overlays.
+
+## N8 — Meso badges: PLANNED badge, checkbox only when complete, mute future · **UX / small · ready**
+Meso statuses: `draft|unplanned|planned|active|completed|abandoned`
+(`src/lib/types/database.ts:191-197`). **The owner's description (orange CURRENT
+badge + checkbox) matches the `/cycles` list page**, `StatusMark`
+(`cycles/page.tsx:29-43`): completed = ✓ filled box, active = orange CURRENT
+text badge (`:36-41` — the exact style to mirror in white), **everything else
+incl. planned = empty checkbox** (`:42`, the offender). `+ PLAN` for unplanned at
+`:63-84`; muting today applies to `unplanned` only (`:67,92`). The macro overview
+timeline (`macro/[macroId]/page.tsx`) uses a different vocabulary —
+`TimelineMark` numbered/dashed boxes + ✓ (`:68-86`), sub-labels DONE/IN
+PROGRESS/PLANNED (`:232-241`), muting again unplanned-only (`:247,251-261`).
+**Changes:** `/cycles` `StatusMark`: planned → white "PLANNED" text badge
+(CURRENT's geometry, `border-ink`/white), checkbox reserved for completed;
+widen the muted branch to `planned` + `unplanned` (only active/completed full
+ink). **Macro timeline — decided (owner, 2026-07-03 addendum):** keep the
+numbered `TimelineMark` vocabulary, but for **planned** mesos swap the
+right-side progress bar (`macro/[macroId]/page.tsx:287-295` — today `bg-ink/15`
+on future rows) for the white PLANNED badge; adopt the same muting scheme
+(widen `:247,251-261` so planned + unplanned mute, only active/completed full
+ink). Unplanned timeline rows keep `+ PLAN` (`:265-279`) as is. Check fig 2.x
+mockups (rule 8) before build.
+
+## N9 — Macro Performance: muscle-group primary + exercise drill-down · **F / medium · ready**
+Macro Performance tab renders only `StrengthProgressSection`
+(`macro/[macroId]/page.tsx:341-346`; component
+`src/components/stats/StrengthProgress.tsx:14-91`): flat per-exercise list (I11)
+at `:24-62` — **the part to demote** — and the PH37 muscle-group grid at
+`:64-88` — **the part to promote + make expandable**. Data:
+`getMacroStats` → `buildStrengthProgress` (`stats.ts:232-245`) →
+`rollupMuscleProgress` (`stats.ts:160-191`) which **already iterates the
+per-exercise attribution** (`getExerciseMuscleLinks`, `stats.ts:194-223`;
+role-weighted 1.0/0.5) but discards it — `MuscleGroupProgress`
+(`stats.ts:140-146`) keeps only a count. **Plan:** extend the rollup to carry
+`contributors: {exercise_id, name, score_pct, role, sessions}[]` (~20 lines),
+then a new expandable macro Performance layout (client expand/collapse,
+~60-100 lines). An exercise appearing under several groups is expected
+(fractional credit). **Caution:** `StrengthProgressSection` is shared with the
+meso tab (`MesoStatsViews.tsx:310`) — branch by scope or split components so the
+meso side (N10) is trimmed independently. Ship with N10.
+
+## N10 — Meso Performance: drop top-sets-by-week + across-macro sections · **F / small-medium · ready**
+Both in `PerformanceView` (`src/components/stats/MesoStatsViews.tsx:198-336`):
+"TOP SET BY WEEK — KEY LIFTS" at `:208-253` (data `buildKeyLifts`,
+`stats.ts:483-531`, fed by a dedicated `logged_sets` top-set query+fold,
+`stats.ts:658-691`) and "ACROSS MACRO — {lift} EST. 1RM" at `:255-307` (data
+block `stats.ts:693-756`, `MacroChartBar` `stats.ts:295-299`). What stays:
+`StrengthProgressSection` (`:309-313`) + PRS THIS MESO (`:315-333`). Net
+deletion ~150-200 lines. **Coupling caution:** `keyLifts[0]` picks the macro
+chart's lead lift (`stats.ts:719-721`) and feeds `mesoPosition`/`contextLine`
+(`stats.ts:737,811-817`) — re-derive or drop `contextLine`'s meso-position bit
+when retiring `buildKeyLifts`. Ship with N9.
+
+## N11 — Deload sets show ▼ at exactly-prescribed performance · **B / trivial · ready**
+Marker memo: `DayView.tsx:1484-1519` (render `:1613-1626`), ±1.5% band. **The
+comparison is RIR-asymmetric:** prescription side
+`estimateE1rm(prescribedEff, prescribedReps, targetRir, …)` (`:1489-1493`) bakes
+in the week's target RIR — on a deload that's `params.deload.target_rir` (~6,
+`engine/rules/deload.ts:32`), the largest in the ramp; logged side uses
+`logged.rir_reported` (`:1497-1501`) which the quick LOG button always writes as
+`null` (`DayView.tsx:1434`) → treated as RIR 0 (`engine/predict.ts:104-118`,
+monotonic in RIR). So identical weight+reps yields `loggedE1rm ≪
+prescriptionE1rm` → ▼. Deloads maximize the gap; working weeks carry a smaller
+version of the same skew. **Fix (1-3 lines):** compare at equal RIR when
+unreported — `logged.rir_reported ?? targetRir` on the logged side (or compute
+the prescribed side at the same assumed RIR). Consider extracting the memo into
+pure `day-rules.ts` so it's unit-testable (it isn't today).
+
+## N12 — Set logging slow; spinner sometimes never resolves · **B / medium · ready**
+Two compounding halves, both scoped:
+- **Latency:** `logSetAction` (`actions.ts:94-136`) → `logSet`
+  (`logging.ts:359-452`) does **4 serial SELECTs** (WE→workout→micro→meso stamp
+  chain, `:382-405`) before the upsert + a conditional `in_progress` flip
+  (`:444-449`) ≈ ~6 sequential round-trips per set; then `revalidatePath` on
+  BOTH `/log/{id}` and `/workout` re-runs the page: `getWorkoutDetail` (+
+  `select("*")` hot paths) + `ensureFreshPrescriptions`. **The first set of
+  every session busts the reconcile gate** — the `in_progress` flip bumps
+  `workouts.updated_at`, which is the gate's completed-work watermark
+  (`regeneration.ts:441-444,502-514`) → that log pays the full ~8-10-round-trip
+  reconcile; later sets still pay the 2-round-trip signature load.
+- **Hang:** the spinner is `useTransition` pending (`DayView.tsx:1344-1362`,
+  `runLog`) which resolves only when the **revalidation RSC re-render commits
+  client-side** — the upsert itself lands early and independently. A stalled
+  RSC fetch (or app backgrounded mid-flight) leaves the transition pending
+  forever with no timeout/AbortController; navigating away and back re-reads
+  fresh state, which is exactly the reported symptom.
+- **Levers:** collapse the 4-hop stamp chain to one join; exempt the pure-log
+  path's own status flip from the gate watermark (or stamp the signature after
+  the flip); narrow `revalidatePath` → tags (J-performance Phase 2 #5) + narrow
+  the `getWorkoutDetail` selects (#6); acknowledge the write optimistically
+  (clear/decouple the spinner on server-action resolve rather than on
+  revalidation commit). Overlaps WS-J — build as a WS-J slice with N1's Phase 2
+  deferred items.
+
+---
+
 ## Items still needing their own scoping pass (not yet researched)
 - **I12** (mesocycle management under a macrocycle) — **MCP authoring side shipped**
   (PROGRESS 2026-07-01, branch `claude/mcp-mesocycle-creation-i4nica`): day-level
   meso building, macro placement/attach, header edit, duplicate, slot management,
   gated sequential activation, volume preview. Remaining scope is the **in-app**
   planner UX for the same operations.
-- **PH29** (page-switch slowness + double-label glitch) — perf/UX; needs repro +
-  a look at the app-shell label/loading animation.
-- **PH38** (first sets/reps wrong on switch-exercise) — bug; needs repro; likely
-  related to the swap-in seeding path (see A: PR24).
-- **PH30** (LLM prescription analysis), **P21** (soreness-at-0-days rule),
-  **PH31/PH32** (e1RM storage + tap-to-flip), **PH37** (aggregate gains) — see
-  workstreams B/C/H. (**PH34** now scoped above.)
+- **PH30** (LLM prescription analysis) — deferred 2026-07-02; see workstream H.
+
+> Pruned 2026-07-03: PH29/PH38 (shipped PR #84), PH31/PH32 (shipped WS-B),
+> PH37 (shipped PR #104) — resolutions in `archive.md`.
