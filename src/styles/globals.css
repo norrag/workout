@@ -56,6 +56,10 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* N6: the app ships its own pull-to-refresh (PullToRefresh.tsx) — suppress
+     the browser's native overscroll refresh so the gesture can't fire twice
+     (Android standalone Chrome still has a native PTR; iOS PWAs never did). */
+  overscroll-behavior-y: contain;
 }
 
 /* Numbers are the heroes of tracking screens */
