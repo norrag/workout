@@ -11,6 +11,18 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-03 (later 2) — R22 env validation merged (PR #121)
+
+Session 36 (cont. 2) shipped the first of the LOW tail; PR #121 merged with
+all checks green. Full record in PROGRESS 2026-07-03 and the Session 36
+(cont. 2) log entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R22 | Env vars unvalidated at boot — missing/typo'd var passes build (CI placeholders), fails as request-time 500s inside @supabase/ssr | F | L | **done — merged (PR #121).** New `src/lib/env.ts` (zod, parsed once, every offending var named); all four supabase factories + the MCP auth bridge read through it; `next.config.ts` asserts presence at build/dev boot. Service-role key stays confined to `service.ts` (hard rule #4). 6 unit tests; build verified both directions. |
+
+---
+
 ## Swept 2026-07-03 (later) — R15 single-active-meso merged (PR #120)
 
 Session 36 (cont.) shipped the next WS-D item; PR #120 merged with all checks

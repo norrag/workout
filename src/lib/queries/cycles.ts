@@ -72,17 +72,6 @@ export async function getCyclesOverview(
   };
 }
 
-export async function listMacrocycles(
-  supabase: Client,
-): Promise<MacrocycleRow[]> {
-  const { data, error } = await supabase
-    .from("macrocycles")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
-
 // ---------------------------------------------------------------------------
 // mesocycles — standalone creation (fig 2.4 from-scratch/template path) and
 // the groups-first plan (figs 2.5/2.6). In-macro mesos are created by the
@@ -870,26 +859,6 @@ export async function reorderDayGroups(
       .update({ position: i + 1 })
       .eq("id", orderedGroupIds[i])
       .eq("meso_day_id", dayId);
-    if (error) throw error;
-  }
-}
-
-/**
- * Reorder a group's exercises: rewrite each fill's `slot_number`/`position` to
- * its index in `orderedFillIds` (1..n), packing fills to the top slots. Scoped
- * to the group. Live (draft) reorder path; staged edits reorder locally.
- */
-export async function reorderGroupExercises(
-  supabase: Client,
-  groupId: string,
-  orderedFillIds: string[],
-): Promise<void> {
-  for (let i = 0; i < orderedFillIds.length; i++) {
-    const { error } = await supabase
-      .from("meso_exercises")
-      .update({ slot_number: i + 1, position: i + 1 })
-      .eq("id", orderedFillIds[i])
-      .eq("meso_day_group_id", groupId);
     if (error) throw error;
   }
 }

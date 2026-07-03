@@ -702,18 +702,6 @@ export async function clearPlannedSetWeights(
   if (error) throw error;
 }
 
-export async function setExerciseStatus(
-  supabase: Client,
-  workoutExerciseId: string,
-  status: "pending" | "completed" | "skipped",
-): Promise<void> {
-  const { error } = await supabase
-    .from("workout_exercises")
-    .update({ status })
-    .eq("id", workoutExerciseId);
-  if (error) throw error;
-}
-
 /** Remove an exercise from the day — only while nothing is logged on it
  * (deleting the row would cascade logged history otherwise). */
 export async function removeWorkoutExercise(

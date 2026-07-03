@@ -85,12 +85,6 @@ export const CONFIDENCE_WEIGHT: Record<E1rmConfidence, number> = {
   low: 0.25,
 };
 
-const CONFIDENCE_RANK: Record<E1rmConfidence, number> = {
-  high: 3,
-  moderate: 2,
-  low: 1,
-};
-
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
@@ -510,9 +504,4 @@ export function phaseGoals(sessions: ExerciseSession[]): string[] {
   const out: string[] = [];
   for (const s of sessions) if (!out.includes(s.goal_type)) out.push(s.goal_type);
   return out;
-}
-
-/** Confidence rank for sorting/threshold logic (high=3 … low=1). */
-export function confidenceRank(c: E1rmConfidence): number {
-  return CONFIDENCE_RANK[c];
 }

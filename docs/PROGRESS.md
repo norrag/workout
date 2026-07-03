@@ -2,7 +2,46 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — R22: environment validated at boot
+## 2026-07-03 (latest) — R23: repo hygiene batch
+
+The dead-code/config sweep from the review (LOW, workstream L). Migrations
+`20260703000002` + `20260703000003` **applied live + verified**.
+
+- **Attack surface first:** the two unused-but-live `"use server"` POST
+  endpoints are gone — `reorderGroupExercisesAction` (plus its now-orphaned
+  `reorderGroupExercises` query) and `saveProfileDetails` (plus its schema and
+  `ProfileFormState`; the per-field `updateProfileField` path is what the UI
+  actually uses).
+- **Dead exports:** `listMacrocycles` (cycles), `setExerciseStatus` (logging),
+  `confidenceRank` + its private rank map (comparability). Engine barrel
+  trimmed of 7 over-exports with zero consumers anywhere (`epley`, `brzycki`,
+  `loadTypes`, `macroGoalTypes`, `phaseNames`, `macroPlanInputSchema`,
+  `macroProfileSchema`) — module-level exports untouched, so internal use and
+  relative-import tests are unaffected.
+- **Dead components:** `Card`, `MenuCard`/`MenuItem`, `FeedbackScale`,
+  `NumberStepper` (which carried the stale-closure hold-to-repeat bug —
+  deleted rather than fixed), `RirBadge`, `WeekTrack`.
+- **Dead views retired (append-only migrations, both applied live):**
+  `v_muscle_group_volume` (`20260703000002`) — never consumed, UTC-Monday
+  week boundary, integer counts, no hard-set gate; and `v_meso_week_sets`
+  (`20260703000003`) — superseded by the R14 role-grain
+  `v_meso_week_muscle_sets`; this resolves root CLAUDE.md's "pending
+  retirement with R23" note (line updated). Row types + registry entries
+  removed from `database.ts`.
+- **Dep/config nits:** `@next/bundle-analyzer` aligned to the next-15 major
+  (`^15.5.20`); `tsx` added as a devDep (scripts document `npx tsx`); the
+  nonexistent `tests/unit/**` vitest include dropped; `.github/dependabot.yml`
+  added (weekly npm minors/patches grouped prod/dev, majors ignored, plus
+  github-actions).
+
+### Verified
+
+Scratch-PG16 chain green from zero (62 migrations + seed; both views absent,
+`v_meso_week_muscle_sets` intact). `npm run typecheck`, `npm run lint`,
+`npm run test` (734) green; production build green;
+`npx tsx scripts/macro-engine-matrix.ts` still runs with the pinned devDep.
+
+## 2026-07-03 — R22: environment validated at boot
 
 First of the LOW tail (workstream L — delivery guardrails). The Supabase
 client factories read `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` with non-null

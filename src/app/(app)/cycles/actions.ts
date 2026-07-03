@@ -16,7 +16,6 @@ import {
   removeMesoDay,
   reorderDayExercises,
   reorderDayGroups,
-  reorderGroupExercises,
   saveMesoPlan,
   setGroupExercises,
   updateDayGroup,
@@ -385,28 +384,6 @@ export async function reorderDayGroupsAction(input: {
   const parsed = reorderGroupsSchema.parse(input);
   const { supabase } = await requireUser();
   await reorderDayGroups(supabase, parsed.day_id, parsed.ordered_group_ids);
-  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
-}
-
-const reorderExercisesSchema = z.object({
-  meso_id: z.string().uuid(),
-  group_id: z.string().uuid(),
-  ordered_fill_ids: z.array(z.string().uuid()).min(1).max(10),
-});
-
-/** Live (draft) reorder of a group's exercises (fig 2.7 slots). */
-export async function reorderGroupExercisesAction(input: {
-  meso_id: string;
-  group_id: string;
-  ordered_fill_ids: string[];
-}): Promise<void> {
-  const parsed = reorderExercisesSchema.parse(input);
-  const { supabase } = await requireUser();
-  await reorderGroupExercises(
-    supabase,
-    parsed.group_id,
-    parsed.ordered_fill_ids,
-  );
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 

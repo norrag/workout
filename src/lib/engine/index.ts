@@ -24,14 +24,11 @@ import { prescribeBodyweight, usesBodyweightModel } from "./rules/bodyweight";
 
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
-export { macroGoalTypes, phaseNames } from "./params";
 export { engineInputsSchema } from "./types";
 export {
   planMacrocycle,
   spreadPhases,
   suggestMesoLength,
-  macroPlanInputSchema,
-  macroProfileSchema,
   type MacroPlan,
   type MacroPlanInput,
   type MacroPlanArgs,
@@ -42,8 +39,6 @@ export {
 } from "./macro";
 export {
   estimateE1rm,
-  epley,
-  brzycki,
   type E1rmEstimate,
   type E1rmConfidence,
 } from "./e1rm";
@@ -88,7 +83,6 @@ export {
   type ExerciseParamOverride,
 } from "./effective-params";
 export {
-  loadTypes,
   isBodyweightLoad,
   toEngineLoadType,
   coerceLoadType,
