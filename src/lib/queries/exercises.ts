@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { toEngineLoadType } from "@/lib/engine";
 import type {
   Database,
   EquipmentType,
@@ -113,6 +114,25 @@ export async function getMusclesForExercises(
   return map;
 }
 
+/**
+ * Collapse duplicate muscle-group entries to one row per group (R12) — a
+ * duplicated group used to hit the unique constraint AFTER the exercise row
+ * insert, stranding an orphan exercise with no muscles. First occurrence wins,
+ * except a `primary` role always beats a `secondary` for the same group.
+ */
+export function dedupeMuscleRoles(
+  muscleGroups: { muscle_group_id: string; role: "primary" | "secondary" }[],
+): { muscle_group_id: string; role: "primary" | "secondary" }[] {
+  const byGroup = new Map<string, "primary" | "secondary">();
+  for (const mg of muscleGroups) {
+    const existing = byGroup.get(mg.muscle_group_id);
+    if (existing === undefined || (existing === "secondary" && mg.role === "primary")) {
+      byGroup.set(mg.muscle_group_id, mg.role);
+    }
+  }
+  return [...byGroup].map(([muscle_group_id, role]) => ({ muscle_group_id, role }));
+}
+
 export async function createCustomExercise(
   supabase: Client,
   userId: string,
@@ -130,6 +150,10 @@ export async function createCustomExercise(
       user_id: userId,
       name: input.name,
       equipment_type: input.equipment_type,
+      // derive how entered weight maps to effective load (R12) — without this
+      // the column default ('external') gave custom bodyweight exercises wrong
+      // e1RM/effective-load math forever (coerceLoadType prefers a stored value)
+      load_type: toEngineLoadType(input.equipment_type),
       description: input.description ?? null,
       notes: input.notes ?? null,
       video_url: null,
@@ -139,17 +163,23 @@ export async function createCustomExercise(
     .single();
   if (error) throw error;
 
-  if (input.muscle_groups.length > 0) {
+  const muscleGroups = dedupeMuscleRoles(input.muscle_groups);
+  if (muscleGroups.length > 0) {
     const { error: mgError } = await supabase
       .from("exercise_muscle_groups")
       .insert(
-        input.muscle_groups.map((mg) => ({
+        muscleGroups.map((mg) => ({
           exercise_id: data.id,
           muscle_group_id: mg.muscle_group_id,
           role: mg.role,
         })),
       );
-    if (mgError) throw mgError;
+    if (mgError) {
+      // don't strand an orphan exercise with no muscles — remove the row the
+      // failed link insert was for (best-effort; the row is muscle-less either way)
+      await supabase.from("exercises").delete().eq("id", data.id);
+      throw mgError;
+    }
   }
   return data;
 }

@@ -1,7 +1,11 @@
 import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { MacroGoalType, EquipmentType } from "@/lib/types/database";
+import type { MacroGoalType } from "@/lib/types/database";
+import {
+  customExerciseEquipment,
+  type CustomExerciseEquipment,
+} from "@/lib/types/equipment";
 import { getProfile } from "@/lib/queries/profiles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
@@ -427,10 +431,13 @@ function registerCreateCustomExercise(server: McpServer) {
       description:
         "Add a custom exercise to the user's library: name, equipment type, " +
         "optional description, and its muscle groups (by name, each primary or " +
-        "secondary).",
+        "secondary). For bodyweight movements pick the load semantics: " +
+        "'bodyweight only' (push-up — the load IS the bodyweight), 'bodyweight " +
+        "loadable' (weighted pull-up — entered weight is ADDED), or 'machine " +
+        "assistance' (assisted dip — entered weight is assistance REMOVED).",
       inputSchema: {
         name: z.string().min(1).max(80),
-        equipment_type: z.string().min(1),
+        equipment_type: z.enum(customExerciseEquipment),
         description: z.string().max(500).optional(),
         muscle_groups: z
           .array(
@@ -445,7 +452,7 @@ function registerCreateCustomExercise(server: McpServer) {
     async (
       args: {
         name: string;
-        equipment_type: string;
+        equipment_type: CustomExerciseEquipment;
         description?: string;
         muscle_groups: { muscle_group: string; role: "primary" | "secondary" }[];
       },
@@ -463,7 +470,7 @@ function registerCreateCustomExercise(server: McpServer) {
         });
       const exercise = await createCustomExercise(client, userId, {
         name: args.name,
-        equipment_type: args.equipment_type as EquipmentType,
+        equipment_type: args.equipment_type,
         description: args.description ?? null,
         muscle_groups: args.muscle_groups.map((m) => ({
           muscle_group_id: byName.get(m.muscle_group)!,
