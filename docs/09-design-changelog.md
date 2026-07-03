@@ -42,6 +42,29 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-03 (session 3) — Meso header menu: Duplicate; START gate surfaces proactively (I12)
+
+- **Change (meso ⋮ menu).** The mesocycle header's ⋮ menu (P16 grammar) gains a
+  **"Duplicate mesocycle"** row between "Edit plan/weeks" and "Save as template":
+  one tap copies the meso's settings + planner board (loads are never copied — the
+  engine reseeds on activation) into a fresh standalone `planned` meso and lands on
+  its page. Failure returns with an inline accent error line (same pattern as the
+  template error).
+- **Change (START MESOCYCLE).** On a planned meso whose activation is gated —
+  another block is live, or earlier-positioned siblings in its macrocycle aren't
+  finished — the START button now renders **disabled with the reason as a muted
+  (`ink/55`) line beneath it**, instead of looking tappable and failing with a
+  reactive error. The server-side gate is unchanged; the reactive accent error
+  remains for races.
+- **Rationale.** I12: the MCP authoring surface got duplicate + gated activation in
+  PR #92; the in-app surface offered neither, and a dead-looking failure on tap
+  violates the "acknowledge every input" bar (N1).
+- **Affected figures.** → 2.2/2.5-adjacent (meso page header menu, START button
+  state). No mockup figure exists for either control; both reuse the established
+  menu-row / disabled-button grammar (`LOCKED` precedent) — recorded as a rule-8
+  deviation in PROGRESS.
+- **Impact.** `RETROFIT` — shipped with the same entry's build (PR #134).
+
 ## 2026-07-03 (session 2) — Performance-tab reorg: macro drill-down (N9) + meso trim (N10)
 
 Owner decisions (verbatim in `docs/notes/backlog.md` appendix Batch 5). Amends

@@ -169,6 +169,23 @@ top-value gap.
 > see "Shipped 2026-07-03 (N12 slice)" under Phase 2; #5 remains deferred with
 > #7, #6 was assessed & dropped.
 
+**Shipped 2026-07-03 (per-route skeletons, PR #134).** Diagnosis without a
+device, from Next's segment semantics: a `loading.tsx` boundary belongs to its
+*segment*, and navigating between sibling routes under `(app)` never re-suspends
+the group-level boundary — it only ever fires for the segment it sits in. So
+`(app)/loading.tsx` covered nothing in practice, and the two routes with their
+own file (`/workout`, `/log/[workoutId]`) were exactly the two the owner
+reported as behaving. With a per-segment file, `<Link>` prefetch (default on
+the row links and explicit on BottomNav) pulls the loading shell ahead of time
+so it paints on tap even though the routes are dynamically rendered. Shipped
+layout-mirroring skeletons (DayViewSkeleton grammar) for 9 routes: `/cycles`,
+`/cycles/macro/[id]`, `/cycles/meso/[id]` (also covers `/stats`), the planner
+board, the planned-day preview, `/exercises`, `/exercises/[id]`, `/templates`,
+`/more`. The group-level file stays as the fallback for the remaining minor
+routes. **Owner to confirm on device** — if a dead gap persists anywhere, the
+remaining suspects are `router.push` navigations (no prefetch: PlannerBoard,
+MesoHeader calendar) and Suspense-streaming below the skeleton (Phase 3).
+
 Ranked gaps:
 1. **PlannerBoard draft-path mutations** (`PlannerBoard.tsx:234` discards `isPending`;
    steppers/reorder/remove) — on a *draft* meso these `commit()` with no optimistic
