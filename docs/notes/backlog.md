@@ -351,3 +351,74 @@ and the follow-up table; the Session-30 `log.md` entry summarizes the deltas.
 but for future/planned mesos swap the right-side progress bar for the white
 PLANNED badge, and adopt the same muting scheme as `/cycles` — only
 current/completed in full ink.)*
+
+### Batch 7 — field notes (2026-07-04)
+
+Owner: "Here is a new batch of notes for you to process, organize, and add to
+notes. You'll need to assess and organize these a bit as they're sort of stream
+of thought. Lets get them processed and added, and then we will begin
+implementation work in new sessions." *(IDs in brackets show where each note
+landed.)*
+
+- "There are at least some issues with the macro stat roll ups for muscle
+  groups. E.g the July 2024-Dec 2025 bulk the hack squat roll up under the
+  quads muscle group is obviously wrong. It states a starting e1RM of 7 but
+  that exists no where in the exercise history." *[→ N14]*
+- "Drill even further down in macro muscle groups all the way down to exercise
+  history view for the macro/meso. Default to the history component of e1RM
+  view and click to sets and reps" *[→ N15]*
+- "Similarly to above, the est Strength on key lifts metric seems at times to
+  be at odds with other metrics. For instance in Cut · Dec 2025 – May 2026, the
+  est strength on key lifts says -36.3%, but in the performance tab of the same
+  meso almost every muscle group and exercise is positive with few small
+  exceptions." *[→ N16]*
+- "No way to edit # of sets in the planner" *[→ N17]*
+- "Certain elements — like RIR ramp — are only editable via edit details after
+  creating the meso. Could put these in these create meso panel. I don't want
+  to over complicate this with options for users, so this should be an option
+  to edit without being in the users face, and should default to the standard
+  without much badgering to alter it. So, in a sense this is a bit of a deep
+  option that we don't need to make overly obvious, but if a user wants to edit
+  the ramp, they should have the ability to do so. And we might as well allow
+  the RIR for each week to be set independently, rather than just choosing a
+  ramp, for more flexibility." *[→ N18]*
+- "Create a route to archive macros/mesos and put them in a deeper area in
+  profile perhaps, where you can view or unarchive them. Never allow full
+  deletion. Data always is kept." *[→ N19]*
+- "Enter share code should appear in the new cycle tray also, not just the new
+  template tray" *[→ N20]*
+- "Need to get to the bottom of the 'realistic' macro targets, and how these
+  are calculated. Are they right? We should probably hide these from the
+  macrocycle view and create macrocycle view if or until we can work them out.
+  They aren't an particularly integral part of the cycle anyways, its just
+  informational." *[→ N21]*
+- "New exercise page UI sucks, needs an overhaul and the increment setting"
+  *[→ N22]*
+- "Create new exercise says you can share them through the exercise page — you
+  can't." *[→ N23]*
+- "Exercise page should get the header component with share button and menu for
+  settings ect." *[→ N22]*
+- "If individual exercises are shareable through the exercise view, then there
+  should also be a corresponding enter share code option when creating a new
+  exercise. This probably means a new exercise tray with the new exercise or
+  enter code option, like other create new routes. We need to consider and
+  properly handle what happens if someone enters a meso share code into an
+  exercise field and vise-versa. Hopefully either one just automatically takes
+  you to the right place already." *[→ N23]*
+- "Macrocycle views should also get the reusable header component, menu options
+  for edit, etc. This will unify the headers of most major components of the
+  app, I believe" *[→ N24]*
+- "Build out info/help screens throughout the app in relevant places. There are
+  a lot of technical terms throughout the app that are not obvious to normal
+  users, so people need to have an intuitive route to clarity without it
+  cluttering up too much" *[→ N25]*
+- "Increase size of day view set rows by about 10%. They're just slightly too
+  small" *[→ N26]*
+- "The back link when clicking Mesocycle stats through day view goes back to
+  cycles not working out day view. You should always back link where you came
+  from" *[→ N27]*
+- "Re-sort all macrocycles and mesocycles to be newest at the top" *[→ N28]*
+- "When you start a new mesocycle and choose 'From a template', there are no
+  template filters there, but there should be." *[→ N29]*
+- "In general I would prefer a bit of a sleeker filtering UI for exercises and
+  templates. They feel disjointed and clunky." *[→ N29]*
