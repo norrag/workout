@@ -11,6 +11,18 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-04 (later 3) — N31 planner replace fix merged (PR #143)
+
+Session 45 fixed the Batch-8 planner-substitution bug; merged, swept at the
+Session-46 resume. Full record in PROGRESS 2026-07-04 "Batch-8 fix", the 09
+"2026-07-04 (session 3)" entry, and the Session 45 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N31 | Planner board: tapping a filled row appended the pick instead of replacing in place (grew the slot count, left an empty slot after cleanup) | B | D | **done (PR #143).** `PickerTarget.replaceFill`: a filled-row tap opens the picker in replace mode — single-select, seeded with the current movement, rows already filling another slot of the group disabled (`ALREADY IN THIS GROUP`), `REPLACE EXERCISE` submit. Swap keeps the fill's id/day position/slot/sets: staged in editing mode, `replaceSlotAction` → `replaceSlotExercise` single-row update on live drafts (+ duplicate guard, 5 unit tests). Open-slot taps keep the multi-select. |
+
+---
+
 ## Swept 2026-07-04 (later 2) — Batch-7 build 2 merged (PR #142)
 
 Session 44 built the third attack-order slot (N22+N23) with the N30 rider;
