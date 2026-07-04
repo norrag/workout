@@ -11,6 +11,23 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-04 (later) — Batch-7 build 1 merged (PR #140)
+
+Session 43 built the first two attack-order slots; merged with checks green
+while the session was live, so the sweep ran in-session. Full record in
+PROGRESS 2026-07-04 (latest), the 09 2026-07-04 entry, and the Session 43
+`log.md` entry. **N18** (Part B per-week RIR open) and **N21** (target-engine
+correction needs-decision) keep live rows for their remainders.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N14 | Macro muscle-group rollup: bogus "starting e1RM of 7" endpoint | B | C | **done (PR #140).** `dropE1rmOutliers` in `foldProgressScores`: sessions >3× from the exercise's window median (either direction) are dropped from the trend endpoints and the qualification count; <3 sessions keeps all. Kills order-of-magnitude mis-logs; a genuine within-window doubling survives. |
+| N16 | "EST. STRENGTH · KEY LIFTS" tile contradicts the Performance tab | B | C | **done (PR #140).** Bespoke `buildMacroStats` fold deleted; the tile reads `getProgressScores` → pure `keyLiftStrengthPct` (top-3 **qualifying** by frequency, deload-filtered) — one definition with the Performance tab; MCP `get_macrocycle_summary` inherits. Deload-tail regression test. |
+| N17 | Planner: no way to edit # of sets per exercise | F | D | **done (PR #140).** −/＋ START SETS stepper on each filled board row (compact group-stepper grammar); staged in edit mode, live `updateFillSetsAction` → `updateMesoExerciseSets` on drafts; clamp 1–20. Pick-time default stays 3. |
+| N20 | Enter-share-code in the new-cycle tray | UX | D | **done (PR #140).** `NewCycleButton` sheet mounts the kind-agnostic `RedeemForm` under OR ADD FROM A CODE (template-tray pattern). Rode with the planner slice instead of N23. |
+
+---
+
 ## Swept 2026-07-04 — N19 dropped at the Batch-7 addendum
 
 Same-session sweep during the Batch 7 intake: the owner reviewed the intake

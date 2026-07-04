@@ -4,6 +4,18 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 43 (cont.): PR #140 merged — in-session sweep
+
+PR #140 merged with checks green while the session was live, so the
+reconciliation sweep ran in-session: **N14, N16, N17, N20 archived**
+(`archive.md`, "Swept 2026-07-04 (later)"). Rows kept live for the
+remainders: **N18** re-scoped to Part B only (per-week `rir_schedule`),
+**N21** now purely the target-engine needs-decision (hide is merged).
+Docs-only follow-up PR on the branch restarted from merged main (same name).
+Live index is now: N1 (WS-J remainder), N15+N30 (unblocked stats slice),
+N22+N23 (next attack-order slot), N24–N29 remainders, PH30 deferred,
+R24/R25 remainders.
+
 ## 2026-07-04 — Session 43: attack-order slots 1+2 built — N14/N16/N21-hide + N17/N18-A/N20 (PR #140)
 
 Reconciliation sweep: no-op (only dependabot PRs + stale #48 open; no `done`
