@@ -2,7 +2,32 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-04 (latest) — Batch-7 build 3: macro header (N24) + scoped history drill-down (N15) + back links (N27) + set-row scale (N26) + start-date sort (N28)
+## 2026-07-04 (latest) — N32: history-sheet fixes from N15 field testing
+
+Owner tested the PR #144 drill-down and returned one bug + two changes
+(Batch 9 → N32, PR #145). Design of record: the 09 "2026-07-04 (session 5)"
+entry.
+
+- **Sheet scroll bug (root cause: N6 × scroll lock).** The scroll lock's
+  `position:fixed` zeroes `window.scrollY`, so `PullToRefresh` (N6) armed on
+  **every** drag over an open sheet — the pull spacer grew (the page behind
+  the scrim visibly moved) and a long drag fired `router.refresh()`
+  mid-interaction. Affected every sheet since N6 shipped; first noticed on
+  the first long sheet tested after it. Fix at the source: `useScrollLock`
+  exports `isScrollLocked()` and `PullToRefresh` never arms while it's true;
+  `BottomSheet` panels additionally get `overscroll-contain` and stop touch
+  propagation at the overlay root so sheet gestures can never read as page
+  gestures.
+- **Drill-down default reverted to sets/reps.** The session-4 e1RM-first
+  opening is removed (`initialFlipped` prop deleted; targets no longer carry
+  `e1rm_first`) — every history entry point opens on sets/reps, tap to flip
+  (standard PH32 behavior), per the owner.
+- **Exercise-name link.** The history sheet's subtitle exercise name now
+  links to `/exercises/{id}` on every entry point; `BottomSheet.subtitle`
+  widened from string to ReactNode.
+- Green: typecheck, lint, 778 tests, production build.
+
+## 2026-07-04 — Batch-7 build 3: macro header (N24) + scoped history drill-down (N15) + back links (N27) + set-row scale (N26) + start-date sort (N28)
 
 Fourth slot of the Session-42 attack order, folding in the N15 stats slice
 and the three small ready items (PR #144). Design of record: the 09

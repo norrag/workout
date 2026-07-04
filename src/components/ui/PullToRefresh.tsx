@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { isScrollLocked } from "@/components/ui/useScrollLock";
 
 /**
  * PullToRefresh (N6) — the installed standalone PWA has no native
@@ -47,8 +48,14 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const startY = useRef<number | null>(null);
 
   const onTouchStart = (e: React.TouchEvent) => {
+    // N32: never arm while an overlay holds the body lock — the lock's
+    // position:fixed zeroes window.scrollY, so every drag on an open sheet
+    // read as "at the top" and pulled the page behind the scrim (and a long
+    // enough drag fired router.refresh() mid-interaction).
     startY.current =
-      window.scrollY <= 0 && !refreshing ? e.touches[0].clientY : null;
+      window.scrollY <= 0 && !refreshing && !isScrollLocked()
+        ? e.touches[0].clientY
+        : null;
   };
 
   const onTouchMove = (e: React.TouchEvent) => {

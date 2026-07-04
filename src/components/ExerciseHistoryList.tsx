@@ -28,15 +28,15 @@ import { getExerciseHistoryAction } from "@/app/(app)/log/actions";
  * the cursor comes back null — full history is always reachable.
  *
  * N15: the Performance drill-down opens this list scoped to a cycle's mesos
- * (`mesoIds`, threaded through the pager) and e1RM-first (`initialFlipped` —
- * the inverse of the PH32 default; tap still flips to sets/reps).
+ * (`mesoIds`, threaded through the pager). Every entry point starts on
+ * sets/reps — the PH32 default holds (owner reverted the drill-down's
+ * e1RM-first opening, 2026-07-04).
  */
 export function ExerciseHistoryList({
   entries,
   exerciseId,
   nextCursor = null,
   mesoIds,
-  initialFlipped = false,
 }: {
   entries: HistoryEntry[];
   /** required for paging — without it the list renders `entries` only */
@@ -45,11 +45,9 @@ export function ExerciseHistoryList({
   nextCursor?: string | null;
   /** N15: scope older-page fetches to these mesocycles */
   mesoIds?: string[];
-  /** N15: start on the e1RM view instead of sets/reps */
-  initialFlipped?: boolean;
 }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
-  const [flipped, setFlipped] = useState(initialFlipped);
+  const [flipped, setFlipped] = useState(false);
   const [older, setOlder] = useState<HistoryEntry[]>([]);
   const [cursor, setCursor] = useState(nextCursor);
   const [loading, setLoading] = useState(false);

@@ -11,6 +11,24 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-04 (later 4) — Batch-7 build 3 merged (PR #144)
+
+Session 46 built the fourth attack-order slot (N24) plus the N15 stats slice
+and the three small ready items; merged with checks green while the session
+was live, so the sweep ran in-session. Full record in PROGRESS 2026-07-04
+"Batch-7 build 3", the 09 "2026-07-04 (session 4)" entry, and the Session 46
+`log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N15 | Macro muscle groups drill to a macro/meso-scoped exercise history, e1RM-first | F | C | **done (PR #144).** `getExerciseHistory` gains `scopeMesoIds` (N30 day-grain pagination applies within scope); macro contributor rows + meso ALL EXERCISES rows open the scoped `HistorySheet` (`meso_ids`/`scope_label`/`e1rm_first` on the target), opening on the e1RM view with tap-to-flip to sets/reps (PH32 inverse for this entry point). MCP `get_exercise_history` contract unchanged. |
+| N24 | Macrocycle views adopt the shared header | UX | D | **done (PR #144).** Sticky `MacroHeader` on the shared header grammar (brand row, title + ⋮ `AnchoredMenu` with Edit macrocycle → the existing `/edit` route, meta + status badge, goal-notes line); bottom EDIT MACROCYCLE link removed; skeleton mirrored. Header unification complete across day view / meso / exercise / macro. |
+| N26 | Day-view set rows +~10% | UX | E | **done (PR #144).** 35px cells / 15px values / 23px LOG box / 5px row padding; R18 tap targets grown to 44×35px; grid templates untouched. |
+| N27 | Back links honor origin (meso stats from day view) | UX | E | **done (PR #144).** Producer appends `&from=/log/<id>`; meso page validates with the N4 guard and threads `backHref`/`backLabel` into `MesoHeader` (`‹ WORKOUT` when honored). |
+| N28 | Re-sort macros/mesos newest-first | UX→B | D | **done (PR #144).** Pure `orderCyclesTopLevel` (`start_date ?? created_at` desc, `created_at` tie-break) on the /cycles top level; `created_at` was an import-order artifact. Within-macro order untouched. 3 unit tests. |
+
+---
+
 ## Swept 2026-07-04 (later 3) — N31 planner replace fix merged (PR #143)
 
 Session 45 fixed the Batch-8 planner-substitution bug; merged, swept at the

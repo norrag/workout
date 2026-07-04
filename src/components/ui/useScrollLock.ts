@@ -55,6 +55,16 @@ function unlock() {
 }
 
 /**
+ * N32: whether any overlay currently holds the body lock. Page-level gesture
+ * handlers (PullToRefresh) must check this — the lock's position:fixed zeroes
+ * `window.scrollY`, so "at the top of the page" reads true whenever a sheet
+ * is open and every sheet drag would otherwise arm the pull gesture.
+ */
+export function isScrollLocked(): boolean {
+  return lockCount > 0;
+}
+
+/**
  * Disables background scrolling on the page body while `active` is true (per
  * the request that menus, feedback trays, and any overlay freeze the window
  * behind them), and restores the exact scroll position on release (N7).

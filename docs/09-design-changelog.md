@@ -42,6 +42,32 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-04 (session 5) — History-sheet fixes from N15 testing (N32)
+
+Owner field-tested the session-4 drill-down; three amendments (Batch 9 →
+N32).
+
+- **Change:** the drill-down history sheet opens on **sets/reps** like every
+  other history entry point — the session-4 "e1RM-first" opening is
+  **reverted** (tap a row to flip to e1RM, standard PH32 behavior).
+  **Rationale:** owner: "keep the standard history behavior".
+  **Affected figures:** 3.2. **Impact:** `RETROFIT` (amends the session-4
+  entry).
+- **Change:** the history sheet's subtitle **exercise name is a link** to the
+  exercise page (`/exercises/{id}`, ink underline), on every entry point (day
+  view, picker, drill-down). `BottomSheet.subtitle` widened to a ReactNode.
+  **Rationale:** owner: users should be able to reach the full exercise page
+  from the History panel. **Affected figures:** 3.2. **Impact:** `RETROFIT` +
+  `TOKENS` (shared BottomSheet prop).
+- **Change (bug, behavioral):** sheets no longer fight the N6 pull-to-refresh
+  — while any overlay holds the scroll lock, `PullToRefresh` never arms
+  (the lock's `position:fixed` zeroes `window.scrollY`, so every drag on an
+  open sheet read as a top-of-page pull: the page behind the scrim visibly
+  shifted and a long drag fired a refresh mid-interaction; present on all
+  sheets since N6). Sheet panels also gain `overscroll-contain` and isolate
+  their touch events. **Affected figures:** all sheets. **Impact:** `TOKENS`
+  (BottomSheet / PullToRefresh / useScrollLock primitives).
+
 ## 2026-07-04 (session 4) — Macro header adoption, history drill-down, set-row scale, origin-aware back links
 
 Batch-7 build 3 (N24/N15/N26/N27, with the N28 sort fix riding along). No

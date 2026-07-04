@@ -14,8 +14,9 @@ import {
 // rule-8 deviation recorded in PROGRESS); the row/label grammar mirrors the
 // PRS THIS MESO list and the Balance bars.
 //
-// N15: with a `historyScope`, exercise rows open the scoped history sheet,
-// e1RM-first — the drill-down behind every trend number.
+// N15: with a `historyScope`, exercise rows open the history sheet scoped to
+// this cycle's mesos — the drill-down behind every trend number (sets/reps
+// default, tap a row to flip to e1RM — the standard PH32 behavior).
 
 /** N15: the cycle window a Performance drill-down scopes history to. */
 export interface HistoryScope {
@@ -82,7 +83,6 @@ export function StrengthProgressSection({
                   exercise_name: s.exercise_name,
                   meso_ids: historyScope.mesoIds,
                   scope_label: historyScope.label,
-                  e1rm_first: true,
                 })
               }
               className={`${rowCls} text-left active:bg-ink/5`}

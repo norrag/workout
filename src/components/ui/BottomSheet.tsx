@@ -41,7 +41,9 @@ export function BottomSheet({
   open: boolean;
   onClose: () => void;
   title: string;
-  subtitle?: string;
+  /** small caps line under the title — a node so callers can link part of it
+   * (N32: the history sheet links the exercise name to its page) */
+  subtitle?: ReactNode;
   /**
    * Rise to (nearly) the whole screen — a pinned header, a scrollable middle
    * (children manage their own `flex-1 min-h-0` region), and a pinned footer.
@@ -57,11 +59,20 @@ export function BottomSheet({
   // Tab stays inside while open (R18)
   useModalA11y(render, panelRef, onClose);
   if (!render) return null;
+  // overscroll-contain: the panel's scroll must never chain to the page (N32)
   const panelClass = fullHeight
     ? "absolute inset-x-0 bottom-0 top-[max(1rem,env(safe-area-inset-top))] flex flex-col border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6"
-    : "absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6";
+    : "absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6";
   return (
-    <div className="fixed inset-0 z-50">
+    <div
+      className="fixed inset-0 z-50"
+      // N32: sheet gestures are the sheet's own — without this they bubble
+      // (through the React tree) into page-level touch handlers like
+      // PullToRefresh, which read them as page gestures
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+    >
       <div
         className={`absolute inset-0 bg-ink/45 transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`}
         onClick={onClose}
