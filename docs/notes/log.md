@@ -4,6 +4,17 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-03 — Session 41 (cont.): PR #137 merged — in-session sweep
+
+PR #137 merged with all checks green while the session was live, so the
+reconciliation sweep ran in-session: **I12 + N13 archived** (`archive.md`,
+"Swept 2026-07-03 (later 7)"). With I12 closed, the live index is down to
+N1 (in-progress, WS-J remainder: Phase-2 #5/#7 caching + Phase-3 streaming),
+PH30 (deferred), and the R24/R25 remainders. The four new I12 surfaces have
+no mockups — the owner's field feedback is the acceptance check; reopen
+anything that doesn't hold up. Docs-only follow-up PR (branch restarted from
+the merged main, same name).
+
 ## 2026-07-03 — Session 41: N13 fix + I12 completed (owner-authorized design) (PR #137)
 
 Same session, continued after PRs #134/#135 merged. Owner handed over Batch 6
