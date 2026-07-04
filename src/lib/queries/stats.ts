@@ -56,8 +56,56 @@ export function qualifyingScores(
   );
 }
 
+/**
+ * N16: the macro "EST. STRENGTH · KEY LIFTS" tile — mean e1RM %-change of the
+ * key lifts, where key lifts = the most-logged **qualifying** exercises
+ * (doc 10 §7 frequency rule). Derived from the same deload-filtered,
+ * ≥3-session scores as the Performance tab so the tile and the tab can never
+ * tell different stories about the same window.
+ */
+export function keyLiftStrengthPct(
+  scores: ExerciseProgressScore[],
+  topN = 3,
+): number | null {
+  const key = qualifyingScores(scores)
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, topN)
+    .map((s) => s.score_pct)
+    .filter((s): s is number => s != null);
+  if (key.length === 0) return null;
+  return Math.round((key.reduce((a, b) => a + b, 0) / key.length) * 10) / 10;
+}
+
+/**
+ * N14: a single mis-logged session (reps typed into the weight field, a
+ * technique set) must not define a trend endpoint — one 7-lb "session" on an
+ * otherwise ~200-lb lift turned a macro rollup wildly positive. Sessions whose
+ * e1RM is more than this ratio away from the exercise's window median (either
+ * direction) are dropped before the first→last fold. 3× is deliberately
+ * generous: a real beginner run can double within a window and must survive;
+ * only order-of-magnitude mis-logs are outliers.
+ */
+export const E1RM_OUTLIER_RATIO = 3;
+
+/** Drop sessions implausibly far from the window median (N14). Needs ≥3
+ *  sessions to establish a median worth trusting; below that, keep all. */
+export function dropE1rmOutliers(e1rms: number[]): number[] {
+  if (e1rms.length < 3) return e1rms;
+  const sorted = [...e1rms].sort((a, b) => a - b);
+  const mid = sorted.length / 2;
+  const median =
+    sorted.length % 2 === 1
+      ? sorted[Math.floor(mid)]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  if (median <= 0) return e1rms;
+  return e1rms.filter(
+    (v) => v >= median / E1RM_OUTLIER_RATIO && v <= median * E1RM_OUTLIER_RATIO,
+  );
+}
+
 /** Pure first→last e1RM fold shared by the meso and macro scopes (rows must
- *  arrive ordered by performed_on; deload sessions are skipped — T-A2). */
+ *  arrive ordered by performed_on; deload sessions are skipped — T-A2;
+ *  outlier sessions are dropped from the endpoints and the count — N14). */
 export function foldProgressScores(
   rows: Pick<
     VExerciseHistoryRow,
@@ -65,35 +113,31 @@ export function foldProgressScores(
   >[],
   deloadMicroIds: Set<string>,
 ): ExerciseProgressScore[] {
-  const byExercise = new Map<
-    string,
-    { name: string; first: number | null; last: number | null; sessions: number }
-  >();
+  const byExercise = new Map<string, { name: string; e1rms: number[] }>();
   for (const row of rows) {
     if (row.e1rm == null) continue;
     if (deloadMicroIds.has(row.microcycle_id)) continue;
-    const cur = byExercise.get(row.exercise_id);
+    let cur = byExercise.get(row.exercise_id);
     if (!cur) {
-      byExercise.set(row.exercise_id, {
-        name: row.exercise_name,
-        first: row.e1rm,
-        last: row.e1rm,
-        sessions: 1,
-      });
-    } else {
-      cur.last = row.e1rm;
-      cur.sessions += 1;
+      cur = { name: row.exercise_name, e1rms: [] };
+      byExercise.set(row.exercise_id, cur);
     }
+    cur.e1rms.push(row.e1rm);
   }
 
-  return [...byExercise.entries()].map(([exercise_id, v]) => ({
-    exercise_id,
-    exercise_name: v.name,
-    first_e1rm: v.first,
-    last_e1rm: v.last,
-    score_pct: scoreProgress(v.first, v.last),
-    sessions: v.sessions,
-  }));
+  return [...byExercise.entries()].map(([exercise_id, v]) => {
+    const kept = dropE1rmOutliers(v.e1rms);
+    const first = kept.length > 0 ? kept[0] : null;
+    const last = kept.length > 0 ? kept[kept.length - 1] : null;
+    return {
+      exercise_id,
+      exercise_name: v.name,
+      first_e1rm: first,
+      last_e1rm: last,
+      score_pct: scoreProgress(first, last),
+      sessions: kept.length,
+    };
+  });
 }
 
 /** Progress scores across one or more mesocycles (macro scope = all its mesos). */

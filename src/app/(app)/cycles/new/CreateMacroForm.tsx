@@ -10,7 +10,6 @@ import {
   type MacroGoal,
   type MacroPlan,
   type MacroProfile,
-  type MacroRange,
 } from "@/lib/engine/macro";
 import type { EngineParams } from "@/lib/engine/params";
 import { createMacrocycleAction, type FormState } from "../actions";
@@ -26,31 +25,6 @@ const GOALS: { value: MacroGoal; label: string }[] = [
 
 const DURATIONS = [3, 6, 12] as const;
 const MESO_LENGTHS = [4, 5, 6] as const;
-
-const GOAL_NOUN: Record<MacroGoal, string> = {
-  hypertrophy: "lean mass",
-  strength: "on key lifts",
-  cut: "bodyweight",
-  maintain: "",
-};
-
-function fmtRange(r: MacroRange): string {
-  const unit = r.unit === "%" ? "%" : ` ${r.unit}`;
-  const sign = r.direction === "loss" ? "−" : "+";
-  if (r.direction === "none") return "—";
-  return r.low === r.high
-    ? `${sign}${r.low}${unit}`
-    : `${sign}${r.low}–${r.high}${unit}`;
-}
-
-function fmtRate(r: MacroRange): string {
-  const unit = r.unit === "%" ? "%" : ` ${r.unit}`;
-  const sign = r.direction === "loss" ? "−" : "+";
-  if (r.direction === "none") return "";
-  const body =
-    r.low === r.high ? `${r.low}${unit}` : `${r.low}–${r.high}${unit}`;
-  return `≈ ${sign}${body} / month`;
-}
 
 export function CreateMacroForm({
   profile,
@@ -100,8 +74,6 @@ export function CreateMacroForm({
       ),
     [goal, durationMonths, mesoLength, profile, params],
   );
-
-  const noun = GOAL_NOUN[goal];
 
   return (
     <form action={formAction}>
@@ -223,31 +195,13 @@ export function CreateMacroForm({
         ))}
       </div>
 
-      {/* engine output (recomputed live) */}
+      {/* engine plan shape (recomputed live). The YOUR TARGET range + rate +
+          rationale are hidden (N21, owner 2026-07-04) pending a target-engine
+          correction — `planMacrocycle` still runs for the block math. */}
       <div className="mt-[18px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-accent">
-          YOUR TARGET
+        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+          PLAN
         </div>
-        {plan.target.direction === "none" ? (
-          <div className="mt-1.5 text-[20px] font-extrabold leading-tight tracking-[-0.01em]">
-            Recomposition — no weight target
-          </div>
-        ) : (
-          <div className="mt-1.5 flex items-baseline gap-2">
-            <div className="text-[30px] font-extrabold leading-none tracking-[-0.02em]">
-              {fmtRange(plan.target)}
-            </div>
-            <div className="text-[12px] font-semibold text-ink/60">
-              {noun ? `${noun} · ` : ""}
-              {plan.durationMonths} mo
-            </div>
-          </div>
-        )}
-        {plan.target.direction !== "none" && (
-          <div className="mt-[7px] text-[11px] font-semibold tracking-[0.02em] text-accent">
-            {fmtRate(plan.perMonthRate)}
-          </div>
-        )}
         <div className="mt-[7px] text-[11px] leading-normal text-ink/65">
           {plan.durationMonths} months at {mesoLength}-week blocks fits{" "}
           <strong className="text-ink">
@@ -294,10 +248,6 @@ export function CreateMacroForm({
         >
           {pending ? "CREATING" : "CREATE MACROCYCLE"}
         </button>
-      </div>
-
-      <div className="mb-4 text-[10px] leading-normal text-ink/50">
-        {plan.rationale}
       </div>
     </form>
   );

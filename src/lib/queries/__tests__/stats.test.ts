@@ -10,9 +10,12 @@ import {
   buildBalance,
   buildPrs,
   buildVolumeMatrix,
+  dropE1rmOutliers,
   foldProgressScores,
+  keyLiftStrengthPct,
   qualifyingScores,
   rollupMuscleProgress,
+  E1RM_OUTLIER_RATIO,
   MIN_PROGRESS_SESSIONS,
   type ExerciseProgressScore,
   type MesoStatsWeek,
@@ -221,6 +224,108 @@ describe("foldProgressScores", () => {
       new Set(),
     );
     expect(scores[0]).toMatchObject({ first_e1rm: 100, sessions: 2 });
+  });
+
+  it("N14: a mis-logged endpoint session cannot define the denominator", () => {
+    // the field case: one 7-lb "session" on a ~200-lb lift made the rollup
+    // read a massive gain; the fold must anchor on the first plausible session
+    const scores = foldProgressScores(
+      [
+        historyRow("hack", "w1", 7),
+        historyRow("hack", "w2", 200),
+        historyRow("hack", "w3", 205),
+        historyRow("hack", "w4", 210),
+      ],
+      new Set(),
+    );
+    expect(scores[0]).toMatchObject({
+      first_e1rm: 200,
+      last_e1rm: 210,
+      score_pct: 5,
+      sessions: 3,
+    });
+  });
+});
+
+describe("dropE1rmOutliers (N14)", () => {
+  it("drops sessions beyond the ratio band around the window median", () => {
+    expect(dropE1rmOutliers([7, 200, 205, 210, 900])).toEqual([200, 205, 210]);
+  });
+
+  it("keeps a genuine beginner run that doubles within the window", () => {
+    const run = [100, 120, 150, 180, 200];
+    expect(dropE1rmOutliers(run)).toEqual(run);
+  });
+
+  it("keeps everything below 3 sessions — no median worth trusting", () => {
+    expect(dropE1rmOutliers([7, 200])).toEqual([7, 200]);
+  });
+
+  it("band is symmetric at the documented ratio", () => {
+    const median = 100;
+    const values = [
+      median / E1RM_OUTLIER_RATIO,
+      median,
+      median * E1RM_OUTLIER_RATIO,
+    ];
+    expect(dropE1rmOutliers(values)).toEqual(values);
+  });
+});
+
+describe("keyLiftStrengthPct (N16 — the macro EST. STRENGTH tile)", () => {
+  const score = (
+    id: string,
+    sessions: number,
+    score_pct: number | null,
+  ): ExerciseProgressScore => ({
+    exercise_id: id,
+    exercise_name: id,
+    first_e1rm: 100,
+    last_e1rm: 100,
+    score_pct,
+    sessions,
+  });
+
+  it("means the top-3-by-frequency qualifying lifts", () => {
+    expect(
+      keyLiftStrengthPct([
+        score("a", 10, 6),
+        score("b", 9, 3),
+        score("c", 8, 0),
+        score("d", 7, -30), // 4th most-logged — not a key lift
+      ]),
+    ).toBe(3);
+  });
+
+  it("ignores unqualified lifts even when they are the most-logged... of the rest", () => {
+    // subbed-in lifts (<3 sessions) and no-score lifts can't be key lifts
+    expect(
+      keyLiftStrengthPct([
+        score("subbed", 2, -40),
+        score("no-score", 12, null),
+        score("real", 5, 4),
+      ]),
+    ).toBe(4);
+  });
+
+  it("returns null with no qualifying lift", () => {
+    expect(keyLiftStrengthPct([score("subbed", 1, -40)])).toBeNull();
+  });
+
+  it("N16 regression: a deload tail arrives pre-filtered, so the tile matches the tab", () => {
+    // the -36.3% case: deload sessions never reach the scores because
+    // getProgressScores excludes them upstream (T-A2) — the tile reads the
+    // same qualified scores the Performance tab renders. Fold-level proof:
+    const scores = foldProgressScores(
+      [
+        historyRow("squat", "w1", 300),
+        historyRow("squat", "w2", 310),
+        historyRow("squat", "w3", 315),
+        historyRow("squat", "dl", 190), // final week is a deload
+      ],
+      new Set(["dl"]),
+    );
+    expect(keyLiftStrengthPct(scores)).toBe(5);
   });
 });
 
