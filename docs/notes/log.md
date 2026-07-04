@@ -4,6 +4,41 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 45: PR #142 swept; N31 intake + fix (PR #143)
+
+Reconciliation sweep: **N22, N23, N30 archived** (`archive.md`, "Swept
+2026-07-04 (later 2)" — PR #142 merged). Branch restarted from merged main.
+
+Owner handed over one bug note in-chat (verbatim = **backlog appendix Batch
+8**): substituting an exercise on the planner board of a *planned* meso
+appended the pick instead of replacing, kept the original, showed both
+selected on re-open, and (via the group multi-select's `exercise_slots`
+growth) left an empty slot after manual cleanup.
+
+**Root cause (one defect, both bullets):** a filled board row opened the same
+group-wide multi-select `ExercisePicker` as an open slot (`setPicker({group,
+day})` with no notion of the tapped fill). Selection is seeded with the
+group's current exercises, so a "replacement" tap *adds* to the set;
+`setGroupExercises`/`planGroupExercises` append new picks after the day's
+last position and `exercise_slots: max(layout, slots)` grows the group. The
+board simply had no replace-in-place path (MCP's `edit_mesocycle
+swap_exercise` did; the app didn't).
+
+**N31 fixed (same PR):** `PickerTarget` gains `replaceFill`; a filled-row tap
+opens the picker in **replace mode** — single-select (radio), seeded with the
+current movement, rows already filling *another* slot of the group disabled
+(`ALREADY IN THIS GROUP`), sheet titled "Replace exercise" with a
+`REPLACE EXERCISE` submit (disabled until a different pick). The swap keeps
+the fill's id/day position/slot/starting sets: staged in editing mode (the
+owner's planned-meso path, committed via SAVE CHANGES), and a new
+`replaceSlotAction` → `replaceSlotExercise` single-row `exercise_id` update
+on live drafts, with a query-layer duplicate guard (+5 unit tests). Open-slot
+taps keep the original multi-select unchanged.
+
+Green: typecheck, lint, 775 tests (+5), production build. 09 entry
+"2026-07-04 (session 3)"; PROGRESS updated. Archive sweep for N31's row falls
+to the next session.
+
 ## 2026-07-04 — Session 44: attack-order slot 3 built — N22 + N23 + N30 (PR #142)
 
 Reconciliation sweep: no-op (PR #141's sweep already archived N14/N16/N17/N20;

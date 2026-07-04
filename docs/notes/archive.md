@@ -11,6 +11,21 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-04 (later 2) — Batch-7 build 2 merged (PR #142)
+
+Session 44 built the third attack-order slot (N22+N23) with the N30 rider;
+merged, swept at the Session-45 resume. Full record in PROGRESS 2026-07-04
+"Batch-7 build 2", the 09 "2026-07-04 (session 2)" entry, and the Session 44
+`log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N22 | Exercise surfaces overhaul (header + create rebuild + MCP parity) | F+UX | F | **done (PR #142).** (a) Sticky `ExerciseHeader` on the meso-header grammar ([share][⋮] on `AnchoredMenu`); `LoadStepSheet` menu-driven, disabled-not-hidden on bodyweight-only; share off the OVERVIEW tab; in-app delete for owned custom exercises with the MCP tool's guards. (b) Create page rebuilt in ledger sections, load step settable at creation (per-equipment default from `engine_params.rounding`). (c) `create_custom_exercise` +notes/+weight_increment; new `set_exercise_increment` tool (doc 05 updated). |
+| N23 | Exercise sharing entry points — the new-exercise tray | F | F | **done (PR #142).** `NewExerciseButton` chooser (Blank exercise / OR ADD FROM A CODE with the kind-agnostic `RedeemForm`) replaces the bare `+ NEW` link. Backend untouched — sharing already worked; this completes the receptacle set (templates PH27, cycles N20). |
+| N30 | Full exercise history reachable (120-set silent cap) | F | C | **done (PR #142).** `getExerciseHistory` cursor-paged on whole calendar days (`pageSetsByDay`, pure + unit-tested — import-artifact identical timestamps can't split/dupe a session across pages); `LOAD OLDER` IntersectionObserver row in `ExerciseHistoryList`; HISTORY tab + `HistorySheet` inherit; MCP first-page contract unchanged. N15's scoped variant should reuse this pagination. |
+
+---
+
 ## Swept 2026-07-04 (later) — Batch-7 build 1 merged (PR #140)
 
 Session 43 built the first two attack-order slots; merged with checks green

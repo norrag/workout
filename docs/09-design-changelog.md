@@ -42,6 +42,21 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-04 (session 3) — Planner picker: replace-in-place mode (N31)
+
+- **Change:** tapping a **filled** row on the planner board (2.5) now opens
+  the exercise picker (2.7) in a *replace* mode instead of the group
+  multi-select: title "Replace exercise", subtitle
+  `SWAPS <NAME> — SAME SLOT & SETS`, single-select rows (radio behavior,
+  seeded with the current movement), exercises already filling another slot
+  of the same group disabled with an `ALREADY IN THIS GROUP` sub-label, and a
+  full-width `REPLACE EXERCISE` submit (disabled until a different pick).
+  The swap keeps the slot's day position, group slot, and starting sets.
+  Open-slot rows keep the original multi-select ("ADD TO …") unchanged.
+  **Rationale:** N31 — substitution via the multi-select appended the pick at
+  the day's end, kept the original, and grew the slot count.
+  **Affected figures:** 2.5 / 2.7. **Impact:** `RETROFIT` (shipped PR #143).
+
 ## 2026-07-04 (session 2) — Exercise surfaces: shared header, create-page rebuild, new-exercise tray, paged history
 
 Batch-7 build 2 (N22/N23/N30). No mockup figures exist for these controls; the

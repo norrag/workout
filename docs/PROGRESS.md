@@ -2,7 +2,28 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-04 (latest) — Batch-7 build 2: exercise surfaces (N22/N23) + paged full history (N30)
+## 2026-07-04 (latest) — N31: planner board replace-in-place
+
+One-defect fix (PR #143). Tapping a filled planner row opened the same
+group-wide multi-select picker as an open slot, so a "substitution" appended
+the pick at the day's end, kept the original selected, grew the group's
+`exercise_slots`, and left an empty slot after manual cleanup.
+
+- `ExercisePicker` gains a **replace mode** (`PickerTarget.replaceFill`):
+  single-select seeded with the tapped fill's movement; exercises already
+  filling another slot of the group are disabled (`ALREADY IN THIS GROUP`);
+  sheet reads "Replace exercise / SWAPS <name> — SAME SLOT & SETS" with a
+  `REPLACE EXERCISE` submit, disabled until a different pick. Open-slot taps
+  keep the original multi-select.
+- The swap preserves the fill's identity — day position, group slot, and
+  starting sets. Staged path (planned/active mesos) swaps the working copy
+  in place; draft path uses new `replaceSlotAction` → `replaceSlotExercise`,
+  a single-row `exercise_id` update with a duplicate guard at the query
+  layer (5 unit tests: targeted write, dup refusal, same-pick no-op,
+  missing slot, group-less legacy fill).
+- Green: typecheck, lint, **775 tests (+5)**, production build.
+
+## 2026-07-04 — Batch-7 build 2: exercise surfaces (N22/N23) + paged full history (N30)
 
 Third slot of the Session-42 attack order, plus the N30 rider (PR #142).
 
