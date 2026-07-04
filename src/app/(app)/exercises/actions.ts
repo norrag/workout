@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createCustomExercise } from "@/lib/queries/exercises";
+import {
+  createCustomExercise,
+  deleteCustomExercise,
+  getExerciseDeletionImpact,
+} from "@/lib/queries/exercises";
 import { customExerciseEquipment } from "@/lib/types/equipment";
 import { clearPinnedNote, savePinnedNote } from "@/lib/queries/logging";
 import {
@@ -83,6 +87,38 @@ export async function setIncrementOverrideAction(input: {
   revalidatePath("/log/[workoutId]", "page");
 }
 
+/**
+ * Delete an owned custom exercise from the exercise page header (N22). Same
+ * guards as the MCP delete_custom_exercise tool: stock exercises and anything
+ * with logged sets are refused (logged history is never destroyed — hard rule
+ * #5), as is a movement still referenced by a planned meso or generated
+ * workout. The header sheet pre-explains blockers; this re-checks server-side.
+ */
+export async function deleteCustomExerciseAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = z.string().uuid().safeParse(formData.get("exercise_id"));
+  if (!parsed.success) return { error: "Invalid exercise." };
+  const { supabase, user } = await requireUser();
+  const impact = await getExerciseDeletionImpact(supabase, user.id, parsed.data);
+  if (!impact.found) return { error: "Exercise not found." };
+  if (!impact.isCustom)
+    return { error: "Only your own custom exercises can be deleted." };
+  if (impact.loggedSets > 0)
+    return {
+      error: `Can't delete: ${impact.loggedSets} logged ${impact.loggedSets === 1 ? "set references" : "sets reference"} this exercise — logged history is never destroyed.`,
+    };
+  if (impact.plannedRefs > 0 || impact.workoutRefs > 0)
+    return {
+      error:
+        "Can't delete: this exercise is still used by a planned mesocycle or generated workout. Remove it from those first.",
+    };
+  await deleteCustomExercise(supabase, user.id, parsed.data);
+  revalidatePath("/exercises");
+  redirect("/exercises");
+}
+
 const customExerciseSchema = z.object({
   name: z.string().min(1, "Name is required").max(80),
   // the create vocabulary replaces bare "bodyweight" with the three load-typed
@@ -92,6 +128,9 @@ const customExerciseSchema = z.object({
   secondary_muscle_group_ids: z.array(z.string().uuid()).max(4),
   description: z.string().max(500).nullable(),
   notes: z.string().max(500).nullable(),
+  // N22: the load step is settable at creation (was create-then-edit); same
+  // bounds as the edit path. Null = use the equipment default (no override row).
+  weight_increment: z.number().positive().max(1000).nullable(),
 });
 
 export async function createCustomExerciseAction(
@@ -104,6 +143,7 @@ export async function createCustomExerciseAction(
   } catch {
     return { error: "Invalid muscle groups." };
   }
+  const rawIncrement = String(formData.get("weight_increment") ?? "").trim();
   const parsed = customExerciseSchema.safeParse({
     name: formData.get("name"),
     equipment_type: formData.get("equipment_type"),
@@ -111,6 +151,7 @@ export async function createCustomExerciseAction(
     secondary_muscle_group_ids: secondary,
     description: String(formData.get("description") ?? "").trim() || null,
     notes: String(formData.get("notes") ?? "").trim() || null,
+    weight_increment: rawIncrement === "" ? null : Number(rawIncrement),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -132,6 +173,17 @@ export async function createCustomExerciseAction(
         .map((id) => ({ muscle_group_id: id, role: "secondary" as const })),
     ],
   });
+  // N22: the increment override is per-user/per-exercise (a second write, not
+  // an exercises column) — set it now so the load step chosen at creation is
+  // live from the first prescription.
+  if (parsed.data.weight_increment != null) {
+    await setExerciseIncrementOverride(
+      supabase,
+      user.id,
+      exercise.id,
+      parsed.data.weight_increment,
+    );
+  }
   revalidatePath("/exercises");
   redirect(`/exercises/${exercise.id}`);
 }

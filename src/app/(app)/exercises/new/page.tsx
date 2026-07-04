@@ -2,6 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listMuscleGroups } from "@/lib/queries/exercises";
+import { getActiveEngineParams } from "@/lib/queries/generation";
+import { toEngineEquipment } from "@/lib/engine";
+import {
+  customExerciseEquipment,
+  type CustomExerciseEquipment,
+} from "@/lib/types/equipment";
 import { NewExerciseForm } from "./NewExerciseForm";
 
 export default async function NewExercisePage() {
@@ -11,7 +17,20 @@ export default async function NewExercisePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const muscleGroups = await listMuscleGroups(supabase);
+  const [muscleGroups, activeParams] = await Promise.all([
+    listMuscleGroups(supabase),
+    getActiveEngineParams(supabase),
+  ]);
+
+  // N22 — the load step is settable at creation; each creatable equipment
+  // value carries its engine default rounding step so the DEFAULT chip is
+  // honest about what "default" means for the current pick.
+  const defaultSteps = Object.fromEntries(
+    customExerciseEquipment.map((eq) => [
+      eq,
+      activeParams.params.rounding[toEngineEquipment(eq)] ?? 5,
+    ]),
+  ) as Record<CustomExerciseEquipment, number>;
 
   return (
     <div>
@@ -25,7 +44,7 @@ export default async function NewExercisePage() {
       <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink/55">
         CUSTOM — ONLY VISIBLE TO YOU
       </div>
-      <NewExerciseForm muscleGroups={muscleGroups} />
+      <NewExerciseForm muscleGroups={muscleGroups} defaultSteps={defaultSteps} />
     </div>
   );
 }

@@ -32,6 +32,10 @@ import {
   getExerciseDeletionImpact,
   deleteCustomExercise,
 } from "@/lib/queries/exercises";
+import {
+  setExerciseIncrementOverride,
+  clearExerciseIncrementOverride,
+} from "@/lib/queries/exercise-overrides";
 import { savePinnedNote, clearPinnedNote } from "@/lib/queries/logging";
 import {
   saveMesoAsTemplate,
@@ -430,15 +434,21 @@ function registerCreateCustomExercise(server: McpServer) {
       title: "Create custom exercise",
       description:
         "Add a custom exercise to the user's library: name, equipment type, " +
-        "optional description, and its muscle groups (by name, each primary or " +
-        "secondary). For bodyweight movements pick the load semantics: " +
-        "'bodyweight only' (push-up — the load IS the bodyweight), 'bodyweight " +
-        "loadable' (weighted pull-up — entered weight is ADDED), or 'machine " +
-        "assistance' (assisted dip — entered weight is assistance REMOVED).",
+        "optional description and notes, its muscle groups (by name, each " +
+        "primary or secondary), and an optional weight_increment — the per-set " +
+        "load step (lb) the engine adds on a met prescription, overriding the " +
+        "equipment default for this lift (ignored for 'bodyweight only', where " +
+        "the engine progresses reps, never load). For bodyweight movements pick " +
+        "the load semantics: 'bodyweight only' (push-up — the load IS the " +
+        "bodyweight), 'bodyweight loadable' (weighted pull-up — entered weight " +
+        "is ADDED), or 'machine assistance' (assisted dip — entered weight is " +
+        "assistance REMOVED).",
       inputSchema: {
         name: z.string().min(1).max(80),
         equipment_type: z.enum(customExerciseEquipment),
         description: z.string().max(500).optional(),
+        notes: z.string().max(500).optional(),
+        weight_increment: z.number().positive().max(1000).optional(),
         muscle_groups: z
           .array(
             z.object({
@@ -454,6 +464,8 @@ function registerCreateCustomExercise(server: McpServer) {
         name: string;
         equipment_type: CustomExerciseEquipment;
         description?: string;
+        notes?: string;
+        weight_increment?: number;
         muscle_groups: { muscle_group: string; role: "primary" | "secondary" }[];
       },
       extra: McpExtra,
@@ -472,14 +484,86 @@ function registerCreateCustomExercise(server: McpServer) {
         name: args.name,
         equipment_type: args.equipment_type,
         description: args.description ?? null,
+        notes: args.notes ?? null,
         muscle_groups: args.muscle_groups.map((m) => ({
           muscle_group_id: byName.get(m.muscle_group)!,
           role: m.role,
         })),
       });
+      // N22 MCP parity: the load step is settable at creation, like the app
+      // form. Inert for bodyweight-only lifts (the engine never adds load), so
+      // skip the override write rather than store a setting that does nothing.
+      const stepApplies = args.equipment_type !== "bodyweight only";
+      if (args.weight_increment != null && stepApplies) {
+        await setExerciseIncrementOverride(
+          client,
+          userId,
+          exercise.id,
+          args.weight_increment,
+        );
+      }
       const summary = `created custom exercise "${args.name}"`;
       await recordMcpWrite(userId, CREATE_CUSTOM_EXERCISE, args, summary);
-      return jsonResult({ ok: true, exercise_id: exercise.id, summary });
+      return jsonResult({
+        ok: true,
+        exercise_id: exercise.id,
+        summary,
+        ...(args.weight_increment != null && !stepApplies
+          ? {
+              note: "weight_increment was ignored: a bodyweight-only lift progresses on reps at fixed bodyweight, so the load step is inert.",
+            }
+          : {}),
+      });
+    },
+  );
+}
+
+// --- set_exercise_increment --------------------------------------------------
+
+export const SET_EXERCISE_INCREMENT = "set_exercise_increment";
+function registerSetExerciseIncrement(server: McpServer) {
+  server.registerTool(
+    SET_EXERCISE_INCREMENT,
+    {
+      title: "Set exercise load step",
+      description:
+        "Set or clear the user's per-exercise weight increment (lb) — the " +
+        "per-set load step the engine adds on a met prescription, overriding " +
+        "the equipment default for that lift only (the app's 'Load step'). " +
+        "Pass weight_increment null to clear back to the default. Works on any " +
+        "exercise (stock or custom); it's a per-user setting, not an edit to " +
+        "the exercise. Prescriptions refresh on next view; logged history is " +
+        "never touched. Pointless for bodyweight-only lifts (reps progression).",
+      inputSchema: {
+        exercise_id: z.string().uuid(),
+        weight_increment: z.number().positive().max(1000).nullable(),
+      },
+    },
+    async (
+      args: { exercise_id: string; weight_increment: number | null },
+      extra: McpExtra,
+    ) => {
+      const { client, userId } = resolveSession(extra);
+      // resolve for the summary + a clean unknown-id error (RLS-visible only)
+      const unknown = await findUnknownExerciseIds(client, [args.exercise_id]);
+      if (unknown.length > 0)
+        return jsonResult({ ok: false, error: "Exercise not found." });
+      if (args.weight_increment == null) {
+        await clearExerciseIncrementOverride(client, userId, args.exercise_id);
+      } else {
+        await setExerciseIncrementOverride(
+          client,
+          userId,
+          args.exercise_id,
+          args.weight_increment,
+        );
+      }
+      const summary =
+        args.weight_increment == null
+          ? "cleared an exercise's load-step override (back to the equipment default)"
+          : `set an exercise's load step to +${args.weight_increment} lb`;
+      await recordMcpWrite(userId, SET_EXERCISE_INCREMENT, args, summary);
+      return jsonResult({ ok: true, summary });
     },
   );
 }
@@ -762,6 +846,7 @@ export function registerWriteTools(server: McpServer) {
   registerEditMesocycle(server);
   registerCreateTemplate(server);
   registerCreateCustomExercise(server);
+  registerSetExerciseIncrement(server);
   registerUpdateMacrocycleGoals(server);
   registerManageExclusions(server);
   registerLogNote(server);
