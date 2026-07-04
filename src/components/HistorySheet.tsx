@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FetchRetry } from "@/components/ui/FetchRetry";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
@@ -16,12 +17,11 @@ export interface HistorySheetTarget {
   meso_ids?: string[];
   /** N15: subtitle context naming the scope, e.g. "THIS MACROCYCLE" */
   scope_label?: string;
-  /** N15: open on the e1RM view (inverts the PH32 sets/reps default) */
-  e1rm_first?: boolean;
 }
 
 /** History sheet (fig 3.2) — fetches on open; shared by day view, picker,
- * and the Performance drill-down (N15: meso-scoped, e1RM-first). */
+ * and the Performance drill-down (N15: meso-scoped). The subtitle's exercise
+ * name links to the exercise page (N32). */
 export function HistorySheet({
   target,
   onClose,
@@ -61,7 +61,18 @@ export function HistorySheet({
       open
       onClose={onClose}
       title="History"
-      subtitle={`${target.exercise_name.toUpperCase()}${context ? ` — ${context.toUpperCase()}` : ""}`}
+      subtitle={
+        <>
+          {/* N32: through to the full exercise page (overview, chart, bests) */}
+          <Link
+            href={`/exercises/${target.exercise_id}`}
+            className="border-b border-ink/45 pb-[1px]"
+          >
+            {target.exercise_name.toUpperCase()}
+          </Link>
+          {context ? ` — ${context.toUpperCase()}` : ""}
+        </>
+      }
     >
       {failed ? (
         <FetchRetry onRetry={() => setAttempt((a) => a + 1)} />
@@ -74,7 +85,6 @@ export function HistorySheet({
           exerciseId={target.exercise_id}
           nextCursor={page.nextCursor}
           mesoIds={target.meso_ids}
-          initialFlipped={target.e1rm_first}
         />
       )}
     </BottomSheet>

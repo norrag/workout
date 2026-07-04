@@ -46,6 +46,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source (RIR, e1RM, MEV/MRV, deload, ramp…); migrate the 2 ad-hoc feedback-sheet explainers; place incrementally across dense surfaces | F | MED | M | ready |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | ready (picker) / triaged (FilterBar) |
+| N32 | History-sheet fixes from N15 testing: (a) sheet not scrollable / background moved instead — root cause: N6 `PullToRefresh` armed on every sheet drag because the scroll lock's `position:fixed` zeroes `window.scrollY` (affected **all** sheets since N6, not just the drill-down); (b) owner reverted the drill-down's e1RM-first opening — sets/reps default everywhere; (c) sheet subtitle's exercise name links to the exercise page | B+UX | HIGH | E | **done (PR #145)** — `isScrollLocked()` guard in `PullToRefresh` + `overscroll-contain`/touch-isolation on `BottomSheet`; `initialFlipped` removed; subtitle name → `/exercises/{id}` |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -487,3 +488,19 @@ landed.)*
   should be sorted oldest to newest, top to bottom." *[→ N28 ready: the query
   is `created_at` desc, but the completed macros' created_at is an
   import-order artifact — sort by training start date instead]*
+
+### Batch 9 — in-chat bug notes after N15 testing (2026-07-04, after PR #144 merged)
+
+- "After testing, there are a couple bugs and changes we need to address on the
+  macrocycle > performance > muscle group > exercise history drill down:
+  — The history page pop-up is not made active or focused, or something to
+  that effect; the panel is not scrollable, and instead the backmost meso page
+  is still scrollable. Sets/e1RM flip, but scrolls don't work.
+  — On second thought lets keep the standard history behavior of displaying
+  sets and reps as default, and flip to e1RM via click.
+  — Link through to the standard exercise page via a click on the exercise
+  name at the top of the History panel, so users can access the exercise page
+  from there if desired." *[→ N32 — the scroll defect root-caused to the N6
+  PullToRefresh × scroll-lock interaction (bug present on every sheet since
+  N6, first noticed on the first long sheet tested after it); the two change
+  requests folded into the same item]*

@@ -4,6 +4,30 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 46 (cont. 2): Batch 9 intake + N32 fix (PR #145)
+
+Owner field-tested the PR #144 drill-down and handed over one bug + two
+changes in-chat (verbatim = **backlog appendix Batch 9**, all → **N32**,
+fixed on the open PR #145 branch):
+
+- **Scroll bug root-caused** — not an N15 defect: the scroll lock's
+  `position:fixed` zeroes `window.scrollY`, so the N6 `PullToRefresh` armed
+  on every drag over any open sheet (pull spacer moved the page behind the
+  scrim; a long drag fired `router.refresh()` mid-interaction). Present on
+  **all** sheets since N6 shipped (2026-07-03); the drill-down was simply the
+  first long sheet tested after it. Fix: `isScrollLocked()` export +
+  `PullToRefresh` guard, `overscroll-contain` + touch isolation on
+  `BottomSheet`.
+- **Drill-down opens on sets/reps** — owner reverted the e1RM-first opening;
+  `initialFlipped`/`e1rm_first` removed everywhere (PH32 default holds).
+- **Exercise-name link** — the history sheet subtitle's exercise name links
+  to `/exercises/{id}` on every entry point (`BottomSheet.subtitle` is now a
+  ReactNode).
+
+Green: typecheck, lint, 778 tests, production build. 09 entry "2026-07-04
+(session 5)"; PROGRESS updated. N32 rides PR #145 (the docs-sweep PR, now
+docs + fix); archive sweep falls to the next session.
+
 ## 2026-07-04 — Session 46 (cont.): PR #144 merged — in-session sweep
 
 PR #144 merged with checks green while the session was live, so the

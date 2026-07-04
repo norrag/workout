@@ -19,8 +19,8 @@ import type { HistoryScope } from "./StrengthProgress";
 // row/label grammar mirrors StrengthProgress.tsx.
 //
 // N15: with a `historyScope`, contributor rows drill one level further — a tap
-// opens the scoped history sheet, e1RM-first (the number the trend is made of;
-// tap a row there to flip to sets/reps — the inverse of the PH32 default).
+// opens the history sheet scoped to this cycle's mesos (sets/reps default,
+// tap a row to flip to e1RM — the standard PH32 behavior).
 
 function fmtPct(pct: number): string {
   return `${pct > 0 ? "+" : ""}${pct}%`;
@@ -121,7 +121,6 @@ export function MuscleStrengthSection({
                           exercise_name: c.exercise_name,
                           meso_ids: historyScope.mesoIds,
                           scope_label: historyScope.label,
-                          e1rm_first: true,
                         })
                       }
                       className={`${rowCls} text-left active:bg-ink/5`}
