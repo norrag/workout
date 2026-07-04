@@ -2,7 +2,53 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-04 (latest) — Batch-7 build 1: stats trust (N14/N16/N21-hide) + planner & create flow (N17/N18-A/N20)
+## 2026-07-04 (latest) — Batch-7 build 2: exercise surfaces (N22/N23) + paged full history (N30)
+
+Third slot of the Session-42 attack order, plus the N30 rider (PR #142).
+
+- **N22(a) — exercise page header.** New sticky `ExerciseHeader` client
+  component on the meso-header grammar (brand row with the N4 `?from=`-aware
+  back link + `LIBRARY` label, title, `[share][⋮]` cluster, meta line +
+  CUSTOM badge, shared `AnchoredMenu`). The I13 Load-step sheet is refactored
+  to a controlled `LoadStepSheet` driven from the ⋮ menu — and now shows
+  *disabled* (`BODYWEIGHT` tag) on bodyweight-only lifts instead of vanishing
+  (PH36 intent kept, discoverability fixed). Share moves off the OVERVIEW tab
+  into a header share sheet (owned custom only). **New: in-app delete for
+  owned custom exercises** — `deleteCustomExerciseAction` mirrors the MCP
+  tool's guards exactly (stock refused; logged sets refused — hard rule #5;
+  planned/workout references refused), and the confirm sheet pre-explains
+  blockers instead of failing.
+- **N22(b) — create-exercise rebuild.** `NewExerciseForm` reworked into
+  divided ledger sections; bodyweight equipment picks explain their load
+  semantics inline (R12 vocabulary); a `LOAD STEP` section (preset chips +
+  CUSTOM, `DEFAULT +n lb` derived per equipment from `engine_params.rounding`)
+  makes the per-user increment settable **at creation** —
+  `createCustomExerciseAction` gains the zod-bounded optional field and
+  writes the `exercise_param_overrides` row post-insert. Hidden for
+  bodyweight-only equipment (the step is inert there).
+- **N22(c) — MCP parity.** `create_custom_exercise` accepts `notes` +
+  `weight_increment` (same bounds as the app; increment skipped with an
+  explanatory note for bodyweight-only). **New tool `set_exercise_increment`**
+  — the first MCP surface for the editable increment on *any* exercise
+  (set/clear, per-user override; doc 14 phase 3); doc 05 tool table updated.
+- **N23 — new-exercise tray.** `NewExerciseButton` chooser sheet (Blank
+  exercise / `OR ADD FROM A CODE` with the kind-agnostic `RedeemForm`)
+  replaces the bare `+ NEW` link on the exercises page — the receptacle where
+  a user holding an exercise share code actually looks. Backend untouched
+  (sharing already worked end-to-end).
+- **N30 — full history reachable.** `getExerciseHistory` is cursor-paged:
+  over-fetch by one set, trim to whole *calendar days* (`pageSetsByDay`, pure
+  + unit-tested — day-grain means identical-timestamp import artifacts can
+  never split or duplicate a session across pages), return
+  `{ entries, nextCursor }`. `ExerciseHistoryList` appends older pages via an
+  IntersectionObserver `LOAD OLDER` row (tappable fallback, retry state);
+  the HISTORY tab and `HistorySheet` both inherit it. MCP
+  `get_exercise_history` keeps its first-page + lifetime-count contract.
+- Rule-8 note: no mockup figures exist for any of these controls — recorded
+  as the dated 09 entry "2026-07-04 (session 2)" reusing established grammar.
+- Green: typecheck, lint, **770 tests (+7)**, production build.
+
+## 2026-07-04 — Batch-7 build 1: stats trust (N14/N16/N21-hide) + planner & create flow (N17/N18-A/N20)
 
 First two slots of the Session-42 attack order (PR #140).
 

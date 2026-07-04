@@ -42,6 +42,49 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-04 (session 2) — Exercise surfaces: shared header, create-page rebuild, new-exercise tray, paged history
+
+Batch-7 build 2 (N22/N23/N30). No mockup figures exist for these controls; the
+header adopts the established P16 meso-header grammar and the trays mirror the
+PH27 template tray (recorded per rule 8).
+
+- **Change:** the exercise detail page (3.1a/b) header is rebuilt as a sticky
+  `ExerciseHeader` on the day-view/meso header grammar: brand row (back link —
+  still honoring the N4 `?from=` origin — + `LIBRARY` context label), 28px
+  title + `[share][⋮]` icon cluster, meta line + `CUSTOM` badge. The ⋮
+  `AnchoredMenu` carries **Load step** (the I13 sheet — now shown *disabled*
+  with a `BODYWEIGHT` trailing tag on bodyweight-only lifts instead of
+  vanishing, PH36 intent preserved), **Share exercise** and **Delete
+  exercise** (owned custom only). The share row leaves the bottom of the
+  OVERVIEW tab for a share sheet behind the header icon (meso-header
+  pattern). Delete gets a confirm sheet that mirrors the MCP tool's guards —
+  refused with reasons when logged sets or plan references exist (hard rule
+  #5). **Rationale:** N22 — the increment felt absent behind a faint `⋯`;
+  header unification (day view / meso / exercise share one idiom).
+  **Affected figures:** 3.1a/3.1b. **Impact:** `RETROFIT`.
+- **Change:** the create-exercise page (08 §4, described-not-mocked) is
+  rebuilt as divided ledger sections (NAME / EQUIPMENT / MUSCLES / LOAD STEP /
+  DETAILS): bodyweight equipment picks now explain their load semantics
+  inline, and a **LOAD STEP** section (same preset-chip grammar as the
+  Load-step sheet, `DEFAULT +n lb` chip first, CUSTOM entry) makes the
+  per-exercise increment settable **at creation** — previously
+  create-then-edit. Hidden for bodyweight-only equipment (inert there).
+  **Rationale:** N22(b) — owner: increments must be available at creation.
+  **Affected figures:** none (08 §4). **Impact:** `RETROFIT`.
+- **Change:** the exercises page `+ NEW` control becomes a chooser tray
+  (template-tray grammar): **Blank exercise** row → the create page, plus the
+  `OR ADD FROM A CODE` redeem input. **Rationale:** N23 — a user handed an
+  exercise share code looks under *new exercise*, not the meso/template trays
+  (redeem stays kind-agnostic; any code routes right). **Affected figures:**
+  3.1. **Impact:** `RETROFIT`.
+- **Change:** exercise history (3.2 — HISTORY tab and the day-view history
+  sheet) no longer truncates silently at ~120 sets: older sessions lazy-load
+  via a quiet `LOAD OLDER` ledger row (auto-fires as it scrolls into view;
+  tappable as the fallback; shows `LOADING OLDER…` / retry states) until the
+  history is exhausted. **Rationale:** N30 — full history must be reachable;
+  the silent cap hid the N14 outlier session. **Affected figures:** 3.2.
+  **Impact:** `RETROFIT` + `DATA` (paged `getExerciseHistory`).
+
 ## 2026-07-04 — Batch-7 build 1: planner set stepper, create-time RIR disclosure, cycles-tray redeem, target cards hidden
 
 No mockup figures exist for the three new controls; each reuses established

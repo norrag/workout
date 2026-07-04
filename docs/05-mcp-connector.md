@@ -78,7 +78,8 @@ plans stay grounded in the user's real movement preferences rather than a generi
 | `activate_mesocycle` | turn a reviewed `planned` meso into the live block (engine builds the microcycle ramp + seeds week 1). Requires `confirm="activate"`. **Sequential within a macro**: a future block can't start until every earlier block is complete and none is active — so planned mesos are seeded from the latest results, never in advance of the prior blocks' completion. Prefer in-app activation |
 | `preview_mesocycle_volume` | project a plan's weekly working sets per muscle group vs the athlete's MEV/MAV/MRV landmarks **without persisting anything** — pass a `mesocycle_id` or a proposed `days` spec — so a draft self-checks (under-dosed / over-dosed muscles) before it's ever written. Advisory only (10 §9) |
 | `create_template` | build a reusable template from a spec or from an existing meso |
-| `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, **tracking type**, description) |
+| `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, **tracking type**, description, notes, optional `weight_increment` load step — full parity with the app's create form, N22) |
+| `set_exercise_increment` | set or clear the per-user, per-exercise **load step** override (the app's "Load step" — doc 14 phase 3) on any exercise; null clears back to the equipment default. Prescriptions refresh via the read-path reconcile; logged history untouched |
 | `update_macrocycle_goals` | edit goal / duration / block length / timeline (the engine recomputes the target + phases); no goal-arc slots — superseded by positioned mesos |
 | `manage_exclusions` | add/remove excluded exercises with a reason |
 | `log_note` | attach a note — either a **pinned** note on an exercise (exercise-wide, persists across workouts) or a **session** note on a workout's exercise log (that day only). See Notes below |
