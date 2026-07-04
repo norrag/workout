@@ -4,6 +4,96 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 42 (cont.): Batch-7 addendum — owner clarifications (PR #139)
+
+Owner reviewed the intake findings in-chat (with a /cycles screenshot) and
+returned five clarifications; verbatim capture = **backlog appendix Batch 7
+addendum**. Deltas applied:
+
+- **N30 (new, F, MED, WS-C, ready)** — the 120-set history cap surfaced by
+  N14's scoping is itself unwanted: full history must be reachable via
+  lazy-load/pagination (~120 initial page is fine). Scoped: keyset pagination
+  on `getExerciseHistory` + a sentinel in `ExerciseHistoryList`/`HistorySheet`.
+  Rides with N15 or N22.
+- **N22 expanded** — the increment gap is at **creation**: rebuild the
+  create-exercise page (general UI overhaul + Load-step settable at creation;
+  today it's create-then-edit), and **MCP parity** — `create_custom_exercise`
+  lacks increment (and notes); no MCP increment surface exists at all.
+- **N23 confirmed as scoped** — the point is the receptacle where users
+  expect it (new-exercise tray), even though redeem is already kind-agnostic.
+- **N19 → wontfix, archived** ("Drop the archival bit"). The side-finding —
+  app meso delete cascades logged history behind an ack checkbox while MCP
+  refuses (rule-5 spirit gap) — was not ruled on; noted in the archive row
+  for whenever the delete flow is next touched.
+- **N28 needs-input → ready (UX→B)** — the screenshot resolved it: completed
+  macros render oldest-first because their `created_at` is an import-order
+  artifact. Fix = top-level sort by training start date desc (fallback
+  created_at); within-macro order confirmed correct, untouched.
+
+Attack-order impact: slot 4 becomes **N24 alone** (macro header, menu =
+edit/goals — no archive row); N30 joins the N15 slice (or rides N22).
+
+## 2026-07-04 — Session 42: Batch 7 intake — 16 new items (N14–N29) (PR #139)
+
+Reconciliation sweep: no-op (PR #138 — the I12/N13 sweep — merged; no `done`
+rows live; open PRs are only dependabot + stale #48). Owner handed over 19
+stream-of-thought notes; ran the intake protocol. Verbatim capture = **backlog
+appendix Batch 7**; all items scoped against the code at intake (4 parallel
+scoping passes; full file:line detail in `scoping.md` § Batch 7). Notes-only
+PR — no code changed. New workstream **M** (in-app help & education) added to
+the roster.
+
+**Merges at parse time:** notes 9+11 → **N22** (exercise page overhaul +
+header + increment); notes 10+12 → **N23** (exercise sharing entry points);
+notes 18+19 → **N29** (filter UI). 19 notes → 16 items.
+
+**Key scoping findings (premise checks worth knowing before building):**
+- **N14/N16 (HIGH, stats trust):** both macro-stat complaints are real and
+  share a root — single-first/last-session endpoints with no qualification.
+  N14: `foldProgressScores` lets one unrepresentative early session (e1RM 7)
+  define the denominator, and the 120-set history cap hides that session from
+  the history view. N16: the KEY LIFTS tile is a separate bespoke fold that
+  includes deloads and means only the 3 most-logged lifts — a cut ending on a
+  deload reads -36.3% while the qualified Performance pipeline stays positive.
+  One PR can fix both against one definition.
+- **N17 (HIGH):** planner set-count editing is UI-only — `initial_sets` is
+  already plumbed model→board→save→engine seed; it's just hardcoded to 3 with
+  no stepper.
+- **N19 (HIGH, data-loss surface):** the app's meso delete cascades logged
+  history behind an ack checkbox — violates hard rule #5's spirit (MCP side
+  already refuses). Archive-not-delete via `archived_at` + `/more/archive`.
+- **N22/N23 (premises contradicted by shipped code):** the increment setting
+  already exists (I13 Load-step sheet) — it's just behind a faint `⋯` that
+  vanishes on bodyweight-only lifts; exercise sharing already works
+  end-to-end incl. **kind-agnostic redeem** (a meso code entered anywhere
+  routes correctly — the owner's hoped-for behavior is already built). The
+  real gaps: header/discoverability + `RedeemForm` mounting only in the
+  templates tray.
+- **N28:** top-level cycle lists are **already newest-first** (`created_at`
+  desc) — needs-input: which list looked wrong, or is `start_date`-desc the
+  ask?
+- **N21:** target-engine audit found real smells (age/sex applied only to
+  hypertrophy; discontinuous model flip on profile completeness; cut cap
+  collapse). Interim hide is small and keeps the timeline's `plan.phases`
+  dependencies intact.
+
+**Suggested attack order for the build sessions:**
+1. **N14 + N16 + N21-hide** (stats-trust PR — all in `stats.ts`/`macro.ts`
+   folds + two view-card removals; HIGH).
+2. **N17 + N18-A + N20** (planner/create PR — stepper + advanced RIR
+   disclosure + tray redeem; small pieces, one surface family).
+3. **N22 + N23** (exercise page overhaul + sharing trays; owner-authorized
+   design delta needed → 09 entry at build time).
+4. **N19 then N24** (archive-not-delete, then the macro header that hosts the
+   macro-side archive row — or one PR if capacity allows).
+5. **N27 + N26** (small day-view PR: origin-aware back links + row sizing).
+6. **N29-picker** (small wiring) whenever a templates PR is open; the unified
+   FilterBar and **N15** (drill-down, after stats are right) as their own
+   medium slices; **N25** (InfoDot + glossary) incremental.
+
+Open from before: N1 WS-J remainder (Phase-2 caching / Phase-3 streaming),
+R24 reprice-down investigation, R25 tool consolidation, PH30 deferred.
+
 ## 2026-07-03 — Session 41 (cont.): PR #137 merged — in-session sweep
 
 PR #137 merged with all checks green while the session was live, so the

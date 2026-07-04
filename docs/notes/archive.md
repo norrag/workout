@@ -11,6 +11,18 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-04 — N19 dropped at the Batch-7 addendum
+
+Same-session sweep during the Batch 7 intake: the owner reviewed the intake
+findings and dropped the archival idea outright, so the row never reached a
+build session.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N19 | Archive macros/mesos (view/unarchive under profile); never allow full deletion | F | D | **wontfix (owner 2026-07-04).** "Drop the archival bit. Its really not important." Scoping preserved in `scoping.md` § N19 in case it returns. The finding it surfaced — the app's meso delete cascades logged history behind an ack checkbox while MCP refuses (rule-5 spirit gap) — was **not** ruled on and is worth revisiting if the delete flow is ever touched. |
+
+---
+
 ## Swept 2026-07-03 (later 7) — I12 completed + N13 first-set reset fix merged (PR #137)
 
 Session 41 closed the last open HIGH feature and the Batch-6 bug in one PR;
