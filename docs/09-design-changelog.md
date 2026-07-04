@@ -42,6 +42,36 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-04 — Batch-7 build 1: planner set stepper, create-time RIR disclosure, cycles-tray redeem, target cards hidden
+
+No mockup figures exist for the three new controls; each reuses established
+grammar (recorded per rule 8). The card removals retrofit existing screens.
+
+- **Change:** each filled planner-board row gains a compact −/＋ `START SETS`
+  stepper (group-slots stepper grammar at 28px row scale, `START SETS`
+  micro-caption below) between the exercise text and ✕; the `· START n SETS`
+  text leaves the sub-label. **Rationale:** N17 — the seed was plumbed but
+  uneditable. **Affected figures:** 2.5. **Impact:** `RETROFIT` (shipped
+  PR #140).
+- **Change:** the finalize sheet's `RIR RAMP: x → y` caption is now a
+  disclosure row (right-aligned `EDIT`/`DONE` underline affordance) expanding
+  to the edit-details sheet's START RIR / END RIR segmented rows + the
+  final-week-deload checkbox. Collapsed by default with standard values.
+  **Rationale:** N18-A — a deep option without badgering. **Affected
+  figures:** 2.8. **Impact:** `RETROFIT` (shipped PR #140).
+- **Change:** the cycles `+ NEW` sheet appends the template tray's
+  `OR ADD FROM A CODE` divider + redeem input below the macro/meso rows.
+  **Rationale:** N20 — one receptacle per create surface; redeem is
+  kind-agnostic. **Affected figures:** 2.1b. **Impact:** `RETROFIT` (shipped
+  PR #140).
+- **Change:** the macro overview's `REALISTIC TARGET` card and the
+  create-macrocycle `YOUR TARGET` range/rate/rationale are hidden; the create
+  form keeps the block-fit sentence + M1..Mn phase strip under a plain `PLAN`
+  label (ink/55, not accent — rule 7). **Rationale:** N21 — the target engine
+  needs correction before the numbers are shown again; hiding is a pure view
+  change. **Affected figures:** 2.2, 2.3. **Impact:** `RETROFIT` (shipped
+  PR #140); re-enabling later is view-only.
+
 ## 2026-07-03 (session 4) — I12 completes in-app: place-into-macro, edit details, block management, planner volume readout
 
 Owner authorization (2026-07-03, in-chat): *"I will take your design direction

@@ -4,6 +4,37 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 43: attack-order slots 1+2 built — N14/N16/N21-hide + N17/N18-A/N20 (PR #140)
+
+Reconciliation sweep: no-op (only dependabot PRs + stale #48 open; no `done`
+rows live). No new notes handed over → picked the top of the Session-42 attack
+order and shipped the first two slots as one PR (single designated branch):
+
+- **Stats trust (WS-C):** **N14 done** — `dropE1rmOutliers` in the shared fold
+  (sessions >3× from the window median dropped; generous by design so real
+  beginner runs survive). **N16 done** — bespoke `buildMacroStats` fold
+  deleted; the tile now reads pure `keyLiftStrengthPct` over the same
+  qualified scores as the Performance tab (MCP inherits via
+  `getMacroOverview`). **N21 hide done** — both target cards removed, engine +
+  columns + block math kept; the target-engine correction stays open
+  (needs-decision). 9 new unit tests incl. the 7-lb endpoint case and the
+  deload-tail regression.
+- **Planner/create (WS-D):** **N17 done** — START SETS stepper on filled
+  board rows (staged + live-draft paths, clamp 1–20). **N18-A done** —
+  FinalizeSheet ramp line is a collapsed disclosure → START/END RIR + deload,
+  optional override through `finalizeSchema`/`finalizeDraftMeso`; **Part B
+  (per-week RIR) still open.** **N20 done** — `RedeemForm` in the new-cycle
+  tray (rode here instead of with N23).
+- **N15 unblocked** (was sequenced behind N14/N16); rides with N30 next.
+- Design records: 09 entry (2026-07-04) for the three no-mockup control
+  deltas + the N21 card removals; PROGRESS.md updated. Green: typecheck,
+  lint, 763 tests (+9), production build.
+
+Next per the attack order: **N22 + N23** (exercise page overhaul + sharing
+trays), then **N24**, **N27 + N26**, with **N15 + N30** as the follow-on
+stats slice. Archive sweep for this PR's rows falls to the next session
+(a merged PR can't sweep its own rows).
+
 ## 2026-07-04 — Session 42 (cont.): Batch-7 addendum — owner clarifications (PR #139)
 
 Owner reviewed the intake findings in-chat (with a /cycles screenshot) and
