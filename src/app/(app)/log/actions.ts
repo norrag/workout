@@ -36,7 +36,7 @@ import {
   skipRemainingSets,
   unlogSet,
 } from "@/lib/queries/logging";
-import { getExerciseHistory, type HistoryEntry } from "@/lib/queries/history";
+import { getExerciseHistory, type HistoryPage } from "@/lib/queries/history";
 import {
   getPrescriptionAudit,
   type PrescriptionAudit,
@@ -462,13 +462,21 @@ export async function saveFeedbackAction(input: {
   revalidatePath("/workout");
 }
 
-/** Exercise history (fig 3.2): sessions grouped by meso, newest first. */
+/** Exercise history (fig 3.2): sessions grouped by meso, newest first.
+ * Paged (N30): pass the previous page's `nextCursor` as `before` to walk
+ * older sessions until the cursor comes back null. */
 export async function getExerciseHistoryAction(
   exerciseId: string,
-): Promise<HistoryEntry[]> {
+  before?: string,
+): Promise<HistoryPage> {
   const parsed = z.string().uuid().parse(exerciseId);
+  const parsedBefore = z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .parse(before);
   const { supabase, user } = await requireUser();
-  return getExerciseHistory(supabase, user.id, parsed);
+  return getExerciseHistory(supabase, user.id, parsed, parsedBefore ?? null);
 }
 
 /** Latest engine decision behind a prescription (day-view audit reveal). */

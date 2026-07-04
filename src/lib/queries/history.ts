@@ -29,6 +29,17 @@ export interface HistoryMesoGroup {
   entries: HistoryEntry[];
 }
 
+/** One page of session history plus the cursor for the next (older) page. */
+export interface HistoryPage {
+  entries: HistoryEntry[];
+  /** pass as `before` to fetch the next page; null = history exhausted (N30) */
+  nextCursor: string | null;
+}
+
+/** Sets fetched per page — the initial view the owner sized as "plenty";
+ * older pages lazy-load past it until the history is exhausted (N30). */
+export const HISTORY_PAGE_SETS = 120;
+
 /**
  * The session's average stored per-set e1RM (PH32 flip view, N2): the mean engine
  * estimate across the session's working sets. N2 — the session e1RM stat should
@@ -65,25 +76,61 @@ export function groupHistoryByMeso(entries: HistoryEntry[]): HistoryMesoGroup[] 
 }
 
 /**
+ * Trim an over-fetched (limit+1) newest-first set window to a whole-day page
+ * (N30). The raw row limit can split a session — and the sets of one workout
+ * can even share identical timestamps (imports) — so the page boundary is the
+ * calendar day: every row of the oldest, possibly-split day is dropped and the
+ * cursor points at the start of the oldest day kept, so the next fetch
+ * (`performed_at < cursor`) re-reads the dropped day in full. No set is ever
+ * skipped or duplicated across pages. Degenerate guard: if every fetched row
+ * is on one day (a >limit-set day), keep the split rather than an empty page.
+ */
+export function pageSetsByDay<T extends { performed_at: string }>(
+  rows: T[],
+  limit: number,
+): { page: T[]; nextCursor: string | null } {
+  if (rows.length <= limit) return { page: rows, nextCursor: null };
+  const boundaryDay = rows[limit].performed_at.slice(0, 10);
+  const page = rows
+    .slice(0, limit)
+    .filter((r) => r.performed_at.slice(0, 10) > boundaryDay);
+  if (page.length === 0) {
+    const kept = rows.slice(0, limit);
+    return { page: kept, nextCursor: kept[kept.length - 1].performed_at };
+  }
+  const oldestKeptDay = page[page.length - 1].performed_at.slice(0, 10);
+  return { page, nextCursor: `${oldestKeptDay}T00:00:00Z` };
+}
+
+/**
  * Exercise history (fig 3.2): one entry per session — top weight with the
  * reps at that weight — grouped by meso, newest first. Shared by the library
  * detail page, the planner picker, and the day-view exercise menu.
+ *
+ * Paged (N30): each call returns up to ~HISTORY_PAGE_SETS sets' worth of whole
+ * sessions plus a cursor; pass it back as `before` to walk older history until
+ * `nextCursor` is null. Full history is always reachable.
  */
 export async function getExerciseHistory(
   supabase: Client,
   userId: string,
   exerciseId: string,
-): Promise<HistoryEntry[]> {
-  const { data: sets, error } = await supabase
+  before?: string | null,
+): Promise<HistoryPage> {
+  let query = supabase
     .from("logged_sets")
     .select("*")
     .eq("user_id", userId)
     .eq("exercise_id", exerciseId)
     .eq("is_warmup", false)
     .order("performed_at", { ascending: false })
-    .limit(120);
+    .limit(HISTORY_PAGE_SETS + 1);
+  if (before) query = query.lt("performed_at", before);
+  const { data: fetched, error } = await query;
   if (error) throw error;
-  if (!sets || sets.length === 0) return [];
+  if (!fetched || fetched.length === 0) return { entries: [], nextCursor: null };
+  const { page: sets, nextCursor } = pageSetsByDay(fetched, HISTORY_PAGE_SETS);
+  if (sets.length === 0) return { entries: [], nextCursor: null };
 
   const mesoIds = [...new Set(sets.map((s) => s.mesocycle_id))];
   const microIds = [...new Set(sets.map((s) => s.microcycle_id))];
@@ -139,7 +186,7 @@ export async function getExerciseHistory(
     cur.push(s);
     byWorkout.set(s.workout_id, cur);
   }
-  return [...byWorkout.entries()].map(([workoutId, group]) => {
+  const entries = [...byWorkout.entries()].map(([workoutId, group]) => {
     const top = Math.max(...group.map((s) => s.weight));
     const reps = group
       .filter((s) => s.weight === top)
@@ -167,4 +214,5 @@ export async function getExerciseHistory(
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };
   });
+  return { entries, nextCursor };
 }

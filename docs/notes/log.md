@@ -4,6 +4,43 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 44: attack-order slot 3 built — N22 + N23 + N30 (PR #142)
+
+Reconciliation sweep: no-op (PR #141's sweep already archived N14/N16/N17/N20;
+open PRs are only dependabot + stale #48). No new notes handed over → picked
+the next attack-order slot (N22+N23) and pulled the N30 rider in with it (its
+scoping said "ride with N15 or N22"; it shares the exercise-page surface):
+
+- **Exercise surfaces (WS-F):** **N22 done** — (a) sticky `ExerciseHeader` on
+  the meso-header grammar ([share][⋮] on `AnchoredMenu`; the I13 Load-step
+  sheet refactored to a controlled `LoadStepSheet` in the ⋮ menu, disabled
+  with a `BODYWEIGHT` tag on bodyweight-only lifts instead of vanishing;
+  share moved off the OVERVIEW tab; **new in-app delete** for owned custom
+  exercises with the MCP tool's exact guards + a blocker-explaining confirm
+  sheet); (b) create-exercise page rebuilt in ledger sections with the load
+  step settable at creation (per-equipment `DEFAULT +n lb` chip from
+  `engine_params.rounding`); (c) MCP parity — `create_custom_exercise`
+  +`notes`/+`weight_increment`, new **`set_exercise_increment`** tool (first
+  MCP increment surface; doc 05 table updated). **N23 done** — `+ NEW` on the
+  exercises page is now a tray (Blank exercise / OR ADD FROM A CODE with the
+  kind-agnostic `RedeemForm`); backend untouched.
+- **History depth (WS-C):** **N30 done** — `getExerciseHistory` cursor-paged
+  on whole calendar days (`pageSetsByDay` pure helper + 7 unit tests; the
+  day grain makes identical-timestamp import artifacts unable to split or
+  dupe a session across pages); `ExerciseHistoryList` lazy-loads older pages
+  via a `LOAD OLDER` IntersectionObserver row (tap fallback + retry);
+  HISTORY tab + `HistorySheet` inherit; MCP first-page contract unchanged.
+- **N15 unblocked further:** the scoped drill-down should reuse N30's
+  pagination (row updated).
+- Design records: 09 entry "2026-07-04 (session 2)" (four no-mockup deltas);
+  PROGRESS.md updated. Green: typecheck, lint, 770 tests (+7), production
+  build.
+
+Next per the attack order: **N24** (macro header adoption), then **N27 + N26**
+(back-link origin + set-row sizing), **N15** (scoped history drill-down),
+**N28** (start-date sort), **N29** (picker filters). Archive sweep for this
+PR's rows falls to the next session.
+
 ## 2026-07-04 — Session 43 (cont.): PR #140 merged — in-session sweep
 
 PR #140 merged with checks green while the session was live, so the

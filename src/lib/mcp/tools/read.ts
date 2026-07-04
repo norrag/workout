@@ -623,7 +623,7 @@ function registerGetExerciseHistory(server: McpServer) {
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const [sessions, pinned, overview] = await Promise.all([
+      const [historyPage, pinned, overview] = await Promise.all([
         getExerciseHistory(client, userId, exercise_id),
         listPinnedNotes(client, userId, [exercise_id]),
         client
@@ -637,14 +637,14 @@ function registerGetExerciseHistory(server: McpServer) {
       return jsonResult(
         formatExerciseHistory(
           exercise_id,
-          sessions,
+          historyPage.entries,
           pinned[0] ?? null,
           overview.data?.times_trained ?? null,
         ),
         {
           dataQuality: {
             samples: {
-              sessions_shown: sessions.length,
+              sessions_shown: historyPage.entries.length,
               lifetime_sessions: overview.data?.times_trained ?? null,
             },
             estimates:

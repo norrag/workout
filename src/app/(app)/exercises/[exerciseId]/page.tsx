@@ -1,17 +1,18 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getExerciseHistory } from "@/lib/queries/history";
-import { getExerciseOverview } from "@/lib/queries/exercises";
+import {
+  getExerciseOverview,
+  getExerciseDeletionImpact,
+} from "@/lib/queries/exercises";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
 import { toEngineEquipment, coerceLoadType } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
-import { ShareRow } from "@/components/ShareRow";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
-import { ExerciseSettingsMenu } from "./ExerciseSettingsMenu";
+import { ExerciseHeader } from "./ExerciseHeader";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -78,6 +79,8 @@ export default async function ExerciseDetailPage({
   if (error) throw error;
   if (!exercise) notFound();
 
+  const isOwned = exercise.user_id === user.id;
+
   const [
     { data: links, error: linkError },
     { data: groups, error: groupError },
@@ -86,6 +89,7 @@ export default async function ExerciseDetailPage({
     history,
     activeParams,
     incrementOverride,
+    deletionImpact,
   ] = await Promise.all([
     supabase.from("exercise_muscle_groups").select("*").eq("exercise_id", exercise.id),
     supabase.from("muscle_groups").select("*"),
@@ -102,6 +106,11 @@ export default async function ExerciseDetailPage({
     getExerciseHistory(supabase, user.id, exercise.id),
     getActiveEngineParams(supabase),
     getExerciseIncrementOverride(supabase, user.id, exercise.id),
+    // delete lives in the header menu for owned custom exercises only (N22);
+    // the impact counts drive the confirm sheet's guards (mirror the MCP tool)
+    isOwned
+      ? getExerciseDeletionImpact(supabase, user.id, exercise.id)
+      : Promise.resolve(null),
   ]);
   if (linkError) throw linkError;
   if (groupError) throw groupError;
@@ -146,34 +155,23 @@ export default async function ExerciseDetailPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <Link
-          href={backToWorkout ?? "/exercises"}
-          className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
-        >
-          {backToWorkout ? "‹ WORKOUT" : "‹ EXERCISES"}
-        </Link>
-        {showLoadStep && (
-          <ExerciseSettingsMenu
-            exerciseId={exercise.id}
-            defaultStep={defaultStep}
-            override={incrementOverride}
-          />
-        )}
-      </div>
-      <div className="mt-3 flex items-end justify-between">
-        <h1 className="text-[28px] font-extrabold leading-none tracking-[-0.02em]">
-          {exercise.name}
-        </h1>
-        {exercise.user_id !== null && (
-          <div className="border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink/55">
-            CUSTOM
-          </div>
-        )}
-      </div>
-      <div className="mt-2 text-[10.5px] font-medium tracking-[0.12em] text-ink/55">
-        {metaLine}
-      </div>
+      {/* N22 — shared header grammar (sticky brand row, title + CUSTOM badge,
+          [share][⋮] cluster); load step / share / delete live in the menu */}
+      <ExerciseHeader
+        exerciseId={exercise.id}
+        name={exercise.name}
+        metaLine={metaLine}
+        backHref={backToWorkout ?? "/exercises"}
+        backLabel={backToWorkout ? "‹ WORKOUT" : "‹ EXERCISES"}
+        isCustom={exercise.user_id !== null}
+        isOwned={isOwned}
+        loadStep={{
+          enabled: showLoadStep,
+          defaultStep,
+          override: incrementOverride,
+        }}
+        deletionImpact={deletionImpact}
+      />
 
       {/* OVERVIEW | HISTORY tabs (3.1a/3.1b) — instant client-state toggle (both
           panels' data is already fetched); `?tab=` still seeds the initial panel */}
@@ -298,13 +296,13 @@ export default async function ExerciseDetailPage({
             exerciseId={exercise.id}
             initial={pinned?.body ?? null}
           />
-
-          {exercise.user_id === user.id && (
-            <ShareRow objectType="exercise" objectId={exercise.id} />
-          )}
           </div>,
           <div key="history" className="mt-5">
-            <ExerciseHistoryList entries={history} />
+            <ExerciseHistoryList
+              entries={history.entries}
+              exerciseId={exercise.id}
+              nextCursor={history.nextCursor}
+            />
           </div>,
         ]}
       />

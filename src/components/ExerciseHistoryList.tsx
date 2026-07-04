@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { formatWeight } from "@/lib/units";
 import { shortDateWithYear as shortDate } from "@/lib/dates";
 import type { HistoryEntry } from "@/lib/queries/history";
+import { getExerciseHistoryAction } from "@/app/(app)/log/actions";
 
 /**
  * The 3.2 history content: sessions grouped by meso — current meso in full
@@ -20,19 +21,75 @@ import type { HistoryEntry } from "@/lib/queries/history";
  * T-I2 (#3): for a bodyweight exercise the flip shows the session-average
  * EFFECTIVE load (bodyweight ± entered) instead of e1RM — the load the engine
  * actually trains, surfaced the same minimal way the e1RM is for other lifts.
+ *
+ * N30: history is paged. `entries` is the first page; when `nextCursor` is
+ * non-null a sentinel row at the bottom lazy-loads older pages (via
+ * IntersectionObserver, with the row itself tappable as the fallback) until
+ * the cursor comes back null — full history is always reachable.
  */
-export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
+export function ExerciseHistoryList({
+  entries,
+  exerciseId,
+  nextCursor = null,
+}: {
+  entries: HistoryEntry[];
+  /** required for paging — without it the list renders `entries` only */
+  exerciseId?: string;
+  /** cursor for the next (older) page, from the first page's fetch */
+  nextCursor?: string | null;
+}) {
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [flipped, setFlipped] = useState(false);
+  const [older, setOlder] = useState<HistoryEntry[]>([]);
+  const [cursor, setCursor] = useState(nextCursor);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // guards the observer against firing again while a page is in flight
+  const busyRef = useRef(false);
+
+  const all = older.length > 0 ? [...entries, ...older] : entries;
+
+  const loadOlder = async () => {
+    if (!exerciseId || !cursor || busyRef.current) return;
+    busyRef.current = true;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const page = await getExerciseHistoryAction(exerciseId, cursor);
+      setOlder((cur) => [...cur, ...page.entries]);
+      setCursor(page.nextCursor);
+    } catch {
+      setFailed(true);
+    } finally {
+      busyRef.current = false;
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !cursor || failed) return;
+    const observer = new IntersectionObserver(
+      (obsEntries) => {
+        if (obsEntries.some((e) => e.isIntersecting)) void loadOlder();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, failed]);
+
   // a bodyweight exercise carries a per-session effective load; the flip surfaces
   // that in place of e1RM for these lifts.
-  const isBodyweight = entries.some((e) => e.effective_load != null);
+  const isBodyweight = all.some((e) => e.effective_load != null);
   const flipValue = isBodyweight
     ? (e: HistoryEntry) => e.effective_load
     : (e: HistoryEntry) => e.e1rm;
   const flipLabel = isBodyweight ? "EFF LOAD" : "E1RM";
   const groups: { meso: string; rows: HistoryEntry[] }[] = [];
-  for (const e of entries) {
+  for (const e of all) {
     const last = groups.at(-1);
     if (last && last.meso === e.meso_name) last.rows.push(e);
     else groups.push({ meso: e.meso_name, rows: [e] });
@@ -128,6 +185,22 @@ export function ExerciseHistoryList({ entries }: { entries: HistoryEntry[] }) {
           })}
         </div>
       ))}
+      {exerciseId && cursor && (
+        <div ref={sentinelRef}>
+          <button
+            type="button"
+            onClick={() => void loadOlder()}
+            disabled={loading}
+            className="w-full py-3.5 text-center text-[10px] font-bold tracking-[0.14em] text-ink/45"
+          >
+            {failed
+              ? "COULDN’T LOAD OLDER — TAP TO RETRY"
+              : loading
+                ? "LOADING OLDER…"
+                : "LOAD OLDER"}
+          </button>
+        </div>
+      )}
     </>
   );
 }

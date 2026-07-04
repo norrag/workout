@@ -10,6 +10,7 @@ import type { ExerciseWithMuscles } from "@/lib/queries/exercises";
 // R6: shared drift-safe formatter (was a local MM/DD/YY copy that parsed the
 // raw timestamp — near-midnight sessions showed the wrong day)
 import { shortDateWithYear as shortDate } from "@/lib/dates";
+import { NewExerciseButton } from "./NewExerciseButton";
 
 /**
  * Exercise library (fig 3.1): search + two-axis filter (MUSCLE × EQUIP, AND).
@@ -64,12 +65,8 @@ export function ExercisesBrowser({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="title-display text-[32px]">exercises</h1>
-        <Link
-          href="/exercises/new"
-          className="border-[1.5px] border-ink px-3.5 py-[9px] text-[11px] font-bold tracking-[0.1em]"
-        >
-          + NEW
-        </Link>
+        {/* N23 — tray (blank / enter code), replacing the bare page link */}
+        <NewExerciseButton />
       </div>
 
       <input
