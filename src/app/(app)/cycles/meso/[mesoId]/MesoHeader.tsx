@@ -66,6 +66,8 @@ export function MesoHeader({
   mesoId,
   mesoName,
   status,
+  backHref = "/cycles",
+  backLabel = "‹ CYCLES",
   contextLabel,
   metaLine,
   rampLine,
@@ -84,6 +86,9 @@ export function MesoHeader({
   mesoId: string;
   mesoName: string;
   status: string;
+  /** N27: origin-aware back link — defaults to the cycles list */
+  backHref?: string;
+  backLabel?: string;
   /** top-right caps label — the macrocycle name, or STANDALONE */
   contextLabel: string;
   metaLine: string;
@@ -150,10 +155,10 @@ export function MesoHeader({
       {/* brand row — back link + cycle context (day-view header grammar) */}
       <div className="flex items-center justify-between">
         <Link
-          href="/cycles"
+          href={backHref}
           className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
         >
-          ‹ CYCLES
+          {backLabel}
         </Link>
         <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
           {contextLabel.toUpperCase()}
