@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { formatWeight } from "@/lib/units";
 import type { StrengthProgress } from "@/lib/queries/stats";
+import {
+  HistorySheet,
+  type HistorySheetTarget,
+} from "@/components/HistorySheet";
+import type { HistoryScope } from "./StrengthProgress";
 
 // N9 — the macro Performance tab's primary statistic: est-strength gain per
 // muscle group, each group expandable to the exercises that rolled into its
@@ -12,6 +17,10 @@ import type { StrengthProgress } from "@/lib/queries/stats";
 // appears under each (fractional credit is expected). No mockup exists for
 // this section (rule-8 deviation carried from M8 — recorded in PROGRESS); the
 // row/label grammar mirrors StrengthProgress.tsx.
+//
+// N15: with a `historyScope`, contributor rows drill one level further — a tap
+// opens the scoped history sheet, e1RM-first (the number the trend is made of;
+// tap a row there to flip to sets/reps — the inverse of the PH32 default).
 
 function fmtPct(pct: number): string {
   return `${pct > 0 ? "+" : ""}${pct}%`;
@@ -20,12 +29,16 @@ function fmtPct(pct: number): string {
 export function MuscleStrengthSection({
   strength,
   scopeLabel,
+  historyScope,
 }: {
   strength: StrengthProgress;
   /** e.g. "THIS MACROCYCLE" — names the trend window */
   scopeLabel: string;
+  /** N15: when set, contributor rows open the scoped history drill-down */
+  historyScope?: HistoryScope;
 }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [histTarget, setHistTarget] = useState<HistorySheetTarget | null>(null);
   const toggle = (group: string) =>
     setOpen((cur) => {
       const next = new Set(cur);
@@ -69,33 +82,58 @@ export function MuscleStrengthSection({
             </button>
             {expanded && (
               <div className="mb-2.5 ml-[3px] border-l-2 border-ink/25 pl-3">
-                {m.contributors.map((c) => (
-                  <div
-                    key={`${c.exercise_id}-${c.role}`}
-                    className="flex items-baseline justify-between gap-3 border-b border-ink/10 py-[7px] last:border-b-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-bold">
-                        {c.exercise_name}
+                {m.contributors.map((c) => {
+                  const inner = (
+                    <>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold">
+                          {c.exercise_name}
+                        </div>
+                        <div className="mt-[2px] text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+                          <span className="numeral">
+                            {formatWeight(Math.round(c.first_e1rm ?? 0))}
+                          </span>{" "}
+                          →{" "}
+                          <span className="numeral">
+                            {formatWeight(Math.round(c.last_e1rm ?? 0))}
+                          </span>{" "}
+                          LB E1RM · <span className="numeral">{c.sessions}</span>{" "}
+                          SESSIONS
+                          {c.role === "secondary" ? " · SECONDARY" : ""}
+                          {historyScope ? " ›" : ""}
+                        </div>
                       </div>
-                      <div className="mt-[2px] text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
-                        <span className="numeral">
-                          {formatWeight(Math.round(c.first_e1rm ?? 0))}
-                        </span>{" "}
-                        →{" "}
-                        <span className="numeral">
-                          {formatWeight(Math.round(c.last_e1rm ?? 0))}
-                        </span>{" "}
-                        LB E1RM · <span className="numeral">{c.sessions}</span>{" "}
-                        SESSIONS
-                        {c.role === "secondary" ? " · SECONDARY" : ""}
+                      <div className="numeral text-sm font-extrabold">
+                        {c.score_pct != null ? fmtPct(c.score_pct) : "—"}
                       </div>
+                    </>
+                  );
+                  const rowCls =
+                    "flex w-full items-baseline justify-between gap-3 border-b border-ink/10 py-[7px] last:border-b-0";
+                  return historyScope ? (
+                    <button
+                      key={`${c.exercise_id}-${c.role}`}
+                      type="button"
+                      aria-label={`${c.exercise_name} history`}
+                      onClick={() =>
+                        setHistTarget({
+                          exercise_id: c.exercise_id,
+                          exercise_name: c.exercise_name,
+                          meso_ids: historyScope.mesoIds,
+                          scope_label: historyScope.label,
+                          e1rm_first: true,
+                        })
+                      }
+                      className={`${rowCls} text-left active:bg-ink/5`}
+                    >
+                      {inner}
+                    </button>
+                  ) : (
+                    <div key={`${c.exercise_id}-${c.role}`} className={rowCls}>
+                      {inner}
                     </div>
-                    <div className="numeral text-sm font-extrabold">
-                      {c.score_pct != null ? fmtPct(c.score_pct) : "—"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -111,6 +149,9 @@ export function MuscleStrengthSection({
           ROLE-WEIGHTED MEAN (PRIMARY 1.0 · SECONDARY 0.5) · EXERCISES LOGGED
           3+ SESSIONS · FIRST → LAST NON-DELOAD SESSION · E1RM IS AN ESTIMATE
         </p>
+      )}
+      {historyScope && (
+        <HistorySheet target={histTarget} onClose={() => setHistTarget(null)} />
       )}
     </div>
   );

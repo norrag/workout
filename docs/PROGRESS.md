@@ -2,10 +2,11 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-04 (latest) — Batch-7 build 3: macro header (N24) + origin back link (N27) + set-row scale (N26) + start-date sort (N28)
+## 2026-07-04 (latest) — Batch-7 build 3: macro header (N24) + scoped history drill-down (N15) + back links (N27) + set-row scale (N26) + start-date sort (N28)
 
-Fourth slot of the Session-42 attack order, folding in the three small ready
-items (PR #144). Design of record: the 09 "2026-07-04 (session 4)" entry.
+Fourth slot of the Session-42 attack order, folding in the N15 stats slice
+and the three small ready items (PR #144). Design of record: the 09
+"2026-07-04 (session 4)" entry.
 
 - **N24 — macro header adoption.** New sticky `MacroHeader` client component
   on the shared header grammar (brand row `‹ CYCLES` + `MACROCYCLE`, title +
@@ -16,6 +17,16 @@ items (PR #144). Design of record: the 09 "2026-07-04 (session 4)" entry.
   OVERVIEW tab. Day view / meso / exercise / macro now share one header
   idiom. Route skeleton (`loading.tsx`) updated to mirror it (and sheds the
   stale N21 target-card block).
+- **N15 — Performance drill-down to scoped history.** `getExerciseHistory`
+  gains an optional `scopeMesoIds` filter (N30's day-grain pagination applies
+  inside the scope unchanged), threaded through `getExerciseHistoryAction`
+  (zod: uuid array, ≤100) and `ExerciseHistoryList`'s pager. `HistorySheet`
+  targets take optional `meso_ids`/`scope_label`/`e1rm_first`; the macro
+  Performance tab's muscle-group contributor rows (`MuscleStrengthSection`)
+  and the meso tab's ALL EXERCISES rows (`StrengthProgressSection`, now a
+  client component) open it scoped to their cycle, **e1RM-first** (tap flips
+  to sets/reps — the inverse of the PH32 default, per the owner). MCP
+  `get_exercise_history` contract unchanged.
 - **N27 — back links honor origin.** Day-view ⋮ → "Mesocycle stats" now
   appends `&from=/log/<workoutId>`; the meso page validates it with the same
   `/^\/log\/[A-Za-z0-9-]+$/` guard the exercise page uses (N4) and passes

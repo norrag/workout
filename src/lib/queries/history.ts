@@ -110,12 +110,17 @@ export function pageSetsByDay<T extends { performed_at: string }>(
  * Paged (N30): each call returns up to ~HISTORY_PAGE_SETS sets' worth of whole
  * sessions plus a cursor; pass it back as `before` to walk older history until
  * `nextCursor` is null. Full history is always reachable.
+ *
+ * Scoped (N15): `scopeMesoIds` restricts the window to those mesocycles — the
+ * macro/meso Performance drill-down shows the history behind a trend, not the
+ * lifetime record. Pagination applies within the scope unchanged.
  */
 export async function getExerciseHistory(
   supabase: Client,
   userId: string,
   exerciseId: string,
   before?: string | null,
+  scopeMesoIds?: string[] | null,
 ): Promise<HistoryPage> {
   let query = supabase
     .from("logged_sets")
@@ -125,6 +130,8 @@ export async function getExerciseHistory(
     .eq("is_warmup", false)
     .order("performed_at", { ascending: false })
     .limit(HISTORY_PAGE_SETS + 1);
+  if (scopeMesoIds && scopeMesoIds.length > 0)
+    query = query.in("mesocycle_id", scopeMesoIds);
   if (before) query = query.lt("performed_at", before);
   const { data: fetched, error } = await query;
   if (error) throw error;

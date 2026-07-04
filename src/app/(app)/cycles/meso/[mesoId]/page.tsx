@@ -399,7 +399,12 @@ export default async function MesoDetailPage({
         panels={[
           overviewPanel,
           <BalanceView key="balance" balance={stats.balance} />,
-          <PerformanceView key="performance" stats={stats} />,
+          <PerformanceView
+            key="performance"
+            stats={stats}
+            // N15: exercise rows drill into this meso's scoped history
+            historyScope={{ mesoIds: [meso.id], label: "THIS MESO" }}
+          />,
         ]}
       />
     </div>

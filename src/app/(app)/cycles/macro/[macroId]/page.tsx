@@ -252,6 +252,11 @@ export default async function MacroOverviewPage({
             <MuscleStrengthSection
               strength={macroStats.strength}
               scopeLabel="THIS MACROCYCLE"
+              // N15: contributor rows drill into the macro-scoped history
+              historyScope={{
+                mesoIds: mesos.map((m) => m.id),
+                label: "THIS MACROCYCLE",
+              }}
             />
           </div>,
         ]}

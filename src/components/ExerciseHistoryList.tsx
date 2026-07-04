@@ -26,20 +26,30 @@ import { getExerciseHistoryAction } from "@/app/(app)/log/actions";
  * non-null a sentinel row at the bottom lazy-loads older pages (via
  * IntersectionObserver, with the row itself tappable as the fallback) until
  * the cursor comes back null — full history is always reachable.
+ *
+ * N15: the Performance drill-down opens this list scoped to a cycle's mesos
+ * (`mesoIds`, threaded through the pager) and e1RM-first (`initialFlipped` —
+ * the inverse of the PH32 default; tap still flips to sets/reps).
  */
 export function ExerciseHistoryList({
   entries,
   exerciseId,
   nextCursor = null,
+  mesoIds,
+  initialFlipped = false,
 }: {
   entries: HistoryEntry[];
   /** required for paging — without it the list renders `entries` only */
   exerciseId?: string;
   /** cursor for the next (older) page, from the first page's fetch */
   nextCursor?: string | null;
+  /** N15: scope older-page fetches to these mesocycles */
+  mesoIds?: string[];
+  /** N15: start on the e1RM view instead of sets/reps */
+  initialFlipped?: boolean;
 }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
-  const [flipped, setFlipped] = useState(false);
+  const [flipped, setFlipped] = useState(initialFlipped);
   const [older, setOlder] = useState<HistoryEntry[]>([]);
   const [cursor, setCursor] = useState(nextCursor);
   const [loading, setLoading] = useState(false);
@@ -56,7 +66,7 @@ export function ExerciseHistoryList({
     setLoading(true);
     setFailed(false);
     try {
-      const page = await getExerciseHistoryAction(exerciseId, cursor);
+      const page = await getExerciseHistoryAction(exerciseId, cursor, mesoIds);
       setOlder((cur) => [...cur, ...page.entries]);
       setCursor(page.nextCursor);
     } catch {

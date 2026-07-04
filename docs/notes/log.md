@@ -4,12 +4,13 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-04 — Session 46: PR #143 swept; attack-order slot 4 built — N24 + N26 + N27 + N28 (PR #144)
+## 2026-07-04 — Session 46: PR #143 swept; attack-order slots 4+5 built — N24 + N15 + N26 + N27 + N28 (PR #144)
 
 Reconciliation sweep: **N31 archived** (`archive.md`, "Swept 2026-07-04
 (later 3)" — PR #143 merged). Branch restarted from merged main. No new notes
-handed over → picked the next attack-order slot (N24) and folded in the three
-small `ready` items (N26/N27/N28):
+handed over → picked the next attack-order slot (N24), folded in the three
+small `ready` items (N26/N27/N28), then continued into the follow-on stats
+slice (N15):
 
 - **Headers (WS-D):** **N24 done** — sticky `MacroHeader` on the shared
   header grammar (brand row + `MACROCYCLE` label, title + ⋮ `AnchoredMenu`
@@ -30,16 +31,24 @@ small `ready` items (N26/N27/N28):
   (`start_date ?? created_at` desc, `created_at` tie-break) applied to macros
   + standalone mesos in `getCyclesOverview`; `orderMesos` untouched; 3 unit
   tests.
+- **Stats drill-down (WS-C):** **N15 done** — `getExerciseHistory` gains an
+  optional `scopeMesoIds` filter (N30 pagination applies within the scope);
+  threaded through the action (zod uuid array ≤100) and the list's pager.
+  `HistorySheetTarget` gains `meso_ids`/`scope_label`/`e1rm_first`; macro
+  muscle-group **contributor rows** and meso **ALL EXERCISES rows** open the
+  sheet scoped to their cycle, **e1RM-first** (tap flips to sets/reps —
+  inverse of the PH32 default per the owner). `StrengthProgressSection` became
+  a client component; MCP `get_exercise_history` contract unchanged.
 
 Green: typecheck, lint, 778 tests (+3), production build. 09 entry
 "2026-07-04 (session 4)"; PROGRESS updated. Archive sweep for this PR's rows
-falls to the next session.
+falls to the next session. **WS-C is now fully clear except the N21
+needs-decision.**
 
-Next per the attack order: **N15** (macro/meso-scoped exercise-history
-drill-down, reusing N30's pagination), then **N29** (from-template picker
-filters; the unified FilterBar remains triaged), **N25** (InfoDot + glossary).
-Open decisions: N18-B (per-week RIR), N21 (target engine), R24/R25
-remainders, WS-J phase 2/3.
+Next per the attack order: **N29** (from-template picker filters; the unified
+FilterBar remains triaged), **N25** (InfoDot + glossary). Open decisions:
+N18-B (per-week RIR), N21 (target engine), R24/R25 remainders, WS-J phase
+2/3.
 
 ## 2026-07-04 — Session 45: PR #142 swept; N31 intake + fix (PR #143)
 

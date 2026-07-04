@@ -42,11 +42,12 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
-## 2026-07-04 (session 4) — Macro header adoption, set-row scale, origin-aware back links
+## 2026-07-04 (session 4) — Macro header adoption, history drill-down, set-row scale, origin-aware back links
 
-Batch-7 build 3 (N24/N26/N27, with the N28 sort fix riding along). No mockup
-figures exist for the macro header; it adopts the established P16 meso-header
-grammar (recorded per rule 8).
+Batch-7 build 3 (N24/N15/N26/N27, with the N28 sort fix riding along). No
+mockup figures exist for the macro header or the drill-down rows; they adopt
+the established P16 header grammar and the fig-3.2 history sheet (recorded per
+rule 8).
 
 - **Change:** the macrocycle page (2.2) header is rebuilt as a sticky
   `MacroHeader` on the day-view/meso/exercise header grammar: brand row
@@ -75,6 +76,18 @@ grammar (recorded per rule 8).
   hardcoded `‹ CYCLES`. Only a same-app `/log/<id>` path is honored.
   **Rationale:** N27 — "you should always back link where you came from".
   **Affected figures:** 2.3. **Impact:** `RETROFIT`.
+- **Change:** Performance-tab trend rows drill into history: the macro tab's
+  muscle-group **contributor rows** and the meso tab's **ALL EXERCISES rows**
+  are now tappable (a `›` after the meta line marks it) and open the fig-3.2
+  history sheet **scoped to that cycle's mesocycles** — subtitle reads
+  `<EXERCISE> — THIS MACROCYCLE` / `THIS MESO` in place of the equipment tag —
+  and **e1RM-first**: the sheet opens on the e1RM view (the number the trend
+  is made of) and a row tap flips to sets/reps, the inverse of the PH32
+  default for this entry point only. Scoped history pages exactly like the
+  full sheet (N30's LOAD OLDER row). **Rationale:** N15 — "drill even further
+  down in macro muscle groups all the way down to exercise history".
+  **Affected figures:** 3.2 (new entry point; sheet layout unchanged).
+  **Impact:** `RETROFIT`.
 
 ## 2026-07-04 (session 3) — Planner picker: replace-in-place mode (N31)
 

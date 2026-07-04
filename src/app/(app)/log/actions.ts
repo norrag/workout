@@ -464,10 +464,12 @@ export async function saveFeedbackAction(input: {
 
 /** Exercise history (fig 3.2): sessions grouped by meso, newest first.
  * Paged (N30): pass the previous page's `nextCursor` as `before` to walk
- * older sessions until the cursor comes back null. */
+ * older sessions until the cursor comes back null. Scoped (N15): `mesoIds`
+ * restricts the window to those mesocycles (the Performance drill-down). */
 export async function getExerciseHistoryAction(
   exerciseId: string,
   before?: string,
+  mesoIds?: string[],
 ): Promise<HistoryPage> {
   const parsed = z.string().uuid().parse(exerciseId);
   const parsedBefore = z
@@ -475,8 +477,19 @@ export async function getExerciseHistoryAction(
     .datetime({ offset: true })
     .optional()
     .parse(before);
+  const parsedMesoIds = z
+    .array(z.string().uuid())
+    .max(100)
+    .optional()
+    .parse(mesoIds);
   const { supabase, user } = await requireUser();
-  return getExerciseHistory(supabase, user.id, parsed, parsedBefore ?? null);
+  return getExerciseHistory(
+    supabase,
+    user.id,
+    parsed,
+    parsedBefore ?? null,
+    parsedMesoIds ?? null,
+  );
 }
 
 /** Latest engine decision behind a prescription (day-view audit reveal). */
