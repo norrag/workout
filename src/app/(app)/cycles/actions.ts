@@ -20,6 +20,7 @@ import {
   saveMesoPlan,
   setGroupExercises,
   updateDayGroup,
+  updateMesoExerciseSets,
   updateMesoDay,
   updateMesocycleAttrs,
 } from "@/lib/queries/cycles";
@@ -198,22 +199,36 @@ export async function startCopyDraftAction(formData: FormData): Promise<void> {
   redirect(`/cycles/meso/${meso.id}/plan`);
 }
 
-const finalizeSchema = z.object({
-  meso_id: z.string().uuid(),
-  name: z.string().min(1, "Name is required").max(80),
-  weeks: z.coerce.number().int().min(3).max(8),
-});
+const finalizeSchema = z
+  .object({
+    meso_id: z.string().uuid(),
+    name: z.string().min(1, "Name is required").max(80),
+    weeks: z.coerce.number().int().min(3).max(8),
+    // N18-A: the sheet's collapsed ADVANCED disclosure — optional create-time
+    // RIR ramp + deload override (same bounds as the edit-details sheet)
+    rir_start: z.coerce.number().int().min(0).max(5).optional(),
+    rir_end: z.coerce.number().int().min(0).max(5).optional(),
+    includes_deload: z.enum(["true", "false"]).optional(),
+  })
+  .refine(
+    (v) =>
+      v.rir_start === undefined ||
+      v.rir_end === undefined ||
+      v.rir_start >= v.rir_end,
+    { message: "The RIR ramp must descend (start ≥ end)." },
+  );
 
 /** Create-mesocycle final stage — name the draft + confirm weeks → planned. */
 export async function finalizeMesoAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const parsed = finalizeSchema.safeParse({
-    meso_id: formData.get("meso_id"),
-    name: formData.get("name"),
-    weeks: formData.get("weeks"),
-  });
+  const raw = Object.fromEntries(
+    ["meso_id", "name", "weeks", "rir_start", "rir_end", "includes_deload"]
+      .map((k) => [k, formData.get(k)])
+      .filter(([, v]) => v != null),
+  );
+  const parsed = finalizeSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
@@ -221,6 +236,12 @@ export async function finalizeMesoAction(
   await finalizeDraftMeso(supabase, user.id, parsed.data.meso_id, {
     name: parsed.data.name,
     weeks: parsed.data.weeks,
+    rir_start: parsed.data.rir_start,
+    rir_end: parsed.data.rir_end,
+    includes_deload:
+      parsed.data.includes_deload === undefined
+        ? undefined
+        : parsed.data.includes_deload === "true",
   });
   revalidatePath("/cycles");
   redirect(`/cycles/meso/${parsed.data.meso_id}`);
@@ -358,6 +379,25 @@ export async function updateGroupAction(input: {
   await updateDayGroup(supabase, parsed.group_id, {
     exercise_slots: parsed.exercise_slots,
   });
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
+/** N17: live (draft) write of one planned exercise's starting set count. */
+export async function updateFillSetsAction(input: {
+  fill_id: string;
+  meso_id: string;
+  initial_sets: number;
+}): Promise<void> {
+  const parsed = z
+    .object({
+      fill_id: z.string().uuid(),
+      meso_id: z.string().uuid(),
+      // matches the meso_exercises initial_sets 1–20 check constraint
+      initial_sets: z.coerce.number().int().min(1).max(20),
+    })
+    .parse(input);
+  const { supabase } = await requireUser();
+  await updateMesoExerciseSets(supabase, parsed.fill_id, parsed.initial_sets);
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
 }
 

@@ -172,11 +172,28 @@ export async function finalizeDraftMeso(
   supabase: Client,
   userId: string,
   mesoId: string,
-  input: { name: string; weeks: number },
+  input: {
+    name: string;
+    weeks: number;
+    /** N18-A: optional create-time ramp override (the sheet's ADVANCED
+     *  disclosure) — omitted fields keep the draft's standard defaults */
+    rir_start?: number;
+    rir_end?: number;
+    includes_deload?: boolean;
+  },
 ): Promise<void> {
   const { error } = await supabase
     .from("mesocycles")
-    .update({ name: input.name, weeks: input.weeks, status: "planned" })
+    .update({
+      name: input.name,
+      weeks: input.weeks,
+      ...(input.rir_start !== undefined ? { rir_start: input.rir_start } : {}),
+      ...(input.rir_end !== undefined ? { rir_end: input.rir_end } : {}),
+      ...(input.includes_deload !== undefined
+        ? { includes_deload: input.includes_deload }
+        : {}),
+      status: "planned",
+    })
     .eq("id", mesoId)
     .eq("user_id", userId)
     .eq("status", "draft");
@@ -828,6 +845,20 @@ export async function updateDayGroup(
     .from("meso_day_groups")
     .update(patch)
     .eq("id", groupId);
+  if (error) throw error;
+}
+
+/** N17: set one planned exercise's starting set count (the engine's week-1
+ *  seed — set progression takes over from week 2). RLS scopes the row. */
+export async function updateMesoExerciseSets(
+  supabase: Client,
+  fillId: string,
+  initialSets: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("meso_exercises")
+    .update({ initial_sets: initialSets })
+    .eq("id", fillId);
   if (error) throw error;
 }
 

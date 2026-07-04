@@ -28,6 +28,7 @@ import {
   saveMesoPlanAction,
   setGroupExercisesAction,
   updateDayAction,
+  updateFillSetsAction,
   updateGroupAction,
   type FormState,
 } from "../../../actions";
@@ -362,6 +363,35 @@ export function PlannerBoard({
     }
     commit(() =>
       updateGroupAction({ group_id: groupId, meso_id: meso.id, exercise_slots: slots }),
+    );
+  };
+
+  // N17: per-exercise starting set count — the engine's week-1 seed (set
+  // progression takes over after that). Staged in editing mode; a live write
+  // on a draft. Clamped 1–20 to match the schema check.
+  const setFillSets = (fillId: string, sets: number) => {
+    if (sets < 1 || sets > 20) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) => ({
+            ...g,
+            fills: g.fills.map((f) =>
+              f.id === fillId ? { ...f, initial_sets: sets } : f,
+            ),
+          })),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(() =>
+      updateFillSetsAction({
+        fill_id: fillId,
+        meso_id: meso.id,
+        initial_sets: sets,
+      }),
     );
   };
 
@@ -790,10 +820,43 @@ export function PlannerBoard({
                       {group.muscle_group.toUpperCase()} ·{" "}
                       {exercises
                         .find((e) => e.id === fill.exercise_id)
-                        ?.equipment_type.toUpperCase() ?? ""}{" "}
-                      · START <span className="numeral">{fill.initial_sets}</span> SETS
+                        ?.equipment_type.toUpperCase() ?? ""}
                     </div>
                   </button>
+                  {/* N17: starting-set stepper — the group-slots stepper's
+                      grammar, compacted to fit the row */}
+                  <div className="flex flex-col items-center gap-[3px]">
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        aria-label={`fewer ${fill.exercise_name} sets`}
+                        disabled={fill.initial_sets <= 1}
+                        onClick={() =>
+                          setFillSets(fill.id, fill.initial_sets - 1)
+                        }
+                        className="flex h-7 w-7 items-center justify-center border-[1.5px] border-ink text-[14px] font-semibold disabled:opacity-25"
+                      >
+                        −
+                      </button>
+                      <div className="numeral flex h-7 w-[26px] items-center justify-center border-y-[1.5px] border-ink text-[13px] font-extrabold">
+                        {fill.initial_sets}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`more ${fill.exercise_name} sets`}
+                        disabled={fill.initial_sets >= 20}
+                        onClick={() =>
+                          setFillSets(fill.id, fill.initial_sets + 1)
+                        }
+                        className="flex h-7 w-7 items-center justify-center border-[1.5px] border-ink text-[14px] font-semibold disabled:opacity-25"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="text-[7.5px] font-semibold tracking-[0.14em] text-ink/45">
+                      START SETS
+                    </div>
+                  </div>
                   <button
                     type="button"
                     aria-label={`remove ${fill.exercise_name}`}
@@ -1140,8 +1203,19 @@ function FinalizeSheet({
   const [weeks, setWeeks] = useState(
     defaultWeeks >= 4 && defaultWeeks <= 8 ? defaultWeeks : 5,
   );
+  // N18-A: the ramp is a deep option — collapsed by default, standard values,
+  // no badgering. Expanding reveals the edit-details sheet's ramp grammar.
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [ramp, setRamp] = useState({
+    start: rirStart,
+    end: rirEnd,
+    deload: includesDeload,
+  });
 
   if (!open) return null;
+
+  const rirBtn =
+    "numeral flex-1 py-[13px] text-center text-[15px] disabled:opacity-40";
 
   return (
     <BottomSheet
@@ -1185,10 +1259,94 @@ function FinalizeSheet({
             </button>
           ))}
         </div>
-        <div className="mt-[7px] text-[10px] font-medium tracking-[0.08em] text-ink/50">
-          RIR RAMP: {rirStart} → {rirEnd}
-          {includesDeload ? ` · W${weeks} DELOAD AT 4 RIR` : ""}
-        </div>
+        <input type="hidden" name="rir_start" value={ramp.start} />
+        <input type="hidden" name="rir_end" value={ramp.end} />
+        <input type="hidden" name="includes_deload" value={String(ramp.deload)} />
+
+        {/* N18-A: collapsed summary line doubles as the ADVANCED disclosure */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="mt-[7px] flex w-full items-center justify-between text-left"
+        >
+          <span className="text-[10px] font-medium tracking-[0.08em] text-ink/50">
+            RIR RAMP: {ramp.start} → {ramp.end}
+            {ramp.deload ? ` · W${weeks} DELOAD AT 4 RIR` : ""}
+          </span>
+          <span className="text-[9px] font-bold tracking-[0.12em] text-ink/55 underline underline-offset-2">
+            {showAdvanced ? "DONE" : "EDIT"}
+          </span>
+        </button>
+
+        {showAdvanced && (
+          <>
+            <div className="mt-4">
+              <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                START RIR
+              </div>
+              <div className="mt-2 flex border-[1.5px] border-ink">
+                {[0, 1, 2, 3, 4, 5].map((r, i) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() =>
+                      setRamp((v) => ({
+                        ...v,
+                        start: r,
+                        end: Math.min(v.end, r),
+                      }))
+                    }
+                    className={`${rirBtn} ${
+                      ramp.start === r
+                        ? "bg-ink font-bold text-bg-base"
+                        : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                END RIR
+              </div>
+              <div className="mt-2 flex border-[1.5px] border-ink">
+                {[0, 1, 2, 3, 4, 5].map((r, i) => (
+                  <button
+                    key={r}
+                    type="button"
+                    disabled={r > ramp.start}
+                    onClick={() => setRamp((v) => ({ ...v, end: r }))}
+                    className={`${rirBtn} ${
+                      ramp.end === r
+                        ? "bg-ink font-bold text-bg-base"
+                        : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRamp((v) => ({ ...v, deload: !v.deload }))}
+              className="mt-4 flex w-full items-center gap-2.5 text-left"
+            >
+              <div
+                className={`flex h-[18px] w-[18px] items-center justify-center border-[1.5px] border-ink text-[11px] font-bold ${
+                  ramp.deload ? "bg-ink text-bg-base" : ""
+                }`}
+              >
+                {ramp.deload ? "✓" : ""}
+              </div>
+              <span className="text-xs font-semibold">
+                Final week is a deload
+              </span>
+            </button>
+          </>
+        )}
 
         {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}
 

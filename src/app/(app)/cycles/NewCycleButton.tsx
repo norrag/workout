@@ -3,8 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { RedeemForm } from "@/components/RedeemForm";
 
-/** `+ NEW` button + chooser sheet (fig 2.1b): macrocycle vs standalone meso. */
+/** `+ NEW` button + chooser sheet (fig 2.1b): macrocycle vs standalone meso,
+ *  plus the share-code receptacle (N20 — redeem is kind-agnostic, so a code
+ *  entered here routes to whatever it names). */
 export function NewCycleButton() {
   const [open, setOpen] = useState(false);
 
@@ -58,6 +61,11 @@ export function NewCycleButton() {
           <strong className="text-ink">+ PLAN</strong> rows instead — they keep
           it attached to the goal.
         </div>
+
+        <div className="mt-[18px] border-t border-ink/15 pt-3 text-[10px] font-bold tracking-[0.14em] text-ink/55">
+          OR ADD FROM A CODE
+        </div>
+        <RedeemForm />
       </BottomSheet>
     </>
   );
