@@ -45,15 +45,13 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N15 | Macro muscle groups drill all the way to a macro/meso-scoped exercise history; default e1RM view, tap to sets/reps (inverts the PH32 default for this entry point) | F | MED | C | ready — unblocked (N14/N16 merged PR #140); N30 shipped separately (PR #142) — reuse its `getExerciseHistory` pagination for the scoped variant |
 | N18 | Per-week independent RIR (Part B of the create-time ramp item; **Part A merged PR #140** — FinalizeSheet advanced disclosure). Needs a `rir_schedule` override + `rirRamp` hook + doc-14 fingerprint scoping (the framework's literal worked example); week-by-week editor behind the same disclosure | F | MED | D | triaged — own slice |
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
-| N22 | Exercise surfaces overhaul: (a) detail page shared header ([share][⋮] via `AnchoredMenu`, Load-step disabled-not-hidden on bodyweight-only, in-app delete with MCP-mirrored guards); (b) create-exercise rebuild with increment at creation; (c) MCP parity — `create_custom_exercise` +notes/+weight_increment, new `set_exercise_increment` tool | F+UX | HIGH | F | **done (PR #142)** |
-| N23 | Exercise sharing entry points — the new-exercise tray (blank / enter code via kind-agnostic `RedeemForm`), completing the receptacle set (templates PH27, cycles N20) | F | MED | F | **done (PR #142)** |
+| N31 | Planner board: tapping a filled row must **replace in place**, not re-open the group multi-select (which appended the pick at the day's end, kept the original, grew the slot count, and left an empty slot after the manual cleanup) | B | HIGH | D | **done (PR #143)** — picker replace mode (single-select, same slot/position/sets; duplicate rows disabled) |
 | N24 | Macrocycle views adopt the shared header (sticky, ⋮ menu: edit/goals) — completes the day-view/meso/macro/exercise header unification (archive row dropped with N19) | UX | MED | D | ready |
 | N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source (RIR, e1RM, MEV/MRV, deload, ramp…); migrate the 2 ad-hoc feedback-sheet explainers; place incrementally across dense surfaces | F | MED | M | ready |
 | N26 | Day-view set rows +~10% (cell h-32→35px, text 14→15px, LOG box 21→23px; keep header/row grid templates in sync) | UX | LOW | E | ready |
 | N27 | Back links honor origin — day-view ⋮ "Mesocycle stats" lands back on /cycles, not the day view. Generalize N4's `?from=` pattern (producer + `MesoHeader` backHref props) | UX | MED | E | ready |
 | N28 | Re-sort macros/mesos newest-first — **answered (2026-07-04 + screenshot):** the query is already `created_at` desc, but completed macros render oldest-first because their `created_at` is an import-order artifact. Fix: sort the top level (macros + standalone mesos) by training **start date** desc (fallback `created_at`); within-macro order (oldest→newest) unchanged | UX→B | LOW | D | ready |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | ready (picker) / triaged (FilterBar) |
-| N30 | Full exercise history must be reachable — the 120-set cap truncates it silently (also how N14's bad session hid). ~120 initial page, then lazy-load on scroll until exhausted; history tab + `HistorySheet` | F | MED | C | **done (PR #142)** — day-grain cursor pagination + `LOAD OLDER` sentinel |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -434,6 +432,28 @@ landed.)*
   template filters there, but there should be." *[→ N29]*
 - "In general I would prefer a bit of a sleeker filtering UI for exercises and
   templates. They feel disjointed and clunky." *[→ N29]*
+
+### Batch 8 — in-chat bug note (2026-07-04, after PR #142 merged)
+
+- "I am in a planned meso and wanted substitute an exercise on the planner
+  board for a different one. When I did so, it instead *added* the selected
+  exercise to the end of the set and retained the original exercise also
+  rather than replacing it in the same slot. Furthermore, when I click again
+  on the original exercise, the picker displays the replacement exercise as
+  having been already selected. Thus, it is not properly substituting an
+  exercise in the planner." *[→ N31]*
+- "When the new exercise was added to the end of the day planner, it added a
+  *new* slot for the exercise (i.e. it added an additional exercise for
+  chest). It *was* possible to manually delete the original exercise, and
+  then manually move the position of the new exercise inserted at the end
+  back up to the position of the original, but in so doing it left a blank
+  slot for the muscle group at the end, since an additional exercise was
+  added. This then necessitated editing the day and removing the newly added
+  and now empty slot. This is not the intended behavior for changing an
+  exercise in a meso slot. Please address." *[→ N31 — same root: the filled
+  row opened the group multi-select, whose layout appends new picks and grows
+  `exercise_slots`; the leftover empty slot is the workaround's residue, not a
+  separate defect]*
 
 #### Batch 7 addendum — owner clarifications on the intake findings (2026-07-04, in-chat, with a /cycles screenshot)
 

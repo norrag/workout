@@ -18,6 +18,7 @@ import {
   addDayAction,
   addGroupsAction,
   clearSlotAction,
+  replaceSlotAction,
   discardDraftAction,
   finalizeMesoAction,
   removeDayAction,
@@ -98,7 +99,14 @@ interface ViewDay {
   groups: ViewGroup[];
 }
 
-type PickerTarget = { group: ViewGroup; day: ViewDay };
+type PickerTarget = {
+  group: ViewGroup;
+  day: ViewDay;
+  /** set = replace-in-place mode (N31): the picker swaps THIS fill's exercise
+   *  (single-select, position/slot/sets kept) instead of editing the group's
+   *  multi-select. Unset = fill open slots (the original add mode). */
+  replaceFill?: ViewFill;
+};
 type Commit = (fn: () => Promise<void>) => void;
 
 function tmpId(): string {
@@ -527,6 +535,53 @@ export function PlannerBoard({
     );
   };
 
+  // N31: substitute one filled slot's exercise in place — the fill keeps its
+  // id (staged), day position, group slot, and starting sets; only the
+  // movement changes. Staged in editing mode; a live single-row write on a
+  // draft (which preserves position/slot/sets by never re-inserting).
+  const replaceFillExercise = (
+    groupId: string,
+    fill: ViewFill,
+    exerciseId: string,
+  ) => {
+    if (exerciseId === fill.exercise_id) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) =>
+            g.id === groupId
+              ? {
+                  ...g,
+                  fills: g.fills.map((f) =>
+                    f.id === fill.id
+                      ? {
+                          ...f,
+                          exercise_id: exerciseId,
+                          exercise_name:
+                            exercises.find((e) => e.id === exerciseId)?.name ??
+                            "",
+                        }
+                      : f,
+                  ),
+                }
+              : g,
+          ),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(async () => {
+      const result = await replaceSlotAction({
+        meso_id: meso.id,
+        meso_exercise_id: fill.id,
+        exercise_id: exerciseId,
+      });
+      if (result.error) toast(result.error);
+    });
+  };
+
   const clearFill = (groupId: string, fill: ViewFill) => {
     if (editing) {
       setWorkDays((ds) =>
@@ -811,7 +866,11 @@ export function PlannerBoard({
                   <button
                     type="button"
                     className="flex-1 text-left"
-                    onClick={() => setPicker({ group, day: activeDay })}
+                    onClick={() =>
+                      // N31: a filled row opens the picker in replace-in-place
+                      // mode (swap THIS slot), not the group multi-select
+                      setPicker({ group, day: activeDay, replaceFill: fill })
+                    }
                   >
                     <div className="text-[15px] font-semibold">
                       {fill.exercise_name}
@@ -1078,6 +1137,9 @@ export function PlannerBoard({
         target={picker}
         exercises={exercises}
         onSubmit={(ids) => picker && setGroupExercises(picker.group.id, ids)}
+        onReplace={(fill, exerciseId) =>
+          picker && replaceFillExercise(picker.group.id, fill, exerciseId)
+        }
         onClose={() => setPicker(null)}
       />
       <FinalizeSheet
@@ -1685,19 +1747,24 @@ function AddGroupsSheet({
 }
 
 // ---------------------------------------------------------------------------
-// exercise picker (fig 2.7): pre-filtered to the group's muscle, multi-select,
-// with an equipment filter; the selected exercises become the group's slots.
+// exercise picker (fig 2.7): pre-filtered to the group's muscle, with an
+// equipment filter. Two modes: multi-select over the group's slots (open-slot
+// tap — the selected exercises become the group's slots), or replace-in-place
+// (filled-row tap, N31 — single-select swaps that one slot's movement,
+// keeping its position and starting sets).
 // ---------------------------------------------------------------------------
 
 function ExercisePicker({
   target,
   exercises,
   onSubmit,
+  onReplace,
   onClose,
 }: {
   target: PickerTarget | null;
   exercises: PickerExerciseLite[];
   onSubmit: (exerciseIds: string[]) => void;
+  onReplace: (fill: ViewFill, exerciseId: string) => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -1706,14 +1773,23 @@ function ExercisePicker({
   const [historyFor, setHistoryFor] = useState<PickerExerciseLite | null>(null);
 
   const groupId = target?.group.id ?? null;
+  const replaceFill = target?.replaceFill ?? null;
 
   useEffect(() => {
     if (!target) return;
-    setSelected(new Set(target.group.fills.map((f) => f.exercise_id)));
+    // replace mode seeds with just the slot being swapped; add mode with the
+    // group's current picks
+    setSelected(
+      new Set(
+        replaceFill
+          ? [replaceFill.exercise_id]
+          : target.group.fills.map((f) => f.exercise_id),
+      ),
+    );
     setSearch("");
     setEquip(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [groupId, replaceFill?.id]);
 
   const groupCandidates = useMemo(() => {
     if (!target) return [];
@@ -1738,6 +1814,11 @@ function ExercisePicker({
   const dayName = `${dayTabLabel(target.day)}${target.day.label ? ` — ${target.day.label.toUpperCase()}` : ""}`;
 
   const toggle = (id: string) => {
+    if (replaceFill) {
+      // single-select: the new pick replaces the selection (radio behavior)
+      setSelected(new Set([id]));
+      return;
+    }
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1752,7 +1833,16 @@ function ExercisePicker({
     onClose();
   };
 
+  const replacePickId = replaceFill ? [...selected][0] ?? null : null;
+  const replaceUnchanged =
+    replaceFill != null && replacePickId === replaceFill.exercise_id;
+
   const save = () => {
+    if (replaceFill) {
+      if (replacePickId && !replaceUnchanged) onReplace(replaceFill, replacePickId);
+      close();
+      return;
+    }
     const orderedIds = groupCandidates
       .filter((e) => selected.has(e.id))
       .map((e) => e.id);
@@ -1768,8 +1858,12 @@ function ExercisePicker({
       open
       fullHeight
       onClose={close}
-      title="Pick exercise"
-      subtitle={`${target.group.muscle_group.toUpperCase()} · ${dayName}`}
+      title={replaceFill ? "Replace exercise" : "Pick exercise"}
+      subtitle={
+        replaceFill
+          ? `SWAPS ${replaceFill.exercise_name.toUpperCase()} — SAME SLOT & SETS`
+          : `${target.group.muscle_group.toUpperCase()} · ${dayName}`
+      }
     >
       <div className="flex items-center gap-2">
         <input
@@ -1809,6 +1903,13 @@ function ExercisePicker({
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
         {visible.map((e) => {
           const sel = selected.has(e.id);
+          // replace mode: an exercise already filling ANOTHER slot of this
+          // group can't be the swap target (it would duplicate the movement)
+          const inGroupElsewhere =
+            replaceFill != null &&
+            target.group.fills.some(
+              (f) => f.id !== replaceFill.id && f.exercise_id === e.id,
+            );
           return (
             <div
               key={e.id}
@@ -1817,24 +1918,31 @@ function ExercisePicker({
               <button
                 type="button"
                 aria-label={`${sel ? "deselect" : "select"} ${e.name}`}
+                disabled={inGroupElsewhere}
                 onClick={() => toggle(e.id)}
                 className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-[12px] ${
-                  sel ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/40"
+                  sel
+                    ? "bg-ink text-bg-base"
+                    : `border-[1.5px] border-ink/40 ${inGroupElsewhere ? "opacity-30" : ""}`
                 }`}
               >
                 {sel ? "✓" : ""}
               </button>
               <button
                 type="button"
+                disabled={inGroupElsewhere}
                 onClick={() => toggle(e.id)}
-                className="flex-1 text-left"
+                className={`flex-1 text-left ${inGroupElsewhere ? "opacity-40" : ""}`}
               >
                 <div className="text-[15px] font-bold">{e.name}</div>
                 <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
-                  {e.equipment_type.toUpperCase()} ·{" "}
-                  {e.last_performed_at
-                    ? `LAST ${shortDate(e.last_performed_at)}`
-                    : "NEVER PERFORMED"}
+                  {inGroupElsewhere
+                    ? "ALREADY IN THIS GROUP"
+                    : `${e.equipment_type.toUpperCase()} · ${
+                        e.last_performed_at
+                          ? `LAST ${shortDate(e.last_performed_at)}`
+                          : "NEVER PERFORMED"
+                      }`}
                 </div>
               </button>
               {e.last_performed_at && (
@@ -1858,9 +1966,10 @@ function ExercisePicker({
       <button
         type="button"
         onClick={save}
-        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base"
+        disabled={replaceFill != null && (replacePickId == null || replaceUnchanged)}
+        className="mt-4 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
       >
-        ADD TO {dayName}
+        {replaceFill ? "REPLACE EXERCISE" : `ADD TO ${dayName}`}
       </button>
 
       <HistorySheet

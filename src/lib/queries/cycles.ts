@@ -924,6 +924,49 @@ export async function clearSlot(
   if (error) throw error;
 }
 
+/**
+ * Replace one planned slot's exercise in place (N31): the fill keeps its id,
+ * group, slot, day position, and starting sets — only the movement changes.
+ * This is the board's substitute path (the live/draft variant; staged edits
+ * swap the local copy and commit through saveMesoPlan). Refuses a swap that
+ * would duplicate an exercise already filled in the same group — the picker
+ * disables those rows, but the write must hold on its own.
+ */
+export async function replaceSlotExercise(
+  supabase: Client,
+  mesoExerciseId: string,
+  exerciseId: string,
+): Promise<{ error: string | null }> {
+  const { data: fill, error: fillError } = await supabase
+    .from("meso_exercises")
+    .select("id, meso_day_group_id, exercise_id")
+    .eq("id", mesoExerciseId)
+    .maybeSingle();
+  if (fillError) throw fillError;
+  if (!fill) return { error: "Slot not found." };
+  if (fill.exercise_id === exerciseId) return { error: null };
+
+  if (fill.meso_day_group_id != null) {
+    const { data: siblings, error: sibError } = await supabase
+      .from("meso_exercises")
+      .select("id, exercise_id")
+      .eq("meso_day_group_id", fill.meso_day_group_id);
+    if (sibError) throw sibError;
+    const duplicate = (siblings ?? []).some(
+      (s) => s.id !== mesoExerciseId && s.exercise_id === exerciseId,
+    );
+    if (duplicate)
+      return { error: "That exercise is already in this muscle group." };
+  }
+
+  const { error } = await supabase
+    .from("meso_exercises")
+    .update({ exercise_id: exerciseId })
+    .eq("id", mesoExerciseId);
+  if (error) throw error;
+  return { error: null };
+}
+
 // ---------------------------------------------------------------------------
 // delete a mesocycle (user-initiated). FK cascades remove its microcycles,
 // workouts, logged_sets, planner days/groups/fills — so deleting an active or

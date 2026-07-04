@@ -8,6 +8,7 @@ import {
   addDayGroups,
   addMesoDay,
   clearSlot,
+  replaceSlotExercise,
   copyMesoStructure,
   createDraftMeso,
   deleteMesocycle,
@@ -536,6 +537,31 @@ export async function clearSlotAction(input: {
   const { supabase } = await requireUser();
   await clearSlot(supabase, parsed.meso_exercise_id);
   revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+}
+
+/** N31: live (draft) replace of one planned slot's exercise in place — keeps
+ *  the fill's position, slot, and starting sets; only the movement changes. */
+export async function replaceSlotAction(input: {
+  meso_id: string;
+  meso_exercise_id: string;
+  exercise_id: string;
+}): Promise<FormState> {
+  const parsed = z
+    .object({
+      meso_id: z.string().uuid(),
+      meso_exercise_id: z.string().uuid(),
+      exercise_id: z.string().uuid(),
+    })
+    .parse(input);
+  const { supabase } = await requireUser();
+  const { error } = await replaceSlotExercise(
+    supabase,
+    parsed.meso_exercise_id,
+    parsed.exercise_id,
+  );
+  if (error) return { error };
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+  return { error: null };
 }
 
 // ---------------------------------------------------------------------------
