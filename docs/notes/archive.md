@@ -11,6 +11,19 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-04 (later 5) — N32 history-sheet fixes merged (PR #145)
+
+Session 46 root-caused the owner's field report on the PR #144 drill-down and
+fixed it on the open sweep PR; merged while the session was live, so the
+sweep ran in-session. Full record in PROGRESS 2026-07-04 "N32", the 09
+"2026-07-04 (session 5)" entry, and the Session 46 (cont. 2) `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N32 | History-sheet fixes from N15 testing: sheet "not scrollable" / background moved; revert e1RM-first opening; link the exercise name | B+UX | E | **done (PR #145).** Root cause was N6 × the scroll lock — `position:fixed` zeroes `window.scrollY`, so `PullToRefresh` armed on every drag over any open sheet (all sheets since N6, not an N15 defect). Fix: `isScrollLocked()` guard in `PullToRefresh`, `overscroll-contain` + touch isolation on `BottomSheet`. Drill-down opens on sets/reps (`initialFlipped`/`e1rm_first` removed; PH32 default holds everywhere). Sheet subtitle's exercise name links to `/exercises/{id}` on every entry point (`BottomSheet.subtitle` → ReactNode). |
+
+---
+
 ## Swept 2026-07-04 (later 4) — Batch-7 build 3 merged (PR #144)
 
 Session 46 built the fourth attack-order slot (N24) plus the N15 stats slice

@@ -4,6 +4,18 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 46 (cont. 3): PR #145 merged — in-session sweep
+
+PR #145 (notes sweep + N32 fix) merged with checks green while the session
+was live, so the reconciliation sweep ran in-session: **N32 archived**
+(`archive.md`, "Swept 2026-07-04 (later 5)"). Docs-only follow-up PR on the
+branch restarted from merged main (same name). Live index is now: N1 (WS-J
+remainder), N18-B (per-week RIR), N21 (target-engine needs-decision), N25
+(InfoDot + glossary), N29 (picker filters + FilterBar), PH30 deferred,
+R24/R25 remainders. Owner should re-test the sheet scroll fix on device —
+the root-cause diagnosis (N6 pull gesture arming under the scroll lock) was
+made from the code paths, not reproduced on hardware.
+
 ## 2026-07-04 — Session 46 (cont. 2): Batch 9 intake + N32 fix (PR #145)
 
 Owner field-tested the PR #144 drill-down and handed over one bug + two
