@@ -443,6 +443,234 @@ planner-board WEEKLY SETS readout (fold relocated to
 tab / MCP preview). I12 is closed; seed-slot-from-template/copy was assessed
 and left out (duplicate + place composes to the same outcome in two taps).
 
+## Batch 7 items (scoped 2026-07-04, session 42 — 4 parallel passes)
+
+### N14 — Macro muscle-group rollup shows bogus "starting e1RM of 7" · **B / small–medium**
+
+Chain: `getMacroStats` (`src/lib/queries/stats.ts:729-803`) → `getProgressScores`
+(`stats.ts:100-126`) → `foldProgressScores` (`stats.ts:61-97`) → `rollupMuscleProgress`
+(`stats.ts:170-213`) → `MuscleStrengthSection.tsx:82-90`. `first_e1rm` is the
+session-average e1RM of the **single chronologically-first** non-deload session in
+the window — no minimum, no outlier guard. A 7-lb value implies one unrepresentative
+early session (reps-in-weight-field, technique set, machine-level mis-log) defining
+the %-change denominator. Every other strength surface uses `max` (PRs), so the bad
+set is invisible elsewhere. **Why it's "nowhere in history":** the history sheet caps
+at `.limit(120)` sets (`src/lib/queries/history.ts:84`) — 18 months of macro
+truncates the earliest sessions out of view — and history defaults to sets/reps
+(bodyweight lifts show effective load, never raw e1RM). **Fix:** robust endpoints in
+`foldProgressScores` (median of first/last-N qualifying sessions, or outlier drop vs
+the window median); align/lift the history cap so rollup and history agree on what
+exists. Small for the pure-fold guard (covered by `stats.test.ts`); medium if adding
+server-side data-hygiene detection of the offending sets.
+
+### N16 — "EST. STRENGTH · KEY LIFTS" contradicts the Performance tab · **B / small–medium · related N14**
+
+The tile is the macro **OVERVIEW** stat (`cycles/macro/[macroId]/page.tsx:323-326`),
+fed by a **separate bespoke fold** in `buildMacroStats` (`src/lib/queries/macro.ts:844-902`):
+first/last per exercise **with deloads included** (never consults
+`microcycles.is_deload`), then means the **3 most-logged** exercises — no ≥3-session
+qualification, no role weighting. The Performance tab (`getProgressScores`) excludes
+deloads and averages all qualifying exercises. A cut whose last logged week is a
+deload reads strongly negative (-36.3%) while Performance stays positive — leading
+hypothesis. Same single-endpoint fragility as N14, amplified by n=3. **Fix:** delete
+the bespoke fold; derive the tile from the qualified pipeline (deload-filtered,
+qualifying exercises — top-3 by frequency or the overall mean), one definition with
+the Performance tab. Regression test: deload-tail case in `stats.test.ts`.
+
+### N15 — Drill down from macro muscle groups to a scoped exercise history (e1RM-first) · **F / medium · sequence after N14/N16**
+
+Contributor rows in `MuscleStrengthSection.tsx:70-100` are static — not links. The
+PH32 flip component exists (`src/components/ExerciseHistoryList.tsx:24-33,71`;
+default `flipped=false` = sets/reps) and `HistorySheet`
+(`src/components/HistorySheet.tsx:35`) opens on an exercise target — but
+`getExerciseHistory` (`history.ts:72-170`) takes only `exerciseId`, unscoped, capped
+120 sets. **Build:** (a) contributor rows open `HistorySheet`; (b) optional
+`mesoIds`/date-window param threaded `HistorySheet → getExerciseHistoryAction →
+getExerciseHistory` (lift the cap within a bounded window); (c) `initialView` prop on
+`ExerciseHistoryList` so this entry point defaults to e1RM, tap to flip to sets/reps
+(owner wants the inverse of the current default). `HistorySheetTarget.equipment_type`
+needs sourcing onto `MuscleGroupContributor` (small extra join).
+
+### N21 — "Realistic" macro targets: audited; hide from both macro views · **Q→D / hide = small · fix = large**
+
+Engine: `planMacrocycle`/`computeTarget` (`src/lib/engine/macro.ts:234-364`), spec
+doc 10 §5. Bucket = training-years else self-reported (`macro.ts:89-96`). **Audit
+smells:** the strength target is bucket-only — `ageMultiplier`/`sexFactor` apply
+**only** to hypertrophy (`macro.ts:345`); hypertrophy flips discontinuously between
+FFMI-proximity and training-age-decay models depending on whether body comp is fully
+set (`macro.ts:378-388`); cut compounding + separate cap can collapse the low/high
+range (`macro.ts:325-326`). All `estimate: true`, informational-only (no
+progress-vs-target tracking per spec §5). **Hide (the owner's interim call):** remove
+the `REALISTIC TARGET` card (`cycles/macro/[macroId]/page.tsx:182-220` + helpers
+`:30-60,127-128`) and the create-flow `YOUR TARGET` card + rationale
+(`CreateMacroForm.tsx:227-278,299-301`) — but **keep** `plan.mesoCount`/`plan.phases`
+/`durationMonths` (timeline + phase strip depend on them) and leave
+`planMacrocycle` + the persisted `target_*` columns in place so re-enabling is a pure
+view change. Don't conflate with the N16 tile — separate metric. Correcting the
+target engine itself is a later, large item (needs-decision after the hide ships).
+
+### N17 — Planner: edit # of sets per exercise · **F / small**
+
+The model + persistence already exist end-to-end: `meso_exercises.initial_sets`
+(schema `20260611000001:240`, 1–20 check) → `ViewFill.initial_sets`
+(`PlannerBoard.tsx:80`) → day readout + volume fold (`:639-644,652-656`) → `doSave`
+serialises it (`:591-596`) → seeds the engine as the week-1 `initial.sets`
+(`src/lib/queries/generation.ts:88-145`); after week 1 the set-progression takes
+over. Today it renders read-only ("START n SETS", `PlannerBoard.tsx:789-795`) and is
+hardcoded to 3 at pick time (`planGroupExercises(current, ids, 3)`,
+`PlannerBoard.tsx:397-403`, `src/lib/planner/groups.ts:78-98`). **Only the UI control
+is missing:** −/＋ stepper on each filled row (`:750-806`) with a `setFillSets`
+mutator mirroring `updateGroupSlots` (`:350-366`); draft/live path needs a small
+server action to write `initial_sets`. Clamp 1–20.
+
+### N18 — RIR ramp in the create panel + per-week RIR · **F / A = small, B = medium-large**
+
+Create's `FinalizeSheet` exposes only NAME+WEEKS; ramp is read-only
+(`PlannerBoard.tsx:1117-1214,1189-1191`; `finalizeMesoAction` accepts only
+`{meso_id,name,weeks}`, `cycles/actions.ts:201-227`). The Edit-details sheet already
+has the full segmented grammar gated pre-start (`MesoHeader.tsx:513-665`).
+**Part A (small):** collapsed "advanced" disclosure in `FinalizeSheet` reusing the
+Edit-details START/END RIR + deload controls; thread through `finalizeSchema` +
+`finalizeDraftMeso`. Defaults stay standard — matches the owner's "deep option, no
+badgering". **Part B (medium-large):** per-week independent RIR is **not
+representable today** — `microcycles.target_rir` rows are derived at activation by
+`rirRamp()` linear interpolation (`src/lib/engine/rules/rir.ts:14-45`;
+`generation.ts:391-431`). Needs a `rir_schedule` override column (or materialized
+editable micros) consumed by `rirRamp`, a week-by-week editor behind the same
+disclosure, and doc-14 fingerprint scoping (per-week RIR edits are the framework's
+literal worked example — docs/14:137-149,184). Ship A now; B is its own slice.
+
+### N19 — Archive macros/mesos; never full-delete · **F / medium · HIGH (data-loss surface)**
+
+**Current deletes:** app meso ⋮ → "Delete mesocycle" (`MesoHeader.tsx:394-477`) →
+`deleteMesoAction` (`cycles/actions.ts:674-680`) → raw `.delete()`
+(`cycles.ts:923-934`) — **cascades logged_sets** (schema `:346-348`), gated only by
+an ack checkbox; copy says "permanently deletes … can't be undone". This violates
+hard rule #5's spirit; MCP is already history-safe (`write.ts:626-652` refuses when
+`loggedSets>0`; macro delete MCP-only, `write.ts:654-688`). Macro has **no** app
+delete/archive UI at all. **Build:** nullable `archived_at` on both tables (orthogonal
+to lifecycle status — a completed meso stays completed while archived; don't reuse
+the macro enum's unused `archived` value) + partial index; archive/unarchive
+queries + actions; relabel the meso delete sheet to archive (drop the erase ack);
+`deleteMesocycle` survives only for the draft-discard path. Exclude
+`archived_at is not null` from: `getCyclesOverview` (`cycles.ts:45-60`),
+`listCopyableMesos` (`:395-407`), `getCurrentState` (`:948-960`), `getDraftMeso`
+(`:125-139`), place-target lookups, MCP `get_macrocycles`/`get_mesocycle`. Surface:
+new deep page `/more/archive` (PH26's sub-page pattern) with view + unarchive.
+Macro-side archive action wants the N24 header (soft dependency). Optionally add MCP
+`archive_*` tools; keep `delete_*` for truly-empty blocks only.
+
+### N20 — Enter share code in the new-cycle tray · **UX / trivial**
+
+`NewCycleButton` (`cycles/NewCycleButton.tsx`) is link-only; the template tray
+already mounts the generic `<RedeemForm/>` (`templates/NewTemplateButton.tsx:47-50`),
+and redeem already routes meso codes (`DESTINATION.mesocycle → /cycles/meso/{id}`,
+`src/components/RedeemForm.tsx:7-11`; `acceptShareCode` copy-on-accept,
+`sharing.ts:142-159`). Drop the same divider + `<RedeemForm/>` into the tray. Ship
+with N23's tray work.
+
+### N22 — Exercise page overhaul: real header + surfaced increment · **F+UX / medium**
+
+**Premise check: the increment setting already ships (I13)** —
+`ExerciseSettingsMenu` "Load step" sheet behind the bare `⋯`
+(`exercises/[exerciseId]/page.tsx:156-162`; `ExerciseSettingsMenu.tsx:36-201`;
+`setIncrementOverrideAction`, `exercises/actions.ts:47-84`; table
+`exercise_param_overrides`). It feels absent because the trigger is a faint
+`text-ink/45` glyph and is **hidden entirely on bodyweight-only lifts**
+(`showLoadStep`, page `:119-123`). **Build:** `ExerciseHeader` client component
+mirroring `MesoHeader`'s grammar (sticky brand row keeping the N4 `?from=` back
+link, title + CUSTOM badge, icon cluster [share][⋮]) on the shared
+`AnchoredMenu`/`MenuRow` (`components/ui/AnchoredMenu.tsx` — already the single
+implementation). ⋮ rows: Load step (refactor `ExerciseSettingsMenu` to be
+menu-driven; show disabled on bodyweight-only rather than vanishing), share
+(owned custom only — move `ShareRow` out of the OVERVIEW tab bottom, page
+`:302-304`), delete custom exercise (query `deleteCustomExercise` exists,
+`exercises.ts:260`; **no app action/UI today** — new action + confirm sheet; or
+fold into N19's archive philosophy). No mockup figure → owner-authorized design
+delta (09 entry at build time). Rest of page (tabs, bests grid, chart) stays.
+
+### N23 — Exercise sharing end-to-end · **F / small · ship with N22**
+
+**Premise check: sharing already works end-to-end.** `ShareObjectType` includes
+`"exercise"` (`sharing.ts:7`); create via `ShareRow` on owned custom exercises
+(page `:302-304`); `acceptShareCode` deep-copies via `copyExercise`
+(`sharing.ts:121-129,168-227`); codes are untyped random 8-char, redeem is
+**kind-agnostic** and routes by stored `object_type` (`RedeemForm.tsx:7-11,27`) —
+so a meso code in an "exercise field" already lands on the right page; **no
+mismatch failure mode to build**. The create-form copy ("share them from the
+exercise page", `NewExerciseForm.tsx:124-127`) is true for owned custom exercises —
+the owner likely tested a stock exercise (correctly not shareable,
+`sharing.ts:45-46`). **Real gap:** the only `RedeemForm` mount in the app is the
+templates tray; exercises `+ NEW` is a bare Link (`ExercisesBrowser.tsx:67-72`).
+**Build:** `NewExerciseButton` tray mirroring `NewTemplateButton` (blank exercise /
+OR ADD FROM A CODE), swap the Link; N20 adds the cycles tray. Backend: nothing.
+
+### N24 — Macrocycle views adopt the shared header · **UX / medium (small if archive/delete deferred)**
+
+Macro overview header is a one-off (`cycles/macro/[macroId]/page.tsx:143-173`): not
+sticky, no icon cluster, no ⋮; the only action is a full-width EDIT MACROCYCLE link
+at the bottom of the overview tab (`:340-345`). **Build:** `MacroHeader` mirroring
+`MesoHeader` (sticky brand row, title + status badge, ⋮ `AnchoredMenu`): Edit
+macrocycle (existing `/edit` route), Edit goals, Archive (needs N19's new action —
+ship together or sequence N19 → N24). No share button (macros aren't a
+`ShareObjectType`; expanding that is out of scope). After N22+N24 the
+day-view/meso/macro/exercise surfaces all share the `AnchoredMenu` header idiom —
+adoption, not new infra.
+
+### N25 — Info/help affordances for jargon · **F / medium (primitive small, breadth medium)**
+
+Only two ad-hoc "i" explainers exist, both inside the feedback sheet
+(`DayView.tsx:2482-2500` pump, `:2520-2539` workload); no shared primitive, no
+glossary, no help pattern in docs 06/08. **Build:** extract `components/ui/InfoDot.tsx`
+(17px "i" → BottomSheet or inline expander) backed by one glossary source
+`src/lib/glossary.ts` (RIR, e1RM, MEV/MRV, deload, ramp, macro/meso/micro, pump,
+workload…); migrate the two existing explainers onto it; sprinkle across the dense
+surfaces (day-view target line, meso header ramp/DL, stats tabs, planner volume
+readout, create/edit-details sheets, exercise page). Ship primitive + glossary
+first, place incrementally. Design note for 06/08: needs a dated 09 delta at build
+time (no existing pattern).
+
+### N26 — Day-view set rows +10% · **UX / trivial**
+
+`SetRow` in `DayView.tsx`: `cellBase` `h-[32px] … text-[14px]` (`:1444-1446` →
+35px/15px), row container `py-[4px]` (`:1568` → 5px), LOG box `h-[21px] w-[21px]`
+(`:1716` → 23px). The `grid-cols-[20px_1fr_1fr_44px]` template appears in **both**
+the header row (`:1047`) and set row (`:1568`) — change together to stay aligned.
+
+### N27 — Back link honors origin (meso stats from day view) · **UX / small · generalizes N4**
+
+Producer: day-view ⋮ "Mesocycle stats" → `go(\`/cycles/meso/${mesoId}?view=balance\`)`
+(`DayView.tsx:769-771`) with no origin. `MesoHeader`'s back link is hardcoded
+`‹ CYCLES` (`MesoHeader.tsx:152-157`). **Fix (mirrors N4 exactly):** append
+`&from=/log/${workoutId}` at the producer; meso page validates `from` with the same
+`/^\/log\/[A-Za-z0-9-]+$/` guard the exercise page uses
+(`exercises/[exerciseId]/page.tsx:55-65`) and passes `backHref`/`backLabel` props
+into `MesoHeader`. Audit note: `planned/[week]/[day]/page.tsx:67-72` is the same
+hardcode class (currently correct); exercise page is the reference implementation.
+
+### N28 — Sort macros/mesos newest-first · **UX / verify (likely already satisfied) · needs-input**
+
+`getCyclesOverview` already orders macrocycles AND mesocycles `created_at desc`
+(`cycles.ts:51,59`) — top-level `/cycles` cards and standalone mesos are already
+newest-first; within-macro ordering is intentionally chronological (`orderMesos`,
+`cycles.ts:32-39`) and the macro timeline must stay so. **Question for the owner:**
+which list looked wrong — or is the ask `start_date`-desc rather than
+`created_at`-desc (differs when an older-created cycle starts later)?
+
+### N29 — Template filters in the from-template picker + unified filter UI · **UX+F / picker small, unified medium**
+
+Three divergent surfaces, zero shared components: from-template picker has **search
+only** (`cycles/plan/template/page.tsx:35-43`) though `listTemplates` already
+supports `{days, emphasis, gender}`; templates page uses URL-driven `<select>`s
+(`templates/TemplateFilters.tsx:39-45`); exercises page uses client-state two-axis
+chips (`ExercisesBrowser.tsx:84-167`); the planner's exercise picker is a third
+variant (`PlannerBoard.tsx:1605-1649`). **Quick win (small):** render
+`<TemplateFilters/>` in the picker + thread searchParams into `listTemplates`
+(mirrors `templates/page.tsx:25-31,42-55`). **Unified (medium):** shared chip-based
+`FilterBar` (the ExercisesBrowser idiom is the sleeker one) with a value/onChange
+vs URL-sync adapter, consumed by templates, picker, exercises (and eventually the
+planner picker). Keep two-axis AND semantics.
+
 ## Items still needing their own scoping pass (not yet researched)
 - **PH30** (LLM prescription analysis) — deferred 2026-07-02; see workstream H.
 
