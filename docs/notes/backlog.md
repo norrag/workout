@@ -46,7 +46,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source (RIR, e1RM, MEV/MRV, deload, ramp…); migrate the 2 ad-hoc feedback-sheet explainers; place incrementally across dense surfaces | F | MED | M | ready |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | ready (picker) / triaged (FilterBar) |
-| N33 | Exercise swap writes prescriptions out-of-band → incoherent audit state + doc-14 blind spot. `replaceWorkoutExercise` writes PR weight/reps raw (no engine call, no decision, no fingerprint restamp, sets/RIR left from the old decision), so after a deload-week swap-out/in the detail sheet showed 245×15·2·6RIR over a V17 deload trace (215×10) with a now-false "re-verified under V18" line; sets filled with anchor-predicted 245×5. Framework can't self-correct: swap busts neither the meso stale gate nor the row fingerprint (exercise identity isn't hashed; replay never checks `decision.exercise_id`). Fix: route swap through the engine (advance off the §7c counterpart when one exists — makes A→B→A restore the engine numbers — else cold seed like `addWorkoutExercises`), add the decision/row exercise-id mismatch ⇒ backfill rule, extract a single `writePrescription` chokepoint, sheet mismatch guard. Full investigation + solution assessment: [`docs/reviews/2026-07-04-swap-prescription-provenance.md`](../reviews/2026-07-04-swap-prescription-provenance.md). Data-layer sibling of N5/N13 (client symptoms, PRs #131/#137) | B | HIGH | G | ready |
+| N33 | Exercise swap writes prescriptions out-of-band → incoherent audit state + doc-14 blind spot. `replaceWorkoutExercise` writes PR weight/reps raw (no engine call, no decision, no fingerprint restamp, sets/RIR left from the old decision), so after a deload-week swap-out/in the detail sheet showed 245×15·2·6RIR over a V17 deload trace (215×10) with a now-false "re-verified under V18" line; sets filled with anchor-predicted 245×5. Framework can't self-correct: swap busts neither the meso stale gate nor the row fingerprint (exercise identity isn't hashed; replay never checks `decision.exercise_id`). Fix: route swap through the engine (advance off the §7c counterpart when one exists — makes A→B→A restore the engine numbers — else cold seed like `addWorkoutExercises`), add the decision/row exercise-id mismatch ⇒ backfill rule, extract a single `writePrescription` chokepoint, sheet mismatch guard. Full investigation + solution assessment: [`docs/reviews/2026-07-04-swap-prescription-provenance.md`](../reviews/2026-07-04-swap-prescription-provenance.md). **Owner follow-up (2026-07-04, Batch 10 addendum) folded in:** the advance-first resolver also applies to `addWorkoutExercises` (remove-then-re-add = same lineage break), and the counterpart lookback extends to N-2 (K=2, same-day-slot, source must have logged working sets, trace discloses the gap — design + issue analysis in review doc §9; plain skips already advance today, it's the swapped-away/removed week that breaks the chain). Propagated sibling-week rows each compute under their own week context. Data-layer sibling of N5/N13 (client symptoms, PRs #131/#137); spawned T-N33 (stale stored e1RM stamps) | B | HIGH | G | ready |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -68,6 +68,7 @@ in [`archive.md`](./archive.md).
 |----|------|-------|------|--------|
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (realized via WS-I / T-I4, merged PR #82) |
 | T-A5 | S7 | Graded MEV→MAV→MRV ramp + MRV-stop auto-deload | D→F | **deferred (2026-07-02):** keep the ±1 model for now (do **not** amend doc 10 — the graded ramp stays as a documented future option). Owner idea to revisit down the road: expose **training style** (this ±1 "German-style" ramp/deload vs. the graded MEV→MAV→MRV ramp) as a **setting or macrocycle-type selection**. Big overhaul; kept in orbit. |
+| T-N33 | N33 | Stored per-set e1RM stamps (`logged_sets.e1rm`) go stale across params versions — the history surface showed 384.2 (pre-v11 averaged formula, stamped at log time) while every live engine estimate says 367.5 (v11 §S3 Brzycki cutoff), which caused the owner's "anchor lower than the set it was based on" confusion. Decide display strategy: restamp on params activation (legit — it's a derived column, not logged truth), compute live under active params, or label the vintage. Review doc §8.2 | D | needs-input (low stakes, display-only — but has confused the owner twice) |
 
 > **WS-I (T-I1–T-I5) complete & merged** — swept to [`archive.md`](./archive.md#swept-2026-06-30--reconcile-merged-build-prs) 2026-06-30. Bodyweight load-type model live (engine_params v16), legacy increment/regression + prior-peak seed retired. PRs #72 / #80 / #81 / #82.
 
@@ -535,3 +536,36 @@ landed.)*
   and the audit incoherence share the root cause (swap bypasses the engine +
   the framework is blind to exercise identity); the e1RM-skew aside is noted
   in the review doc §7 against the open R24 remainder]*
+
+#### Batch 10 addendum — owner follow-up on the N33 findings (2026-07-04, in-chat)
+
+- "the add exercise should also check if the incoming exercise has a completed
+  same-exercise counterpart in week N-1 and compute the advance if true. This
+  would catch the nearly-identical scenario of an exercise being removed and
+  then re-added to a meso, in the same way a swap-then-swap-back occurred, and
+  recompute the advance rather than seed it." *[→ folded into N33 (S1 applies
+  to both entry points via one shared resolver)]*
+- "what exactly are you calling 'cold seed'? You say addWorkoutExercise does
+  this." *[→ answered in review doc §8.1]*
+- "you've said that the 285x9 over-prescription was based on a 367.5lb anchor,
+  but the exercise history lists the e1RM from the 245x15 week which the
+  prescription was based on as 384. Why was anchor e1RM lower than the set it
+  was based on?" *[→ resolved in review doc §8.2 — log-time stamp under
+  pre-v11 averaged formula vs live anchor under the v11 Brzycki cutoff;
+  spawned T-N33 for the stale stored stamps]*
+- "there is one move common scenario that I would like to think through which
+  is similar in nature to the exercise swap scenario above, and may relate
+  also to your advance-first solution: sometimes it can be common to have to
+  swap (or skip) an exercise in a week of a meso, often due to the machine or
+  equipment being in use at the gym. Often times the user may skip the
+  exercise, or substitute to another exercise for only one week and return to
+  the original exercise in the next session. In these cases also it would be
+  useful to compute the advance for the following week even though it was
+  missed for a week. In my mind this would essentially extend the N-1 exercise
+  check to N-2 also, so that a skipped week will still catch an advance
+  compute. Think this through and flesh out the possibility and whether or not
+  there are any problems which make this approach an issue." *[→ folded into
+  N33 — design + issue analysis in review doc §9: K=2 lookback, same-day-slot,
+  source must carry logged working sets, trace discloses the gap. Finding:
+  plain skips (row present, no sets) already advance today; it's the
+  swapped-away/removed week that breaks the chain]*

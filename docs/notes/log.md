@@ -4,6 +4,24 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 47 (cont.): Batch 10 addendum — owner follow-up folded into N33
+
+Owner follow-up on the findings (verbatim = **Batch 10 addendum** in the
+appendix): (1) advance-first also applies to the **add** path (remove →
+re-add = the same lineage break) — folded into N33/S1 as one shared resolver;
+(2) "cold seed" defined in review doc §8.1 (no in-meso `previous`; precedence
+anchor → plan initial → unseeded — history still flows in via the anchor);
+(3) the 384-vs-367.5 anchor question **resolved** (§8.2, verified against the
+params registry: the history surface shows log-time per-set stamps under the
+pre-v11 averaged formula, the anchor recomputes live under the v11
+`brzycki_max_eff_reps=10` cutoff → Epley-only 367.5; W5 anchor 331.9 = mean
+of the 285×7/4 session's estimates) — spawned **T-N33** (needs-input: restamp
+/ compute-live / label the stale stored e1RMs); (4) missed-week lookback
+designed in §9 (N-1 → K=2, same-day-slot, source must have logged working
+sets, trace discloses the gap) — key finding: plain skips already advance
+today (`generateDay` passes empty actualSets → anchor reprice/hold); only a
+swapped-away/removed week breaks the chain, which the lookback + S1 fix.
+
 ## 2026-07-04 — Session 47: Batch 10 intake — swap/prescription provenance investigation (N33)
 
 Owner raised an in-chat investigation request with a W5·D2 screenshot: after a

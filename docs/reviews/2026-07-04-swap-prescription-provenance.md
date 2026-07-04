@@ -2,7 +2,10 @@
 
 **Date:** 2026-07-04 · **Reporter:** owner (in-chat, with a W5·D2 screenshot)
 · **Status:** investigated, root-caused, solutions assessed — no code changed yet.
-**Scoping record for backlog item N33.**
+**Scoping record for backlog item N33.** §8–§9 added same day from the owner's
+follow-up questions (Batch 10 addendum): add-path advance-first, the "cold
+seed" definition, the 384-vs-367.5 anchor question (resolved, → T-N33), and
+the missed-week lookback design.
 
 ---
 
@@ -127,14 +130,23 @@ exist**. Concretely:
 - **S1 (core fix): route the swap through the engine, like the add path.**
   On swap, after updating `exercise_id` and clearing `set_weights`:
   - If the incoming exercise has a **completed same-exercise counterpart in
-    week N-1** (the reconcile's §7c advance-backfill basis,
-    `regeneration.ts:821`), compute an **ADVANCE** via `prescribe` — deload-
-    aware by construction. A→B→A round-trips then *restore* the engine
-    prescription (here: exactly 215×10@6RIR·2 sets), fixing the "technically
-    correct but undesirable" reseed the owner flagged.
+    a recent prior week** (the reconcile's §7c advance-backfill basis,
+    `regeneration.ts:821`, generalized per §9 below), compute an **ADVANCE**
+    via `prescribe` — deload-aware by construction. A→B→A round-trips then
+    *restore* the engine prescription (here: exactly 215×10@6RIR·2 sets),
+    fixing the "technically correct but undesirable" reseed the owner flagged.
   - Otherwise compute a **cold seed** via `seedMeso` exactly as
     `addWorkoutExercises` does (PR as `initial`, §S1 anchor pricing, week RIR)
     — on-step, window-priced, deload-RIR-aware instead of raw PR.
+  - **The same advance-first resolver applies to `addWorkoutExercises`**
+    (owner follow-up, 2026-07-04): an exercise *removed* from a day and later
+    *re-added* is the same lineage break as swap-out/swap-in — today the add
+    path always cold-seeds. Both entry points should share one "derive the
+    kind from the data" helper: counterpart found ⇒ advance; else seed.
+  - Note the swap **propagates to future sibling weeks**
+    (`getFutureSiblingWorkoutIds`, `logging.ts:799`): each propagated row must
+    run the same engine compute under *its own* week context (RIR/deload) and
+    get its own decision — not a copy of the source week's numbers.
   - Either way: write the full tuple (weight/reps/sets/targetRir), set `notes`
     to the engine rationale (one provenance string, killing the bespoke
     "all-time best" copy), stamp `dep_fingerprint` + `params_version`, insert
@@ -178,14 +190,147 @@ follow-up, **S5** separate engine PR.
 
 - **The 285×9 over-prescription** the owner mentioned traces to the V11-era
   anchor **367.5, LOW confidence** (Epley-only at 15 effective reps) driving a
-  +25 lb jump off the 245×15 outlier session. Later params versions already
-  temper this (V17 anchor 331.9, high confidence; §S3 Brzycki cutoff; R24
-  capped the cutoff ≤10). Whether a *low-confidence* anchor should authorize a
-  full-increment jump at all may be worth folding into the open R24
-  reprice/guardrail investigation.
+  +25 lb jump off the 245×15 outlier session (why 367.5 and not the displayed
+  384: resolved in §8.2). Later params versions already temper the estimate
+  (V17 anchor 331.9, high confidence; §S3 Brzycki cutoff). Whether a
+  *low-confidence* anchor should authorize a full-increment jump at all may be
+  worth folding into the open R24 reprice/guardrail investigation.
 - **`v_exercise_prs` best (245×15) is itself the outlier set** — one more
   reason "swap in at your all-time best" is the wrong seed basis versus the
   recency anchor (consistent with the T-I5 owner ruling: don't fabricate;
   prefer data-honest seeds).
 - The swap note's *"this week's sets seed next week"* is false in a final /
   deload week; S1 retires the copy along with the path.
+
+## 8. Follow-up Q&A (owner, 2026-07-04)
+
+### 8.1 What "cold seed" means
+
+"Cold seed" = the `seedMeso` path (`engine/index.ts:565`): a prescription
+computed with **no `previous`** — no prior-week prescription + logged session
+in this meso to grade and advance from. "Cold" refers to the meso's
+week-to-week progression chain, **not** to ignoring history. Precedence
+(post-T-I5, no fabrication):
+
+1. **Confident recency anchor** (§S1 `seed_from_anchor`, active since v11):
+   pick the weight that lands the goal window's `target_low` reps at the
+   week's RIR off the anchor, reps follow the load. This is history-driven —
+   the anchor is the decay-weighted estimate over all completed sets.
+2. **Plan `initial_*`** (the user's manual seed) when there's no confident
+   anchor.
+3. **Unseeded** (null weight, prompt the user).
+
+`addWorkoutExercises` runs exactly this, passing the user's all-time PR as the
+`initial` fallback (so a no-confident-anchor add still gets a number), and
+records a `kind:"seed"` decision + fingerprint. The key contrast with an
+**advance**: in anchor/rep_window mode both paths price the *load* off the
+same anchor at the week's RIR — what the advance adds is **set-count
+continuity, feedback autoregulation (workload/pump/pain set adjustments), and
+performance grading** from the source session. That's why advance-first
+matters even though seed loads are usually close.
+
+### 8.2 Why was the anchor (367.5) lower than the displayed e1RM (384) for the same set? — RESOLVED
+
+Both numbers come from the same 245×15 set; they differ by **formula
+generation**, and the archaeology is verified against the params registry:
+
+- **384.2** = averaged Epley+Brzycki at 15 effective reps (Epley 367.5,
+  Brzycki 400.9). Brzycki inflates hard above ~10 reps — this *is* the
+  "skewed high" the owner noticed.
+- **v11** (created 2026-06-24 19:48, the §S3 investigation) introduced
+  `e1rm.brzycki_max_eff_reps = 10`: above 10 effective reps, **Epley alone**.
+  245×15 ⇒ 245 × 1.5 = **367.5 exactly**.
+- The W4·D2 sets were logged **before v11 was activated** that evening, so
+  their **stored per-set stamps** (`logged_sets.e1rm`, written at log time)
+  carry the old averaged value 384.2. The exercise-history surface displays
+  the session mean of those *stored* stamps (`history.ts:52
+  sessionAvgE1rm`) → 384.
+- The **anchor recomputes live from raw sets under the active params**
+  (`anchors.ts` → `recencyWeightedE1rm`, method `session_best`: recency-best
+  set → mean of that session's per-set estimates). Same evening under v11 →
+  367.5 (LOW confidence: 15 effective reps + RIR assumed from the target).
+  By the W5·D2 decision the recency-best session was the 285×7/4 one → mean
+  of (346.8, 317.0) = **331.9**, HIGH confidence — matching the deload trace.
+
+So the anchor was never "decayed below the set" — it deliberately refused the
+Brzycki inflation the display still shows. The residual defect is the
+**display**: `logged_sets.e1rm` is itself a cached derived value with no
+freshness story (the N33 theme in miniature — frozen under whatever params
+were active at log time, never restamped, diverging from every live engine
+estimate). Deliberately low-stakes (display-only trend), but it has now cost
+real owner confusion twice. Spawned **T-N33**: decide the display strategy —
+restamp stored e1RMs on params activation (append-only concerns: it's a
+derived column, not logged truth, so restamping is legitimate), compute
+display values live under active params, or label the vintage.
+
+## 9. Missed-week lookback — extending the counterpart check to N-2 (owner follow-up)
+
+Scenario: equipment is taken, so the user skips the exercise — or swaps it out
+— for one week and returns to it the next. Should week N+1 still compute an
+advance off week N-1?
+
+**Baseline today — the two shapes behave differently:**
+
+- **Skip (row exists, no sets):** already advances. `generateDay`
+  (`progression.ts:251`) advances every week-N slot with `actualSets ?? []`;
+  with a confident anchor the rep-window path reprices at the next week's RIR,
+  else the R24 no-anchor safety **hold**. The chain never breaks; grading is
+  just data-less.
+- **Swap-away / removal (no row for exercise A in week N):** the chain
+  breaks. A's re-entry has no N-1 counterpart, so today it falls into the raw
+  PR write (the N33 bug), and even under S1 it would cold-seed. **This is the
+  case the lookback fixes.** Note the swap propagates to later sibling weeks,
+  so a mid-meso one-week substitution is exactly A@N-1 → B@N → A@N+1 in the
+  data.
+
+**Proposed rule:** the advance source is the **most recent same-day-slot,
+same-exercise instance with logged working sets, looking back up to K weeks
+(K=2), within the meso**. Found ⇒ advance off that whole source (its
+prescription as `previous`, its actuals/feedback as the derived history);
+none ⇒ cold seed (§8.1). Applied uniformly at swap, add, generation, and the
+reconcile's §7c backfill so recompute replays identically.
+
+**Why it's sound (checked against the engine):**
+
+- `prescribe`'s inputs carry no week-adjacency assumption: `previous` has its
+  own `targetRir`, the destination week supplies its own RIR/deload
+  (`buildEngineInputs`, `progression.ts:92`). A 2-step RIR gap is just a
+  bigger step in the same math.
+- In rep_window + anchor mode the load is **repriced absolutely** off the
+  anchor at the destination RIR — nothing increments per-week, so a gap can't
+  compound. (The retired legacy increment path would have under-stepped
+  across gaps; it's gone for this fleet.)
+- The anchor's recency decay already discounts the gap's staleness in the
+  load; `weekPeak` / `muscleGroupWeeklySets` key off the source week exactly
+  as §7c does today.
+- Requiring **logged working sets** on the source is the real improvement
+  over the status-quo skip behavior too: a skipped week's empty advance
+  grades nothing; grading off the last *performed* session is strictly more
+  informative. (Preferring the performed W3 source over the empty W4 hold
+  when both exist should use the whole W3 source — don't mix W4's `previous`
+  with W3's actuals; one lineage per compute.)
+
+**Issues found / design bounds (none fatal):**
+
+1. **Feedback staleness.** Autoregulation (workload/pump/pain set deltas)
+   acts on a 2-week-old session. Acceptable at K=2; the rationale/trace must
+   disclose the gap ("advanced off W3·D2 — W4 missed") so the user sees it.
+2. **Bound K.** K=2 covers the one-missed-week case. Beyond that the
+   advance's marginal value over an anchor seed (set continuity + stale
+   feedback) decays toward zero while grading noise grows — recommend K=2 as
+   an engine param (a params change then re-fingerprints naturally via the
+   params token).
+3. **Same-slot only.** With an exercise on two days (this user's deadlift:
+   D2 *and* D4), cross-slot lookback would cross deliberate lineages
+   (different set counts/intents per slot). Keep lookback within the
+   day-slot; the anchor already transfers strength information across slots.
+4. **Deload contamination:** can't occur within a meso — the deload is the
+   final week, so weeks N-1/N-2 of any advance target are working weeks;
+   lookback stays meso-scoped (never crosses into a prior meso).
+5. **Skip-as-signal.** A pain-motivated skip carries no feedback, and the
+   lookback will cheerfully advance past it. Disclosure in the trace (point
+   1) is the mitigation; the joint-pain gate still applies from the source
+   session's own feedback.
+6. **Grading across the gap** should be verified with unit tests at build
+   time (grade vs the source's own target RIR, RIR-step trace wording with a
+   2-step gap) — no code inspection red flags found.
