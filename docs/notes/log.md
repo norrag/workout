@@ -4,6 +4,35 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 42 (cont.): Batch-7 addendum — owner clarifications (PR #139)
+
+Owner reviewed the intake findings in-chat (with a /cycles screenshot) and
+returned five clarifications; verbatim capture = **backlog appendix Batch 7
+addendum**. Deltas applied:
+
+- **N30 (new, F, MED, WS-C, ready)** — the 120-set history cap surfaced by
+  N14's scoping is itself unwanted: full history must be reachable via
+  lazy-load/pagination (~120 initial page is fine). Scoped: keyset pagination
+  on `getExerciseHistory` + a sentinel in `ExerciseHistoryList`/`HistorySheet`.
+  Rides with N15 or N22.
+- **N22 expanded** — the increment gap is at **creation**: rebuild the
+  create-exercise page (general UI overhaul + Load-step settable at creation;
+  today it's create-then-edit), and **MCP parity** — `create_custom_exercise`
+  lacks increment (and notes); no MCP increment surface exists at all.
+- **N23 confirmed as scoped** — the point is the receptacle where users
+  expect it (new-exercise tray), even though redeem is already kind-agnostic.
+- **N19 → wontfix, archived** ("Drop the archival bit"). The side-finding —
+  app meso delete cascades logged history behind an ack checkbox while MCP
+  refuses (rule-5 spirit gap) — was not ruled on; noted in the archive row
+  for whenever the delete flow is next touched.
+- **N28 needs-input → ready (UX→B)** — the screenshot resolved it: completed
+  macros render oldest-first because their `created_at` is an import-order
+  artifact. Fix = top-level sort by training start date desc (fallback
+  created_at); within-macro order confirmed correct, untouched.
+
+Attack-order impact: slot 4 becomes **N24 alone** (macro header, menu =
+edit/goals — no archive row); N30 joins the N15 slice (or rides N22).
+
 ## 2026-07-04 — Session 42: Batch 7 intake — 16 new items (N14–N29) (PR #139)
 
 Reconciliation sweep: no-op (PR #138 — the I12/N13 sweep — merged; no `done`

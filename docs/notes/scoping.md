@@ -459,8 +459,9 @@ at `.limit(120)` sets (`src/lib/queries/history.ts:84`) — 18 months of macro
 truncates the earliest sessions out of view — and history defaults to sets/reps
 (bodyweight lifts show effective load, never raw e1RM). **Fix:** robust endpoints in
 `foldProgressScores` (median of first/last-N qualifying sessions, or outlier drop vs
-the window median); align/lift the history cap so rollup and history agree on what
-exists. Small for the pure-fold guard (covered by `stats.test.ts`); medium if adding
+the window median); the history-cap side is now **N30** (lazy-load full history) so
+rollup and history agree on what exists. Small for the pure-fold guard (covered by
+`stats.test.ts`); medium if adding
 server-side data-hygiene detection of the offending sets.
 
 ### N16 — "EST. STRENGTH · KEY LIFTS" contradicts the Performance tab · **B / small–medium · related N14**
@@ -540,7 +541,12 @@ editable micros) consumed by `rirRamp`, a week-by-week editor behind the same
 disclosure, and doc-14 fingerprint scoping (per-week RIR edits are the framework's
 literal worked example — docs/14:137-149,184). Ship A now; B is its own slice.
 
-### N19 — Archive macros/mesos; never full-delete · **F / medium · HIGH (data-loss surface)**
+### N19 — Archive macros/mesos; never full-delete · **wontfix (owner 2026-07-04: "Drop the archival bit")**
+
+> Scoping kept below in case it returns. The side-finding stands independently:
+> the app's meso delete cascades logged history behind an ack checkbox while the
+> MCP side refuses (hard-rule-5 spirit gap) — unruled, revisit if the delete
+> flow is ever touched.
 
 **Current deletes:** app meso ⋮ → "Delete mesocycle" (`MesoHeader.tsx:394-477`) →
 `deleteMesoAction` (`cycles/actions.ts:674-680`) → raw `.delete()`
@@ -585,9 +591,25 @@ implementation). ⋮ rows: Load step (refactor `ExerciseSettingsMenu` to be
 menu-driven; show disabled on bodyweight-only rather than vanishing), share
 (owned custom only — move `ShareRow` out of the OVERVIEW tab bottom, page
 `:302-304`), delete custom exercise (query `deleteCustomExercise` exists,
-`exercises.ts:260`; **no app action/UI today** — new action + confirm sheet; or
-fold into N19's archive philosophy). No mockup figure → owner-authorized design
-delta (09 entry at build time). Rest of page (tabs, bests grid, chart) stays.
+`exercises.ts:260`; **no app action/UI today** — new action + confirm sheet;
+mirror the MCP guards, `write.ts:722-739`: refuse with logged sets or plan
+references). No mockup figure → owner-authorized design delta (09 entry at
+build time). Rest of page (tabs, bests grid, chart) stays.
+
+**Owner expansion (2026-07-04 addendum):** the increment gap is at **creation**
+— `NewExerciseForm` has no increment field, so users must create then edit.
+(b) **Rebuild the create-exercise page**: general UI overhaul + the Load-step
+increment settable at creation. Wire-up: `createCustomExerciseAction`
+(`exercises/actions.ts:97-137`) gains an optional increment arg and calls
+`setExerciseIncrementOverride` after insert (the override is per-user/
+per-exercise in `exercise_param_overrides`, so it's a second write, not an
+`exercises` column). (c) **MCP parity: all attributes at creation** —
+`create_custom_exercise` (`write.ts:425-460`) takes only
+name/equipment/description/muscle_groups: add optional `weight_increment`
+(+ `notes` — the app form has NOTES, the tool doesn't), same post-insert
+override write. There is **no MCP increment surface at all** today (also not
+on existing exercises) — consider a companion `set_exercise_increment` tool or
+an `update` path while in there; zod bounds per hard rule #6.
 
 ### N23 — Exercise sharing end-to-end · **F / small · ship with N22**
 
@@ -648,14 +670,39 @@ Producer: day-view ⋮ "Mesocycle stats" → `go(\`/cycles/meso/${mesoId}?view=b
 into `MesoHeader`. Audit note: `planned/[week]/[day]/page.tsx:67-72` is the same
 hardcode class (currently correct); exercise page is the reference implementation.
 
-### N28 — Sort macros/mesos newest-first · **UX / verify (likely already satisfied) · needs-input**
+### N28 — Sort macros/mesos newest-first · **UX→B / small · answered 2026-07-04**
 
-`getCyclesOverview` already orders macrocycles AND mesocycles `created_at desc`
-(`cycles.ts:51,59`) — top-level `/cycles` cards and standalone mesos are already
-newest-first; within-macro ordering is intentionally chronological (`orderMesos`,
-`cycles.ts:32-39`) and the macro timeline must stay so. **Question for the owner:**
-which list looked wrong — or is the ask `start_date`-desc rather than
-`created_at`-desc (differs when an older-created cycle starts later)?
+`getCyclesOverview` orders macrocycles AND mesocycles `created_at desc`
+(`cycles.ts:51,59`), and the page renders array order — yet the owner's
+screenshot shows Current > Oldest > … > Newest. **Resolution:** the completed
+macros' `created_at` is an **import-order artifact** (historical cycles
+backfilled newest-training-first, so the oldest training period carries the
+newest `created_at`). `created_at` is the wrong key for a training ledger.
+**Fix:** sort the top level by training **start date** desc with `created_at`
+fallback — macros carry date ranges; derive the macro key from its earliest
+meso `start_date` (or the macro's own start column if present) and sort
+`standaloneMesos` by `start_date ?? created_at` desc. In-memory sort in
+`getCyclesOverview` after fetch (null start dates — unstarted cycles — sort
+first, which also keeps a fresh planned cycle on top). **Do not touch**
+`orderMesos` (`cycles.ts:32-39`) — within-macro oldest→newest is confirmed
+correct by the owner.
+
+### N30 — Full exercise history reachable (lazy-load past the 120-set cap) · **F / small-medium · from the Batch-7 addendum**
+
+The owner didn't know the cap existed and wants full history always reachable:
+keep ~120 sets as the initial load, then fetch more as the user scrolls
+(lazy-load/pagination — mechanism Claude's choice). Today `getExerciseHistory`
+(`src/lib/queries/history.ts:72-170`) hard-caps `.limit(120)` (`:84`) and both
+consumers render the truncated list with no "more" affordance:
+`ExerciseHistoryList` (exercise page HISTORY tab) and `HistorySheet`
+(`HistorySheet.tsx:35` via `getExerciseHistoryAction`). **Build:** cursor
+pagination on `getExerciseHistory` (keyset on `performed_on desc, id` —
+grain is logged sets grouped into sessions; page on sessions to avoid
+splitting one mid-page) + a `loadMore` server action; `ExerciseHistoryList`
+gets an intersection-observer sentinel (or LOAD MORE row) appending pages;
+`HistorySheet` reuses it. Interacts with N15: the meso/macro-scoped variant
+should use the same pagination rather than lifting the cap wholesale. Closes
+the N14 mismatch where the rollup sees sessions history can't show.
 
 ### N29 — Template filters in the from-template picker + unified filter UI · **UX+F / picker small, unified medium**
 

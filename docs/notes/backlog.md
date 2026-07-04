@@ -42,22 +42,22 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. **Escalated (2026-07-03, Batch 5):** owner reports 1-2s dead gaps on page taps persist, esp. cycles page + subpages — users double-tap in doubt; wants IMMEDIATE switch + skeleton on every nav (day view is the only page doing it right). Disproves the Phase-A assumption that route navs already paint the `(app)/loading.tsx` fallback — re-verify on device, then per-route skeletons/streaming (Phase 3 pulled forward). **Per-route skeletons shipped (PR #134):** 9 routes (`/cycles` + macro/meso/planner/planned-day, exercises list+detail, templates, more) each got a layout-mirroring `loading.tsx` — the group-level fallback never repaints for sibling navs, which is why only day view (own file) acknowledged taps. **Owner confirmed on device 2026-07-03 (Batch 6): "all nav skeletons look good".** Remaining WS-J scope: Phase-2 #5/#7 caching pair, Phase-3 streaming/decomposition as measured. | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
 | R24 | Engine guardrail batch — **4 of 5 shipped (PR #127):** cross-field param invariants (superRefine + tests), `e1rmFactor` cutoff capped ≤ 10 (+ monotonicity property tests), no-anchor "hold" no longer rounds the held load, retire-flag comments fixed. **Remaining (open): hold-week reprice-down** (owner 2026-07-02: real concern — a slightly-decayed anchor makes a "hold" on wk N+1 < wk N; matters most for cut/maintain macro types meant to *preserve* strength; logged for future investigation, no fix decided yet) | B | LOW | G | **in-progress** — mechanical fixes merged (PR #127); reprice-down investigation open |
 | R25 | MCP polish — **3 of 4 shipped (PR #129):** audit-write failure no longer inverts a committed write (log-and-return + tests); resource handlers guarded (structured errors, no more raw `[object Object]`); `MCP_JWT_AUDIENCE` enablement step added to the runbook. **Remaining (open): tool-surface consolidation** (~4–5 overlapping tools — a deliberate design pass, not mechanical) + full dual-error-contract convergence (`{ok:false}` vs thrown→`isError`) | F | LOW | K | **in-progress** — mechanical fixes in PR #129; consolidation open |
-| N14 | Macro muscle-group rollup: bogus "starting e1RM of 7" (hack squat/quads, Jul-24→Dec-25 bulk) — `foldProgressScores` lets one unrepresentative first session define the %-change denominator; the offending session is also invisible in history (120-set cap). Fix: robust endpoints + align the history cap | B | HIGH | C | ready |
+| N14 | Macro muscle-group rollup: bogus "starting e1RM of 7" (hack squat/quads, Jul-24→Dec-25 bulk) — `foldProgressScores` lets one unrepresentative first session define the %-change denominator; the offending session is also invisible in history (120-set cap → N30). Fix: robust endpoints; N30 makes full history reachable | B | HIGH | C | ready |
 | N15 | Macro muscle groups drill all the way to a macro/meso-scoped exercise history; default e1RM view, tap to sets/reps (inverts the PH32 default for this entry point) | F | MED | C | ready — **sequence after N14/N16** (same surface; data must be right first) |
 | N16 | "EST. STRENGTH · KEY LIFTS" tile (-36.3% on the Dec-25 cut) contradicts the Performance tab — bespoke `buildMacroStats` fold includes deloads, means only the 3 most-logged lifts, no qualification. Fix: derive the tile from the qualified pipeline (one definition). Related N14 (same endpoint fragility) | B | HIGH | C | ready |
 | N17 | Planner: no way to edit # of sets per exercise — `initial_sets` is plumbed end-to-end (model→board→save→engine seed); only the stepper UI is missing (hardcoded 3 at pick time) | F | HIGH | D | ready |
 | N18 | RIR ramp editable at create (collapsed "advanced" section, standard defaults, no badgering) + per-week independent RIR. Part A (ramp in FinalizeSheet) small; Part B (per-week — needs `rir_schedule` override + `rirRamp` hook + doc-14 fingerprint scoping) medium-large, own slice | F | MED | D | ready (A) / triaged (B) |
-| N19 | Archive macros/mesos (view/unarchive under a deep `/more/archive` page); **never allow full deletion — data always kept.** App meso delete currently cascades logged history behind an ack checkbox (rule-5 spirit violation → the HIGH). `archived_at` on both tables; delete survives only for drafts/empty. Macro-side UI wants N24's header | F | HIGH | D | ready |
 | N20 | Enter-share-code in the new-cycle tray too — `RedeemForm` is generic and already routes meso codes; drop it into `NewCycleButton` like the template tray | UX | LOW | D | ready — ride with N23 |
 | N21 | "Realistic" macro targets: audited (strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range) — **hide from macro view + create flow now** (keep `plan.mesoCount`/`phases` — timeline depends on them); correcting the target engine is a later decision | Q→D | MED | C | ready (hide) — engine fix needs-decision after |
-| N22 | Exercise page overhaul: adopt the shared header (sticky brand row, [share][⋮] cluster via `AnchoredMenu`) + surface the increment setting. **Premise check: the I13 Load-step sheet already ships** — it hides behind a faint `⋯` and vanishes on bodyweight-only lifts; N22 = make it discoverable, not build it | F+UX | HIGH | F | ready — ship with N23 |
-| N23 | Exercise sharing entry points. **Premise check: share + kind-agnostic redeem already work end-to-end** (a meso code entered anywhere routes correctly; create-form copy is true for owned custom exercises — owner likely tested a stock one). Real gap: `RedeemForm` mounts only in the templates tray → new-exercise tray (blank / enter code) + N20's cycles tray | F | MED | F | ready — ship with N22 |
-| N24 | Macrocycle views adopt the shared header (sticky, ⋮ menu: edit/goals/archive) — completes the day-view/meso/macro/exercise header unification; archive row needs N19's action (ship together or N19 first) | UX | MED | D | ready |
+| N22 | Exercise surfaces overhaul (owner expanded 2026-07-04): (a) detail page adopts the shared header ([share][⋮] via `AnchoredMenu`) surfacing the existing I13 Load-step sheet (today a faint `⋯` that vanishes on bodyweight-only lifts); (b) **rebuild the create-exercise page** — general UI overhaul **+ increment settable at creation** (today create→then edit); (c) **MCP parity: `create_custom_exercise` must accept all attributes** — it lacks increment entirely (no MCP increment surface exists) | F+UX | HIGH | F | ready — ship with N23 |
+| N23 | Exercise sharing entry points — **owner confirmed the scoped read (2026-07-04):** backend + kind-agnostic redeem already work; the gap is the *receptacle where users expect it* — the new-exercise tray (blank / enter code), plus N20's cycles tray. `RedeemForm` mounts only in the templates tray today | F | MED | F | ready — ship with N22 |
+| N24 | Macrocycle views adopt the shared header (sticky, ⋮ menu: edit/goals) — completes the day-view/meso/macro/exercise header unification (archive row dropped with N19) | UX | MED | D | ready |
 | N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source (RIR, e1RM, MEV/MRV, deload, ramp…); migrate the 2 ad-hoc feedback-sheet explainers; place incrementally across dense surfaces | F | MED | M | ready |
 | N26 | Day-view set rows +~10% (cell h-32→35px, text 14→15px, LOG box 21→23px; keep header/row grid templates in sync) | UX | LOW | E | ready |
 | N27 | Back links honor origin — day-view ⋮ "Mesocycle stats" lands back on /cycles, not the day view. Generalize N4's `?from=` pattern (producer + `MesoHeader` backHref props) | UX | MED | E | ready |
-| N28 | Re-sort macros/mesos newest-first — **top-level lists are already `created_at` desc**; within-macro stays chronological by design. Which list looked wrong, or is the ask `start_date`-desc? | UX | LOW | D | needs-input |
+| N28 | Re-sort macros/mesos newest-first — **answered (2026-07-04 + screenshot):** the query is already `created_at` desc, but completed macros render oldest-first because their `created_at` is an import-order artifact. Fix: sort the top level (macros + standalone mesos) by training **start date** desc (fallback `created_at`); within-macro order (oldest→newest) unchanged | UX→B | LOW | D | ready |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | ready (picker) / triaged (FilterBar) |
+| N30 | Full exercise history must be reachable — the 120-set cap truncates it silently (also how N14's bad session hid). Keep ~120 as the initial page, then lazy-load/paginate on scroll until exhausted; applies to the history tab + `HistorySheet` | F | MED | C | ready — ride with N15 or N22 |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -438,3 +438,42 @@ landed.)*
   template filters there, but there should be." *[→ N29]*
 - "In general I would prefer a bit of a sleeker filtering UI for exercises and
   templates. They feel disjointed and clunky." *[→ N29]*
+
+#### Batch 7 addendum — owner clarifications on the intake findings (2026-07-04, in-chat, with a /cycles screenshot)
+
+- "'history view caps at 120 sets' — I did not realize this, and this isn't the
+  behavior I want. Full history should be available to the user. Pagination or
+  lazy-loading, etc should be employed as to keep calls minimal and only load
+  what the user actually needs to see, but they need to be able to access full
+  history if desired. 120 sets is plenty to see in an initial load, but
+  scrolling further into the history should fetch and load the full history via
+  additional lazy load calls, or pagination, or however it is you want to
+  handle it technically." *[→ N30, new]*
+- "Per-exercise increments: Yes, these already exist in exercise page - where
+  they do not exist is in the *create new* exercise page. I.e. you can't set
+  these when you *create* the exercise. You have to create it, and *then* go
+  and edit it in order to access these fields. This should be addressed in a
+  rebuild of the create new exercise page, so that these are available at
+  creation, along with a general overhaul of the UI for better design and
+  function. Additionally the exercise page updates to the header component will
+  also better surface the settings and share capabilities. Addt'l note: that
+  all attributes should be available to the MCP when creating an exercise too,
+  if they're not already." *[→ folded into N22]*
+- "Exercise sharing: If this already works, great. The gap is that when a user
+  is sent a share code for an exercise, the intuitive location the user will
+  navigate to is *create new exercise*, where they would expect to enter the
+  code, not create new mesocycle where the 'enter code' input exists now. Even
+  if they both accomplish the same thing, we need to have a receptacle for this
+  information in the location the users expect to find it." *[→ confirms N23
+  as scoped]*
+- "Drop the archival bit. Its really not important." *[→ N19 wontfix]*
+- "N28 input: Currently the most recent/active macrocycle appears on top.
+  Completed macrocycles appear below it, sorted with the oldest ones at the
+  top, and the newest at the bottom. This results in the order, top to bottom,
+  being: Current > Oldest > next oldest > ... — Mesocycles *within* a
+  macrocycle are currently sorted correctly and should not be changed.
+  Essentially, the top level of macrocycles (or standalone mesocycles) should
+  be sorted newest to oldest from top to bottom, and mesocycles within a macro
+  should be sorted oldest to newest, top to bottom." *[→ N28 ready: the query
+  is `created_at` desc, but the completed macros' created_at is an
+  import-order artifact — sort by training start date instead]*
