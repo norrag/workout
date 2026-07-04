@@ -1,5 +1,8 @@
 import type { MesoStats } from "@/lib/queries/stats";
-import { StrengthProgressSection } from "./StrengthProgress";
+import {
+  StrengthProgressSection,
+  type HistoryScope,
+} from "./StrengthProgress";
 
 // Shared renderers for the meso-stats views (figs 4.1–4.3) — used by the
 // stats screen and the Workout-tab resting state (08 §2).
@@ -196,7 +199,14 @@ export function BalanceView({ balance }: { balance: MesoStats["balance"] }) {
 // exercise chart — macro-scope content on a meso view.
 // ---------------------------------------------------------------------------
 
-export function PerformanceView({ stats }: { stats: MesoStats }) {
+export function PerformanceView({
+  stats,
+  historyScope,
+}: {
+  stats: MesoStats;
+  /** N15: exercise rows drill into the scoped history when provided */
+  historyScope?: HistoryScope;
+}) {
   const { performance } = stats;
 
   return (
@@ -205,6 +215,7 @@ export function PerformanceView({ stats }: { stats: MesoStats }) {
       <StrengthProgressSection
         strength={performance.strength}
         scopeLabel="THIS MESO"
+        historyScope={historyScope}
       />
 
       <div className="mt-4 border-t-[1.5px] border-ink">

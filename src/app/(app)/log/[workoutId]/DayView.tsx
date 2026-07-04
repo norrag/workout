@@ -768,7 +768,11 @@ function WorkoutOptionsMenu({
         <MenuRow
           label="Mesocycle stats"
           trailing="STATS"
-          onClick={() => go(`/cycles/meso/${mesoId}?view=balance`)}
+          // N27: carry the origin so the meso page's back link returns here,
+          // not to /cycles (the N4 `?from=` pattern)
+          onClick={() =>
+            go(`/cycles/meso/${mesoId}?view=balance&from=/log/${workoutId}`)
+          }
         />
         {mesoActive && (
           <MenuRow
@@ -1441,9 +1445,9 @@ function SetRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plannedWeight, we.bodyweight]);
 
-  // denser rows (09 §5): 32px box, 14px value, 21px log box
+  // denser rows (09 §5), scaled +10% per N26: 35px box, 15px value, 23px log box
   const cellBase =
-    "h-[32px] w-full text-center text-[14px] focus:outline-none numeral";
+    "h-[35px] w-full text-center text-[15px] focus:outline-none numeral";
   const cell =
     state === "logged"
       ? `${cellBase} border border-ink/30 bg-ink/5 font-semibold`
@@ -1565,18 +1569,18 @@ function SetRow({
 
   return (
     <div
-      className={`relative grid grid-cols-[20px_1fr_1fr_44px] items-center gap-2.5 py-[4px] ${
+      className={`relative grid grid-cols-[20px_1fr_1fr_44px] items-center gap-2.5 py-[5px] ${
         isLastRow ? "" : "border-b border-ink/15"
       }`}
     >
-      {/* 24×32px target overflowing the 20px column into the gaps — the glyph
+      {/* 24×35px target overflowing the 20px column into the gaps — the glyph
           itself was a ~10px target (R18) */}
       <button
         type="button"
         ref={menuBtnRef}
         aria-label={`set ${setNumber} menu`}
         onClick={onOpenMenu}
-        className={`-ml-0.5 flex h-8 w-6 items-center justify-center text-base leading-[0.5] ${menuOpen ? "font-bold text-ink" : "text-ink/40"}`}
+        className={`-ml-0.5 flex h-[35px] w-6 items-center justify-center text-base leading-[0.5] ${menuOpen ? "font-bold text-ink" : "text-ink/40"}`}
       >
         ⋮
       </button>
@@ -1674,9 +1678,9 @@ function SetRow({
           </div>
         </>
       )}
-      {/* LOG column — the checkbox button itself fills the 44×32 cell (R18);
-          the visual stays the 21px box */}
-      <div className="flex h-8 items-center justify-center">
+      {/* LOG column — the checkbox button itself fills the 44×35 cell (R18);
+          the visual stays the 23px box */}
+      <div className="flex h-[35px] items-center justify-center">
         {state === "logged" || state === "next" ? (
           <LogCheckbox
             checked={ack ? ack === "logged" : state === "logged"}
@@ -1713,7 +1717,7 @@ function SetRow({
             SKIP
           </span>
         ) : (
-          <div className="h-[21px] w-[21px] border-[1.5px] border-ink/35" />
+          <div className="h-[23px] w-[23px] border-[1.5px] border-ink/35" />
         )}
       </div>
       {(state === "next" && dropPending) || logged?.set_type === "drop" ? (

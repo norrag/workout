@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { MacroHeader } from "./MacroHeader";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMacroOverview, phaseLabel } from "@/lib/queries/macro";
@@ -93,44 +94,21 @@ export default async function MacroOverviewPage({
   const { macro, mesos, plan, stats } = overview;
 
   const months = macro.duration_months ?? plan.durationMonths;
-  const statusBadge =
-    macro.status === "active"
-      ? { label: "ACTIVE", cls: "border-accent text-accent" }
-      : macro.status === "completed"
-        ? { label: "COMPLETE", cls: "border-ink/40 text-ink/55" }
-        : { label: "ARCHIVED", cls: "border-ink/40 text-ink/55" };
+  const metaLine = `GOAL ${macro.goal_type.toUpperCase()} · ${span(
+    macro.start_date,
+    macro.target_end_date,
+  )} · ${months} MONTH${months === 1 ? "" : "S"}`;
 
   return (
     <div>
-      <Link
-        href="/cycles"
-        className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
-      >
-        ‹ CYCLES
-      </Link>
-
-      <div className="mt-3 flex items-start justify-between">
-        <div>
-          <div className="text-[27px] font-extrabold leading-none tracking-[-0.02em]">
-            {macro.name}
-          </div>
-          {macro.goal_notes && (
-            <div className="mt-[3px] text-[13px] font-semibold text-ink/55">
-              {macro.goal_notes}
-            </div>
-          )}
-        </div>
-        <div
-          className={`border-[1.5px] px-2 py-1 text-[9px] font-bold tracking-[0.12em] ${statusBadge.cls}`}
-        >
-          {statusBadge.label}
-        </div>
-      </div>
-      <div className="mt-2.5 text-[10.5px] font-semibold tracking-[0.1em] text-ink/55">
-        GOAL <span className="text-ink">{macro.goal_type.toUpperCase()}</span> ·{" "}
-        {span(macro.start_date, macro.target_end_date)} · {months} MONTH
-        {months === 1 ? "" : "S"}
-      </div>
+      {/* N24: the shared sticky header — edit lives in its ⋮ menu */}
+      <MacroHeader
+        macroId={macroId}
+        name={macro.name}
+        goalNotes={macro.goal_notes}
+        metaLine={metaLine}
+        status={macro.status}
+      />
 
       {/* M8: the meso page's three-way toggle at macro scope — instant
           client-state switch, `?view=` seeds deep links */}
@@ -252,18 +230,11 @@ export default async function MacroOverviewPage({
             label="ADHERENCE"
           />
         </div>
-        <div className="mt-[9px] text-[10px] leading-normal text-ink/55">
+        <div className="mb-6 mt-[9px] text-[10px] leading-normal text-ink/55">
           Per-meso detail on each meso&apos;s{" "}
           <strong className="text-ink">BALANCE · PERFORMANCE</strong> tabs.
         </div>
       </div>
-
-      <Link
-        href={`/cycles/macro/${macroId}/edit`}
-        className="mb-6 mt-[18px] block border-[1.5px] border-ink py-[13px] text-center text-[11px] font-bold tracking-[0.1em] text-ink"
-      >
-        EDIT MACROCYCLE
-      </Link>
           </div>,
           <div key="balance">
             <BalanceView balance={macroStats.balance} />
@@ -281,6 +252,11 @@ export default async function MacroOverviewPage({
             <MuscleStrengthSection
               strength={macroStats.strength}
               scopeLabel="THIS MACROCYCLE"
+              // N15: contributor rows drill into the macro-scoped history
+              historyScope={{
+                mesoIds: mesos.map((m) => m.id),
+                label: "THIS MACROCYCLE",
+              }}
             />
           </div>,
         ]}

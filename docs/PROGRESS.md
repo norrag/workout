@@ -2,7 +2,51 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-04 (latest) — N31: planner board replace-in-place
+## 2026-07-04 (latest) — Batch-7 build 3: macro header (N24) + scoped history drill-down (N15) + back links (N27) + set-row scale (N26) + start-date sort (N28)
+
+Fourth slot of the Session-42 attack order, folding in the N15 stats slice
+and the three small ready items (PR #144). Design of record: the 09
+"2026-07-04 (session 4)" entry.
+
+- **N24 — macro header adoption.** New sticky `MacroHeader` client component
+  on the shared header grammar (brand row `‹ CYCLES` + `MACROCYCLE`, title +
+  `⋮` on the shared `AnchoredMenu`, meta line + ACTIVE/COMPLETE/ARCHIVED
+  badge, goal-notes line). "Edit macrocycle" moves into the ⋮ menu (the
+  existing `/edit` route already covers goal/duration/notes/blocks),
+  replacing the full-width EDIT MACROCYCLE link at the bottom of the
+  OVERVIEW tab. Day view / meso / exercise / macro now share one header
+  idiom. Route skeleton (`loading.tsx`) updated to mirror it (and sheds the
+  stale N21 target-card block).
+- **N15 — Performance drill-down to scoped history.** `getExerciseHistory`
+  gains an optional `scopeMesoIds` filter (N30's day-grain pagination applies
+  inside the scope unchanged), threaded through `getExerciseHistoryAction`
+  (zod: uuid array, ≤100) and `ExerciseHistoryList`'s pager. `HistorySheet`
+  targets take optional `meso_ids`/`scope_label`/`e1rm_first`; the macro
+  Performance tab's muscle-group contributor rows (`MuscleStrengthSection`)
+  and the meso tab's ALL EXERCISES rows (`StrengthProgressSection`, now a
+  client component) open it scoped to their cycle, **e1RM-first** (tap flips
+  to sets/reps — the inverse of the PH32 default, per the owner). MCP
+  `get_exercise_history` contract unchanged.
+- **N27 — back links honor origin.** Day-view ⋮ → "Mesocycle stats" now
+  appends `&from=/log/<workoutId>`; the meso page validates it with the same
+  `/^\/log\/[A-Za-z0-9-]+$/` guard the exercise page uses (N4) and passes
+  new optional `backHref`/`backLabel` props into `MesoHeader` — back reads
+  `‹ WORKOUT` and returns to the workout, defaulting to `‹ CYCLES`
+  everywhere else.
+- **N26 — set rows +10%.** Day-view value cells 32→35px at 15px type, row
+  padding 4→5px, LOG box 21→23px (✓ 12→13px) with the R18 tap target grown
+  to 44×35px; set-menu ⋮ and LOG-cell wrappers kept at the new cell height.
+  Grid templates untouched (header/row stay in sync).
+- **N28 — training-date sort.** `/cycles` top level (macros + standalone
+  mesos) now orders by **training start date** desc via pure
+  `orderCyclesTopLevel` (`start_date ?? created_at`, `created_at`
+  tie-break) — `created_at` was an import-order artifact that rendered
+  completed macros oldest-first. Unstarted plans (null `start_date`) sort by
+  their fresh `created_at`, keeping a new plan on top. Within-macro order
+  (`orderMesos`) untouched per the owner. 3 unit tests.
+- Green: typecheck, lint, **778 tests (+3)**, production build.
+
+## 2026-07-04 — N31: planner board replace-in-place
 
 One-defect fix (PR #143). Tapping a filled planner row opened the same
 group-wide multi-select picker as an open slot, so a "substitution" appended

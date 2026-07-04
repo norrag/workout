@@ -42,6 +42,53 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-04 (session 4) — Macro header adoption, history drill-down, set-row scale, origin-aware back links
+
+Batch-7 build 3 (N24/N15/N26/N27, with the N28 sort fix riding along). No
+mockup figures exist for the macro header or the drill-down rows; they adopt
+the established P16 header grammar and the fig-3.2 history sheet (recorded per
+rule 8).
+
+- **Change:** the macrocycle page (2.2) header is rebuilt as a sticky
+  `MacroHeader` on the day-view/meso/exercise header grammar: brand row
+  (`‹ CYCLES` back link + `MACROCYCLE` context label), 27px title + `⋮` icon
+  button, meta line (`GOAL <TYPE> · <SPAN> · <N> MONTHS`) + status badge
+  (ACTIVE in accent — the meso header's CURRENT geometry; COMPLETE/ARCHIVED
+  in muted ink), with the owner's goal-notes line beneath when present. The ⋮
+  `AnchoredMenu` carries **Edit macrocycle** (the existing `/edit` route —
+  goal, duration, notes, and blocks all edit there), replacing the full-width
+  `EDIT MACROCYCLE` link that sat at the bottom of the OVERVIEW tab. No share
+  button — macrocycles aren't shareable. **Rationale:** N24 — completes the
+  header unification: day view, meso, exercise, and macro now share one
+  sticky-header idiom. **Affected figures:** 2.2. **Impact:** `RETROFIT`
+  (route skeleton updated to match).
+- **Change:** day-view set rows (1.1) scale up ~10%: value cells 32→35px tall
+  at 15px (was 14px) type, row padding 4→5px, and the LOG box 21→23px (its
+  ✓ 12→13px; the R18 full-cell tap target grows with the cell to 44×35px).
+  Column grid (`20px 1fr 1fr 44px`) and the header row are unchanged.
+  **Rationale:** N26 — owner: "they're just slightly too small". Amends the
+  09 §5 "denser rows" values. **Affected figures:** 1.1. **Impact:**
+  `RETROFIT` + `TOKENS` (LogCheckbox is a shared primitive; pull-to-refresh
+  reuses only its travelling-gap animation, not the box size — unaffected).
+- **Change:** the day-view ⋮ → "Mesocycle stats" deep link now carries its
+  origin (the N4 `?from=` pattern): the meso page's back link reads
+  `‹ WORKOUT` and returns to the workout you came from instead of the
+  hardcoded `‹ CYCLES`. Only a same-app `/log/<id>` path is honored.
+  **Rationale:** N27 — "you should always back link where you came from".
+  **Affected figures:** 2.3. **Impact:** `RETROFIT`.
+- **Change:** Performance-tab trend rows drill into history: the macro tab's
+  muscle-group **contributor rows** and the meso tab's **ALL EXERCISES rows**
+  are now tappable (a `›` after the meta line marks it) and open the fig-3.2
+  history sheet **scoped to that cycle's mesocycles** — subtitle reads
+  `<EXERCISE> — THIS MACROCYCLE` / `THIS MESO` in place of the equipment tag —
+  and **e1RM-first**: the sheet opens on the e1RM view (the number the trend
+  is made of) and a row tap flips to sets/reps, the inverse of the PH32
+  default for this entry point only. Scoped history pages exactly like the
+  full sheet (N30's LOAD OLDER row). **Rationale:** N15 — "drill even further
+  down in macro muscle groups all the way down to exercise history".
+  **Affected figures:** 3.2 (new entry point; sheet layout unchanged).
+  **Impact:** `RETROFIT`.
+
 ## 2026-07-04 (session 3) — Planner picker: replace-in-place mode (N31)
 
 - **Change:** tapping a **filled** row on the planner board (2.5) now opens

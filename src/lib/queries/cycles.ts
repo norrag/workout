@@ -38,6 +38,24 @@ function orderMesos(mesos: MesocycleRow[]): MesocycleRow[] {
   );
 }
 
+/**
+ * N28: the /cycles top level (macros + standalone mesos) orders by training
+ * start, newest first. `created_at` is an import-order artifact for
+ * backfilled history (the oldest training period can carry the newest
+ * `created_at`), so it's only the fallback key — which also keeps an
+ * unstarted plan (null `start_date`, fresh `created_at`) on top. Within-macro
+ * order (`orderMesos`, oldest→newest by position) is deliberately untouched.
+ */
+export function orderCyclesTopLevel<
+  T extends { start_date: string | null; created_at: string },
+>(rows: T[]): T[] {
+  const key = (r: T) => r.start_date ?? r.created_at;
+  return [...rows].sort(
+    (a, b) =>
+      key(b).localeCompare(key(a)) || b.created_at.localeCompare(a.created_at),
+  );
+}
+
 export async function getCyclesOverview(
   supabase: Client,
   userId: string,
@@ -62,13 +80,15 @@ export async function getCyclesOverview(
   if (mesoError) throw mesoError;
 
   return {
-    macros: (macros ?? []).map((macro) => ({
+    macros: orderCyclesTopLevel(macros ?? []).map((macro) => ({
       ...macro,
       mesos: orderMesos(
         (mesos ?? []).filter((m) => m.macrocycle_id === macro.id),
       ),
     })),
-    standaloneMesos: (mesos ?? []).filter((m) => !m.macrocycle_id),
+    standaloneMesos: orderCyclesTopLevel(
+      (mesos ?? []).filter((m) => !m.macrocycle_id),
+    ),
   };
 }
 

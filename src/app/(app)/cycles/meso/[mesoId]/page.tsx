@@ -38,14 +38,20 @@ export default async function MesoDetailPage({
   searchParams,
 }: {
   params: Promise<{ mesoId: string }>;
-  searchParams: Promise<{ error?: string; view?: string }>;
+  searchParams: Promise<{ error?: string; view?: string; from?: string }>;
 }) {
   const { mesoId } = await params;
   // saveMesoAsTemplateAction lands back here with ?error=template on failure
-  const { error: actionError, view: viewParam } = await searchParams;
+  const { error: actionError, view: viewParam, from } = await searchParams;
   const view: View = VIEWS.includes(viewParam as View)
     ? (viewParam as View)
     : "overview";
+
+  // N27: a day-view deep link ("Mesocycle stats") carries its origin so back
+  // returns to the workout you came from, not /cycles. Only a same-app
+  // /log/<id> path is honored (the N4 guard).
+  const backToWorkout =
+    from && /^\/log\/[A-Za-z0-9-]+$/.test(from) ? from : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -350,6 +356,8 @@ export default async function MesoDetailPage({
         mesoId={meso.id}
         mesoName={meso.name}
         status={meso.status}
+        backHref={backToWorkout ?? "/cycles"}
+        backLabel={backToWorkout ? "‹ WORKOUT" : "‹ CYCLES"}
         contextLabel={contextLabel}
         metaLine={metaLine}
         rampLine={`RAMP ${meso.rir_start} → ${meso.rir_end} RIR`}
@@ -391,7 +399,12 @@ export default async function MesoDetailPage({
         panels={[
           overviewPanel,
           <BalanceView key="balance" balance={stats.balance} />,
-          <PerformanceView key="performance" stats={stats} />,
+          <PerformanceView
+            key="performance"
+            stats={stats}
+            // N15: exercise rows drill into this meso's scoped history
+            historyScope={{ mesoIds: [meso.id], label: "THIS MESO" }}
+          />,
         ]}
       />
     </div>

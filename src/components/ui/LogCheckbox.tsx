@@ -3,15 +3,15 @@
 /**
  * LogCheckbox — the set "LOG" control (fig 1.1 set grid).
  *
- * Three visual states on the same 21px square, square-cornered per the light
- * ledger system (08 §1):
+ * Three visual states on the same 23px square (the mockup's 21px scaled +10%
+ * with the set grid, N26), square-cornered per the light ledger system (08 §1):
  *   - empty  : ink outline, tap to log
  *   - checked: filled ink box with a ✓ (tap to uncheck, unless read-only)
  *   - loading: the outline itself with a gap that travels around the perimeter
  *
- * The visual stays 21px (mockup fidelity), but the button itself fills the
- * 44×32px LOG cell — the most-tapped control in the app was a 21px target,
- * below the WCAG 2.2 minimum (R18).
+ * The visual stays the small box, but the button itself fills the 44×35px LOG
+ * cell — the most-tapped control in the app was a ~21px target, below the
+ * WCAG 2.2 minimum (R18).
  *
  * The loading state is the immediate acknowledgement that a tap registered —
  * the write fires in the background (no blocking, no full-page refresh) and the
@@ -19,7 +19,7 @@
  * shake) on failure. Motion is disabled under prefers-reduced-motion.
  */
 
-const TARGET = "flex h-8 w-11 items-center justify-center";
+const TARGET = "flex h-[35px] w-11 items-center justify-center";
 
 export function LogCheckbox({
   checked,
@@ -43,7 +43,7 @@ export function LogCheckbox({
         aria-label={`${ariaLabel} — saving`}
         className={`${TARGET} text-ink`}
       >
-        <svg viewBox="0 0 21 21" className="h-[21px] w-[21px]" aria-hidden>
+        <svg viewBox="0 0 21 21" className="h-[23px] w-[23px]" aria-hidden>
           <rect
             x="1.5"
             y="1.5"
@@ -61,7 +61,7 @@ export function LogCheckbox({
   }
 
   if (checked) {
-    const box = `flex h-[21px] w-[21px] items-center justify-center bg-ink text-[12px] text-bg-base ${
+    const box = `flex h-[23px] w-[23px] items-center justify-center bg-ink text-[13px] text-bg-base ${
       error ? "log-checkbox-shake" : ""
     }`;
     if (readOnly) {
@@ -91,7 +91,7 @@ export function LogCheckbox({
       className={TARGET}
     >
       <span
-        className={`h-[21px] w-[21px] border-2 border-ink ${error ? "log-checkbox-shake" : ""}`}
+        className={`h-[23px] w-[23px] border-2 border-ink ${error ? "log-checkbox-shake" : ""}`}
       />
     </button>
   );
