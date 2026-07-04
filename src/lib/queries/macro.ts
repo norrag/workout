@@ -1,13 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   planMacrocycle,
-  scoreProgress,
   type EngineParams,
   type MacroGoal,
   type MacroPlan,
   type MacroProfile,
   type PhaseName,
 } from "@/lib/engine";
+import { getProgressScores, keyLiftStrengthPct } from "./stats";
 import type {
   Database,
   MacrocycleRow,
@@ -857,45 +857,14 @@ async function buildMacroStats(
       ? Math.round((summary.sessions_attended / summary.sessions_due) * 100)
       : null;
 
+  // N16: one definition with the Performance tab — the same deload-filtered,
+  // ≥3-session qualified scores, key lifts by frequency among them. The old
+  // bespoke fold here included deloads and unqualified lifts, so a cut ending
+  // on a deload week read strongly negative while the tab stayed positive.
   let estStrengthPct: number | null = null;
   if (mesoIds.length > 0) {
-    const { data, error } = await supabase
-      .from("v_exercise_history")
-      .select("exercise_id, e1rm, working_sets, performed_on")
-      .eq("user_id", userId)
-      .in("mesocycle_id", mesoIds)
-      .order("performed_on");
-    if (error) throw error;
-
-    const byExercise = new Map<
-      string,
-      { first: number | null; last: number | null; sessions: number }
-    >();
-    for (const row of data ?? []) {
-      const cur = byExercise.get(row.exercise_id) ?? {
-        first: null,
-        last: null,
-        sessions: 0,
-      };
-      cur.sessions += 1;
-      if (row.e1rm != null) {
-        if (cur.first == null) cur.first = row.e1rm;
-        cur.last = row.e1rm;
-      }
-      byExercise.set(row.exercise_id, cur);
-    }
-
-    // key lifts = the three most-logged exercises (10 §7 frequency rule)
-    const keyLifts = [...byExercise.entries()]
-      .sort((a, b) => b[1].sessions - a[1].sessions)
-      .slice(0, 3);
-    const scores = keyLifts
-      .map(([, v]) => scoreProgress(v.first, v.last))
-      .filter((s): s is number => s != null);
-    if (scores.length > 0) {
-      estStrengthPct =
-        Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
-    }
+    const scores = await getProgressScores(supabase, userId, mesoIds);
+    estStrengthPct = keyLiftStrengthPct(scores);
   }
 
   return { estStrengthPct, totalVolume, sessionsLogged, adherencePct };

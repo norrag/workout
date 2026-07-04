@@ -2,7 +2,54 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-03 (latest) — N13 first-set reset fix + I12 in-app planner UX completed
+## 2026-07-04 (latest) — Batch-7 build 1: stats trust (N14/N16/N21-hide) + planner & create flow (N17/N18-A/N20)
+
+First two slots of the Session-42 attack order (PR #140).
+
+- **N14 — robust trend endpoints.** `foldProgressScores` collects each
+  exercise's non-deload session e1RMs and runs `dropE1rmOutliers` (new pure
+  helper, `E1RM_OUTLIER_RATIO = 3`) before taking first→last: sessions more
+  than 3× from the window median — either direction — are dropped from the
+  endpoints *and* the qualification count. Kills order-of-magnitude mis-logs
+  (the 7-lb hack-squat "starting e1RM") while a genuine within-window doubling
+  survives. Fewer than 3 sessions → no drop (no median worth trusting; such
+  lifts never qualify anyway).
+- **N16 — one KEY LIFTS definition.** `buildMacroStats`'s bespoke
+  `v_exercise_history` fold (deloads included, no qualification, mean of the
+  3 most-logged) is deleted; the OVERVIEW tile now reads
+  `getProgressScores` → pure `keyLiftStrengthPct` (top-3 **qualifying** by
+  frequency — doc 10 §7 — mean of their %-changes). Tile, Performance tab, and
+  MCP `get_macrocycle_summary` now share one number; deload-tail regression
+  test pins the −36.3% class of contradiction shut.
+- **N21 — realistic targets hidden** (owner's interim call, Batch 7): the
+  macro overview `REALISTIC TARGET` card and the create-flow `YOUR TARGET`
+  range/per-month rate/rationale are removed from view. `planMacrocycle`
+  still runs everywhere (block math), `target_*` columns persist, and the
+  create form keeps the meso-count sentence + phase strip under a plain
+  `PLAN` label — re-enabling is a pure view change. Target-engine correction
+  tracked separately (backlog N21, needs-decision).
+- **N17 — planner starting-set stepper.** Filled board rows get a compact
+  −/＋ `START SETS` control (the group-slots stepper grammar at row scale);
+  `setFillSets` stages in edit mode or writes live on drafts via new
+  `updateFillSetsAction` → `updateMesoExerciseSets` (zod 1–20, matching the
+  `meso_exercises.initial_sets` check). Pick-time default stays 3.
+- **N18-A — RIR ramp at create.** The FinalizeSheet's ramp summary line is a
+  collapsed disclosure (EDIT ↔ DONE); expanded it shows the edit-details
+  sheet's START/END RIR selectors (end clamped ≤ start) + deload checkbox.
+  `finalizeSchema` gains the optional fields with the same bounds + descend
+  refine; `finalizeDraftMeso` writes them only when present. Untouched, the
+  create flow is byte-identical to before — the owner's "deep option, no
+  badgering". Per-week RIR (N18-B) deliberately not attempted.
+- **N20 — share-code receptacle in the cycles tray.** `NewCycleButton`'s
+  sheet mounts the kind-agnostic `RedeemForm` under `OR ADD FROM A CODE`
+  (template-tray pattern) — a meso/template/exercise code entered here routes
+  by its stored type.
+- Rule-8 note: the stepper, the disclosure, and the tray addition have no
+  mockup figures — recorded as a dated 09 entry (2026-07-04) reusing
+  established control grammar; the N21 card removals are logged there too.
+- Green: typecheck, lint, **763 tests (+9)**, production build.
+
+## 2026-07-03 — N13 first-set reset fix + I12 in-app planner UX completed
 
 Owner session (Batch 6): N1 skeletons confirmed on device; I12 design
 authorized ("rework as you see fit"); one new HIGH bug (N13).

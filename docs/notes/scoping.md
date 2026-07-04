@@ -445,7 +445,12 @@ and left out (duplicate + place composes to the same outcome in two taps).
 
 ## Batch 7 items (scoped 2026-07-04, session 42 — 4 parallel passes)
 
-### N14 — Macro muscle-group rollup shows bogus "starting e1RM of 7" · **B / small–medium**
+### N14 — Macro muscle-group rollup shows bogus "starting e1RM of 7" · **B / small–medium · DONE (PR #140, 2026-07-04)**
+
+Shipped via the pure-fold guard: `dropE1rmOutliers` (sessions >3× from the
+window median dropped before the first→last fold; <3 sessions keeps all —
+no median worth trusting). Server-side data-hygiene detection was not added
+(the fold guard alone closes the reported case). Original scope below.
 
 Chain: `getMacroStats` (`src/lib/queries/stats.ts:729-803`) → `getProgressScores`
 (`stats.ts:100-126`) → `foldProgressScores` (`stats.ts:61-97`) → `rollupMuscleProgress`
@@ -464,7 +469,12 @@ rollup and history agree on what exists. Small for the pure-fold guard (covered 
 `stats.test.ts`); medium if adding
 server-side data-hygiene detection of the offending sets.
 
-### N16 — "EST. STRENGTH · KEY LIFTS" contradicts the Performance tab · **B / small–medium · related N14**
+### N16 — "EST. STRENGTH · KEY LIFTS" contradicts the Performance tab · **B / small–medium · related N14 · DONE (PR #140, 2026-07-04)**
+
+Shipped as scoped: the bespoke fold deleted; `buildMacroStats` now calls
+`getProgressScores` + pure `keyLiftStrengthPct` (top-3 **qualifying** by
+frequency, deload-filtered) — one definition with the Performance tab, deload-
+tail regression test included. Original scope below.
 
 The tile is the macro **OVERVIEW** stat (`cycles/macro/[macroId]/page.tsx:323-326`),
 fed by a **separate bespoke fold** in `buildMacroStats` (`src/lib/queries/macro.ts:844-902`):
@@ -492,7 +502,12 @@ getExerciseHistory` (lift the cap within a bounded window); (c) `initialView` pr
 (owner wants the inverse of the current default). `HistorySheetTarget.equipment_type`
 needs sourcing onto `MuscleGroupContributor` (small extra join).
 
-### N21 — "Realistic" macro targets: audited; hide from both macro views · **Q→D / hide = small · fix = large**
+### N21 — "Realistic" macro targets: audited; hide from both macro views · **Q→D / hide = small · fix = large · HIDE DONE (PR #140, 2026-07-04)**
+
+Hide shipped exactly as scoped (cards removed, `planMacrocycle` + persisted
+`target_*` + `plan.mesoCount`/`phases`/timeline intact; the create form's
+block-math sentence + phase strip survive under a plain PLAN label). The
+target-engine correction remains open (needs-decision). Original scope below.
 
 Engine: `planMacrocycle`/`computeTarget` (`src/lib/engine/macro.ts:234-364`), spec
 doc 10 §5. Bucket = training-years else self-reported (`macro.ts:89-96`). **Audit
@@ -510,7 +525,12 @@ the `REALISTIC TARGET` card (`cycles/macro/[macroId]/page.tsx:182-220` + helpers
 view change. Don't conflate with the N16 tile — separate metric. Correcting the
 target engine itself is a later, large item (needs-decision after the hide ships).
 
-### N17 — Planner: edit # of sets per exercise · **F / small**
+### N17 — Planner: edit # of sets per exercise · **F / small · DONE (PR #140, 2026-07-04)**
+
+Shipped as scoped: −/＋ START SETS stepper on each filled board row (compact
+group-stepper grammar), `setFillSets` mutator (staged in edit mode; live
+`updateFillSetsAction` → `updateMesoExerciseSets` on drafts), clamp 1–20.
+The pick-time default stays 3. Original scope below.
 
 The model + persistence already exist end-to-end: `meso_exercises.initial_sets`
 (schema `20260611000001:240`, 1–20 check) → `ViewFill.initial_sets`
@@ -524,7 +544,14 @@ is missing:** −/＋ stepper on each filled row (`:750-806`) with a `setFillSet
 mutator mirroring `updateGroupSlots` (`:350-366`); draft/live path needs a small
 server action to write `initial_sets`. Clamp 1–20.
 
-### N18 — RIR ramp in the create panel + per-week RIR · **F / A = small, B = medium-large**
+### N18 — RIR ramp in the create panel + per-week RIR · **F / A = small (DONE PR #140), B = medium-large (open)**
+
+Part A shipped as scoped: the FinalizeSheet ramp summary line doubles as the
+collapsed disclosure (EDIT/DONE toggle) revealing START/END RIR + deload,
+threaded through `finalizeSchema` (same bounds + descend refine as the
+edit-details path) and `finalizeDraftMeso` (optional fields; omitted = the
+draft's standard defaults). Part B (per-week `rir_schedule`) still open.
+Original scope below.
 
 Create's `FinalizeSheet` exposes only NAME+WEEKS; ramp is read-only
 (`PlannerBoard.tsx:1117-1214,1189-1191`; `finalizeMesoAction` accepts only
@@ -566,7 +593,10 @@ new deep page `/more/archive` (PH26's sub-page pattern) with view + unarchive.
 Macro-side archive action wants the N24 header (soft dependency). Optionally add MCP
 `archive_*` tools; keep `delete_*` for truly-empty blocks only.
 
-### N20 — Enter share code in the new-cycle tray · **UX / trivial**
+### N20 — Enter share code in the new-cycle tray · **UX / trivial · DONE (PR #140, 2026-07-04)**
+
+Shipped as scoped (divider + `<RedeemForm/>` in the `NewCycleButton` sheet);
+rode with the planner slice rather than N23. Original scope below.
 
 `NewCycleButton` (`cycles/NewCycleButton.tsx`) is link-only; the template tray
 already mounts the generic `<RedeemForm/>` (`templates/NewTemplateButton.tsx:47-50`),
