@@ -4,6 +4,33 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 47: Batch 10 intake — swap/prescription provenance investigation (N33)
+
+Owner raised an in-chat investigation request with a W5·D2 screenshot: after a
+deload-week swap-out/swap-back of Deadlift, the day view filled 245×5, the menu
+note said "swapped in at your all-time best 245 × 15", and the detail sheet
+showed 245×15·2·6RIR over a V17 DELOAD trace (215×10) with a "re-verified under
+V18 — unchanged" line. Verbatim = **backlog appendix Batch 10**, all → **N33**
+(B, HIGH, WS-G, `ready`).
+
+Investigated end-to-end (code + the live `engine_decisions` audit trail via
+MCP); full findings + solution assessment in
+[`docs/reviews/2026-07-04-swap-prescription-provenance.md`](../reviews/2026-07-04-swap-prescription-provenance.md).
+Root causes: `replaceWorkoutExercise` writes PR weight/reps **out-of-band**
+(no engine call, no decision, no fingerprint restamp — the add path was
+brought into doc 14 §6.2, the swap path never was), and the freshness
+framework is **blind to exercise identity** (not in the fingerprint; replay
+never compares `decision.exercise_id` to the row), so the swap busts neither
+the meso stale gate nor the row fingerprint and the reconcile re-certifies
+hand-written numbers. The displayed 245×5 is the day view's anchor predictor
+(e1RM 331.9 @ 245 lb, 6 RIR) papering over the incoherent row. Proposed fix
+(scoped, `ready`): swap computes via the engine (advance off the §7c
+counterpart when one exists — makes A→B→A restore the deload numbers — else a
+cold seed like `addWorkoutExercises`), decision/row exercise-id mismatch ⇒
+backfill in the reconcile, one `writePrescription` chokepoint, sheet mismatch
+guard. Related: N5/N13 were the client-side symptoms of the same flow; the
+e1RM-skew aside is parked with the open R24 remainder (review doc §7).
+
 ## 2026-07-04 — Session 46 (cont. 3): PR #145 merged — in-session sweep
 
 PR #145 (notes sweep + N32 fix) merged with checks green while the session

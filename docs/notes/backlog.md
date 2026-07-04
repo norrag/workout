@@ -46,6 +46,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source (RIR, e1RM, MEV/MRV, deload, ramp…); migrate the 2 ad-hoc feedback-sheet explainers; place incrementally across dense surfaces | F | MED | M | ready |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | ready (picker) / triaged (FilterBar) |
+| N33 | Exercise swap writes prescriptions out-of-band → incoherent audit state + doc-14 blind spot. `replaceWorkoutExercise` writes PR weight/reps raw (no engine call, no decision, no fingerprint restamp, sets/RIR left from the old decision), so after a deload-week swap-out/in the detail sheet showed 245×15·2·6RIR over a V17 deload trace (215×10) with a now-false "re-verified under V18" line; sets filled with anchor-predicted 245×5. Framework can't self-correct: swap busts neither the meso stale gate nor the row fingerprint (exercise identity isn't hashed; replay never checks `decision.exercise_id`). Fix: route swap through the engine (advance off the §7c counterpart when one exists — makes A→B→A restore the engine numbers — else cold seed like `addWorkoutExercises`), add the decision/row exercise-id mismatch ⇒ backfill rule, extract a single `writePrescription` chokepoint, sheet mismatch guard. Full investigation + solution assessment: [`docs/reviews/2026-07-04-swap-prescription-provenance.md`](../reviews/2026-07-04-swap-prescription-provenance.md). Data-layer sibling of N5/N13 (client symptoms, PRs #131/#137) | B | HIGH | G | ready |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -503,3 +504,34 @@ landed.)*
   PullToRefresh × scroll-lock interaction (bug present on every sheet since
   N6, first noticed on the first long sheet tested after it); the two change
   requests folded into the same item]*
+
+### Batch 10 — in-chat investigation request (2026-07-04, with W5·D2 screenshot)
+
+- "There is an issue I need you to look into surrounding prescriptions and
+  potentially seed paths. … In W4D2 I hit 245lb for 15 and 15, e1RM of 384lb.
+  The next session it prescribed 285lb, i believe for 9, but I only hit 7 and
+  4 reps. So, the 15 reps I hit apparently skewed a bit high in e1RM, for
+  reference, but thats a different issue. Later on, I was testing some of our
+  exercise swap implementations, and i went in to W5D2 and swapped the
+  deadlift for a different exercise to test, and the reswapped it back to
+  deadlift again. This caused the deadlift to be reinserted through the seed
+  path, i believe, which is perhaps another separate, technically correct but
+  undesirable issue, which I am looking into/for solutions on. But then this
+  leads us to what the real issue I am raising is, shown in the screenshot.
+  The sets are filled with 245 for 5 and 5 reps. The prescription from the
+  menu itself reads 'Swapped in at your all-time best 245 x 15; this week's
+  sets seed next week', while the prescription detail shows … PRESCRIPTION:
+  245 lb × 15 reps · 2 sets · 6 RIR … Deload off strength anchor (e1RM 331.9
+  lb): 215 lb for 10 reps at 6 RIR, 2 sets … TRACE: DELOAD — deload off
+  strength anchor (e1RM 331.9 lb): 215 lb for 10 reps at 6 RIR, 2 sets. I am
+  having trouble making sense of what's actually happening here, but it does
+  not all appear to reconcile cleanly. At the end of the day, the sets and
+  reps are filled with something vaguely sensible, but I'm not sure how it got
+  there, as it doesn't seem to map to the prescriptions well. The path to get
+  here is a bit unusual, but nonetheless its an issue. Please investigate,
+  report your findings, and assess the underlying solutions to these issues,
+  and how we can go about generalizing this system and engine to better apply
+  across all situations." *[→ N33 — one item: the swap-back reseed complaint
+  and the audit incoherence share the root cause (swap bypasses the engine +
+  the framework is blind to exercise identity); the e1RM-skew aside is noted
+  in the review doc §7 against the open R24 remainder]*
