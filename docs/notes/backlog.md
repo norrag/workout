@@ -68,7 +68,7 @@ in [`archive.md`](./archive.md).
 |----|------|-------|------|--------|
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (realized via WS-I / T-I4, merged PR #82) |
 | T-A5 | S7 | Graded MEV→MAV→MRV ramp + MRV-stop auto-deload | D→F | **deferred (2026-07-02):** keep the ±1 model for now (do **not** amend doc 10 — the graded ramp stays as a documented future option). Owner idea to revisit down the road: expose **training style** (this ±1 "German-style" ramp/deload vs. the graded MEV→MAV→MRV ramp) as a **setting or macrocycle-type selection**. Big overhaul; kept in orbit. |
-| T-N33 | N33 | Stored per-set e1RM stamps (`logged_sets.e1rm`) go stale across params versions — the history surface showed 384.2 (pre-v11 averaged formula, stamped at log time) while every live engine estimate says 367.5 (v11 §S3 Brzycki cutoff), which caused the owner's "anchor lower than the set it was based on" confusion. Decide display strategy: restamp on params activation (legit — it's a derived column, not logged truth), compute live under active params, or label the vintage. Review doc §8.2 | D | needs-input (low stakes, display-only — but has confused the owner twice) |
+| T-N33 | N33 | Stored per-set e1RM stamps (`logged_sets.e1rm`) go stale across params versions — the history surface showed 384.2 (pre-v11 averaged formula, stamped at log time) while every live engine estimate says 367.5 (v11 §S3 Brzycki cutoff), which caused the owner's "anchor lower than the set it was based on" confusion. Review doc §8.2 | D→F | **decided (2026-07-04): restamp on params activation.** Ready to build: on activation, recompute `logged_sets.e1rm` under the new params (derived column, not logged truth — `amendSet` already treats it as updatable; hard rule #5 protects logged actuals, not derived stamps). Scope note: restamp only when the activation actually changes the `e1rm` block (compare the block between versions) so unrelated params bumps don't pay a full-table rewrite; batch per-user, service-role |
 
 > **WS-I (T-I1–T-I5) complete & merged** — swept to [`archive.md`](./archive.md#swept-2026-06-30--reconcile-merged-build-prs) 2026-06-30. Bodyweight load-type model live (engine_params v16), legacy increment/regression + prior-peak seed retired. PRs #72 / #80 / #81 / #82.
 
@@ -569,3 +569,17 @@ landed.)*
   source must carry logged working sets, trace discloses the gap. Finding:
   plain skips (row present, no sets) already advance today; it's the
   swapped-away/removed week that breaks the chain]*
+
+#### Batch 10 addendum 2 — T-N33 decision + anchor-selection question (2026-07-04, in-chat)
+
+- "T-N33: restamp on params activation" *[→ T-N33 decided → ready]*
+- "you said 'And the W5 anchor 331.9 is exactly the mean of the 285×7 and
+  285×4 estimates — the session_best method picking your most recent
+  session'. Why was the W4D4 set chose as the anchor for this over the W3D4
+  set? W3D4 had a higher e1rm, so wouldn't that have been made the session
+  best? If not, why?" *[→ answered in chat + review doc §8.2 note: session
+  selection scores each set by value × recency decay (half-life 30 d); the
+  W4·D2 245×15 set (367.5 live, the likely referent — W3·D4's 259.9×8 is
+  325.9, lower either way) scored ≈312 after 7 days of decay vs ≈347 for the
+  fresh 285×7, so the 07-01 session won; the anchor value is the chosen
+  session's UNDECAYED confidence-weighted mean, 331.9]*

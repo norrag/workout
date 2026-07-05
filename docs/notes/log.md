@@ -4,6 +4,18 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-04 — Session 47 (cont. 2): T-N33 decided (restamp on activation) + anchor-selection Q&A
+
+Owner decided **T-N33: restamp `logged_sets.e1rm` on params activation**
+(row → decided/ready; scope note: restamp only when the activation changes
+the `e1rm` block, batch per-user, service-role — derived column, not logged
+truth, so hard rule #5 is not implicated). Second follow-up question
+answered (chat + review doc §8.2): `session_best` scores sets by estimate ×
+recency decay (half-life 30 d) and anchors on the winner's session at its
+**undecayed** confidence-weighted mean — the 7-day-old 245×15 (367.5 → ≈312
+after decay) lost to the fresh 285×7 (≈347), so the 07-01 session anchored
+at 331.9. Verbatim in **Batch 10 addendum 2**.
+
 ## 2026-07-04 — Session 47 (cont.): Batch 10 addendum — owner follow-up folded into N33
 
 Owner follow-up on the findings (verbatim = **Batch 10 addendum** in the

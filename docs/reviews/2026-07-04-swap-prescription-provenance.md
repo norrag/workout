@@ -258,10 +258,24 @@ Brzycki inflation the display still shows. The residual defect is the
 freshness story (the N33 theme in miniature — frozen under whatever params
 were active at log time, never restamped, diverging from every live engine
 estimate). Deliberately low-stakes (display-only trend), but it has now cost
-real owner confusion twice. Spawned **T-N33**: decide the display strategy —
-restamp stored e1RMs on params activation (append-only concerns: it's a
-derived column, not logged truth, so restamping is legitimate), compute
-display values live under active params, or label the vintage.
+real owner confusion twice. Spawned **T-N33** — **owner decided 2026-07-04:
+restamp stored e1RMs on params activation** (legitimate: it's a derived
+column, not logged truth; restamp only when the activation changes the `e1rm`
+block).
+
+**How `session_best` picks the session** (owner follow-up #2): each working
+set is scored by **estimate × recency decay** (`0.5^(ageDays/30)`,
+`reps.ts:187`); the top-scoring set's *session* anchors, and the anchor value
+is that session's **undecayed** confidence-weighted mean. At the W5·D2 deload
+compute (evening 2026-07-01): the 245×15 set's live estimate 367.5 × 0.848
+(7.1 days old) ≈ **312**, vs the just-logged 285×7's 346.8 × 1 ≈ **347** —
+the fresh session wins, anchor = mean(346.8, 317.0) = **331.9** (both sets
+high confidence, weight 1). A higher-but-older estimate losing to a fresher
+direct observation is the design intent (doc 11 / PH39): the anchor tracks
+*current* strength, and the 07-01 session (missed 285×9 → 7 and 4, back
+limiting) was exactly the evidence the deload needed to price honestly.
+(Minutes after the 245×15 session itself, that set WAS the recency-best —
+which is why the W4·D4 advance anchored on 367.5.)
 
 ## 9. Missed-week lookback — extending the counterpart check to N-2 (owner follow-up)
 
