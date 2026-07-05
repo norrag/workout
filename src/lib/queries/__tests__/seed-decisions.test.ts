@@ -48,4 +48,38 @@ describe("buildSeedDecisionRows (doc 14 §6.2)", () => {
   it("returns [] for no rows", () => {
     expect(buildSeedDecisionRows("u1", [], coords, 9, "hash", "sha")).toEqual([]);
   });
+
+  it("records a swap/add ADVANCE with its §9 source and the doc-11 RIR fallback (N33)", () => {
+    const advanceInputs = {
+      actualSets: [
+        { setNumber: 1, weight: 245, reps: 15, rirReported: null, isWarmup: false },
+        { setNumber: 2, weight: 245, reps: 15, rirReported: null, isWarmup: false },
+      ],
+    } as unknown as EngineInputs;
+    const [r] = buildSeedDecisionRows(
+      "u1",
+      [
+        {
+          workoutExerciseId: "we1",
+          exerciseId: "e1",
+          inputs: advanceInputs,
+          output,
+          kind: "advance",
+          sourceWorkoutExerciseId: "src-we",
+        },
+      ],
+      coords,
+      18,
+      "hash",
+      "sha",
+    );
+    expect(r.kind).toBe("advance");
+    expect(r.source_workout_exercise_id).toBe("src-we");
+    const prov = r.provenance as Record<string, unknown>;
+    const fallback = prov.rir_fallback as Record<string, unknown>;
+    expect(fallback.working_sets).toBe(2);
+    expect(fallback.applied).toBe(true);
+    expect(prov.seed).toBeUndefined();
+    expect(prov.slot_advance).toBeDefined();
+  });
 });

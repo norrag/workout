@@ -46,6 +46,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source (RIR, e1RM, MEV/MRV, deload, ramp…); migrate the 2 ad-hoc feedback-sheet explainers; place incrementally across dense surfaces | F | MED | M | ready |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | ready (picker) / triaged (FilterBar) |
+| N33 | Exercise swap writes prescriptions out-of-band → incoherent audit state + doc-14 blind spot. `replaceWorkoutExercise` writes PR weight/reps raw (no engine call, no decision, no fingerprint restamp, sets/RIR left from the old decision), so after a deload-week swap-out/in the detail sheet showed 245×15·2·6RIR over a V17 deload trace (215×10) with a now-false "re-verified under V18" line; sets filled with anchor-predicted 245×5. Framework can't self-correct: swap busts neither the meso stale gate nor the row fingerprint (exercise identity isn't hashed; replay never checks `decision.exercise_id`). Fix: route swap through the engine (advance off the §7c counterpart when one exists — makes A→B→A restore the engine numbers — else cold seed like `addWorkoutExercises`), add the decision/row exercise-id mismatch ⇒ backfill rule, extract a single `writePrescription` chokepoint, sheet mismatch guard. Full investigation + solution assessment: [`docs/reviews/2026-07-04-swap-prescription-provenance.md`](../reviews/2026-07-04-swap-prescription-provenance.md). **Owner follow-up (2026-07-04, Batch 10 addendum) folded in:** the advance-first resolver also applies to `addWorkoutExercises` (remove-then-re-add = same lineage break), and the counterpart lookback extends to N-2 (K=2, same-day-slot, source must have logged working sets — review doc §9). Data-layer sibling of N5/N13 (client symptoms, PRs #131/#137); spawned T-N33 | B | HIGH | G | **done (PR #147)** — `slot-prescription.ts` resolver (swap+add, advance-first with §9 lookback; golden test restores the owner's 215×10@6RIR·2), `dropForeignDecisions` replay guard + §7c lookback in the reconcile, detail-sheet out-of-band tripwire, doc 14 §6.2 amendment |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -67,6 +68,7 @@ in [`archive.md`](./archive.md).
 |----|------|-------|------|--------|
 | T-A4 | S5 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | **decided (2026-06-25): anchor-only, no back-off; retire `regression_pct`** (realized via WS-I / T-I4, merged PR #82) |
 | T-A5 | S7 | Graded MEV→MAV→MRV ramp + MRV-stop auto-deload | D→F | **deferred (2026-07-02):** keep the ±1 model for now (do **not** amend doc 10 — the graded ramp stays as a documented future option). Owner idea to revisit down the road: expose **training style** (this ±1 "German-style" ramp/deload vs. the graded MEV→MAV→MRV ramp) as a **setting or macrocycle-type selection**. Big overhaul; kept in orbit. |
+| T-N33 | N33 | Stored per-set e1RM stamps (`logged_sets.e1rm`) go stale across params versions — the history surface showed 384.2 (pre-v11 averaged formula, stamped at log time) while every live engine estimate says 367.5 (v11 §S3 Brzycki cutoff). Owner decided 2026-07-04: restamp on params activation. Review doc §8.2 | D→F | **done (PR #147)** — `e1rm-restamp.ts` wired into the MCP `activate_engine_params` tool: restamps only when the `e1rm` block changed, chunked PK upserts on the service client, idempotent, counts reported in the tool result. Caveat documented: migration-activated versions bypass the hook — activate via the MCP tool when a proposal touches the `e1rm` block |
 
 > **WS-I (T-I1–T-I5) complete & merged** — swept to [`archive.md`](./archive.md#swept-2026-06-30--reconcile-merged-build-prs) 2026-06-30. Bodyweight load-type model live (engine_params v16), legacy increment/regression + prior-peak seed retired. PRs #72 / #80 / #81 / #82.
 
@@ -503,3 +505,81 @@ landed.)*
   PullToRefresh × scroll-lock interaction (bug present on every sheet since
   N6, first noticed on the first long sheet tested after it); the two change
   requests folded into the same item]*
+
+### Batch 10 — in-chat investigation request (2026-07-04, with W5·D2 screenshot)
+
+- "There is an issue I need you to look into surrounding prescriptions and
+  potentially seed paths. … In W4D2 I hit 245lb for 15 and 15, e1RM of 384lb.
+  The next session it prescribed 285lb, i believe for 9, but I only hit 7 and
+  4 reps. So, the 15 reps I hit apparently skewed a bit high in e1RM, for
+  reference, but thats a different issue. Later on, I was testing some of our
+  exercise swap implementations, and i went in to W5D2 and swapped the
+  deadlift for a different exercise to test, and the reswapped it back to
+  deadlift again. This caused the deadlift to be reinserted through the seed
+  path, i believe, which is perhaps another separate, technically correct but
+  undesirable issue, which I am looking into/for solutions on. But then this
+  leads us to what the real issue I am raising is, shown in the screenshot.
+  The sets are filled with 245 for 5 and 5 reps. The prescription from the
+  menu itself reads 'Swapped in at your all-time best 245 x 15; this week's
+  sets seed next week', while the prescription detail shows … PRESCRIPTION:
+  245 lb × 15 reps · 2 sets · 6 RIR … Deload off strength anchor (e1RM 331.9
+  lb): 215 lb for 10 reps at 6 RIR, 2 sets … TRACE: DELOAD — deload off
+  strength anchor (e1RM 331.9 lb): 215 lb for 10 reps at 6 RIR, 2 sets. I am
+  having trouble making sense of what's actually happening here, but it does
+  not all appear to reconcile cleanly. At the end of the day, the sets and
+  reps are filled with something vaguely sensible, but I'm not sure how it got
+  there, as it doesn't seem to map to the prescriptions well. The path to get
+  here is a bit unusual, but nonetheless its an issue. Please investigate,
+  report your findings, and assess the underlying solutions to these issues,
+  and how we can go about generalizing this system and engine to better apply
+  across all situations." *[→ N33 — one item: the swap-back reseed complaint
+  and the audit incoherence share the root cause (swap bypasses the engine +
+  the framework is blind to exercise identity); the e1RM-skew aside is noted
+  in the review doc §7 against the open R24 remainder]*
+
+#### Batch 10 addendum — owner follow-up on the N33 findings (2026-07-04, in-chat)
+
+- "the add exercise should also check if the incoming exercise has a completed
+  same-exercise counterpart in week N-1 and compute the advance if true. This
+  would catch the nearly-identical scenario of an exercise being removed and
+  then re-added to a meso, in the same way a swap-then-swap-back occurred, and
+  recompute the advance rather than seed it." *[→ folded into N33 (S1 applies
+  to both entry points via one shared resolver)]*
+- "what exactly are you calling 'cold seed'? You say addWorkoutExercise does
+  this." *[→ answered in review doc §8.1]*
+- "you've said that the 285x9 over-prescription was based on a 367.5lb anchor,
+  but the exercise history lists the e1RM from the 245x15 week which the
+  prescription was based on as 384. Why was anchor e1RM lower than the set it
+  was based on?" *[→ resolved in review doc §8.2 — log-time stamp under
+  pre-v11 averaged formula vs live anchor under the v11 Brzycki cutoff;
+  spawned T-N33 for the stale stored stamps]*
+- "there is one move common scenario that I would like to think through which
+  is similar in nature to the exercise swap scenario above, and may relate
+  also to your advance-first solution: sometimes it can be common to have to
+  swap (or skip) an exercise in a week of a meso, often due to the machine or
+  equipment being in use at the gym. Often times the user may skip the
+  exercise, or substitute to another exercise for only one week and return to
+  the original exercise in the next session. In these cases also it would be
+  useful to compute the advance for the following week even though it was
+  missed for a week. In my mind this would essentially extend the N-1 exercise
+  check to N-2 also, so that a skipped week will still catch an advance
+  compute. Think this through and flesh out the possibility and whether or not
+  there are any problems which make this approach an issue." *[→ folded into
+  N33 — design + issue analysis in review doc §9: K=2 lookback, same-day-slot,
+  source must carry logged working sets, trace discloses the gap. Finding:
+  plain skips (row present, no sets) already advance today; it's the
+  swapped-away/removed week that breaks the chain]*
+
+#### Batch 10 addendum 2 — T-N33 decision + anchor-selection question (2026-07-04, in-chat)
+
+- "T-N33: restamp on params activation" *[→ T-N33 decided → ready]*
+- "you said 'And the W5 anchor 331.9 is exactly the mean of the 285×7 and
+  285×4 estimates — the session_best method picking your most recent
+  session'. Why was the W4D4 set chose as the anchor for this over the W3D4
+  set? W3D4 had a higher e1rm, so wouldn't that have been made the session
+  best? If not, why?" *[→ answered in chat + review doc §8.2 note: session
+  selection scores each set by value × recency decay (half-life 30 d); the
+  W4·D2 245×15 set (367.5 live, the likely referent — W3·D4's 259.9×8 is
+  325.9, lower either way) scored ≈312 after 7 days of decay vs ≈347 for the
+  fresh 285×7, so the 07-01 session won; the anchor value is the chosen
+  session's UNDECAYED confidence-weighted mean, 331.9]*

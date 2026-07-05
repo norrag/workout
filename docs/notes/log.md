@@ -4,6 +4,94 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 47 (cont. 3): N33 + T-N33 built (PR #147)
+
+Owner: "Go ahead and build N33 and T-N33." Both shipped on the open PR #147
+branch (rows → done; archive sweep falls to the next session after merge):
+
+- **N33** — new `queries/slot-prescription.ts` resolver: swap
+  (`replaceWorkoutExercise`) and add (`addWorkoutExercises`) both compute via
+  the engine with the kind derived from the data (advance off the §9 lookback
+  source — most recent same-day-slot instance with logged working sets within
+  2 weeks, set-less N-1 fallback for generation parity — else the doc 14 §6.2
+  cold seed); full tuple + rationale + fingerprint + decision written
+  (`seed-decisions.ts` generalized to carry kind/source). Reconcile gains the
+  S2 exercise-identity replay guard (`dropForeignDecisions`) and the same §9
+  lookback in the §7c backfill (`advanceSourceKeys` + set-presence
+  preference). Detail sheet gains the S4 out-of-band tripwire (decision
+  output numbers compared to the live row; the false "re-verified" line is
+  replaced by an explicit "set outside the engine" note on divergence).
+  Golden test reproduces the owner's W5·D2 case: swap-back restores
+  **215×10@6RIR·2 sets**. Doc 14 §6.2 carries a dated amendment.
+- **T-N33** — `queries/e1rm-restamp.ts` wired into the MCP
+  `activate_engine_params` tool: when the incoming version's `e1rm` block
+  differs from the outgoing one, all `logged_sets.e1rm` stamps recompute
+  under the new params (same rule as log time), changed rows rewritten via
+  chunked PK upserts (service client, idempotent), counts in the tool
+  result. Golden test: 245×15 restamps 384.2 → 367.5. Caveat documented:
+  migration-activated versions bypass the hook.
+
+Green: typecheck, lint, 805 tests (+27: slot resolver, lookback selection,
+replay guard, audit matcher, restamp planner, advance-kind decisions),
+production build. PROGRESS.md entry "2026-07-05 (latest)".
+
+## 2026-07-04 — Session 47 (cont. 2): T-N33 decided (restamp on activation) + anchor-selection Q&A
+
+Owner decided **T-N33: restamp `logged_sets.e1rm` on params activation**
+(row → decided/ready; scope note: restamp only when the activation changes
+the `e1rm` block, batch per-user, service-role — derived column, not logged
+truth, so hard rule #5 is not implicated). Second follow-up question
+answered (chat + review doc §8.2): `session_best` scores sets by estimate ×
+recency decay (half-life 30 d) and anchors on the winner's session at its
+**undecayed** confidence-weighted mean — the 7-day-old 245×15 (367.5 → ≈312
+after decay) lost to the fresh 285×7 (≈347), so the 07-01 session anchored
+at 331.9. Verbatim in **Batch 10 addendum 2**.
+
+## 2026-07-04 — Session 47 (cont.): Batch 10 addendum — owner follow-up folded into N33
+
+Owner follow-up on the findings (verbatim = **Batch 10 addendum** in the
+appendix): (1) advance-first also applies to the **add** path (remove →
+re-add = the same lineage break) — folded into N33/S1 as one shared resolver;
+(2) "cold seed" defined in review doc §8.1 (no in-meso `previous`; precedence
+anchor → plan initial → unseeded — history still flows in via the anchor);
+(3) the 384-vs-367.5 anchor question **resolved** (§8.2, verified against the
+params registry: the history surface shows log-time per-set stamps under the
+pre-v11 averaged formula, the anchor recomputes live under the v11
+`brzycki_max_eff_reps=10` cutoff → Epley-only 367.5; W5 anchor 331.9 = mean
+of the 285×7/4 session's estimates) — spawned **T-N33** (needs-input: restamp
+/ compute-live / label the stale stored e1RMs); (4) missed-week lookback
+designed in §9 (N-1 → K=2, same-day-slot, source must have logged working
+sets, trace discloses the gap) — key finding: plain skips already advance
+today (`generateDay` passes empty actualSets → anchor reprice/hold); only a
+swapped-away/removed week breaks the chain, which the lookback + S1 fix.
+
+## 2026-07-04 — Session 47: Batch 10 intake — swap/prescription provenance investigation (N33)
+
+Owner raised an in-chat investigation request with a W5·D2 screenshot: after a
+deload-week swap-out/swap-back of Deadlift, the day view filled 245×5, the menu
+note said "swapped in at your all-time best 245 × 15", and the detail sheet
+showed 245×15·2·6RIR over a V17 DELOAD trace (215×10) with a "re-verified under
+V18 — unchanged" line. Verbatim = **backlog appendix Batch 10**, all → **N33**
+(B, HIGH, WS-G, `ready`).
+
+Investigated end-to-end (code + the live `engine_decisions` audit trail via
+MCP); full findings + solution assessment in
+[`docs/reviews/2026-07-04-swap-prescription-provenance.md`](../reviews/2026-07-04-swap-prescription-provenance.md).
+Root causes: `replaceWorkoutExercise` writes PR weight/reps **out-of-band**
+(no engine call, no decision, no fingerprint restamp — the add path was
+brought into doc 14 §6.2, the swap path never was), and the freshness
+framework is **blind to exercise identity** (not in the fingerprint; replay
+never compares `decision.exercise_id` to the row), so the swap busts neither
+the meso stale gate nor the row fingerprint and the reconcile re-certifies
+hand-written numbers. The displayed 245×5 is the day view's anchor predictor
+(e1RM 331.9 @ 245 lb, 6 RIR) papering over the incoherent row. Proposed fix
+(scoped, `ready`): swap computes via the engine (advance off the §7c
+counterpart when one exists — makes A→B→A restore the deload numbers — else a
+cold seed like `addWorkoutExercises`), decision/row exercise-id mismatch ⇒
+backfill in the reconcile, one `writePrescription` chokepoint, sheet mismatch
+guard. Related: N5/N13 were the client-side symptoms of the same flow; the
+e1RM-skew aside is parked with the open R24 remainder (review doc §7).
+
 ## 2026-07-04 — Session 46 (cont. 3): PR #145 merged — in-session sweep
 
 PR #145 (notes sweep + N32 fix) merged with checks green while the session

@@ -5,29 +5,15 @@ import type {
   ExerciseFeedbackRow,
   ExerciseNoteRow,
   LoggedSetRow,
-  MacroGoalType,
   MesocycleRow,
   MicrocycleRow,
   SetType,
   WorkoutExerciseRow,
   WorkoutRow,
 } from "@/lib/types/database";
-import {
-  resolveEffectiveParams,
-  seedMeso,
-  toEngineEquipment,
-  toEngineLoadType,
-} from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseE1rmAnchors } from "./anchors";
-import {
-  buildSeedInputs,
-  computeDepFingerprint,
-  configProjection,
-  paramsTokenFor,
-} from "./fingerprint";
-import { getExerciseParamOverrides } from "./exercise-overrides";
-import { engineGoal } from "./engine-goal";
+import { computeSlotPrescriptions } from "./slot-prescription";
 import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
 
 type Client = SupabaseClient<Database>;
@@ -741,7 +727,15 @@ export async function removeWorkoutExercise(
 /**
  * Replace the movement behind an unstarted workout exercise (fig 1.2 menu).
  * Blocked once sets exist — logged history stays attached to what was done.
- * The prescription seeds from the user's best on the incoming exercise.
+ *
+ * N33: the prescription is computed by the ENGINE, never written raw. The
+ * slot-prescription resolver derives the kind from the data — an advance off
+ * the incoming exercise's recent same-slot instance when one exists (§9
+ * lookback; a swap-out/swap-back round trip restores the engine numbers), else
+ * the doc 14 §6.2 cold seed. The full tuple is written, the dep_fingerprint +
+ * params_version are stamped, and a decision is recorded — so the audit
+ * surface (prescription detail sheet) stays coherent and the freshness
+ * framework can replay the row.
  */
 export async function replaceWorkoutExercise(
   supabase: Client,
@@ -757,31 +751,70 @@ export async function replaceWorkoutExercise(
   if ((count ?? 0) > 0)
     return { error: "Sets are logged on this exercise. Skip it instead." };
 
-  const { data: pr, error: prError } = await supabase
-    .from("v_exercise_prs")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("exercise_id", newExerciseId)
+  const { data: slot, error: slotError } = await supabase
+    .from("workout_exercises")
+    .select("id, workout_id, prescribed_sets")
+    .eq("id", workoutExerciseId)
     .maybeSingle();
-  if (prError) throw prError;
+  if (slotError) throw slotError;
+  if (!slot) return { error: "Exercise not found." };
+
+  const { results, paramsVersion, params, coords } = await computeSlotPrescriptions(
+    supabase,
+    userId,
+    slot.workout_id,
+    [newExerciseId],
+    {
+      // a swap keeps the slot's structural set count as the cold-start basis
+      // (an advance derives its own from the source + autoregulation)
+      initialSetsByExercise: new Map([
+        [newExerciseId, slot.prescribed_sets ?? 3],
+      ]),
+    },
+  );
+  const r = results.get(newExerciseId);
+  if (!r) return { error: "Could not compute a prescription for the swap." };
 
   const { error } = await supabase
     .from("workout_exercises")
     .update({
       exercise_id: newExerciseId,
-      prescribed_weight: pr?.best_weight ?? null,
-      prescribed_reps: pr?.best_reps ?? null,
+      prescribed_weight: r.output.weight,
+      prescribed_reps: r.output.reps,
+      prescribed_sets: r.output.sets,
+      target_rir: r.output.targetRir,
       // Clear any per-set weight overrides left on the slot by the outgoing
       // exercise — otherwise the first set shows the old movement's planned
       // weight (and reps predicted off it) until the user hits "reset to
-      // prescription" (PH38). The incoming exercise starts from its own seed.
+      // prescription" (PH38). The incoming exercise starts from its own
+      // engine-computed prescription.
       set_weights: {},
-      notes: pr?.best_weight
-        ? `Swapped in at your all-time best ${pr.best_weight} × ${pr.best_reps}; this week's sets seed next week`
-        : "Swapped in — no history yet; this week's sets seed next week",
+      // one provenance string: the engine rationale (same field the reconcile
+      // writes), not bespoke swap copy
+      notes: r.output.rationale,
+      dep_fingerprint: r.depFingerprint,
+      params_version: paramsVersion,
     })
     .eq("id", workoutExerciseId);
   if (error) throw error;
+
+  // record the decision (service-role, best-effort — doc 14 §6.2)
+  await recordSeedDecisions(
+    userId,
+    [
+      {
+        workoutExerciseId,
+        exerciseId: newExerciseId,
+        inputs: r.inputs,
+        output: r.output,
+        kind: r.kind,
+        sourceWorkoutExerciseId: r.sourceWorkoutExerciseId,
+      },
+    ],
+    coords,
+    params,
+    paramsVersion,
+  );
   return { error: null };
 }
 
@@ -919,16 +952,17 @@ export async function propagateSubstitution(
 }
 
 /** Add exercises to a live workout (workout-page editing). Each lands at the
- *  bottom of the list (max position + 1), tagged with its primary muscle group,
- *  prescription seeded from the user's all-time best — the user reorders as
- *  normal. Logged history is untouched (these are new pending slots).
+ *  bottom of the list (max position + 1), tagged with its primary muscle group
+ *  — the user reorders as normal. Logged history is untouched (these are new
+ *  pending slots).
  *
- *  Doc 14 §6.2: an added slot is a cold-start seed, so it is run through the pure
- *  `seedMeso` (modeling the user's best as the cold-start `initial` defaults, so
- *  there is no peak-backoff — same starting number as before, now on-step), its
- *  `dep_fingerprint` is stamped, and a kind:"seed" decision is recorded. That
- *  lets the read-path reconcile keep it fresh when an input changes, instead of
- *  silently skipping it. */
+ *  N33: the prescription comes from the shared slot resolver — an ADVANCE off
+ *  the exercise's recent same-slot instance when one exists (§9 lookback: an
+ *  exercise removed and later re-added progresses instead of reseeding), else
+ *  the doc 14 §6.2 cold seed (§S1 anchor pricing, the user's best as the
+ *  cold-start `initial`). Either way the `dep_fingerprint` is stamped and a
+ *  decision of the matching kind is recorded, so the read-path reconcile keeps
+ *  the row fresh when any input changes. */
 export async function addWorkoutExercises(
   supabase: Client,
   userId: string,
@@ -947,169 +981,55 @@ export async function addWorkoutExercises(
   if (maxErr) throw maxErr;
   let pos = maxRow?.position ?? 0;
 
-  const { data: workout, error: wErr } = await supabase
-    .from("workouts")
-    .select("microcycle_id")
-    .eq("id", workoutId)
-    .single();
-  if (wErr) throw wErr;
-  const { data: micro, error: mErr } = await supabase
-    .from("microcycles")
-    .select("id, target_rir, is_deload, mesocycle_id")
-    .eq("id", workout.microcycle_id)
-    .single();
-  if (mErr) throw mErr;
+  const { results, paramsVersion, params, coords } =
+    await computeSlotPrescriptions(supabase, userId, workoutId, exerciseIds);
 
-  // config dimensions the seed depends on (doc 14): equipment, profile, goal.
-  const { version: paramsVersion, params } = await getActiveEngineParams(supabase);
-  const [
-    { data: links, error: linkErr },
-    { data: prs, error: prErr },
-    { data: exercises, error: exErr },
-    { data: profile, error: pErr },
-    goal,
-    overrideByEx,
-    anchorByEx,
-  ] = await Promise.all([
-    supabase
-      .from("exercise_muscle_groups")
-      .select("exercise_id, muscle_group_id")
-      .in("exercise_id", exerciseIds)
-      .eq("role", "primary"),
-    supabase
-      .from("v_exercise_prs")
-      .select("exercise_id, best_weight, best_reps")
-      .eq("user_id", userId)
-      .in("exercise_id", exerciseIds),
-    supabase
-      .from("exercises")
-      .select("id, equipment_type")
-      .in("id", exerciseIds),
-    supabase
-      .from("profiles")
-      .select("experience_level, bodyweight")
-      .eq("id", userId)
-      .single(),
-    resolveAddGoal(supabase, micro.mesocycle_id),
-    getExerciseParamOverrides(supabase, userId, exerciseIds),
-    // §S1: recency strength anchors for the anchor-aware seed of added exercises
-    getExerciseE1rmAnchors(supabase, userId, exerciseIds, params),
-  ]);
-  if (linkErr) throw linkErr;
-  if (prErr) throw prErr;
-  if (exErr) throw exErr;
-  if (pErr) throw pErr;
-  const mgByEx = new Map((links ?? []).map((l) => [l.exercise_id, l.muscle_group_id]));
-  const prByEx = new Map((prs ?? []).map((p) => [p.exercise_id, p]));
-  const equipmentByEx = new Map((exercises ?? []).map((e) => [e.id, e.equipment_type]));
-
-  const seeded = exerciseIds.map((id) => {
-    const pr = prByEx.get(id);
-    const equipment = equipmentByEx.get(id) ?? "other";
-    const override = overrideByEx.get(id) ?? null;
-    const effectiveParams = resolveEffectiveParams(
-      params,
-      override,
-      toEngineEquipment(equipment),
-    );
-    // model the user's best as the cold-start `initial` (no prior-meso peak ⇒ no
-    // backoff), so the prescribed number matches the prior behavior while becoming
-    // replayable through seedMeso on recompute.
-    const initial = {
-      weight: pr?.best_weight ?? null,
-      reps: pr?.best_reps ?? null,
-      sets: 3,
-    };
-    const anchor = anchorByEx.get(id) ?? null;
-    const output = seedMeso(
-      null,
-      initial,
-      { equipmentType: toEngineEquipment(equipment), loadType: toEngineLoadType(equipment) },
-      { experienceLevel: profile.experience_level ?? "beginner" },
-      micro.target_rir,
-      effectiveParams,
-      { goalType: goal, anchor, bodyweight: profile.bodyweight ?? null },
-    );
-    const inputs = buildSeedInputs({
-      equipmentType: equipment,
-      profile,
-      goal,
-      startRir: micro.target_rir,
-      isDeload: micro.is_deload,
-      initial,
-      priorPeak: null,
-      strengthAnchor: anchor,
-      bodyweight: profile.bodyweight ?? null,
-    });
-    return {
+  const rows = exerciseIds
+    .map((id) => results.get(id))
+    .filter((r): r is NonNullable<typeof r> => r != null)
+    .map((r) => ({
+      result: r,
       row: {
         workout_id: workoutId,
-        exercise_id: id,
-        muscle_group_id: mgByEx.get(id) ?? null,
+        exercise_id: r.exerciseId,
+        muscle_group_id: r.muscleGroupId,
         position: ++pos,
-        prescribed_weight: output.weight,
-        prescribed_reps: output.reps,
-        prescribed_sets: output.sets,
-        target_rir: output.targetRir,
+        prescribed_weight: r.output.weight,
+        prescribed_reps: r.output.reps,
+        prescribed_sets: r.output.sets,
+        target_rir: r.output.targetRir,
         status: "pending" as const,
-        notes: "Added during the workout",
-        dep_fingerprint: computeDepFingerprint(
-          configProjection(inputs),
-          paramsTokenFor(paramsVersion, override?.weightIncrement),
-        ),
+        notes: r.output.rationale,
+        dep_fingerprint: r.depFingerprint,
         params_version: paramsVersion,
       },
-      exerciseId: id,
-      inputs,
-      output,
-    };
-  });
+    }));
 
   const { data: newWes, error } = await supabase
     .from("workout_exercises")
-    .insert(seeded.map((s) => s.row))
+    .insert(rows.map((s) => s.row))
     .select("id, position");
   if (error) throw error;
 
-  // record a kind:"seed" decision per added slot (service-role; best-effort) so
-  // the row participates in the freshness reconcile (doc 14 §6.2).
+  // record a decision per added slot (service-role; best-effort) so the row
+  // participates in the freshness reconcile (doc 14 §6.2).
   const idByPosition = new Map((newWes ?? []).map((w) => [w.position, w.id]));
-  const decisions: SeededDecision[] = seeded
+  const decisions: SeededDecision[] = rows
     .map((s): SeededDecision | null => {
       const id = idByPosition.get(s.row.position);
       return id
-        ? { workoutExerciseId: id, exerciseId: s.exerciseId, inputs: s.inputs, output: s.output }
+        ? {
+            workoutExerciseId: id,
+            exerciseId: s.result.exerciseId,
+            inputs: s.result.inputs,
+            output: s.result.output,
+            kind: s.result.kind,
+            sourceWorkoutExerciseId: s.result.sourceWorkoutExerciseId,
+          }
         : null;
     })
     .filter((d): d is SeededDecision => d !== null);
-  await recordSeedDecisions(
-    userId,
-    decisions,
-    { workoutId, microcycleId: micro.id, mesocycleId: micro.mesocycle_id },
-    params,
-    paramsVersion,
-  );
-}
-
-/** The meso's progression goal for a freshly added slot (macro goal → default). */
-async function resolveAddGoal(
-  supabase: Client,
-  mesocycleId: string,
-): Promise<ReturnType<typeof engineGoal>> {
-  const { data: meso, error } = await supabase
-    .from("mesocycles")
-    .select("macrocycle_id")
-    .eq("id", mesocycleId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!meso?.macrocycle_id) return engineGoal(null);
-  const { data: macro, error: macroErr } = await supabase
-    .from("macrocycles")
-    .select("goal_type")
-    .eq("id", meso.macrocycle_id)
-    .maybeSingle();
-  if (macroErr) throw macroErr;
-  return engineGoal((macro?.goal_type as MacroGoalType | null) ?? null);
+  await recordSeedDecisions(userId, decisions, coords, params, paramsVersion);
 }
 
 /** Add the same exercises to each target workout's bottom (workout-page

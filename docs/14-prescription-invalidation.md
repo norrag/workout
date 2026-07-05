@@ -370,6 +370,31 @@ effective params + refreshed derived inputs." User-added slots
 (`addWorkoutExercises`) likewise record a `kind: "seed"` decision. This removes the
 current special-case where seed rows have no decision and so can't be replayed.
 
+> **Amended 2026-07-04 (N33) — slot writes + exercise identity.** The
+> investigation `docs/reviews/2026-07-04-swap-prescription-provenance.md`
+> found the exercise-swap path writing prescriptions *outside* the framework
+> (raw PR values, no decision, no fingerprint restamp), and the framework
+> blind to a slot's exercise changing. Three amendments, all shipped:
+>
+> 1. **All slot writes flow through the engine.** Swap
+>    (`replaceWorkoutExercise`) and add (`addWorkoutExercises`) share one
+>    resolver (`queries/slot-prescription.ts`) that derives the KIND from the
+>    data: an **advance** when the incoming exercise has a recent same-day-slot
+>    instance in this meso, else the §6.2 cold **seed**. Full tuple written,
+>    fingerprint stamped, decision recorded — a swap-out/swap-back round trip
+>    *restores* the engine prescription.
+> 2. **Exercise identity guards replay.** A row whose live `exercise_id`
+>    differs from its latest decision's recorded `exercise_id` is treated as
+>    decision-less (`dropForeignDecisions`) and falls into the §7b/§7c
+>    backfill — a foreign decision is never replayed onto a swapped slot.
+> 3. **Lookback advance sources (§9 of the review doc).** The advance-source
+>    counterpart check extends from week N-1 to the most recent same-day-slot
+>    instance **with logged working sets** within 2 weeks
+>    (`LOOKBACK_WEEKS`), falling back to the set-less week-(N-1) counterpart
+>    (generation parity), else seed — so a week skipped or substituted for
+>    equipment reasons still advances off the last performed session. Applies
+>    uniformly at swap, add, and the §7c reconcile backfill.
+
 ### 6.3 Self-healing for un-recomputable rows
 
 If a row's stored inputs can't be replayed (corrupt/invalid), restamp its
