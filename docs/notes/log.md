@@ -4,6 +4,16 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 48 (cont. 2): PR #148 merged — in-session sweep
+
+PR #148 merged with checks green while the session was live, so the
+reconciliation sweep ran in-session: **N25 archived** (`archive.md`, "Swept
+2026-07-05 (later)"). **N29 stays live** — the picker half shipped in #148
+but the chip-based FilterBar unification remains (row: in-progress). Docs-only
+follow-up PR on the branch restarted from merged main (same name). Live index
+is now: N1 (WS-J remainder), N18-B (per-week RIR), N21 (needs-decision), N29
+(FilterBar), PH30 deferred, R24/R25 remainders.
+
 ## 2026-07-05 — Session 48 (cont.): N25 + N29-picker built (PR #148)
 
 Picked the two `ready` items after the sweep; both shipped on PR #148

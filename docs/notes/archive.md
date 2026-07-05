@@ -11,6 +11,20 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-05 (later) — N25 glossary InfoDot merged (PR #148)
+
+Session 48 built N25 (plus the N29 picker half, whose row stays live for the
+FilterBar remainder); PR #148 merged while the session was live, so the sweep
+ran in-session. Full record in PROGRESS "2026-07-05 (latest)", the 09 entry
+"2026-07-05 — Glossary info affordance", and the Session 48 (cont.) `log.md`
+entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N25 | Info/help screens for jargon app-wide: shared `InfoDot` primitive + one `glossary.ts` source; migrate the 2 ad-hoc feedback-sheet explainers; place incrementally | F | M | **done (PR #148).** `src/lib/glossary.ts` (11 terms; copy-contract test enforces all-caps labels, no exclamation marks, card-sized bodies, e1RM/deload honesty guardrails) + `components/ui/InfoDot.tsx` (circled-"i" grammar → anchored square glossary card, AnchoredMenu placement, modal a11y + refcounted scroll lock, stacks over sheets). Both feedback explainers migrated (workload no longer auto-expands — deliberate, in 09). Wave-1 dots: day-view header TARGET/DELOAD, meso calendar ramp footer, edit-details + finalize START RIR, planner volume readout, meso Volume SETS/WEEK, EST. STRENGTH headers, exercise EST. 1RM cell. Further placement is incremental adoption as screens are touched. |
+
+---
+
 ## Swept 2026-07-05 — N33 + T-N33 merged (PR #147)
 
 Session 47 investigated the owner's W5·D2 swap-provenance report end-to-end
