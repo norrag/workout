@@ -42,6 +42,30 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-05 (session 2, cont.) — Per-week RIR editor (N18-B)
+
+- **Change:** both RIR surfaces — the planner **FinalizeSheet**'s ADVANCED
+  disclosure (fig 2.8) and the meso header's **Edit details** sheet — gain a
+  "Set each week independently" toggle (the deload checkbox grammar). Enabling
+  it seeds one row per working week from the current ramp (`W1 … Wn`, each the
+  same 0–5 segmented control as START/END RIR) and **hides the START/END pair**
+  while active (the schedule supersedes it; no dead controls). The deload week
+  never gets a row — a muted note reads `W{n} DELOAD — RIR SET BY THE ENGINE`.
+  Values are deliberately free-form (any 0–5 per week, no descend constraint —
+  flexibility is the point). The collapsed summary line reads
+  `RIR BY WEEK: 3·2·2·1` instead of `RIR RAMP: 3 → 0`, and the meso header's
+  ramp line follows the same swap. Changing WEEKS with a schedule active
+  truncates it or extends it by repeating the last week's RIR.
+- **Rationale:** N18 Batch-7 — "allow the RIR for each week to be set
+  independently, rather than just choosing a ramp, for more flexibility…
+  a deep option that we don't need to make overly obvious." Same disclosure,
+  zero new surface when untouched.
+- **Affected figures:** 2.8 (finalize), meso header edit sheet. **Impact:**
+  `NET-NEW` + `DATA` — `mesocycles.rir_schedule` (per-working-week array; the
+  deload RIR stays engine-owned), threaded through create/edit/duplicate/copy,
+  the activation ramp, the doc-14 freshness reconcile, and the MCP
+  create/update/read tools.
+
 ## 2026-07-05 (session 2) — Unified filter grammar: shared FilterBar (N29)
 
 - **Change:** one shared **FilterBar** primitive (`components/ui/FilterBar.tsx`)

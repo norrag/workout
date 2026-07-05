@@ -225,6 +225,16 @@ function registerCreateMesocycle(server: McpServer) {
         includes_deload: z.boolean().optional(),
         rir_start: z.number().int().min(0).max(6).optional(),
         rir_end: z.number().int().min(0).max(6).optional(),
+        rir_schedule: z
+          .array(z.number().int().min(0).max(5))
+          .min(2)
+          .max(8)
+          .optional()
+          .describe(
+            "N18-B: one target RIR per WORKING week (deload week excluded — the " +
+              "engine owns its RIR), any values in any order; must cover the " +
+              "working weeks exactly. Omit for the rir_start→rir_end ramp.",
+          ),
         template_id: z.string().uuid().optional(),
         days: z.array(mesoDaySchema).min(1).max(7).optional(),
         macrocycle_id: z.string().uuid().optional(),
@@ -238,6 +248,7 @@ function registerCreateMesocycle(server: McpServer) {
         includes_deload?: boolean;
         rir_start?: number;
         rir_end?: number;
+        rir_schedule?: number[];
         template_id?: string;
         days?: z.infer<typeof mesoDaySchema>[];
         macrocycle_id?: string;
@@ -254,6 +265,16 @@ function registerCreateMesocycle(server: McpServer) {
           ok: false,
           error: "pass exactly one of template_id (start from a template) or days (build from scratch).",
         });
+
+      // N18-B: a per-week schedule must set an RIR for every working week
+      if (args.rir_schedule != null) {
+        const working = (args.includes_deload ?? true) ? args.weeks - 1 : args.weeks;
+        if (args.rir_schedule.length !== working)
+          return jsonResult({
+            ok: false,
+            error: `rir_schedule must cover the ${working} working weeks (got ${args.rir_schedule.length}).`,
+          });
+      }
 
       // optionally author straight into a macro slot; returns a placement note or
       // an error that leaves the created meso standing as a standalone draft
@@ -294,6 +315,7 @@ function registerCreateMesocycle(server: McpServer) {
           includes_deload: args.includes_deload ?? true,
           rir_start: args.rir_start ?? 3,
           rir_end: args.rir_end ?? 0,
+          rir_schedule: args.rir_schedule ?? null,
           template_id: args.template_id,
           status: "planned",
         });
@@ -354,6 +376,7 @@ function registerCreateMesocycle(server: McpServer) {
         includes_deload: args.includes_deload ?? true,
         rir_start: args.rir_start ?? 3,
         rir_end: args.rir_end ?? 0,
+        rir_schedule: args.rir_schedule ?? null,
         status: "planned",
       });
 

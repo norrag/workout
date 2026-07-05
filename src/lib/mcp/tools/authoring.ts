@@ -231,11 +231,12 @@ function registerUpdateMesocycle(server: McpServer) {
       description:
         "Edit a mesocycle's own header in place — name, phase " +
         "(accumulation/intensification/peak), length in weeks, deload flag, and " +
-        "RIR ramp (start/end) — without demolishing the plan or losing its macro " +
-        "placement. name/phase change on any unfinished meso; weeks/deload/RIR only " +
-        "before it's started (an active meso's weeks are fixed — its microcycles " +
-        "exist). The engine re-derives the numbers; exercises are edited with " +
-        "edit_mesocycle.",
+        "RIR ramp (start/end, or an explicit per-working-week rir_schedule that " +
+        "supersedes the ramp; null clears it) — without demolishing the plan or " +
+        "losing its macro placement. name/phase change on any unfinished meso; " +
+        "weeks/deload/RIR only before it's started (an active meso's weeks are " +
+        "fixed — its microcycles exist). The engine re-derives the numbers; " +
+        "exercises are edited with edit_mesocycle.",
       inputSchema: {
         mesocycle_id: z.string().uuid(),
         name: z.string().min(1).max(80).optional(),
@@ -247,6 +248,17 @@ function registerUpdateMesocycle(server: McpServer) {
         includes_deload: z.boolean().optional(),
         rir_start: z.number().int().min(0).max(6).optional(),
         rir_end: z.number().int().min(0).max(6).optional(),
+        rir_schedule: z
+          .array(z.number().int().min(0).max(5))
+          .min(2)
+          .max(8)
+          .nullable()
+          .optional()
+          .describe(
+            "N18-B: one target RIR per WORKING week (deload week excluded — the " +
+              "engine owns its RIR), any values in any order. Must cover the " +
+              "working weeks exactly. null reverts to the rir_start→rir_end ramp.",
+          ),
       },
     },
     async (
@@ -258,6 +270,7 @@ function registerUpdateMesocycle(server: McpServer) {
         includes_deload?: boolean;
         rir_start?: number;
         rir_end?: number;
+        rir_schedule?: number[] | null;
       },
       extra: McpExtra,
     ) => {

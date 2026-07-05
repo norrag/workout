@@ -14,6 +14,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { InfoDot } from "@/components/ui/InfoDot";
 import { ShareRow } from "@/components/ShareRow";
+import { RirScheduleEditor } from "./RirScheduleEditor";
 import {
   deleteMesoAction,
   duplicateMesoAction,
@@ -82,6 +83,7 @@ export function MesoHeader({
   rirStart,
   rirEnd,
   includesDeload,
+  rirSchedule = null,
   placeTargets = null,
 }: {
   mesoId: string;
@@ -105,6 +107,8 @@ export function MesoHeader({
   rirStart: number;
   rirEnd: number;
   includesDeload: boolean;
+  /** N18-B: explicit per-week RIR; null = the rir_start→rir_end ramp */
+  rirSchedule?: number[] | null;
   /** non-null ⇒ a standalone planned meso that may be placed into a macro */
   placeTargets?: PlaceTarget[] | null;
 }) {
@@ -496,6 +500,7 @@ export function MesoHeader({
           rirStart={rirStart}
           rirEnd={rirEnd}
           includesDeload={includesDeload}
+          rirSchedule={rirSchedule}
         />
       )}
 
@@ -529,6 +534,7 @@ function EditDetailsSheet({
   rirStart: initialRirStart,
   rirEnd: initialRirEnd,
   includesDeload: initialDeload,
+  rirSchedule: initialSchedule,
 }: {
   open: boolean;
   onClose: () => void;
@@ -539,6 +545,7 @@ function EditDetailsSheet({
   rirStart: number;
   rirEnd: number;
   includesDeload: boolean;
+  rirSchedule: number[] | null;
 }) {
   const [state, formAction, pending] = useActionState(
     updateMesoDetailsAction,
@@ -548,6 +555,8 @@ function EditDetailsSheet({
   const [rirStart, setRirStart] = useState(initialRirStart);
   const [rirEnd, setRirEnd] = useState(initialRirEnd);
   const [deload, setDeload] = useState(initialDeload);
+  // N18-B: per-week override; non-null supersedes the START/END pair
+  const [schedule, setSchedule] = useState<number[] | null>(initialSchedule);
   // shape (length/ramp/deload) is editable only before the meso starts
   const shapeLocked = status !== "planned";
 
@@ -586,6 +595,11 @@ function EditDetailsSheet({
             <input type="hidden" name="rir_start" value={rirStart} />
             <input type="hidden" name="rir_end" value={rirEnd} />
             <input type="hidden" name="includes_deload" value={String(deload)} />
+            <input
+              type="hidden"
+              name="rir_schedule"
+              value={schedule ? schedule.join(",") : ""}
+            />
 
             <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
               WEEKS{deload ? " — INCLUDING DELOAD" : ""}
@@ -607,53 +621,69 @@ function EditDetailsSheet({
               ))}
             </div>
 
-            <div className="mt-5">
-              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-                START RIR
-                <InfoDot term="rir_ramp" small />
-              </div>
-              <div className="mt-2 flex border-[1.5px] border-ink">
-                {[0, 1, 2, 3, 4, 5].map((r, i) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      setRirStart(r);
-                      if (r < rirEnd) setRirEnd(r);
-                    }}
-                    className={`${stepBtn} ${
-                      rirStart === r
-                        ? "bg-ink font-bold text-bg-base"
-                        : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-                END RIR
-              </div>
-              <div className="mt-2 flex border-[1.5px] border-ink">
-                {[0, 1, 2, 3, 4, 5].map((r, i) => (
-                  <button
-                    key={r}
-                    type="button"
-                    disabled={r > rirStart}
-                    onClick={() => setRirEnd(r)}
-                    className={`${stepBtn} ${
-                      rirEnd === r
-                        ? "bg-ink font-bold text-bg-base"
-                        : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* N18-B: the per-week schedule supersedes the ramp; hide the
+                START/END pair while it's active rather than showing dead
+                controls */}
+            {!schedule && (
+              <>
+                <div className="mt-5">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                    START RIR
+                    <InfoDot term="rir_ramp" small />
+                  </div>
+                  <div className="mt-2 flex border-[1.5px] border-ink">
+                    {[0, 1, 2, 3, 4, 5].map((r, i) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setRirStart(r);
+                          if (r < rirEnd) setRirEnd(r);
+                        }}
+                        className={`${stepBtn} ${
+                          rirStart === r
+                            ? "bg-ink font-bold text-bg-base"
+                            : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                    END RIR
+                  </div>
+                  <div className="mt-2 flex border-[1.5px] border-ink">
+                    {[0, 1, 2, 3, 4, 5].map((r, i) => (
+                      <button
+                        key={r}
+                        type="button"
+                        disabled={r > rirStart}
+                        onClick={() => setRirEnd(r)}
+                        className={`${stepBtn} ${
+                          rirEnd === r
+                            ? "bg-ink font-bold text-bg-base"
+                            : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <RirScheduleEditor
+              weeks={weeks}
+              deload={deload}
+              rampStart={rirStart}
+              rampEnd={rirEnd}
+              schedule={schedule}
+              onChange={setSchedule}
+            />
 
             <button
               type="button"

@@ -515,6 +515,27 @@ describe("liveWeekRirUpdates", () => {
     const bad = { weeks: 99, includes_deload: true, rir_start: 3, rir_end: 0 };
     expect(liveWeekRirUpdates(micros, new Set(), bad, V15_PARAMS)).toEqual([]);
   });
+
+  it("N18-B: a per-week schedule refreshes exactly the unstarted weeks that drifted", () => {
+    // doc 14's literal worked example: re-tune week 2's RIR (2 → 3); only the
+    // week-2 row moves, started weeks stay
+    const scheduled = { ...meso, rir_schedule: [3, 3, 1, 0] };
+    const started = new Set(["w1"]);
+    const updates = liveWeekRirUpdates(
+      micros,
+      started,
+      scheduled,
+      DEFAULT_ENGINE_PARAMS, // deload RIR 4 matches the stored value
+    );
+    expect(updates).toEqual([{ id: "w2", target_rir: 3 }]);
+  });
+
+  it("N18-B: a length-mismatched (orphaned) schedule degrades gracefully", () => {
+    const orphaned = { ...meso, rir_schedule: [3, 2] };
+    expect(
+      liveWeekRirUpdates(micros, new Set(), orphaned, DEFAULT_ENGINE_PARAMS),
+    ).toEqual([]);
+  });
 });
 
 describe("latestDecisionsByRow (R11)", () => {

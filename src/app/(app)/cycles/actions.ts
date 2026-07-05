@@ -185,7 +185,7 @@ export async function startCopyDraftAction(formData: FormData): Promise<void> {
   const { supabase, user } = await requireUser();
   const { data: source } = await supabase
     .from("mesocycles")
-    .select("name, weeks, includes_deload, rir_start, rir_end")
+    .select("name, weeks, includes_deload, rir_start, rir_end, rir_schedule")
     .eq("id", sourceId)
     .maybeSingle();
   const meso = await createDraftMeso(supabase, user.id, {
@@ -194,10 +194,42 @@ export async function startCopyDraftAction(formData: FormData): Promise<void> {
     includes_deload: source?.includes_deload,
     rir_start: source?.rir_start,
     rir_end: source?.rir_end,
+    rir_schedule: source?.rir_schedule,
   });
   await copyMesoStructure(supabase, user.id, sourceId, meso.id);
   revalidatePath("/cycles");
   redirect(`/cycles/meso/${meso.id}/plan`);
+}
+
+/** N18-B: the per-week RIR field — CSV of ints ("3,2,2,1"), one per WORKING
+ *  week; "" = clear back to the interpolated ramp; absent = leave unchanged. */
+const rirScheduleField = z
+  .string()
+  .regex(/^$|^[0-5](,[0-5]){1,7}$/, "Each week's RIR must be 0–5.")
+  .optional()
+  .transform((v) =>
+    v === undefined ? undefined : v === "" ? null : v.split(",").map(Number),
+  );
+
+/** N18-B: a supplied schedule must set an RIR for every working week. */
+function refineScheduleLength(
+  v: {
+    weeks?: number;
+    includes_deload?: "true" | "false";
+    rir_schedule?: number[] | null;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (v.rir_schedule == null || v.weeks === undefined) return;
+  const deload = v.includes_deload === undefined || v.includes_deload === "true";
+  const working = deload ? v.weeks - 1 : v.weeks;
+  if (v.rir_schedule.length !== working) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Set an RIR for each of the ${working} working weeks.`,
+      path: ["rir_schedule"],
+    });
+  }
 }
 
 const finalizeSchema = z
@@ -210,6 +242,8 @@ const finalizeSchema = z
     rir_start: z.coerce.number().int().min(0).max(5).optional(),
     rir_end: z.coerce.number().int().min(0).max(5).optional(),
     includes_deload: z.enum(["true", "false"]).optional(),
+    // N18-B: optional explicit per-week RIR (supersedes the ramp when set)
+    rir_schedule: rirScheduleField,
   })
   .refine(
     (v) =>
@@ -217,7 +251,8 @@ const finalizeSchema = z
       v.rir_end === undefined ||
       v.rir_start >= v.rir_end,
     { message: "The RIR ramp must descend (start ≥ end)." },
-  );
+  )
+  .superRefine(refineScheduleLength);
 
 /** Create-mesocycle final stage — name the draft + confirm weeks → planned. */
 export async function finalizeMesoAction(
@@ -225,7 +260,15 @@ export async function finalizeMesoAction(
   formData: FormData,
 ): Promise<FormState> {
   const raw = Object.fromEntries(
-    ["meso_id", "name", "weeks", "rir_start", "rir_end", "includes_deload"]
+    [
+      "meso_id",
+      "name",
+      "weeks",
+      "rir_start",
+      "rir_end",
+      "includes_deload",
+      "rir_schedule",
+    ]
       .map((k) => [k, formData.get(k)])
       .filter(([, v]) => v != null),
   );
@@ -243,6 +286,7 @@ export async function finalizeMesoAction(
       parsed.data.includes_deload === undefined
         ? undefined
         : parsed.data.includes_deload === "true",
+    rir_schedule: parsed.data.rir_schedule,
   });
   revalidatePath("/cycles");
   redirect(`/cycles/meso/${parsed.data.meso_id}`);
@@ -671,6 +715,8 @@ const mesoDetailsSchema = z
     includes_deload: z.enum(["true", "false"]).optional(),
     rir_start: z.coerce.number().int().min(0).max(5).optional(),
     rir_end: z.coerce.number().int().min(0).max(5).optional(),
+    // N18-B: per-week RIR ("" clears back to the ramp)
+    rir_schedule: rirScheduleField,
   })
   .refine(
     (v) =>
@@ -678,7 +724,8 @@ const mesoDetailsSchema = z
       v.rir_end === undefined ||
       v.rir_start >= v.rir_end,
     { message: "The RIR ramp must descend (start ≥ end)." },
-  );
+  )
+  .superRefine(refineScheduleLength);
 
 /** The edit-details sheet closes itself on `saved` (no redirect — it edits in
  *  place on the meso page and the revalidation refreshes the header). */
@@ -694,7 +741,15 @@ export async function updateMesoDetailsAction(
   formData: FormData,
 ): Promise<MesoDetailsState> {
   const raw = Object.fromEntries(
-    ["meso_id", "name", "weeks", "includes_deload", "rir_start", "rir_end"]
+    [
+      "meso_id",
+      "name",
+      "weeks",
+      "includes_deload",
+      "rir_start",
+      "rir_end",
+      "rir_schedule",
+    ]
       .map((k) => [k, formData.get(k)])
       .filter(([, v]) => v != null),
   );
@@ -711,6 +766,7 @@ export async function updateMesoDetailsAction(
         : parsed.data.includes_deload === "true",
     rir_start: parsed.data.rir_start,
     rir_end: parsed.data.rir_end,
+    rir_schedule: parsed.data.rir_schedule,
   });
   if (!result.ok) return { error: result.error ?? "Couldn't save the changes." };
   revalidatePath("/cycles");

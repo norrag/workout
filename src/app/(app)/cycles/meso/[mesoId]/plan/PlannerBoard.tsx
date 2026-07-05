@@ -7,6 +7,7 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { InfoDot } from "@/components/ui/InfoDot";
+import { RirScheduleEditor, rirSummary } from "../RirScheduleEditor";
 import { useToast } from "@/components/ui/Toast";
 import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { HistorySheet } from "@/components/HistorySheet";
@@ -1157,6 +1158,7 @@ export function PlannerBoard({
         rirStart={meso.rir_start}
         rirEnd={meso.rir_end}
         includesDeload={meso.includes_deload}
+        rirSchedule={meso.rir_schedule}
       />
 
       {/* save-changes confirm + immutability warning */}
@@ -1254,6 +1256,7 @@ function FinalizeSheet({
   rirStart,
   rirEnd,
   includesDeload,
+  rirSchedule,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1263,6 +1266,7 @@ function FinalizeSheet({
   rirStart: number;
   rirEnd: number;
   includesDeload: boolean;
+  rirSchedule: number[] | null;
 }) {
   const [state, formAction, pending] = useActionState(
     finalizeMesoAction,
@@ -1272,12 +1276,14 @@ function FinalizeSheet({
     defaultWeeks >= 4 && defaultWeeks <= 8 ? defaultWeeks : 5,
   );
   // N18-A: the ramp is a deep option — collapsed by default, standard values,
-  // no badgering. Expanding reveals the edit-details sheet's ramp grammar.
+  // no badgering. Expanding reveals the edit-details sheet's ramp grammar
+  // (N18-B adds the per-week editor behind the same disclosure).
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [ramp, setRamp] = useState({
     start: rirStart,
     end: rirEnd,
     deload: includesDeload,
+    schedule: rirSchedule,
   });
 
   if (!open) return null;
@@ -1330,6 +1336,11 @@ function FinalizeSheet({
         <input type="hidden" name="rir_start" value={ramp.start} />
         <input type="hidden" name="rir_end" value={ramp.end} />
         <input type="hidden" name="includes_deload" value={String(ramp.deload)} />
+        <input
+          type="hidden"
+          name="rir_schedule"
+          value={ramp.schedule ? ramp.schedule.join(",") : ""}
+        />
 
         {/* N18-A: collapsed summary line doubles as the ADVANCED disclosure */}
         <button
@@ -1338,7 +1349,7 @@ function FinalizeSheet({
           className="mt-[7px] flex w-full items-center justify-between text-left"
         >
           <span className="text-[10px] font-medium tracking-[0.08em] text-ink/50">
-            RIR RAMP: {ramp.start} → {ramp.end}
+            {rirSummary(ramp.schedule, ramp.start, ramp.end)}
             {ramp.deload ? ` · W${weeks} DELOAD AT 4 RIR` : ""}
           </span>
           <span className="text-[9px] font-bold tracking-[0.12em] text-ink/55 underline underline-offset-2">
@@ -1348,56 +1359,71 @@ function FinalizeSheet({
 
         {showAdvanced && (
           <>
-            <div className="mt-4">
-              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-                START RIR
-                <InfoDot term="rir_ramp" small />
-              </div>
-              <div className="mt-2 flex border-[1.5px] border-ink">
-                {[0, 1, 2, 3, 4, 5].map((r, i) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() =>
-                      setRamp((v) => ({
-                        ...v,
-                        start: r,
-                        end: Math.min(v.end, r),
-                      }))
-                    }
-                    className={`${rirBtn} ${
-                      ramp.start === r
-                        ? "bg-ink font-bold text-bg-base"
-                        : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-                END RIR
-              </div>
-              <div className="mt-2 flex border-[1.5px] border-ink">
-                {[0, 1, 2, 3, 4, 5].map((r, i) => (
-                  <button
-                    key={r}
-                    type="button"
-                    disabled={r > ramp.start}
-                    onClick={() => setRamp((v) => ({ ...v, end: r }))}
-                    className={`${rirBtn} ${
-                      ramp.end === r
-                        ? "bg-ink font-bold text-bg-base"
-                        : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* N18-B: the per-week schedule supersedes the ramp; hide the
+                START/END pair while it's active rather than showing dead
+                controls */}
+            {!ramp.schedule && (
+              <>
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                    START RIR
+                    <InfoDot term="rir_ramp" small />
+                  </div>
+                  <div className="mt-2 flex border-[1.5px] border-ink">
+                    {[0, 1, 2, 3, 4, 5].map((r, i) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() =>
+                          setRamp((v) => ({
+                            ...v,
+                            start: r,
+                            end: Math.min(v.end, r),
+                          }))
+                        }
+                        className={`${rirBtn} ${
+                          ramp.start === r
+                            ? "bg-ink font-bold text-bg-base"
+                            : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                    END RIR
+                  </div>
+                  <div className="mt-2 flex border-[1.5px] border-ink">
+                    {[0, 1, 2, 3, 4, 5].map((r, i) => (
+                      <button
+                        key={r}
+                        type="button"
+                        disabled={r > ramp.start}
+                        onClick={() => setRamp((v) => ({ ...v, end: r }))}
+                        className={`${rirBtn} ${
+                          ramp.end === r
+                            ? "bg-ink font-bold text-bg-base"
+                            : `font-medium ${i > 0 ? "border-l border-ink/25" : ""}`
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+            <RirScheduleEditor
+              weeks={weeks}
+              deload={ramp.deload}
+              rampStart={ramp.start}
+              rampEnd={ramp.end}
+              schedule={ramp.schedule}
+              onChange={(schedule) => setRamp((v) => ({ ...v, schedule }))}
+            />
             <button
               type="button"
               onClick={() => setRamp((v) => ({ ...v, deload: !v.deload }))}

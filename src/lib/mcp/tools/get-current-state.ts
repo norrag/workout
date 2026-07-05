@@ -24,7 +24,12 @@ export interface CurrentStatePayload {
     weeks: number;
     days_per_week: number;
     includes_deload: boolean;
-    rir_ramp: { start: number; end: number };
+    rir_ramp: {
+      start: number;
+      end: number;
+      /** N18-B: explicit per-working-week override; null = the linear ramp */
+      schedule: number[] | null;
+    };
     status: string;
   } | null;
   microcycle: {
@@ -81,7 +86,11 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
           weeks: mesocycle.weeks,
           days_per_week: mesocycle.days_per_week,
           includes_deload: mesocycle.includes_deload,
-          rir_ramp: { start: mesocycle.rir_start, end: mesocycle.rir_end },
+          rir_ramp: {
+            start: mesocycle.rir_start,
+            end: mesocycle.rir_end,
+            schedule: mesocycle.rir_schedule,
+          },
           status: mesocycle.status,
         }
       : null,

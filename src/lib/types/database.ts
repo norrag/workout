@@ -28,7 +28,9 @@ type Defaulted =
   | "load_type"
   | "bodyweight"
   // nullable; set only by the library seed/import, never by app inserts
-  | "legacy_id";
+  | "legacy_id"
+  // N18-B: nullable (null = plain ramp); most insert paths never set it
+  | "rir_schedule";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -188,6 +190,8 @@ export type MesocycleRow = {
   includes_deload: boolean;
   rir_start: number;
   rir_end: number;
+  /** N18-B: explicit per-working-week RIR override; null = the rir_start→rir_end ramp */
+  rir_schedule: number[] | null;
   status:
     | "draft"
     | "unplanned"

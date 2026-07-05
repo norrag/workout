@@ -163,6 +163,20 @@ slice lands, fold amendments into those and update [PROGRESS.md](PROGRESS.md).
 > brittle (rounding-dependent), the fingerprint divergence being the load-bearing
 > proof.
 
+> **Amendment (2026-07-05, N18-B — per-week RIR ships).** The "re-tune week 2's
+> RIR" worked example is now a real feature: `mesocycles.rir_schedule`
+> (migration `20260705000002`) stores an explicit per-working-week RIR that
+> `rirRamp()` emits instead of interpolating. Exactly as phase 4 predicted, the
+> freshness framework needed **no new invalidation machinery**: the schedule
+> reaches prescriptions through `microcycles.target_rir` → `week.targetRir`, a
+> dimension the fingerprint already carries, and the read-path reconcile's
+> `liveWeekRirUpdates` re-derives unstarted weeks from the schedule the same way
+> it already did from the ramp. The only gate change is additive:
+> `rir_schedule` joined the `mesoStaleSignature` inputs (with a conservatism
+> test) so a schedule-only edit fires the reconcile. Shape edits that orphan a
+> stored schedule (weeks/deload change without re-supplying it) clear it back
+> to the ramp in `updateMesocycleAttrs`.
+
 ---
 
 ## 1. The problem, stated correctly

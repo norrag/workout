@@ -132,7 +132,12 @@ export function formatMacrocycles(overview: CyclesOverview): Record<string, unkn
     weeks: m.weeks,
     days_per_week: m.days_per_week,
     includes_deload: m.includes_deload,
-    rir_ramp: { start: m.rir_start, end: m.rir_end },
+    rir_ramp: {
+      start: m.rir_start,
+      end: m.rir_end,
+      // N18-B: explicit per-working-week override; null = the linear ramp
+      schedule: m.rir_schedule,
+    },
     status: m.status,
   });
   return {
@@ -269,7 +274,12 @@ export function formatMesoPlan(
       weeks: meso.weeks,
       days_per_week: meso.days_per_week,
       includes_deload: meso.includes_deload,
-      rir_ramp: { start: meso.rir_start, end: meso.rir_end },
+      rir_ramp: {
+        start: meso.rir_start,
+        end: meso.rir_end,
+        // N18-B: explicit per-working-week override; null = the linear ramp
+        schedule: meso.rir_schedule,
+      },
       status: meso.status,
       start_date: meso.start_date,
       planned_sets_per_week: mesoPlannedSets,
