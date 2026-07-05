@@ -18,6 +18,7 @@ import {
   type ProjectedCell,
   type WeightedWeekSets,
 } from "./volume-projection";
+import { getMuscleGroupsCached } from "./reference";
 
 type Client = SupabaseClient<Database>;
 
@@ -262,17 +263,15 @@ export async function getExerciseMuscleLinks(
   exerciseIds: string[],
 ): Promise<ExerciseMuscleLink[]> {
   if (exerciseIds.length === 0) return [];
-  const [{ data: links, error }, { data: groups, error: groupError }] =
-    await Promise.all([
-      supabase
-        .from("exercise_muscle_groups")
-        .select("exercise_id, muscle_group_id, role")
-        .in("exercise_id", exerciseIds),
-      supabase.from("muscle_groups").select("id, name"),
-    ]);
+  const [{ data: links, error }, groups] = await Promise.all([
+    supabase
+      .from("exercise_muscle_groups")
+      .select("exercise_id, muscle_group_id, role")
+      .in("exercise_id", exerciseIds),
+    getMuscleGroupsCached(),
+  ]);
   if (error) throw error;
-  if (groupError) throw groupError;
-  const nameById = new Map((groups ?? []).map((g) => [g.id, g.name]));
+  const nameById = new Map(groups.map((g) => [g.id, g.name]));
   return (links ?? []).flatMap((l) => {
     const muscle_group = nameById.get(l.muscle_group_id);
     if (!muscle_group) return [];

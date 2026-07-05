@@ -484,7 +484,7 @@ function registerPreviewMesocycleVolume(server: McpServer) {
         // resolve muscle-group names so a typo fails cleanly, then aggregate the
         // proposed spec (each day counted once per week)
         const names = args.days!.flatMap((d) => d.groups.map((g) => g.muscle_group));
-        const { missing } = resolveMuscleGroupIds(names, await listMuscleGroups(client));
+        const { missing } = resolveMuscleGroupIds(names, await listMuscleGroups());
         if (missing.length > 0)
           return jsonResult({
             ok: false,

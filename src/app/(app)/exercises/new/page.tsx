@@ -18,7 +18,7 @@ export default async function NewExercisePage() {
   if (!user) redirect("/sign-in");
 
   const [muscleGroups, activeParams] = await Promise.all([
-    listMuscleGroups(supabase),
+    listMuscleGroups(),
     getActiveEngineParams(supabase),
   ]);
 

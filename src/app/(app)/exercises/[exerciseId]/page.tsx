@@ -6,6 +6,7 @@ import {
   getExerciseDeletionImpact,
 } from "@/lib/queries/exercises";
 import { getActiveEngineParams } from "@/lib/queries/generation";
+import { getMuscleGroupsCached } from "@/lib/queries/reference";
 import { getExerciseIncrementOverride } from "@/lib/queries/exercise-overrides";
 import { toEngineEquipment, coerceLoadType } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
@@ -85,7 +86,7 @@ export default async function ExerciseDetailPage({
 
   const [
     { data: links, error: linkError },
-    { data: groups, error: groupError },
+    groups,
     { data: pinned, error: pinnedError },
     overview,
     history,
@@ -94,7 +95,7 @@ export default async function ExerciseDetailPage({
     deletionImpact,
   ] = await Promise.all([
     supabase.from("exercise_muscle_groups").select("*").eq("exercise_id", exercise.id),
-    supabase.from("muscle_groups").select("*"),
+    getMuscleGroupsCached(),
     supabase
       .from("exercise_notes")
       .select("*")
@@ -115,7 +116,6 @@ export default async function ExerciseDetailPage({
       : Promise.resolve(null),
   ]);
   if (linkError) throw linkError;
-  if (groupError) throw groupError;
   if (pinnedError) throw pinnedError;
 
   // engine default loadable step for this exercise, for the increment-override
@@ -133,7 +133,7 @@ export default async function ExerciseDetailPage({
   const loadType = coerceLoadType(exercise.load_type, exercise.equipment_type);
   const showLoadStep = loadType !== "bodyweight_only";
 
-  const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]));
+  const groupName = new Map(groups.map((g) => [g.id, g.name]));
   const primary = (links ?? []).find((l) => l.role === "primary");
   const secondary = (links ?? []).filter((l) => l.role === "secondary");
   const metaLine = [

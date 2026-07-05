@@ -2,7 +2,37 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-05 (latest) — N25 glossary InfoDot + N29 picker filters
+## 2026-07-05 (latest) — WS-J Phase 2 closed: reference-data cache (#7), #5 dropped
+
+The last open items of the N1 performance plan's Phase 2 (server load, egress
+& caching — [notes/J-performance.md](notes/J-performance.md)) are dispositioned;
+the phase is complete (#1–#10 all shipped or rejected with recorded reasons).
+
+- **#7 — cached reference reads.** New `src/lib/queries/reference.ts`: the two
+  global datasets (`muscle_groups`, 12 rows; the stock exercise library +
+  muscle links, 330 + 352 rows) now serve from the shared Next Data Cache
+  (`unstable_cache`, 1 h TTL, `ref:*` tags) instead of hitting Postgres on
+  every request — previously re-fetched on every day-view open, planner load,
+  template/stats/coaching read, `/exercises` visit, and add-exercise sheet.
+  Cache misses read through the service client (cookie-scoped RLS clients
+  can't run inside `unstable_cache`) explicitly scoped to global rows
+  (`user_id IS NULL`); a static test guards that nothing per-user can enter
+  the shared cache. `exercises.ts` merges the user's live custom rows/links
+  over the cached stock (`mergeLibrary` + `filterLibraryExercises`, pure,
+  SQL-parity tested); `listExercises` / `listPickerExercises` /
+  `getAddExerciseCandidates` / `listMuscleGroups` (now zero-arg) plus 7
+  hot-path `muscle_groups` fetches converted. Stock-links embed live-verified
+  352/352 against the hosted project via PostgREST.
+- **#5 — revalidateTag conversion, assessed & dropped.** No log mutation
+  touches what #7 cached (stock reference data has no in-app writers), and
+  per-user workout reads deliberately stay uncached per doc 14's pull-based
+  freshness — so there is no tag to bust; the existing `revalidatePath`
+  calls are the correct client Router Cache bust for the user's own edits.
+  Full rationale in J-performance.md.
+
+Green: typecheck, lint, 820 tests (+9 reference-library), production build.
+
+## 2026-07-05 — N25 glossary InfoDot + N29 picker filters
 
 Two ready backlog items shipped as one slice (09 entry "2026-07-05 — Glossary
 info affordance"):

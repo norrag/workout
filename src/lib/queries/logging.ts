@@ -13,6 +13,7 @@ import type {
 } from "@/lib/types/database";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseE1rmAnchors } from "./anchors";
+import { getMuscleGroupsCached } from "./reference";
 import { computeSlotPrescriptions } from "./slot-prescription";
 import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
 
@@ -147,7 +148,7 @@ export async function getWorkoutDetail(
     { data: sets, error: setsError },
     { data: notes, error: notesError },
     { data: feedback, error: fbError },
-    { data: muscleGroups, error: mgError },
+    muscleGroups,
   ] = await Promise.all([
     exerciseIds.length > 0
       ? supabase
@@ -177,16 +178,15 @@ export async function getWorkoutDetail(
           .select("*")
           .in("workout_exercise_id", weIds)
       : Promise.resolve({ data: [], error: null }),
-    supabase.from("muscle_groups").select("*"),
+    getMuscleGroupsCached(),
   ]);
   if (exError) throw exError;
   if (setsError) throw setsError;
   if (notesError) throw notesError;
   if (fbError) throw fbError;
-  if (mgError) throw mgError;
 
   const exerciseById = new Map((exercises ?? []).map((e) => [e.id, e]));
-  const mgNameById = new Map((muscleGroups ?? []).map((g) => [g.id, g.name]));
+  const mgNameById = new Map(muscleGroups.map((g) => [g.id, g.name]));
   const noteByExercise = new Map<string, ExerciseNoteRow>();
   for (const note of notes ?? []) {
     if (!noteByExercise.has(note.exercise_id))

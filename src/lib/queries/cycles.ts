@@ -10,6 +10,7 @@ import type {
   WorkoutRow,
 } from "@/lib/types/database";
 import { planGroupExercises } from "@/lib/planner/groups";
+import { getMuscleGroupsCached } from "./reference";
 
 type Client = SupabaseClient<Database>;
 
@@ -343,7 +344,7 @@ export async function getMesoPlan(
   const [
     { data: days, error: dayError },
     { data: fills, error: fillError },
-    { data: muscleGroups, error: mgError },
+    muscleGroups,
   ] = await Promise.all([
     supabase
       .from("meso_days")
@@ -358,11 +359,10 @@ export async function getMesoPlan(
       .eq("mesocycle_id", mesoId)
       .order("position")
       .order("slot_number"),
-    supabase.from("muscle_groups").select("*"),
+    getMuscleGroupsCached(),
   ]);
   if (dayError) throw dayError;
   if (fillError) throw fillError;
-  if (mgError) throw mgError;
 
   const dayIds = (days ?? []).map((d) => d.id);
   let groups: MesoDayGroupRow[] = [];
@@ -392,7 +392,7 @@ export async function getMesoPlan(
     );
   }
 
-  const mgNameById = new Map((muscleGroups ?? []).map((g) => [g.id, g.name]));
+  const mgNameById = new Map(muscleGroups.map((g) => [g.id, g.name]));
 
   // days auto-sort by weekday (08 §3 — no manual reorder); unset weekdays last
   const sortedDays = [...(days ?? [])].sort(

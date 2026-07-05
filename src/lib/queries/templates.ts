@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, TemplateRow } from "@/lib/types/database";
 import { getMesoPlan } from "./cycles";
+import { getMuscleGroupsCached } from "./reference";
 
 type Client = SupabaseClient<Database>;
 
@@ -90,7 +91,7 @@ export async function getTemplateDetail(
   const [
     { data: groups, error: groupError },
     { data: fills, error: fillError },
-    { data: muscleGroups, error: mgError },
+    muscleGroups,
   ] = await Promise.all([
     supabase
       .from("template_day_groups")
@@ -102,11 +103,10 @@ export async function getTemplateDetail(
       .select("*")
       .in("template_day_id", dayIds)
       .order("position"),
-    supabase.from("muscle_groups").select("*"),
+    getMuscleGroupsCached(),
   ]);
   if (groupError) throw groupError;
   if (fillError) throw fillError;
-  if (mgError) throw mgError;
 
   const exerciseIds = [...new Set((fills ?? []).map((f) => f.exercise_id))];
   let exerciseById = new Map<

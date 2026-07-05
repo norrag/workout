@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toEngineLoadType } from "@/lib/engine";
+import {
+  getMuscleGroupsCached,
+  getStockLibraryCached,
+  type StockLibraryLink,
+} from "./reference";
 import type {
   Database,
   EquipmentType,
@@ -15,42 +20,100 @@ export interface ExerciseWithMuscles extends ExerciseRow {
   muscles: { id: string; name: string; role: "primary" | "secondary" }[];
 }
 
-/** Stock + own custom exercises (RLS enforces visibility). */
+// ---------------------------------------------------------------------------
+// library loading (WS-J #7) — the stock library (identical for every user)
+// comes from the shared reference cache; only the user's own custom rows and
+// their links are fetched live through the RLS client, then merged.
+// ---------------------------------------------------------------------------
+
+export interface LibrarySlice {
+  exercises: ExerciseRow[];
+  links: StockLibraryLink[];
+}
+
+/** Merge cached stock + live custom into one name-sorted library. Pure. */
+export function mergeLibrary(
+  stock: LibrarySlice,
+  custom: LibrarySlice,
+): {
+  exercises: ExerciseRow[];
+  linksByExercise: Map<string, { muscle_group_id: string; role: "primary" | "secondary" }[]>;
+} {
+  const exercises = [...stock.exercises, ...custom.exercises].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+  const linksByExercise = new Map<
+    string,
+    { muscle_group_id: string; role: "primary" | "secondary" }[]
+  >();
+  for (const l of [...stock.links, ...custom.links]) {
+    const arr = linksByExercise.get(l.exercise_id) ?? [];
+    arr.push({ muscle_group_id: l.muscle_group_id, role: l.role });
+    linksByExercise.set(l.exercise_id, arr);
+  }
+  return { exercises, linksByExercise };
+}
+
+/** In-memory equivalents of the old SQL filters (`ilike %search%`, equipment
+ *  equality) so cached rows filter identically. Pure. */
+export function filterLibraryExercises<
+  T extends { name: string; equipment_type: string },
+>(exercises: T[], opts: { search?: string; equipment?: EquipmentType }): T[] {
+  const q = opts.search ? opts.search.toLowerCase() : null;
+  return exercises.filter(
+    (e) =>
+      (!q || e.name.toLowerCase().includes(q)) &&
+      (!opts.equipment || e.equipment_type === opts.equipment),
+  );
+}
+
+/** The user's own custom exercises + their links (live; RLS-scoped). */
+async function loadCustomLibrary(supabase: Client): Promise<LibrarySlice> {
+  const { data: exercises, error } = await supabase
+    .from("exercises")
+    .select("*")
+    .not("user_id", "is", null)
+    .order("name");
+  if (error) throw error;
+  const rows = exercises ?? [];
+  if (rows.length === 0) return { exercises: [], links: [] };
+  const { data: links, error: linkError } = await supabase
+    .from("exercise_muscle_groups")
+    .select("exercise_id, muscle_group_id, role")
+    .in(
+      "exercise_id",
+      rows.map((e) => e.id),
+    );
+  if (linkError) throw linkError;
+  return { exercises: rows, links: links ?? [] };
+}
+
+/** Full visible library: cached stock + the user's live custom rows. */
+async function loadLibrary(supabase: Client) {
+  const [stock, custom] = await Promise.all([
+    getStockLibraryCached(),
+    loadCustomLibrary(supabase),
+  ]);
+  return mergeLibrary(stock, custom);
+}
+
+/** Stock + own custom exercises (RLS enforces custom visibility). */
 export async function listExercises(
   supabase: Client,
   opts: { search?: string; equipment?: EquipmentType } = {},
 ): Promise<ExerciseWithMuscles[]> {
-  let query = supabase.from("exercises").select("*").order("name");
-  if (opts.search) query = query.ilike("name", `%${opts.search}%`);
-  if (opts.equipment) query = query.eq("equipment_type", opts.equipment);
-  const { data: exercises, error } = await query;
-  if (error) throw error;
-  if (!exercises || exercises.length === 0) return [];
-
-  // Whole-library page: do NOT `.in()` on the id list — 330+ UUIDs make a
-  // ~12 kB query string, which the local stack's gateway rejects with a 414
-  // (hosted merely tolerates it). RLS already scopes the link table to
-  // stock + own rows; fetch it all and join in memory.
-  const idSet = new Set(exercises.map((e) => e.id));
-  const [{ data: links, error: linkError }, { data: groups, error: mgError }] =
-    await Promise.all([
-      supabase.from("exercise_muscle_groups").select("*"),
-      supabase.from("muscle_groups").select("*"),
-    ]);
-  if (linkError) throw linkError;
-  if (mgError) throw mgError;
-
-  const groupById = new Map((groups ?? []).map((g) => [g.id, g.name]));
-  const visibleLinks = (links ?? []).filter((l) => idSet.has(l.exercise_id));
-  return exercises.map((e) => ({
+  const [{ exercises, linksByExercise }, groups] = await Promise.all([
+    loadLibrary(supabase),
+    getMuscleGroupsCached(),
+  ]);
+  const groupById = new Map(groups.map((g) => [g.id, g.name]));
+  return filterLibraryExercises(exercises, opts).map((e) => ({
     ...e,
-    muscles: visibleLinks
-      .filter((l) => l.exercise_id === e.id)
-      .map((l) => ({
-        id: l.muscle_group_id,
-        name: groupById.get(l.muscle_group_id) ?? "",
-        role: l.role,
-      })),
+    muscles: (linksByExercise.get(e.id) ?? []).map((l) => ({
+      id: l.muscle_group_id,
+      name: groupById.get(l.muscle_group_id) ?? "",
+      role: l.role,
+    })),
   }));
 }
 
@@ -270,13 +333,10 @@ export async function deleteCustomExercise(
   if (error) throw error;
 }
 
-export async function listMuscleGroups(supabase: Client) {
-  const { data, error } = await supabase
-    .from("muscle_groups")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  return data ?? [];
+/** All muscle groups, name-ordered (shared reference cache — global rows,
+ *  identical for every user; see reference.ts). */
+export async function listMuscleGroups() {
+  return getMuscleGroupsCached();
 }
 
 /** The subset of the given exercise ids that do NOT exist / aren't visible to
@@ -592,15 +652,13 @@ export async function getAddExerciseCandidates(
   muscleGroups: { id: string; name: string }[];
 }> {
   const [
-    { data: exercises, error: exError },
-    { data: links, error: linkError },
-    { data: muscleGroups, error: mgError },
+    { exercises, linksByExercise },
+    muscleGroups,
     { data: exclusions, error: exclError },
     { data: prs, error: prError },
   ] = await Promise.all([
-    supabase.from("exercises").select("id, name, equipment_type").order("name"),
-    supabase.from("exercise_muscle_groups").select("exercise_id, muscle_group_id"),
-    supabase.from("muscle_groups").select("id, name").order("name"),
+    loadLibrary(supabase),
+    getMuscleGroupsCached(),
     supabase
       .from("excluded_exercises")
       .select("exercise_id")
@@ -610,34 +668,27 @@ export async function getAddExerciseCandidates(
       .select("exercise_id, last_performed_at")
       .eq("user_id", userId),
   ]);
-  if (exError) throw exError;
-  if (linkError) throw linkError;
-  if (mgError) throw mgError;
   if (exclError) throw exclError;
   if (prError) throw prError;
 
   const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
-  const mgByExercise = new Map<string, string[]>();
-  for (const l of links ?? []) {
-    const arr = mgByExercise.get(l.exercise_id) ?? [];
-    arr.push(l.muscle_group_id);
-    mgByExercise.set(l.exercise_id, arr);
-  }
   const lastById = new Map(
     (prs ?? []).map((p) => [p.exercise_id, p.last_performed_at]),
   );
 
   return {
-    exercises: (exercises ?? [])
+    exercises: exercises
       .filter((e) => !excluded.has(e.id))
       .map((e) => ({
         id: e.id,
         name: e.name,
         equipment_type: e.equipment_type,
-        muscle_group_ids: mgByExercise.get(e.id) ?? [],
+        muscle_group_ids: (linksByExercise.get(e.id) ?? []).map(
+          (l) => l.muscle_group_id,
+        ),
         last_performed_at: lastById.get(e.id) ?? null,
       })),
-    muscleGroups: muscleGroups ?? [],
+    muscleGroups,
   };
 }
 
@@ -646,39 +697,32 @@ export async function listPickerExercises(
   userId: string,
   opts: { muscleGroupId?: string; search?: string } = {},
 ): Promise<PickerExercise[]> {
-  let exerciseIds: string[] | null = null;
-  if (opts.muscleGroupId) {
-    const { data: links, error: linkError } = await supabase
-      .from("exercise_muscle_groups")
+  const [
+    { exercises, linksByExercise },
+    { data: exclusions, error: exclError },
+    { data: prs, error: prError },
+  ] = await Promise.all([
+    loadLibrary(supabase),
+    supabase
+      .from("excluded_exercises")
       .select("exercise_id")
-      .eq("muscle_group_id", opts.muscleGroupId);
-    if (linkError) throw linkError;
-    exerciseIds = (links ?? []).map((l) => l.exercise_id);
-    if (exerciseIds.length === 0) return [];
-  }
-
-  let query = supabase.from("exercises").select("*").order("name");
-  if (exerciseIds) query = query.in("id", exerciseIds);
-  if (opts.search) query = query.ilike("name", `%${opts.search}%`);
-  const { data: exercises, error } = await query;
-  if (error) throw error;
-  if (!exercises || exercises.length === 0) return [];
-
-  const [{ data: exclusions, error: exclError }, { data: prs, error: prError }] =
-    await Promise.all([
-      supabase
-        .from("excluded_exercises")
-        .select("exercise_id")
-        .eq("user_id", userId),
-      supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
-    ]);
+      .eq("user_id", userId),
+    supabase.from("v_exercise_prs").select("*").eq("user_id", userId),
+  ]);
   if (exclError) throw exclError;
   if (prError) throw prError;
 
   const excluded = new Set((exclusions ?? []).map((x) => x.exercise_id));
   const prById = new Map((prs ?? []).map((p) => [p.exercise_id, p]));
 
-  return exercises
+  return filterLibraryExercises(exercises, { search: opts.search })
+    .filter(
+      (e) =>
+        !opts.muscleGroupId ||
+        (linksByExercise.get(e.id) ?? []).some(
+          (l) => l.muscle_group_id === opts.muscleGroupId,
+        ),
+    )
     .filter((e) => !excluded.has(e.id))
     .map((e) => {
       const pr = prById.get(e.id);

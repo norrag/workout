@@ -14,7 +14,7 @@ export default async function ExercisesPage() {
   const [exercises, muscleGroups, { data: prs, error: prError }] =
     await Promise.all([
       listExercises(supabase, {}),
-      listMuscleGroups(supabase),
+      listMuscleGroups(),
       supabase.from("v_exercise_prs").select("*").eq("user_id", user.id),
     ]);
   if (prError) throw prError;

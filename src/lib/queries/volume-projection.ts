@@ -6,6 +6,7 @@ import {
   type VolumeCountingWeights,
 } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
+import { getMuscleGroupsCached } from "./reference";
 
 type Client = SupabaseClient<Database>;
 
@@ -214,18 +215,17 @@ export async function loadPlannerBaseline(
   const [
     { data: groups, error: groupError },
     { data: fills, error: fillError },
-    { data: mgs, error: mgError },
+    mgs,
   ] = await Promise.all([
     supabase
       .from("meso_day_groups")
       .select("*")
       .in("meso_day_id", days.map((d) => d.id)),
     supabase.from("meso_exercises").select("*").eq("mesocycle_id", mesoId),
-    supabase.from("muscle_groups").select("*"),
+    getMuscleGroupsCached(),
   ]);
   if (groupError) throw groupError;
   if (fillError) throw fillError;
-  if (mgError) throw mgError;
 
   const { data: links, error: linkError } = await supabase
     .from("exercise_muscle_groups")
@@ -244,7 +244,7 @@ export async function loadPlannerBaseline(
     rolesByExercise.set(l.exercise_id, arr);
   }
 
-  const mgName = new Map((mgs ?? []).map((g) => [g.id, g.name]));
+  const mgName = new Map(mgs.map((g) => [g.id, g.name]));
   const groupById = new Map((groups ?? []).map((g) => [g.id, g]));
   const byName = new Map<string, BaselineSeed>();
   const credit = (

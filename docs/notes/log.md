@@ -4,6 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 50: WS-J Phase 2 closed — #7 reference cache built, #5 dropped (PR #151)
+
+Resume-protocol sweep first: no stale `done` rows (48/49 swept in-session;
+N29/N34 correctly live). Picked the highest-priority open item — **N1**'s
+remaining Phase-2 pair — and closed the phase:
+
+- **#7 shipped.** New `queries/reference.ts`: `muscle_groups` (12 rows, 8+
+  call sites incl. every day-view open) and the stock exercise library +
+  links (330 + 352 rows; `/exercises`, planner, add-exercise sheet) now serve
+  from the shared Next Data Cache (`unstable_cache`, 1 h TTL, `ref:*` tags),
+  read through the service client scoped to global rows only. `exercises.ts`
+  merges live per-user custom rows/links over the cached stock
+  (`loadLibrary`/`mergeLibrary`/`filterLibraryExercises`, pure + tested);
+  `listMuscleGroups` is now zero-arg (7 call sites updated). Static test
+  guards that nothing per-user can enter the shared cache. Live-verified
+  352/352 stock links via PostgREST against the hosted project.
+- **#5 dropped** with rationale in `J-performance.md`: #7 made only global
+  reference data cacheable and no mutation touches it; per-user reads stay
+  uncached per doc 14's pull-based freshness; the existing `revalidatePath`
+  pair is the correct router-cache bust for the user's own edits.
+
+Phase 2 is now fully dispositioned (#1–#10 all shipped/rejected with reasons).
+N1 row narrowed to Phase-3 (streaming/decomposition, as measured). Green:
+typecheck, lint, 820 tests (+9), production build.
+
 ## 2026-07-05 — Session 49: BodySpec DEXA integration assessment (N34)
 
 Owner requested a full assessment of integrating BodySpec's DEXA-scan API
