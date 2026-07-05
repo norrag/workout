@@ -39,10 +39,11 @@ One session, one commit per item:
   cross-referencing lifecycle descriptions; docs/05 drift fixed + new
   Failure-contract section.
 
-**Remaining / external:** apply `20260705000001` (engine_params v19) +
-`20260705000002` (`rir_schedule`) to hosted; for v19 run a `replay_decisions`
-diff then activate per the manual-operations v19 runbook step (expect diffs
-ONLY on ramp-hold weeks).
+**Remaining / external:** ~~apply the two migrations + v19 replay/activate~~
+DONE 2026-07-05 in-session: both migrations applied to hosted via the Supabase
+MCP; v19 replay over v18-sourced decisions was 0 changed / 0 errors (all 26
+are week-1 seeds — the gates live in the advance path); v19 activated via the
+admin MCP tool (restamp no-op, e1rm block unchanged).
 
 Green: typecheck, lint, 847 tests (+27 net), production build.
 

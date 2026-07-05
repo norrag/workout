@@ -192,7 +192,17 @@ Otherwise byte-identical to v14. Same gating discipline as v11/v12/v14.
 > `.../planned/[week]/[day]/page.tsx` now source the deload RIR from the active
 > engine_params too, so they preview 6 the moment v15 is active.
 
-### Apply + activate engine_params **v19** (R24 hold-week reprice-down)
+### ~~Apply + activate engine_params **v19** (R24 hold-week reprice-down)~~ (DONE 2026-07-05)
+
+> Completed from a Claude session 2026-07-05: both `20260705000001` (v19
+> insert, hash verified) and `20260705000002` (`rir_schedule`) applied to
+> hosted via the Supabase MCP; `replay_decisions` for v19 over the v18-sourced
+> decisions came back **0 changed / 0 errors** (all 26 v18 decisions are
+> week-1 seeds — the v19 gates live in the advance path, which the goldens
+> pin); activated via the admin MCP `activate_engine_params` (the hook-bearing
+> path — e1RM restamp correctly reported "e1rm block unchanged"). v18 remains
+> the rollback target. Original steps kept below for the record.
+
 
 `20260705000001_engine_params_v19_hold_week.sql` ships v19 **inactive** — two
 `.optional()` gates over v18: `climb_requires_rir_step` (the Option-A +1 rep
