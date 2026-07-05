@@ -4,6 +4,36 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 48 (cont.): N25 + N29-picker built (PR #148)
+
+Picked the two `ready` items after the sweep; both shipped on PR #148
+(N25 row → done; N29 row → in-progress, picker half done):
+
+- **N25** — `src/lib/glossary.ts` (11 terms; copy-contract test enforces
+  all-caps labels, no exclamation marks, card-sized bodies, the e1RM/deload
+  honesty guardrails) + `components/ui/InfoDot.tsx` (the feedback sheet's
+  circled-"i" grammar → anchored square glossary card, AnchoredMenu
+  placement, modal a11y + refcounted scroll lock so it stacks over sheets).
+  Migrated the two ad-hoc pump/workload explainers (workload no longer
+  auto-expands — deliberate, recorded in 09). Wave-1 placements across
+  day view, meso header/edit sheets, planner, stats, exercise page.
+  09 entry "2026-07-05"; PROGRESS record.
+- **N29 (picker)** — from-template picker reuses `TemplateFilters`
+  unchanged; days/emphasis/gender threaded into `listTemplates`; the search
+  form preserves active filters. FilterBar unification remains open.
+
+Green: typecheck, lint, 811 tests (+5), production build.
+
+## 2026-07-05 — Session 48: reconciliation sweep — archive N33 + T-N33 (PR #147 merged)
+
+Resume-protocol sweep: PR #147 confirmed merged (`b9ba057`) → **N33** and
+**T-N33** rows swept to `archive.md` ("Swept 2026-07-05"). Live index is now:
+N1 (WS-J remainder: Phase-2 #5/#7 caching pair + Phase-3 as measured), N18-B
+(per-week RIR schedule), N21 (target-engine needs-decision), N25 (InfoDot +
+glossary, ready), N29 (picker filters ready / FilterBar triaged), PH30
+deferred, R24/R25 remainders. Session continues with the ready build slice
+(N25 + N29 picker) — see the next entry.
+
 ## 2026-07-05 — Session 47 (cont. 3): N33 + T-N33 built (PR #147)
 
 Owner: "Go ahead and build N33 and T-N33." Both shipped on the open PR #147

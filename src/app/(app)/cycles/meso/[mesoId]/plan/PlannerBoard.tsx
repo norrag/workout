@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { InfoDot } from "@/components/ui/InfoDot";
 import { useToast } from "@/components/ui/Toast";
 import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { HistorySheet } from "@/components/HistorySheet";
@@ -985,12 +986,16 @@ export function PlannerBoard({
       {volumeRows && volumeRows.length > 0 && volumePreview && (
         <div className="mt-6">
           <div className="flex items-baseline justify-between">
-            <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
               WEEKLY SETS PER MUSCLE
+              <InfoDot term="volume_landmarks" small />
             </div>
-            <div className="text-[8.5px] font-medium tracking-[0.1em] text-ink/45">
-              {volumePreview.weights.direct.toFixed(1)} DIRECT ·{" "}
-              {volumePreview.weights.indirect.toFixed(1)} SECONDARY
+            <div className="flex items-center gap-1.5 text-[8.5px] font-medium tracking-[0.1em] text-ink/45">
+              <span>
+                {volumePreview.weights.direct.toFixed(1)} DIRECT ·{" "}
+                {volumePreview.weights.indirect.toFixed(1)} SECONDARY
+              </span>
+              <InfoDot term="fractional_sets" small />
             </div>
           </div>
           <div className="mt-2 border-t border-ink/15">
@@ -1343,8 +1348,9 @@ function FinalizeSheet({
         {showAdvanced && (
           <>
             <div className="mt-4">
-              <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
                 START RIR
+                <InfoDot term="rir_ramp" small />
               </div>
               <div className="mt-2 flex border-[1.5px] border-ink">
                 {[0, 1, 2, 3, 4, 5].map((r, i) => (

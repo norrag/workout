@@ -1,4 +1,5 @@
 import type { MesoStats } from "@/lib/queries/stats";
+import { InfoDot } from "@/components/ui/InfoDot";
 import {
   StrengthProgressSection,
   type HistoryScope,
@@ -42,7 +43,10 @@ export function VolumeView({ stats }: { stats: MesoStats }) {
           className="grid gap-1.5 pb-[5px] pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50"
           style={gridCols}
         >
-          <div>SETS / WEEK</div>
+          <div className="flex items-center gap-1.5">
+            SETS / WEEK
+            <InfoDot term="fractional_sets" small />
+          </div>
           {weeks.map((w) => (
             <div
               key={w.week_number}
