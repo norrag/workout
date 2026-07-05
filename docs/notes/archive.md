@@ -11,6 +11,25 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-05 (later 2) — Session-51 quad merged (PRs #152/#153)
+
+Session 51 closed the four unblocked items on PR #152; a same-session
+follow-up (PR #153) fixed the pre-existing rls-tests CI regression from #151
+and recorded the hosted deploy: both 2026-07-05 migrations applied via the
+Supabase MCP, v19 replayed (0 changed / 0 errors over v18-sourced decisions)
+and ACTIVATED via the admin MCP tool. Both PRs merged in-session → swept
+in-session. Full record in PROGRESS "2026-07-05 (latest)", the 09 entries
+"2026-07-05 (session 2)", and the Session 51 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| R24 | Engine guardrail batch (hold-week reprice-down remainder) | B | G | **done (PR #127 + #152; v19 LIVE).** Mechanical four shipped PR #127. Remainder: both reprice-down mechanisms fixed as engine_params v19 — `climb_requires_rir_step` (the Option-A +1 rep climb only on a real RIR step; top-out reset unconditional; kills the "−5 lb, +1 rep" ramp-hold move) + `hold_week_anchor_deadband` (a pure hold absorbs a sub-step anchor-decay shortfall; a full-step fall is real signal — the cut/maintain preserve-strength answer). Ramp-hold case golden under both param sets. Applied + replayed (clean) + activated 2026-07-05; v18 is the rollback target. Doc 13 §9.2 amended; runbook v19 step recorded done. |
+| R25 | MCP polish (consolidation + error-contract remainder) | F | K | **done (PR #129 + #152).** Failure contract converged at the composition root (`{ok:false}` refusals now also `isError` — one signal, both dialects; error-contract test pins all four quadrants; docs/05 Failure-contract section). `place_mesocycle` → `manage_macrocycle_slots` action "place"; `list_engine_params` → `get_engine_params` no-arg browse (47→45 tools; verified live post-deploy). preview vs muscle-balance deliberately KEPT split (plan-pre-start vs trained-weeks) with cross-referencing descriptions. docs/05 drift fixed (stale regenerate row, summary-tool names, resource list). |
+| N18 | Per-week independent RIR (create-time ramp, Parts A+B) | F | D | **done (PR #140 + #152; migration applied).** Part A: FinalizeSheet ADVANCED disclosure (START/END RIR + deload). Part B: `mesocycles.rir_schedule` (per-working-week array; deload week engine-owned), `rirRamp(schedule?)`, week-1 seed reads the ramp not `rir_start`, `mesoStaleSignature` gains the column (the only freshness change — `week.targetRir` was already fingerprinted, exactly as doc 14's worked example predicted), shared `RirScheduleEditor` behind both sheets' disclosure, MCP create/update/read + duplicate/copy carry. Doc 14 amended. |
+| N29 | Filtering: picker filters + unified chip FilterBar | UX→F | F | **done (PR #148 + #152).** Picker half PR #148. Unification: one `components/ui/FilterBar.tsx` (fig 3.1 grammar — labeled chip tracks, ALL reset chip, ✕-to-clear, live count + CLEAR ALL) serves exercises (MUSCLE gains the ALL chip per the 3.1 spec), templates tab + from-template picker (selects → chips via shared `TemplateFilterPanel`; duplicated search-form collapsed; `TemplateFilters.tsx` retired), and the planner picker's equipment row. 09 entry "2026-07-05 (session 2)". |
+
+---
+
 ## Swept 2026-07-05 (later) — N25 glossary InfoDot merged (PR #148)
 
 Session 48 built N25 (plus the N29 picker half, whose row stays live for the

@@ -4,6 +4,29 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 51 (cont.): CI fix + hosted deploy + in-session sweep (PR #153)
+
+PR #152 merged with the rls-tests job red — root-caused to a PRE-EXISTING
+#151 regression: `unstable_cache` (reference cache, WS-J #7) throws its E469
+`incrementalCache missing` invariant when the vitest integration suite runs
+the query layer outside the Next runtime; the first throw cascaded through
+write-pipeline.test.ts. Fixed on PR #153 (accessors fall back to the same
+uncached loader on exactly that invariant; rls-tests green on the PR) — noted
+as a #7 amendment on the N1 row.
+
+Hosted deploy done in-session per the owner's go-ahead: migrations
+`20260705000001` (v19, hash verified) + `20260705000002` (`rir_schedule`)
+applied via the Supabase MCP; `replay_decisions` for v19 over v18-sourced
+decisions returned **0 changed / 0 errors** (all 26 are week-1 seeds — the
+v19 gates live in the advance path, pinned by the goldens); v19 **activated**
+via the admin MCP `activate_engine_params` (hook ran; e1RM restamp no-op,
+e1rm block unchanged). v18 is the rollback target.
+
+Both PRs merged in-session → reconciliation sweep ran in-session: **R24, R25,
+N18, N29 archived** ("Swept 2026-07-05 (later 2)"). Live index is now: N1
+(WS-J Phase-3 remainder, as measured), N21 (needs-decision), N34
+(needs-input), PH30 (deferred), the answered Q rows, and T-A5 (deferred).
+
 ## 2026-07-05 — Session 51: four closures — N29 FilterBar, N18-B per-week RIR, R24 + R25 remainders (PR #152)
 
 Resume-protocol sweep first: no stale `done` rows. The owner asked for the
