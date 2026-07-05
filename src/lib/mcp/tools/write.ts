@@ -323,7 +323,7 @@ function registerCreateMesocycle(server: McpServer) {
       const groupNames = days.flatMap((d) => d.groups.map((g) => g.muscle_group));
       const { byName, missing } = resolveMuscleGroupIds(
         groupNames,
-        await listMuscleGroups(client),
+        await listMuscleGroups(),
       );
       if (missing.length > 0)
         return jsonResult({
@@ -473,7 +473,7 @@ function registerCreateCustomExercise(server: McpServer) {
       const { client, userId } = resolveSession(extra);
       const { byName, missing } = resolveMuscleGroupIds(
         args.muscle_groups.map((m) => m.muscle_group),
-        await listMuscleGroups(client),
+        await listMuscleGroups(),
       );
       if (missing.length > 0)
         return jsonResult({

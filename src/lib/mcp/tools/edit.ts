@@ -536,7 +536,7 @@ export function registerEditMesocycle(server: McpServer) {
       ];
       const byName = new Map<string, string>();
       if (addNames.length > 0) {
-        const res = resolveMuscleGroupIds(addNames, await listMuscleGroups(client));
+        const res = resolveMuscleGroupIds(addNames, await listMuscleGroups());
         if (res.missing.length > 0)
           return jsonResult({
             ok: false,

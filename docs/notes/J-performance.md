@@ -365,9 +365,9 @@ live, don't pre-materialize); engine-stays-pure is not a bottleneck.
   SECURITY DEFINER **function** WARNs (anti-recursion RLS helpers; return only the caller's
   own role/admin status), the leaked-password toggle (dashboard-only), and the unused-index /
   `shares` multi-policy INFO/WARN noise (dropping/rewriting riskier than the benefit).
-- **Still deferred:** #5/#7 caching (`revalidateTag` + `unstable_cache` stable reads —
-  #5 only pays once #7 makes reads cacheable; build them together). The engine code-split
-  off the `/log` client bundle shipped 2026-07-01 (see Phase 1).
+- ~~**Still deferred:** #5/#7 caching~~ — resolved 2026-07-05: #7 shipped, #5
+  assessed & dropped (see the "Shipped 2026-07-05" block below). The engine
+  code-split off the `/log` client bundle shipped 2026-07-01 (see Phase 1).
 - **#6 (`select("*")` narrowing) — assessed & dropped (2026-07-03, N12 slice).** The two
   flagged hot-path selects (`getWorkoutDetail`'s `logged_sets` / `workout_exercises`) feed
   `LoggedSetRow`/`WorkoutExerciseRow` consumers in DayView that use nearly every column —
@@ -389,6 +389,53 @@ live, don't pre-materialize); engine-stays-pure is not a bottleneck.
 - **LOG spinner decoupled from the revalidation commit** (the N12 hang): tracks the server
   action with a 15s watchdog, acknowledges the box on write-confirm, row remounts on the
   revalidation echo; timeout surfaces as a retryable shake+toast (R3 upsert converges).
+
+**Shipped 2026-07-05 (#7 reference cache — closes the Phase-2 list):**
+- **New `queries/reference.ts`.** The two datasets every user sees identically
+  now live in the shared Next Data Cache via `unstable_cache` (1 h TTL +
+  `ref:*` tags): `muscle_groups` (12 rows — previously re-fetched on every
+  day-view open, planner/template/stats/coaching/volume-projection read; 8+
+  call sites) and the **stock** exercise library + muscle links (330 exercises
+  + 352 links, `user_id IS NULL` — previously fetched whole on every
+  `/exercises` visit, planner open, and add-exercise sheet). Cache misses read
+  through the service client because `unstable_cache` runs outside cookie
+  scope (an RLS user client inside the callback would bake one user's session
+  into a cache other users read); both reads are explicitly global-scoped, and
+  `reference-library.test.ts` carries a static guard that nothing per-user can
+  enter the shared cache.
+- **Per-user data stays live.** `exercises.ts` gains `loadLibrary` — cached
+  stock merged with the user's own custom rows/links (RLS client) via pure
+  `mergeLibrary`; the old SQL filters became `filterLibraryExercises`
+  (`ilike`/equipment parity, tested). `listExercises`, `listPickerExercises`,
+  `getAddExerciseCandidates`, and `listMuscleGroups` (now zero-arg) all ride
+  it; exclusions/PRs/custom rows are fetched live per user as before.
+- **Live-verified** on the hosted project: the stock-links embed
+  (`exercises!inner(user_id)` + `is null` filter) returns 352/352 vs SQL
+  ground truth through PostgREST.
+- Invalidation note: nothing in-app mutates either dataset (custom exercises
+  are per-user and never cached; stock rows change only via migrations), so
+  correctness never depends on a bust — the TTL bounds post-migration
+  staleness and the tags exist for an explicit `revalidateTag` if an admin
+  path ever needs one.
+
+**#5 (revalidateTag conversion) — assessed & dropped (2026-07-05).** The
+premise ("pays off once #7 makes reads cacheable") doesn't materialize: #7
+cached only *global reference* data, which no log mutation touches — nothing
+in-app writes stock reference rows, so there is no tag for any mutation to
+bust. The per-user workout reads deliberately stay uncached (doc 14's
+reconcile-on-read contract; tagging them in the shared Data Cache would need
+per-user cache keys plus push-based invalidation from every out-of-band writer
+— the model doc 14 explicitly rejected in favor of pull-based freshness).
+Meanwhile the existing `revalidatePath('/workout')` + `/log/{id}` pair on the
+log mutations is doing exactly its job: busting the client Router Cache
+(`staleTimes.dynamic: 120`) so the user's own edits repaint instantly — on a
+dynamically-rendered route there is no server cache being over-purged, so the
+calls are not "over-broad" in practice. Don't revisit without a tagged
+per-user read to pair it with.
+
+**Phase 2 fully dispositioned:** #1 ✓ · #2 ✓ · #3 ✗ rejected (anchor floor
+drops real data) · #4 ✓ · #5 ✗ dropped (nothing to bust) · #6 ✗ dropped
+(column churn > byte win) · #7 ✓ · #8 ✓ · #9 ✓ · #10 ✓.
 
 ### Phase 3 — Streaming & structural cleanup (optional)
 - Suspense streaming on heavy server pages using `DayViewSkeleton`.

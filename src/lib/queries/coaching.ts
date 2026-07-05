@@ -6,6 +6,7 @@ import {
   type ExerciseSession,
   type SessionSet,
 } from "@/lib/analysis/comparability";
+import { getMuscleGroupsCached } from "./reference";
 
 type Client = SupabaseClient<Database>;
 
@@ -256,14 +257,13 @@ export async function getExerciseAffinity(
           .select("exercise_id, muscle_group_id, role")
           .in("exercise_id", c),
     ),
-    supabase.from("muscle_groups").select("id, name"),
+    getMuscleGroupsCached(),
     supabase.from("excluded_exercises").select("exercise_id").eq("user_id", userId),
   ]);
-  if (groups.error) throw groups.error;
   if (exclusionRows.error) throw exclusionRows.error;
 
   const exerciseById = new Map(exercises.map((e) => [e.id, e]));
-  const groupNameById = new Map((groups.data ?? []).map((g) => [g.id, g.name]));
+  const groupNameById = new Map(groups.map((g) => [g.id, g.name]));
   const excluded = new Set((exclusionRows.data ?? []).map((x) => x.exercise_id));
   const inGroup = opts.muscleGroupId
     ? new Set(

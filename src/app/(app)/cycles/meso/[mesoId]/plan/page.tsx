@@ -44,7 +44,7 @@ export default async function MesoPlanPage({
     { params: engineParams },
   ] = await Promise.all([
     getMesoPlan(supabase, mesoId),
-    listMuscleGroups(supabase),
+    listMuscleGroups(),
     listPickerExercises(supabase, user.id),
     supabase
       .from("exercise_muscle_groups")
