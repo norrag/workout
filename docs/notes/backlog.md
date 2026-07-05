@@ -45,6 +45,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N18 | Per-week independent RIR (Part B of the create-time ramp item; **Part A merged PR #140** — FinalizeSheet advanced disclosure). Needs a `rir_schedule` override + `rirRamp` hook + doc-14 fingerprint scoping (the framework's literal worked example); week-by-week editor behind the same disclosure | F | MED | D | triaged — own slice |
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N29 | Filtering: from-template picker has no filters (`listTemplates` already supports them — small wiring) + unify the three divergent filter UIs into one chip-based `FilterBar` (medium) | UX→F | MED | F | **in-progress** — picker half done (PR #148: `TemplateFilters` reused, URL-driven, search preserves filters); FilterBar unification still triaged |
+| N34 | BodySpec DEXA integration (optional, per-user OAuth connect → scan import → profile enrichment → macro outcome verdicts). Assessment done: [`docs/15-bodyspec-dexa-integration.md`](../15-bodyspec-dexa-integration.md) — API viable (user-tier OAuth2/PKCE, pull-only), schema = `body_scans` time series + `external_connections` + `v_body_comp_history`, engine touch = measured FFMI into `planMacrocycle` only (never set-level), LSC honesty guardrails. Relates to N21 (macro-target correction should assume scan data may exist). Amends doc 01 out-of-scope if adopted. **Phase 0 is human-only:** email dev-support@bodyspec.com for OAuth client + refresh-token story | F | MED | — | needs-input — assessment shipped (PR #150); owner: adopt & phase? (doc §5); Phase 0 unblock is an owner action |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -580,3 +581,23 @@ landed.)*
   325.9, lower either way) scored ≈312 after 7 days of decay vs ≈347 for the
   fresh 285×7, so the 07-01 session won; the anchor value is the chosen
   session's UNDECAYED confidence-weighted mean, 331.9]*
+
+### Batch 11 — BodySpec DEXA integration request (2026-07-05, session task)
+
+- "On Tuesday I will be getting a DEXA scan through the company BodySpec.
+  BodySpec allows access to to scan data via API. See API docs for details:
+  https://app.bodyspec.com/docs — What I am interested in is creating an
+  optional integration inside of this app to connect a BodySpec account and
+  access the users DEXA scan information via API. When connected the
+  application will give access to scan data, and use the data to
+  expand/update/turbo-charge user profile information, and/or supplement
+  training data/progress with the information. What I want you to do:
+  1. Assess the API, data import/access capabilities, and what data is
+  available. 2. Assess how the available data can/should be structured to be
+  utilized to its greatest potential 3. Assess how this data could be best
+  used to inform training, progression models and engines 4. What genuine new
+  insight or capabilities could this data provide, and how can it actually be
+  used to improve training and/or insight to training progress. Present your
+  findings and assessments in a well-structured document pushed to the repo
+  for reference." *[→ N34; assessment delivered as
+  `docs/15-bodyspec-dexa-integration.md`]*
