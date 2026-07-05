@@ -36,8 +36,8 @@ The MCP connector lets users plug their training data into the LLM of their choi
 | `get_macrocycles` / `get_mesocycle` | cycle structures, goals, status, RIR ramps |
 | `get_exercise_history` | time series for an exercise (weights, reps, volume, e1RM, feedback) with date-range / cycle filters; includes both **note kinds** (see Notes below) — the exercise's pinned note and the per-session log notes |
 | `get_muscle_group_volume` | weekly planned-vs-logged volume per muscle group across the full meso; weeks the engine hasn't generated yet are labeled `not_yet_generated` (it autoregulates forward) rather than read as zero (review §5.10) |
-| `get_meso_summary` | per-meso rollup: adherence, progression achieved, feedback patterns, progress score |
-| `get_macro_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
+| `get_mesocycle_summary` | per-meso rollup: adherence, progression achieved, feedback patterns, progress score |
+| `get_macrocycle_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
 | `search_exercises` / `search_templates` | library queries with the same filters the UI uses |
 | `explain_prescription` | surface the engine's `engine_decisions` rationale for a given prescription |
 
@@ -71,12 +71,11 @@ plans stay grounded in the user's real movement preferences rather than a generi
 | `create_macrocycle` | draft a macrocycle from `goal` (hypertrophy/strength/cut/maintain) + `meso_length_weeks` (+ optional `duration_months`); the **engine** (`planMacrocycle`) computes the profile-personalized target, a **recommended timeframe**, the meso count, and suggested phases — the LLM never invents the numbers (defaults in 10). Creates the macro + its `unplanned` meso placeholders |
 | `create_mesocycle` | draft/plan a meso in `planned` status (an **unapproved draft** the athlete opens, edits, and approves in-app), either from a `template_id` (prefills the board via the same start-from-template path the app uses) **or** from a hand-built groups-first `days` spec (weeks, days with weekday + label, muscle-group blocks, slot fills, RIR ramp) — pass exactly one. Optional `macrocycle_id` (+ `position`) authors it straight into a macro slot (fills the earliest open slot by default) |
 | `edit_mesocycle` | in-place structural edits to a `planned`/`active` meso's planner board: **`add_day`** (lay down a whole training day — label/weekday + its muscle-group blocks with exercises and starting sets — in one call, so an empty/placeholder meso builds up to a complete multi-day plan), **`remove_day`**, plus `add_exercise` / `remove_exercise` / `swap_exercise` / `reorder_day` / `set_baseline_sets`. Returns the fresh plan (new day/slot ids) so a chain of edits needs no re-read. The engine still owns every prescribed number |
-| `place_mesocycle` | attach an existing standalone `planned`/`draft` meso into a macro slot — rescuing an orphaned draft into context. Fills the earliest open (`unplanned`) slot by default, or a given `position` (absorbing a placeholder there + inheriting its phase). Stays `planned` — placing never activates |
 | `update_mesocycle` | edit a meso's own header in place — name, phase (accumulation/intensification/peak), length in weeks, deload flag, RIR ramp — without demolishing the plan or losing its macro placement. name/phase on any unfinished meso; length/RIR/deload only before it's started. The engine re-derives the numbers |
 | `duplicate_mesocycle` | clone a meso's settings + planner board into a new `planned` meso ("run last block back with a few tweaks"); loads are reseeded by the engine on activation, not copied. Optional `macrocycle_id` (+ `position`) to place the copy straight into a slot |
-| `manage_macrocycle_slots` | reshape a macro's slots: `add` an unplanned placeholder, `remove` one, or `reorder` all slots. Only unplanned placeholders are added/removed; planned/active/completed mesos and logged history are never destroyed |
+| `manage_macrocycle_slots` | one tool for the macro's slot surface (R25 consolidation — absorbed the former `place_mesocycle`): `add` an unplanned placeholder, `remove` one, `reorder` all slots, or `place` an existing standalone `planned`/`draft` meso into a slot (earliest open placeholder by default, or a given `position` — the placeholder is absorbed and its phase inherited; placing never activates). Only unplanned placeholders are added/removed; planned/active/completed mesos and logged history are never destroyed |
 | `activate_mesocycle` | turn a reviewed `planned` meso into the live block (engine builds the microcycle ramp + seeds week 1). Requires `confirm="activate"`. **Sequential within a macro**: a future block can't start until every earlier block is complete and none is active — so planned mesos are seeded from the latest results, never in advance of the prior blocks' completion. Prefer in-app activation |
-| `preview_mesocycle_volume` | project a plan's weekly working sets per muscle group vs the athlete's MEV/MAV/MRV landmarks **without persisting anything** — pass a `mesocycle_id` or a proposed `days` spec — so a draft self-checks (under-dosed / over-dosed muscles) before it's ever written. Advisory only (10 §9) |
+| `preview_mesocycle_volume` | project a plan's weekly working sets per muscle group vs the athlete's MEV/MAV/MRV landmarks **without persisting anything** — pass a `mesocycle_id` (a planned/draft meso) or a proposed `days` spec — so a draft self-checks (under-dosed / over-dosed muscles) before it's ever written. Deliberately kept separate from `get_muscle_balance` (R25 design pass): this one reads the *plan* pre-start; that one reads *trained weeks*, which a draft doesn't have. Advisory only (10 §9) |
 | `create_template` | build a reusable template from a spec or from an existing meso |
 | `create_custom_exercise` | add a custom exercise (name, equipment, muscle groups, **tracking type**, description, notes, optional `weight_increment` load step — full parity with the app's create form, N22) |
 | `set_exercise_increment` | set or clear the per-user, per-exercise **load step** override (the app's "Load step" — doc 14 phase 3) on any exercise; null clears back to the equipment default. Prescriptions refresh via the read-path reconcile; logged history untouched |
@@ -93,16 +92,15 @@ Per [08-design-decisions.md](08-design-decisions.md) §3, **the MCP connector is
 
 | Tool | Purpose |
 |---|---|
-| `list_engine_params` / `get_engine_params` | browse param versions; diff two versions |
+| `get_engine_params` | one browse/get/diff tool (R25 consolidation — absorbed the former `list_engine_params`): no args = browse all versions (active flag, notes, dates); `version` = full values + provenance; add `compare_to_version` for the dot-path diff |
 | `propose_engine_params` | write a new **inactive** param version (zod-gated; a malformed set can never be activated) |
 | `activate_engine_params` | activate a version — requires an explicit confirmation argument echoing the version number |
 | `get_engine_decisions` | decision inspector: filter by user/exercise/date/params version; full inputs, output, rationale |
 | `replay_decisions` | re-run historical decisions or a whole meso against a candidate param version; return prescription diffs |
 | `simulate_prescriptions` | probe hypothetical inputs against a candidate version (per-item isolated, invalid cases don't fail the batch) |
 | `discard_engine_params` | undo a `propose` — delete an **inactive** version (review §5.8); refused for the active version or any version referenced by a recorded decision (kept reproducible); requires a `confirm_version` echo |
-| `regenerate_planned_prescriptions` | re-run the engine on not-yet-started **planned** prescriptions whose last decision predates the active version, writing refreshed weight/reps/sets/RIR back with a fresh audited decision; **dry-run by default** (`confirm="apply"` to write); never touches in-progress/completed workouts, logged sets, or manual weight overrides; all users (no `user_id` arg), optional `mesocycle_id` scope |
 
-The tuning loop: inspect decisions → propose a version → replay real history against it → review diffs in chat → activate → **`regenerate_planned_prescriptions`** (dry-run, then `confirm="apply"`) so already-planned future workouts pick up the new version. Same tables and replay functions a future UI would use.
+The tuning loop: inspect decisions → propose a version → replay real history against it → review diffs in chat → activate. Already-planned future workouts pick up the new version lazily through the read-path freshness reconcile (doc 14) — the former `regenerate_planned_prescriptions` manual step is retired. Same tables and replay functions a future UI would use.
 
 ## Notes — two kinds, both exposed
 
@@ -128,8 +126,25 @@ the active session only, never edits of completed logged history.
 
 ## Resources
 
-- `workout://profile`, `workout://current-cycle`, `workout://meso/{id}/summary` — read-only documents for clients that prefer resources over tool calls.
+- `workout://profile`, `workout://current-cycle`, `workout://coaching-guide` — read-only documents for clients that prefer resources over tool calls.
 - A server-level instructions string teaching the LLM the domain (RIR, cycle hierarchy, units).
+
+## Failure contract (converged 2026-07-05, R25)
+
+One signal covers every failure: a tool result that did not do what was asked
+carries `isError: true`. Two failure bodies remain, by cause:
+
+- **Domain refusal** (validation, not-found, guarded state): the familiar
+  in-band `{ ok: false, error: "…" }` envelope — readable prose the model uses
+  to self-correct (fix the argument, pick the other tool). Previously these
+  shipped with `isError` unset, so a consumer had to check both `isError` and
+  `ok`; the composition-root wrapper now flags them too.
+- **Infrastructure failure** (thrown — DB error, bug): structured
+  `{ error: { code, message, detail } }`, also `isError: true`, reported
+  server-side.
+
+Success results never carry `isError`; read tools answer not-found with
+`{ found: false }` prose, which is an answer, not a failure.
 
 ## Data-shape contract
 

@@ -1,7 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
 import { mesoActivationBlock } from "@/lib/queries/generation";
-import { weeklySetsByGroup, previewVolume } from "../tools/authoring";
+import {
+  weeklySetsByGroup,
+  previewVolume,
+  registerAuthoringTools,
+  MANAGE_MACROCYCLE_SLOTS,
+} from "../tools/authoring";
+import { captureServer, fakeExtra, fakeAuthInfo } from "./harness";
 
 // ---------------------------------------------------------------------------
 // weeklySetsByGroup — weekly-set aggregation (fractional via roles since R14;
@@ -117,5 +123,46 @@ describe("mesoActivationBlock", () => {
   it("never blocks a standalone meso (no position)", () => {
     const gate = mesoActivationBlock([], null);
     expect(gate.blocked).toBe(false);
+  });
+});
+
+// --- R25 consolidation: place is a slot action, not a standalone tool -------
+
+describe("manage_macrocycle_slots — place action (R25)", () => {
+  beforeAll(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "test-anon-key";
+  });
+
+  function slotsHandler() {
+    const { server, tools } = captureServer();
+    registerAuthoringTools(server);
+    return { tools, handler: tools.get(MANAGE_MACROCYCLE_SLOTS)!.handler };
+  }
+
+  function bodyOf(result: unknown): Record<string, unknown> {
+    const r = result as { content: { text: string }[] };
+    return JSON.parse(r.content[0].text).data;
+  }
+
+  it("the standalone place_mesocycle tool is retired", () => {
+    const { tools } = slotsHandler();
+    expect(tools.has("place_mesocycle")).toBe(false);
+    expect(tools.has(MANAGE_MACROCYCLE_SLOTS)).toBe(true);
+  });
+
+  it("place validates its mesocycle_id before touching anything", async () => {
+    const { handler } = slotsHandler();
+    const out = bodyOf(
+      await handler(
+        {
+          macrocycle_id: "11111111-1111-1111-1111-111111111111",
+          action: "place",
+        },
+        fakeExtra(fakeAuthInfo("u1")),
+      ),
+    );
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toMatch(/mesocycle_id/);
   });
 });

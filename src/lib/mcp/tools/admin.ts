@@ -261,45 +261,39 @@ export function replayDecisions(
   };
 }
 
-// --- list_engine_params / get_engine_params --------------------------------
-
-export const LIST_ENGINE_PARAMS = "list_engine_params";
-function registerListEngineParams(server: McpServer) {
-  server.registerTool(
-    LIST_ENGINE_PARAMS,
-    {
-      title: "List engine param versions",
-      description:
-        "Admin only. Browse engine parameter versions (which is active, notes, " +
-        "created date). Takes no arguments.",
-      inputSchema: {},
-    },
-    async (_args: Record<string, never>, extra: McpExtra) => {
-      const { client } = await resolveAdmin(extra);
-      return jsonResult({ versions: await listEngineParams(client) });
-    },
-  );
-}
+// --- get_engine_params (list / get / diff — R25 consolidation) --------------
+// `list_engine_params` was a strict subset (its no-arg browse is now this
+// tool's no-arg mode); retired 2026-07-05 to cut tool-choice ambiguity.
 
 export const GET_ENGINE_PARAMS = "get_engine_params";
 function registerGetEngineParams(server: McpServer) {
   server.registerTool(
     GET_ENGINE_PARAMS,
     {
-      title: "Get / diff engine params",
+      title: "Browse / get / diff engine params",
       description:
-        "Admin only. Get one engine-params version's full values; with " +
-        "compare_to_version, return the dot-path diff between two versions.",
+        "Admin only. With no arguments, browse all engine-params versions " +
+        "(which is active, notes, created date). With version, get that " +
+        "version's full values; add compare_to_version for the dot-path diff " +
+        "between two versions.",
       inputSchema: {
-        version: z.number().int().positive(),
+        version: z.number().int().positive().optional(),
         compare_to_version: z.number().int().positive().optional(),
       },
     },
     async (
-      { version, compare_to_version }: { version: number; compare_to_version?: number },
+      { version, compare_to_version }: { version?: number; compare_to_version?: number },
       extra: McpExtra,
     ) => {
       const { client } = await resolveAdmin(extra);
+      if (version == null) {
+        if (compare_to_version != null)
+          return jsonResult({
+            ok: false,
+            error: "compare_to_version needs a version to diff against.",
+          });
+        return jsonResult({ versions: await listEngineParams(client) });
+      }
       const a = await getEngineParamsVersion(client, version);
       if (!a) return jsonResult({ found: false, error: `version ${version} not found` });
       if (compare_to_version == null) {
@@ -773,7 +767,6 @@ function registerDiscardEngineParams(server: McpServer) {
 // stay as read-only inspection (preview what a recompute would produce).
 
 export function registerAdminTools(server: McpServer) {
-  registerListEngineParams(server);
   registerGetEngineParams(server);
   registerProposeEngineParams(server);
   registerActivateEngineParams(server);
@@ -786,7 +779,6 @@ export function registerAdminTools(server: McpServer) {
 /** Every role-gated tool this module registers — the roster the tools/list
  *  visibility filter hides from non-admins (PH33). */
 export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
-  LIST_ENGINE_PARAMS,
   GET_ENGINE_PARAMS,
   PROPOSE_ENGINE_PARAMS,
   ACTIVATE_ENGINE_PARAMS,

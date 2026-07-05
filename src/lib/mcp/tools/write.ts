@@ -217,7 +217,7 @@ function registerCreateMesocycle(server: McpServer) {
         "RIR ramp; the engine computes the actual loads/reps/sets when the meso is " +
         "started. Pass macrocycle_id (and optional position) to author it straight " +
         "into a macro slot — filling the earliest open slot by default; omit it for " +
-        "a standalone draft you can place later with place_mesocycle. The meso lands " +
+        "a standalone draft you can place later with manage_macrocycle_slots (action \"place\"). The meso lands " +
         "PLANNED (an unapproved draft) for the athlete to open, edit, and activate.",
       inputSchema: {
         name: z.string().min(1).max(80),
@@ -295,7 +295,7 @@ function registerCreateMesocycle(server: McpServer) {
         if (!res.ok)
           return {
             ok: false,
-            error: `created the meso, but placing it into the macro failed: ${res.error} It's a standalone planned draft — place it with place_mesocycle.`,
+            error: `created the meso, but placing it into the macro failed: ${res.error} It's a standalone planned draft — place it with manage_macrocycle_slots (action "place").`,
           };
         return { ok: true, note: ` in the macrocycle at position ${res.position}`, position: res.position };
       };

@@ -608,9 +608,12 @@ function registerGetMuscleBalance(server: McpServer) {
       title: "Get muscle balance",
       description:
         "Weekly sets per muscle group and the push/pull/legs split for a " +
-        "mesocycle, with the in-app balance callout and a per-day emphasis " +
-        "breakdown (so a lower-set leg day isn't misread as under-trained). " +
-        "Advisory only — a guide to weak points, not a hard prescription.",
+        "STARTED (active/completed) mesocycle, with the in-app balance callout " +
+        "and a per-day emphasis breakdown (so a lower-set leg day isn't misread " +
+        "as under-trained). Reads trained weeks, so a not-yet-started plan has " +
+        "nothing here — self-check a draft with preview_mesocycle_volume " +
+        "instead. Advisory only — a guide to weak points, not a hard " +
+        "prescription.",
       inputSchema: { mesocycle_id: z.string().uuid() },
     },
     async ({ mesocycle_id }: { mesocycle_id: string }, extra: McpExtra) => {
