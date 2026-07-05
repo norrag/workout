@@ -31,6 +31,11 @@ import type { ExerciseRow, MuscleGroupRow } from "@/lib/types/database";
  * correctness never depends on a bust. The TTL bounds staleness after a
  * migration; the tags allow an explicit `revalidateTag` if an admin path ever
  * needs one.
+ *
+ * Outside the Next runtime (the vitest integration suite exercises the query
+ * layer directly) `unstable_cache` has no incremental cache and throws its
+ * E469 invariant — so each accessor falls back to the uncached live read on
+ * exactly that error. Same rows either way; only the caching differs.
  */
 
 export const MUSCLE_GROUPS_TAG = "ref:muscle-groups";
@@ -53,52 +58,85 @@ export interface StockLibrary {
   links: StockLibraryLink[];
 }
 
-/** All muscle groups, name-ordered. Cached; identical for every user. */
-export const getMuscleGroupsCached = unstable_cache(
-  async (): Promise<MuscleGroupRow[]> => {
-    const service = createServiceClient();
-    const { data, error } = await service
-      .from("muscle_groups")
-      .select("*")
-      .order("name");
-    if (error) throw error;
-    return data ?? [];
-  },
+async function loadMuscleGroups(): Promise<MuscleGroupRow[]> {
+  const service = createServiceClient();
+  const { data, error } = await service
+    .from("muscle_groups")
+    .select("*")
+    .order("name");
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function loadStockLibrary(): Promise<StockLibrary> {
+  const service = createServiceClient();
+  const [{ data: exercises, error: exError }, { data: links, error: linkError }] =
+    await Promise.all([
+      service.from("exercises").select("*").is("user_id", null).order("name"),
+      // stock-only links via the FK join — an `.in()` on 330+ ids would hit
+      // the same 414 query-string limit listExercises documents. The
+      // hand-authored DB types carry no relationship metadata, so the embed
+      // shape is typed via the cast below (same pattern as logSet's chain).
+      service
+        .from("exercise_muscle_groups")
+        .select("exercise_id, muscle_group_id, role, exercises!inner(user_id)")
+        .is("exercises.user_id", null),
+    ]);
+  if (exError) throw exError;
+  if (linkError) throw linkError;
+  const linkRows = (links ?? []) as unknown as (StockLibraryLink & {
+    exercises: { user_id: string | null };
+  })[];
+  return {
+    exercises: exercises ?? [],
+    links: linkRows.map((l) => ({
+      exercise_id: l.exercise_id,
+      muscle_group_id: l.muscle_group_id,
+      role: l.role,
+    })),
+  };
+}
+
+const muscleGroupsCached = unstable_cache(
+  loadMuscleGroups,
   ["reference-muscle-groups"],
   { revalidate: REFERENCE_TTL_SECONDS, tags: [MUSCLE_GROUPS_TAG] },
 );
 
-/** The stock exercise library + muscle links. Cached; identical for every
- *  user. Callers merge the user's live custom exercises on top. */
-export const getStockLibraryCached = unstable_cache(
-  async (): Promise<StockLibrary> => {
-    const service = createServiceClient();
-    const [{ data: exercises, error: exError }, { data: links, error: linkError }] =
-      await Promise.all([
-        service.from("exercises").select("*").is("user_id", null).order("name"),
-        // stock-only links via the FK join — an `.in()` on 330+ ids would hit
-        // the same 414 query-string limit listExercises documents. The
-        // hand-authored DB types carry no relationship metadata, so the embed
-        // shape is typed via the cast below (same pattern as logSet's chain).
-        service
-          .from("exercise_muscle_groups")
-          .select("exercise_id, muscle_group_id, role, exercises!inner(user_id)")
-          .is("exercises.user_id", null),
-      ]);
-    if (exError) throw exError;
-    if (linkError) throw linkError;
-    const linkRows = (links ?? []) as unknown as (StockLibraryLink & {
-      exercises: { user_id: string | null };
-    })[];
-    return {
-      exercises: exercises ?? [],
-      links: linkRows.map((l) => ({
-        exercise_id: l.exercise_id,
-        muscle_group_id: l.muscle_group_id,
-        role: l.role,
-      })),
-    };
-  },
+const stockLibraryCached = unstable_cache(
+  loadStockLibrary,
   ["reference-stock-library"],
   { revalidate: REFERENCE_TTL_SECONDS, tags: [STOCK_LIBRARY_TAG] },
 );
+
+/** `unstable_cache` outside the Next runtime (vitest integration suite, any
+ *  plain-node script) throws `Invariant: incrementalCache missing` (E469).
+ *  Only that exact failure falls through to the live read — a DB error from
+ *  inside the cached callback must still surface. */
+async function cachedOrLive<T>(
+  cached: () => Promise<T>,
+  live: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await cached();
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message.includes("incrementalCache missing")
+    ) {
+      return live();
+    }
+    throw err;
+  }
+}
+
+/** All muscle groups, name-ordered. Cached; identical for every user. */
+export function getMuscleGroupsCached(): Promise<MuscleGroupRow[]> {
+  return cachedOrLive(muscleGroupsCached, loadMuscleGroups);
+}
+
+/** The stock exercise library + muscle links. Cached; identical for every
+ *  user. Callers merge the user's live custom exercises on top. */
+export function getStockLibraryCached(): Promise<StockLibrary> {
+  return cachedOrLive(stockLibraryCached, loadStockLibrary);
+}
