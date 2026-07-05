@@ -14,7 +14,10 @@ import {
   type SummaryDelta,
   type VolumeCountingWeights,
 } from "@/lib/engine";
-import { getExerciseE1rmAnchors } from "./logging";
+// imported from the leaf `anchors.ts` (not the `logging.ts` re-export) so the
+// slot-prescription resolver can sit between logging and progression without a
+// module cycle (N33).
+import { getExerciseE1rmAnchors } from "./anchors";
 import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
   buildConfigInputs,

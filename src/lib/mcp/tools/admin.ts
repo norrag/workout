@@ -20,6 +20,13 @@ import {
   getEngineDecisions,
   type DecisionRecord,
 } from "@/lib/queries/engine-admin";
+import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  e1rmBlockChanged,
+  restampLoggedSetE1rms,
+} from "@/lib/queries/e1rm-restamp";
+import { createServiceClient } from "@/lib/supabase/service";
+import { reportError } from "@/lib/observability/report";
 import { resolveSession, type McpExtra, type McpClient } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
@@ -398,7 +405,10 @@ function registerActivateEngineParams(server: McpServer) {
         "changes the live engine for all users' future generation. No manual " +
         "regenerate step is needed: already-planned, not-yet-started prescriptions " +
         "refresh automatically on each user's next view (the read-path freshness " +
-        "reconcile detects the changed engine_params token and recomputes them).",
+        "reconcile detects the changed engine_params token and recomputes them). " +
+        "If the new version changes the e1rm block, every stored per-set e1RM " +
+        "stamp is recomputed under the new params (T-N33) — the result reports " +
+        "how many rows were restamped.",
       inputSchema: {
         version: z.number().int().positive(),
         confirm_version: z.number().int().positive(),
@@ -414,14 +424,55 @@ function registerActivateEngineParams(server: McpServer) {
           ok: false,
           error: `confirm_version (${confirm_version}) must echo version (${version}).`,
         });
+      // capture the outgoing active version BEFORE the flip, so the T-N33
+      // restamp can compare e1rm blocks (already-active target ⇒ no change).
+      let prior: EngineParams | null = null;
+      try {
+        prior = (await getActiveEngineParams(client)).params;
+      } catch {
+        prior = null; // no resolvable active version — restamp decides via null
+      }
       try {
         await activateEngineParams(client, version);
       } catch (e) {
         return jsonResult({ ok: false, error: e instanceof Error ? e.message : String(e) });
       }
+
+      // T-N33 (owner decision 2026-07-04): stored per-set e1RM stamps are
+      // derived values frozen under the params active at log time; when the
+      // activation changes the e1rm block, restamp them under the new params
+      // so history/display agrees with every live engine estimate. Runs on the
+      // service client (stamps are global, per-user rows). Best-effort: the
+      // activation itself is already committed, so a restamp failure is
+      // reported, not thrown — re-activating (or any later e1rm-block change)
+      // re-runs it, and the pass is idempotent.
+      let restamp: { scanned: number; updated: number } | null = null;
+      let restampError: string | null = null;
+      const detail = await getEngineParamsVersion(client, version);
+      if (detail?.resolved && e1rmBlockChanged(prior, detail.resolved)) {
+        try {
+          restamp = await restampLoggedSetE1rms(
+            createServiceClient(),
+            detail.resolved,
+          );
+        } catch (e) {
+          restampError = e instanceof Error ? e.message : String(e);
+          await reportError("mcp:activate-params-restamp", e, { version });
+        }
+      }
+
       const summary = `activated engine_params v${version}`;
       await recordMcpWrite(userId, ACTIVATE_ENGINE_PARAMS, { version }, summary);
-      return jsonResult({ ok: true, version, summary: `${summary} — now live for future generation.` });
+      return jsonResult({
+        ok: true,
+        version,
+        summary: `${summary} — now live for future generation.`,
+        e1rm_restamp: restampError
+          ? { ran: true, error: restampError }
+          : restamp
+            ? { ran: true, ...restamp }
+            : { ran: false, reason: "e1rm block unchanged" },
+      });
     },
   );
 }

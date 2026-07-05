@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import type { PrescriptionAudit } from "@/lib/queries/audit";
+import {
+  prescriptionMatchesDecision,
+  type PrescriptionAudit,
+} from "@/lib/queries/audit";
 import { getPrescriptionAuditAction } from "@/app/(app)/log/actions";
 import { formatPrescription } from "@/lib/units";
 import { shortDate } from "@/lib/dates";
@@ -85,10 +88,28 @@ export function PrescriptionDetailSheet({
 
   if (!target) return null;
 
+  // N33 S4 tripwire: the "re-verified, unchanged" inference is only valid while
+  // the live numbers still ARE the decision's numbers. Every prescription write
+  // now flows through the engine + records a decision, so a divergence here
+  // means an out-of-band write (or a decision write that failed) — say so
+  // instead of advertising a verification that never happened.
+  const outOfBand =
+    audit?.output != null &&
+    !prescriptionMatchesDecision(
+      {
+        weight: target.prescribedWeight,
+        reps: target.prescribedReps,
+        sets: target.prescribedSets,
+        targetRir: target.targetRir,
+      },
+      audit.output,
+    );
+
   // the row stamp can be ahead of the decision version when a newer params version
   // was activated and re-verified the row WITHOUT changing the numbers (no new
   // decision is written then) — surface that as the audit signal it is.
   const reverified =
+    !outOfBand &&
     target.paramsVersion != null &&
     audit != null &&
     target.paramsVersion > audit.decisionVersion;
@@ -127,6 +148,15 @@ export function PrescriptionDetailSheet({
               <span className="numeral">{versionLabel(target.paramsVersion)}</span> —
               numbers unchanged since{" "}
               <span className="numeral">{versionLabel(audit!.decisionVersion)}</span>.
+            </p>
+          )}
+
+          {/* ink, not accent — orange is reserved for current position/selection (rule 7) */}
+          {outOfBand && (
+            <p className="mt-2 border-l-2 border-ink/40 pl-2.5 text-[11px] leading-[1.45] text-ink/70">
+              Current numbers don&apos;t match this decision — they were set
+              outside the engine. The rationale below describes the recorded
+              decision, not the numbers shown above.
             </p>
           )}
 

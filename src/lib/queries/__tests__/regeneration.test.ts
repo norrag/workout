@@ -10,6 +10,8 @@ import {
 import {
   recomputeRow,
   advanceSourceKey,
+  advanceSourceKeys,
+  dropForeignDecisions,
   latestDecisionsByRow,
   liveWeekRirUpdates,
   type RecomputeArgs,
@@ -428,6 +430,54 @@ describe("advanceSourceKey (decision-less backfill routing)", () => {
   });
 });
 
+describe("advanceSourceKeys (N33 §9 lookback)", () => {
+  it("lists candidates nearest week first, down to the lookback bound", () => {
+    expect(advanceSourceKeys(4, 2, "ex-a")).toEqual([
+      { offset: 1, key: "3:2:ex-a" },
+      { offset: 2, key: "2:2:ex-a" },
+    ]);
+  });
+
+  it("floors at week 1 (a week-2 row has only its week-1 candidate)", () => {
+    expect(advanceSourceKeys(2, 4, "ex-a")).toEqual([
+      { offset: 1, key: "1:4:ex-a" },
+    ]);
+    expect(advanceSourceKeys(1, 4, "ex-a")).toEqual([]);
+  });
+});
+
+describe("dropForeignDecisions (N33 S2 — swapped slots never replay a foreign decision)", () => {
+  const decision = (exerciseId: string | null) => ({
+    id: "d1",
+    kind: "advance" as const,
+    sourceWorkoutExerciseId: null,
+    exerciseId,
+    inputs: {},
+  });
+
+  it("drops a decision computed for a different exercise than the row now holds", () => {
+    const latest = new Map([["we1", decision("ex-old")]]);
+    dropForeignDecisions(latest, new Map([["we1", "ex-new"]]));
+    expect(latest.has("we1")).toBe(false);
+  });
+
+  it("keeps a matching decision, and legacy decisions with no recorded exercise", () => {
+    const latest = new Map([
+      ["we1", decision("ex-a")],
+      ["we2", decision(null)],
+    ]);
+    dropForeignDecisions(
+      latest,
+      new Map([
+        ["we1", "ex-a"],
+        ["we2", "ex-b"],
+      ]),
+    );
+    expect(latest.has("we1")).toBe(true);
+    expect(latest.has("we2")).toBe(true);
+  });
+});
+
 describe("liveWeekRirUpdates", () => {
   // a 5-week meso with a deload (ramp 3→0 across weeks 1–4, deload week 5)
   const meso = { weeks: 5, includes_deload: true, rir_start: 3, rir_end: 0 };
@@ -473,6 +523,7 @@ describe("latestDecisionsByRow (R11)", () => {
     id,
     workout_exercise_id: we,
     source_workout_exercise_id: null,
+    exercise_id: null,
     kind: "advance",
     inputs: {},
   });

@@ -1,5 +1,6 @@
 import "server-only";
 import type { EngineInputs, EngineParams, Prescription } from "@/lib/engine";
+import type { EngineDecisionKind } from "@/lib/types/database";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
 import { engineCodeSha, hashParams } from "./params-provenance";
@@ -29,12 +30,19 @@ import { engineCodeSha, hashParams } from "./params-provenance";
  * service-client hiccup never breaks meso start / plan save / add-exercise.
  */
 
-/** One seeded prescription paired with the engine I/O that produced it. */
+/** One slot prescription paired with the engine I/O that produced it. Defaults
+ *  to a cold-start seed; a swap/add that progressed a §9 lookback source instead
+ *  records `kind:"advance"` with that source (N33 — the resolver derives the
+ *  kind from the data, and the decision must record what actually ran). */
 export interface SeededDecision {
   workoutExerciseId: string;
   exerciseId: string;
   inputs: EngineInputs;
   output: Prescription;
+  /** which engine produced it; absent ⇒ "seed" (the historical shape) */
+  kind?: EngineDecisionKind;
+  /** the week-(N-k) source an advance progressed from; absent/null for a seed */
+  sourceWorkoutExerciseId?: string | null;
 }
 
 /** Cycle coordinates shared by every seeded row of one workout/day. */
@@ -44,18 +52,33 @@ export interface SeedDecisionCoords {
   mesocycleId: string;
 }
 
-/** Recording-time provenance for a seed decision (mirrors the advance shape, but
- *  a cold start has no logged sets, so the RIR fallback never applies). */
-function seedProvenance(codeSha: string | null): Record<string, unknown> {
+/** Recording-time provenance for a slot decision. A seed mirrors the advance
+ *  shape with a zeroed RIR fallback (a cold start has no logged sets); an
+ *  advance computes the doc-11 fallback from its source's actual sets, exactly
+ *  like `decisionProvenance` in progression.ts. */
+function slotProvenance(
+  kind: EngineDecisionKind,
+  inputs: EngineInputs,
+  codeSha: string | null,
+): Record<string, unknown> {
+  const working = (inputs.actualSets ?? []).filter((s) => !s.isWarmup);
+  const assumed = working.filter((s) => s.rirReported == null).length;
   return {
     code_sha: codeSha,
     rir_fallback: {
       rule: "null rir_reported assumed at the prescribed target RIR (doc 11)",
-      working_sets: 0,
-      sets_assumed: 0,
-      applied: false,
+      working_sets: working.length,
+      sets_assumed: assumed,
+      applied: assumed > 0,
     },
-    seed: { reason: "cold start (seedMeso): no logged history" },
+    ...(kind === "seed"
+      ? { seed: { reason: "cold start (seedMeso): no logged history" } }
+      : {
+          slot_advance: {
+            reason:
+              "swap/add progressed a recent same-slot instance (N33 §9 lookback)",
+          },
+        }),
   };
 }
 
@@ -72,22 +95,27 @@ export function buildSeedDecisionRows(
   paramsHash: string,
   codeSha: string | null,
 ) {
-  return rows.map((r) => ({
-    user_id: userId,
-    workout_exercise_id: r.workoutExerciseId,
-    exercise_id: r.exerciseId,
-    // a seed has no week-N source — it is a cold start, not a progression
-    source_workout_exercise_id: null,
-    workout_id: coords.workoutId,
-    microcycle_id: coords.microcycleId,
-    mesocycle_id: coords.mesocycleId,
-    inputs: r.inputs as unknown as Record<string, unknown>,
-    output: r.output as unknown as Record<string, unknown>,
-    params_version: paramsVersion,
-    params_hash: paramsHash,
-    provenance: seedProvenance(codeSha),
-    kind: "seed" as const,
-  }));
+  return rows.map((r) => {
+    const kind: EngineDecisionKind = r.kind ?? "seed";
+    return {
+      user_id: userId,
+      workout_exercise_id: r.workoutExerciseId,
+      exercise_id: r.exerciseId,
+      // a seed has no week-N source — it is a cold start, not a progression;
+      // an advance records the §9 lookback source it progressed
+      source_workout_exercise_id:
+        kind === "seed" ? null : (r.sourceWorkoutExerciseId ?? null),
+      workout_id: coords.workoutId,
+      microcycle_id: coords.microcycleId,
+      mesocycle_id: coords.mesocycleId,
+      inputs: r.inputs as unknown as Record<string, unknown>,
+      output: r.output as unknown as Record<string, unknown>,
+      params_version: paramsVersion,
+      params_hash: paramsHash,
+      provenance: slotProvenance(kind, r.inputs, codeSha),
+      kind,
+    };
+  });
 }
 
 /**

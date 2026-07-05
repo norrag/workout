@@ -2,7 +2,49 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-04 (latest) — N32: history-sheet fixes from N15 field testing
+## 2026-07-05 (latest) — N33 + T-N33: engine-mediated slot prescriptions + e1RM restamp on activation
+
+The swap/seed-path provenance investigation
+([reviews/2026-07-04-swap-prescription-provenance.md](reviews/2026-07-04-swap-prescription-provenance.md),
+doc 14 §6.2 amendment) built out (PR #147). Root defect: `replaceWorkoutExercise`
+wrote the incoming exercise's all-time PR raw onto half the prescription tuple —
+no engine call, no decision, no fingerprint restamp — so the detail sheet showed
+a chimera (245×15·2·6RIR over a V17 deload trace) with a false "re-verified"
+line, and the freshness framework kept certifying hand-written numbers (a swap
+changes neither the meso stale gate nor the row fingerprint).
+
+- **Slot resolver (S1 + §9 lookback).** New `queries/slot-prescription.ts`:
+  swap AND add flow through one resolver that derives the engine kind from the
+  data — an **advance** off the most recent same-day-slot instance with logged
+  working sets within 2 weeks (`LOOKBACK_WEEKS`; set-less week-(N-1) fallback =
+  generation parity), else the doc 14 §6.2 cold seed. Swap-out/swap-back now
+  RESTORES the engine prescription (golden test: the owner's exact W5·D2 case
+  reproduces 215 lb × 10 @ 6 RIR × 2 sets); a removed-then-re-added exercise
+  advances instead of reseeding; a week substituted for equipment reasons still
+  advances off the last performed session. Full tuple + rationale written,
+  fingerprint stamped, decision recorded (`seed-decisions.ts` generalized to
+  carry `kind`/source). Propagated sibling-week swaps each compute under their
+  own week context.
+- **Exercise-identity replay guard (S2).** The reconcile drops a latest
+  decision whose recorded `exercise_id` differs from the row's live one
+  (`dropForeignDecisions`) — the row falls into the §7b/§7c backfill instead of
+  replaying a foreign decision. §7c itself gained the same §9 lookback
+  (`advanceSourceKeys` + set-presence preference).
+- **Audit tripwire (S4).** `PrescriptionAudit` now carries the decision's
+  output numbers; the detail sheet compares them to the live row and replaces
+  the "re-verified — unchanged" inference with an explicit "set outside the
+  engine" note on divergence (ink border, not accent — rule 7).
+- **T-N33 — stored e1RM restamp on activation.** `queries/e1rm-restamp.ts`:
+  when `activate_engine_params` activates a version whose `e1rm` block differs
+  from the outgoing one, every `logged_sets.e1rm` stamp is recomputed under the
+  new params (same rule as log time) and changed rows rewritten via chunked PK
+  upserts on the service client; the tool reports scanned/updated. Caveat: a
+  version activated BY MIGRATION bypasses the hook — prefer the MCP tool when a
+  proposal touches the `e1rm` block. Golden test: the owner's 245×15 restamps
+  384.2 → 367.5 (v11 Brzycki cutoff).
+- Green: typecheck, lint, 805 tests (+27), production build.
+
+## 2026-07-04 — N32: history-sheet fixes from N15 field testing
 
 Owner tested the PR #144 drill-down and returned one bug + two changes
 (Batch 9 → N32, PR #145). Design of record: the 09 "2026-07-04 (session 5)"

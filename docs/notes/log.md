@@ -4,6 +4,37 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 47 (cont. 3): N33 + T-N33 built (PR #147)
+
+Owner: "Go ahead and build N33 and T-N33." Both shipped on the open PR #147
+branch (rows → done; archive sweep falls to the next session after merge):
+
+- **N33** — new `queries/slot-prescription.ts` resolver: swap
+  (`replaceWorkoutExercise`) and add (`addWorkoutExercises`) both compute via
+  the engine with the kind derived from the data (advance off the §9 lookback
+  source — most recent same-day-slot instance with logged working sets within
+  2 weeks, set-less N-1 fallback for generation parity — else the doc 14 §6.2
+  cold seed); full tuple + rationale + fingerprint + decision written
+  (`seed-decisions.ts` generalized to carry kind/source). Reconcile gains the
+  S2 exercise-identity replay guard (`dropForeignDecisions`) and the same §9
+  lookback in the §7c backfill (`advanceSourceKeys` + set-presence
+  preference). Detail sheet gains the S4 out-of-band tripwire (decision
+  output numbers compared to the live row; the false "re-verified" line is
+  replaced by an explicit "set outside the engine" note on divergence).
+  Golden test reproduces the owner's W5·D2 case: swap-back restores
+  **215×10@6RIR·2 sets**. Doc 14 §6.2 carries a dated amendment.
+- **T-N33** — `queries/e1rm-restamp.ts` wired into the MCP
+  `activate_engine_params` tool: when the incoming version's `e1rm` block
+  differs from the outgoing one, all `logged_sets.e1rm` stamps recompute
+  under the new params (same rule as log time), changed rows rewritten via
+  chunked PK upserts (service client, idempotent), counts in the tool
+  result. Golden test: 245×15 restamps 384.2 → 367.5. Caveat documented:
+  migration-activated versions bypass the hook.
+
+Green: typecheck, lint, 805 tests (+27: slot resolver, lookback selection,
+replay guard, audit matcher, restamp planner, advance-kind decisions),
+production build. PROGRESS.md entry "2026-07-05 (latest)".
+
 ## 2026-07-04 — Session 47 (cont. 2): T-N33 decided (restamp on activation) + anchor-selection Q&A
 
 Owner decided **T-N33: restamp `logged_sets.e1rm` on params activation**

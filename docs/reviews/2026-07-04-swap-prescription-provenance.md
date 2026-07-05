@@ -1,7 +1,13 @@
 # Swap / seed-path prescription provenance — investigation (N33)
 
 **Date:** 2026-07-04 · **Reporter:** owner (in-chat, with a W5·D2 screenshot)
-· **Status:** investigated, root-caused, solutions assessed — no code changed yet.
+· **Status:** **BUILT (PR #147, 2026-07-05)** — S1/S2/S4 + the §9 lookback and
+the T-N33 restamp shipped per §6/§8.2/§9 below. S3 is realized as the shared
+`slot-prescription.ts` resolver both entry points call, plus a source-scan
+test (`prescription-writers.test.ts`) pinning the allowlist of modules that
+may build prescription write payloads. S5 (deload-aware `seedMeso`) remains
+open as noted. Implementation record:
+`docs/PROGRESS.md` "2026-07-05". Dated framework amendment: doc 14 §6.2.
 **Scoping record for backlog item N33.** §8–§9 added same day from the owner's
 follow-up questions (Batch 10 addendum): add-path advance-first, the "cold
 seed" definition, the 384-vs-367.5 anchor question (resolved, → T-N33), and

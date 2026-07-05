@@ -25,6 +25,10 @@ import {
   peakByExercise,
 } from "./progression";
 import { getMesoPlan } from "./cycles";
+import {
+  chooseAdvanceSource,
+  LOOKBACK_WEEKS as SLOT_LOOKBACK_WEEKS,
+} from "./slot-prescription";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
 import { engineGoal } from "./engine-goal";
@@ -95,6 +99,49 @@ export function advanceSourceKey(
   exerciseId: string,
 ): string | null {
   return weekNumber <= 1 ? null : `${weekNumber - 1}:${dayNumber}:${exerciseId}`;
+}
+
+/**
+ * Pure (N33 §9 lookback): the candidate advance-source keys for a decision-less
+ * row, nearest week first — `[N-1, N-2, …]` down to `lookback` weeks, floored at
+ * week 1. Selection among the hits is `chooseAdvanceSource` (slot-prescription):
+ * most recent WITH logged working sets, else the week-(N-1) counterpart even
+ * set-less (parity with `generateDay`'s empty advance), else none → seed.
+ */
+export function advanceSourceKeys(
+  weekNumber: number,
+  dayNumber: number,
+  exerciseId: string,
+  lookback = SLOT_LOOKBACK_WEEKS,
+): { offset: number; key: string }[] {
+  const out: { offset: number; key: string }[] = [];
+  for (let offset = 1; offset <= lookback; offset += 1) {
+    const week = weekNumber - offset;
+    if (week < 1) break;
+    out.push({ offset, key: `${week}:${dayNumber}:${exerciseId}` });
+  }
+  return out;
+}
+
+/**
+ * Pure (N33 S2): drop any "latest decision" that was computed for a DIFFERENT
+ * exercise than its row currently holds — an exercise swap changed the slot
+ * after the decision was recorded, so replaying it would progress the wrong
+ * movement's history. The row is treated as decision-less instead (it falls
+ * into the §7b/§7c backfill and gets a correct fresh basis). Decisions with no
+ * recorded exercise (pre-backfill legacy rows) are kept — there is nothing to
+ * compare, and dropping them would discard real replay sources.
+ */
+export function dropForeignDecisions(
+  latest: Map<string, LatestDecision>,
+  exerciseByRow: Map<string, string>,
+): void {
+  for (const [weId, d] of latest) {
+    const rowExercise = exerciseByRow.get(weId);
+    if (d.exerciseId != null && rowExercise != null && d.exerciseId !== rowExercise) {
+      latest.delete(weId);
+    }
+  }
 }
 
 export type RecomputeStatus = "changed" | "unchanged" | "invalid_source";
@@ -269,6 +316,10 @@ export interface LatestDecision {
   id: string;
   kind: EngineDecisionKind;
   sourceWorkoutExerciseId: string | null;
+  /** the exercise the decision was computed FOR (null on legacy rows) — compared
+   *  against the row's live exercise_id so a swapped slot never replays a foreign
+   *  decision (N33 S2, `dropForeignDecisions`) */
+  exerciseId: string | null;
   inputs: Record<string, unknown>;
 }
 
@@ -277,6 +328,7 @@ export interface DecisionPageRow {
   id: string;
   workout_exercise_id: string | null;
   source_workout_exercise_id: string | null;
+  exercise_id: string | null;
   kind: EngineDecisionKind;
   inputs: Record<string, unknown>;
 }
@@ -312,6 +364,7 @@ export async function latestDecisionsByRow(
           id: d.id,
           kind: d.kind,
           sourceWorkoutExerciseId: d.source_workout_exercise_id,
+          exerciseId: d.exercise_id,
           inputs: d.inputs,
         });
       }
@@ -705,7 +758,9 @@ export async function reconcilePrescriptions(
   const latestByWe = await latestDecisionsByRow(async (from, to) => {
     const { data, error } = await service
       .from("engine_decisions")
-      .select("id, workout_exercise_id, source_workout_exercise_id, kind, inputs")
+      .select(
+        "id, workout_exercise_id, source_workout_exercise_id, exercise_id, kind, inputs",
+      )
       .in("workout_exercise_id", openWeIds)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
@@ -713,6 +768,14 @@ export async function reconcilePrescriptions(
     if (error) throw error;
     return (data ?? []) as DecisionPageRow[];
   }, openWeIds);
+
+  // N33 S2: a decision computed for a different exercise than the row now holds
+  // (the slot was swapped) is not replayable — demote the row to decision-less
+  // so the §7b/§7c backfill rebuilds a correct basis for the CURRENT exercise.
+  dropForeignDecisions(
+    latestByWe,
+    new Map(openWes.map((we) => [we.id, we.exercise_id])),
+  );
 
   // 7. config dimensions resolved once: profile, macro goal, equipment per exercise
   const [{ data: profile, error: profileError }, mesoGoal] = await Promise.all([
@@ -838,11 +901,50 @@ export async function reconcilePrescriptions(
       completedWeByKey.set(`${mc.week_number}:${w.day_number}:${we.exercise_id}`, we);
     }
   }
-  const advanceSourceByRow = new Map<string, (typeof wes)[number]>();
+  // N33 §9 lookback: candidates are the same-day-slot, same-exercise closed
+  // rows in weeks N-1..N-2; the most recent one WITH logged working sets wins
+  // (else the week-(N-1) counterpart even set-less — parity with generateDay's
+  // empty advance). One presence read, only when candidates exist.
+  const candidatesByRow = new Map<
+    string,
+    { offset: number; source: (typeof wes)[number] }[]
+  >();
   for (const r of decisionlessRows) {
-    const key = advanceSourceKey(r.weekNumber, r.dayNumber, r.exerciseId);
-    const src = key ? completedWeByKey.get(key) : undefined;
-    if (src) advanceSourceByRow.set(r.id, src);
+    const cands = advanceSourceKeys(r.weekNumber, r.dayNumber, r.exerciseId)
+      .map(({ offset, key }) => {
+        const source = completedWeByKey.get(key);
+        return source ? { offset, source } : null;
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+    if (cands.length > 0) candidatesByRow.set(r.id, cands);
+  }
+  let candidateHasSets = new Set<string>();
+  if (candidatesByRow.size > 0) {
+    const candidateWeIds = [
+      ...new Set(
+        [...candidatesByRow.values()].flat().map((c) => c.source.id),
+      ),
+    ];
+    const { data: candSets, error: candSetsError } = await service
+      .from("logged_sets")
+      .select("workout_exercise_id")
+      .in("workout_exercise_id", candidateWeIds)
+      .eq("is_warmup", false);
+    if (candSetsError) throw candSetsError;
+    candidateHasSets = new Set(
+      (candSets ?? []).map((s) => s.workout_exercise_id),
+    );
+  }
+  const advanceSourceByRow = new Map<string, (typeof wes)[number]>();
+  for (const [rowId, cands] of candidatesByRow) {
+    const src = chooseAdvanceSource(
+      cands.map((c) => ({
+        offset: c.offset,
+        hasSets: candidateHasSets.has(c.source.id),
+        source: c.source,
+      })),
+    );
+    if (src) advanceSourceByRow.set(rowId, src);
   }
 
   // pre-build the advance inputs (the engine's derived history) for those rows,

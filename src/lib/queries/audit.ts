@@ -32,6 +32,47 @@ export interface PrescriptionAudit {
   rationale: string | null;
   /** the engine trace that produced it */
   trace: AuditTraceStep[];
+  /** the decision's prescribed numbers — compared against the live row so an
+   *  out-of-band write (numbers the engine never produced) is surfaced instead
+   *  of being passed off as "re-verified" (N33 S4 tripwire) */
+  output: DecisionOutputNumbers | null;
+}
+
+/** The prescription tuple recorded on a decision's output. */
+export interface DecisionOutputNumbers {
+  weight: number | null;
+  reps: number | null;
+  sets: number | null;
+  targetRir: number | null;
+}
+
+/** Coerce the stored `output` jsonb into the prescribed tuple. Pure; defensive
+ *  (the stored jsonb is untyped). Null when no numeric field is present. */
+export function readOutputNumbers(output: unknown): DecisionOutputNumbers | null {
+  if (!output || typeof output !== "object") return null;
+  const o = output as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
+  const numbers = {
+    weight: num(o.weight),
+    reps: num(o.reps),
+    sets: num(o.sets),
+    targetRir: num(o.targetRir),
+  };
+  return Object.values(numbers).every((v) => v == null) ? null : numbers;
+}
+
+/** Pure (N33 S4): does the live row still carry the decision's numbers? Field
+ *  null-mismatches count as divergence — the whole tuple is engine-written. */
+export function prescriptionMatchesDecision(
+  live: DecisionOutputNumbers,
+  decision: DecisionOutputNumbers,
+): boolean {
+  return (
+    live.weight === decision.weight &&
+    live.reps === decision.reps &&
+    live.sets === decision.sets &&
+    live.targetRir === decision.targetRir
+  );
 }
 
 /** Coerce the stored `output` jsonb into the trace steps we display. Pure;
@@ -78,5 +119,6 @@ export async function getPrescriptionAudit(
     decidedAt: data.created_at,
     rationale: typeof rationale === "string" ? rationale : null,
     trace: readTrace(data.output),
+    output: readOutputNumbers(data.output),
   };
 }
