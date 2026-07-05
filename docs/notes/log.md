@@ -4,6 +4,45 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 51: four closures — N29 FilterBar, N18-B per-week RIR, R24 + R25 remainders (PR #152)
+
+Resume-protocol sweep first: no stale `done` rows. The owner asked for the
+unblocked R24/R25 remainders + N29 FilterBar + N18-B, with design authority
+delegated. All four shipped on PR #152, one commit each:
+
+- **N29 → done.** Shared `FilterBar` primitive (the fig 3.1 two-axis chip
+  grammar generalized); exercises refactored onto it, templates tab + picker
+  swap their selects for chips via one `TemplateFilterPanel` (duplicated
+  search-form block collapsed; `TemplateFilters.tsx` retired), planner
+  picker's equipment row adopts it. 09 entry.
+- **N18 → done.** Part B: `mesocycles.rir_schedule` (migration
+  `20260705000002`), `rirRamp(schedule?)`, week-1 seed reads the ramp not
+  `rir_start`, `mesoStaleSignature` gains the column (the only freshness
+  change — the fingerprint already carried `week.targetRir`, exactly as
+  doc 14's worked example predicted; dated amendment added), shared
+  `RirScheduleEditor` behind both sheets' ADVANCED disclosure, MCP
+  create/update/read support. Copy/duplicate carry it.
+- **R24 → done.** Hold-week reprice-down investigated: two mechanisms —
+  (a) the Option-A climb's unconditional `prevReps + 1` breaks the doc 13
+  §9.2 constant-effective-reps invariant on ramp-hold weeks (the default
+  ramp holds at wk 2→3, so this was routine, not rare); (b) anchor decay
+  prices an identical hold lower in wk N+1. Fixed as engine_params **v19**
+  (INACTIVE; `climb_requires_rir_step` + `hold_week_anchor_deadband` —
+  deadband absorbs sub-step decay only, a full-step fall is real signal).
+  Previously-unpinned ramp-hold case now golden under both param sets.
+  Runbook v19 step added; activation is an owner action after a replay diff.
+- **R25 → done.** Error contract converged at the composition-root wrapper
+  (`{ok:false}` refusals now also `isError`); `place_mesocycle` and
+  `list_engine_params` retired into `manage_macrocycle_slots`/
+  `get_engine_params`; preview vs muscle-balance kept split deliberately
+  (plan-pre-start vs trained-weeks — muscle_balance is empty for a draft)
+  with cross-referencing descriptions; docs/05 drift fixed (stale
+  regenerate tool row, summary-tool names, resource list) + new
+  Failure-contract section.
+
+Green: typecheck, lint, 847 tests (+27), production build. Archive sweep for
+these rows falls to the next session after PR #152 merges.
+
 ## 2026-07-05 — Session 50: WS-J Phase 2 closed — #7 reference cache built, #5 dropped (PR #151)
 
 Resume-protocol sweep first: no stale `done` rows (48/49 swept in-session;

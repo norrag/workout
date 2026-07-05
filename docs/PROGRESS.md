@@ -2,7 +2,51 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-05 (latest) — WS-J Phase 2 closed: reference-data cache (#7), #5 dropped
+## 2026-07-05 (latest) — Four backlog closures: N29 FilterBar, N18-B per-week RIR, R24 hold-week, R25 MCP pass (PR #152)
+
+One session, one commit per item:
+
+- **N29 — shared FilterBar.** `components/ui/FilterBar.tsx` generalizes the
+  exercise library's two-axis chip grammar (labeled scrolling chip tracks,
+  leading ALL reset chip, ✕-to-clear, live count + CLEAR ALL) and replaces the
+  three divergent filter UIs: exercises (unchanged behavior; MUSCLE gains the
+  ALL chip per the original 3.1 spec), templates tab + from-template picker
+  (selects → chips via one shared `TemplateFilterPanel`, URL-driven as before;
+  `TemplateFilters.tsx` retired), and the planner exercise picker's equipment
+  row. 09 entry "2026-07-05 (session 2)".
+- **N18-B — per-week RIR.** `mesocycles.rir_schedule int[]`
+  (`20260705000002`): explicit per-working-week RIR superseding the
+  `rir_start→rir_end` interpolation; deload week stays engine-owned. Engine
+  `rirRamp(schedule?)`; activation + week-1 seed (now ramp-derived, not
+  `rir_start`); freshness needed zero new machinery (flows through
+  `week.targetRir`, already fingerprinted) beyond adding the column to
+  `mesoStaleSignature`; shape edits clear an orphaned schedule. UI: "Set each
+  week independently" behind both sheets' ADVANCED disclosure (shared
+  `RirScheduleEditor`). MCP create/update accept it; reads surface it. Doc 14
+  amendment: the framework's worked example is now the shipped feature.
+- **R24 — hold-week reprice-down (remainder closed).** engine_params **v19**
+  (`20260705000001`, shipped INACTIVE): `climb_requires_rir_step` (the
+  Option-A +1 rep climb only on a real RIR step — kills the "−5 lb, +1 rep"
+  lateral move on ramp-hold weeks; top-out reset unconditional) +
+  `hold_week_anchor_deadband` (a pure hold absorbs sub-step anchor decay; a
+  full-step fall passes through — the cut/maintain preserve-strength answer).
+  Ramp-hold goldens pin both param sets. Doc 13 §9.2 amendment.
+- **R25 — MCP polish (remainder closed).** Failure contract converged at the
+  composition root (`{ok:false}` refusals now also flagged `isError` — one
+  signal for both dialects); `place_mesocycle` → `manage_macrocycle_slots`
+  action "place"; `list_engine_params` → `get_engine_params` no-arg browse
+  (47 → 45 tools); preview vs muscle-balance deliberately kept split with
+  cross-referencing lifecycle descriptions; docs/05 drift fixed + new
+  Failure-contract section.
+
+**Remaining / external:** apply `20260705000001` (engine_params v19) +
+`20260705000002` (`rir_schedule`) to hosted; for v19 run a `replay_decisions`
+diff then activate per the manual-operations v19 runbook step (expect diffs
+ONLY on ramp-hold weeks).
+
+Green: typecheck, lint, 847 tests (+27 net), production build.
+
+## 2026-07-05 — WS-J Phase 2 closed: reference-data cache (#7), #5 dropped
 
 The last open items of the N1 performance plan's Phase 2 (server load, egress
 & caching — [notes/J-performance.md](notes/J-performance.md)) are dispositioned;
