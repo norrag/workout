@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { InfoDot } from "@/components/ui/InfoDot";
@@ -1856,9 +1857,6 @@ function ExercisePicker({
     close();
   };
 
-  const chip =
-    "flex h-8 flex-shrink-0 items-center px-3 text-[10px] font-bold tracking-[0.1em]";
-
   return (
     <BottomSheet
       open
@@ -1883,27 +1881,20 @@ function ExercisePicker({
         </div>
       </div>
 
-      {/* equipment / machine-type filter */}
+      {/* equipment / machine-type filter — shared chip grammar (N29) */}
       {equipTypes.length > 1 && (
-        <div className="mt-2.5 flex gap-1.5 overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setEquip(null)}
-            className={`${chip} ${equip === null ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
-          >
-            ALL
-          </button>
-          {equipTypes.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setEquip(equip === t ? null : t)}
-              className={`${chip} ${equip === t ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
-            >
-              {t.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        <FilterBar
+          className="mt-2.5"
+          axes={[
+            {
+              key: "equip",
+              label: "EQUIP",
+              options: equipTypes.map((t) => ({ value: t, label: t })),
+              value: equip,
+            },
+          ]}
+          onChange={(_key, value) => setEquip(value)}
+        />
       )}
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto">

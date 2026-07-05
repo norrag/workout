@@ -42,6 +42,37 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-05 (session 2) — Unified filter grammar: shared FilterBar (N29)
+
+- **Change:** one shared **FilterBar** primitive (`components/ui/FilterBar.tsx`)
+  replaces the three divergent filter UIs. The grammar generalizes the exercise
+  library's two-axis idiom (fig 3.1, the sleekest of the three): each axis is a
+  52px tracked-caps caption + a horizontally scrolling chip track led by an
+  `ALL` reset chip; selected = filled ink with an `✕` (tapping the active chip
+  also clears); while any axis is active, a live result count and a `CLEAR ALL`
+  underline action appear. Chips are `min-h-8` (≥32px tap target), square,
+  ink-selected — orange stays reserved for current position. State lives with
+  the caller, so the same bar serves client-state surfaces and URL-driven ones.
+- **Adoptions:** the **Templates tab** (fig 3.3) and the **from-template
+  picker** (fig 2.4 option 02) swap their three `<select>` dropdowns for chip
+  rows — `DAYS` (2–7), `SPLIT` (full body … other), `FOR` (ANYONE / FEMALE /
+  MALE) — and gain the count + CLEAR ALL affordance the selects lacked; both
+  render one shared `TemplateFilterPanel` (search form + FilterBar), still
+  URL-driven. The **exercise library** (fig 3.1) keeps its exact behavior but
+  its MUSCLE axis gains the leading `ALL` chip the original 3.1 spec described
+  (previously only EQUIP had one). The **planner exercise picker** (fig 2.7)
+  adopts the same chips for its equipment row and gains the `EQUIP` axis
+  caption (previously an unlabeled, differently-sized chip row).
+- **Rationale:** N29 — "a bit of a sleeker filtering UI for exercises and
+  templates. They feel disjointed and clunky." Three hand-rolled chip specs and
+  a select grid encoded the same filled-ink selection grammar with different
+  sizes, borders, and affordances.
+- **Affected figures:** 3.1, 3.3, 2.4, 2.7. **Impact:** `TOKENS` + `RETROFIT` —
+  new shared primitive; no data changes. Deliberate deltas: templates filtering
+  is now chip-based rather than dropdown-based, and its count line reads
+  `n TEMPLATES` (no `OF total` — the list is server-filtered, the unfiltered
+  total isn't fetched).
+
 ## 2026-07-05 — Glossary info affordance (InfoDot) + template-picker filters (N25, N29)
 
 - **Change:** app-wide **InfoDot** primitive (`components/ui/InfoDot.tsx`) — the

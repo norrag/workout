@@ -10,6 +10,7 @@ import type { ExerciseWithMuscles } from "@/lib/queries/exercises";
 // R6: shared drift-safe formatter (was a local MM/DD/YY copy that parsed the
 // raw timestamp — near-midnight sessions showed the wrong day)
 import { shortDateWithYear as shortDate } from "@/lib/dates";
+import { FilterBar, type FilterAxis } from "@/components/ui/FilterBar";
 import { NewExerciseButton } from "./NewExerciseButton";
 
 /**
@@ -54,12 +55,20 @@ export function ExercisesBrowser({
       ),
     [searched, activeGroup, eq],
   );
-  const filtering = !!activeGroup || !!eq;
-
-  const chipBase =
-    "px-2.5 py-1.5 text-[10.5px] tracking-[0.08em] whitespace-nowrap";
-  const chipOn = `bg-ink text-bg-base font-bold flex items-center gap-2 ${chipBase}`;
-  const chipOff = `border-[1.5px] border-ink/40 text-ink/55 font-medium ${chipBase}`;
+  const axes: FilterAxis[] = [
+    {
+      key: "muscle",
+      label: "MUSCLE",
+      options: muscleGroups.map((g) => ({ value: g.id, label: g.name })),
+      value: mg,
+    },
+    {
+      key: "equip",
+      label: "EQUIP",
+      options: equipTypes.map((t) => ({ value: t, label: t })),
+      value: eq,
+    },
+  ];
 
   return (
     <div>
@@ -78,90 +87,18 @@ export function ExercisesBrowser({
         className="mt-4 h-[46px] w-full border-[1.5px] border-ink bg-paper px-3.5 text-sm text-ink placeholder:text-ink/45 focus:outline-none"
       />
 
-      {/* MUSCLE axis */}
-      <div className="mt-2.5 flex items-center gap-2">
-        <span className="w-[52px] flex-shrink-0 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
-          MUSCLE
-        </span>
-        <div className="flex gap-1.5 overflow-x-auto">
-          {muscleGroups.map((g) =>
-            activeGroup?.id === g.id ? (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setMg(null)}
-                className={chipOn}
-              >
-                {g.name.toUpperCase()} <span className="opacity-60">✕</span>
-              </button>
-            ) : (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setMg(g.id)}
-                className={chipOff}
-              >
-                {g.name.toUpperCase()}
-              </button>
-            ),
-          )}
-        </div>
-      </div>
-
-      {/* EQUIP axis */}
-      <div className="mt-2 flex items-center gap-2">
-        <span className="w-[52px] flex-shrink-0 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
-          EQUIP
-        </span>
-        <div className="flex gap-1.5 overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setEq(null)}
-            className={eq ? chipOff : chipOn}
-          >
-            ALL
-          </button>
-          {equipTypes.map((type) =>
-            eq === type ? (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setEq(null)}
-                className={chipOn}
-              >
-                {type.toUpperCase()} <span className="opacity-60">✕</span>
-              </button>
-            ) : (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setEq(type)}
-                className={chipOff}
-              >
-                {type.toUpperCase()}
-              </button>
-            ),
-          )}
-        </div>
-      </div>
-
-      {filtering && (
-        <div className="mt-2.5 flex items-baseline justify-between">
-          <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/45">
-            {visible.length} OF {searched.length} EXERCISES
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setMg(null);
-              setEq(null);
-            }}
-            className="border-b-[1.5px] border-ink text-[9.5px] font-bold tracking-[0.1em] text-ink"
-          >
-            CLEAR ALL
-          </button>
-        </div>
-      )}
+      <FilterBar
+        className="mt-2.5"
+        axes={axes}
+        onChange={(key, value) =>
+          key === "muscle" ? setMg(value) : setEq(value as EquipmentType | null)
+        }
+        summary={{
+          visible: visible.length,
+          total: searched.length,
+          noun: "EXERCISES",
+        }}
+      />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         {visible.length === 0 && (
