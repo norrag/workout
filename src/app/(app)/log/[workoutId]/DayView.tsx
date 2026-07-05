@@ -16,6 +16,7 @@ import { useScrollLock } from "@/components/ui/useScrollLock";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import { AnchoredMenu, MenuRow } from "@/components/ui/AnchoredMenu";
 import { SnapSlider } from "@/components/ui/SnapSlider";
+import { InfoDot } from "@/components/ui/InfoDot";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
@@ -667,8 +668,10 @@ function DayHeader({
           <div className="flex items-stretch gap-2.5">
             <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
               {dateLabel}
-              <br />
-              <span className="font-bold text-accent">{rirLabel}</span>
+              <span className="flex items-center justify-end gap-1.5">
+                <span className="font-bold text-accent">{rirLabel}</span>
+                <InfoDot term={isDeload ? "deload" : "rir"} small />
+              </span>
             </div>
             <WorkoutOptionsMenu
               mesoId={mesoId}
@@ -2376,8 +2379,6 @@ function FeedbackSheet({
   const [sorenessDays, setSorenessDays] = useState<number | null>(
     existing?.soreness_days ?? null,
   );
-  const [workloadInfo, setWorkloadInfo] = useState(true);
-  const [pumpInfo, setPumpInfo] = useState(false);
   // close only after the write lands — a failure keeps the slider values on
   // screen for retry instead of throwing to the error boundary (R17)
   const [saving, startSaving] = useTransition();
@@ -2483,25 +2484,8 @@ function FeedbackSheet({
                 {mg} pump{" "}
                 <span className="text-xs font-normal text-ink/55">— today</span>
               </div>
-              <button
-                type="button"
-                aria-label="pump explainer"
-                onClick={() => setPumpInfo((v) => !v)}
-                className={`flex h-[17px] w-[17px] items-center justify-center rounded-full text-[10px] font-bold ${
-                  pumpInfo
-                    ? "bg-ink text-bg-base"
-                    : "border border-ink/50 text-ink/60"
-                }`}
-              >
-                i
-              </button>
+              <InfoDot term="pump" />
             </div>
-            {pumpInfo && (
-              <div className="mt-2 border-l-2 border-ink py-1.5 pl-2.5 text-[11.5px] leading-normal text-ink/75">
-                How full the muscle felt by the last set — a rough proxy for
-                whether the volume reached it.
-              </div>
-            )}
             <div className="mt-3">
               <SnapSlider
                 label={`${mg} pump`}
@@ -2521,26 +2505,8 @@ function FeedbackSheet({
                   — whole session
                 </span>
               </div>
-              <button
-                type="button"
-                aria-label="workload explainer"
-                onClick={() => setWorkloadInfo((v) => !v)}
-                className={`flex h-[17px] w-[17px] items-center justify-center rounded-full text-[10px] font-bold ${
-                  workloadInfo
-                    ? "bg-ink text-bg-base"
-                    : "border border-ink/50 text-ink/60"
-                }`}
-              >
-                i
-              </button>
+              <InfoDot term="workload" />
             </div>
-            {workloadInfo && (
-              <div className="mt-2 border-l-2 border-ink py-1.5 pl-2.5 text-[11.5px] leading-normal text-ink/75">
-                How taxing all of today&apos;s {mg.toLowerCase()} work felt,
-                recovery included. The middle means the dose was right — this
-                sets next week&apos;s set count.
-              </div>
-            )}
             <div className="mt-3">
               <SnapSlider
                 label={`${mg} workload`}

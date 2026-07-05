@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatWeight } from "@/lib/units";
+import { InfoDot } from "@/components/ui/InfoDot";
 import type { StrengthProgress } from "@/lib/queries/stats";
 import {
   HistorySheet,
@@ -45,8 +46,9 @@ export function StrengthProgressSection({
   return (
     <>
       <div className="mt-4 border-t-[1.5px] border-ink">
-        <div className="pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+        <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
           EST. STRENGTH {scopeLabel} — ALL EXERCISES
+          <InfoDot term="e1rm" small />
         </div>
         {strength.exercises.map((s) => {
           const inner = (

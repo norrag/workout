@@ -42,6 +42,42 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-05 — Glossary info affordance (InfoDot) + template-picker filters (N25, N29)
+
+- **Change:** app-wide **InfoDot** primitive (`components/ui/InfoDot.tsx`) — the
+  feedback sheet's circled-"i" trigger grammar (17px, or 14px `small` on dense
+  meta lines; open state inverts to ink) generalized into a shared affordance
+  that opens an **anchored glossary card**: ink/35 scrim + a square
+  `border-[1.5px] border-ink` card (264px, `shadow-menu`, AnchoredMenu
+  placement — below the trigger, flipping above when it won't fit) with a
+  tracked all-caps term label and 2–3 sentence body. All copy comes from one
+  source, `src/lib/glossary.ts` (RIR, RIR ramp, deload, e1RM, MEV/MRV,
+  fractional set counting, pump, workload, macro/meso/microcycle) so a term is
+  explained with the same words everywhere. **Rationale:** N25 — technical
+  terms sit all over the app with no intuitive route to clarity; the owner
+  asked for help affordances that don't clutter. **Affected figures:** 1.4
+  (feedback sheet), 1.1 (day-view header meta), 2.6 (planner), 4.1/4.3
+  (stats), 3.1 (exercise page). **Impact:** `TOKENS` + `RETROFIT` — new shared
+  primitive; the two ad-hoc feedback-sheet explainers (pump/workload inline
+  expanders) are migrated onto it. Deliberate delta: the workload explainer
+  no longer auto-expands on sheet open (the slider's JUST RIGHT center label
+  keeps the essential cue; full copy is one tap away, consistent with every
+  other term).
+- **Change:** wave-1 InfoDot placements: day-view header `TARGET n RIR` /
+  `DELOAD WEEK` line (terms: RIR / deload), meso calendar ramp footer +
+  edit-details START RIR (RIR ramp), planner finalize-sheet START RIR (RIR
+  ramp), planner WEEKLY SETS PER MUSCLE header (MEV/MRV) + DIRECT·SECONDARY
+  weights line (set counting), meso Volume tab SETS/WEEK header (set
+  counting), EST. STRENGTH header on meso/macro Performance (e1RM), exercise
+  page EST. 1RM best cell (e1RM). Placement is intentionally incremental —
+  more surfaces adopt it as they're touched. **Impact:** `RETROFIT`.
+- **Change:** the **from-template picker** (fig 2.4 option 02) gains the same
+  DAYS/WK · SPLIT · FOR filter bar as the Templates tab (fig 3.3), URL-driven,
+  search preserves active filters. **Rationale:** N29 — `listTemplates`
+  already supported the filters; the picker just never rendered them.
+  **Affected figures:** 2.4. **Impact:** `RETROFIT` (reuses
+  `TemplateFilters` unchanged).
+
 ## 2026-07-04 (session 5) — History-sheet fixes from N15 testing (N32)
 
 Owner field-tested the session-4 drill-down; three amendments (Batch 9 →

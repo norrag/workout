@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { AnchoredMenu, MenuRow } from "@/components/ui/AnchoredMenu";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { InfoDot } from "@/components/ui/InfoDot";
 import { ShareRow } from "@/components/ShareRow";
 import {
   deleteMesoAction,
@@ -323,7 +324,10 @@ export function MesoHeader({
               </div>
             ))}
             <div className="mt-2 flex justify-between border-t-[1.5px] border-ink pt-2 text-[9.5px] font-medium tracking-[0.1em] text-ink/50">
-              <span>{rampLine}</span>
+              <span className="flex items-center gap-1.5">
+                {rampLine}
+                <InfoDot term="rir_ramp" small />
+              </span>
               {deloadLine && <span>{deloadLine}</span>}
             </div>
           </div>
@@ -604,8 +608,9 @@ function EditDetailsSheet({
             </div>
 
             <div className="mt-5">
-              <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
                 START RIR
+                <InfoDot term="rir_ramp" small />
               </div>
               <div className="mt-2 flex border-[1.5px] border-ink">
                 {[0, 1, 2, 3, 4, 5].map((r, i) => (

@@ -2,7 +2,38 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-05 (latest) — N33 + T-N33: engine-mediated slot prescriptions + e1RM restamp on activation
+## 2026-07-05 (latest) — N25 glossary InfoDot + N29 picker filters
+
+Two ready backlog items shipped as one slice (09 entry "2026-07-05 — Glossary
+info affordance"):
+
+- **N25 — InfoDot + glossary.** New `src/lib/glossary.ts` — the single copy
+  source for in-app jargon (RIR, RIR ramp, deload, e1RM, MEV/MRV, fractional
+  set counting, pump, workload, macro/meso/microcycle; copy held to the
+  design voice by `glossary.test.ts`: all-caps labels, no exclamation marks,
+  card-sized bodies, e1RM framed as an estimate). New
+  `components/ui/InfoDot.tsx` — the feedback sheet's circled-"i" grammar
+  generalized: tap opens an anchored square glossary card (scrim + 264px
+  `border-ink` card, AnchoredMenu placement, `useModalA11y` + refcounted
+  scroll lock so it stacks safely over sheets). The two ad-hoc feedback-sheet
+  explainers migrated onto it (their inline-expander states deleted; the
+  workload explainer no longer auto-expands — recorded as a deliberate delta
+  in 09). Wave-1 placements: day-view header TARGET/DELOAD line, meso
+  calendar ramp footer, edit-details + finalize-sheet START RIR, planner
+  WEEKLY SETS PER MUSCLE + DIRECT·SECONDARY, meso Volume SETS/WEEK, EST.
+  STRENGTH header (meso + macro performance), exercise-page EST. 1RM cell.
+  Remaining N25 scope (more surfaces) is incremental adoption as screens are
+  touched.
+- **N29 (picker half) — from-template filters.** The plan-from-template
+  picker renders the Templates tab's `TemplateFilters` unchanged (URL-driven;
+  search form preserves active filters) and threads days/emphasis/gender into
+  `listTemplates`, which already supported them. The FilterBar unification
+  half of N29 stays open.
+
+Green: typecheck, lint, 811 tests (+5 glossary), production build. Session
+also ran the resume-protocol sweep: N33/T-N33 archived (PR #147 merged).
+
+## 2026-07-05 — N33 + T-N33: engine-mediated slot prescriptions + e1RM restamp on activation
 
 The swap/seed-path provenance investigation
 ([reviews/2026-07-04-swap-prescription-provenance.md](reviews/2026-07-04-swap-prescription-provenance.md),

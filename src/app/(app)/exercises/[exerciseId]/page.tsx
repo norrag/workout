@@ -11,6 +11,8 @@ import { toEngineEquipment, coerceLoadType } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { InfoDot } from "@/components/ui/InfoDot";
+import type { GlossaryKey } from "@/lib/glossary";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
 import { ExerciseHeader } from "./ExerciseHeader";
 
@@ -204,6 +206,7 @@ export default async function ExerciseDetailPage({
               value={ov?.best_e1rm != null ? formatWeight(ov.best_e1rm) : "—"}
               suffix="lb"
               label="EST. 1RM"
+              info="e1rm"
             />
             <BestCell
               value={ov?.volume_pr_weight != null ? formatWeight(ov.volume_pr_weight) : "—"}
@@ -320,10 +323,13 @@ function BestCell({
   value,
   suffix,
   label,
+  info,
 }: {
   value: string;
   suffix: string | null;
   label: string;
+  /** N25: glossary key rendered as an InfoDot beside the label */
+  info?: GlossaryKey;
 }) {
   return (
     <div className="bg-bg-base px-3 py-[11px]">
@@ -333,8 +339,9 @@ function BestCell({
           <span className="ml-1 text-[12px] font-semibold text-ink/50">{suffix}</span>
         )}
       </div>
-      <div className="mt-[3px] text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+      <div className="mt-[3px] flex items-center gap-1.5 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
         {label}
+        {info && <InfoDot term={info} small />}
       </div>
     </div>
   );
