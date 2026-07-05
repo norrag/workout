@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
-import { TemplateFilters } from "../../../templates/TemplateFilters";
+import { TemplateFilterPanel } from "../../../templates/TemplateFilterPanel";
 import { startTemplateDraftAction } from "../../actions";
 
 /** Template picker for the plan-a-meso flow (fig 2.4 option 02). */
@@ -45,20 +45,13 @@ export default async function PlanFromTemplatePage({
         THE PLANNER BOARD OPENS PREFILLED
       </div>
 
-      <form method="get">
-        {/* keep active filters when submitting a search */}
-        {days && <input type="hidden" name="days" value={days} />}
-        {emphasis && <input type="hidden" name="emphasis" value={emphasis} />}
-        {gender && <input type="hidden" name="gender" value={gender} />}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Search"
-          className="mt-4 h-[46px] w-full border-[1.5px] border-ink bg-paper px-3.5 text-sm text-ink placeholder:text-ink/45 focus:outline-none"
-        />
-      </form>
-      <TemplateFilters days={days} emphasis={emphasis} gender={gender} />
+      <TemplateFilterPanel
+        q={q}
+        days={days}
+        emphasis={emphasis}
+        gender={gender}
+        count={templates.length}
+      />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         {templates.length === 0 && (

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listTemplates } from "@/lib/queries/templates";
 import { NewTemplateButton } from "./NewTemplateButton";
-import { TemplateFilters } from "./TemplateFilters";
+import { TemplateFilterPanel } from "./TemplateFilterPanel";
 
 /** Templates tab (fig 3.3): stock + own templates, search, filters, start-from-template. */
 export default async function TemplatesPage({
@@ -39,20 +39,13 @@ export default async function TemplatesPage({
         <NewTemplateButton />
       </div>
 
-      <form method="get">
-        {/* keep active filters when submitting a search */}
-        {days && <input type="hidden" name="days" value={days} />}
-        {emphasis && <input type="hidden" name="emphasis" value={emphasis} />}
-        {gender && <input type="hidden" name="gender" value={gender} />}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Search"
-          className="mt-4 h-[46px] w-full border-[1.5px] border-ink bg-paper px-3.5 text-sm text-ink placeholder:text-ink/45 focus:outline-none"
-        />
-      </form>
-      <TemplateFilters days={days} emphasis={emphasis} gender={gender} />
+      <TemplateFilterPanel
+        q={q}
+        days={days}
+        emphasis={emphasis}
+        gender={gender}
+        count={templates.length}
+      />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
         {templates.length === 0 && (

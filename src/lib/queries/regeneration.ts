@@ -437,6 +437,7 @@ export function liveWeekRirUpdates(
     includes_deload: boolean;
     rir_start: number;
     rir_end: number;
+    rir_schedule?: number[] | null;
   },
   params: EngineParams,
 ): { id: string; target_rir: number }[] {
@@ -448,10 +449,13 @@ export function liveWeekRirUpdates(
       meso.rir_start,
       meso.rir_end,
       params,
+      meso.rir_schedule ?? null,
     );
   } catch {
-    // a meso with out-of-range weeks/RIR shouldn't exist (validated at creation),
-    // but never break the reconcile over it — leave the stored RIRs untouched.
+    // a meso with out-of-range weeks/RIR (or a length-mismatched rir_schedule)
+    // shouldn't exist (validated at creation; shape edits clear an orphaned
+    // schedule), but never break the reconcile over it — leave the stored RIRs
+    // untouched.
     return [];
   }
   const liveByWeek = new Map(ramp.map((w) => [w.weekNumber, w.targetRir]));
@@ -479,6 +483,9 @@ interface MesoStaleInputs {
   /** meso RIR ramp + length → `week.targetRir` / `isDeload` in the fingerprint */
   rirStart: number;
   rirEnd: number;
+  /** N18-B per-week override (null = interpolated ramp) — a schedule-only edit
+   *  must fire the gate so unstarted weeks re-derive their RIR */
+  rirSchedule: number[] | null;
   weeks: number;
   includesDeload: boolean;
   /** macro `goal_type` (fingerprint goal); null for a standalone meso */
@@ -520,7 +527,7 @@ async function loadMesoStaleInputs(
     await Promise.all([
       service
         .from("mesocycles")
-        .select("rir_start, rir_end, weeks, includes_deload, macrocycle_id")
+        .select("rir_start, rir_end, rir_schedule, weeks, includes_deload, macrocycle_id")
         .eq("id", mesoId)
         .eq("user_id", userId)
         .single(),
@@ -585,6 +592,7 @@ async function loadMesoStaleInputs(
     paramsVersion,
     rirStart: mesoRes.data.rir_start,
     rirEnd: mesoRes.data.rir_end,
+    rirSchedule: mesoRes.data.rir_schedule ?? null,
     weeks: mesoRes.data.weeks,
     includesDeload: mesoRes.data.includes_deload,
     goalType: macroRes.data?.goal_type ?? null,
@@ -691,7 +699,7 @@ export async function reconcilePrescriptions(
   );
   const { data: mesoConfig, error: mesoConfigError } = await service
     .from("mesocycles")
-    .select("weeks, includes_deload, rir_start, rir_end")
+    .select("weeks, includes_deload, rir_start, rir_end, rir_schedule")
     .eq("id", mesoId)
     .single();
   if (mesoConfigError) throw mesoConfigError;

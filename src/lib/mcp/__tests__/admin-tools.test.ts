@@ -15,7 +15,6 @@ import {
   diffPrescription,
   replayDecisions,
   registerAdminTools,
-  LIST_ENGINE_PARAMS,
   GET_ENGINE_PARAMS,
   PROPOSE_ENGINE_PARAMS,
   ACTIVATE_ENGINE_PARAMS,
@@ -296,7 +295,6 @@ describe("replayDecisions", () => {
 // --- registration + admin gating -------------------------------------------
 
 const ALL_ADMIN_TOOLS = [
-  LIST_ENGINE_PARAMS,
   GET_ENGINE_PARAMS,
   PROPOSE_ENGINE_PARAMS,
   ACTIVATE_ENGINE_PARAMS,
@@ -333,5 +331,22 @@ describe("admin-tool registration", () => {
         /authenticated session/i,
       );
     }
+  });
+});
+
+// --- R25 consolidation: list_engine_params folded into get_engine_params ----
+
+describe("get_engine_params consolidation (R25)", () => {
+  it("list_engine_params is retired; get_engine_params stands alone", () => {
+    const { server, tools } = captureServer();
+    registerAdminTools(server);
+    expect(tools.has("list_engine_params")).toBe(false);
+    expect(tools.has(GET_ENGINE_PARAMS)).toBe(true);
+  });
+
+  it("the visibility roster no longer lists the retired tool", async () => {
+    const { ADMIN_TOOL_NAMES } = await import("../tools/admin");
+    expect(ADMIN_TOOL_NAMES.has("list_engine_params")).toBe(false);
+    expect(ADMIN_TOOL_NAMES.has(GET_ENGINE_PARAMS)).toBe(true);
   });
 });

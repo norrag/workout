@@ -301,7 +301,8 @@ export function prescribe(
     gradeDetail: string | null;
     /** the Option-A schedule reps for this week (held effective workload) */
     targetReps: number;
-    /** a gate blocked a warranted increase: hold the load, hold the workload */
+    /** hold the exact load + schedule reps: a gate blocked a warranted
+     *  increase (§S5) or the hold-week deadband absorbed anchor drift (§R24b) */
     gateHeld: boolean;
   } | null = null;
 
@@ -323,13 +324,42 @@ export function prescribe(
       (params.climb_on_performed_reps ?? false) && performedMin != null
         ? performedMin
         : baseReps;
-    const targetReps =
-      prevReps >= goalWindow!.target_high
-        ? goalWindow!.target_low
-        : Math.min(goalWindow!.target_high, Math.max(goalWindow!.target_low, prevReps + 1));
-    const repriced =
+    // §R24a: the +1 climb exists to offset a −1 RIR step (constant effective
+    // reps ⇒ held load, doc 13 §9.2). On a ramp-hold week the step didn't
+    // happen, so — gated — reps hold too; the unconditional +1 repriced the
+    // load DOWN mid-meso. Topping the window still resets/steps regardless
+    // (double progression earns the load step on performance, not the ramp).
+    const toppedOut = prevReps >= goalWindow!.target_high;
+    const climbs = rirStepped || !(params.climb_requires_rir_step ?? false);
+    const targetReps = toppedOut
+      ? goalWindow!.target_low
+      : Math.min(
+          goalWindow!.target_high,
+          Math.max(goalWindow!.target_low, climbs ? prevReps + 1 : prevReps),
+        );
+    let repriced =
       weightForRepsAtRir(anchor!.value, targetReps, inputs.week.targetRir, params) ??
       baseWeight;
+    // §R24b: a pure hold (same reps, same RIR) should return the handled load,
+    // but the recency anchor decays between sessions — absorb a sub-step
+    // shortfall as decay noise; a full step or more is real signal. The held
+    // load is exact (like the §S5 gate hold): the window nudge and the
+    // anchor-predictor reps clamp are skipped below, else they'd re-price the
+    // very drift the deadband just absorbed.
+    let deadbandHeld = false;
+    const pureHold = !rirStepped && !toppedOut && targetReps <= baseReps;
+    if ((params.hold_week_anchor_deadband ?? false) && pureHold) {
+      const step = params.rounding[inputs.exercise.equipmentType] ?? 5;
+      const drift = baseWeight - repriced;
+      if (drift > 0 && drift < step) {
+        reasons.push({
+          rule: "load",
+          detail: `hold-week deadband: anchor drifted −${round2(drift)} lb (under one ${step} lb step); holding ${baseWeight} lb`,
+        });
+        repriced = baseWeight;
+        deadbandHeld = true;
+      }
+    }
     // §S5: a gate (pain or session dampener) blocks a warranted *increase*. The
     // legacy path then resets the load to baseWeight but re-derives reps from the
     // anchor predictor clamped to the window ceiling — producing a `weight × reps
@@ -350,7 +380,7 @@ export function prescribe(
       win: goalWindow!,
       gradeDetail: grade?.detail ?? null,
       targetReps,
-      gateHeld: gateHeld && (params.hold_rep_consistent ?? false),
+      gateHeld: (gateHeld && (params.hold_rep_consistent ?? false)) || deadbandHeld,
     };
   } else {
     // ----- no-anchor safety hold (T-I4: the legacy increment/regression path is

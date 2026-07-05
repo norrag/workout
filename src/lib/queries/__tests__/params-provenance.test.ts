@@ -195,6 +195,45 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v19 is a complete, replayable snapshot matching the migration hash", () => {
+    // v19 = v18 + the R24 hold-week pair: climb_requires_rir_step (the Option-A
+    // +1 rep climb only on a real RIR step) and hold_week_anchor_deadband (a
+    // pure hold absorbs sub-step anchor decay). Both `.optional()`, so
+    // v18/earlier rows are byte-identical and the new row stays replayable.
+    const v19 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+      session_fatigue_dampen_threshold: 8,
+      session_performance_dampen_threshold: 3,
+      climb_requires_rir_step: true,
+      hold_week_anchor_deadband: true,
+    });
+    const p = resolveProvenance(v19 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION);
+    expect(p.params_hash).toBe(
+      "e296579e6c0bca2f0a097360181c899eeb4502cfafb9de96e32d90e628ae9623",
+    );
+  });
+
+  it("the R24 hold-week flags are absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain(
+      "climb_requires_rir_step",
+    );
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain(
+      "hold_week_anchor_deadband",
+    );
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("pain_cut_gate is absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("pain_cut_gate");
     expect(

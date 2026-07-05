@@ -33,6 +33,7 @@ function meso(overrides: Partial<MesocycleRow> = {}): MesocycleRow {
     includes_deload: true,
     rir_start: 3,
     rir_end: 0,
+    rir_schedule: null,
     status: "active",
     template_id: null,
     start_date: "2026-06-01",
@@ -131,7 +132,7 @@ describe("formatCurrentState", () => {
       goal_type: "hypertrophy",
       duration_months: 4,
     });
-    expect(out.mesocycle?.rir_ramp).toEqual({ start: 3, end: 0 });
+    expect(out.mesocycle?.rir_ramp).toEqual({ start: 3, end: 0, schedule: null });
     expect(out.microcycle?.target_rir).toBe(1);
     expect(out.next_workout).toMatchObject({
       id: "k1",

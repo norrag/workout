@@ -192,6 +192,23 @@ Otherwise byte-identical to v14. Same gating discipline as v11/v12/v14.
 > `.../planned/[week]/[day]/page.tsx` now source the deload RIR from the active
 > engine_params too, so they preview 6 the moment v15 is active.
 
+### Apply + activate engine_params **v19** (R24 hold-week reprice-down)
+
+`20260705000001_engine_params_v19_hold_week.sql` ships v19 **inactive** — two
+`.optional()` gates over v18: `climb_requires_rir_step` (the Option-A +1 rep
+climb advances only on a week the target RIR actually stepped; the
+top-of-window reset stays unconditional) and `hold_week_anchor_deadband` (a
+pure hold absorbs an anchor-decay shortfall under one loadable step; a
+full-step fall passes through). Fixes the mid-meso "−5 lb, +1 rep" lateral
+move on ramp-hold weeks and the week-N+1 hold pricing under week N's — most
+visible on cut/maintain blocks.
+
+| Step | What / why |
+|---|---|
+| Apply the v19 migration to hosted | Inserts engine_params v19 with `is_active = false`. Additive; the active row is unchanged, so nothing changes for users yet. |
+| **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v19**. Expect diffs ONLY on ramp-hold weeks (e.g. the default 3→2→2→1 ramp's week 2→3): held `weight × reps` where the legacy path emitted a lighter load at +1 rep. Stepped weeks, top-outs, deloads, and seeds must be byte-identical. |
+| **Activate v19** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 19;` (single-active invariant). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v18. |
+
 ---
 
 ## How Claude flags these

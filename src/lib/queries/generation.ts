@@ -391,6 +391,7 @@ export async function startMeso(
     meso.rir_start,
     meso.rir_end,
     params,
+    meso.rir_schedule,
   );
 
   // exercises referenced by the plan, for equipment-aware seeding
@@ -476,7 +477,9 @@ export async function startMeso(
     prById,
     experienceLevel: profile.experience_level,
     bodyweight: profile.bodyweight ?? null,
-    targetRir: meso.rir_start,
+    // N18-B: week 1's RIR comes from the ramp (a per-week schedule can differ
+    // from rir_start), so the seed fingerprint matches the microcycle row
+    targetRir: ramp[0].targetRir,
     isDeload: week1.is_deload,
     goal,
     params,

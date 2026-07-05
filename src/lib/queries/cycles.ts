@@ -108,6 +108,7 @@ export async function createMesocycle(
     includes_deload: boolean;
     rir_start: number;
     rir_end: number;
+    rir_schedule?: number[] | null;
     template_id?: string | null;
     status?: MesocycleRow["status"];
   },
@@ -125,6 +126,7 @@ export async function createMesocycle(
       includes_deload: input.includes_deload,
       rir_start: input.rir_start,
       rir_end: input.rir_end,
+      rir_schedule: input.rir_schedule ?? null,
       status: input.status ?? "planned",
       template_id: input.template_id ?? null,
       start_date: null,
@@ -169,6 +171,7 @@ export async function createDraftMeso(
     includes_deload?: boolean;
     rir_start?: number;
     rir_end?: number;
+    rir_schedule?: number[] | null;
   } = {},
 ): Promise<MesocycleRow> {
   const { error: clearError } = await supabase
@@ -184,6 +187,7 @@ export async function createDraftMeso(
     includes_deload: opts.includes_deload ?? true,
     rir_start: opts.rir_start ?? 3,
     rir_end: opts.rir_end ?? 0,
+    rir_schedule: opts.rir_schedule ?? null,
     status: "draft",
   });
 }
@@ -201,6 +205,8 @@ export async function finalizeDraftMeso(
     rir_start?: number;
     rir_end?: number;
     includes_deload?: boolean;
+    /** N18-B: explicit per-working-week RIR (null clears back to the ramp) */
+    rir_schedule?: number[] | null;
   },
 ): Promise<void> {
   const { error } = await supabase
@@ -212,6 +218,9 @@ export async function finalizeDraftMeso(
       ...(input.rir_end !== undefined ? { rir_end: input.rir_end } : {}),
       ...(input.includes_deload !== undefined
         ? { includes_deload: input.includes_deload }
+        : {}),
+      ...(input.rir_schedule !== undefined
+        ? { rir_schedule: input.rir_schedule }
         : {}),
       status: "planned",
     })
@@ -235,6 +244,8 @@ export interface MesoAttrPatch {
   includes_deload?: boolean;
   rir_start?: number;
   rir_end?: number;
+  /** N18-B: per-working-week RIR; explicit null clears back to the ramp */
+  rir_schedule?: number[] | null;
   phase?: MesocycleRow["phase"];
 }
 
@@ -257,7 +268,7 @@ export async function updateMesocycleAttrs(
 ): Promise<MesoAttrResult> {
   const { data: meso, error } = await supabase
     .from("mesocycles")
-    .select("id, status")
+    .select("id, status, weeks, includes_deload, rir_schedule")
     .eq("id", mesoId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -273,7 +284,8 @@ export async function updateMesocycleAttrs(
     patch.weeks !== undefined ||
     patch.includes_deload !== undefined ||
     patch.rir_start !== undefined ||
-    patch.rir_end !== undefined;
+    patch.rir_end !== undefined ||
+    patch.rir_schedule !== undefined;
   const notStarted =
     meso.status === "draft" ||
     meso.status === "unplanned" ||
@@ -288,7 +300,13 @@ export async function updateMesocycleAttrs(
   const update: Partial<
     Pick<
       MesocycleRow,
-      "name" | "phase" | "weeks" | "includes_deload" | "rir_start" | "rir_end"
+      | "name"
+      | "phase"
+      | "weeks"
+      | "includes_deload"
+      | "rir_start"
+      | "rir_end"
+      | "rir_schedule"
     >
   > = {};
   if (patch.name !== undefined) update.name = patch.name;
@@ -298,8 +316,28 @@ export async function updateMesocycleAttrs(
     update.includes_deload = patch.includes_deload;
   if (patch.rir_start !== undefined) update.rir_start = patch.rir_start;
   if (patch.rir_end !== undefined) update.rir_end = patch.rir_end;
+  if (patch.rir_schedule !== undefined) update.rir_schedule = patch.rir_schedule;
   if (Object.keys(update).length === 0)
     return { ok: false, error: "no attributes to update were provided." };
+
+  // N18-B shape consistency: a per-week schedule must cover the working weeks
+  // exactly. A supplied schedule that doesn't fit the (post-patch) shape is an
+  // input error; a stored schedule orphaned by a weeks/deload edit that didn't
+  // re-supply one is cleared — the meso reverts to the rir_start→rir_end ramp
+  // rather than carrying a week map that no longer lines up.
+  const nextWeeks = patch.weeks ?? meso.weeks;
+  const nextDeload = patch.includes_deload ?? meso.includes_deload;
+  const workingWeeks = nextDeload ? nextWeeks - 1 : nextWeeks;
+  const nextSchedule =
+    patch.rir_schedule !== undefined ? patch.rir_schedule : meso.rir_schedule;
+  if (nextSchedule != null && nextSchedule.length !== workingWeeks) {
+    if (patch.rir_schedule !== undefined)
+      return {
+        ok: false,
+        error: `rir_schedule must cover the ${workingWeeks} working weeks (got ${nextSchedule.length}).`,
+      };
+    update.rir_schedule = null;
+  }
 
   const { error: updErr } = await supabase
     .from("mesocycles")
@@ -602,7 +640,7 @@ export async function duplicateMesocycle(
 ): Promise<{ meso: MesocycleRow | null; error: string | null }> {
   const { data: source, error } = await supabase
     .from("mesocycles")
-    .select("name, weeks, includes_deload, rir_start, rir_end")
+    .select("name, weeks, includes_deload, rir_start, rir_end, rir_schedule")
     .eq("id", sourceMesoId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -615,6 +653,7 @@ export async function duplicateMesocycle(
     includes_deload: source.includes_deload,
     rir_start: source.rir_start,
     rir_end: source.rir_end,
+    rir_schedule: source.rir_schedule,
     status: "planned",
   });
   await copyMesoStructure(supabase, userId, sourceMesoId, meso.id);

@@ -19,13 +19,29 @@ type ToolHandler = Parameters<RegisterTool>[2];
  * `[object Object]` the SDK would otherwise emit (MCP tooling review §5.6).
  * The wrapper is applied here, at the single composition root, so the pure
  * `register*` functions stay testable without it.
+ *
+ * R25 (error-contract convergence): the surface previously spoke two failure
+ * dialects — thrown → `isError` + `{code,message,detail}` vs an in-band
+ * `{ok:false, error}` envelope with `isError` UNSET — so a consumer had to
+ * check both. Converged here, at the same chokepoint: any enveloped result
+ * whose payload carries `ok: false` is flagged `isError: true` as well (per
+ * the MCP spec, tool-level failures belong inside the result with `isError`
+ * so the model can see and self-correct). The `{ok:false, error}` body keeps
+ * its shape — agents already read it — one signal now covers both dialects.
  */
-function withErrorHandling(server: McpServer): McpServer {
+export function withErrorHandling(server: McpServer): McpServer {
   const register = server.registerTool.bind(server) as RegisterTool;
   const wrapped = ((name: string, config: unknown, handler: ToolHandler) => {
     const guardedHandler = (async (...args: unknown[]) => {
       try {
-        return await (handler as (...a: unknown[]) => unknown)(...args);
+        const result = await (handler as (...a: unknown[]) => unknown)(...args);
+        const data = (
+          result as { structuredContent?: { data?: { ok?: unknown } } } | null
+        )?.structuredContent?.data;
+        if (data && data.ok === false) {
+          return { ...(result as object), isError: true };
+        }
+        return result;
       } catch (err) {
         // the structured result reaches the model; the server side previously
         // recorded nothing (R20) — report before enveloping

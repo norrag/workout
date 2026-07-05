@@ -14,6 +14,7 @@ const base = {
   paramsVersion: 16,
   rirStart: 3,
   rirEnd: 0,
+  rirSchedule: null as number[] | null,
   weeks: 5,
   includesDeload: true,
   goalType: "gain" as string | null,
@@ -36,6 +37,8 @@ describe("mesoStaleSignature (reconcile gate #1)", () => {
       { paramsVersion: 17 }, // engine_params activation
       { rirStart: 4 }, // meso RIR ramp edit
       { rirEnd: 1 },
+      { rirSchedule: [3, 2, 2, 1] }, // N18-B: per-week schedule SET
+      { rirSchedule: [3, 3, 2, 1] }, // N18-B: per-week schedule EDITED
       { weeks: 6 },
       { includesDeload: false },
       { goalType: "cut" }, // macro goal change

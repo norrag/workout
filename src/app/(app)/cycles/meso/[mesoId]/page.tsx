@@ -106,6 +106,9 @@ export default async function MesoDetailPage({
   const previewRir = (weekIdx: number, isDeload: boolean) => {
     if (isDeload) return engineParams.deload.target_rir;
     const working = meso.includes_deload ? meso.weeks - 1 : meso.weeks;
+    // N18-B: an explicit per-week schedule supersedes the interpolated ramp
+    const scheduled = meso.rir_schedule?.[Math.min(weekIdx, working - 1)];
+    if (scheduled != null) return scheduled;
     const t = working === 1 ? 1 : Math.min(weekIdx, working - 1) / (working - 1);
     return Math.round(meso.rir_start + (meso.rir_end - meso.rir_start) * t);
   };
@@ -360,7 +363,11 @@ export default async function MesoDetailPage({
         backLabel={backToWorkout ? "‹ WORKOUT" : "‹ CYCLES"}
         contextLabel={contextLabel}
         metaLine={metaLine}
-        rampLine={`RAMP ${meso.rir_start} → ${meso.rir_end} RIR`}
+        rampLine={
+          meso.rir_schedule
+            ? `RIR BY WEEK ${meso.rir_schedule.join("·")}`
+            : `RAMP ${meso.rir_start} → ${meso.rir_end} RIR`
+        }
         deloadLine={
           deloadRow
             ? `DELOAD W${deloadRow.weekNumber} — ${deloadRow.targetRir} RIR`
@@ -375,6 +382,7 @@ export default async function MesoDetailPage({
         rirStart={meso.rir_start}
         rirEnd={meso.rir_end}
         includesDeload={meso.includes_deload}
+        rirSchedule={meso.rir_schedule}
         placeTargets={placeTargets}
       />
 

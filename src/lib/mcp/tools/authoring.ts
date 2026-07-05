@@ -100,53 +100,6 @@ export function previewVolume(
   return { perMuscle, belowMev, aboveMrv };
 }
 
-// --- place_mesocycle -------------------------------------------------------
-
-export const PLACE_MESOCYCLE = "place_mesocycle";
-function registerPlaceMesocycle(server: McpServer) {
-  server.registerTool(
-    PLACE_MESOCYCLE,
-    {
-      title: "Place mesocycle into a macrocycle",
-      description:
-        "Attach an existing standalone planned/draft mesocycle into a macrocycle " +
-        "slot — rescuing a draft you built earlier so the athlete sees it in " +
-        "context, no hand-placing. Omit position to fill the earliest open " +
-        "(unplanned) slot; give a position to insert at that slot (a placeholder " +
-        "there is absorbed and its phase inherited). The meso stays PLANNED for " +
-        "in-app review and activation — placing never starts it.",
-      inputSchema: {
-        mesocycle_id: z.string().uuid(),
-        macrocycle_id: z.string().uuid(),
-        position: z.number().int().min(1).max(24).optional(),
-      },
-    },
-    async (
-      args: { mesocycle_id: string; macrocycle_id: string; position?: number },
-      extra: McpExtra,
-    ) => {
-      const { client, userId } = resolveSession(extra);
-      const res = await attachMesoToMacro(
-        client,
-        userId,
-        args.mesocycle_id,
-        args.macrocycle_id,
-        args.position ?? null,
-      );
-      if (!res.ok) return jsonResult({ ok: false, error: res.error });
-      const summary = `placed mesocycle into the macrocycle at position ${res.position}`;
-      await recordMcpWrite(userId, PLACE_MESOCYCLE, args, summary);
-      return jsonResult({
-        ok: true,
-        mesocycle_id: args.mesocycle_id,
-        position: res.position,
-        consumed_placeholder: res.consumed_placeholder,
-        summary: `${summary}. Review and activate it in-app (or with activate_mesocycle).`,
-      });
-    },
-  );
-}
-
 // --- duplicate_mesocycle ---------------------------------------------------
 
 export const DUPLICATE_MESOCYCLE = "duplicate_mesocycle";
@@ -231,11 +184,12 @@ function registerUpdateMesocycle(server: McpServer) {
       description:
         "Edit a mesocycle's own header in place — name, phase " +
         "(accumulation/intensification/peak), length in weeks, deload flag, and " +
-        "RIR ramp (start/end) — without demolishing the plan or losing its macro " +
-        "placement. name/phase change on any unfinished meso; weeks/deload/RIR only " +
-        "before it's started (an active meso's weeks are fixed — its microcycles " +
-        "exist). The engine re-derives the numbers; exercises are edited with " +
-        "edit_mesocycle.",
+        "RIR ramp (start/end, or an explicit per-working-week rir_schedule that " +
+        "supersedes the ramp; null clears it) — without demolishing the plan or " +
+        "losing its macro placement. name/phase change on any unfinished meso; " +
+        "weeks/deload/RIR only before it's started (an active meso's weeks are " +
+        "fixed — its microcycles exist). The engine re-derives the numbers; " +
+        "exercises are edited with edit_mesocycle.",
       inputSchema: {
         mesocycle_id: z.string().uuid(),
         name: z.string().min(1).max(80).optional(),
@@ -247,6 +201,17 @@ function registerUpdateMesocycle(server: McpServer) {
         includes_deload: z.boolean().optional(),
         rir_start: z.number().int().min(0).max(6).optional(),
         rir_end: z.number().int().min(0).max(6).optional(),
+        rir_schedule: z
+          .array(z.number().int().min(0).max(5))
+          .min(2)
+          .max(8)
+          .nullable()
+          .optional()
+          .describe(
+            "N18-B: one target RIR per WORKING week (deload week excluded — the " +
+              "engine owns its RIR), any values in any order. Must cover the " +
+              "working weeks exactly. null reverts to the rir_start→rir_end ramp.",
+          ),
       },
     },
     async (
@@ -258,6 +223,7 @@ function registerUpdateMesocycle(server: McpServer) {
         includes_deload?: boolean;
         rir_start?: number;
         rir_end?: number;
+        rir_schedule?: number[] | null;
       },
       extra: McpExtra,
     ) => {
@@ -287,6 +253,8 @@ function registerUpdateMesocycle(server: McpServer) {
 }
 
 // --- manage_macrocycle_slots -----------------------------------------------
+// R25 consolidation: "place" (formerly the standalone `place_mesocycle` tool)
+// is a slot action like the rest — one tool now owns the macro's slot surface.
 
 export const MANAGE_MACROCYCLE_SLOTS = "manage_macrocycle_slots";
 function registerManageMacrocycleSlots(server: McpServer) {
@@ -296,27 +264,58 @@ function registerManageMacrocycleSlots(server: McpServer) {
       title: "Manage macrocycle slots",
       description:
         "Reshape a macrocycle's mesocycle slots: add an empty (unplanned) slot, " +
-        "remove an unplanned placeholder, or reorder every slot (pass all its " +
-        "mesocycle ids in the new order). Only unplanned placeholders can be added " +
-        "or removed — planned/active/completed mesos and their logged history are " +
-        "never destroyed (use delete_mesocycle for a planned block).",
+        "remove an unplanned placeholder, reorder every slot (pass all its " +
+        "mesocycle ids in the new order), or place an existing standalone " +
+        "planned/draft meso into a slot (mesocycle_id; omit position to fill the " +
+        "earliest open placeholder, or give one to insert there — the placeholder " +
+        "is absorbed and its phase inherited; placing never activates). Only " +
+        "unplanned placeholders can be added or removed — planned/active/completed " +
+        "mesos and their logged history are never destroyed (use delete_mesocycle " +
+        "for a planned block).",
       inputSchema: {
         macrocycle_id: z.string().uuid(),
-        action: z.enum(["add", "remove", "reorder"]),
+        action: z.enum(["add", "remove", "reorder", "place"]),
         mesocycle_id: z.string().uuid().optional(),
         ordered_mesocycle_ids: z.array(z.string().uuid()).min(1).max(24).optional(),
+        position: z.number().int().min(1).max(24).optional(),
       },
     },
     async (
       args: {
         macrocycle_id: string;
-        action: "add" | "remove" | "reorder";
+        action: "add" | "remove" | "reorder" | "place";
         mesocycle_id?: string;
         ordered_mesocycle_ids?: string[];
+        position?: number;
       },
       extra: McpExtra,
     ) => {
       const { client, userId } = resolveSession(extra);
+
+      if (args.action === "place") {
+        if (!args.mesocycle_id)
+          return jsonResult({
+            ok: false,
+            error: "place needs a mesocycle_id (the standalone planned meso to attach).",
+          });
+        const res = await attachMesoToMacro(
+          client,
+          userId,
+          args.mesocycle_id,
+          args.macrocycle_id,
+          args.position ?? null,
+        );
+        if (!res.ok) return jsonResult({ ok: false, error: res.error });
+        const summary = `placed mesocycle into the macrocycle at position ${res.position}`;
+        await recordMcpWrite(userId, MANAGE_MACROCYCLE_SLOTS, args, summary);
+        return jsonResult({
+          ok: true,
+          mesocycle_id: args.mesocycle_id,
+          position: res.position,
+          consumed_placeholder: res.consumed_placeholder,
+          summary: `${summary}. Review and activate it in-app (or with activate_mesocycle).`,
+        });
+      }
 
       let op: MacroSlotAction;
       if (args.action === "add") op = { action: "add" };
@@ -429,10 +428,11 @@ function registerPreviewMesocycleVolume(server: McpServer) {
       description:
         "Project a plan's weekly working sets per muscle group against the " +
         "athlete's experience-scaled MEV/MAV/MRV landmarks — WITHOUT writing " +
-        "anything — so a draft self-checks before you commit it. Pass a " +
-        "mesocycle_id to preview an existing plan, OR a `days` spec (each day's " +
+        "anything — so a PLAN self-checks before it starts. Pass a mesocycle_id " +
+        "to preview an existing planned/draft meso, OR a `days` spec (each day's " +
         "muscle_group blocks with the exercises and their starting sets — the same " +
-        "shape create_mesocycle takes, exercise ids optional here). Counting is " +
+        "shape create_mesocycle takes, exercise ids optional here). For a STARTED " +
+        "meso's actual trained balance use get_muscle_balance instead. Counting is " +
         "fractional (doc 10 §2): an existing plan's sets credit 1.0 per primary + " +
         "0.5 per secondary muscle of each exercise (matching get_muscle_balance); " +
         "a proposed `days` spec without exercise ids credits the block's group. " +
@@ -543,7 +543,6 @@ function planToGroupDays(plan: MesoPlan) {
 // --- registry --------------------------------------------------------------
 
 export function registerAuthoringTools(server: McpServer) {
-  registerPlaceMesocycle(server);
   registerDuplicateMesocycle(server);
   registerUpdateMesocycle(server);
   registerManageMacrocycleSlots(server);
