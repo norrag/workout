@@ -4,6 +4,24 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-05 — Session 49: BodySpec DEXA integration assessment (N34)
+
+Owner requested a full assessment of integrating BodySpec's DEXA-scan API
+(scan booked for Tuesday). Intake as **Batch 11 → N34** (F, MED,
+needs-input). Deliverable: **`docs/15-bodyspec-dexa-integration.md`** —
+API assessment (OpenAPI v0.14.3 fetched live: user-tier OAuth2/PKCE via
+Keycloak, pull-only — webhooks are partner-tier; full scan history via
+paginated results; composition/bone/percentiles/VAT/RMR sections), proposed
+schema (`body_scans` time series + `external_connections` +
+`v_body_comp_history`; scan facts treated as *derived* inputs per doc 14,
+like bodyweight), engine direction (measured FFM/FFMI into `planMacrocycle`
+targets only — never set/week-level autoregulation; ties into N21's model
+correction), genuinely-new capabilities (outcome verdicts for macros, cut
+lean-retention, percentile positioning, RMR context), LSC/same-scanner
+honesty guardrails, 4-phase build sketch. Phase 0 (OAuth client
+registration, refresh-token story) is an owner email to
+dev-support@bodyspec.com. Adoption would amend doc 01's out-of-scope line.
+
 ## 2026-07-05 — Session 48 (cont. 2): PR #148 merged — in-session sweep
 
 PR #148 merged with checks green while the session was live, so the
