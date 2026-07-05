@@ -315,6 +315,24 @@ the load only moves when (a) they top the window (reset low, load steps) or (b) 
 the behavior the whole thread asked for, now expressed inside doc 13's
 anchor→weight framework rather than as a separate `rep_ramp` engine.
 
+> **Amendment (2026-07-05, R24 — hold weeks).** The schedule above assumes the
+> −1 RIR step happens every week, but the default ramp contains **hold weeks**
+> (`3→2→2→1` holds at week 2→3, and `rirRamp`'s rounding produces them on most
+> 5-week+ blocks). On a hold week the unconditional `prevReps + 1` broke the
+> constant-effective-reps invariant and repriced the load *down* — a "−5 lb,
+> +1 rep" lateral move mid-meso. Two `engine_params` gates (v19,
+> `20260705000001`) fix this without changing the stepped-week behavior:
+> `climb_requires_rir_step` advances the rep climb **only when the target RIR
+> actually stepped** (the top-of-window reset stays unconditional — topping the
+> window earns the load step on performance; with `climb_on_performed_reps`,
+> demonstrated extra reps still advance), and `hold_week_anchor_deadband`
+> absorbs a **sub-step** anchor-decay shortfall on a pure hold (same reps, same
+> RIR) so an identical hold never prices a hair lower in week N+1 than week N —
+> a full-step fall is demonstrated regression and passes through. The deadband
+> also answers the cut/maintain "preserve strength" concern: flat ramps are all
+> hold weeks, and under the gates they hold honestly instead of drifting down
+> with decay.
+
 ### 9.3 Anchor = **`session_best`** (amends decision 4)
 
 `best` (recency-weighted single max set) is the right *direction* — we'd rather

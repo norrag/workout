@@ -206,6 +206,30 @@ export const engineParamsSchema = z.object({
   // predicts 13–14 is left there even when one step lands squarely in 8–12.
   bound_to_target_window: z.boolean().optional(),
 
+  // ----- R24 — hold-week reprice-down (owner concern 2026-07-02) — both gated ---
+  // Same `.optional()` discipline (absent ⇒ prior behavior, no fingerprint churn).
+
+  // §R24a: advance the Option-A rep climb only on a week where the target RIR
+  // actually stepped down. Doc 13 §9.2's premise is "+1 rep BECAUSE the ramp
+  // dropped −1 RIR" (constant effective reps ⇒ held load); on a ramp-hold week
+  // (e.g. the 3→2→2→1 default's 2→2) the unconditional +1 broke that invariant
+  // and repriced the load DOWN mid-meso — a lateral "−5 lb, +1 rep" move that
+  // reads as regression. Gated: reps hold when the RIR holds (with
+  // `climb_on_performed_reps`, demonstrated extra reps still advance the climb).
+  // The top-of-window reset stays unconditional — topping the window earns the
+  // load step regardless of the ramp (doc 10 double progression). ABSENT / false
+  // ⇒ legacy unconditional +1.
+  climb_requires_rir_step: z.boolean().optional(),
+  // §R24b: on a pure hold week (no RIR step, no rep advance, no top-out) the
+  // reprice should return the previously handled load — but the recency anchor
+  // decays between sessions, so an identical hold can price a hair lower in week
+  // N+1 than week N (most visible on cut/maintain blocks meant to preserve
+  // strength). When set, an anchor-drift shortfall of LESS than one loadable
+  // step is absorbed (hold the handled load); a fall of a full step or more is
+  // real signal (demonstrated regression moves the anchor further than decay
+  // can) and passes through. ABSENT / false ⇒ legacy raw reprice.
+  hold_week_anchor_deadband: z.boolean().optional(),
+
   // ----- WS-I / T-I5 — retire the prior-peak meso seed (owner ruling 2026-06-25) ---
   // Same `.optional()` discipline (absent ⇒ prior behavior, no fingerprint churn).
   //

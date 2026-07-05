@@ -72,6 +72,16 @@ export const V18_PARAMS: EngineParams = {
   session_performance_dampen_threshold: 3,
 };
 
+/** v19 = v18 plus the R24 hold-week pair: the Option-A rep climb advances only
+ *  on a real RIR step (top-out reset stays unconditional), and a pure hold
+ *  absorbs sub-step anchor-decay drift instead of repricing down. Mirrors
+ *  `20260705000001_engine_params_v19_hold_week`. */
+export const V19_PARAMS: EngineParams = {
+  ...V18_PARAMS,
+  climb_requires_rir_step: true,
+  hold_week_anchor_deadband: true,
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {
