@@ -11,6 +11,21 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-05 — N33 + T-N33 merged (PR #147)
+
+Session 47 investigated the owner's W5·D2 swap-provenance report end-to-end
+(review doc `docs/reviews/2026-07-04-swap-prescription-provenance.md`), built
+both items on PR #147, and the PR merged after the session — swept at the next
+session start per the resume protocol. Full record in PROGRESS "2026-07-05
+(latest)" and the Session 47 (cont. 3) `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N33 | Exercise swap writes prescriptions out-of-band → incoherent audit state + doc-14 blind spot (swap bypassed the engine; framework blind to exercise identity) | B | G | **done (PR #147).** `queries/slot-prescription.ts` resolver: swap (`replaceWorkoutExercise`) and add (`addWorkoutExercises`) both compute via the engine — advance off the §9 lookback source (most recent same-day-slot instance with logged working sets within 2 weeks, set-less N-1 fallback) else the doc 14 §6.2 cold seed; full tuple + rationale + fingerprint + decision written. Reconcile gains the `dropForeignDecisions` exercise-identity replay guard + the §9 lookback in the §7c backfill. Detail sheet gains the out-of-band tripwire (false "re-verified" line replaced by an explicit divergence note). Golden test restores the owner's case: swap-back yields 215×10@6RIR·2. Doc 14 §6.2 amended. |
+| T-N33 | Stored per-set e1RM stamps (`logged_sets.e1rm`) stale across params versions (384.2 log-time stamp vs 367.5 live v11 estimate) | D→F | G | **done (PR #147).** Owner decided restamp-on-activation: `queries/e1rm-restamp.ts` wired into MCP `activate_engine_params` — restamps only when the `e1rm` block changed, chunked PK upserts on the service client, idempotent, counts in the tool result. Golden test: 245×15 restamps 384.2 → 367.5. Caveat: migration-activated versions bypass the hook — activate via the MCP tool when a proposal touches the `e1rm` block. |
+
+---
+
 ## Swept 2026-07-04 (later 5) — N32 history-sheet fixes merged (PR #145)
 
 Session 46 root-caused the owner's field report on the PR #144 drill-down and
