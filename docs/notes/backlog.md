@@ -42,6 +42,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. **Escalated (2026-07-03, Batch 5):** owner reports 1-2s dead gaps on page taps persist, esp. cycles page + subpages — users double-tap in doubt; wants IMMEDIATE switch + skeleton on every nav (day view is the only page doing it right). Disproves the Phase-A assumption that route navs already paint the `(app)/loading.tsx` fallback — re-verify on device, then per-route skeletons/streaming (Phase 3 pulled forward). **Per-route skeletons shipped (PR #134):** 9 routes (`/cycles` + macro/meso/planner/planned-day, exercises list+detail, templates, more) each got a layout-mirroring `loading.tsx` — the group-level fallback never repaints for sibling navs, which is why only day view (own file) acknowledged taps. **Owner confirmed on device 2026-07-03 (Batch 6): "all nav skeletons look good".** **Phase 2 closed (PR #151):** #7 reference cache shipped (`queries/reference.ts` — muscle_groups + stock exercise library in the shared Data Cache, per-user overlays live); #5 revalidateTag assessed & dropped (nothing to bust — reference data has no in-app writers, per-user reads stay uncached per doc 14). #7 amended (PR #153): the cached accessors fall back to live reads outside the Next runtime — `unstable_cache`'s E469 invariant had broken the rls-tests CI job since #151. Remaining WS-J scope: Phase-3 streaming/`DayView`-`PlannerBoard` decomposition, only as measurement demands | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N34 | BodySpec DEXA integration (optional, per-user OAuth connect → scan import → profile enrichment → macro outcome verdicts). Assessment done: [`docs/15-bodyspec-dexa-integration.md`](../15-bodyspec-dexa-integration.md) — API viable (user-tier OAuth2/PKCE, pull-only), schema = `body_scans` time series + `external_connections` + `v_body_comp_history`, engine touch = measured FFMI into `planMacrocycle` only (never set-level), LSC honesty guardrails. Relates to N21 (macro-target correction should assume scan data may exist). Amends doc 01 out-of-scope if adopted. **Phase 0 is human-only:** email dev-support@bodyspec.com for OAuth client + refresh-token story | F | MED | — | needs-input — assessment shipped (PR #150); owner: adopt & phase? (doc §5); Phase 0 unblock is an owner action |
+| N35 | **Prescribed e1RM progression** (owner memo "Updates to the Prescription Engine", Batch 12) — the engine never *demands* progress: exact compliance is a verified fixed point (prescription and measurement invert the same curve; the Option-A climb is RIR-neutral; the seed reprices the unchanged anchor), so meso N+1 = meso N forever unless the athlete volunteers over-performance. Analysis + recommended design shipped (survived a hostile design review): [`docs/reviews/2026-07-07-prescribed-progression-review.md`](../reviews/2026-07-07-prescribed-progression-review.md) — never bump the *measured* e1RM (T-I5); prescribe from a target anchor `A* = anchor + one earned quantum` (explicit all-sets compliance gate incl. workload + staleness, `min(weight, rep)` quantum with a realized-ask rule, never compounds unconfirmed, governed by per-microcycle cadence + a doc-10 §5 rate ceiling + a miss throttle — governors ship in Phase 1), param-gated `progression` block (v20), phases: advance chain → seed route → deeper macro coupling (after N21). Relates: archived S4/PR22 (this is their prescriptive half), T-I5 ruling, R24 (cut/maintain default-off), N21 | D→F | HIGH | — | needs-input — review shipped (PR #<n>); owner: confirm design + the §10 open questions (δ mode, cut/maintain, confidence floor, cadence, peak week, honest-RIR confirmation) before build |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -597,3 +598,86 @@ landed.)*
   findings and assessments in a well-structured document pushed to the repo
   for reference." *[→ N34; assessment delivered as
   `docs/15-bodyspec-dexa-integration.md`]*
+
+### Batch 12 — owner memo: "Updates to the Prescription Engine" (2026-07-07, uploaded .docx)
+
+> The core pillar of the application is the prescription engine. In its current
+> form, the app adequately captures user progress in terms of e1RM by use of
+> session best identification techniques and prescriptions, but it does not
+> prescribe progression of the e1RM by design. When (or if) a user out-performs
+> an exercise's prescriptions, the model adequately will identify that the user
+> has progressed and prescribe their progress forward either through the advance
+> computation, or through the seed route. However, if the user strictly follows
+> prescriptions indefinitely, the model itself would never proactively prescribe
+> a genuine progression (increase) of the exercise's e1RM. Progression, it would
+> seem, must come from the athlete over-performing the prescription at some
+> point, and thereby raising the anchor by their own performance. This takes a
+> particularly honest and driven athlete to truly push themselves to the target
+> RIR in spite of the prescription, not because of it.
+>
+> [Editors note: I wrote the below plan before flagging it as flawed. The
+> intention below was to solve the above problem with the app using a double
+> progression model in a clean and generalized format. However, as explained
+> further below, it seems to me that the solution described may be flawed in a
+> number of ways. Primarily, it would seem that unless additional reps/effective
+> reps are prescribed continually (potentially across meso boundaries), then the
+> user would never actually hit the target 12 reps and trigger the progression
+> and complete the double progression method. Prescribing the additional reps
+> itself would be an increase to the e1RM, so effectively the e1RM must increase
+> for the user to even reach the top of the rep range, therefore is it not
+> reaching the top of the rep range which triggers an increase to the e1RM – The
+> e1RM must be consistently increased, and reaching the top of the rep range
+> simple triggers the weight increment (not e1RM) to ratchet the weight to the
+> next level clear headroom to continue progression within the rep range.
+> Therefore, the open question still remains unresolved by the changes proposed
+> below: How, and on what basis, do we trigger an increase to the e1RM of the
+> user such that they are prescribed progress cleanly throughout their
+> macrocycles and mesocycles? Below is my original notes and plans for context.
+> Please provide your thoughts and analysis on how we can architect the desired
+> functionality and outcome]
+>
+> Updates to the engines advance prescription chain, and the seed prescription
+> are necessary to establish a method of true prescribed progression to the
+> user's e1RM:
+>
+> - [Editors note: Defective – inheriting same weight x reps disregards RIR. If
+>   the user does not reach the top of the rep range inside the mesocycle,
+>   keeping the "same reps" and RIR will result in the same ramp, same reps, and
+>   same end results meso-over-meso: the user will never reach the top of the
+>   rep range.]
+> - Seed prescriptions:
+>   - Do not automatically reprice e1RM to the low end of the rep range when
+>     seeding a prescription. Instead, the seed route would identify the anchor
+>     by its existing mechanisms, and inherit the same average weight x reps as
+>     the anchor session, unless:
+>   - The anchor session rep average is outside the target rep window.
+>     - If the session rep average is below the target rep window → retain the
+>       anchor and reprice to the low end of the rep range per existing logic.
+>     - If the session rep average is above the target rep window → compute a
+>       progression to the anchor e1RM by incrementing the anchor up by one
+>       minimum increment, and then repricing the new anchor to the low end of
+>       the rep range. See more below on progression prescription details.
+> - Advance prescription chain:
+>   - Retain the same anchor mechanisms as existing and progress reps
+>     incrementally until the user performs all prescribed sets and reps at the
+>     top of the rep window without reporting pain. When the user satisfies
+>     these conditions, the advance prescription progresses the anchor weight up
+>     by one minimum increment, and reprices the new anchor back to the bottom
+>     of the target rep window.
+>
+> The fundamentally new element introduced with these changes is the model
+> actually increasing the e1RM of an exercise when the above conditions are met,
+> which introduces a route to genuine progression prescribed by the model
+> instead of relying on the user to proactively progress themselves. To make the
+> progression triggerable by the described definitions, the prescriptions must
+> functionally enable the user to actually reach the trigger point (the top of
+> the rep window), which necessitates the ability for the seed mechanisms to
+> retain the previous reps. Without this key functionality, prescriptions would
+> consistently push the user back to the low end of the rep range at the same
+> e1RM without tripping the progression trigger. The changes to the advance
+> engine enable progression of the e1RM when the trigger is met during a
+> mesocycle, and the mirrored updates to the seed mechanism inherent the same
+> effect when the trigger is met at the end of a mesocycle, when there is no
+> advance to compute.
+
+*[→ N35; analysis delivered as `docs/reviews/2026-07-07-prescribed-progression-review.md`]*

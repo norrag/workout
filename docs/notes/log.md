@@ -4,6 +4,35 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-07 — Session 52: Batch 12 intake — prescribed e1RM progression review (N35)
+
+Owner handed over a memo ("Updates to the Prescription Engine", uploaded
+.docx): the engine captures e1RM progress but never *prescribes* it — exact
+compliance never advances the anchor. The memo drafts a double-progression
+fix, withdraws it as flawed, and asks on what basis the e1RM should advance.
+
+Intake: verbatim text captured as **Batch 12** in the appendix; one new item
+**N35** (D→F, HIGH, needs-input). Reconciliation sweep ran clean (nothing
+merged-but-live; live index is N1 in-progress, N21/N34/N35 open).
+
+Analysis delivered as
+[`docs/reviews/2026-07-07-prescribed-progression-review.md`](../reviews/2026-07-07-prescribed-progression-review.md):
+the memo's diagnosis is **confirmed exact** — prescription and measurement
+invert the same `e1rmFactor` curve, the Option-A climb is RIR-neutral by
+design (R24a), and the seed reprices the unchanged anchor; verified by running
+the real engine (three consecutive byte-identical mesos, anchor pinned at
+198.2). Recommended design: never bump the *measured* e1RM (T-I5); prescribe
+from a target anchor `A* = anchor + one earned quantum` — explicit all-sets
+compliance gate (incl. workload + staleness), `min(weight, rep)` quantum with
+a realized-ask rule, no compounding of unconfirmed leads, governed by
+per-microcycle cadence + a doc-10 §5 rate ceiling + a miss throttle — as a
+param-gated `progression` block (v20), phased advance-chain → seed-route →
+deeper macro coupling (after N21). The design was hardened by a hostile
+review (fixed: an inert `high` confidence floor for hypertrophy, the
+checkbox-logging runaway asymmetry, per-session vs per-week rate arithmetic,
+gate predicate gaps, a deadband corner, the `bodyweight_only` rep-cap dead
+end). Six open questions for the owner in the review's §10.
+
 ## 2026-07-05 — Session 51 (cont.): CI fix + hosted deploy + in-session sweep (PR #153)
 
 PR #152 merged with the rls-tests job red — root-caused to a PRE-EXISTING
