@@ -356,10 +356,11 @@ describe("formatMesoSummary", () => {
       {
         exercise_id: "e1",
         exercise_name: "Bench Press",
-        first_e1rm: 300,
-        last_e1rm: 315,
+        baseline_e1rm: 300,
+        current_e1rm: 315,
         score_pct: 5,
         sessions: 4,
+        trend: "improving",
       },
     ]);
     expect(out.adherence_pct).toBe(Math.round((15 / 16) * 100));
@@ -403,10 +404,11 @@ describe("formatMesoSummary", () => {
         {
           exercise_id: "e1",
           exercise_name: "Dumbbell Curl",
-          first_e1rm: 33.33333333,
-          last_e1rm: 27.0,
+          baseline_e1rm: 33.33333333,
+          current_e1rm: 27.0,
           score_pct: -15.9, // raw-float pct that disagrees with the displayed values
           sessions: 3,
+          trend: "declining",
         },
       ],
     );
@@ -416,8 +418,8 @@ describe("formatMesoSummary", () => {
     expect(feedback.avg_pump).toBe(6.5);
     expect(feedback.avg_overall_fatigue).toBe(2.1);
     const score = (out.progress_scores as Record<string, unknown>[])[0];
-    expect(score.first_e1rm_estimate).toBe(33.3);
-    expect(score.last_e1rm_estimate).toBe(27);
+    expect(score.baseline_e1rm_estimate).toBe(33.3);
+    expect(score.recent_e1rm_estimate).toBe(27);
     // change is recomputed from the rounded e1RM shown, not the raw float:
     // (27 − 33.3) / 33.3 = −18.9%, so the payload reconciles with itself
     expect(score.e1rm_change_pct).toBe(-18.9);
@@ -481,6 +483,7 @@ describe("formatExerciseHistory", () => {
         reps: "8, 8",
         e1rm: 281.3,
         effective_load: null,
+        avg_rir: 2,
         is_deload: false,
         session_note: "elbow cranky",
       },
@@ -492,6 +495,7 @@ describe("formatExerciseHistory", () => {
     expect((out.sessions as Record<string, unknown>[])[0]).toMatchObject({
       reps_at_top: "8, 8",
       e1rm: 281.3,
+      avg_rir: 2,
       session_note: "elbow cranky",
     });
   });
@@ -513,6 +517,7 @@ describe("formatExerciseHistory", () => {
         reps: "8",
         e1rm: 281.3,
         effective_load: null,
+        avg_rir: null,
         is_deload: false,
         session_note: null,
       },

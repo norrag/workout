@@ -43,6 +43,14 @@ export {
   type E1rmConfidence,
 } from "./e1rm";
 export {
+  strengthTrend,
+  volumeWeightedMean,
+  DEFAULT_STRENGTH,
+  type StrengthTrend,
+  type StrengthTrendConfig,
+  type StrengthTrendLabel,
+} from "./strength";
+export {
   predictRepsAtWeight,
   impliedRirAtReps,
   effectiveRepsForE1rm,

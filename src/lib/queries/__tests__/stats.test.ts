@@ -12,7 +12,7 @@ import {
   buildVolumeMatrix,
   dropE1rmOutliers,
   foldProgressScores,
-  keyLiftStrengthPct,
+  volumeWeightedStrengthTotal,
   qualifyingScores,
   rollupMuscleProgress,
   E1RM_OUTLIER_RATIO,
@@ -192,7 +192,7 @@ function historyRow(
 }
 
 describe("foldProgressScores", () => {
-  it("takes first → last non-deload session and counts the trend points", () => {
+  it("scores recent-best vs baseline-best and excludes deloads from the count", () => {
     const scores = foldProgressScores(
       [
         historyRow("bench", "w1", 200),
@@ -202,14 +202,16 @@ describe("foldProgressScores", () => {
       ],
       new Set(["dl"]),
     );
+    // n=3 ⇒ k=1: baseline = first session, current = last session
     expect(scores).toEqual([
       {
         exercise_id: "bench",
         exercise_name: "BENCH",
-        first_e1rm: 200,
-        last_e1rm: 210,
+        baseline_e1rm: 200,
+        current_e1rm: 210,
         score_pct: 5,
         sessions: 3,
+        trend: "improving",
       },
     ]);
   });
@@ -217,18 +219,20 @@ describe("foldProgressScores", () => {
   it("skips sessions without an e1RM (bodyweight) entirely", () => {
     const scores = foldProgressScores(
       [
-        historyRow("row", "w1", null),
-        historyRow("row", "w2", 100),
+        historyRow("row", "w0", null),
+        historyRow("row", "w1", 100),
+        historyRow("row", "w2", 105),
         historyRow("row", "w3", 110),
       ],
       new Set(),
     );
-    expect(scores[0]).toMatchObject({ first_e1rm: 100, sessions: 2 });
+    // the null session is dropped: 3 real points remain
+    expect(scores[0]).toMatchObject({ baseline_e1rm: 100, sessions: 3 });
   });
 
   it("N14: a mis-logged endpoint session cannot define the denominator", () => {
     // the field case: one 7-lb "session" on a ~200-lb lift made the rollup
-    // read a massive gain; the fold must anchor on the first plausible session
+    // read a massive gain; the outlier drop removes it before scoring
     const scores = foldProgressScores(
       [
         historyRow("hack", "w1", 7),
@@ -238,11 +242,38 @@ describe("foldProgressScores", () => {
       ],
       new Set(),
     );
+    // [200,205,210] survive ⇒ n=3, k=1: baseline 200 → current 210
     expect(scores[0]).toMatchObject({
-      first_e1rm: 200,
-      last_e1rm: 210,
+      baseline_e1rm: 200,
+      current_e1rm: 210,
       score_pct: 5,
       sessions: 3,
+      trend: "improving",
+    });
+  });
+
+  it("a fresh block's light opener does not crater a continuing lift", () => {
+    // the reported bug: an old block ends near peak (250), then a new block
+    // opens light + high-RIR (210, 215). A first→last fold reads the opener as
+    // the endpoint and craters the number. Recent-best over the last window
+    // still catches the old block's strong final session, so it HOLDS.
+    const scores = foldProgressScores(
+      [
+        historyRow("squat", "w1", 230),
+        historyRow("squat", "w2", 240),
+        historyRow("squat", "w3", 250),
+        historyRow("squat", "w4", 250), // end of the old block (near peak)
+        historyRow("squat", "w5", 210), // new meso opener (light, high RIR)
+        historyRow("squat", "w6", 215),
+      ],
+      new Set(),
+    );
+    // n=6 ⇒ k=3: baseline = max(230,240,250)=250, current = max(250,210,215)=250
+    expect(scores[0]).toMatchObject({
+      baseline_e1rm: 250,
+      current_e1rm: 250,
+      score_pct: 0,
+      trend: "holding",
     });
   });
 });
@@ -272,50 +303,49 @@ describe("dropE1rmOutliers (N14)", () => {
   });
 });
 
-describe("keyLiftStrengthPct (N16 — the macro EST. STRENGTH tile)", () => {
-  const score = (
-    id: string,
-    sessions: number,
+describe("volumeWeightedStrengthTotal (N16 — the macro EST. STRENGTH tile)", () => {
+  const muscle = (
+    muscle_group: string,
     score_pct: number | null,
-  ): ExerciseProgressScore => ({
-    exercise_id: id,
-    exercise_name: id,
-    first_e1rm: 100,
-    last_e1rm: 100,
+  ): Parameters<typeof volumeWeightedStrengthTotal>[0][number] => ({
+    muscle_group,
     score_pct,
-    sessions,
+    lifts: 1,
+    contributors: [],
   });
 
-  it("means the top-3-by-frequency qualifying lifts", () => {
-    expect(
-      keyLiftStrengthPct([
-        score("a", 10, 6),
-        score("b", 9, 3),
-        score("c", 8, 0),
-        score("d", 7, -30), // 4th most-logged — not a key lift
+  it("weights each muscle by its fractional set volume over the scope", () => {
+    // legs (+3% over 40 sets) should dominate traps (+15% over 4 sets)
+    const total = volumeWeightedStrengthTotal(
+      [muscle("legs", 3), muscle("traps", 15)],
+      new Map([
+        ["legs", 40],
+        ["traps", 4],
       ]),
-    ).toBe(3);
+    );
+    // (3·40 + 15·4) / 44 = 4.09 → 4.1
+    expect(total).toBeCloseTo(4.1, 1);
   });
 
-  it("ignores unqualified lifts even when they are the most-logged... of the rest", () => {
-    // subbed-in lifts (<3 sessions) and no-score lifts can't be key lifts
+  it("skips muscles with no score or no volume", () => {
     expect(
-      keyLiftStrengthPct([
-        score("subbed", 2, -40),
-        score("no-score", 12, null),
-        score("real", 5, 4),
-      ]),
-    ).toBe(4);
+      volumeWeightedStrengthTotal(
+        [muscle("legs", 5), muscle("back", null)],
+        new Map([
+          ["legs", 20],
+          ["back", 10],
+        ]),
+      ),
+    ).toBe(5);
   });
 
-  it("returns null with no qualifying lift", () => {
-    expect(keyLiftStrengthPct([score("subbed", 1, -40)])).toBeNull();
+  it("returns null when nothing qualifies", () => {
+    expect(volumeWeightedStrengthTotal([muscle("legs", null)], new Map())).toBeNull();
   });
 
-  it("N16 regression: a deload tail arrives pre-filtered, so the tile matches the tab", () => {
-    // the -36.3% case: deload sessions never reach the scores because
-    // getProgressScores excludes them upstream (T-A2) — the tile reads the
-    // same qualified scores the Performance tab renders. Fold-level proof:
+  it("N16 regression: a deload tail is excluded from the fold (T-A2)", () => {
+    // the -36.3% case: deload sessions never reach the scores — the tile reads
+    // the same qualified scores the Performance tab renders, so both agree.
     const scores = foldProgressScores(
       [
         historyRow("squat", "w1", 300),
@@ -325,7 +355,8 @@ describe("keyLiftStrengthPct (N16 — the macro EST. STRENGTH tile)", () => {
       ],
       new Set(["dl"]),
     );
-    expect(keyLiftStrengthPct(scores)).toBe(5);
+    expect(scores[0].score_pct).toBe(5);
+    expect(scores[0].trend).toBe("improving");
   });
 });
 
@@ -337,10 +368,11 @@ describe("qualifyingScores (I11 — logged ≥3× in the window)", () => {
   ): ExerciseProgressScore => ({
     exercise_id: id,
     exercise_name: id,
-    first_e1rm: 100,
-    last_e1rm: 104,
+    baseline_e1rm: 100,
+    current_e1rm: 104,
     score_pct,
     sessions,
+    trend: "improving",
   });
 
   it("keeps only exercises with enough sessions and a computable score", () => {
@@ -360,18 +392,20 @@ describe("rollupMuscleProgress (PH37)", () => {
     {
       exercise_id: "bench",
       exercise_name: "Bench",
-      first_e1rm: 200,
-      last_e1rm: 220,
+      baseline_e1rm: 200,
+      current_e1rm: 220,
       score_pct: 10,
       sessions: 4,
+      trend: "improving",
     },
     {
       exercise_id: "fly",
       exercise_name: "Fly",
-      first_e1rm: 60,
-      last_e1rm: 62,
+      baseline_e1rm: 60,
+      current_e1rm: 62,
       score_pct: 4,
       sessions: 3,
+      trend: "improving",
     },
   ];
 

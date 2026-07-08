@@ -7,6 +7,8 @@ import { getMacroOverview, phaseLabel } from "@/lib/queries/macro";
 import { getMacroStats } from "@/lib/queries/stats";
 import { getProfile } from "@/lib/queries/profiles";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { InfoDot } from "@/components/ui/InfoDot";
+import type { GlossaryKey } from "@/lib/glossary";
 import { BalanceView } from "@/components/stats/MesoStatsViews";
 import { MuscleStrengthSection } from "@/components/stats/MuscleStrengthSection";
 import type { MesocycleRow } from "@/lib/types/database";
@@ -221,7 +223,8 @@ export default async function MacroOverviewPage({
         <div className="mt-[11px] grid grid-cols-2 gap-[1.5px] border-[1.5px] border-ink bg-ink">
           <Stat
             value={stats.estStrengthPct == null ? "—" : `${stats.estStrengthPct > 0 ? "+" : ""}${stats.estStrengthPct}%`}
-            label="EST. STRENGTH · KEY LIFTS"
+            label="EST. STRENGTH"
+            info="est_strength"
           />
           <Stat value={fmtVolume(stats.totalVolume)} label="TOTAL VOLUME · LB" />
           <Stat value={String(stats.sessionsLogged)} label="SESSIONS LOGGED" />
@@ -265,14 +268,23 @@ export default async function MacroOverviewPage({
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({
+  value,
+  label,
+  info,
+}: {
+  value: string;
+  label: string;
+  info?: GlossaryKey;
+}) {
   return (
     <div className="bg-bg-base px-3 py-[11px]">
       <div className="numeral text-[22px] font-extrabold tracking-[-0.01em]">
         {value}
       </div>
-      <div className="mt-0.5 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+      <div className="mt-0.5 flex items-center gap-1 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
         {label}
+        {info && <InfoDot term={info} small />}
       </div>
     </div>
   );

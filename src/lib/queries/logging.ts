@@ -354,6 +354,8 @@ export async function logSet(
     set_type: SetType;
     /** engine per-set e1RM (PH31), computed by the caller from active params */
     e1rm: number | null;
+    /** the e1RM's confidence band (high/moderate/low), stamped with it */
+    e1rm_confidence: string | null;
     /** T-I2/#4: the lifter's bodyweight at log time — the effective-load base for
      *  bodyweight movements. Captured here, locked once the workout completes (amend
      *  never rewrites it). Null when the profile has no bodyweight set. */
@@ -423,6 +425,7 @@ export async function logSet(
         set_type: input.set_type,
         rir_reported: input.rir_reported,
         e1rm: input.e1rm,
+        e1rm_confidence: input.e1rm_confidence,
         bodyweight: input.bodyweight,
         is_warmup: false,
         notes: null,
@@ -603,7 +606,15 @@ export async function amendSet(
   userId: string,
   setId: string,
   patch: Partial<
-    Pick<LoggedSetRow, "weight" | "reps" | "rir_reported" | "set_type" | "e1rm">
+    Pick<
+      LoggedSetRow,
+      | "weight"
+      | "reps"
+      | "rir_reported"
+      | "set_type"
+      | "e1rm"
+      | "e1rm_confidence"
+    >
   >,
 ): Promise<void> {
   const { error } = await supabase

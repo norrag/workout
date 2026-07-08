@@ -4,6 +4,43 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-08 — Session 53: est-strength rework — recent-vs-baseline rolling trend (N36)
+
+Owner flagged that aggregated macrocycle "est. strength" dropped the moment a
+new meso started, and suspected (a) the in-progress block factoring in and
+(b) volatility from a pure first→last two-point delta. Investigation confirmed
+both, compounding: the RIR ramp makes a fresh block open light, so its opener
+became the `last` endpoint and cratered every continuing lift. Also found the
+Overview tile (top-3 key-lift mean) and the Performance tab (muscle rollup)
+were *different* aggregations that could disagree (the archived N16 fix only
+partially closed this).
+
+Reworked the whole metric bottom-up (owner-approved design), shipped as **N36**:
+- **engine/strength.ts** (pure, golden-tested): `strengthTrend` = best of the
+  most-recent window vs best of the earliest, symmetric non-overlapping windows
+  (`engine_params.strength`, `.optional()` so no params-hash churn — replay
+  safe; falls back to `DEFAULT_STRENGTH`). `volumeWeightedMean` helper.
+- **queries/stats.ts + macro.ts**: `foldProgressScores` uses it; muscle rollup
+  unchanged (role-weighted, PH37); headline = **volume-weighted mean of the
+  muscle changes** (fractional-set weights), shared by the Overview tile and
+  Performance tab so they're identical by construction (finishes N16). Dropped
+  `keyLiftStrengthPct`.
+- **Confidence stored** (`logged_sets.e1rm_confidence`, migration
+  `20260708000001` + backfill; stamped at log/amend, restamped on e1rm-block
+  change) — auditability (owner: "log it").
+- **Clarity** (owner: info buttons over terse one-liners): glossary rewrites
+  (e1rm now states RIR/effective-reps plainly; new `est_strength`,
+  `e1rm_confidence` cards), InfoDots on the macro tile + strength sections, and
+  **RIR denoted next to e1RM in the history flip view**.
+- Session value stays the **session average** e1RM (N2 kept, per owner).
+- Verified on live data: Bench Press −7.3%→−3.8% (single opener corrected),
+  Machine Chest Supported Row −32%→−31.7% (genuine decline honestly preserved).
+
+Spec updated: `docs/10-metrics-spec.md` §1 (confidence persisted), §6 (est.
+strength redefined), §8 (`strength` param block). Relates to / supersedes the
+archived N16; extends N9's muscle rollup. Ships as PR on
+`claude/macrocycle-strength-estimates-wdbefl`.
+
 ## 2026-07-07 — Session 52: Batch 12 intake — prescribed e1RM progression review (N35)
 
 Owner handed over a memo ("Updates to the Prescription Engine", uploaded

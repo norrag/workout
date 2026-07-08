@@ -320,6 +320,10 @@ export type LoggedSetRow = {
   rir_reported: number | null;
   /** engine per-set e1RM estimate (PH31); null for bodyweight/non-working sets */
   e1rm: number | null;
+  /** the e1RM's confidence band (high/moderate/low) — stamped alongside `e1rm`
+   *  under the active engine params, so the estimate's reliability is auditable
+   *  and surfaceable without recomputing. Null when `e1rm` is null. */
+  e1rm_confidence: string | null;
   /** T-I2/#4: the lifter's bodyweight at log time (lb) — the effective-load base
    *  for bodyweight movements. Captured at log, locked once the workout completes.
    *  Null when the profile had no bodyweight set. */

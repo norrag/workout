@@ -58,8 +58,11 @@ e1RM = average( Epley(weight, effectiveReps), Brzycki(weight, effectiveReps) )
   so the forward estimate and the inverse load-for-reps math stay consistent. See
   `docs/reviews/2026-06-23-standalone-prescription-investigation.md`.
 - **Confidence weighting [EVIDENCED]:** trust is highest at low effective reps / low RIR and
-  degrades fast beyond. Store a confidence with each e1RM and down-weight low-confidence points in
-  "best e1RM" and trend lines:
+  degrades fast beyond. The band is now **persisted per set** (`logged_sets.e1rm_confidence`,
+  migration `20260708000001`) alongside the stored `e1rm` — stamped at log/amend and restamped when
+  the `e1rm` block changes — so an estimate's reliability is auditable and surfaceable (history
+  glossary card, MCP) without recomputing. Down-weight low-confidence points in "best e1RM" and
+  trend lines:
   | effective reps | RIR | confidence |
   |---|---|---|
   | ≤ 8 | 0–2 | high |
@@ -261,9 +264,21 @@ Params: `macro_target.<goal>` rate tables, `macro_target.sex_factor`, `macro_tar
   *REP PR* = better e1RM at or below the prior top weight (lifts with no prior history can't PR).
 - **Times trained / Total volume / First logged [DERIVED]:** session count where the exercise was
   logged / lifetime working-set tonnage / earliest logged date.
-- **Est. strength · key lifts [DERIVED, decision 4]:** the macro's **most-logged exercises** are the
-  key lifts; "+N%" = mean % change of their best e1RM vs the macro's start. `params.key_lifts.n`
-  (default ~5), `params.key_lifts.selection = "frequency"`.
+- **Est. strength [DERIVED, N16/N9 — supersedes the "key lifts" fold]:** one number rolled up
+  bottom-up so the Overview tile and the Performance tab can never disagree (N16). Per exercise:
+  **recent best vs starting best** — `(max session-avg e1RM over the most-recent `window_sessions`
+  − max over the earliest `window_sessions`) / the earliest`, over its non-deload sessions in scope,
+  symmetric non-overlapping windows that shrink on short series (best of first ⌊n/2⌋ vs best of last
+  ⌊n/2⌋, capped at `window_sessions`). This replaced the old first→last two-point fold, which let a
+  fresh block's deliberately light opening session define the endpoint and crater every continuing
+  lift the moment a new meso began (the reported symptom). A single light opener no longer moves the
+  number; a genuine multi-session decline still does. Qualifies at ≥`strength.min_sessions`
+  non-deload sessions (I11). Per **muscle group**: role-weighted mean (primary 1.0 / secondary 0.5,
+  `params.volume`) of its lifts' changes (PH37). **Headline**: volume-weighted mean of the muscle
+  changes, weighted by each muscle's fractional set volume over the scope — so a one-lift muscle
+  can't swing it as hard as a heavily-trained one. The session value stays the **session average**
+  e1RM (N2), which is already RIR-aware (effective reps). `params.strength = { window_sessions: 3,
+  min_sessions: 3, tolerance_pct: 1.5 }`. (`params.key_lifts` is retired from this metric.)
 
 ## 7. Stats & rollup metrics
 
@@ -307,7 +322,8 @@ Params: `macro_target.<goal>` rate tables, `macro_target.sex_factor`, `macro_tar
                     "cut_pct_bw_week":          { "high_bf": [1.0,1.5], "average": [0.5,1.0], "lean": [0.25,0.5] },
                     "present": "conservative_end", "age_taper": true },
   "phase_plan":  { "order": ["accumulation","intensification","peak"] },
-  "key_lifts":   { "n": 5, "selection": "frequency" },
+  "key_lifts":   { "n": 5, "selection": "frequency" },   // retired from "est. strength" (N16); kept for parsing
+  "strength":    { "window_sessions": 3, "min_sessions": 3, "tolerance_pct": 1.5 },  // §6 est-strength rolling windows
   "adherence":   { "window": "cycle" }
 }
 ```

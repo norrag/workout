@@ -384,14 +384,15 @@ export function formatMesoSummary(
       // round the e1RM estimates for display and recompute the change from the
       // *rounded* values so the percent reconciles with the numbers shown
       // (the §5.2 self-consistency fix, applied here too) (§5.7)
-      const first = round1(s.first_e1rm);
-      const last = round1(s.last_e1rm);
+      const baseline = round1(s.baseline_e1rm);
+      const recent = round1(s.current_e1rm);
       return {
         exercise_id: s.exercise_id,
         exercise_name: s.exercise_name,
-        first_e1rm_estimate: first,
-        last_e1rm_estimate: last,
-        e1rm_change_pct: scoreProgress(first, last),
+        baseline_e1rm_estimate: baseline,
+        recent_e1rm_estimate: recent,
+        e1rm_change_pct: scoreProgress(baseline, recent),
+        trend: s.trend,
         sessions: s.sessions,
       };
     }),
@@ -406,7 +407,8 @@ export function formatMesoSummary(
     // analyze_exercise_progress (§5.2)
     metric_definitions: {
       e1rm_change_pct:
-        "(last e1RM − first e1RM) / first e1RM, within this mesocycle only (first → last non-deload session of the block; deload sessions are recovery, not signal — T-A2)",
+        "recent best vs starting best (10 §6): (best session e1RM over the most-recent ~3 sessions − best over the earliest ~3) / the earliest, within this mesocycle only. A rolling window, so a fresh block's light opening session can't crater the number. Deloads excluded (T-A2).",
+      trend: "improving / holding / declining, with a small dead-band so noise reads as holding",
       window: "this mesocycle",
       sessions: "non-deload sessions with an e1RM — the trend's data points",
       muscle_group_progress: `role-weighted mean (primary 1.0 / secondary 0.5, engine_params.volume) of e1rm_change_pct over exercises with ≥${MIN_PROGRESS_SESSIONS} sessions — the in-app display applies the same ≥${MIN_PROGRESS_SESSIONS}-session rule (I11)`,
@@ -508,14 +510,15 @@ export function formatMacroSummary(
     ...(strength
       ? {
           progress_scores: strength.exercises.map((s) => {
-            const first = round1(s.first_e1rm);
-            const last = round1(s.last_e1rm);
+            const baseline = round1(s.baseline_e1rm);
+            const recent = round1(s.current_e1rm);
             return {
               exercise_id: s.exercise_id,
               exercise_name: s.exercise_name,
-              first_e1rm_estimate: first,
-              last_e1rm_estimate: last,
-              e1rm_change_pct: scoreProgress(first, last),
+              baseline_e1rm_estimate: baseline,
+              recent_e1rm_estimate: recent,
+              e1rm_change_pct: scoreProgress(baseline, recent),
+              trend: s.trend,
               sessions: s.sessions,
             };
           }),
@@ -525,7 +528,9 @@ export function formatMacroSummary(
             lifts: m.lifts,
           })),
           metric_definitions: {
-            e1rm_change_pct: `first → last non-deload session within this macrocycle; only exercises with ≥${MIN_PROGRESS_SESSIONS} such sessions are listed (I11)`,
+            e1rm_change_pct: `recent best vs starting best (10 §6): best session e1RM over the most-recent ~3 sessions vs best over the earliest ~3, across this macrocycle; only exercises with ≥${MIN_PROGRESS_SESSIONS} non-deload sessions are listed (I11)`,
+            est_strength_change_pct:
+              "volume-weighted mean of muscle_group_progress, weighted by each muscle's fractional set volume — the same number the app's EST. STRENGTH tile shows (N16)",
             muscle_group_progress:
               "role-weighted mean (primary 1.0 / secondary 0.5, engine_params.volume) of the listed exercises' e1rm_change_pct (PH37)",
           },
@@ -606,10 +611,14 @@ export function formatExerciseHistory(
       is_deload: s.is_deload,
       top_weight: s.top_weight,
       reps_at_top: s.reps,
-      // engine per-set e1RM (PH31): the session's best stored estimate (averaged
-      // Epley/Brzycki over effective reps). Null on bodyweight sessions. This is
-      // the engine's value, distinct from the raw-Epley e1RM in v_exercise_*.
+      // engine per-set e1RM (PH31), averaged across the session's working sets
+      // (N2 — the session average, not the single best set). Averaged
+      // Epley/Brzycki over effective reps = reps + RIR·offset, so it already
+      // accounts for how far from failure the sets were. Null on bodyweight
+      // sessions. The engine's value, distinct from the raw-Epley v_exercise_*.
       e1rm: s.e1rm,
+      // the session's average reported RIR — the effort context behind e1rm
+      avg_rir: s.avg_rir,
       session_note: s.session_note,
     })),
     note: truncated
@@ -658,7 +667,7 @@ function registerGetExerciseHistory(server: McpServer) {
               lifetime_sessions: overview.data?.times_trained ?? null,
             },
             estimates:
-              "top_weight × reps are logged actuals; e1rm is the engine's per-set estimate (averaged Epley/Brzycki over effective reps = reps + RIR·offset), the session's best — an estimate/trend, not a tested 1RM. Null on bodyweight sessions. Differs from the raw-Epley e1RM in the stats views (v_exercise_*).",
+              "top_weight × reps are logged actuals; e1rm is the engine's per-set estimate (averaged Epley/Brzycki over effective reps = reps + RIR·offset), averaged across the session's working sets (N2) — an estimate/trend, not a tested 1RM. avg_rir is the session's average reported RIR (the effort context folded into e1rm). Null e1rm on bodyweight sessions.",
           },
         },
       );

@@ -27,9 +27,16 @@ describe("glossary", () => {
     }
   });
 
-  it("bodies stay card-sized (~3 short sentences max)", () => {
+  it("bodies stay card-sized — simple terms tight, complex metrics fuller", () => {
+    // Owner directive (2026-07-08): for complicated metrics, prefer a fuller
+    // plain-language explanation any level of user can follow over a terse
+    // one-liner ("better to explain well than be short"). Those keys carry a
+    // higher ceiling; every other term stays one-glance short. The 264px card
+    // scrolls, so the cap is about focus, not overflow.
+    const EXPLAINERS = new Set(["e1rm", "e1rm_confidence", "est_strength"]);
     for (const [key, entry] of entries) {
-      expect(entry.body.length, key).toBeLessThanOrEqual(280);
+      const cap = EXPLAINERS.has(key) ? 640 : 280;
+      expect(entry.body.length, key).toBeLessThanOrEqual(cap);
     }
   });
 

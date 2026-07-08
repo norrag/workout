@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatWeight } from "@/lib/units";
+import { InfoDot } from "@/components/ui/InfoDot";
 import type { StrengthProgress } from "@/lib/queries/stats";
 import {
   HistorySheet,
@@ -49,8 +50,9 @@ export function MuscleStrengthSection({
 
   return (
     <div className="mt-4 border-t-[1.5px] border-ink">
-      <div className="pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+      <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
         EST. STRENGTH {scopeLabel} — BY MUSCLE GROUP
+        <InfoDot term="est_strength" small />
       </div>
       {strength.muscles.map((m) => {
         const expanded = open.has(m.muscle_group);
@@ -91,11 +93,11 @@ export function MuscleStrengthSection({
                         </div>
                         <div className="mt-[2px] text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
                           <span className="numeral">
-                            {formatWeight(Math.round(c.first_e1rm ?? 0))}
+                            {formatWeight(Math.round(c.baseline_e1rm ?? 0))}
                           </span>{" "}
                           →{" "}
                           <span className="numeral">
-                            {formatWeight(Math.round(c.last_e1rm ?? 0))}
+                            {formatWeight(Math.round(c.current_e1rm ?? 0))}
                           </span>{" "}
                           LB E1RM · <span className="numeral">{c.sessions}</span>{" "}
                           SESSIONS
@@ -146,7 +148,7 @@ export function MuscleStrengthSection({
       {strength.muscles.length > 0 && (
         <p className="pt-2 text-[9px] leading-normal tracking-[0.04em] text-ink/45">
           ROLE-WEIGHTED MEAN (PRIMARY 1.0 · SECONDARY 0.5) · EXERCISES LOGGED
-          3+ SESSIONS · FIRST → LAST NON-DELOAD SESSION · E1RM IS AN ESTIMATE
+          3+ SESSIONS · STARTING BEST → RECENT BEST · E1RM IS AN ESTIMATE
         </p>
       )}
       {historyScope && (
