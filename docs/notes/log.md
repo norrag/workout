@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-08 — Session 53: Batch 13 — N35 follow-up answered, design amended (macro-rate pacing)
+
+Owner responded to the N35 review with four threads; captured verbatim as
+**Batch 13** in the appendix and answered in
+[`docs/reviews/2026-07-08-prescribed-progression-followup.md`](../reviews/2026-07-08-prescribed-progression-followup.md)
+(which amends the 2026-07-07 review — follow-up wins on conflict).
+
+Substance: (1) convergence confirmed; "when" restated as earned + once per
+microcycle at most + rate-paced. (2) The "progressing twice" concern:
+half-dissolved (the ramp rep is reserve drawdown — zero capacity ask;
+capacity ask is exactly one quantum/week), half-adopted (ungoverned
+per-microcycle stepping ≈ 10–15%/mo is too aggressive — resolved by the
+owner's own macro-rate idea). (3) **Design amendment:** the §6.6 rate
+ceiling is promoted to a **macro-rate pacer** (macro sets the expected
+strength rate, meso paces earned quanta to it; hard boundary: budget never
+quota — the rate meters the ask, only performance mints it) and the
+per-goal booleans become **per-goal rate factors** (strength 1.0,
+hypertrophy 0.75 [HEURISTIC — research pass before v20], cut/maintain 0);
+ships in Phase 1 (backward-compatible generalization of the ceiling);
+`rate_source: "plan"` is the post-N21 personalization flip (N21 row
+cross-linked). (4) Misc answered: the `moderate` confidence ceiling under
+compliant hypertrophy is intentional (estimate-accuracy honesty, doc 10 §9
+— only gates needed fixing, already done); "reported RIR" is
+`logged_sets.rir_reported` — a real optional column honored everywhere on
+read but with **no write surface today** (DayView logs null always), so
+review §10 Q6 is now explicitly a two-part decision (engine rule + capture
+affordance + narrow doc-11 premise amendment). Updated owner-decision list
+in the follow-up's §6; N35 stays needs-input.
+
+Reconciliation sweep ran clean (no merged-but-live rows; N1 in-progress,
+N21/N34/N35 open).
+
 ## 2026-07-07 — Session 52: Batch 12 intake — prescribed e1RM progression review (N35)
 
 Owner handed over a memo ("Updates to the Prescription Engine", uploaded

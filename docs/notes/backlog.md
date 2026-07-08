@@ -40,9 +40,9 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | PH30 | Expanded weekly prescription explanation — LLM narrative layer | D | — | H | **deferred (2026-07-02):** not now. Refined vision: LLM does **not** replace the engine — it's an explanation layer over it (uses session notes, explains the engine's decision verbosely, light PT-style advice via MCP tools). Parked |
 | PH39 | How fast does e1RM recency decay? (Pulldown e1RM 110.1 but did 115×11 on May 22) | Q | — | A | answered → T-A1 |
 | N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. **Escalated (2026-07-03, Batch 5):** owner reports 1-2s dead gaps on page taps persist, esp. cycles page + subpages — users double-tap in doubt; wants IMMEDIATE switch + skeleton on every nav (day view is the only page doing it right). Disproves the Phase-A assumption that route navs already paint the `(app)/loading.tsx` fallback — re-verify on device, then per-route skeletons/streaming (Phase 3 pulled forward). **Per-route skeletons shipped (PR #134):** 9 routes (`/cycles` + macro/meso/planner/planned-day, exercises list+detail, templates, more) each got a layout-mirroring `loading.tsx` — the group-level fallback never repaints for sibling navs, which is why only day view (own file) acknowledged taps. **Owner confirmed on device 2026-07-03 (Batch 6): "all nav skeletons look good".** **Phase 2 closed (PR #151):** #7 reference cache shipped (`queries/reference.ts` — muscle_groups + stock exercise library in the shared Data Cache, per-user overlays live); #5 revalidateTag assessed & dropped (nothing to bust — reference data has no in-app writers, per-user reads stay uncached per doc 14). #7 amended (PR #153): the cached accessors fall back to live reads outside the Next runtime — `unstable_cache`'s E469 invariant had broken the rls-tests CI job since #151. Remaining WS-J scope: Phase-3 streaming/`DayView`-`PlannerBoard` decomposition, only as measurement demands | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
-| N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
+| N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed. **New consumer (2026-07-08):** N35's macro-rate pacer will read the corrected per-user strength rate (`rate_source: "plan"`), so the strength-path fix (age/sex-aware, currently bucket-only) should expose a per-user monthly rate — see the N35 follow-up §3.4 | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N34 | BodySpec DEXA integration (optional, per-user OAuth connect → scan import → profile enrichment → macro outcome verdicts). Assessment done: [`docs/15-bodyspec-dexa-integration.md`](../15-bodyspec-dexa-integration.md) — API viable (user-tier OAuth2/PKCE, pull-only), schema = `body_scans` time series + `external_connections` + `v_body_comp_history`, engine touch = measured FFMI into `planMacrocycle` only (never set-level), LSC honesty guardrails. Relates to N21 (macro-target correction should assume scan data may exist). Amends doc 01 out-of-scope if adopted. **Phase 0 is human-only:** email dev-support@bodyspec.com for OAuth client + refresh-token story | F | MED | — | needs-input — assessment shipped (PR #150); owner: adopt & phase? (doc §5); Phase 0 unblock is an owner action |
-| N35 | **Prescribed e1RM progression** (owner memo "Updates to the Prescription Engine", Batch 12) — the engine never *demands* progress: exact compliance is a verified fixed point (prescription and measurement invert the same curve; the Option-A climb is RIR-neutral; the seed reprices the unchanged anchor), so meso N+1 = meso N forever unless the athlete volunteers over-performance. Analysis + recommended design shipped (survived a hostile design review): [`docs/reviews/2026-07-07-prescribed-progression-review.md`](../reviews/2026-07-07-prescribed-progression-review.md) — never bump the *measured* e1RM (T-I5); prescribe from a target anchor `A* = anchor + one earned quantum` (explicit all-sets compliance gate incl. workload + staleness, `min(weight, rep)` quantum with a realized-ask rule, never compounds unconfirmed, governed by per-microcycle cadence + a doc-10 §5 rate ceiling + a miss throttle — governors ship in Phase 1), param-gated `progression` block (v20), phases: advance chain → seed route → deeper macro coupling (after N21). Relates: archived S4/PR22 (this is their prescriptive half), T-I5 ruling, R24 (cut/maintain default-off), N21 | D→F | HIGH | — | needs-input — review shipped (PR #155); owner: confirm design + the §10 open questions (δ mode, cut/maintain, confidence floor, cadence, peak week, honest-RIR confirmation) before build |
+| N35 | **Prescribed e1RM progression** (owner memo "Updates to the Prescription Engine", Batch 12) — the engine never *demands* progress: exact compliance is a verified fixed point (prescription and measurement invert the same curve; the Option-A climb is RIR-neutral; the seed reprices the unchanged anchor), so meso N+1 = meso N forever unless the athlete volunteers over-performance. Analysis + recommended design shipped (survived a hostile design review): [`docs/reviews/2026-07-07-prescribed-progression-review.md`](../reviews/2026-07-07-prescribed-progression-review.md) — never bump the *measured* e1RM (T-I5); prescribe from a target anchor `A* = anchor + one earned quantum` (explicit all-sets compliance gate incl. workload + staleness, `min(weight, rep)` quantum with a realized-ask rule, never compounds unconfirmed, governed by per-microcycle cadence + a doc-10 §5 rate ceiling + a miss throttle — governors ship in Phase 1), param-gated `progression` block (v20), phases: advance chain → seed route → deeper macro coupling (after N21). Relates: archived S4/PR22 (this is their prescriptive half), T-I5 ruling, R24 (cut/maintain default-off), N21. **Owner follow-up answered + design amended (PR #<n>):** [`docs/reviews/2026-07-08-prescribed-progression-followup.md`](../reviews/2026-07-08-prescribed-progression-followup.md) — the rate ceiling is promoted to a **macro-rate pacer** (macro layer sets the expected strength rate from profile+goal, meso layer paces earned quanta to it; budget-never-quota — the rate meters the ask, only performance mints it; ships in Phase 1), per-goal booleans become **per-goal rate factors** (cut/maintain 0 subsumes the opt-out; hypertrophy 0.75 [HEURISTIC — research pass before v20]); `rate_source: "plan"` (personalized per-user rate) is the post-N21 flip. Also answered: the double-progression concern (one capacity quantum/week, not two — the ramp rep is reserve drawdown; the pacer bounds the rate), the `moderate` confidence ceiling under compliant hypertrophy (intentional — measurement honesty, doc 10 §9), and "reported RIR" (`logged_sets.rir_reported` — real optional column honored everywhere on read, **no write surface exists today**; §10 Q6 requires building one + a narrow doc-11 premise amendment) | D→F | HIGH | — | needs-input — review (PR #155) + follow-up (PR #<n>) shipped; owner: the follow-up's §6 decision list (δ mode, adopt pacing + `rate_source` default, goal rate factors, peak week, per-set RIR affordance) before build |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -681,3 +681,102 @@ landed.)*
 > advance to compute.
 
 *[→ N35; analysis delivered as `docs/reviews/2026-07-07-prescribed-progression-review.md`]*
+
+### Batch 13 — N35 follow-up: owner responses to the progression review (2026-07-08, session task)
+
+> The follow up questions and comments below are in response to
+> docs/reviews/2026-07-07-prescribed-progression-review.md. Please review this
+> file, and address the below comments and questions in the most appropriate
+> format in the repo.
+>
+> Follow-up Questions
+>
+> High-level questions, concerns, and observations:
+>
+> Your solution more accurately clarifies what gets incremented (the
+> prescription target, never the measurement), but this is essentially what I
+> meant. I wasn't intending to suggest fabricating a recorded e1RM; rather, I
+> meant updating the prescription target such that it results in an increase
+> in future measured e1RM. In that sense, your solution does not fundamentally
+> differ from mine, although it achieves the same outcome much more elegantly
+> and with greater precision. We increment the prescription based on real
+> measured e1RM to produce an increase in future performed e1RM. The remaining
+> question from my original memo was simply when we should apply that
+> increment. The proposed answer appears to be: once per microcycle.
+>
+> If we increment the prescribed effort once per exercise, per microcycle
+> (week), but each week already adds an additional prescribed rep via the RIR
+> step, doesn't that mean the athlete is effectively progressing twice—once
+> through the additional prescribed rep and again through the prescription
+> increment (whether that ultimately manifests as another rep or a load
+> increase)? It's true that the RIR ramp increases performed reps rather than
+> effective reps, and because e1RM is based on effective reps, it is not
+> technically advancing e1RM, whereas your proposed solution does. However,
+> the combined effect is that the athlete is asked to both reduce RIR and
+> increase the prescription simultaneously, resulting in either two additional
+> reps each week (one from the RIR reduction and one from the e1RM
+> progression) or an additional rep plus additional load. My concern is that
+> this may simply be too aggressive.
+>
+> Strength rates, and macrocycle goals:
+>
+> You aptly pointed out in §6.2 that estimated strength gain per macrocycle
+> provides a useful rate limiter. I think this is a key insight because it
+> aligns with the original purpose of macrocycles: using the athlete's
+> characteristics and stated goals to personalize progression. However, I
+> think this concept can be taken a step further.
+>
+> Rather than using projected strength gain solely as a rate limiter, we could
+> use it to actively determine the rate of prescription progression. The
+> macrocycle engine was originally envisioned as an aggregation layer that
+> collects information such as age, sex, training experience, body composition
+> (and potentially future DEXA scan integration) to estimate an athlete's
+> realistic rate of adaptation and generate an appropriate progression
+> trajectory. A 60-year-old female beginner should not be expected to progress
+> at the same rate as an 18-year-old male beginner or a 32-year-old advanced
+> lifter.
+>
+> The intent was for the macrocycle layer to aggregate and store these
+> characteristics, then feed progression targets down to the mesocycle layer.
+> We drifted away from that concept, but it still seems both valuable and
+> achievable without overcomplicating the prescription engine.
+>
+> My thought is that the macrocycle should define an expected strength rate of
+> change, while the mesocycle should translate that into prescription
+> adjustments. Rather than blindly progressing every exercise each microcycle
+> regardless of the subject or goal, the progression ask could be calibrated
+> to remain consistent with the athlete's projected rate of improvement.
+>
+> Think this through and push back where appropriate. I'd like to flesh out
+> how something like this might work in practice.
+>
+> If this approach makes sense, it may also imply that a strength
+> rate-of-change metric exists for every macrocycle type, even when strength
+> is not the primary stated goal. A strength macrocycle explicitly targets
+> strength gains over time, whereas hypertrophy, cut, and maintenance
+> macrocycles do not. However, it seems plausible (subject to confirming the
+> research) that both strength and hypertrophy phases might prescribe similar
+> expected rates of strength improvement, even though hypertrophy prioritizes
+> muscle gain rather than strength itself. In that case, the primary
+> distinction between strength and hypertrophy programming may be rep ranges
+> rather than progression rate.
+>
+> Likewise, cut and maintenance macrocycles may both target essentially flat
+> strength progression, differing primarily in the user's stated objective and
+> perhaps future outcome measurements (for example, DEXA scans or similar body
+> composition metrics).
+>
+> Miscellaneous:
+>
+> You mentioned that anchor.confidence can never reach a high value through a
+> compliant hypertrophy cycle. Is that intentional, or is it something that
+> should be addressed?
+>
+> An optional "reported RIR" is mentioned several times. What exactly is this?
+> I'm not aware of any mechanism by which a user directly reports RIR. Is this
+> a derived value?
+
+*[→ N35 follow-up; answered + design amended in
+`docs/reviews/2026-07-08-prescribed-progression-followup.md` (macro-rate
+pacer, per-goal rate factors, double-progression analysis, confidence +
+reported-RIR answers)]*
