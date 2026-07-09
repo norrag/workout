@@ -6,9 +6,8 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-09 — Session 54: N35 build Phase 1 — engine core + advance chain (doc 16 §10)
 
-First build slice of doc 16 shipped on
-`claude/prescribed-progression-phase-1-vgi63a` (PR number to be stamped on
-this row and N35's when the PR exists). Ships INACTIVE — engine_params **v20**
+First build slice of doc 16 shipped as **PR #158**
+(`claude/prescribed-progression-phase-1-vgi63a`). Ships INACTIVE — engine_params **v20**
 (`20260709000001`) carries the `progression` block; with it absent every
 output, fingerprint, and trace is byte-identical (pinned by the treadmill
 golden, which also reproduces the doc-16 §7 worked example verbatim:
