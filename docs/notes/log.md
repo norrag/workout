@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-09 — Session 55: N35 build Phase 2 — seed route / meso-over-meso carry (doc 16 §10)
 
-Second build slice of doc 16 shipped as **PR #TBD**
+Second build slice of doc 16 shipped as **PR #159**
 (`claude/prescribed-progression-phase-2-uzc3ff`). No migration — v20
 (INACTIVE) already carries the block; with it absent every seed output,
 recorded input, fingerprint, and trace stays byte-identical (pinned).
