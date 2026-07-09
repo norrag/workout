@@ -17,6 +17,12 @@ per-goal rate factors). Where this doc conflicts with the 2026-07-07 review,
 **Relates to:** N35 (this thread), N21 (macro-target correction — the pacer's
 Phase-3 dependency), N34 (DEXA — the cut/maintain outcome measurement), T-I5,
 R24, doc 10 §4/§5/§9, doc 11 (RIR premise), doc 13 §9.2.
+**Follow-up 2 (2026-07-09):** auditability, pacing mechanics, the envelope
+idea, and standalone mesos answered in
+[`2026-07-09-prescribed-progression-followup-2.md`](./2026-07-09-prescribed-progression-followup-2.md)
+— it amends this doc's realized-ask trace silence (always-on status-coded
+progression trace) and replaces `rate_source`'s `band_mid`/`band_top` halves
+with a continuous `band_position`; where the two conflict, follow-up 2 wins.
 
 ---
 

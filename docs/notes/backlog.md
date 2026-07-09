@@ -42,7 +42,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N1 | Performance & efficiency pass. **Owner's north star (2026-06-30):** "snappy" = *every* user interaction on *every* surface is visually acknowledged immediately, so the user never wonders "did my tap register?" — responsiveness over instantaneous data. Plus strategic caching + efficient loading for real load times. Measure first (bundle analyzer, slow-query baseline) + an **interaction-acknowledgment audit** of every surface, then client bundle/render wins + query-scope/caching. Backend already does the heavy lifting — do **not** relocate the engine to edge/DB. Absorbs PH29's instant-switch remainder. **Escalated (2026-07-03, Batch 5):** owner reports 1-2s dead gaps on page taps persist, esp. cycles page + subpages — users double-tap in doubt; wants IMMEDIATE switch + skeleton on every nav (day view is the only page doing it right). Disproves the Phase-A assumption that route navs already paint the `(app)/loading.tsx` fallback — re-verify on device, then per-route skeletons/streaming (Phase 3 pulled forward). **Per-route skeletons shipped (PR #134):** 9 routes (`/cycles` + macro/meso/planner/planned-day, exercises list+detail, templates, more) each got a layout-mirroring `loading.tsx` — the group-level fallback never repaints for sibling navs, which is why only day view (own file) acknowledged taps. **Owner confirmed on device 2026-07-03 (Batch 6): "all nav skeletons look good".** **Phase 2 closed (PR #151):** #7 reference cache shipped (`queries/reference.ts` — muscle_groups + stock exercise library in the shared Data Cache, per-user overlays live); #5 revalidateTag assessed & dropped (nothing to bust — reference data has no in-app writers, per-user reads stay uncached per doc 14). #7 amended (PR #153): the cached accessors fall back to live reads outside the Next runtime — `unstable_cache`'s E469 invariant had broken the rls-tests CI job since #151. Remaining WS-J scope: Phase-3 streaming/`DayView`-`PlannerBoard` decomposition, only as measurement demands | F | HIGH | J | **in-progress** — plan in [`J-performance.md`](./J-performance.md) |
 | N21 | "Realistic" macro-target **engine correction** (audit found: strength target ignores age/sex; hypertrophy model flips discontinuously on profile completeness; cut caps can collapse the range). The interim **hide merged (PR #140)** — cards removed, `planMacrocycle`/`target_*` columns/timeline deps intact, so re-enabling is a pure view change once the engine is fixed. **New consumer (2026-07-08):** N35's macro-rate pacer will read the corrected per-user strength rate (`rate_source: "plan"`), so the strength-path fix (age/sex-aware, currently bucket-only) should expose a per-user monthly rate — see the N35 follow-up §3.4 | Q→D | MED | C | needs-decision (hide shipped; decide the target model before re-showing) |
 | N34 | BodySpec DEXA integration (optional, per-user OAuth connect → scan import → profile enrichment → macro outcome verdicts). Assessment done: [`docs/15-bodyspec-dexa-integration.md`](../15-bodyspec-dexa-integration.md) — API viable (user-tier OAuth2/PKCE, pull-only), schema = `body_scans` time series + `external_connections` + `v_body_comp_history`, engine touch = measured FFMI into `planMacrocycle` only (never set-level), LSC honesty guardrails. Relates to N21 (macro-target correction should assume scan data may exist). Amends doc 01 out-of-scope if adopted. **Phase 0 is human-only:** email dev-support@bodyspec.com for OAuth client + refresh-token story | F | MED | — | needs-input — assessment shipped (PR #150); owner: adopt & phase? (doc §5); Phase 0 unblock is an owner action |
-| N35 | **Prescribed e1RM progression** (owner memo "Updates to the Prescription Engine", Batch 12) — the engine never *demands* progress: exact compliance is a verified fixed point (prescription and measurement invert the same curve; the Option-A climb is RIR-neutral; the seed reprices the unchanged anchor), so meso N+1 = meso N forever unless the athlete volunteers over-performance. Analysis + recommended design shipped (survived a hostile design review): [`docs/reviews/2026-07-07-prescribed-progression-review.md`](../reviews/2026-07-07-prescribed-progression-review.md) — never bump the *measured* e1RM (T-I5); prescribe from a target anchor `A* = anchor + one earned quantum` (explicit all-sets compliance gate incl. workload + staleness, `min(weight, rep)` quantum with a realized-ask rule, never compounds unconfirmed, governed by per-microcycle cadence + a doc-10 §5 rate ceiling + a miss throttle — governors ship in Phase 1), param-gated `progression` block (v20), phases: advance chain → seed route → deeper macro coupling (after N21). Relates: archived S4/PR22 (this is their prescriptive half), T-I5 ruling, R24 (cut/maintain default-off), N21. **Owner follow-up answered + design amended (PR #156):** [`docs/reviews/2026-07-08-prescribed-progression-followup.md`](../reviews/2026-07-08-prescribed-progression-followup.md) — the rate ceiling is promoted to a **macro-rate pacer** (macro layer sets the expected strength rate from profile+goal, meso layer paces earned quanta to it; budget-never-quota — the rate meters the ask, only performance mints it; ships in Phase 1), per-goal booleans become **per-goal rate factors** (cut/maintain 0 subsumes the opt-out; hypertrophy 0.75 [HEURISTIC — research pass before v20]); `rate_source: "plan"` (personalized per-user rate) is the post-N21 flip. Also answered: the double-progression concern (one capacity quantum/week, not two — the ramp rep is reserve drawdown; the pacer bounds the rate), the `moderate` confidence ceiling under compliant hypertrophy (intentional — measurement honesty, doc 10 §9), and "reported RIR" (`logged_sets.rir_reported` — real optional column honored everywhere on read, **no write surface exists today**; §10 Q6 requires building one + a narrow doc-11 premise amendment) | D→F | HIGH | — | needs-input — review (PR #155) + follow-up (PR #156) shipped; owner: the follow-up's §6 decision list (δ mode, adopt pacing + `rate_source` default, goal rate factors, peak week, per-set RIR affordance) before build |
+| N35 | **Prescribed e1RM progression** (owner memo "Updates to the Prescription Engine", Batch 12) — the engine never *demands* progress: exact compliance is a verified fixed point (prescription and measurement invert the same curve; the Option-A climb is RIR-neutral; the seed reprices the unchanged anchor), so meso N+1 = meso N forever unless the athlete volunteers over-performance. Analysis + recommended design shipped (survived a hostile design review): [`docs/reviews/2026-07-07-prescribed-progression-review.md`](../reviews/2026-07-07-prescribed-progression-review.md) — never bump the *measured* e1RM (T-I5); prescribe from a target anchor `A* = anchor + one earned quantum` (explicit all-sets compliance gate incl. workload + staleness, `min(weight, rep)` quantum with a realized-ask rule, never compounds unconfirmed, governed by per-microcycle cadence + a doc-10 §5 rate ceiling + a miss throttle — governors ship in Phase 1), param-gated `progression` block (v20), phases: advance chain → seed route → deeper macro coupling (after N21). Relates: archived S4/PR22 (this is their prescriptive half), T-I5 ruling, R24 (cut/maintain default-off), N21. **Owner follow-up answered + design amended (PR #156):** [`docs/reviews/2026-07-08-prescribed-progression-followup.md`](../reviews/2026-07-08-prescribed-progression-followup.md) — the rate ceiling is promoted to a **macro-rate pacer** (macro layer sets the expected strength rate from profile+goal, meso layer paces earned quanta to it; budget-never-quota — the rate meters the ask, only performance mints it; ships in Phase 1), per-goal booleans become **per-goal rate factors** (cut/maintain 0 subsumes the opt-out; hypertrophy 0.75 [HEURISTIC — research pass before v20]); `rate_source: "plan"` (personalized per-user rate) is the post-N21 flip. Also answered: the double-progression concern (one capacity quantum/week, not two — the ramp rep is reserve drawdown; the pacer bounds the rate), the `moderate` confidence ceiling under compliant hypertrophy (intentional — measurement honesty, doc 10 §9), and "reported RIR" (`logged_sets.rir_reported` — real optional column honored everywhere on read, **no write surface exists today**; §10 Q6 requires building one + a narrow doc-11 premise amendment) **Follow-up 2 answered (PR #156):** [`docs/reviews/2026-07-09-prescribed-progression-followup-2.md`](../reviews/2026-07-09-prescribed-progression-followup-2.md) — auditability (progression trace becomes **always-on + status-coded** — stepped/vanished/paced/not_earned with structured payload; events recorded at decision grain, aggregated read-side via MCP, fed back only as a doc-14 derived input), pacing decoupling confirmed (band table not projections; quantum mechanical; `"plan"` opt-in), `band_position` (0–1, default 0.5) replaces the band_mid/band_top enum, the owner's **envelope loop adopted as Phase 3** (performance moves position within the macro envelope, meso-boundary cadence, demand-side signals), standalone mesos need nothing extra (goal/bucket/history all macro-independent; stale "standalone → gain" comment at `progression.ts:1129` flagged for cleanup) | D→F | HIGH | — | needs-input — review (PR #155) + follow-ups 1–2 (PR #156) shipped; owner: the follow-up-2 §6 decision list (δ mode, pacing + `band_position`, goal rate factors, trace polarity, envelope as Phase 3, peak week, per-set RIR affordance) before build |
 
 > **R1–R25** come from the 2026-07-01 full-surface repo review (Batch 3 in the
 > appendix). Evidence, file:line scoping, and a suggested attack order live in
@@ -780,3 +780,70 @@ landed.)*
 `docs/reviews/2026-07-08-prescribed-progression-followup.md` (macro-rate
 pacer, per-goal rate factors, double-progression analysis, confidence +
 reported-RIR answers)]*
+
+### Batch 14 — N35 follow-up #2: auditability, pacing mechanics, envelope, standalone mesos (2026-07-09, session task)
+
+> I like all of this, but we should keep prescription auditability in mind.
+> With these proposals, we are introducing another layer of data that informs
+> the prescription engine. While I think this is the right direction, it also
+> adds another abstraction that could make prescriptions more difficult to
+> audit and reason about. We should make sure we explicitly account for this
+> through prescription details and MCP tooling.
+>
+> This may warrant exposing progression-specific information. We may want to
+> aggregate some form of prescription progression history or audit trail. At
+> a minimum, I think we should record earned (and perhaps unearned)
+> progression events so we can validate that the cadence and progression
+> parameters are behaving as intended. At the other end of the spectrum, an
+> earned progression history could become a useful aggregate feedback signal.
+> Could it help close the loop within either the macrocycle or mesocycle
+> engine? Would it provide information beyond the existing exercise history,
+> or would it simply duplicate it? My intuition is that there is probably
+> additional value here, but I'm not yet sure where the line should be drawn.
+>
+> On the topic of progression pacing, macro-rate pacing makes sense to me,
+> but I am still trying to understand a few aspects of the implementation.
+>
+> First, is the pacing mechanism mechanically coupled to the strength gain
+> calculations performed elsewhere in the application, or are they
+> intentionally independent? I hope they are not directly coupled, because
+> the strength calculations are, by necessity, somewhat heuristic and
+> arguably one of the weaker predictive elements of the current system. My
+> understanding is that the pacing layer is instead a relatively thin
+> consumer of whatever progression rate the macrocycle layer has already
+> established and an earned progression quantum is considered to be a
+> relatively static percentage of the macrocycle progression budget, not
+> heuristically measured.
+>
+> If that understanding is correct, then it sounds like all of the
+> personalization variables ultimately collapse into a single macrocycle
+> strength-rate band. The `goal_rate_factor` then consumes that band (scaled
+> from 0.0–1.0) and targets a progression rate somewhere within it.
+>
+> That raises a few questions. Where within the band does it target by
+> default—the lower bound, midpoint, upper bound, or somewhere else? Is that
+> itself a tunable parameter?
+>
+> One idea that comes to mind is feeding progression history mentioned above
+> back into this selection process. Rather than allowing performance to
+> freely modify macrocycle goals, performance and progression history could
+> simply influence where within the bounded rate band the athlete is paced.
+> In other words, the macrocycle establishes the allowable progression
+> envelope, while accumulated performance determines whether prescriptions
+> track toward the lower, middle, or upper portion of that envelope. This
+> would introduce a meaningful feedback loop while keeping behavior bounded,
+> predictable, and auditable.
+>
+> Food for thought. My primary goal here is simply to fully understand the
+> architecture before implementation—measure twice, cut once.
+>
+> Finally, how are standalone mesocycles intended to behave under this model?
+> They already default to the hypertrophy model, which seems perfectly
+> reasonable. Beyond that default, is there anything else required to support
+> them?
+
+*[→ N35 follow-up 2; answered + design amended in
+`docs/reviews/2026-07-09-prescribed-progression-followup-2.md` (always-on
+status-coded progression trace, read-side aggregation line, continuous
+`band_position`, envelope loop adopted as Phase 3, standalone mesos need
+nothing extra)]*
