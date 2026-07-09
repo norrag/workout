@@ -22,6 +22,12 @@ Updated decision list in §6. No code changes.
 inputs, decision records), doc 05 / hard rule 9 (engine inspection over
 MCP), P0-4 (trace ↔ rationale lockstep), migration `20260620000005`
 (`engine_decisions.kind`), `docs/reviews/2026-06-23-standalone-prescription-investigation.md`.
+**Follow-up 3 (2026-07-09):** earn-retention semantics (retry-not-stack),
+live-row coupling, three-state markers, and finalization answered in
+[`2026-07-09-prescribed-progression-followup-3.md`](./2026-07-09-prescribed-progression-followup-3.md);
+the consolidated build spec is now
+[`docs/16-prescribed-progression.md`](../16-prescribed-progression.md) —
+**doc 16 supersedes this whole thread where they conflict.**
 
 ---
 

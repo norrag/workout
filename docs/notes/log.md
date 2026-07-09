@@ -4,6 +4,42 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 53 (cont.): Batch 15 — N35 follow-up #3 + design finalized (doc 16)
+
+Owner's third follow-up (Batch 15 verbatim in the appendix) answered in
+[`docs/reviews/2026-07-09-prescribed-progression-followup-3.md`](../reviews/2026-07-09-prescribed-progression-followup-3.md),
+and the design **finalized** as
+[`docs/16-prescribed-progression.md`](../16-prescribed-progression.md) —
+the authoritative build spec consolidating the memo + review + follow-ups
+1–3 (doc 16 wins over the whole thread; root `CLAUDE.md` docs list updated).
+
+Substance: (1) **Vanished earns — the owner's accumulation assumption is
+corrected** (the "worth discussing before implementation" branch): "earn
+retained" = the single-quantum entitlement is *retried* (re-armed at
+`A + δ` off the measured anchor), never *stacked* (`A + kδ` never exists) —
+stacking is the compounding-unconfirmed-credit failure the no-compounding
+rule forbids, and it would eventually demand a multi-quantum leap on
+exactly the lift least able to absorb it. Coarse-increment lifts don't
+need it: `step: "min"` picks the rep axis, each performed quantum banks in
+the measured anchor (the anchor IS the accumulator), and the top-of-window
+reset — which this design finally makes reachable — converts the banked
+rep gains into the load step. True dead-ends (window cap + oversized plate
+jump; `bodyweight_only` ceiling) get equipment/product answers (increment
+override, doc 10 §8, substitution nudge), not credit. (2) Prefill
+flow-through confirmed automatic. (3) **Owner rulings adopted:** the live
+day-view predictor prices off the prescription-basis target anchor (A*
+when stepped — flips review §7.1's deferral; `logging.ts:335` /
+`DayView.tsx:1339` today read the measured anchor), and the earn gate
+moves to **e1RM-space per-set compliance** — not the literal weight×reps
+pair, which broke under athlete-owned weight edits — sharing the P19
+`loggedSetMarker` comparison (grinder guard intrinsic: reported-low-RIR
+scores under). (4) Markers go **three-state (over/met/under)**;
+`MARKER_BAND` moves into params as `compliance_band` so marker, gate, and
+grading read one tunable; "met" glyph is mockup-governed (09 entry at
+build). N35 → **ready (build)**: phases in doc 16 §10 (engine core → seed
+→ day-view/markers → audit aggregate → owner-gated activation with the
+hypertrophy-factor research pass); implementation in new sessions.
+
 ## 2026-07-09 — Session 53 (cont.): Batch 14 — N35 follow-up #2 (auditability, band_position, envelope, standalone)
 
 Owner responded again (same PR #156 thread); captured verbatim as **Batch
