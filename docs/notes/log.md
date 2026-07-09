@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-09 — Session 56: N35 build Phase 3 — day-view coupling + three-state markers (doc 16 §10)
 
-Third build slice of doc 16 shipped as **PR #<n>**
+Third build slice of doc 16 shipped as **PR #160**
 (`claude/prescribed-progression-phase-3-4etoto`). No engine-output change and
 no migration — with the v20 block (still INACTIVE) absent, no decision ever
 records a target anchor, so every fallback path is byte-identical to today.
