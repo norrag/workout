@@ -6,9 +6,10 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-09 — Session 58: N35 Phase R — activation prep + deferred spine filed + N21 primed
 
-Phase R is a **runbook, not code** (doc 16 §10). No engine change, no app
-change; the branch carries docs + the applied-inactive v20 migration. Work
-done this session:
+Phase R is a **runbook, not code** (doc 16 §10) — shipped as **PR #162**
+(`claude/phase-r-implementation-gkmzol`). No engine change, no app change; the
+branch carries docs + the applied-inactive v20 migration. Work done this
+session:
 
 **(1) Research pass — the activation gate.** `goal_rate_factor.hypertrophy`
 resolved: **keep 0.75** (do NOT collapse to 1.0). New evidence doc
