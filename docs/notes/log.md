@@ -4,6 +4,63 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 58: N35 Phase R — activation prep + deferred spine filed + N21 primed
+
+Phase R is a **runbook, not code** (doc 16 §10). No engine change, no app
+change; the branch carries docs + the applied-inactive v20 migration. Work
+done this session:
+
+**(1) Research pass — the activation gate.** `goal_rate_factor.hypertrophy`
+resolved: **keep 0.75** (do NOT collapse to 1.0). New evidence doc
+`docs/reviews/2026-07-09-goal-rate-factor-research.md` (doc-10 house style,
+evidence labels): moderate-load (8–12) 1RM conversion runs ~0.56–0.73 of
+heavy-load (3–5) in the one head-to-head that isolates rep zone
+(Schoenfeld 2016 squat 0.56 / bench 0.73), consistent with the load-continuum
+meta (Schoenfeld 2017) + volume-matched trials (Lasevicius 2018, Campos 2002).
+0.75 is the conservative-for-a-*governor* top of that band — the pacer only
+delays, so erring high lets earned performance through. v20 already carries
+0.75, so **no params edit** — the finding validates the shipped value.
+
+**(2) v20 applied INACTIVE + replay diff.** Migration
+`20260709000001_engine_params_v20_prescribed_progression.sql` applied to hosted
+via the Supabase MCP, hash-verified `cb451a02…c90287` (matches
+`params-provenance.test.ts`); v19 remains active, nothing changes for users.
+`replay_decisions` candidate v20: **v19→v20 = 15 source / 11 changed / 0 errors**
+(all diffs are earned steps on compliant advance/seed working weeks — reprice up
+one quantum, e.g. Hack Squat 110→112.5, or a +1 rep climb; lattice snaps to
+window-bottom); broader 100-decision replay = 80 unchanged / 20 changed / 0
+errors (unchanged = seeds/deloads/gate-failures, byte-identical as designed).
+This is the diff the owner reviews before activating.
+
+**(3) Runbook.** `docs/deployment/manual-operations.md` gained the "Activate
+engine_params v20" section (5 steps: research ✓ / replay ✓ / owner review /
+activate via admin MCP `activate_engine_params` / monitor via
+`get_engine_decisions` + `get_progression_history`), plus the increment
+recommendation and the plan-rate/envelope unblock note.
+
+**(4) Deferred spine filed — N36–N39.** The doc 16 §11 deferred items are now
+first-class high-priority backlog rows (workstream **P**, new), each pointing
+back to doc 16 §11: **N36** envelope loop (blocked on v20-active + field data +
+N21), **N37** `rate_source:"plan"` pacer branch (blocked on N21), **N38**
+required honest-RIR confirmation + capture affordance, **N39** per-exercise
+progression-off override. README workstream roster + doc 16 §11 updated with
+the IDs.
+
+**(5) N21 primed as NEXT TARGET.** New scoping doc
+`docs/reviews/2026-07-09-n21-strength-rate-priming.md`: re-verified the audit
+(strength target is bucket-only — age/sex applied only to hypertrophy; model
+flip on profile completeness; cut-range collapse), researched the missing
+modifiers (**strength `sexFactor ≈ 1.0`, NOT the hypertrophy 0.7** — relative
+1RM gains are sex-equal, Roberts 2020 / Refalo 2025; apply `ageMultiplier` with
+a possibly higher strength floor, Peterson 2010 neural-gain preservation),
+proposed a v21 shape that exposes the personalized `perMonthRate` the
+`rate_source:"plan"` flip reads, and laid out the
+Phase-R → N21 → plan-rate → envelope sequence. N21 elevated MED→HIGH (it blocks
+N37 + N36).
+
+N35 row → Phase R prepped; stays live until v20 is activated (owner) and the
+deferred rows are picked up. Next target: **N21**.
+
 ## 2026-07-09 — Session 57: N35 build Phase 4 — audit aggregate (doc 16 §8.3/§10)
 
 Fourth (final code) build slice of doc 16 shipped as **PR #161**
