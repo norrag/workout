@@ -16,7 +16,7 @@ import {
   liveWeekRirUpdates,
   type RecomputeArgs,
 } from "../regeneration";
-import { V15_PARAMS } from "@/lib/engine/__tests__/helpers";
+import { V15_PARAMS, V20_PARAMS } from "@/lib/engine/__tests__/helpers";
 import {
   buildConfigInputs,
   buildSeedInputs,
@@ -299,6 +299,109 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         PARAMS,
       ).weight,
     );
+  });
+
+  it("replays a STEPPED seed (doc 16 §3.7): frozen earn context + same anchor ⇒ unchanged", () => {
+    // a mode-active meso seed that earned at close: its decision recorded the
+    // earn context + lookback (derived, doc 14 §3); the recompute replays them
+    // frozen while refreshing the anchor — same anchor ⇒ byte-identical output.
+    const anchor: E1rmAnchor = { value: 198.2, confidence: "moderate" };
+    const progression = {
+      seedEarn: {
+        previous: { weight: 145, reps: 8, sets: 3, targetRir: 3 },
+        actualSets: [1, 2, 3].map((n) => ({
+          setNumber: n,
+          weight: 145,
+          reps: 8,
+          rirReported: null,
+          isWarmup: false,
+        })),
+        exerciseFeedback: null,
+        workoutFeedback: null,
+      },
+      progressionHistory: {
+        earnedThisMicrocycle: false,
+        trailing30dPrescribedGainPct: null,
+        consecutiveMissedEarns: 0,
+      },
+      daysSincePreviousSession: 8,
+    };
+    const stored = buildSeedInputs({
+      equipmentType: "barbell",
+      profile,
+      goal: "hypertrophy",
+      startRir: 3,
+      isDeload: false,
+      initial: null,
+      priorPeak: null,
+      strengthAnchor: anchor,
+      progression,
+    });
+    const output = seedMeso(
+      null,
+      null,
+      { equipmentType: "barbell", loadType: "external" },
+      { experienceLevel: "intermediate" },
+      3,
+      V20_PARAMS,
+      {
+        goalType: "hypertrophy",
+        anchor,
+        earn: progression.seedEarn,
+        progressionHistory: progression.progressionHistory,
+        daysSincePreviousSession: progression.daysSincePreviousSession,
+      },
+    );
+    // sanity: the stored output really is the led (stepped) prescription
+    expect(
+      output.trace.some((s) => s.rule === "progression" && s.status === "stepped"),
+    ).toBe(true);
+
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored as unknown as Record<string, unknown>,
+        liveConfig: liveCfg({ initial: null }),
+        anchor,
+        bodyweight: null,
+        currentOutput: output,
+      },
+      V20_PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    // the rebuilt inputs carry the derived progression fields forward for the
+    // next replay, and the config projection is untouched (fingerprint parity)
+    expect((res.inputs as EngineInputs).seedEarn).toEqual(progression.seedEarn);
+    expect(configProjection(res.inputs!)).toEqual(
+      configProjection(buildSeedInputs({
+        equipmentType: "barbell",
+        profile,
+        goal: "hypertrophy",
+        startRir: 3,
+        isDeload: false,
+        initial: null,
+        priorPeak: null,
+      })),
+    );
+  });
+
+  it("a pre-Phase-2 seed decision (no earn fields) replays byte-identically under v20", () => {
+    // stored inputs that predate the seed route carry no progression fields;
+    // rebuilding them must not invent any, and the replay must not step
+    const { stored, output } = storedSeed(peak, initial);
+    const res = recomputeRow(
+      {
+        kind: "seed",
+        storedInputs: stored,
+        liveConfig: liveCfg(),
+        anchor: null,
+        bodyweight: null,
+        currentOutput: output,
+      },
+      V20_PARAMS,
+    );
+    expect(res.status).toBe("unchanged");
+    expect((res.inputs as EngineInputs).seedEarn).toBeUndefined();
   });
 
   it("ignores the strength anchor on the seed path (cold start has no anchor)", () => {

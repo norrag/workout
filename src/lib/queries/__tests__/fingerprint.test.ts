@@ -397,6 +397,39 @@ describe("seed inputs (doc 14 §6.2)", () => {
     expect(a).not.toBe(b);
   });
 
+  it("fingerprint is INVARIANT to the seed's progression inputs (doc 16 §3.7 / doc 14 §3)", () => {
+    // the earn context, governors' lookback, and staleness gap are all derived
+    // (denylisted): a mode-active seed's fingerprint must be byte-identical to
+    // an inactive one's, and write/check parity must still hold.
+    const bare = buildSeedInputs(seedBase);
+    const withProgression = buildSeedInputs({
+      ...seedBase,
+      progression: {
+        seedEarn: {
+          previous: { weight: 145, reps: 8, sets: 3, targetRir: 3 },
+          actualSets: [
+            { setNumber: 1, weight: 145, reps: 8, rirReported: null, isWarmup: false },
+          ],
+          exerciseFeedback: { jointPain: 0, pump: 5, workload: 5 },
+          workoutFeedback: null,
+        },
+        progressionHistory: {
+          earnedThisMicrocycle: false,
+          trailing30dPrescribedGainPct: 1.2,
+          consecutiveMissedEarns: 0,
+        },
+        daysSincePreviousSession: 8,
+      },
+    });
+    expect(configProjection(withProgression)).toEqual(configProjection(bare));
+    expect(
+      computeDepFingerprint(configProjection(withProgression), token),
+    ).toBe(computeDepFingerprint(configProjection(bare), token));
+    // ...and the derived fields actually rode along for replay
+    expect(withProgression.seedEarn).not.toBeNull();
+    expect(withProgression.progressionHistory).not.toBeNull();
+  });
+
   it("a seed (previous=null) is not confusable with an advance at the same scope", () => {
     const seed = computeDepFingerprint(configProjection(buildSeedInputs(seedBase)), token);
     const advance = computeDepFingerprint(

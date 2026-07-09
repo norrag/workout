@@ -2,7 +2,80 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-09 (latest) — Prescribed progression Phase 1: engine core + advance chain (doc 16 §10, N35)
+## 2026-07-09 (latest) — Prescribed progression Phase 2: seed route / meso-over-meso carry (doc 16 §10, N35)
+
+Second build slice of [doc 16 — prescribed progression](16-prescribed-progression.md):
+the earned-step overload now carries across the deload boundary into the next
+meso's seed (the memo's second half). Still **inactive** — no migration in this
+phase (v20 already ships the block, INACTIVE); with it absent every seed
+output, recorded input, fingerprint, and trace is byte-identical.
+
+- **Engine (`seedMeso`).** The seed path is refactored into an
+  anchor-parameterized `seedCore` (bodyweight model → §S1 anchor seed → plan
+  `initial` → unseeded, all byte-identical) plus a doc-16 §3.7 wrapper that
+  mirrors `prescribe()`'s: the caller supplies the prior meso's final working
+  session as an `earn` opt (its prescription + performed sets + feedback) with
+  `progressionHistory` and `daysSincePreviousSession`, and the wrapper runs the
+  SAME `assessProgression` gate + governors as the advance chain (one
+  comparison, one arithmetic — §2.5), re-prices `seedCore` off
+  `A* = A + δ` when earned+offered, and applies the shared §3.3 realized-ask
+  rule (extracted into `applyRealizedAsk`, used verbatim by both routes:
+  `vanished` retains the earn, `max_pct_per_step` paces, `stepped` announces
+  the target). Swaps/cold starts pass no context ⇒ `not_earned /
+  no_previous_session`; an `isDeload` opt bypasses the wrapper (deloads
+  neither earn nor take steps). Exactly one status-coded step per active-mode
+  seed. The quantum is priced at the unearned seed's effective point, which
+  the Option-A invariant makes the same effective-rep point the advance chain
+  prices at — seed-route parity is by construction and pinned by test.
+- **Earned-at-close derivation.** New leaf `queries/seed-progression.ts`
+  (`getSeedEarnContexts`): per exercise, the most recent COMPLETED WORKING
+  session (deload weeks excluded — `chooseEarnSources` pure) within a 90-day
+  fetch window, assembled exactly like `generateDay`'s inputs (prescription,
+  logged sets, joint pain + group-closing pump/workload, session feedback,
+  staleness gap). Cross-meso by construction (§4) — the same lookup serves
+  standalone→standalone; the in-engine `max_gap_days` staleness gate is what
+  decides whether a carry across the boundary is still honest.
+- **Caller plumbing (doc 16 §10 Phase 2 site list).** Meso activation
+  (`startMeso`) derives earn contexts + the governors' lookback (keyed to the
+  week-1 micro, so a retried activation sees a step an earlier attempt
+  recorded — cadence) and threads them through `seedExerciseRow`;
+  `regenerateOpenWorkouts` (plan-edit adds) and the slot resolver's cold seed
+  (swaps / mid-workout adds) pass no earn context by design, and the slot path
+  forwards the week's `isDeload`; the freshness recompute (`recomputeSeed`)
+  replays the stored earn context/lookback FROZEN (exactly like the advance
+  replay's `progressionHistory`) while the refreshed anchor flows into the
+  gate and target arithmetic; the admin `replay_decisions`/
+  `simulate_prescriptions` seed branch replays the recorded context so a
+  stepped seed reproduces byte-for-byte under the same params. The
+  `progressionHistory` assembly moved to the leaf
+  `queries/progression-history.ts` (generation ↔ progression cannot import
+  each other); `progression.ts` re-exports, so importers/tests are untouched.
+- **Doc-14 treatment.** New derived `EngineInputs.seedEarn` (`.nullish()`, no
+  default — pre-Phase-2 stored inputs parse byte-identically), added to the
+  fingerprint denylist: a mode-active seed's `dep_fingerprint` is
+  byte-identical to an inactive one's (pinned), and `seedEngineInputs`/
+  `buildSeedInputs` spread the progression fields only when the caller
+  assembled them, so recorded inputs stay byte-identical while the mode is
+  absent.
+- **Tests** (+23; suite 919): seed-route parity with the advance route (same
+  context ⇒ same δ, same A*), meso-over-meso golden (block absent: meso N+1
+  week 1 byte-identical to meso N week 1 even WITH the earn supplied — the
+  fixed point; active: the earn carries across an 8-day deload boundary and
+  meso 2 opens above meso 1), staleness cutoff at `max_gap_days` (10 ⇒
+  stepped, 11 ⇒ `stale`), incomplete-final-session / low-confidence /
+  factor-0 gate cases, cadence + rate-pacer governors on the seed,
+  `bodyweight_only` rep-cap vanish + substitution nudge, absent-block
+  byte-identity with earn opts supplied, doc-14 fingerprint parity, frozen
+  earn-context seed replay (regeneration + admin, incl. the honest diff when
+  a candidate removes the block), pre-Phase-2 decision replay, earn-source
+  selection.
+
+Remaining phases per doc 16 §10: Phase 3 (day-view target-anchor coupling +
+three-state markers, hard-rule-8 mockup pass), Phase 4 (audit aggregate,
+optional), Phase R (owner-gated activation incl. the hypertrophy-factor
+research pass).
+
+## 2026-07-09 — Prescribed progression Phase 1: engine core + advance chain (doc 16 §10, N35)
 
 First build slice of [doc 16 — prescribed progression](16-prescribed-progression.md)
 (earned-step overload + macro-rate pacing). Ships **inactive** (engine_params

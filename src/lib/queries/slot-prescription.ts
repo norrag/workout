@@ -211,7 +211,14 @@ export function computeSlotPrescription(
     { experienceLevel: args.profile.experience_level ?? "beginner" },
     args.week.targetRir,
     args.params,
-    { goalType: args.goal, anchor: args.anchor, bodyweight: args.bodyweight },
+    {
+      goalType: args.goal,
+      anchor: args.anchor,
+      bodyweight: args.bodyweight,
+      // doc 16 §3.7: a swap/add has no compliance context ⇒ never earns (no
+      // `earn` opt); a deload target week bypasses the progression wrapper.
+      isDeload: args.week.isDeload,
+    },
   );
   const inputs = buildSeedInputs({
     equipmentType: args.equipmentType,
