@@ -333,6 +333,17 @@ anchor→weight framework rather than as a separate `rep_ramp` engine.
 > hold weeks, and under the gates they hold honestly instead of drifting down
 > with decay.
 
+> **Amendment (2026-07-09, [doc 16 — prescribed progression](./16-prescribed-progression.md),
+> `engine_params` v20).** The anchor stops being the only mover: under exact compliance the
+> schedule above is a **fixed point** (prescription and measurement invert the same curve, the
+> climb is RIR-neutral, and every seed reprices the unchanged anchor — doc 16 §1), so "the load
+> only moves when … the anchor changes" meant a compliant athlete was never asked for more.
+> With `progression.mode = "earned_step"` the prescription is priced off a **target anchor**
+> `A* = A + δ` when the previous session earned it (full compliance in e1RM space, no gates,
+> paced by the macro strength-rate band) — threaded through this exact machinery as an anchor
+> substitution, with the R24b deadband evaluated only on un-earned weeks. The measured anchor
+> stays untouched (T-I5); performing the led ask is what moves it. See doc 16 §3.
+
 ### 9.3 Anchor = **`session_best`** (amends decision 4)
 
 `best` (recency-weighted single max set) is the right *direction* — we'd rather

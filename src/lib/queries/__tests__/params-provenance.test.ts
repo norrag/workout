@@ -222,6 +222,64 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v20 is a complete, replayable snapshot matching the migration hash", () => {
+    // v20 = v19 + the doc-16 `progression` block (earned-step overload +
+    // macro-rate pacing). The block is `.optional()`, so v19/earlier rows are
+    // byte-identical and the new row stays replayable.
+    const v20 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+      session_fatigue_dampen_threshold: 8,
+      session_performance_dampen_threshold: 3,
+      climb_requires_rir_step: true,
+      hold_week_anchor_deadband: true,
+      progression: {
+        mode: "earned_step",
+        step: "min",
+        min_confidence: "moderate",
+        compliance_band: 0.015,
+        cadence: "microcycle",
+        pacing: "macro_rate",
+        rate_source: "band",
+        band_position: 0.5,
+        goal_rate_factor: {
+          strength: 1.0,
+          hypertrophy: 0.75,
+          gain: 0.75,
+          cut: 0.0,
+          maintain: 0.0,
+        },
+        miss_rearm_sessions: 2,
+        max_gap_days: 10,
+        peak_week: "skip",
+        max_pct_per_step: 0.05,
+      },
+    });
+    const p = resolveProvenance(v20 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION); // optional block: no shape bump
+    expect(p.params_hash).toBe(
+      "cb451a02d96135a5cb6d1bec5f01e83a5fbdb08f87da9d1799dae176d1c90287",
+    );
+  });
+
+  it("the progression block is absent from DEFAULT (v10), preserving its hash", () => {
+    // substring note: DEFAULT legitimately contains "progression_style" (the
+    // retired legacy field) — assert on the exact key, not the substring.
+    expect(
+      Object.keys(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).not.toContain("progression");
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("the R24 hold-week flags are absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain(
       "climb_requires_rir_step",

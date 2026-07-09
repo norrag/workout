@@ -149,7 +149,16 @@ experience effect is contested, so don't assume "advanced ⇒ accurate".)*
 **Load increment (double progression) [principle EVIDENCED; sizes HEURISTIC].** Advance reps within
 the prescribed range; when the top of the range is hit for all sets at target RIR, add one
 increment and reset to the bottom. *(Progressive overload via load or reps is interchangeable for
-hypertrophy — Plotkin 2022.)* Per-equipment increments in the user's unit, decaying over the block:
+hypertrophy — Plotkin 2022.)*
+
+> **Implemented by [doc 16 — prescribed progression](./16-prescribed-progression.md)** (2026-07-09,
+> `engine_params` v20): the RIR-neutral Option-A climb had silently lost this section's overload
+> intent (compliance was a fixed point — doc 16 §1). The earned-step mechanism realizes it inside
+> doc 13's anchor→weight framework: the demand leads the measured anchor by one earned quantum
+> (`A* = A + δ`, δ = the smallest honest step — one increment or one rep in e1RM space), gated on
+> full compliance and paced by the §5 strength-rate band. Read doc 16 before touching this behavior.
+
+Per-equipment increments in the user's unit, decaying over the block:
 
 | Lift class | Increment (lb / kg) | ≈ % |
 |---|---|---|
