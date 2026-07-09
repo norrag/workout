@@ -18,7 +18,10 @@ import {
   getParamsDeletionImpact,
   deleteEngineParamsVersion,
   getEngineDecisions,
+  getProgressionHistory,
+  PROGRESSION_AUDIT_FETCH_LIMIT,
   type DecisionRecord,
+  type ExerciseProgressionHistory,
 } from "@/lib/queries/engine-admin";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
@@ -581,6 +584,107 @@ function registerGetEngineDecisions(server: McpServer) {
   );
 }
 
+// --- get_progression_history (doc 16 §8.3, Phase 4) --------------------------
+
+/** Default audit window: two mesos of history, comfortably past the pacer's
+ *  90-day lookback, without dredging the whole table by default. */
+const PROGRESSION_AUDIT_DEFAULT_DAYS = 180;
+
+function shapeProgressionHistory(x: ExerciseProgressionHistory) {
+  const s = x.summary;
+  const gain = (g: typeof s.prescribedGain) =>
+    g
+      ? {
+          first: g.first,
+          last: g.last,
+          gain_pct: g.gainPct,
+          gain_pct_per_30d: g.gainPctPer30d,
+          span_days: g.spanDays,
+          points: g.points,
+        }
+      : null;
+  return {
+    exercise_id: x.exercise_id,
+    exercise_name: x.exercise_name,
+    summary: {
+      decisions: s.decisions,
+      status_counts: s.statusCounts,
+      governor_firings: s.governorFirings,
+      gate_failures: s.gateFailures,
+      vanished_share: s.vanishedShare,
+      earned_then_met: s.earnedThenMet,
+      earned_then_missed: s.earnedThenMissed,
+      earned_unanswered: s.earnedUnanswered,
+      open_ask: s.openAsk,
+      prescribed_gain: gain(s.prescribedGain),
+      measured_gain: gain(s.measuredGain),
+    },
+    series: x.series,
+    series_truncated: x.series_truncated,
+  };
+}
+
+export const GET_PROGRESSION_HISTORY = "get_progression_history";
+function registerGetProgressionHistory(server: McpServer) {
+  server.registerTool(
+    GET_PROGRESSION_HISTORY,
+    {
+      title: "Progression history (audit aggregate)",
+      description:
+        "Admin only. The earned-step audit aggregate over the caller's own " +
+        "recorded engine decisions, per exercise: earn/miss/skip status mix, " +
+        "governor firings, gate-failure reasons, vanished-ask share (the " +
+        "increment-sizing signal), trailing prescribed vs measured e1RM gain, " +
+        "and a bounded chronological event series. Read-only aggregation — " +
+        "nothing new is stored. Empty while the progression mode is inactive " +
+        "(no decision carries a progression step).",
+      inputSchema: {
+        exercise_id: z.string().uuid().optional(),
+        since: z
+          .string()
+          .optional()
+          .describe("ISO date/time lower bound (default: 180 days back)"),
+        series_limit: z
+          .number()
+          .int()
+          .min(0)
+          .max(100)
+          .optional()
+          .describe("events per exercise in the series (default 20; 0 = summaries only)"),
+      },
+    },
+    async (
+      args: { exercise_id?: string; since?: string; series_limit?: number },
+      extra: McpExtra,
+    ) => {
+      const { client, userId } = await resolveAdmin(extra);
+      // prescribed-side pricing basis: the ACTIVE params' e1RM curve — the
+      // same basis the governors' live lookback derivation prices through
+      const { version, params } = await getActiveEngineParams(client);
+      const since =
+        args.since ??
+        new Date(Date.now() - PROGRESSION_AUDIT_DEFAULT_DAYS * 86_400_000).toISOString();
+      const result = await getProgressionHistory(client, userId, params, {
+        exerciseId: args.exercise_id,
+        since,
+        seriesLimit: args.series_limit,
+      });
+      return jsonResult({
+        since,
+        pricing_params_version: version,
+        decisions_scanned: result.decisions_scanned,
+        exercise_count: result.exercises.length,
+        exercises: result.exercises.map(shapeProgressionHistory),
+        ...(result.window_truncated
+          ? {
+              note: `fetch window filled (${PROGRESSION_AUDIT_FETCH_LIMIT} decisions) — the oldest history was cut off; narrow with since/exercise_id`,
+            }
+          : {}),
+      });
+    },
+  );
+}
+
 // --- replay_decisions ------------------------------------------------------
 
 export const REPLAY_DECISIONS = "replay_decisions";
@@ -804,6 +908,7 @@ export function registerAdminTools(server: McpServer) {
   registerProposeEngineParams(server);
   registerActivateEngineParams(server);
   registerGetEngineDecisions(server);
+  registerGetProgressionHistory(server);
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
@@ -816,6 +921,7 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   PROPOSE_ENGINE_PARAMS,
   ACTIVATE_ENGINE_PARAMS,
   GET_ENGINE_DECISIONS,
+  GET_PROGRESSION_HISTORY,
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,

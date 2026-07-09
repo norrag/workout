@@ -2,7 +2,63 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-09 (latest) — Prescribed progression Phase 3: day-view coupling + three-state markers (doc 16 §10, N35)
+## 2026-07-09 (latest) — Prescribed progression Phase 4: audit aggregate (doc 16 §8.3/§10, N35)
+
+Fourth build slice of [doc 16 — prescribed progression](16-prescribed-progression.md):
+the admin-side audit aggregate over the status-coded `progression` trace steps
+the engine has recorded since Phase 1. Read-side only — no schema change, no
+migration, no engine change; while the v20 block stays INACTIVE no decision
+carries a progression step, so the tool honestly reads empty.
+
+- **New admin MCP tool `get_progression_history`** (role-gated, hidden from
+  non-admin sessions like the rest of the Slice-4 roster; hard rule 9 — the
+  connector is the entire admin interface). Per exercise, over the caller's
+  own `engine_decisions` (hard rule 5 — no cross-user identity): the
+  earn/miss/skip **status mix** (`stepped | vanished | paced | not_earned`),
+  **governor firings** (`paced` by governor — cadence / rate_pacer /
+  miss_throttle / peak_week / max_pct_per_step), **gate failures**
+  (`not_earned` by first failing predicate), the **`vanished` share** of asks
+  (§8.3's increment-sizing signal, feeding the doc 10 §8 finer-increments
+  decision), **earned-then-met / missed / unanswered** pairing (each `stepped`
+  ask answered by the NEXT decision's source-session compliance — the same
+  pairing the miss throttle folds) plus an `open_ask` flag, **trailing
+  prescribed vs measured gain** (first→last %/30d-normalized with the pacer's
+  7-day span floor, deloads excluded — demand leading measurement by ~one
+  quantum is the design visibly working), and a bounded chronological **event
+  series** (decision id, W·D coordinate, status/governor/predicate, δ target
+  vs realized, target anchor, prescribed e1RM, measured anchor). Args:
+  `exercise_id`, `since` (default 180 days), `series_limit`. The prescribed
+  side is priced through the ACTIVE params' e1RM curve (`pricing_params_version`
+  reported) — the same basis the governors' live lookback uses.
+- **Pure fold + widened event** (`queries/progression-history.ts`):
+  `toProgressionAuditEvent` (the §8.2 derivation event widened with the full
+  recorded step, measured anchor + confidence, identity fields) and
+  `aggregateProgressionEvents` — exported for tests, re-exported through
+  `queries/progression.ts` like the rest of the module. Fetch + label
+  resolution (`queries/engine-admin.ts::getProgressionHistory`) mirrors the
+  decision inspector (JSONB containment on the trace rule, ascending, 2000-row
+  window with an explicit truncation note).
+- **`v_progression_events` NOT built** — doc 16 §10 Phase 4 gates the view on
+  a stats screen wanting it; none does (stats stay measured-e1RM everywhere,
+  §9). Recorded here as the deliberate deferral, per the shared-views
+  convention.
+- **Aggregation is read-side only** (§8.3): nothing here feeds back into
+  prescriptions — the only sanctioned feedback path remains the §8.2 derived
+  input (and, later, the Phase-3-of-the-design envelope loop).
+- **Tests** (+9; suite 941): audit-event widening (full step + anchor fields,
+  pre-v20 tolerance), status/governor/predicate counting incl. stepless rows,
+  `vanished` share, ask-pairing semantics (met / missed / unanswered /
+  open-ask; a non-compliance gate failure counts as performed — compliance is
+  checked first), gain math (normalization, deload exclusion, two-point
+  minimum, 7-day span floor), and the admin roster/gating suites now cover the
+  new tool (registration, no `user_id` arg, unauthenticated rejection,
+  non-admin visibility filtering).
+
+Remaining per doc 16 §10: Phase R (owner-gated activation incl. the
+hypertrophy-factor research pass — runbook, not code). With Phase 4 the
+build-out of doc 16 is complete.
+
+## 2026-07-09 — Prescribed progression Phase 3: day-view coupling + three-state markers (doc 16 §10, N35)
 
 Third build slice of [doc 16 — prescribed progression](16-prescribed-progression.md):
 the day view now couples to the prescription-basis anchor and the ▲/▼ markers

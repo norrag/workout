@@ -1,11 +1,16 @@
 /**
  * doc 16 §8.2 — the caller-side `progressionHistory` derivation over recorded
- * engine decisions (pure transforms; the I/O wrapper is thin).
+ * engine decisions, and §8.3 (Phase 4) — the audit aggregate behind the admin
+ * `get_progression_history` tool (pure transforms; the I/O wrappers are thin).
  */
 import { describe, expect, it } from "vitest";
 import {
+  aggregateProgressionEvents,
   deriveProgressionHistory,
+  toProgressionAuditEvent,
   toProgressionEvent,
+  type ProgressionAuditEvent,
+  type ProgressionAuditStep,
   type ProgressionDecisionEvent,
 } from "../progression";
 import { V20_PARAMS } from "@/lib/engine/__tests__/helpers";
@@ -210,5 +215,201 @@ describe("toProgressionEvent", () => {
     expect(e.step).toBeNull();
     // effective 200 lb × k(10 + 6) — just assert it priced off 200, not 20
     expect(e.prescribedE1rm!).toBeGreaterThan(200);
+  });
+});
+
+// --- §8.3 (Phase 4): the audit aggregate -------------------------------------
+
+describe("toProgressionAuditEvent", () => {
+  const row = {
+    id: "dec-1",
+    kind: "advance",
+    workout_id: "w-1",
+    microcycle_id: "m1",
+    created_at: new Date(NOW).toISOString(),
+    inputs: {
+      week: { isDeload: false },
+      exercise: { loadType: "external" },
+      strengthAnchor: { value: 198.2, confidence: "moderate" },
+    },
+    output: {
+      weight: 150,
+      reps: 9,
+      targetRir: 2,
+      trace: [
+        { rule: "load", detail: "..." },
+        {
+          rule: "progression",
+          status: "stepped",
+          deltaTarget: 4.8,
+          deltaRealized: 6.8,
+          targetAnchor: 203,
+          detail: "earned overload: targeting e1RM 203.0",
+        },
+      ],
+    },
+  };
+
+  it("widens the derivation event with the full step + measured anchor", () => {
+    const e = toProgressionAuditEvent(row, V20_PARAMS);
+    expect(e.decisionId).toBe("dec-1");
+    expect(e.kind).toBe("advance");
+    expect(e.workoutId).toBe("w-1");
+    expect(e.createdAt).toBe(row.created_at);
+    expect(e.measuredAnchor).toBe(198.2);
+    expect(e.anchorConfidence).toBe("moderate");
+    expect(e.auditStep).toEqual({
+      status: "stepped",
+      governor: undefined,
+      predicate: undefined,
+      deltaTarget: 4.8,
+      deltaRealized: 6.8,
+      targetAnchor: 203,
+      detail: "earned overload: targeting e1RM 203.0",
+    });
+    // the §8.2 base fields ride along unchanged
+    expect(e.step).toEqual({ status: "stepped", predicate: undefined });
+    expect(e.prescribedE1rm).toBeGreaterThan(198.2);
+  });
+
+  it("tolerates pre-v20 rows (no step, no anchor)", () => {
+    const e = toProgressionAuditEvent(
+      {
+        ...row,
+        inputs: { week: { isDeload: false }, exercise: { loadType: "external" } },
+        output: { weight: 145, reps: 9, targetRir: 2 },
+      },
+      V20_PARAMS,
+    );
+    expect(e.auditStep).toBeNull();
+    expect(e.measuredAnchor).toBeNull();
+    expect(e.anchorConfidence).toBeNull();
+  });
+});
+
+describe("aggregateProgressionEvents", () => {
+  function auditEvent(
+    daysAgo: number,
+    auditStep: ProgressionAuditStep | null,
+    overrides: Partial<ProgressionAuditEvent> = {},
+  ): ProgressionAuditEvent {
+    return {
+      createdAtMs: NOW - daysAgo * DAY_MS,
+      microcycleId: "micro-1",
+      isDeload: false,
+      prescribedE1rm: 200,
+      // keep the §8.2 `step` view in lockstep, as toProgressionAuditEvent does
+      step: auditStep
+        ? { status: auditStep.status, predicate: auditStep.predicate }
+        : null,
+      decisionId: `d-${daysAgo}`,
+      kind: "advance",
+      workoutId: null,
+      createdAt: new Date(NOW - daysAgo * DAY_MS).toISOString(),
+      measuredAnchor: 198,
+      anchorConfidence: "moderate",
+      auditStep,
+      ...overrides,
+    };
+  }
+
+  it("empty history aggregates to zeros and nulls", () => {
+    const s = aggregateProgressionEvents([]);
+    expect(s.decisions).toBe(0);
+    expect(s.statusCounts).toEqual({ stepped: 0, vanished: 0, paced: 0, not_earned: 0 });
+    expect(s.governorFirings).toEqual({});
+    expect(s.gateFailures).toEqual({});
+    expect(s.vanishedShare).toBeNull();
+    expect(s.openAsk).toBe(false);
+    expect(s.prescribedGain).toBeNull();
+    expect(s.measuredGain).toBeNull();
+  });
+
+  it("counts the status mix, governor firings, and gate-failure reasons", () => {
+    const s = aggregateProgressionEvents([
+      auditEvent(10, { status: "not_earned", predicate: "compliance" }),
+      auditEvent(9, { status: "not_earned", predicate: "pain" }),
+      auditEvent(8, { status: "paced", governor: "cadence" }),
+      auditEvent(7, { status: "paced", governor: "rate_pacer" }),
+      auditEvent(6, { status: "paced", governor: "rate_pacer" }),
+      auditEvent(5, { status: "stepped" }),
+      auditEvent(4, { status: "vanished" }),
+      auditEvent(3, null), // stepless row contributes nothing
+    ]);
+    expect(s.decisions).toBe(7);
+    expect(s.statusCounts).toEqual({ stepped: 1, vanished: 1, paced: 3, not_earned: 2 });
+    expect(s.governorFirings).toEqual({ cadence: 1, rate_pacer: 2 });
+    expect(s.gateFailures).toEqual({ compliance: 1, pain: 1 });
+    // vanished / (stepped + vanished) — the increment-sizing signal
+    expect(s.vanishedShare).toBe(0.5);
+  });
+
+  it("pairs each stepped ask with the NEXT decision's source compliance", () => {
+    const s = aggregateProgressionEvents([
+      auditEvent(12, { status: "stepped" }),
+      // answered: this decision's source session complied (it stepped again)
+      auditEvent(10, { status: "stepped" }),
+      // missed: compliance is the named failing predicate
+      auditEvent(8, { status: "not_earned", predicate: "compliance" }),
+      auditEvent(6, { status: "stepped" }),
+      // unanswered: a stepless follow-up row says nothing about the ask
+      auditEvent(4, null),
+      // the newest decision asks again — still awaiting its session
+      auditEvent(2, { status: "stepped" }),
+    ]);
+    expect(s.earnedThenMet).toBe(1);
+    expect(s.earnedThenMissed).toBe(1);
+    expect(s.earnedUnanswered).toBe(1);
+    expect(s.openAsk).toBe(true);
+  });
+
+  it("a non-compliance gate failure answers the ask as PERFORMED (met)", () => {
+    const s = aggregateProgressionEvents([
+      auditEvent(6, { status: "stepped" }),
+      // pain gated ⇒ compliance passed first — the ask itself was performed
+      auditEvent(4, { status: "not_earned", predicate: "pain" }),
+    ]);
+    expect(s.earnedThenMet).toBe(1);
+    expect(s.earnedThenMissed).toBe(0);
+    expect(s.openAsk).toBe(false);
+  });
+
+  it("prescribed vs measured gain: first→last, %/30d-normalized, deloads excluded", () => {
+    const s = aggregateProgressionEvents([
+      auditEvent(15, null, { prescribedE1rm: 200, measuredAnchor: 198 }),
+      // deload junk never pollutes either series
+      auditEvent(7, null, { prescribedE1rm: 150, measuredAnchor: 100, isDeload: true }),
+      auditEvent(0, null, { prescribedE1rm: 206, measuredAnchor: 200.97 }),
+    ]);
+    expect(s.prescribedGain).toEqual({
+      first: 200,
+      last: 206,
+      gainPct: 3,
+      gainPctPer30d: 6, // +3% over 15 days
+      spanDays: 15,
+      points: 2,
+    });
+    expect(s.measuredGain!.gainPct).toBe(1.5);
+    expect(s.measuredGain!.gainPctPer30d).toBe(3);
+    // the demand leading the measurement is the §8.3 comparison working
+    expect(s.prescribedGain!.gainPct).toBeGreaterThan(s.measuredGain!.gainPct);
+  });
+
+  it("gain needs two usable points and a positive span", () => {
+    expect(aggregateProgressionEvents([auditEvent(3, null)]).prescribedGain).toBeNull();
+    const s = aggregateProgressionEvents([
+      auditEvent(5, null, { measuredAnchor: null }),
+      auditEvent(3, null, { measuredAnchor: null }),
+    ]);
+    expect(s.measuredGain).toBeNull();
+    expect(s.prescribedGain).not.toBeNull();
+  });
+
+  it("a short gain span is floored at 7 days like the pacer's trailing rate", () => {
+    const s = aggregateProgressionEvents([
+      auditEvent(1, null, { prescribedE1rm: 200 }),
+      auditEvent(0, null, { prescribedE1rm: 206 }),
+    ]);
+    expect(s.prescribedGain!.gainPctPer30d).toBeCloseTo(3 * (30 / 7), 1);
   });
 });

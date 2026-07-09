@@ -4,6 +4,34 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 57: N35 build Phase 4 — audit aggregate (doc 16 §8.3/§10)
+
+Fourth (final code) build slice of doc 16 shipped as **PR #161**
+(`claude/prescribed-progression-phase-4-d9pzs5`). Read-side only — no schema
+change, no migration, no engine change; while v20 stays INACTIVE no decision
+carries a progression step, so the new surface honestly reads empty.
+
+Landed: admin MCP tool `get_progression_history` (role-gated Slice-4 roster;
+caller's own decisions only, hard rule 5) — per exercise: earn/miss/skip
+status mix, governor firings (`paced` by governor), gate failures
+(`not_earned` by first failing predicate), the `vanished` share of asks
+(§8.3's increment-sizing signal → the doc 10 §8 finer-increments decision),
+earned-then-met/missed/unanswered ask pairing (the miss throttle's pairing,
+surfaced) + `open_ask`, trailing prescribed vs measured gain (%/30d, pacer's
+7-day span floor, deloads excluded), and a bounded chronological event
+series. Pure fold in `queries/progression-history.ts`
+(`toProgressionAuditEvent` + `aggregateProgressionEvents`, re-exported via
+`queries/progression.ts`); fetch + labels in
+`queries/engine-admin.ts::getProgressionHistory` (trace-rule JSONB
+containment, 2000-row window with truncation note); doc 05 admin table row.
+`v_progression_events` deliberately NOT built — §10 gates the view on a stats
+screen wanting it and none does; deferral recorded in PROGRESS.md. Tests +9
+(suite 941).
+
+N35 row → Phase 4 shipped; doc-16 build-out complete. Remaining: Phase R
+(owner-gated activation incl. the hypertrophy-factor research pass — runbook,
+not code).
+
 ## 2026-07-09 — Session 56: N35 build Phase 3 — day-view coupling + three-state markers (doc 16 §10)
 
 Third build slice of doc 16 shipped as **PR #160**
@@ -2041,7 +2069,7 @@ in lockstep with PRs going forward. Branch `claude/review-notes-section-khtf4p`.
   WS-I tasks (note + archive link left in place); T-A4 annotated as realized via #82. Replaced
   the "done (PR pending)" note with the new status convention.
 - **Process fix (the real ask).** `docs/notes/CLAUDE.md`: new **"Keeping the index in sync
-  with PRs"** section (rule 1: the *building* PR sets `done (PR #<n>)` with the real number +
+  with PRs"** section (rule 1: the *building* PR sets `done (PR #161)` with the real number +
   logs it; rule 2: a merged PR can't sweep its own row; rule 3: a **reconciliation sweep** runs
   at every session start). Wired the sweep into the **resume protocol** as step 3. Root
   `CLAUDE.md`: added the "any PR that resolves a backlog item updates its row in the same PR"

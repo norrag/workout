@@ -1,6 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { engineParamsSchema, type EngineParams } from "@/lib/engine";
+import {
+  engineParamsSchema,
+  PROGRESSION_RULE,
+  type EngineParams,
+} from "@/lib/engine";
 import type { Database, EngineDecisionKind } from "@/lib/types/database";
+import {
+  aggregateProgressionEvents,
+  toProgressionAuditEvent,
+  type ProgressionAuditEvent,
+  type ProgressionAuditSummary,
+} from "./progression-history";
 import {
   CURRENT_PARAMS_SCHEMA_VERSION,
   engineCodeSha,
@@ -343,4 +353,154 @@ export async function getEngineDecisions(
       ? (overrideByExercise.get(d.exercise_id)?.weightIncrement ?? null)
       : null,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// doc 16 §8.3 / §10 Phase 4 — the progression-history audit aggregate. An
+// aggregation over `engine_decisions`, no new table and no view (the
+// `v_progression_events` view stays unbuilt until a stats screen wants it,
+// per the shared-views convention). Identity stays the session's (hard rule
+// #5) — like the decision inspector above, this reads the caller's own rows.
+// The pure fold lives in `progression-history.ts`; this is the fetch + label
+// resolution backing the admin `get_progression_history` MCP tool.
+// ---------------------------------------------------------------------------
+
+/** One event of the per-exercise earn/miss/skip series, shaped for the tool. */
+export interface ProgressionSeriesEntry {
+  decision_id: string;
+  created_at: string;
+  /** W·D coordinate when the decision's workout still resolves */
+  coordinate: string | null;
+  kind: string;
+  status: string | null;
+  governor: string | null;
+  predicate: string | null;
+  delta_target: number | null;
+  delta_realized: number | null;
+  target_anchor: number | null;
+  prescribed_e1rm: number | null;
+  measured_anchor: number | null;
+  anchor_confidence: string | null;
+}
+
+export interface ExerciseProgressionHistory {
+  exercise_id: string;
+  exercise_name: string | null;
+  summary: ProgressionAuditSummary;
+  /** chronological, capped to the NEWEST `seriesLimit` events */
+  series: ProgressionSeriesEntry[];
+  series_truncated: boolean;
+}
+
+/** Fetch-window bound; a full window means the oldest history was cut off. */
+export const PROGRESSION_AUDIT_FETCH_LIMIT = 2000;
+
+export interface ProgressionHistoryResult {
+  exercises: ExerciseProgressionHistory[];
+  decisions_scanned: number;
+  /** the fetch window filled — narrow with since/exercise_id for full history */
+  window_truncated: boolean;
+}
+
+/**
+ * The caller's recorded progression events (decisions whose trace carries a
+ * status-coded `progression` step), aggregated per exercise: status mix,
+ * governor firings, gate-failure reasons, vanished share, earned-then-met/
+ * missed pairing, and trailing prescribed vs measured gain. `params` supplies
+ * the e1RM curve the prescribed side is priced through (callers pass the
+ * ACTIVE set — the same basis the governors' live lookback uses).
+ */
+export async function getProgressionHistory(
+  client: Client,
+  userId: string,
+  params: EngineParams,
+  filters: { exerciseId?: string; since?: string; seriesLimit?: number } = {},
+): Promise<ProgressionHistoryResult> {
+  const seriesLimit = filters.seriesLimit ?? 20;
+  let query = client
+    .from("engine_decisions")
+    .select("id, kind, exercise_id, workout_id, microcycle_id, created_at, inputs, output")
+    .eq("user_id", userId)
+    // only decisions carrying a progression step — while the mode is inactive
+    // this matches nothing, so the tool reads empty rather than misleading
+    .contains("output", { trace: [{ rule: PROGRESSION_RULE }] })
+    .order("created_at", { ascending: true })
+    .limit(PROGRESSION_AUDIT_FETCH_LIMIT);
+  if (filters.exerciseId) query = query.eq("exercise_id", filters.exerciseId);
+  if (filters.since) query = query.gte("created_at", filters.since);
+  const { data, error } = await query;
+  if (error) throw error;
+  const rows = data ?? [];
+
+  const byExercise = new Map<string, ProgressionAuditEvent[]>();
+  for (const row of rows) {
+    if (!row.exercise_id) continue;
+    const cur = byExercise.get(row.exercise_id) ?? [];
+    cur.push(toProgressionAuditEvent(row, params));
+    byExercise.set(row.exercise_id, cur);
+  }
+
+  // display labels, resolved exactly like the decision inspector's
+  const exerciseIds = [...byExercise.keys()];
+  const workoutIds = [
+    ...new Set(rows.map((r) => r.workout_id).filter((x): x is string => x != null)),
+  ];
+  const exerciseNameById = new Map<string, string>();
+  const coordByWorkout = new Map<string, string>();
+  if (exerciseIds.length > 0) {
+    const { data: exercises } = await client
+      .from("exercises")
+      .select("id, name")
+      .in("id", exerciseIds);
+    for (const e of exercises ?? []) exerciseNameById.set(e.id, e.name);
+  }
+  if (workoutIds.length > 0) {
+    const { data: workouts } = await client
+      .from("workouts")
+      .select("id, day_number, microcycle_id")
+      .in("id", workoutIds);
+    const microIds = [...new Set((workouts ?? []).map((w) => w.microcycle_id))];
+    const { data: micros } = microIds.length
+      ? await client.from("microcycles").select("id, week_number").in("id", microIds)
+      : { data: [] };
+    const weekByMicro = new Map((micros ?? []).map((m) => [m.id, m.week_number]));
+    for (const w of workouts ?? [])
+      coordByWorkout.set(w.id, `W${weekByMicro.get(w.microcycle_id) ?? "?"}·D${w.day_number}`);
+  }
+
+  const exercises: ExerciseProgressionHistory[] = [...byExercise.entries()].map(
+    ([exerciseId, events]) => ({
+      exercise_id: exerciseId,
+      exercise_name: exerciseNameById.get(exerciseId) ?? null,
+      summary: aggregateProgressionEvents(events),
+      series: events.slice(Math.max(0, events.length - seriesLimit)).map((e) => ({
+        decision_id: e.decisionId,
+        created_at: e.createdAt,
+        coordinate: e.workoutId ? (coordByWorkout.get(e.workoutId) ?? null) : null,
+        kind: e.kind,
+        status: e.auditStep?.status ?? null,
+        governor: e.auditStep?.governor ?? null,
+        predicate: e.auditStep?.predicate ?? null,
+        delta_target: e.auditStep?.deltaTarget ?? null,
+        delta_realized: e.auditStep?.deltaRealized ?? null,
+        target_anchor: e.auditStep?.targetAnchor ?? null,
+        prescribed_e1rm: e.prescribedE1rm,
+        measured_anchor: e.measuredAnchor,
+        anchor_confidence: e.anchorConfidence,
+      })),
+      series_truncated: events.length > seriesLimit,
+    }),
+  );
+  // most active lifts first, then stable by name for deterministic output
+  exercises.sort(
+    (a, b) =>
+      b.summary.decisions - a.summary.decisions ||
+      (a.exercise_name ?? "").localeCompare(b.exercise_name ?? ""),
+  );
+
+  return {
+    exercises,
+    decisions_scanned: rows.length,
+    window_truncated: rows.length === PROGRESSION_AUDIT_FETCH_LIMIT,
+  };
 }
