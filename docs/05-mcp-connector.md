@@ -96,6 +96,7 @@ Per [08-design-decisions.md](08-design-decisions.md) §3, **the MCP connector is
 | `propose_engine_params` | write a new **inactive** param version (zod-gated; a malformed set can never be activated) |
 | `activate_engine_params` | activate a version — requires an explicit confirmation argument echoing the version number |
 | `get_engine_decisions` | decision inspector: filter by user/exercise/date/params version; full inputs, output, rationale |
+| `get_progression_history` | doc-16 §8.3 audit aggregate over recorded decisions (its §10 Phase 4): per-exercise earn/miss/skip status mix, governor firings, gate-failure reasons, `vanished` share (increment sizing), trailing prescribed vs measured e1RM gain, bounded event series. Read-side aggregation only — no new table; the `v_progression_events` view stays unbuilt until a stats screen wants it |
 | `replay_decisions` | re-run historical decisions or a whole meso against a candidate param version; return prescription diffs |
 | `simulate_prescriptions` | probe hypothetical inputs against a candidate version (per-item isolated, invalid cases don't fail the batch) |
 | `discard_engine_params` | undo a `propose` — delete an **inactive** version (review §5.8); refused for the active version or any version referenced by a recorded decision (kept reproducible); requires a `confirm_version` echo |

@@ -106,6 +106,13 @@ export {
   getProgressionHistories,
   daysSincePerformed,
   PROGRESSION_LOOKBACK_DAYS,
+  // §8.3 audit aggregate (Phase 4) — pure fold behind get_progression_history
+  aggregateProgressionEvents,
+  toProgressionAuditEvent,
+  type ProgressionAuditEvent,
+  type ProgressionAuditStep,
+  type ProgressionAuditSummary,
+  type ProgressionGain,
   type ProgressionDecisionEvent,
   type ProgressionHistoryInput,
 } from "./progression-history";
