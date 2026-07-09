@@ -21,7 +21,23 @@ import {
   type E1rmAnchor,
 } from "./reps";
 import { prescribeBodyweight, usesBodyweightModel } from "./rules/bodyweight";
+import {
+  PROGRESSION_RULE,
+  assessProgression,
+  progressionActive,
+} from "./rules/progression";
+import { estimateE1rm as estimateE1rmCore } from "./predict";
+import { effectiveLoad } from "./load";
 
+export {
+  PROGRESSION_RULE,
+  progressionActive,
+  complianceBand,
+  setComplianceMarker,
+  DEFAULT_COMPLIANCE_BAND,
+  type ProgressionStatus,
+  type ProgressionTraceStep,
+} from "./rules/progression";
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
 export { engineInputsSchema } from "./types";
@@ -100,6 +116,28 @@ export function prescribe(
   const inputs = engineInputsSchema.parse(rawInputs);
   const params = engineParamsSchema.parse(rawParams);
 
+  // doc 16 — prescribed progression (earned-step overload). Inactive (block
+  // absent / mode off / goal factor 0) ⇒ the core path below runs untouched:
+  // byte-identical output, fingerprint, and trace (§2.7). A deload is not a
+  // working prescription — it neither earns nor takes steps (§3.4), so it
+  // bypasses the progression wrapper entirely.
+  if (!progressionActive(inputs, params) || inputs.week.isDeload) {
+    return prescribeCore(inputs, params);
+  }
+  return prescribeWithProgression(inputs, params);
+}
+
+/**
+ * The pre-doc-16 prescription path, unchanged — everything is expressed
+ * relative to the strength-anchor input, which is exactly what lets the
+ * progression wrapper thread `A* = A + δ` through it (§3.1): the same climb,
+ * deadband, gate-hold, window-bound, and rounding machinery composes on a
+ * substituted anchor with no further changes. Takes ALREADY-PARSED inputs.
+ */
+function prescribeCore(
+  inputs: EngineInputs,
+  params: EngineParams,
+): Prescription {
   // T-I2: bodyweight load types price on effective load (bodyweight ± entered) and
   // progress on reps at a fixed load (bodyweight_only) or the rep-window in effective
   // space (loadable/assisted). Gated on `bodyweight_model`; the external path below
@@ -486,6 +524,154 @@ export function prescribe(
     rationale: capitalize(reasons.map((r) => r.detail).join("; ") + "."),
     trace: reasons,
   };
+}
+
+/**
+ * doc 16 — the earned-step wrapper around the core path (working, non-deload
+ * prescriptions while the mode is active). Always emits exactly ONE
+ * status-coded `progression` trace step (§3.6):
+ *
+ *  1. price the UNEARNED prescription (today's behavior) — the baseline;
+ *  2. run the earn gate + governors (§3.4/§3.5) against the previous session;
+ *  3. when earned + offered, re-price the SAME machinery off the target anchor
+ *     `A* = A + δ` — an anchor-input substitution, with the R24b deadband
+ *     disabled on that run only (the deadband's job is absorbing decay on a
+ *     hold; an earned week intends an increase — §3.1);
+ *  4. apply the realized-ask rule AFTER rounding (§3.3): a byte-identical
+ *     realized ask claims nothing and retains the earn (`vanished`, retry per
+ *     §2.3 — never `A + kδ`); an ask past `max_pct_per_step × A` holds today's
+ *     behavior (`paced`); otherwise the led prescription ships (`stepped`).
+ *
+ * Grading stays on the MEASURED anchor throughout (§3.6) — the led run's grade
+ * note is swapped back to the baseline's.
+ */
+function prescribeWithProgression(
+  inputs: EngineInputs,
+  params: EngineParams,
+): Prescription {
+  const baseline = prescribeCore(inputs, params);
+  const gate = assessProgression(inputs, params, baseline);
+
+  if (!gate.offered) {
+    // record why (auditability, §3.6) without touching the prescription or its
+    // rationale — a hold is never narrated as an overload.
+    return withProgressionStep(baseline, {
+      rule: PROGRESSION_RULE,
+      detail: gate.detail,
+      status: gate.status === "paced" ? "paced" : "not_earned",
+      deltaTarget: gate.delta,
+      deltaRealized: null,
+      ...(gate.governor ? { governor: gate.governor } : {}),
+      ...(gate.predicate ? { predicate: gate.predicate } : {}),
+    });
+  }
+
+  const anchor = inputs.strengthAnchor!;
+  const led = prescribeCore(
+    {
+      ...inputs,
+      strengthAnchor: { ...anchor, value: gate.targetAnchor! },
+    },
+    { ...params, hold_week_anchor_deadband: false },
+  );
+  // grading stays on the measured anchor (§3.6): the led run graded last week
+  // against A*, which is not the measurement — restore the baseline's grade.
+  const baselineGrade = baseline.trace.find((s) => s.rule === "grade");
+  const trace = led.trace.map((s) =>
+    s.rule === "grade" && baselineGrade ? { ...s, detail: baselineGrade.detail } : s,
+  );
+
+  // ---- realized-ask rule (§3.3), after rounding -----------------------------
+  const baseE1rm = prescribedE1rm(baseline, inputs, params);
+  const ledE1rm = prescribedE1rm(led, inputs, params);
+  const deltaRealized =
+    baseE1rm != null && ledE1rm != null
+      ? Math.round((ledE1rm - baseE1rm) * 10) / 10
+      : null;
+
+  const identical = led.weight === baseline.weight && led.reps === baseline.reps;
+  if (identical || deltaRealized == null || deltaRealized <= 0) {
+    // the quantum vanished (window hard cap, `bodyweight_only` rep ceiling,
+    // lattice corner): claim nothing, keep the earn (retry, don't stack —
+    // §2.3). At the bodyweight_only rep cap the rationale carries the
+    // substitution nudge instead of an overload claim.
+    const win = repWindowFor(inputs.goalType, params);
+    const atBodyweightCap =
+      inputs.exercise.loadType === "bodyweight_only" &&
+      win != null &&
+      baseline.reps != null &&
+      baseline.reps >= win.max;
+    const out = withProgressionStep(baseline, {
+      rule: PROGRESSION_RULE,
+      detail: "earned but unrealizable at this increment; earn retained",
+      status: "vanished",
+      deltaTarget: gate.delta,
+      deltaRealized: deltaRealized ?? 0,
+    });
+    return atBodyweightCap
+      ? {
+          ...out,
+          rationale:
+            out.rationale +
+            " At the rep cap for a bodyweight movement — add load or progress to the loadable variation to keep overloading.",
+        }
+      : out;
+  }
+  if (deltaRealized > params.progression!.max_pct_per_step * anchor.value) {
+    // a coarse plate jump on a light lift: the cap binds on the REALIZED ask,
+    // where it can actually fire — skip the step, hold today's behavior.
+    return withProgressionStep(baseline, {
+      rule: PROGRESSION_RULE,
+      detail: `earned; realized step ${deltaRealized} lb exceeds max_pct_per_step (${Math.round(params.progression!.max_pct_per_step * 100)}% of anchor ${anchor.value})`,
+      status: "paced",
+      deltaTarget: gate.delta,
+      deltaRealized,
+      governor: "max_pct_per_step",
+    });
+  }
+
+  // stepped: the led prescription ships, the trace announces the target, and
+  // the rationale is recomposed from the adjusted trace (P0-4 lockstep).
+  const step: DecisionTraceStep = {
+    rule: PROGRESSION_RULE,
+    detail: gate.detail,
+    status: "stepped",
+    deltaTarget: gate.delta,
+    deltaRealized,
+    targetAnchor: gate.targetAnchor!,
+  };
+  const fullTrace = [...trace, step];
+  return {
+    ...led,
+    trace: fullTrace,
+    rationale: capitalize(fullTrace.map((s) => s.detail).join("; ") + "."),
+  };
+}
+
+/** Append the always-on progression step, leaving the prescription untouched. */
+function withProgressionStep(
+  p: Prescription,
+  step: DecisionTraceStep,
+): Prescription {
+  return { ...p, trace: [...p.trace, step] };
+}
+
+/**
+ * The e1RM a prescription demands (§3.3's realized-ask measure): its effective
+ * load × reps scored at the target RIR through the shared curve. Null when the
+ * triple is incomplete.
+ */
+function prescribedE1rm(
+  p: Pick<Prescription, "weight" | "reps" | "targetRir">,
+  inputs: EngineInputs,
+  params: EngineParams,
+): number | null {
+  if (p.weight == null || p.reps == null) return null;
+  const load = usesBodyweightModel(inputs, params)
+    ? effectiveLoad(inputs.exercise.loadType, p.weight, inputs.bodyweight)
+    : p.weight;
+  if (load == null || load <= 0) return null;
+  return estimateE1rmCore(load, p.reps, p.targetRir, params.e1rm)?.value ?? null;
 }
 
 type RepWindow = NonNullable<ReturnType<typeof repWindowFor>>;

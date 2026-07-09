@@ -508,12 +508,26 @@ function registerGetEngineDecisions(server: McpServer) {
       title: "Inspect engine decisions",
       description:
         "Admin only. The caller's own recorded engine decisions (inputs, output, " +
-        "rationale), newest first, filterable by params version, exercise, and " +
-        "date. The raw material for tuning and replay.",
+        "rationale), newest first, filterable by params version, exercise, " +
+        "date, and trace rule/status (e.g. rule=progression + status=stepped — " +
+        "the doc-16 earned-step audit surface). The raw material for tuning " +
+        "and replay.",
       inputSchema: {
         params_version: z.number().int().positive().optional(),
         exercise_id: z.string().uuid().optional(),
         since: z.string().optional().describe("ISO date/time lower bound"),
+        rule: z
+          .string()
+          .optional()
+          .describe(
+            'only decisions whose trace has a step with this rule (e.g. "progression")',
+          ),
+        status: z
+          .string()
+          .optional()
+          .describe(
+            'narrow to trace steps carrying this status ("stepped" | "vanished" | "paced" | "not_earned")',
+          ),
         limit: z.number().int().min(1).max(100).optional(),
         cursor: z
           .string()
@@ -526,6 +540,8 @@ function registerGetEngineDecisions(server: McpServer) {
         params_version?: number;
         exercise_id?: string;
         since?: string;
+        rule?: string;
+        status?: string;
         limit?: number;
         cursor?: string;
       },
@@ -537,6 +553,8 @@ function registerGetEngineDecisions(server: McpServer) {
         paramsVersion: args.params_version,
         exerciseId: args.exercise_id,
         since: args.since,
+        rule: args.rule,
+        status: args.status,
         limit,
         cursor: args.cursor,
       });

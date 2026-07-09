@@ -4,6 +4,36 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 54: N35 build Phase 1 — engine core + advance chain (doc 16 §10)
+
+First build slice of doc 16 shipped on
+`claude/prescribed-progression-phase-1-vgi63a` (PR number to be stamped on
+this row and N35's when the PR exists). Ships INACTIVE — engine_params **v20**
+(`20260709000001`) carries the `progression` block; with it absent every
+output, fingerprint, and trace is byte-identical (pinned by the treadmill
+golden, which also reproduces the doc-16 §7 worked example verbatim:
+145×8@3 → earned 150×9@2 targeting e1RM 203.0 → measured 205.0).
+
+Landed: `src/lib/engine/rules/progression.ts` (earn gate with e1RM-space
+per-set compliance via the shared three-state comparison, governors —
+cadence / macro-rate pacer / miss throttle / peak-week — and the quantum δ);
+`prescribe()` threading (`A*` as an anchor-input substitution, deadband
+carve-out on earned pricing, realized-ask rule after rounding with
+retry-not-stack `vanished` + `max_pct_per_step` + the `bodyweight_only`
+substitution nudge, always-on status-coded `progression` trace step, grading
+pinned to the measured anchor); `progressionHistory` +
+`daysSincePreviousSession` derived inputs (doc 14 §3 denylist, recorded for
+replay) with assembly in `queries/progression.ts` (90-day lookback,
+normalized %/30d pacer rate, miss/re-arm derivation) wired into `generateDay`
+and `projectNextPrescription`; `get_engine_decisions` rule/status filter
+(§8.3); doc 10 §4 + doc 13 §9.2 pointers to doc 16; the stale
+"standalone → gain" comment corrected (follow-up 2 §5). Full §10 Phase-1
+test matrix green (+49 tests; suite 896).
+
+N35 row → **in-progress, Phase 1 shipped**. Next per 16 §10: Phase 2 (seed
+route), Phase 3 (day-view coupling + markers), Phase 4 (optional audit
+aggregate), Phase R (owner-gated activation).
+
 ## 2026-07-09 — Session 53 (cont.): Batch 15 — N35 follow-up #3 + design finalized (doc 16)
 
 Owner's third follow-up (Batch 15 verbatim in the appendix) answered in

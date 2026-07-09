@@ -51,6 +51,13 @@ export const DERIVED_INPUT_KEYS = [
   // mass-stale every bodyweight prescription; refreshed from the live profile on
   // recompute (doc 14 §3).
   "bodyweight",
+  // doc 16 §8.2: the progression governors' lookback (assembled from recent
+  // engine_decisions) and the caller-computed staleness gap — both derived,
+  // recomputed on read, recorded in the decision for replay. Excluding them
+  // keeps every pre-v20 fingerprint byte-identical; the `progression` params
+  // block itself rides `paramsToken` (activation is the intended v-bump).
+  "progressionHistory",
+  "daysSincePreviousSession",
 ] as const;
 
 export type DerivedInputKey = (typeof DERIVED_INPUT_KEYS)[number];

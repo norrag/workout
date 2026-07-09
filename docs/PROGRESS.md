@@ -2,7 +2,66 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-05 (latest) — Four backlog closures: N29 FilterBar, N18-B per-week RIR, R24 hold-week, R25 MCP pass (PR #152)
+## 2026-07-09 (latest) — Prescribed progression Phase 1: engine core + advance chain (doc 16 §10, N35)
+
+First build slice of [doc 16 — prescribed progression](16-prescribed-progression.md)
+(earned-step overload + macro-rate pacing). Ships **inactive** (engine_params
+v20, `20260709000001`); with the block absent every output, fingerprint, and
+trace is byte-identical — pinned by the treadmill golden.
+
+- **Engine.** New pure rule module `src/lib/engine/rules/progression.ts`: the
+  §3.4 earn gate (per-set compliance in e1RM space via the shared §5.3
+  three-state comparison — `setComplianceMarker`, grinder guard intrinsic; pain
+  / dampener / workload / deload / staleness / confidence predicates, first
+  failing one named), the §3.5 governors (microcycle cadence, macro-rate pacer
+  `lerp(strength_pct_month[bucket], band_position) × goal_rate_factor[goal]`,
+  miss throttle, peak-week skip), and the §3.2 quantum
+  `δ = min(one loadable step, one rep) in e1RM space`. `prescribe()` threads
+  `A* = A + δ` through the existing §9.2 machinery as an anchor-input
+  substitution (R24b deadband disabled on the earned pricing run only); the
+  §3.3 realized-ask rule runs after rounding (`vanished` retains the earn —
+  retry-not-stack; `max_pct_per_step` binds on the realized ask; the
+  `bodyweight_only` rep cap carries the substitution nudge). Exactly one
+  status-coded `progression` trace step per working prescription while active
+  (`stepped | vanished | paced | not_earned` + `deltaTarget`/`deltaRealized`/
+  `targetAnchor` payload); grading stays on the measured anchor; no stored
+  e1RM is ever bumped (T-I5).
+- **Params.** v20 block (`progression`) in `params.ts` under the house
+  `.optional()` discipline; `compliance_band` (0.015) absorbs the day view's
+  `MARKER_BAND` engine-side (UI consumption is Phase 3). Migration
+  `20260709000001_engine_params_v20_prescribed_progression.sql`, append-only,
+  INACTIVE, hash-guarded in `params-provenance.test.ts`.
+- **Derived inputs (doc 14 §3).** `EngineInputs.progressionHistory`
+  (`earnedThisMicrocycle`, `trailing30dPrescribedGainPct` normalized to %/30d,
+  `consecutiveMissedEarns`) + `daysSincePreviousSession` — caller-computed,
+  excluded from the freshness fingerprint (denylist), recorded in the decision
+  for replay. Assembly in `queries/progression.ts`
+  (`deriveProgressionHistory`/`toProgressionEvent` pure + one decisions query,
+  90-day lookback so the pacer's rate memory delivers the §3.5 cadences),
+  wired into `generateDay` (fresh per generated day so same-run backfills see
+  earlier steps) and `projectNextPrescription`. Fields are omitted entirely
+  while the mode is inactive — recorded inputs stay byte-identical.
+- **Audit surface (§8.3).** `get_engine_decisions` gains `rule`/`status`
+  filters (JSONB containment on the output trace).
+- **Tests** (+49): treadmill golden (fixed point with the block absent; the §7
+  worked example verbatim with it active — 145×8@3 → earned 150×9@2 targeting
+  203.0 → measured 205.0), gate-arms-per-goal (hypertrophy, gain, strength;
+  cut/maintain factor-0 byte-identical), no-compounding + retry-not-stack,
+  full gate matrix (each failing predicate ⇒ held output), governor set
+  (cadence / pacer arithmetic vs `band_position` / miss throttle / peak week),
+  realized-ask bounds, e1RM-space compliance (athlete-owned weight moves up
+  and down comply; reported-low-RIR grind fails), trace consistency, replay
+  determinism on pre-v20-shaped stored inputs, lookback-derivation unit tests.
+- **Docs.** Doc 10 §4 and doc 13 §9.2 gained pointers to doc 16; the stale
+  "standalone → gain" comment at the projection path corrected to the
+  `engineGoal` hypertrophy default (follow-up 2 §5 housekeeping).
+
+Remaining phases per doc 16 §10: Phase 2 (seed route / meso-over-meso carry),
+Phase 3 (day-view target-anchor coupling + three-state markers, hard-rule-8
+mockup pass), Phase 4 (audit aggregate, optional), Phase R (owner-gated
+activation incl. the hypertrophy-factor research pass).
+
+## 2026-07-05 — Four backlog closures: N29 FilterBar, N18-B per-week RIR, R24 hold-week, R25 MCP pass (PR #152)
 
 One session, one commit per item:
 

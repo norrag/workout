@@ -235,6 +235,13 @@ export interface DecisionFilters {
   limit?: number;
   /** keyset cursor: return decisions strictly older than this created_at (P1-4) */
   cursor?: string;
+  /** doc 16 §8.3: only decisions whose output trace contains a step with this
+   *  rule (e.g. "progression") — the Phase-1 audit surface for the earned-step
+   *  mode (earn/miss/skip mix, `vanished` frequency). */
+  rule?: string;
+  /** with `rule`, narrow to steps carrying this status (e.g. "stepped",
+   *  "paced"); alone, matches any step carrying the status */
+  status?: string;
 }
 
 /**
@@ -260,6 +267,15 @@ export async function getEngineDecisions(
   if (filters.cursor) query = query.lt("created_at", filters.cursor);
   // exercise filter is now a direct column predicate (persisted exercise_id)
   if (filters.exerciseId) query = query.eq("exercise_id", filters.exerciseId);
+  // doc 16 §8.3: trace-step filter via JSONB containment — `output @>
+  // {"trace":[{...}]}` matches rows whose trace has a step carrying ALL the
+  // given keys (rule + status must co-occur on one step).
+  if (filters.rule || filters.status) {
+    const step: Record<string, string> = {};
+    if (filters.rule) step.rule = filters.rule;
+    if (filters.status) step.status = filters.status;
+    query = query.contains("output", { trace: [step] });
+  }
 
   const { data: decisions, error } = await query;
   if (error) throw error;

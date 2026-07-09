@@ -109,6 +109,32 @@ export const engineInputsSchema = z.object({
   // the live profile on recompute. Null when unknown ⇒ a bodyweight lift defers to
   // a manual seed. Only consulted when `params.bodyweight_model` is on.
   bodyweight: z.number().positive().nullable().default(null),
+  // doc 16 §8.2: the progression governors' lookback, assembled by the caller
+  // from recent `engine_decisions` (same pattern and doc-14 treatment as the
+  // strength anchor: DERIVED — recomputed on read, excluded from the freshness
+  // fingerprint, recorded in the decision for replay). Null ⇒ no history: the
+  // cadence/pacer/throttle governors are permissive (an athlete's first steps
+  // are how the trajectory starts). Only consulted when `params.progression`
+  // is active.
+  // `.nullish()` with NO default, so parsing inputs that predate the feature
+  // injects nothing (stored decision inputs stay byte-identical) and existing
+  // input literals keep compiling.
+  progressionHistory: z
+    .object({
+      /** a `stepped` decision already targets the microcycle being generated */
+      earnedThisMicrocycle: z.boolean(),
+      /** trailing prescribed-e1RM gain, normalized to %/30 days (pacer input) */
+      trailing30dPrescribedGainPct: z.number().nullable(),
+      /** current run of earned-then-missed cycles, 0 once re-armed (§3.5) */
+      consecutiveMissedEarns: z.number().int().min(0),
+    })
+    .nullish(),
+  // doc 16 §3.4 staleness gate: days since the source session was performed,
+  // caller-supplied (the engine is clockless). DERIVED like the anchor — at
+  // normal advance-at-completion it is ~0; a catch-up run or freshness
+  // recompute after a layoff correctly disarms the earn. Null ⇒ unknown ⇒
+  // the gate passes (the advance chain always supplies it).
+  daysSincePreviousSession: z.number().min(0).nullish(),
 });
 
 export type EngineInputs = z.infer<typeof engineInputsSchema>;
@@ -124,6 +150,23 @@ export type PrescriptionBase = z.infer<typeof prescriptionSchema>;
 export interface DecisionTraceStep {
   rule: string;
   detail: string;
+  /**
+   * doc 16 §3.6 — the `progression` rule's structured payload (absent on every
+   * other rule). Additive JSONB inside the recorded decision output; the
+   * always-on status-coded step is what makes cadence/pacer behavior auditable
+   * (`stepped | vanished | paced | not_earned`).
+   */
+  status?: string;
+  /** the intended quantum δ in e1RM space (lb) */
+  deltaTarget?: number | null;
+  /** the realized (post-rounding) ask above the unearned prescription (lb) */
+  deltaRealized?: number | null;
+  /** which governor skipped an earned step (`paced` only) */
+  governor?: string;
+  /** the first failing gate predicate (`not_earned` only) */
+  predicate?: string;
+  /** the prescription-basis anchor A* recorded for the day view (`stepped` only) */
+  targetAnchor?: number;
 }
 
 export interface Prescription extends PrescriptionBase {
