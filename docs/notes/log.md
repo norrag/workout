@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-09 — Session 57: N35 build Phase 4 — audit aggregate (doc 16 §8.3/§10)
 
-Fourth (final code) build slice of doc 16 shipped as **PR #<n>**
+Fourth (final code) build slice of doc 16 shipped as **PR #161**
 (`claude/prescribed-progression-phase-4-d9pzs5`). Read-side only — no schema
 change, no migration, no engine change; while v20 stays INACTIVE no decision
 carries a progression step, so the new surface honestly reads empty.
@@ -2069,7 +2069,7 @@ in lockstep with PRs going forward. Branch `claude/review-notes-section-khtf4p`.
   WS-I tasks (note + archive link left in place); T-A4 annotated as realized via #82. Replaced
   the "done (PR pending)" note with the new status convention.
 - **Process fix (the real ask).** `docs/notes/CLAUDE.md`: new **"Keeping the index in sync
-  with PRs"** section (rule 1: the *building* PR sets `done (PR #<n>)` with the real number +
+  with PRs"** section (rule 1: the *building* PR sets `done (PR #161)` with the real number +
   logs it; rule 2: a merged PR can't sweep its own row; rule 3: a **reconciliation sweep** runs
   at every session start). Wired the sweep into the **resume protocol** as step 3. Root
   `CLAUDE.md`: added the "any PR that resolves a backlog item updates its row in the same PR"
