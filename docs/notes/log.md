@@ -4,6 +4,110 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 53 (cont.): Batch 15 — N35 follow-up #3 + design finalized (doc 16)
+
+Owner's third follow-up (Batch 15 verbatim in the appendix) answered in
+[`docs/reviews/2026-07-09-prescribed-progression-followup-3.md`](../reviews/2026-07-09-prescribed-progression-followup-3.md),
+and the design **finalized** as
+[`docs/16-prescribed-progression.md`](../16-prescribed-progression.md) —
+the authoritative build spec consolidating the memo + review + follow-ups
+1–3 (doc 16 wins over the whole thread; root `CLAUDE.md` docs list updated).
+
+Substance: (1) **Vanished earns — the owner's accumulation assumption is
+corrected** (the "worth discussing before implementation" branch): "earn
+retained" = the single-quantum entitlement is *retried* (re-armed at
+`A + δ` off the measured anchor), never *stacked* (`A + kδ` never exists) —
+stacking is the compounding-unconfirmed-credit failure the no-compounding
+rule forbids, and it would eventually demand a multi-quantum leap on
+exactly the lift least able to absorb it. Coarse-increment lifts don't
+need it: `step: "min"` picks the rep axis, each performed quantum banks in
+the measured anchor (the anchor IS the accumulator), and the top-of-window
+reset — which this design finally makes reachable — converts the banked
+rep gains into the load step. True dead-ends (window cap + oversized plate
+jump; `bodyweight_only` ceiling) get equipment/product answers (increment
+override, doc 10 §8, substitution nudge), not credit. (2) Prefill
+flow-through confirmed automatic. (3) **Owner rulings adopted:** the live
+day-view predictor prices off the prescription-basis target anchor (A*
+when stepped — flips review §7.1's deferral; `logging.ts:335` /
+`DayView.tsx:1339` today read the measured anchor), and the earn gate
+moves to **e1RM-space per-set compliance** — not the literal weight×reps
+pair, which broke under athlete-owned weight edits — sharing the P19
+`loggedSetMarker` comparison (grinder guard intrinsic: reported-low-RIR
+scores under). (4) Markers go **three-state (over/met/under)**;
+`MARKER_BAND` moves into params as `compliance_band` so marker, gate, and
+grading read one tunable; "met" glyph is mockup-governed (09 entry at
+build). N35 → **ready (build)**: phases in doc 16 §10 (engine core → seed
+→ day-view/markers → audit aggregate → owner-gated activation with the
+hypertrophy-factor research pass); implementation in new sessions.
+
+## 2026-07-09 — Session 53 (cont.): Batch 14 — N35 follow-up #2 (auditability, band_position, envelope, standalone)
+
+Owner responded again (same PR #156 thread); captured verbatim as **Batch
+14** and answered in
+[`docs/reviews/2026-07-09-prescribed-progression-followup-2.md`](../reviews/2026-07-09-prescribed-progression-followup-2.md)
+(amends follow-up 1 where they conflict).
+
+Substance: (1) **Auditability** — the substrate already exists
+(`engine_decisions` inputs/output + structured trace + explain/replay/
+simulate MCP tools); amendment: the progression trace becomes **always-on
+and status-coded** (stepped / vanished / paced / not_earned, with a
+structured payload naming the governor or failing predicate) — follow-up 1's
+"no trace when the ask vanishes" refined to "never *claim*, always
+*record*". Line drawn: record at decision grain (Phase 1), aggregate
+read-side only (`get_engine_decisions` filter now; admin
+`get_progression_history` once field data exists), feed back into
+prescriptions only as a doc-14 derived input (= the envelope, Phase 3). The
+history does NOT duplicate `v_exercise_history`: it's demand-side +
+relational (earn/miss/skip stream, governor firings, prescribed-vs-measured
+gap) — none of it exists elsewhere. (2) **Pacing decoupling confirmed**: the
+pacer reads the `strength_pct_month` *band table* (a param), none of
+`planMacrocycle`'s heuristic projections; the quantum is mechanical
+(increment/rep), never band-derived; `rate_source: "plan"` is the one
+explicit opt-in coupling. (3) **`band_position` (0–1, default 0.5)**
+replaces the band_mid/band_top enum — continuous, tunable, and deliberately
+the same knob the owner's **envelope loop** (adopted as the Phase-3 shape)
+will drive: performance moves position *within* the macro envelope, at meso
+boundaries, hysteretic, from demand-side outcomes — bounded by construction,
+replay-exact (position recorded in decision inputs). (4) **Standalone
+mesos**: nothing extra needed — goal resolves via `engineGoal(null)` →
+hypertrophy, the band keys off the profile bucket, history is per
+user × exercise across meso/macro boundaries; post-N21 "plan" works too
+(pure function). Flagged the stale "standalone → gain" comment
+(`progression.ts:1129`) for cleanup in the build PR. N35 stays needs-input;
+updated decision list in follow-up 2 §6.
+
+## 2026-07-08 — Session 53: Batch 13 — N35 follow-up answered, design amended (macro-rate pacing)
+
+Owner responded to the N35 review with four threads; captured verbatim as
+**Batch 13** in the appendix and answered in
+[`docs/reviews/2026-07-08-prescribed-progression-followup.md`](../reviews/2026-07-08-prescribed-progression-followup.md)
+(which amends the 2026-07-07 review — follow-up wins on conflict).
+
+Substance: (1) convergence confirmed; "when" restated as earned + once per
+microcycle at most + rate-paced. (2) The "progressing twice" concern:
+half-dissolved (the ramp rep is reserve drawdown — zero capacity ask;
+capacity ask is exactly one quantum/week), half-adopted (ungoverned
+per-microcycle stepping ≈ 10–15%/mo is too aggressive — resolved by the
+owner's own macro-rate idea). (3) **Design amendment:** the §6.6 rate
+ceiling is promoted to a **macro-rate pacer** (macro sets the expected
+strength rate, meso paces earned quanta to it; hard boundary: budget never
+quota — the rate meters the ask, only performance mints it) and the
+per-goal booleans become **per-goal rate factors** (strength 1.0,
+hypertrophy 0.75 [HEURISTIC — research pass before v20], cut/maintain 0);
+ships in Phase 1 (backward-compatible generalization of the ceiling);
+`rate_source: "plan"` is the post-N21 personalization flip (N21 row
+cross-linked). (4) Misc answered: the `moderate` confidence ceiling under
+compliant hypertrophy is intentional (estimate-accuracy honesty, doc 10 §9
+— only gates needed fixing, already done); "reported RIR" is
+`logged_sets.rir_reported` — a real optional column honored everywhere on
+read but with **no write surface today** (DayView logs null always), so
+review §10 Q6 is now explicitly a two-part decision (engine rule + capture
+affordance + narrow doc-11 premise amendment). Updated owner-decision list
+in the follow-up's §6; N35 stays needs-input.
+
+Reconciliation sweep ran clean (no merged-but-live rows; N1 in-progress,
+N21/N34/N35 open).
+
 ## 2026-07-07 — Session 52: Batch 12 intake — prescribed e1RM progression review (N35)
 
 Owner handed over a memo ("Updates to the Prescription Engine", uploaded
