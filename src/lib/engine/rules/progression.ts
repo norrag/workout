@@ -57,9 +57,10 @@ export interface ProgressionTraceStep extends DecisionTraceStep {
 
 /**
  * The default set-level comparison band when the params block is absent —
- * mirrors the day view's P19 `MARKER_BAND` (±1.5% e1RM), which
- * `progression.compliance_band` absorbs so marker, earn gate, and grading read
- * one tunable (§5.3; the UI moves onto it in Phase 3).
+ * the day view's old P19 `MARKER_BAND` (±1.5% e1RM), which
+ * `progression.compliance_band` absorbed so marker, earn gate, and grading
+ * read one tunable (§5.3; the day view consumes it via `complianceBand()`
+ * since Phase 3).
  */
 export const DEFAULT_COMPLIANCE_BAND = 0.015;
 

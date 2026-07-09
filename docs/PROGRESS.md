@@ -2,7 +2,66 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-09 (latest) — Prescribed progression Phase 2: seed route / meso-over-meso carry (doc 16 §10, N35)
+## 2026-07-09 (latest) — Prescribed progression Phase 3: day-view coupling + three-state markers (doc 16 §10, N35)
+
+Third build slice of [doc 16 — prescribed progression](16-prescribed-progression.md):
+the day view now couples to the prescription-basis anchor and the ▲/▼ markers
+become the earn gate's comparison made visible. No engine-output change and no
+migration — with the v20 block absent (still INACTIVE) no decision ever
+records a target, so every fallback path is byte-identical to today.
+
+- **Day read (`queries/logging.ts`).** `LoggedExercise` gains
+  `prescription_anchor`: the target `A* = A + δ` from the status-`stepped`
+  progression step of the LATEST `engine_decisions` row per workout exercise
+  (every reprice — advance, seed, freshness recompute — records a fresh
+  decision, so a superseded step can never leak a stale lead). Held /
+  pre-v20 / decision-less rows stay null. Read unconditionally (not gated on
+  the mode) so the coupling stays honest in the deactivation window, before
+  the doc-14 recompute has pulled a stored `A*` prescription through.
+- **Live predictor (doc 16 §5.2).** `SetRow`'s `predictRepsAtWeight` prices
+  off `prescription_anchor ?? e1rm_anchor` — an athlete-owned weight edit
+  re-derives reps faithful to the prescribed target *including the earned
+  lead*; without a recorded target it's the measured anchor, today's
+  behavior. The measured anchor remains the basis everywhere else (stats,
+  PRs, sampling, confidence, grading). Prefill flow-through was already
+  automatic (the engine writes the stored prescription; asserted by the e2e).
+- **Three-state markers (doc 16 §5.3).** `day-rules.ts::loggedSetMarker` is
+  now a pure delegation to the engine's `setComplianceMarker` — the SAME
+  comparison the earn gate scores each working set with, so marker, gate, and
+  grading cannot diverge (made structural, not conventional). In-band returns
+  `met` (a positive state under the progression model) instead of null; null
+  stays reserved for not-comparable. The module-local `MARKER_BAND` is gone —
+  the band is params-fed (`progression.compliance_band`, default ±1.5% while
+  the block is absent) and threaded `DayView → ExerciseBlock → SetRow` as
+  `markerBand`. Glyphs: ▲ over (top) / ■ met (centered, 6px) / ▼ under
+  (bottom), small ink per the ledger system — house-style like the original
+  P19 pair (**rule-8 pass re-verified: no mockup figure exists for the set-row
+  marker**); recorded as the 2026-07-09 entry in
+  [09-design-changelog.md](09-design-changelog.md). Session-level "progression
+  earned" stays disclosed via the existing rationale/audit affordances — no
+  new indicator.
+- **WS-J bundle guard extended.** `rules/progression.ts` (and its
+  `rules/feedback.ts` import) now ride the day view's client chunk; the
+  predict-test import guard grew to pin all four leaf modules free of runtime
+  zod/params/types/e1rm/reps imports.
+- **Tests** (+13; suite 932): day-rules three-state (met on-target incl. the
+  N11 deload case, reported-RIR-at-target met, params-fed band absorbs a beat
+  into met), marker ⇄ earn-gate agreement fixture (8 scenarios: exact/quick-log
+  compliance, rep-short, athlete-owned weight change up, honest grind,
+  RIR-at-target, missing set, non-comparable zero-load set, over — the gate's
+  compliance row passes exactly when every set marker reads over|met), extended
+  bundle guard. New e2e (`tests/e2e/prescribed-progression.spec.ts`): a
+  fabricated `stepped` decision (service-role fixture, active params untouched)
+  → the earned prescription renders in the row, a weight edit re-derives reps
+  off the recorded target (the fixture user has no logged history, so only the
+  recorded `A*` can predict), exactly-as-prescribed logs read `met` and a short
+  set reads `under`.
+
+Remaining phases per doc 16 §10: Phase 4 (audit aggregate, optional, post
+field data), Phase R (owner-gated activation incl. the hypertrophy-factor
+research pass).
+
+## 2026-07-09 — Prescribed progression Phase 2: seed route / meso-over-meso carry (doc 16 §10, N35)
 
 Second build slice of [doc 16 — prescribed progression](16-prescribed-progression.md):
 the earned-step overload now carries across the deload boundary into the next

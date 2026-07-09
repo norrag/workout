@@ -4,6 +4,37 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 56: N35 build Phase 3 — day-view coupling + three-state markers (doc 16 §10)
+
+Third build slice of doc 16 shipped as **PR #<n>**
+(`claude/prescribed-progression-phase-3-4etoto`). No engine-output change and
+no migration — with the v20 block (still INACTIVE) absent, no decision ever
+records a target anchor, so every fallback path is byte-identical to today.
+
+Landed: the day read (`queries/logging.ts`) carries `prescription_anchor` per
+exercise — the target `A* = A + δ` from the `stepped` progression step of the
+LATEST `engine_decisions` row (every reprice records a fresh decision, so a
+superseded step can't leak a stale lead; read ungated so the coupling stays
+honest in the deactivation window). `SetRow`'s live predictor prices off
+`prescription_anchor ?? e1rm_anchor` (§5.2) — a weight edit re-derives reps
+faithful to the prescribed target including the earned lead; the measured
+anchor stays the basis everywhere else. Markers go three-state (§5.3):
+`loggedSetMarker` now delegates to the engine's `setComplianceMarker` — the
+earn gate's comparison made visible, structurally unable to diverge — with
+the band params-fed (`progression.compliance_band` absorbed `MARKER_BAND`).
+Glyphs ▲/■/▼ small ink, house-style (rule-8 pass re-verified: no mockup
+figure exists for the set-row marker; 09-changelog 2026-07-09 entry is the
+authoritative treatment). WS-J bundle guard extended to pin
+`rules/progression.ts` + `rules/feedback.ts` zod-free in the client chunk.
+Tests +13 (suite 932): three-state day-rules, the marker ⇄ earn-gate
+agreement fixture (8 scenarios), extended guard; new e2e
+(`prescribed-progression.spec.ts`) drives a fabricated stepped decision
+through the real UI — earned prescription renders, weight edit re-derives
+off the recorded target, met/under markers reflect the shared comparison.
+
+N35 row → Phase 3 shipped. Next per 16 §10: Phase 4 (optional audit
+aggregate, post field data), Phase R (owner-gated activation).
+
 ## 2026-07-09 — Session 55: N35 build Phase 2 — seed route / meso-over-meso carry (doc 16 §10)
 
 Second build slice of doc 16 shipped as **PR #159**

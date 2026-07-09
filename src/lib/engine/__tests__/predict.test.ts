@@ -81,15 +81,23 @@ describe("predict.ts cores match the validating public API exactly", () => {
 
 describe("client-chunk import guard (WS-J)", () => {
   const engineDir = join(__dirname, "..");
-  // a runtime (non-`import type`) import of zod or ./params would pull the
-  // schema layer — and zod — back into the day-view client bundle
-  const RUNTIME_IMPORT = /^import\s+(?!type\s)[^;]*?from\s+["'](zod|\.\/params)["']/m;
+  // a runtime (non-`import type`) import of zod — or of the schema-bearing
+  // modules params/types or the validating wrappers e1rm/reps — would pull
+  // the schema layer (and zod) back into the day-view client bundle.
+  // `rules/progression.ts` + its `rules/feedback.ts` import joined the chunk
+  // in doc-16 Phase 3 (day-rules delegates the marker to the engine's shared
+  // comparison), so they hold the same guarantee.
+  const RUNTIME_IMPORT =
+    /^import\s+(?!type\s)[^;]*?from\s+["'](zod|\.{1,2}\/(params|types|e1rm|reps))["']/m;
 
-  it.each(["predict.ts", "load.ts"])("%s has no runtime zod/params import", (file) => {
-    const src = readFileSync(join(engineDir, file), "utf8");
-    expect(src).not.toMatch(RUNTIME_IMPORT);
-    expect(src).not.toMatch(/require\(/);
-  });
+  it.each(["predict.ts", "load.ts", "rules/progression.ts", "rules/feedback.ts"])(
+    "%s has no runtime zod/schema-layer import",
+    (file) => {
+      const src = readFileSync(join(engineDir, file), "utf8");
+      expect(src).not.toMatch(RUNTIME_IMPORT);
+      expect(src).not.toMatch(/require\(/);
+    },
+  );
 });
 
 describe("e1rmFactor monotonicity (R24)", () => {

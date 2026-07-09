@@ -317,8 +317,9 @@ export const engineParamsSchema = z.object({
       // floor is provably inert for the flagship goal.
       min_confidence: z.enum(["high", "moderate", "low"]).default("moderate"),
       // the shared set-level e1RM comparison band (§5.3): earn gate, ▲/met/▼
-      // markers, and grading read this ONE tunable (absorbs the day view's
-      // module-local MARKER_BAND = 0.015; UI consumption lands in Phase 3).
+      // markers, and grading read this ONE tunable (absorbed the day view's
+      // module-local MARKER_BAND = 0.015; the UI consumes it via
+      // `complianceBand()` since Phase 3).
       compliance_band: z.number().min(0).max(0.2).default(0.015),
       // at most one step per exercise per microcycle (mirrors how the RIR ramp
       // steps); "session" is the aggressive-novice setting (multiplies by
