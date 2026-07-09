@@ -4,6 +4,40 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-09 — Session 55: N35 build Phase 2 — seed route / meso-over-meso carry (doc 16 §10)
+
+Second build slice of doc 16 shipped as **PR #TBD**
+(`claude/prescribed-progression-phase-2-uzc3ff`). No migration — v20
+(INACTIVE) already carries the block; with it absent every seed output,
+recorded input, fingerprint, and trace stays byte-identical (pinned).
+
+Landed: `seedMeso` doc-16 §3.7 wrapper — the caller supplies the prior meso's
+final working session (`earn` opt + `progressionHistory` +
+`daysSincePreviousSession`) and the seed evaluates it through the SAME
+`assessProgression` gate + governors as the advance chain, re-prices the
+anchor-parameterized `seedCore` off `A* = A + δ`, and shares the extracted
+`applyRealizedAsk` §3.3 rule verbatim (vanished retains the earn;
+`max_pct_per_step`; `stepped` announces the target). New derived
+`EngineInputs.seedEarn` (doc 14 §3 denylisted, recorded for replay).
+Earned-at-close derivation in the new leaf `queries/seed-progression.ts`
+(most recent completed WORKING session per exercise — deloads excluded, so
+the earn crosses the deload boundary; `max_gap_days` decides honesty).
+Caller plumbing per the §10 site list: `startMeso` earns; plan-edit adds +
+slot swaps never (no compliance context; slot path forwards `isDeload`);
+`recomputeSeed` + admin `replay_decisions` replay the recorded earn frozen
+with the anchor refreshed. `progressionHistory` assembly moved to the leaf
+`queries/progression-history.ts` (generation ↔ progression cycle), re-exported
+from `progression.ts`. Tests +23 (suite 919): seed↔advance parity (same δ,
+same A* — by construction via the shared gate), meso-over-meso golden (the
+memo's acceptance case: fixed point absent, meso 2 opens above meso 1
+active), deload-boundary carry + staleness cutoff, gate/governor cases on the
+seed, bodyweight rep-cap vanish, doc-14 fingerprint parity, replay
+determinism.
+
+N35 row → Phase 2 shipped. Next per 16 §10: Phase 3 (day-view coupling +
+three-state markers, hard-rule-8 mockup pass), Phase 4 (optional audit
+aggregate), Phase R (owner-gated activation).
+
 ## 2026-07-09 — Session 54: N35 build Phase 1 — engine core + advance chain (doc 16 §10)
 
 First build slice of doc 16 shipped as **PR #158**

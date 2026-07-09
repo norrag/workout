@@ -135,11 +135,33 @@ export const engineInputsSchema = z.object({
   // recompute after a layoff correctly disarms the earn. Null ⇒ unknown ⇒
   // the gate passes (the advance chain always supplies it).
   daysSincePreviousSession: z.number().min(0).nullish(),
+  // doc 16 §3.7 — the SEED route's earn context: the prior meso's final WORKING
+  // session (its prescription + what was performed against it + its feedback),
+  // assembled by the caller exactly like the advance chain's inputs, so an earn
+  // at meso close carries across the deload boundary into the next seed.
+  // DERIVED (doc 14 §3 denylist): excluded from the freshness fingerprint,
+  // recorded in the seed decision for replay. `.nullish()` with NO default —
+  // absent on every input that predates the feature (stored decision inputs
+  // parse byte-identically) and on swaps/cold starts, which have no compliance
+  // context and therefore never earn (§3.7). Only consulted by `seedMeso` while
+  // `params.progression` is active; `prescribe` ignores it.
+  seedEarn: z
+    .object({
+      /** the final working session's prescription (the compliance target) */
+      previous: prescriptionSchema,
+      /** what was actually performed against it */
+      actualSets: z.array(loggedSetInputSchema),
+      exerciseFeedback: exerciseFeedbackInputSchema.nullable(),
+      workoutFeedback: workoutFeedbackInputSchema.nullable(),
+    })
+    .nullish(),
 });
 
 export type EngineInputs = z.infer<typeof engineInputsSchema>;
 export type LoggedSetInput = z.infer<typeof loggedSetInputSchema>;
 export type PrescriptionBase = z.infer<typeof prescriptionSchema>;
+/** doc 16 §3.7 — the seed route's caller-assembled earn context. */
+export type SeedEarnContext = NonNullable<EngineInputs["seedEarn"]>;
 
 /**
  * One structured step in the engine's reasoning (P0-4). The human `rationale`

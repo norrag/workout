@@ -227,6 +227,21 @@ export function replayDecisions(
                 // it made every bodyweight-lift seed replay as the deferred
                 // null-weight prescription → a spurious diff on every candidate.
                 bodyweight: parsed.data.bodyweight,
+                // doc 16 §3.7: the seed's recorded earn context + governors'
+                // lookback replay verbatim, so a stepped seed reproduces its
+                // stored output under the same params (and diffs honestly
+                // under a candidate that changes the gate).
+                isDeload: parsed.data.week.isDeload,
+                ...(parsed.data.seedEarn != null
+                  ? {
+                      earn: parsed.data.seedEarn,
+                      daysSincePreviousSession:
+                        parsed.data.daysSincePreviousSession ?? null,
+                    }
+                  : {}),
+                ...(parsed.data.progressionHistory !== undefined
+                  ? { progressionHistory: parsed.data.progressionHistory }
+                  : {}),
               },
             )
           : prescribe(parsed.data, effectiveCandidate);
