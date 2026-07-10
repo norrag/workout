@@ -17,13 +17,13 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@serwist/next": "^9.0.0",
-    "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.49.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.2",
     "jose": "^6.2.3",
     "mcp-handler": "^1.1.0",
-    "next": "^15.5.0",
+    "next": "^15.5.20",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
