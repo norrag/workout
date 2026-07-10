@@ -11,7 +11,7 @@ around N21: (1) how do we get targets right, (2) how do we use them,
 (3) how do we measure results and close the loop, (4) what persists across
 macro boundaries. Answered in
 **`docs/reviews/2026-07-10-macrocycle-goals-architecture.md`** (design record,
-not a build — doc 16's authority untouched). PR #<n>. Highlights:
+not a build — doc 16's authority untouched). PR #166. Highlights:
 
 - **Frame:** confirmed the owner's cadence+pacing levers / envelope-tunes-
   within-bounds understanding; sharpened it — the engine-facing product of the
