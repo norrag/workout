@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-10 — Session 63: N37 built — doc 17 Phase 2 (`rate_source: "plan"` pacer branch)
 
-Owner kicked off Phase 2 ("implement phase 2"). One PR (**#<n>**, branch
+Owner kicked off Phase 2 ("implement phase 2"). One PR (**#170**, branch
 `claude/macrocycle-goals-phase-2-gncftk`); **no migration, no behavior
 change** — every params row keeps `rate_source: "band"`, the flip is the v22
 micro-bump at doc 17 Phase R3.
@@ -40,7 +40,7 @@ micro-bump at doc 17 Phase R3.
   "band"/absent block, fingerprint denylist + write/check parity, frozen
   replay (recompute + admin), assembly self-gate/standalone/never-throws.
 
-**N37 → done (PR #<n>).** Phase R3 (the flip) unblocks once R1 (v20) + R2
+**N37 → done (PR #170).** Phase R3 (the flip) unblocks once R1 (v20) + R2
 (v21) are activated. Reconciliation sweep: **N21 archived** (PR #169 merged;
 row → `archive.md`, live index trimmed).
 
