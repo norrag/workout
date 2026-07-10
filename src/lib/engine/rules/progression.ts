@@ -380,20 +380,29 @@ function quantum(
 }
 
 /**
- * §3.5 rate pacer target: `lerp(strength_pct_month[bucket], band_position) ×
- * goal_rate_factor[goal]`, in %/month. v1 `rate_source` is the band table only;
- * `"plan"` (post-N21) falls back to the band until the personalized rate
- * exists. Null disables the pacer (no evidenced band for the bucket).
+ * §3.5 rate pacer target: `lerp(source_band, band_position) ×
+ * goal_rate_factor[goal]`, in %/month. The source band is selected by
+ * `rate_source` (doc 17 §3, N37): `"plan"` reads the caller-derived
+ * `planStrengthRate` (the §2.1-personalized `strengthRatePctMonth` — always
+ * strength-denominated, whatever the macro's goal); `"band"` — and `"plan"`
+ * with no plan rate assembled — reads the bucket table. Degradation is always
+ * toward `"band"`, never unpaced; `band_position` and the goal factor compose
+ * identically under either source (so the Phase-6 envelope is source-agnostic).
+ * Null disables the pacer (no evidenced band for the bucket).
  */
 function pacerTargetRate(
   inputs: EngineInputs,
   params: EngineParams,
 ): number | null {
   const p = params.progression!;
+  const factor = p.goal_rate_factor[inputs.goalType] ?? 0;
+  if (p.rate_source === "plan" && inputs.planStrengthRate != null) {
+    const { low, high } = inputs.planStrengthRate;
+    return (low + (high - low) * p.band_position) * factor;
+  }
   const band = params.macro_target.strength_pct_month[inputs.user.experienceLevel];
   if (!band) return null;
   const [low, high] = band;
-  const factor = p.goal_rate_factor[inputs.goalType] ?? 0;
   return (low + (high - low) * p.band_position) * factor;
 }
 

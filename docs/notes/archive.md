@@ -11,6 +11,16 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-10 — macro goals Phase 1 merged (PR #169)
+
+Reconciliation sweep at the doc-17 Phase-2 session start: N21's PR merged
+2026-07-10 (row stamped `done (PR #169)` in-PR per protocol). Full record in
+doc 17 §2, doc 10 §5, PROGRESS, and the Session-62 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N21 | "Realistic" macro-target engine correction (strength target ignored age/sex; hypertrophy model flipped discontinuously on profile completeness; cut caps collapsed the range) | Q→D | C | **done (PR #169, merged 2026-07-10).** Doc 17 §2 / Phase 1: engine_params **v21 INACTIVE** (`20260710000002` — `strength_sex_factor` {1,1}, `age_taper_floor_strength` 0.7, `bf_proxy_pct`), strength band personalized (target + recommended duration), hypertrophy continuity via the BMI-band bf% proxy (continuity golden), cut-band proportional rescale, goal-independent `MacroPlan.strengthRatePctMonth` (the N37 carrier), `macrocycles.plan_inputs` contract snapshot + goals-edit gate (principle 3), `profiles.birthdate` + derived age (`20260710000001`), doc 10 §5 amendments. Activation + target-card re-enable = doc 17 Phase R2 (`manual-operations.md`). Unblocked N37 (built in the next session). |
+
 ## Swept 2026-07-10 — est-strength rework merged (PR #157)
 
 Reconciliation sweep at the doc-17 session start: N42's PR merged

@@ -291,6 +291,80 @@ describe("replayDecisions", () => {
     expect(reverted.changed).toBe(1);
   });
 
+  it("replays the recorded plan rate on a seed, so a rate_source flip diffs honestly (doc 17 §3)", () => {
+    // a stepped seed recorded under "band" whose inputs carried a tiny
+    // personalized plan band: replaying under the SAME params reproduces it,
+    // and a candidate that flips rate_source to "plan" reads the recorded rate
+    // verbatim — the pacer now declines the step, so the decision diffs. This
+    // is exactly the Phase-R v22 replay-diff review path.
+    const anchor = { value: 198.2, confidence: "moderate" as const };
+    const progression = {
+      seedEarn: {
+        previous: { weight: 145, reps: 8, sets: 3, targetRir: 3 },
+        actualSets: [1, 2, 3].map((n) => ({
+          setNumber: n,
+          weight: 145,
+          reps: 8,
+          rirReported: null,
+          isWarmup: false,
+        })),
+        exerciseFeedback: null,
+        workoutFeedback: null,
+      },
+      progressionHistory: {
+        earnedThisMicrocycle: false,
+        // under the band target (1.6875 %/mo) this flows; under the recorded
+        // plan band [0.1, 0.1] × 0.75 it paces
+        trailing30dPrescribedGainPct: 1.0,
+        consecutiveMissedEarns: 0,
+      },
+      daysSincePreviousSession: 8,
+      planStrengthRate: { low: 0.1, high: 0.1 },
+    };
+    const seedIn = buildSeedInputs({
+      equipmentType: "barbell",
+      profile: { experience_level: "intermediate" },
+      goal: "hypertrophy",
+      startRir: 3,
+      isDeload: false,
+      initial: null,
+      priorPeak: null,
+      strengthAnchor: anchor,
+      progression,
+    });
+    const seedOut = seedMeso(
+      null,
+      null,
+      { equipmentType: "barbell", loadType: "external" },
+      { experienceLevel: "intermediate" },
+      3,
+      V20_PARAMS,
+      {
+        goalType: "hypertrophy",
+        anchor,
+        earn: progression.seedEarn,
+        progressionHistory: progression.progressionHistory,
+        daysSincePreviousSession: progression.daysSincePreviousSession,
+        planStrengthRate: progression.planStrengthRate,
+      },
+    );
+    expect(
+      seedOut.trace.some((s) => s.rule === "progression" && s.status === "stepped"),
+    ).toBe(true);
+    const stored = decision(
+      seedIn as unknown as Record<string, unknown>,
+      seedOut as unknown as Record<string, unknown>,
+      "seed",
+    );
+    expect(replayDecisions([stored], V20_PARAMS).changed).toBe(0);
+    const planSource: EngineParams = {
+      ...V20_PARAMS,
+      progression: { ...V20_PARAMS.progression!, rate_source: "plan" },
+    };
+    const flipped = replayDecisions([stored], planSource);
+    expect(flipped.changed).toBe(1);
+  });
+
   it("replays a bodyweight seed with the stored bodyweight (R10)", () => {
     // R10: stored seed inputs carry `bodyweight`; the replay used to drop it,
     // so under the live bodyweight model every bodyweight-lift seed replayed

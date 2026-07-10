@@ -293,6 +293,27 @@ activation)** in doc 17 §8, but independent of it mechanically.
 | **Re-enable the target cards** | After activation: a small code PR transcribing figs 2.2/2.3 per hard rule 8 (PR #140 made the hide a pure view change). |
 | **Owner re-saves the profile birthdate** | The profile page now carries BIRTHDATE (fig 4.5 amendment, 09-changelog 2026-07-10); the legacy static `age` int stays the fallback until re-saved. One-time, no backfill (single-user deployment). |
 
+### Flip `rate_source` to **"plan"** (v22 micro-bump — doc 17 Phase R3)
+
+The doc 17 §3 / Phase 2 code (N37) ships the pacer's `"plan"` branch fully
+plumbed but **unflipped**: every params row still carries
+`progression.rate_source: "band"`, so behavior is byte-identical until this
+step. The flip swaps the pacer's source band from the bucket table
+(`macro_target.strength_pct_month[bucket]`) to the profile-personalized
+`planMacrocycle` strength band (the recorded `planStrengthRate` derived input);
+`band_position` and `goal_rate_factor` compose identically under either source,
+and a decision with no plan rate assembled degrades to the band — never
+unpaced. Sequenced **after R1 (v20 active) and R2 (v21 active)** in doc 17 §8:
+the pacer only runs while the progression block is active, and the plan rate is
+only worth flipping to once v21's personalization is live.
+
+| Step | What / why |
+|---|---|
+| **① Propose v22** | Admin MCP `propose_engine_params`: v21's content with the single change `progression.rate_source: "plan"` (a micro-bump — no other knob moves). |
+| **② Replay diff** | `replay_decisions` candidate v22 over recorded decisions. Expected shape: the **paced/stepped mix shifts** on earned working weeks (decisions that recorded a `planStrengthRate` re-judge the trailing rate against the personalized band instead of the bucket band); **no entitlement change** — the earn gate, quantum δ, and anchor arithmetic are untouched, so any diff is a step *deferred or released*, never resized. Decisions recorded before Phase 2 carry no plan rate and must replay byte-identically (band fallback). |
+| **③ Owner reviews + activates** | Confirm the shifted mix reads right (a lifter whose personalized band sits below the bucket band gets paced sooner; above, later). Activate via `activate_engine_params`; roll back by re-activating v21. |
+| **④ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20 monitor row; this field data also feeds the Phase-6 envelope fit. |
+
 ---
 
 ## How Claude flags these

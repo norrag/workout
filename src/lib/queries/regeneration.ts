@@ -257,15 +257,18 @@ function recomputeSeed(
   const priorPeak: SeedPeak | null = storedPeak
     ? { weight: storedPeak.weight, reps: storedPeak.reps, sets: storedPeak.sets }
     : null;
-  // doc 16 §3.7: the seed's derived progression inputs replay FROZEN from the
-  // stored decision (exactly like the advance replay's `progressionHistory` —
-  // the earn context is immutable completed work), while the refreshed anchor
-  // flows into the gate + target-anchor arithmetic like everywhere else. Only
-  // spread when recorded, so pre-Phase-2 seed inputs rebuild byte-identically.
+  // doc 16 §3.7 / doc 17 §3: the seed's derived progression inputs replay
+  // FROZEN from the stored decision (exactly like the advance replay's
+  // `progressionHistory` — the earn context is immutable completed work, and
+  // the recorded plan rate is the rate the decision consumed), while the
+  // refreshed anchor flows into the gate + target-anchor arithmetic like
+  // everywhere else. Only spread when recorded, so pre-Phase-2 seed inputs
+  // rebuild byte-identically.
   const stored = args.storedInputs as {
     seedEarn?: EngineInputs["seedEarn"];
     progressionHistory?: EngineInputs["progressionHistory"];
     daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
+    planStrengthRate?: EngineInputs["planStrengthRate"];
   };
   const storedProgression = {
     ...(stored.seedEarn !== undefined ? { seedEarn: stored.seedEarn } : {}),
@@ -274,6 +277,9 @@ function recomputeSeed(
       : {}),
     ...(stored.daysSincePreviousSession !== undefined
       ? { daysSincePreviousSession: stored.daysSincePreviousSession }
+      : {}),
+    ...(stored.planStrengthRate !== undefined
+      ? { planStrengthRate: stored.planStrengthRate }
       : {}),
   };
 
@@ -303,6 +309,9 @@ function recomputeSeed(
           : {}),
         ...(stored.progressionHistory !== undefined
           ? { progressionHistory: stored.progressionHistory }
+          : {}),
+        ...(stored.planStrengthRate !== undefined
+          ? { planStrengthRate: stored.planStrengthRate }
           : {}),
       },
     );

@@ -855,6 +855,10 @@ export function seedMeso(
      *  performed (caller clock — across a deload boundary this is what decides
      *  whether the earn carries or the athlete re-measures first) */
     daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
+    /** doc 17 §3 (N37): the personalized plan strength band the rate pacer
+     *  reads under `rate_source: "plan"`, caller-derived like the advance
+     *  path's. Null/omitted ⇒ the pacer degrades to the bucket band. */
+    planStrengthRate?: EngineInputs["planStrengthRate"];
   },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
@@ -902,6 +906,7 @@ export function seedMeso(
     bodyweight,
     progressionHistory: opts?.progressionHistory ?? null,
     daysSincePreviousSession: opts?.daysSincePreviousSession ?? null,
+    planStrengthRate: opts?.planStrengthRate ?? null,
   };
   const gate = assessProgression(gateInputs, params, baseline);
   if (!gate.offered) {

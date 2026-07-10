@@ -330,8 +330,10 @@ export const engineParamsSchema = z.object({
       // never quota — §2.4).
       pacing: z.enum(["macro_rate", "off"]).optional(),
       // "band" = macro_target.strength_pct_month keyed by the profile's
-      // experience bucket; "plan" (post-N21) swaps in the personalized
-      // planMacrocycle rate — until N21 lands it falls back to "band".
+      // experience bucket; "plan" (doc 17 §3, N37) swaps in the personalized
+      // planMacrocycle rate — the caller-derived `planStrengthRate` input —
+      // degrading to "band" (never unpaced) when none is assembled. The flip
+      // to "plan" is the Phase-R v22 micro-bump.
       rate_source: z.enum(["band", "plan"]).default("band"),
       // where in the band the pacer targets: 0 = floor, 1 = top. The Phase-3
       // envelope loop writes this same knob at meso boundaries (§4).

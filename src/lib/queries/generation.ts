@@ -39,6 +39,7 @@ import {
   type ProgressionHistoryInput,
 } from "./progression-history";
 import { getSeedEarnContexts, type SeedEarnBundle } from "./seed-progression";
+import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
 
 type Client = SupabaseClient<Database>;
 
@@ -65,6 +66,10 @@ interface SeedCtx {
    *  mode is inactive — the recorded seed inputs then omit every progression
    *  field, staying byte-identical to today (§2.7). */
   progressionByExerciseId: Map<string, ProgressionHistoryInput> | null;
+  /** doc 17 §3 (N37): the pacer's personalized plan strength band — per user ×
+   *  goal, derived once per operation. Recorded (and passed to the engine) only
+   *  under the same mode gate as `progressionByExerciseId`. */
+  planStrengthRate: PlanStrengthRate | null;
 }
 
 /** A seeded prescription row plus the engine I/O that produced it, so the caller
@@ -152,7 +157,12 @@ function seedExerciseRow(
             daysSincePreviousSession: earnBundle.daysSincePreviousSession,
           }
         : {}),
-      ...(ctx.progressionByExerciseId ? { progressionHistory: history } : {}),
+      ...(ctx.progressionByExerciseId
+        ? {
+            progressionHistory: history,
+            planStrengthRate: ctx.planStrengthRate,
+          }
+        : {}),
     },
   );
   const inputs = buildSeedInputs({
@@ -172,6 +182,7 @@ function seedExerciseRow(
             progressionHistory: history,
             daysSincePreviousSession:
               earnBundle?.daysSincePreviousSession ?? null,
+            planStrengthRate: ctx.planStrengthRate,
           },
         }
       : {}),
@@ -523,6 +534,11 @@ export async function startMeso(
     getSeedEarnContexts(supabase, userId, exerciseIds, goal, params),
     getProgressionHistories(supabase, userId, exerciseIds, week1.id, params),
   ]);
+  // doc 17 §3: the pacer's plan strength band, derived once per activation
+  // (per-user, not per-exercise) from the live profile under the resolved goal
+  // (standalone mesos resolve to hypertrophy). Self-gates: null while the
+  // progression mode is inactive.
+  const planStrengthRate = derivePlanStrengthRate(profile, goal, params);
 
   const seedCtx: SeedCtx = {
     equipmentById,
@@ -540,6 +556,7 @@ export async function startMeso(
     anchorByExerciseId,
     earnByExerciseId,
     progressionByExerciseId,
+    planStrengthRate,
   };
 
   // a half-applied prior attempt may have created some week-1 workouts
@@ -722,9 +739,11 @@ export async function regenerateOpenWorkouts(
       anchorByExerciseId,
       // doc 16 §3.7: a plan-edit add mid-meso is a cold start — no compliance
       // context, never earned; the seed emits `not_earned` while the mode is
-      // active and stays byte-identical while it is absent.
+      // active and stays byte-identical while it is absent. The plan rate rides
+      // the same gate (a never-earned seed can't reach the pacer anyway).
       earnByExerciseId: null,
       progressionByExerciseId: null,
+      planStrengthRate: null,
     };
 
     // 1. drop planned workouts whose day was removed from the plan — but never
