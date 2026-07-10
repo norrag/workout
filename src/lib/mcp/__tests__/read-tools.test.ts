@@ -57,6 +57,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     id: "u1",
     display_name: "Garron",
     age: 34,
+    birthdate: null,
     gender: "male",
     height_in: 71,
     bodyweight: 198,

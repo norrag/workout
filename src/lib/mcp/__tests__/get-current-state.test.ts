@@ -61,6 +61,7 @@ function macro(overrides: Partial<MacrocycleRow> = {}): MacrocycleRow {
     target_direction: null,
     rate_low: null,
     rate_high: null,
+    plan_inputs: null,
     start_date: "2026-06-01",
     target_end_date: null,
     status: "active",

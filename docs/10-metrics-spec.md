@@ -217,10 +217,17 @@ the same calendar age correctly gets ~0. `sexFactor = 0.7` female (relative gain
 sexes — Roberts 2020 / Refalo 2025; the residual reflects women's lower lean-mass fraction, **not** a
 halved response, so the old 0.5 was too low), `1.0` male. Also tapered by **age** (older → lower).
 
-**Fallback (no body fat):** when `bodyFat%`/height are unknown we use the **training-age decay**
-`rate(T)% = base × e^(−T/tau)`, `tau = 5` yr — monotonic in duration, tapering toward potential with
-training age. *(Aragon %BW/month bands; Lyle McDonald front-loaded model; Casey Butt / Kouri FFMI
-ceiling ~25; sex: Roberts 2020 / Refalo 2025.)*
+**Proxy (height + weight known, body fat not) [v21, doc 17 §2.2]:** the proximity model runs on a
+**representative bf% for the BMI leanness band** (`bf_proxy_pct`, per sex: male `{lean 10, average
+16, high_bf 25}`, female `{lean 18, average 26, high_bf 35}` — mid-band values consistent with
+`cut_bf_thresholds`), so completing the bf% field moves the rate **continuously** from the band's
+representative value instead of flipping models; the remaining-potential cap applies on both sides
+of the toggle.
+
+**Fallback (no height/bodyweight):** only when body composition can't be read at all we use the
+**training-age decay** `rate(T)% = base × e^(−T/tau)`, `tau = 5` yr — monotonic in duration,
+tapering toward potential with training age. *(Aragon %BW/month bands; Lyle McDonald front-loaded
+model; Casey Butt / Kouri FFMI ceiling ~25; sex: Roberts 2020 / Refalo 2025.)*
 
 > **Evolution.** v3 used experience buckets × duration with a hard **career-cap clamp**, which pinned
 > near-potential lifters to an *identical target for every duration* (the "static" bug). v4 replaced
@@ -230,10 +237,19 @@ ceiling ~25; sex: Roberts 2020 / Refalo 2025.)*
 > back-compat only. **Individual variation dwarfs these means** (Hubal 2005: −2% to +59% size on one
 > program) — always a labeled estimate band, never a promise.
 
-**Strength — % on key lifts:** monthly compounding, decelerating by training status: beginner
-~4–8%/mo (neural/linear phase), intermediate ~1.5–3%/mo, advanced ~0.5–1.5%/mo; cap long horizons
-(asymptotic toward potential). Relative gains ~sex-equal (women slightly higher upper-body). *(ACSM
-2009 — ~40% untrained vs ~16% trained; SBS/Nuckols; Moritani & DeVries 1979 neural time-course.)*
+**Strength — % gain, measured by the §6 est-strength rollup** *(restated with v21: the "% on key
+lifts" framing predates PR #157 — key lifts are retired from measurement; the target grades against
+the volume-weighted `strengthTrend` headline)*: monthly compounding, decelerating by training
+status: beginner ~4–8%/mo (neural/linear phase), intermediate ~1.5–3%/mo, advanced ~0.5–1.5%/mo;
+cap long horizons (asymptotic toward potential). **Personalized (v21, doc 17 §2.1):** the band
+scales by `strength_sex_factor` (default `{male 1.0, female 1.0}` — relative 1RM gains are
+~sex-equal, women slightly higher upper-body; a distinct param from the hypertrophy lean-mass
+factor) and by the existing age taper with a **strength-specific floor** `age_taper_floor_strength`
+(default **0.7** > the hypertrophy 0.6 — neural adaptation is preserved with age; Peterson 2010,
+ACSM 2009). Both endpoints scale; the recommended timeframe reads the same personalized band, and
+`planMacrocycle` exposes it goal-independently as `MacroPlan.strengthRatePctMonth` (the doc-16
+`rate_source: "plan"` pacer carrier). *(ACSM 2009 — ~40% untrained vs ~16% trained; SBS/Nuckols;
+Moritani & DeVries 1979 neural time-course.)*
 
 **Cut — fat loss as %BW/week, scaled by leanness/bodyweight (the user's emphasis):**
 | Leanness | %BW / week |
@@ -246,7 +262,10 @@ bodyweight** so long cuts decelerate instead of extrapolating linearly to absurd
 total is **capped at `cut_cap_pct_bw` (25% of bodyweight)** since the profile carries no body-fat
 floor. **[EVIDENCED — best of the three]** *(Helms/Aragon/Fitschen 2014: 0.5–1%/wk; Garthe 2011:
 0.7%/wk preserved & built lean mass, 1.4% did not; Lyle ~31 kcal/lb-fat ceiling → leaner = slower.)*
-Heavier/over-fat users can be guided faster and safely; lean users slower.
+Heavier/over-fat users can be guided faster and safely; lean users slower. **When the cap binds
+the high endpoint (v21, doc 17 §2.3), the low endpoint rescales proportionally**
+(`low = low_raw × cap / high_raw`) instead of clamping onto the cap — a long cut keeps a band with
+its relative width rather than collapsing to a point.
 
 **Maintain:** target ≈ 0 (recomposition framing); no weight target.
 
@@ -257,7 +276,9 @@ user-chosen duration against it. `mesoCount = floor(durationMonths × 4.33 / mes
 phases spread accumulate → intensify → peak (`params.phase_plan`).
 
 Params: `macro_target.<goal>` rate tables, `macro_target.sex_factor`, `macro_target.age_taper`,
-`macro_target.career_cap`, `phase_plan`.
+`macro_target.career_cap`, `phase_plan`; v21 (doc 17 §2, gated — absent ⇒ prior behavior):
+`macro_target.strength_sex_factor`, `macro_target.age_taper_floor_strength`,
+`macro_target.bf_proxy_pct`.
 
 ## 6. Performance metrics (exercise page 3.1a/b, performance tab 4.2)
 

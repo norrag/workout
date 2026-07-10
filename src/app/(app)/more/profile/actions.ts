@@ -35,9 +35,20 @@ function revalidate() {
   revalidatePath("/more/profile");
 }
 
+// birthdate replaces the static age int (doc 17 §2.5) — age derives from it
+const birthdateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a date")
+  .refine((s) => {
+    const born = new Date(`${s}T12:00:00`).getTime();
+    if (Number.isNaN(born)) return false;
+    const years = (Date.now() - born) / (365.25 * 24 * 60 * 60 * 1000);
+    return years >= 13 && years <= 120;
+  }, "Enter a valid birthdate (13+)");
+
 const fieldSchemas = {
   display_name: z.string().min(1).max(60),
-  age: z.coerce.number().int().min(13).max(120),
+  birthdate: birthdateSchema,
   height_in: z.coerce.number().min(36).max(96),
   bodyweight: z.coerce.number().positive().max(1000),
   training_since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

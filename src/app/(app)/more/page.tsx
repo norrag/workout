@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile } from "@/lib/queries/profiles";
+import { getProfile, profileAge } from "@/lib/queries/profiles";
 import { signOut } from "@/app/(auth)/actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ThemeToggle } from "./ThemeToggle";
@@ -23,8 +23,9 @@ export default async function MorePage() {
     .eq("status", "completed");
   if (countError) throw countError;
 
+  const age = profile ? profileAge(profile) : null;
   const meta = [
-    profile?.age != null ? String(profile.age) : null,
+    age != null ? String(age) : null,
     profile?.experience_level?.toUpperCase() ?? null,
     profile?.bodyweight != null ? `${profile.bodyweight} LB` : null,
     formatHeight(profile?.height_in ?? null),

@@ -92,9 +92,16 @@ export async function createMacrocycleAction(
   const { supabase, user } = await requireUser();
   const profile = await getProfile(supabase, user.id);
   if (!profile) redirect("/onboarding");
-  const { params } = await getActiveEngineParams(supabase);
+  const { params, version } = await getActiveEngineParams(supabase);
 
-  await createMacrocycleWithMesos(supabase, user.id, parsed.data, profile, params);
+  await createMacrocycleWithMesos(
+    supabase,
+    user.id,
+    parsed.data,
+    profile,
+    params,
+    version,
+  );
   revalidatePath("/cycles");
   redirect("/cycles");
 }
@@ -129,10 +136,18 @@ export async function editMacrocycleAction(
   const { supabase, user } = await requireUser();
   const profile = await getProfile(supabase, user.id);
   if (!profile) redirect("/onboarding");
-  const { params } = await getActiveEngineParams(supabase);
+  const { params, version } = await getActiveEngineParams(supabase);
 
   const { macro_id, ...input } = parsed.data;
-  await updateMacrocycle(supabase, user.id, macro_id, input, profile, params);
+  await updateMacrocycle(
+    supabase,
+    user.id,
+    macro_id,
+    input,
+    profile,
+    params,
+    version,
+  );
   revalidatePath("/cycles");
   revalidatePath(`/cycles/macro/${macro_id}`);
   redirect(`/cycles/macro/${macro_id}`);

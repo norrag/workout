@@ -149,7 +149,7 @@ function registerCreateMacrocycle(server: McpServer) {
       const profile = await getProfile(client, userId);
       if (!profile)
         return jsonResult({ ok: false, error: "The user has no profile yet." });
-      const { params } = await getActiveEngineParams(client);
+      const { params, version } = await getActiveEngineParams(client);
       const macro = await createMacrocycleWithMesos(
         client,
         userId,
@@ -163,6 +163,7 @@ function registerCreateMacrocycle(server: McpServer) {
         },
         profile,
         params,
+        version,
       );
       const summary = `created macrocycle "${args.name}" (${args.goal})`;
       await recordMcpWrite(userId, CREATE_MACROCYCLE, args, summary);
@@ -648,8 +649,16 @@ function registerUpdateMacrocycleGoals(server: McpServer) {
         goal_notes:
           args.goal_notes !== undefined ? args.goal_notes : macro.goal_notes,
       };
-      const { params } = await getActiveEngineParams(client);
-      await updateMacrocycle(client, userId, args.macrocycle_id, input, profile, params);
+      const { params, version } = await getActiveEngineParams(client);
+      await updateMacrocycle(
+        client,
+        userId,
+        args.macrocycle_id,
+        input,
+        profile,
+        params,
+        version,
+      );
       const summary = `updated macrocycle "${input.name}" goals (engine re-planned open slots)`;
       await recordMcpWrite(userId, UPDATE_MACROCYCLE_GOALS, args, summary);
       return jsonResult({ ok: true, macrocycle_id: args.macrocycle_id, summary });

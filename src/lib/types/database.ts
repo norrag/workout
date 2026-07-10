@@ -30,7 +30,11 @@ type Defaulted =
   // nullable; set only by the library seed/import, never by app inserts
   | "legacy_id"
   // N18-B: nullable (null = plain ramp); most insert paths never set it
-  | "rir_schedule";
+  | "rir_schedule"
+  // doc 17 §2.5: nullable contract snapshot / birthdate — stamped/edited by
+  // their dedicated write paths only, optional on insert
+  | "plan_inputs"
+  | "birthdate";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -68,7 +72,10 @@ export type SetType = "straight" | "drop";
 export type ProfileRow = {
   id: string;
   display_name: string | null;
+  /** legacy static age (fallback); superseded by `birthdate` when present */
   age: number | null;
+  /** ISO date; preferred age source — derived fresh at plan time (doc 17 §2.5) */
+  birthdate: string | null;
   gender: "female" | "male" | "other" | "undisclosed" | null;
   /** height in whole inches (imperial-only) */
   height_in: number | null;
@@ -169,6 +176,9 @@ export type MacrocycleRow = {
   target_direction: "gain" | "loss" | "none" | null;
   rate_low: number | null;
   rate_high: number | null;
+  /** §2.5 contract snapshot: resolved MacroProfile + params version stamped
+   *  whenever target_* is written (create / goals edit); null pre-Phase-1 */
+  plan_inputs: Record<string, unknown> | null;
   start_date: string;
   target_end_date: string | null;
   status: "active" | "completed" | "archived";

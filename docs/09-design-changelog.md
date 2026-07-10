@@ -42,6 +42,24 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-10 — Profile AGE row becomes BIRTHDATE (doc 17 §2.5, N21 Phase 1)
+
+- **Change:** the profile data row **AGE** (fig 4.5) and the onboarding ABOUT
+  YOU field **Age** are replaced by **BIRTHDATE** — same row/field pattern, a
+  native date input instead of a number. The profile row displays the stored
+  ISO date; a legacy profile that only carries the static age int shows
+  `AGE <n>` until re-saved (no backfill; single-user deployment). Everything
+  else on both screens is unchanged.
+- **Rationale:** a stored age goes stale a year at a time, and the v21
+  strength-path personalization now reads age (doc 17 §2.1). Age is derived
+  fresh from birthdate at plan time (`profileAge`), falling back to the
+  legacy int.
+- **Affected figures:** 4.5 (profile), onboarding step 1.
+- **Impact:** `RETROFIT` + `DATA` — `profiles.birthdate date` (migration
+  `20260710000001`); onboarding/profile editors swap the field; every age
+  read (`profileToMacroProfile`, MCP `get_profile`, More card) goes through
+  the derived age.
+
 ## 2026-07-09 — Three-state set marker: `met` glyph joins ▲/▼ (doc 16 §5.3, N35 Phase 3)
 
 - **Change:** the P19 per-set performance marker on logged set rows (Day View,

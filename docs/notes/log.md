@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-10 — Session 62: N21 built — doc 17 Phase 1 (v21 target correction + contract snapshot + birthdate)
+
+Owner kicked off the doc-17 build ("implement phase 1"). One PR (#TBD — branch
+`claude/macrocycle-goals-phase-1-9vs7z4`), everything gated per §2.6:
+
+- **Engine (`macro.ts`):** strength band × `strength_sex_factor` {1,1} × age
+  taper w/ strength floor 0.7 (target + `recommendDuration`); hypertrophy
+  proximity model runs on a BMI-band bf% proxy when only bf% is missing
+  (`bf_proxy_pct`; decay reserved for no-height/bw); cut cap now rescales the
+  low endpoint proportionally (parameterless); `MacroPlan.strengthRatePctMonth`
+  exposed for every goal (unrounded — the N37 pacer carrier). All three params
+  `.optional()`; DEFAULT hash untouched (guarded).
+- **Contract:** `macrocycles.plan_inputs` snapshot (resolved MacroProfile +
+  params version) stamped at create + goals edits; `updateMacrocycle` gained
+  the `isGoalsEdit` gate — rename/notes saves no longer re-price the contract
+  (principle 3). `profiles.birthdate` replaces the static age as the age
+  source (`profileAge`, int fallback); onboarding/profile UI swapped (fig 4.5,
+  09-changelog 2026-07-10); MCP `get_profile` + More card read derived age.
+- **Migrations:** `20260710000001` (plan_inputs + birthdate),
+  `20260710000002` (v21 INACTIVE, hash `7017e257…b4316`).
+- **Docs:** doc 10 §5 amended (incl. restating the strength target as
+  measured by the §6 est-strength rollup); `manual-operations.md` gained the
+  Phase R2 runbook (v21 replay diff ≈ empty expected → activate → re-enable
+  target cards → owner re-saves birthdate). PROGRESS.md entry.
+- **Tests** +23 (suite 975 green): §2.6 matrix (personalization goldens incl.
+  the pinned legacy 60F=18M defect, continuity, cut rescale, carrier
+  denomination, provenance hashes, birthdate derivation, `isGoalsEdit`).
+
+**N21 → done (PR #TBD).** N37 (Phase 2) unblocks on merge; N40/N41/N34 remain
+ready per doc 17 §9. Reconciliation sweep: nothing to archive (session-61
+rows all current; #168 merged and already reflected).
+
 ## 2026-07-10 — Session 61: doc 17 — the macro-goals build spec; owner ratifications folded in; N42 swept
 
 Owner ratified the architecture record (PR #166) with three updates and asked

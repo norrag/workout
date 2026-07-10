@@ -40,14 +40,20 @@ const EQUIPMENT = [
 
 const KNOWN_EQUIPMENT = new Set<string>(EQUIPMENT);
 
-type EditableField = "display_name" | "age" | "height_in" | "bodyweight" | "training_since";
+type EditableField =
+  | "display_name"
+  | "birthdate"
+  | "height_in"
+  | "bodyweight"
+  | "training_since";
 
 const FIELD_META: Record<
   EditableField,
   { label: string; type: string; hint?: string }
 > = {
   display_name: { label: "NAME", type: "text" },
-  age: { label: "AGE", type: "number" },
+  // birthdate replaces the static age int (doc 17 §2.5); age derives from it
+  birthdate: { label: "BIRTHDATE", type: "date" },
   height_in: { label: "HEIGHT", type: "number" },
   bodyweight: { label: "BODYWEIGHT", type: "number" },
   training_since: { label: "TRAINING SINCE", type: "date" },
@@ -105,9 +111,16 @@ export function ProfileEditor({
       raw: profile.display_name ?? "",
     },
     {
-      field: "age",
-      value: <span className="numeral">{profile.age ?? "—"}</span>,
-      raw: profile.age != null ? String(profile.age) : "",
+      field: "birthdate",
+      // legacy profiles carry only the static age until re-saved (no backfill)
+      value: profile.birthdate ? (
+        <span className="numeral">{profile.birthdate}</span>
+      ) : profile.age != null ? (
+        <span className="numeral">AGE {profile.age}</span>
+      ) : (
+        "—"
+      ),
+      raw: profile.birthdate ?? "",
     },
     {
       field: "height_in",

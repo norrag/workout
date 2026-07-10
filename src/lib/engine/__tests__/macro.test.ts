@@ -3,7 +3,7 @@
  * (docs/04 §Macrocycle planning, docs/10 §5).
  */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ENGINE_PARAMS } from "../params";
+import { DEFAULT_ENGINE_PARAMS, engineParamsSchema } from "../params";
 import {
   planMacrocycle,
   spreadPhases,
@@ -12,6 +12,21 @@ import {
 } from "../macro";
 
 const params = DEFAULT_ENGINE_PARAMS;
+
+// the v21 macro-target correction (doc 17 §2 / N21), built the same way the
+// 20260710000002 migration materializes it
+const v21 = engineParamsSchema.parse({
+  ...DEFAULT_ENGINE_PARAMS,
+  macro_target: {
+    ...DEFAULT_ENGINE_PARAMS.macro_target,
+    strength_sex_factor: { male: 1.0, female: 1.0 },
+    age_taper_floor_strength: 0.7,
+    bf_proxy_pct: {
+      male: { lean: 10, average: 16, high_bf: 25 },
+      female: { lean: 18, average: 26, high_bf: 35 },
+    },
+  },
+});
 
 const intermediateMale: MacroProfile = {
   sex: "male",
@@ -402,6 +417,229 @@ describe("hypertrophy — FFMI proximity model (when body fat is known)", () => 
       ).perMonthRate.high;
     // higher-BF band cuts faster than the lean band
     expect(cut(28)).toBeGreaterThan(cut(10));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 17 §2 / v21 — target-engine correction (N21). Everything below is gated
+// on the three new macro_target params; with them absent (DEFAULT / every
+// pre-v21 row) the plan is byte-identical to before — the golden fixtures
+// above run on DEFAULT and pin that.
+// ---------------------------------------------------------------------------
+
+describe("v21 §2.1 — strength-path personalization", () => {
+  const strengthPlan = (
+    p: Partial<MacroProfile>,
+    engineParams = v21,
+    bucket: MacroProfile["experienceLevel"] = "beginner",
+  ) =>
+    planMacrocycle(
+      {
+        goal: "strength",
+        profile: {
+          sex: "male",
+          age: 30,
+          bodyweight: 160,
+          heightIn: 68,
+          experienceLevel: bucket,
+          trainingYears: null,
+          bodyFatPct: null,
+          ...p,
+        },
+        durationMonths: 4,
+        mesoLengthWeeks: 5,
+      },
+      engineParams,
+    );
+
+  it("legacy (v20 params): a 60-yr-old female beginner gets the identical band as an 18-yr-old male", () => {
+    // the audited defect — the strength target ignored age and sex entirely
+    const older = strengthPlan({ sex: "female", age: 60 }, params);
+    const younger = strengthPlan({ sex: "male", age: 18 }, params);
+    expect(older.perMonthRate).toEqual(younger.perMonthRate);
+    expect(older.target).toEqual(younger.target);
+  });
+
+  it("v21: the 60-yr-old's band tapers (×0.7 floor) while the 18-yr-old's doesn't", () => {
+    const older = strengthPlan({ sex: "female", age: 60 });
+    const younger = strengthPlan({ sex: "male", age: 18 });
+    // beginner band [4, 8] × the strength floor 0.7 (1 − 20yr × 0.02 = 0.6 binds below it)
+    expect(older.perMonthRate.low).toBeCloseTo(2.8, 5);
+    expect(older.perMonthRate.high).toBeCloseTo(5.6, 5);
+    expect(younger.perMonthRate.low).toBeCloseTo(4, 5);
+    expect(younger.perMonthRate.high).toBeCloseTo(8, 5);
+    expect(older.target.high).toBeLessThan(younger.target.high);
+  });
+
+  it("v21: sexes are equal at the default factors (strength ≠ hypertrophy 0.7)", () => {
+    const female = strengthPlan({ sex: "female", age: 30 });
+    const male = strengthPlan({ sex: "male", age: 30 });
+    expect(female.perMonthRate).toEqual(male.perMonthRate);
+    expect(female.target).toEqual(male.target);
+  });
+
+  it("v21: the strength floor binds for high ages (taper never drops below 0.7)", () => {
+    const at60 = strengthPlan({ age: 60 });
+    const at80 = strengthPlan({ age: 80 });
+    expect(at80.perMonthRate).toEqual(at60.perMonthRate);
+    expect(at80.strengthRatePctMonth).toEqual(at60.strengthRatePctMonth);
+  });
+
+  it("v21: recommendDuration reads the personalized band (older ⇒ longer)", () => {
+    const older = planMacrocycle(
+      {
+        goal: "strength",
+        profile: {
+          sex: "male",
+          age: 60,
+          bodyweight: 180,
+          heightIn: 70,
+          experienceLevel: "intermediate",
+          trainingYears: 3,
+          bodyFatPct: null,
+        },
+        mesoLengthWeeks: 5,
+      },
+      v21,
+    );
+    const younger = planMacrocycle(
+      {
+        goal: "strength",
+        profile: {
+          sex: "male",
+          age: 30,
+          bodyweight: 180,
+          heightIn: 70,
+          experienceLevel: "intermediate",
+          trainingYears: 3,
+          bodyFatPct: null,
+        },
+        mesoLengthWeeks: 5,
+      },
+      v21,
+    );
+    expect(older.recommendedDurationMonths).toBeGreaterThan(
+      younger.recommendedDurationMonths,
+    );
+  });
+});
+
+describe("v21 §2.4 — strengthRatePctMonth is exposed goal-independently", () => {
+  const profile: MacroProfile = {
+    sex: "male",
+    age: 60,
+    bodyweight: 198,
+    heightIn: 71,
+    experienceLevel: "intermediate",
+    trainingYears: 3,
+    bodyFatPct: null,
+  };
+
+  it("is present for all four goals and identical across them (profile-only)", () => {
+    const bands = (["hypertrophy", "strength", "cut", "maintain"] as const).map(
+      (goal) =>
+        planMacrocycle({ goal, profile, durationMonths: 4, mesoLengthWeeks: 5 }, v21)
+          .strengthRatePctMonth,
+    );
+    for (const band of bands) {
+      expect(band.low).toBeGreaterThan(0);
+      expect(band.high).toBeGreaterThan(band.low);
+      expect(band).toEqual(bands[0]);
+    }
+    // intermediate [1.5, 3] × floor-bound 0.7 taper at age 60 — and unrounded
+    expect(bands[0].low).toBeCloseTo(1.05, 10);
+    expect(bands[0].high).toBeCloseTo(2.1, 10);
+  });
+
+  it("falls back to the raw bucket band when the v21 params are absent", () => {
+    const plan = planMacrocycle(
+      { goal: "hypertrophy", profile, durationMonths: 4, mesoLengthWeeks: 5 },
+      params,
+    );
+    expect(plan.strengthRatePctMonth).toEqual({ low: 1.5, high: 3 });
+  });
+
+  it("stays strength-denominated on a mass-goal macro (never lb/mo)", () => {
+    const plan = planMacrocycle(
+      { goal: "hypertrophy", profile, durationMonths: 4, mesoLengthWeeks: 5 },
+      v21,
+    );
+    // the display band is lb/mo, the pacer carrier is %/mo — different numbers
+    expect(plan.perMonthRate.unit).toBe("lb");
+    expect(plan.strengthRatePctMonth.low).toBeCloseTo(1.05, 10);
+    expect(plan.strengthRatePctMonth.high).toBeCloseTo(2.1, 10);
+  });
+});
+
+describe("v21 §2.2 — hypertrophy continuity (bf proxy)", () => {
+  // male, 5'10" 180 lb ⇒ BMI ≈ 25.8 ⇒ "average" band ⇒ proxy bf 16%
+  const base: MacroProfile = {
+    sex: "male",
+    age: 30,
+    bodyweight: 180,
+    heightIn: 70,
+    experienceLevel: "intermediate",
+    trainingYears: 5,
+    bodyFatPct: null,
+  };
+  const high = (p: Partial<MacroProfile>, engineParams = v21) =>
+    planMacrocycle(
+      {
+        goal: "hypertrophy",
+        profile: { ...base, ...p },
+        durationMonths: 6,
+        mesoLengthWeeks: 5,
+      },
+      engineParams,
+    ).target.high;
+
+  it("continuity golden: entering a bf% equal to the proxy moves the target by ≈ 0", () => {
+    expect(high({ bodyFatPct: 16 })).toBe(high({ bodyFatPct: null }));
+  });
+
+  it("a different bf% moves the target proportionally, never discontinuously", () => {
+    // higher bf at equal weight = less muscle = more headroom = faster
+    expect(high({ bodyFatPct: 14 })).toBeLessThan(high({ bodyFatPct: null }));
+    expect(high({ bodyFatPct: 18 })).toBeGreaterThan(high({ bodyFatPct: null }));
+    // the completion step is small — nothing like the old model flip
+    const jump = Math.abs(high({ bodyFatPct: 18 }) - high({ bodyFatPct: null }));
+    expect(jump).toBeLessThan(high({ bodyFatPct: null }) * 0.25);
+  });
+
+  it("the decay path is reserved for profiles missing height/bodyweight", () => {
+    // no BMI ⇒ no band ⇒ proxy can't apply; identical to the legacy fallback
+    expect(high({ heightIn: null })).toBe(high({ heightIn: null }, params));
+  });
+
+  it("legacy (v20 params): bf-unknown still flips to the training-age decay", () => {
+    expect(high({}, params)).not.toBe(high({}));
+  });
+});
+
+describe("v21 §2.3 — cut-band proportional rescale (parameterless)", () => {
+  it("the band never collapses when the total cap binds", () => {
+    // 12-month cut at high body fat: both raw endpoints exceed cap (25% BW)
+    const plan = planMacrocycle(
+      {
+        goal: "cut",
+        profile: {
+          sex: "male",
+          age: 30,
+          bodyweight: 200,
+          heightIn: 70,
+          experienceLevel: "intermediate",
+          trainingYears: 3,
+          bodyFatPct: 28,
+        },
+        durationMonths: 12,
+        mesoLengthWeeks: 5,
+      },
+      params,
+    );
+    expect(plan.target.high).toBeCloseTo(50, 5); // cap = 200 × 0.25
+    // low rescales by cap/high_raw instead of clamping onto the cap
+    expect(plan.target.low).toBeLessThan(plan.target.high);
+    expect(plan.target.low).toBeCloseTo(37.4, 0);
   });
 });
 
