@@ -90,6 +90,21 @@ settings, so a human must toggle branch protection:
 |---|---|---|
 | Require `checks` + `rls-tests` to pass before merging into `main` | Repo → Settings → Branches → add branch protection rule for `main` (or Settings → Rules → Rulesets) → "Require status checks to pass" → select **`checks`** and **`rls-tests`** | Do this only after the R2 PR is merged and both jobs are green on `main`, otherwise every PR is instantly blocked. |
 
+### Restore GitHub Actions runners (billing / spending limit)
+
+First seen 2026-07-10 ~20:58 UTC (runs #431–#433): **every job in every run
+fails within ~5 seconds with no logs and `runner_id: 0`** — no runner is ever
+assigned, so nothing (not even checkout) executes. That signature is an
+account-level Actions condition, not a code failure. This is a **private**
+repo, so all three CI jobs bill against the account's included Actions minutes;
+the usual cause is the monthly included-minutes quota being exhausted (or a $0
+spending limit blocking overage).
+
+| Operation | Where | Notes |
+|---|---|---|
+| Check Actions usage / raise the spending limit | Personal Settings → Billing and plans → Plans and usage → Actions; spending limit under Billing → Spending limits → Actions | If included minutes are exhausted, either raise the Actions spending limit or wait for the monthly reset. Also check https://www.githubstatus.com in case it's a platform incident. |
+| Re-run the dead runs once restored | Each run page → "Re-run all jobs" (or push any commit) | Runs that failed with the no-runner signature never executed — re-running is safe and is the only way to get a real verdict on those commits. |
+
 ### Apply `20260620000006_exercise_param_overrides` to hosted (doc 14 phase 3)
 
 The phase-3 migration that creates `public.exercise_param_overrides` was **not

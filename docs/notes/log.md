@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-10 — Session 60: PR #157 refresh — merged main, N36→N40 renumber
+## 2026-07-10 — Session 60: PR #157 refresh — merged main ×2, N36→N40→N42 renumber, CI fixes
 
 Owner asked to freshen the open est-strength PR (#157) against main and advise
 for merge. Merged `origin/main` (post #161/#162/#167) into the branch:
@@ -14,9 +14,12 @@ for merge. Merged `origin/main` (post #161/#162/#167) into the branch:
   `PROGRESS.md`).
 - **ID collision found and fixed:** the PR session filed the est-strength item
   as **N36**, but Session 58 (Phase R, merged first) filed the doc-16 deferred
-  spine as **N36–N39**. The est-strength item is renumbered **N40** (next free
-  ID); main's N36 (envelope loop) stands. Code/spec never referenced the ID, so
-  the renumber is docs-only. Same story for the session number: the PR session
+  spine as **N36–N39**, and the second refresh merge hit the same collision
+  again: PR #166 (N21 macrocycle-goals architecture, merged 2026-07-10) filed
+  **N40/N41** (macro close + retrospective, bodyweight series). The
+  est-strength item is renumbered **N42** (next free ID); main's N36 (envelope
+  loop) and N40/N41 (architecture doc) stand. Code/spec never referenced the
+  ID, so the renumbers are docs-only. Same story for the session number: the PR session
   was a parallel "Session 53" — left dated in place below, marked as a parallel
   branch.
 - Full suite + typecheck re-run green on the merged tree.
@@ -37,6 +40,60 @@ for merge. Merged `origin/main` (post #161/#162/#167) into the branch:
   via the Supabase MCP pre-merge (additive; deployed main code ignores the
   column). Backfill verified: 10,918 stamped sets banded (all `low` — correct,
   `rir_reported` has no write surface yet), 1 null-e1RM row null.
+- **GitHub Actions runners died account-wide at ~20:58 UTC** — runs #431–#433
+  (incl. the run that would have exercised the e2e fix, and main's #166 merge)
+  all failed in ~5s with `runner_id: 0` and no logs: no runner assigned,
+  nothing executed. Human-only fix (billing/spending limit) — runbook section
+  added to `docs/deployment/manual-operations.md` → "Restore GitHub Actions
+  runners". The e2e fix is verified locally through the real stack; CI can't
+  confirm it until runners return.
+
+## 2026-07-10 — Session 59 (parallel): N21 macrocycle-goals architecture record (owner's four questions answered)
+
+Owner asked for the end-to-end architecture of the macrocycle goal layer
+around N21: (1) how do we get targets right, (2) how do we use them,
+(3) how do we measure results and close the loop, (4) what persists across
+macro boundaries. Answered in
+**`docs/reviews/2026-07-10-macrocycle-goals-architecture.md`** (design record,
+not a build — doc 16's authority untouched). PR #166. Highlights:
+
+- **Frame:** confirmed the owner's cadence+pacing levers / envelope-tunes-
+  within-bounds understanding; sharpened it — the engine-facing product of the
+  whole macro layer is exactly one number (the expected monthly strength rate)
+  plus two per-goal lookups (`goal_rate_factor`, `rep_window`); the loop closes
+  at four nested timescales (entitlement / pacing / position / contract), the
+  fourth of which had no design until now.
+- **Q1 (set):** N21 defect recap + the input-quality ladder (self-reported →
+  derived → measured → observed record); **contract-vs-estimate snapshot
+  semantics named as designed behavior** (stored `target_*` = the contract,
+  overwritten only by an explicit goal edit; live recompute = the estimate;
+  retrospectives grade against the contract) + persist the `MacroProfile`
+  inputs beside the target columns at create/edit (N21 slice). Hygiene finds:
+  `profiles.age` is a static int (→ birthdate), `key_lifts` display uses
+  top-3 vs the param's n=5 (`stats.ts:67-78`).
+- **Q2 (use):** the two levers and the three non-levers (quantum size,
+  entitlement, measured anchor); **N37 shape fixed** — plan rate stays a band
+  lerped by `band_position`, arrives as a doc-14 derived input
+  (fingerprint-excluded, replay-recorded), degrades toward `"band"` never
+  unpaced.
+- **Q3 (measure):** the per-goal measurement asymmetry (strength fully
+  in-app; mass goals honestly ungradable until body data exists); **N36
+  residence fixed** — per-user derived `band_position` fold over trailing
+  decisions at seed time, params value as default, per-user grain, no new
+  table; **macro close + retrospective designed** (nothing happens at macro
+  end today — `status` never leaves `active`); filed as **N40**.
+- **Q4 (carry):** the permanent record is the persistence layer — derive,
+  don't duplicate (decisions + logged history already carry entitlement,
+  pacing, position across every boundary). Persist only two things for
+  measurement: the enriched contract snapshot and a **bodyweight time series**
+  (filed as **N41**); observed-rate priming of the next macro's create flow is
+  derive-on-read, display-only (never silently blended).
+
+Backlog updates in the same PR: N21 row gains the architecture-doc pointer
+(build scope unchanged, still next target); N36/N37 rows carry their decided
+shapes; **N40** (macro close + retrospective, needs-input) and **N41**
+(bodyweight series, needs-input) added to workstream C. Owner decision list in
+the doc's §6 (7 decisions, each with a recommendation).
 
 ## 2026-07-10 — Session 59: N34 readiness probe — BodySpec build unblocked (doc 15 §8)
 
@@ -346,7 +403,7 @@ in the follow-up's §6; N35 stays needs-input.
 Reconciliation sweep ran clean (no merged-but-live rows; N1 in-progress,
 N21/N34/N35 open).
 
-## 2026-07-08 — Session 53 (parallel branch): est-strength rework — recent-vs-baseline rolling trend (N40, filed as N36)
+## 2026-07-08 — Session 53 (parallel branch): est-strength rework — recent-vs-baseline rolling trend (N42, filed as N36)
 
 Owner flagged that aggregated macrocycle "est. strength" dropped the moment a
 new meso started, and suspected (a) the in-progress block factoring in and
@@ -357,7 +414,7 @@ Overview tile (top-3 key-lift mean) and the Performance tab (muscle rollup)
 were *different* aggregations that could disagree (the archived N16 fix only
 partially closed this).
 
-Reworked the whole metric bottom-up (owner-approved design), shipped as **N40** (filed as N36 in-session; renumbered at merge — see Session 60):
+Reworked the whole metric bottom-up (owner-approved design), shipped as **N42** (filed as N36 in-session; renumbered at merge — see Session 60):
 - **engine/strength.ts** (pure, golden-tested): `strengthTrend` = best of the
   most-recent window vs best of the earliest, symmetric non-overlapping windows
   (`engine_params.strength`, `.optional()` so no params-hash churn — replay

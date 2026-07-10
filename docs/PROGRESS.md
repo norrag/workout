@@ -291,7 +291,7 @@ Phase 3 (day-view target-anchor coupling + three-state markers, hard-rule-8
 mockup pass), Phase 4 (audit aggregate, optional), Phase R (owner-gated
 activation incl. the hypertrophy-factor research pass).
 
-## 2026-07-08 — Est-strength rework: recent-vs-baseline rolling trend (N40, filed as N36)
+## 2026-07-08 — Est-strength rework: recent-vs-baseline rolling trend (N42, filed as N36)
 
 Reworked the aggregated "est. strength" metric bottom-up. Root cause of the
 owner's "it drops when a new meso starts": a pure first→last two-point delta let
