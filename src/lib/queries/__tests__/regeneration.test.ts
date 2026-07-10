@@ -182,6 +182,65 @@ describe("recomputeRow", () => {
     expect(after.output!.reps).toBeGreaterThanOrEqual(win.min);
     expect(after.output!.reps).toBeLessThanOrEqual(win.max);
   });
+
+  it("replays the recorded plan rate FROZEN (doc 17 §3): the recompute never overlays a live one", () => {
+    // an advance recorded under rate_source "plan" with a tiny personalized
+    // band: the pacer declined the earned step BECAUSE of that recorded rate
+    // (under "band" the same trailing gain would have stepped). The recompute
+    // rebuilds from the stored inputs + live config; the plan rate is derived
+    // (denylisted), so it replays exactly as recorded and the paced decision
+    // reproduces — unchanged, and the rebuilt inputs carry the frozen rate.
+    const planParams: EngineParams = {
+      ...V20_PARAMS,
+      progression: { ...V20_PARAMS.progression!, rate_source: "plan" },
+    };
+    const anchor: E1rmAnchor = { value: 245, confidence: "moderate" };
+    const storedInputs = sampleInputs({
+      // fully performed (3 of 3 prescribed sets) so the earn gate passes and
+      // the PACER is the deciding governor
+      actualSets: [1, 2, 3].map((n) => ({
+        setNumber: n,
+        weight: 185,
+        reps: 8,
+        rirReported: 2,
+        isWarmup: false,
+      })),
+      strengthAnchor: anchor,
+      progressionHistory: {
+        earnedThisMicrocycle: false,
+        trailing30dPrescribedGainPct: 1.0,
+        consecutiveMissedEarns: 0,
+      },
+      daysSincePreviousSession: 7,
+      planStrengthRate: { low: 0.1, high: 0.1 },
+    });
+    const output = prescribe(storedInputs as unknown as EngineInputs, planParams);
+    const step = output.trace.find((s) => s.rule === "progression");
+    expect(step?.status).toBe("paced");
+    expect(step?.governor).toBe("rate_pacer");
+    // sanity: under the band source the same inputs step — the frozen plan
+    // rate is what carries the paced verdict through replay
+    const bandStep = prescribe(storedInputs as unknown as EngineInputs, V20_PARAMS)
+      .trace.find((s) => s.rule === "progression");
+    expect(bandStep?.status).toBe("stepped");
+
+    const res = recomputeRow(
+      {
+        kind: "advance",
+        storedInputs,
+        liveConfig: sampleConfig(),
+        anchor,
+        bodyweight: null,
+        currentOutput: output,
+      },
+      planParams,
+    );
+    expect(res.status).toBe("unchanged");
+    expect((res.inputs as EngineInputs).planStrengthRate).toEqual({
+      low: 0.1,
+      high: 0.1,
+    });
+  });
 });
 
 describe("recomputeRow — seed (doc 14 §6.2)", () => {
@@ -325,6 +384,8 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         consecutiveMissedEarns: 0,
       },
       daysSincePreviousSession: 8,
+      // doc 17 §3: recorded plan rate — replays frozen like the earn context
+      planStrengthRate: { low: 2.1, high: 4.2 },
     };
     const stored = buildSeedInputs({
       equipmentType: "barbell",
@@ -350,6 +411,7 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
         earn: progression.seedEarn,
         progressionHistory: progression.progressionHistory,
         daysSincePreviousSession: progression.daysSincePreviousSession,
+        planStrengthRate: progression.planStrengthRate,
       },
     );
     // sanity: the stored output really is the led (stepped) prescription
@@ -372,6 +434,9 @@ describe("recomputeRow — seed (doc 14 §6.2)", () => {
     // the rebuilt inputs carry the derived progression fields forward for the
     // next replay, and the config projection is untouched (fingerprint parity)
     expect((res.inputs as EngineInputs).seedEarn).toEqual(progression.seedEarn);
+    expect((res.inputs as EngineInputs).planStrengthRate).toEqual(
+      progression.planStrengthRate,
+    );
     expect(configProjection(res.inputs!)).toEqual(
       configProjection(buildSeedInputs({
         equipmentType: "barbell",

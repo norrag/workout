@@ -245,6 +245,12 @@ export function replayDecisions(
                 ...(parsed.data.progressionHistory !== undefined
                   ? { progressionHistory: parsed.data.progressionHistory }
                   : {}),
+                // doc 17 §3: the recorded plan rate replays verbatim, so a
+                // candidate that flips `rate_source` to "plan" diffs honestly
+                // against decisions recorded under "band".
+                ...(parsed.data.planStrengthRate !== undefined
+                  ? { planStrengthRate: parsed.data.planStrengthRate }
+                  : {}),
               },
             )
           : prescribe(parsed.data, effectiveCandidate);

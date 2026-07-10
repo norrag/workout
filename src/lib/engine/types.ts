@@ -129,6 +129,22 @@ export const engineInputsSchema = z.object({
       consecutiveMissedEarns: z.number().int().min(0),
     })
     .nullish(),
+  // doc 17 §3 (N37): the profile-personalized monthly strength band the
+  // macro-rate pacer reads under `rate_source: "plan"` — `planMacrocycle`'s
+  // `strengthRatePctMonth`, evaluated in the queries layer at the same sites as
+  // `progressionHistory` (generation/advance/recompute/replay; standalone mesos
+  // under the hypertrophy default). Strength-denominated for EVERY goal — the
+  // per-goal `goal_rate_factor` composes on top in the pacer, never here.
+  // DERIVED (doc 14 §3 denylist): depends on bodyweight/bf%/age, none of which
+  // are config dimensions — excluded from the freshness fingerprint (a routine
+  // bodyweight edit must not churn open rows), recorded in the decision for
+  // replay (the recorded rate replays frozen). Null ⇒ no plan rate: the pacer
+  // degrades to the bucket band (`"band"`), never to unpaced.
+  // `.nullish()` with NO default, so inputs that predate the feature parse
+  // byte-identically and existing input literals keep compiling.
+  planStrengthRate: z
+    .object({ low: z.number(), high: z.number() })
+    .nullish(),
   // doc 16 §3.4 staleness gate: days since the source session was performed,
   // caller-supplied (the engine is clockless). DERIVED like the anchor — at
   // normal advance-at-completion it is ~0; a catch-up run or freshness

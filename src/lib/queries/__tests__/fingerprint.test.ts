@@ -164,6 +164,34 @@ describe("computeDepFingerprint", () => {
       computeDepFingerprint(configProjection(b), token),
     );
   });
+
+  it("is INVARIANT to planStrengthRate (doc 17 §3 / doc 14 §3 denylist)", () => {
+    // the pacer's plan rate derives from bodyweight/bf%/age — not config
+    // dimensions — so its presence, absence, or value must never move the
+    // fingerprint (a routine bodyweight edit must not churn open rows), while
+    // write/check parity with the bare config resolver still holds.
+    const bare = buildEngineInputs(engineArgs());
+    const withRate = buildEngineInputs({
+      ...engineArgs(),
+      planStrengthRate: { low: 2.1, high: 4.2 },
+    });
+    const withNull = buildEngineInputs({
+      ...engineArgs(),
+      planStrengthRate: null,
+    });
+    expect(configProjection(withRate)).toEqual(configProjection(bare));
+    expect(computeDepFingerprint(configProjection(withRate), token)).toBe(
+      computeDepFingerprint(configProjection(bare), token),
+    );
+    expect(computeDepFingerprint(configProjection(withNull), token)).toBe(
+      computeDepFingerprint(configProjection(bare), token),
+    );
+    expect(configProjection(withRate)).toEqual(
+      buildConfigInputs(configArgs()),
+    );
+    // ...and the derived field actually rode along for replay/recording
+    expect(withRate.planStrengthRate).toEqual({ low: 2.1, high: 4.2 });
+  });
 });
 
 describe("paramsTokenFor — increment override (doc 14 phase 3)", () => {
@@ -419,6 +447,7 @@ describe("seed inputs (doc 14 §6.2)", () => {
           consecutiveMissedEarns: 0,
         },
         daysSincePreviousSession: 8,
+        planStrengthRate: { low: 2.1, high: 4.2 },
       },
     });
     expect(configProjection(withProgression)).toEqual(configProjection(bare));
@@ -428,6 +457,7 @@ describe("seed inputs (doc 14 §6.2)", () => {
     // ...and the derived fields actually rode along for replay
     expect(withProgression.seedEarn).not.toBeNull();
     expect(withProgression.progressionHistory).not.toBeNull();
+    expect(withProgression.planStrengthRate).toEqual({ low: 2.1, high: 4.2 });
   });
 
   it("a seed (previous=null) is not confusable with an advance at the same scope", () => {

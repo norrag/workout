@@ -2,7 +2,52 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-10 (latest) — Macro goals Phase 1: v21 target correction + contract snapshot + birthdate (doc 17 §2, N21)
+## 2026-07-10 (latest) — Macro goals Phase 2: `rate_source: "plan"` pacer branch (doc 17 §3, N37)
+
+Second build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
+the macro-rate pacer can now pace against the profile-personalized
+`planMacrocycle` strength band instead of the bucket table. **No migration and
+no behavior change** — every params row still ships `rate_source: "band"`; the
+flip is a v22 micro-bump at doc 17 Phase R3 (runbook added to
+`manual-operations.md`) after the owner reviews the replay diff.
+
+- **Derived input.** `EngineInputs.planStrengthRate` (`{low, high} | null`,
+  `.nullish()` with no default — pre-existing stored inputs parse
+  byte-identically). Doc-14 treatment exactly like `progressionHistory`:
+  **denylisted** from the freshness fingerprint (it derives from
+  bodyweight/bf%/age — a routine bodyweight edit must not churn open rows),
+  recorded in decision `inputs`, replayed **frozen** by the freshness
+  recompute and the admin replay.
+- **Assembly.** New leaf `queries/plan-rate.ts` —
+  `derivePlanStrengthRate(profile, goal, params)` evaluates the pure
+  `planMacrocycle` and reads the goal-independent `strengthRatePctMonth`
+  (Phase 1's carrier); self-gates null while the progression mode is
+  inactive; never throws (unresolvable plan ⇒ null ⇒ band). Wired at the
+  same sites as `progressionHistory`: meso activation seed (`SeedCtx`),
+  week-advance (`WeekContext`), the read-only projection, seed/advance
+  recompute (frozen from stored inputs), admin `replay_decisions`.
+  `profileToMacroProfile` moved into the leaf (macro → stats → generation
+  would cycle); `macro.ts` re-exports it. Standalone mesos assemble under
+  `engineGoal(null)` → hypertrophy — one code path.
+- **Pacer branch.** `pacerTargetRate`: `rate_source === "plan"` with a
+  non-null plan rate ⇒ `lerp(planStrengthRate, band_position) ×
+  goal_rate_factor[goal]`; otherwise the bucket band. Degradation is always
+  toward `"band"`, never unpaced; position + factor compose identically
+  under either source (Phase 6 stays source-agnostic). `seedMeso` gains the
+  matching opt so the seed-route earn shares the same pacer.
+- **Tests** +16 (suite 991 green): plan-vs-band pacer arithmetic +
+  band_position composition + goal denomination (a hypertrophy macro paces
+  on the strength band × 0.75, never lb/mo); null/absent plan rate ⇒
+  byte-identical band fallback; plan rate inert under `"band"` and with the
+  block absent; fingerprint invariance + write/check parity (advance + seed);
+  recompute + admin replay reproduce the recorded rate frozen (and a
+  `rate_source` flip diffs honestly); assembly self-gate, standalone path,
+  goal independence, never-throws.
+
+Remaining / external: the flip itself — doc 17 Phase R3 (propose v22 with
+`rate_source: "plan"` → replay diff → activate), after R1 (v20) and R2 (v21).
+
+## 2026-07-10 — Macro goals Phase 1: v21 target correction + contract snapshot + birthdate (doc 17 §2, N21)
 
 First build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
 the target-engine correction the 2026-07-09 audit priming scoped, shipped as

@@ -4,6 +4,46 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-10 — Session 63: N37 built — doc 17 Phase 2 (`rate_source: "plan"` pacer branch)
+
+Owner kicked off Phase 2 ("implement phase 2"). One PR (**#<n>**, branch
+`claude/macrocycle-goals-phase-2-gncftk`); **no migration, no behavior
+change** — every params row keeps `rate_source: "band"`, the flip is the v22
+micro-bump at doc 17 Phase R3.
+
+- **Engine:** `EngineInputs.planStrengthRate` (`{low, high} | null`,
+  `.nullish()` no default — pre-existing stored inputs parse byte-identically);
+  `pacerTargetRate` branches on `rate_source === "plan"` with a non-null plan
+  rate (`lerp(planStrengthRate, band_position) × goal_rate_factor[goal]`),
+  degrading to the bucket band otherwise — never unpaced, position + factor
+  source-agnostic (N36 composes unchanged); `seedMeso` gains the matching opt
+  so the seed-route earn shares the pacer.
+- **Assembly:** new leaf `queries/plan-rate.ts` — `derivePlanStrengthRate`
+  evaluates pure `planMacrocycle` on the live profile and reads the
+  goal-independent `strengthRatePctMonth` (the Phase-1 carrier); self-gates
+  null while the mode is inactive; never throws. Wired at the
+  `progressionHistory` sites: meso-activation seed (`SeedCtx`), week advance
+  (`WeekContext`), the projection, and standalone mesos via
+  `engineGoal(null)` → hypertrophy. `profileToMacroProfile` moved into the
+  leaf (macro → stats → generation would cycle); `macro.ts` re-exports.
+- **Doc-14 treatment:** `planStrengthRate` added to `DERIVED_INPUT_KEYS`
+  (fingerprint-excluded — bodyweight/bf%/age edits don't churn open rows),
+  recorded in decision inputs, replayed **frozen** by the freshness recompute
+  (advance + seed) and `replay_decisions` (a candidate flipping `rate_source`
+  diffs honestly against recorded rates).
+- **Docs:** PROGRESS entry; `manual-operations.md` gained the Phase R3
+  runbook (propose v22 `rate_source: "plan"` → replay diff: paced/stepped mix
+  shifts, no entitlement change → activate → monitor).
+- **Tests** +16 (suite 991 green): plan-vs-band arithmetic, band_position
+  composition, goal denomination (hypertrophy paces on the strength band ×
+  0.75, never lb/mo), null-plan band fallback byte-identity, inert under
+  "band"/absent block, fingerprint denylist + write/check parity, frozen
+  replay (recompute + admin), assembly self-gate/standalone/never-throws.
+
+**N37 → done (PR #<n>).** Phase R3 (the flip) unblocks once R1 (v20) + R2
+(v21) are activated. Reconciliation sweep: **N21 archived** (PR #169 merged;
+row → `archive.md`, live index trimmed).
+
 ## 2026-07-10 — Session 62: N21 built — doc 17 Phase 1 (v21 target correction + contract snapshot + birthdate)
 
 Owner kicked off the doc-17 build ("implement phase 1"). One PR (**#169**, branch

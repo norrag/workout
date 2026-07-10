@@ -8,7 +8,7 @@ import {
   type PhaseName,
 } from "@/lib/engine";
 import { getMacroStrength } from "./stats";
-import { profileAge } from "./profiles";
+import { profileToMacroProfile } from "./plan-rate";
 import type {
   Database,
   MacrocycleRow,
@@ -21,32 +21,12 @@ import type {
 
 type Client = SupabaseClient<Database>;
 
-const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
-
-/** Map a stored profile onto the engine's pure macro-profile inputs. */
-export function profileToMacroProfile(
-  profile: ProfileRow,
-  now: Date = new Date(),
-): MacroProfile {
-  let trainingYears: number | null = null;
-  if (profile.training_since) {
-    const since = new Date(`${profile.training_since}T12:00:00`);
-    if (!Number.isNaN(since.getTime())) {
-      trainingYears = Math.max(0, (now.getTime() - since.getTime()) / MS_PER_YEAR);
-    }
-  }
-  return {
-    sex: profile.gender ?? null,
-    // birthdate-derived age preferred (doc 17 §2.5 — a static int goes stale
-    // a year at a time); the legacy `age` int is the fallback until re-saved
-    age: profileAge(profile, now),
-    bodyweight: profile.bodyweight,
-    heightIn: profile.height_in,
-    experienceLevel: profile.experience_level,
-    trainingYears,
-    bodyFatPct: profile.body_fat_pct,
-  };
-}
+// moved to the LEAF module `plan-rate.ts` with doc 17 Phase 2 (the pacer's
+// plan-rate assembly in generation/progression needs it, and those cannot
+// import this module — macro → stats → generation would cycle); re-exported
+// here so existing importers and tests keep working — same pattern as
+// `engine-goal.ts` / `progression-history.ts`.
+export { profileToMacroProfile } from "./plan-rate";
 
 /**
  * The §2.5 contract snapshot stamped into `macrocycles.plan_inputs` whenever

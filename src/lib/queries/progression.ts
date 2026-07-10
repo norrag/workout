@@ -22,6 +22,7 @@ import {
   getProgressionHistories,
   daysSincePerformed,
 } from "./progression-history";
+import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
 import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
   buildConfigInputs,
@@ -139,6 +140,8 @@ export function buildEngineInputs(args: {
   progressionHistory?: EngineInputs["progressionHistory"];
   /** doc 16 §3.4 staleness input; omit while the mode is inactive */
   daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
+  /** doc 17 §3 pacer plan-rate input; omit while the mode is inactive */
+  planStrengthRate?: EngineInputs["planStrengthRate"];
 }): EngineInputs {
   const { we } = args;
   // config half resolved through the single shared resolver (doc 14 §3) so the
@@ -195,6 +198,9 @@ export function buildEngineInputs(args: {
       : {}),
     ...(args.daysSincePreviousSession !== undefined
       ? { daysSincePreviousSession: args.daysSincePreviousSession }
+      : {}),
+    ...(args.planStrengthRate !== undefined
+      ? { planStrengthRate: args.planStrengthRate }
       : {}),
   };
 }
@@ -283,6 +289,9 @@ interface WeekContext {
   nameByExercise: Map<string, string>;
   /** per-user×exercise increment overrides (doc 14 phase 3); absent ⇒ default */
   overrideByExercise: Map<string, ExerciseParamOverride>;
+  /** doc 17 §3 (N37): the pacer's personalized plan strength band — per user ×
+   *  goal, derived once per advance run; null while the mode is inactive */
+  planStrengthRate: PlanStrengthRate | null;
 }
 
 /**
@@ -364,6 +373,7 @@ async function generateDay(
             progressionHistory:
               progressionByExercise.get(we.exercise_id) ?? null,
             daysSincePreviousSession: daysSince,
+            planStrengthRate: ctx.planStrengthRate,
           }
         : {}),
     });
@@ -823,6 +833,7 @@ export async function advanceWeekAfterWorkout(
     setsByWe.set(s.workout_exercise_id, cur);
   }
 
+  const goal = engineGoal(macroGoal);
   const ctx: WeekContext = {
     service,
     userId,
@@ -832,7 +843,7 @@ export async function advanceWeekAfterWorkout(
     meso,
     micro,
     nextMicro,
-    goal: engineGoal(macroGoal),
+    goal,
     weekWes,
     setsByWe,
     feedbackByWe: new Map(
@@ -853,6 +864,10 @@ export async function advanceWeekAfterWorkout(
     ),
     nameByExercise: new Map((exercises ?? []).map((e) => [e.id, e.name])),
     overrideByExercise,
+    // doc 17 §3: the pacer's plan strength band, derived once per advance run
+    // from the live profile under the resolved goal (standalone → hypertrophy);
+    // null while the progression mode is inactive.
+    planStrengthRate: derivePlanStrengthRate(profile, goal, params),
   };
 
   // -------------------------------------------------------------------------
@@ -1254,6 +1269,7 @@ export async function projectNextPrescription(
     nextMicro?.id ?? null,
     params,
   );
+  const projectionGoal = engineGoal(macroGoal);
   const inputs = buildEngineInputs({
     we: sourceWe,
     sets: setsByWe.get(sourceWe.id) ?? [],
@@ -1265,7 +1281,7 @@ export async function projectNextPrescription(
       (workoutFeedback ?? []).find((f) => f.workout_id === sourceWorkout.id) ?? null,
     microTargetRir: micro.target_rir,
     nextWeek,
-    goal: engineGoal(macroGoal),
+    goal: projectionGoal,
     equipmentType: exercise.equipment_type,
     profile,
     muscleGroupWeeklySets: sourceWe.muscle_group_id
@@ -1283,6 +1299,11 @@ export async function projectNextPrescription(
           progressionHistory: projectionProgression.get(exerciseId) ?? null,
           daysSincePreviousSession: daysSincePerformed(
             sourceWorkout.performed_at,
+          ),
+          planStrengthRate: derivePlanStrengthRate(
+            profile,
+            projectionGoal,
+            params,
           ),
         }
       : {}),

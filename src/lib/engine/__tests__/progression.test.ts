@@ -416,6 +416,159 @@ describe("governors (§3.5)", () => {
   });
 });
 
+describe("rate pacer source (doc 17 §3, N37)", () => {
+  const PLAN_SOURCE: EngineParams = {
+    ...V20_PARAMS,
+    progression: { ...V20_PARAMS.progression!, rate_source: "plan" },
+  };
+  const earnedInputs = (
+    over: Partial<EngineInputs> = {},
+    history: Partial<NonNullable<EngineInputs["progressionHistory"]>> = {},
+  ) =>
+    baseInputs({
+      goalType: "hypertrophy",
+      week: { targetRir: 2, isDeload: false },
+      previous: { weight: 145, reps: 8, sets: 3, targetRir: 3 },
+      actualSets: [
+        { setNumber: 1, weight: 145, reps: 8, rirReported: null, isWarmup: false },
+        { setNumber: 2, weight: 145, reps: 8, rirReported: null, isWarmup: false },
+        { setNumber: 3, weight: 145, reps: 8, rirReported: null, isWarmup: false },
+      ],
+      exerciseFeedback: null,
+      workoutFeedback: null,
+      strengthAnchor: { value: 198.2, confidence: "moderate" },
+      progressionHistory: { ...PERMISSIVE_HISTORY, ...history },
+      daysSincePreviousSession: 7,
+      ...over,
+    });
+
+  it("'plan' targets lerp(planStrengthRate, band_position) × goal_rate_factor", () => {
+    // plan band [4, 8] at position 0.5 ⇒ 6 %/mo; hypertrophy factor 0.75 ⇒ 4.5
+    const rate = { low: 4, high: 8 };
+    const over = prescribe(
+      earnedInputs(
+        { planStrengthRate: rate },
+        { trailing30dPrescribedGainPct: 4.6 },
+      ),
+      PLAN_SOURCE,
+    );
+    expect(progressionSteps(over)[0].status).toBe("paced");
+    expect(progressionSteps(over)[0].governor).toBe("rate_pacer");
+    const under = prescribe(
+      earnedInputs(
+        { planStrengthRate: rate },
+        { trailing30dPrescribedGainPct: 4.4 },
+      ),
+      PLAN_SOURCE,
+    );
+    expect(progressionSteps(under)[0].status).toBe("stepped");
+    // same trailing under "band" (intermediate [1.5, 3] ⇒ target 1.6875): the
+    // source — not the arithmetic — is what changed the verdict
+    const banded = prescribe(
+      earnedInputs(
+        { planStrengthRate: rate },
+        { trailing30dPrescribedGainPct: 4.4 },
+      ),
+      V20_PARAMS,
+    );
+    expect(progressionSteps(banded)[0].status).toBe("paced");
+    expect(progressionSteps(banded)[0].governor).toBe("rate_pacer");
+  });
+
+  it("band_position composes identically under 'plan' (source-agnostic lerp)", () => {
+    const rate = { low: 4, high: 8 };
+    const at = (position: number): EngineParams => ({
+      ...PLAN_SOURCE,
+      progression: { ...PLAN_SOURCE.progression!, band_position: position },
+    });
+    // position 0 ⇒ 4 × 0.75 = 3: trailing 3.1 is over, 2.9 is under
+    const floor = prescribe(
+      earnedInputs({ planStrengthRate: rate }, { trailing30dPrescribedGainPct: 3.1 }),
+      at(0),
+    );
+    expect(progressionSteps(floor)[0].governor).toBe("rate_pacer");
+    const floorUnder = prescribe(
+      earnedInputs({ planStrengthRate: rate }, { trailing30dPrescribedGainPct: 2.9 }),
+      at(0),
+    );
+    expect(progressionSteps(floorUnder)[0].status).toBe("stepped");
+    // position 1 ⇒ 8 × 0.75 = 6: trailing 5.9 still flows
+    const top = prescribe(
+      earnedInputs({ planStrengthRate: rate }, { trailing30dPrescribedGainPct: 5.9 }),
+      at(1),
+    );
+    expect(progressionSteps(top)[0].status).toBe("stepped");
+  });
+
+  it("goal denomination: every goal paces on the STRENGTH band × its factor", () => {
+    // the same strength-denominated plan band [4, 4]; hypertrophy pays 0.75 ⇒ 3,
+    // strength pays 1.0 ⇒ 4 — the band itself is never goal-denominated
+    const rate = { low: 4, high: 4 };
+    const hyp = prescribe(
+      earnedInputs({ planStrengthRate: rate }, { trailing30dPrescribedGainPct: 3.5 }),
+      PLAN_SOURCE,
+    );
+    expect(progressionSteps(hyp)[0].status).toBe("paced");
+    expect(progressionSteps(hyp)[0].governor).toBe("rate_pacer");
+    const str = prescribe(
+      earnedInputs(
+        { planStrengthRate: rate, goalType: "strength" },
+        { trailing30dPrescribedGainPct: 3.5 },
+      ),
+      PLAN_SOURCE,
+    );
+    expect(progressionSteps(str)[0].status).toBe("stepped");
+  });
+
+  it("null/absent plan rate under 'plan' degrades to the band, byte-identically", () => {
+    // trailing 1.7 sits over the band target (1.6875) and far under any plan
+    // rate — the fallback verdict is the band's
+    const explicitNull = prescribe(
+      earnedInputs(
+        { planStrengthRate: null },
+        { trailing30dPrescribedGainPct: 1.7 },
+      ),
+      PLAN_SOURCE,
+    );
+    const absent = prescribe(
+      earnedInputs({}, { trailing30dPrescribedGainPct: 1.7 }),
+      PLAN_SOURCE,
+    );
+    const banded = prescribe(
+      earnedInputs({}, { trailing30dPrescribedGainPct: 1.7 }),
+      V20_PARAMS,
+    );
+    expect(explicitNull).toEqual(banded);
+    expect(absent).toEqual(banded);
+    expect(progressionSteps(banded)[0].governor).toBe("rate_pacer");
+  });
+
+  it("under 'band' a present plan rate is inert (v20 ships unflipped)", () => {
+    const withRate = prescribe(
+      earnedInputs(
+        { planStrengthRate: { low: 40, high: 80 } },
+        { trailing30dPrescribedGainPct: 1.7 },
+      ),
+      V20_PARAMS,
+    );
+    const without = prescribe(
+      earnedInputs({}, { trailing30dPrescribedGainPct: 1.7 }),
+      V20_PARAMS,
+    );
+    expect(withRate).toEqual(without);
+  });
+
+  it("block absent: planStrengthRate is inert and the output byte-identical", () => {
+    const withRate = prescribe(
+      earnedInputs({ planStrengthRate: { low: 4, high: 8 } }),
+      V19_PARAMS,
+    );
+    const without = prescribe(earnedInputs(), V19_PARAMS);
+    expect(withRate).toEqual(without);
+    expect(progressionSteps(withRate)).toHaveLength(0);
+  });
+});
+
 describe("realized-ask bounds (§3.3)", () => {
   it("max_pct_per_step binds on the realized ask (coarse plate jump on a light lift)", () => {
     const incrementMode: EngineParams = {

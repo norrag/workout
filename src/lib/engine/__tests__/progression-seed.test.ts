@@ -306,6 +306,34 @@ describe("seed route — the earn gate + governors (shared with the advance chai
     expect(step.governor).toBe("rate_pacer");
   });
 
+  it("the seed pacer reads the plan rate under rate_source 'plan' (doc 17 §3)", () => {
+    const planSource: EngineParams = {
+      ...V20_PARAMS,
+      progression: { ...V20_PARAMS.progression!, rate_source: "plan" },
+    };
+    // trailing 2.0 is over the band target (intermediate ⇒ 1.6875) but under a
+    // personalized plan band [4, 8] at position 0.5 (⇒ 4.5): the plan source
+    // lets the earned seed step where the band would pace it
+    const history = {
+      ...PERMISSIVE_HISTORY,
+      trailing30dPrescribedGainPct: 2.0,
+    };
+    const banded = seed(V20_PARAMS, { ...earnedOpts, progressionHistory: history });
+    expect(progressionSteps(banded)[0].governor).toBe("rate_pacer");
+    const planned = seed(planSource, {
+      ...earnedOpts,
+      progressionHistory: history,
+      planStrengthRate: { low: 4, high: 8 },
+    });
+    expect(progressionSteps(planned)[0].status).toBe("stepped");
+    // no plan rate assembled ⇒ degrade to the band, byte-identical
+    const fallback = seed(planSource, {
+      ...earnedOpts,
+      progressionHistory: history,
+    });
+    expect(fallback).toEqual(banded);
+  });
+
   it("a deload target week bypasses the wrapper entirely (neither earns nor steps)", () => {
     const out = seedMeso(null, null, EXTERNAL, USER, 6, V20_PARAMS, {
       goalType: "hypertrophy",

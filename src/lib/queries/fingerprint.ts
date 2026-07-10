@@ -63,6 +63,11 @@ export const DERIVED_INPUT_KEYS = [
   // seed row's fingerprint is byte-identical with or without an earn, and
   // recorded in the seed decision for replay.
   "seedEarn",
+  // doc 17 §3 (N37): the personalized plan strength band the pacer reads under
+  // `rate_source: "plan"` — derived from bodyweight/bf%/age, none of which are
+  // config dimensions (a routine bodyweight edit must not churn open rows).
+  // Recomputed at assembly, recorded in the decision for replay.
+  "planStrengthRate",
 ] as const;
 
 export type DerivedInputKey = (typeof DERIVED_INPUT_KEYS)[number];
@@ -181,15 +186,19 @@ export function seedEngineInputs(
     ...(progression?.daysSincePreviousSession !== undefined
       ? { daysSincePreviousSession: progression.daysSincePreviousSession }
       : {}),
+    ...(progression?.planStrengthRate !== undefined
+      ? { planStrengthRate: progression.planStrengthRate }
+      : {}),
   };
 }
 
-/** doc 16 §3.7 — the seed route's derived progression inputs (all denylisted;
- *  present only while the progression mode is active). */
+/** doc 16 §3.7 / doc 17 §3 — the seed route's derived progression inputs (all
+ *  denylisted; present only while the progression mode is active). */
 export interface SeedProgressionInputs {
   seedEarn?: EngineInputs["seedEarn"];
   progressionHistory?: EngineInputs["progressionHistory"];
   daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
+  planStrengthRate?: EngineInputs["planStrengthRate"];
 }
 
 export interface SeedInputArgs {
