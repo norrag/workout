@@ -25,7 +25,8 @@ two questions that actually blocked the build:
 Doc 15 amended in place: §1.1/§5/§7 pointers + new **§8 addendum**
 ("build is unblocked for a private deployment"). N34 row updated —
 Phase 0 is no longer an owner action; remaining owner input is the
-adopt-&-phase decision (doc 15 §5). No code.
+adopt-&-phase decision (doc 15 §5). No code. Shipped as **PR #167**
+(`claude/bodyspec-dexa-api-readiness-q5a25w`).
 
 ## 2026-07-09 — Session 58: N35 Phase R — activation prep + deferred spine filed + N21 primed
 
