@@ -7,15 +7,18 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine";
 import {
+  isGoalsEdit,
   macroEditImpact,
   phaseLabel,
   placeholderName,
   planForMacro,
+  planInputsSnapshot,
   planMacroPlacement,
   profileToMacroProfile,
   reconcileMacroSlots,
   type SlotMeso,
 } from "../macro";
+import { profileAge } from "../profiles";
 import type { MesocycleRow, ProfileRow } from "@/lib/types/database";
 
 function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -23,6 +26,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     id: "u1",
     display_name: "Test",
     age: 34,
+    birthdate: null,
     gender: "male",
     height_in: 71,
     bodyweight: 198,
@@ -65,6 +69,74 @@ describe("profileToMacroProfile", () => {
 
   it("leaves training years null when training_since is unset", () => {
     expect(profileToMacroProfile(profile()).trainingYears).toBeNull();
+  });
+
+  it("prefers birthdate-derived age over the static int (doc 17 §2.5)", () => {
+    const now = new Date("2026-07-10T12:00:00Z");
+    const mp = profileToMacroProfile(
+      profile({ age: 34, birthdate: "1990-07-01" }),
+      now,
+    );
+    expect(mp.age).toBe(36); // 1990-07-01 → just turned 36; the stale int said 34
+  });
+
+  it("falls back to the static age int when birthdate is unset or invalid", () => {
+    expect(profileToMacroProfile(profile({ birthdate: null })).age).toBe(34);
+    expect(profileToMacroProfile(profile({ birthdate: "not-a-date" })).age).toBe(34);
+  });
+});
+
+describe("profileAge", () => {
+  const now = new Date("2026-07-10T12:00:00Z");
+
+  it("derives whole years from birthdate against `now`", () => {
+    expect(profileAge({ age: null, birthdate: "1990-07-11" }, now)).toBe(35);
+    expect(profileAge({ age: null, birthdate: "1990-07-09" }, now)).toBe(36);
+  });
+
+  it("falls back to the legacy int, tolerating null everywhere", () => {
+    expect(profileAge({ age: 34, birthdate: null }, now)).toBe(34);
+    expect(profileAge({ age: null, birthdate: null }, now)).toBeNull();
+  });
+});
+
+describe("planInputsSnapshot (doc 17 §2.5 contract snapshot)", () => {
+  it("stamps the resolved profile, params version, and time", () => {
+    const now = new Date("2026-07-10T12:00:00Z");
+    const mp = profileToMacroProfile(profile(), now);
+    expect(planInputsSnapshot(mp, 21, now)).toEqual({
+      profile: mp,
+      params_version: 21,
+      stamped_at: "2026-07-10T12:00:00.000Z",
+    });
+  });
+});
+
+describe("isGoalsEdit (contract rewrites only on a re-contract)", () => {
+  const macro = {
+    goal_type: "hypertrophy",
+    duration_months: 6,
+    meso_length_weeks: 5,
+  } as const;
+
+  it("rename/notes-only edits are NOT goals edits", () => {
+    expect(
+      isGoalsEdit(macro, {
+        goal_type: "hypertrophy",
+        duration_months: 6,
+        meso_length_weeks: 5,
+      }),
+    ).toBe(false);
+  });
+
+  it("changing goal, duration, or block length is a goals edit", () => {
+    expect(isGoalsEdit(macro, { ...macro, goal_type: "cut" })).toBe(true);
+    expect(isGoalsEdit(macro, { ...macro, duration_months: 8 })).toBe(true);
+    expect(isGoalsEdit(macro, { ...macro, meso_length_weeks: 4 })).toBe(true);
+  });
+
+  it("a null duration (re-recommend) is always a re-contract", () => {
+    expect(isGoalsEdit(macro, { ...macro, duration_months: null })).toBe(true);
   });
 });
 

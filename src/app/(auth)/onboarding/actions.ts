@@ -5,9 +5,21 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/queries/profiles";
 
+// birthdate replaces the static age int (doc 17 §2.5) — age is derived fresh
+// at plan time from this, so it never goes stale a year at a time
+const birthdateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Birthdate is required")
+  .refine((s) => {
+    const born = new Date(`${s}T12:00:00`).getTime();
+    if (Number.isNaN(born)) return false;
+    const years = (Date.now() - born) / (365.25 * 24 * 60 * 60 * 1000);
+    return years >= 13 && years <= 120;
+  }, "Enter a valid birthdate (13+)");
+
 const onboardingSchema = z.object({
   display_name: z.string().min(1, "Name is required").max(60),
-  age: z.coerce.number().int().min(13).max(120),
+  birthdate: birthdateSchema,
   gender: z.enum(["female", "male", "other", "undisclosed"]).default("undisclosed"),
   height_in: z.coerce.number().min(36).max(96).nullable(),
   bodyweight: z.coerce.number().positive().max(1000).nullable(),
@@ -25,7 +37,7 @@ export async function completeOnboarding(
 ): Promise<OnboardingState> {
   const parsed = onboardingSchema.safeParse({
     display_name: formData.get("display_name"),
-    age: formData.get("age"),
+    birthdate: formData.get("birthdate"),
     gender: formData.get("gender") || "undisclosed",
     height_in: formData.get("height_in") || null,
     bodyweight: formData.get("bodyweight") || null,

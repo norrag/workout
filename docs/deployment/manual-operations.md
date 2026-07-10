@@ -272,6 +272,27 @@ already merged, PRs #158–#161). Full mechanism: `docs/16-prescribed-progressio
 > `docs/reviews/2026-07-09-n21-strength-rate-priming.md` for the N21 → plan-rate
 > → envelope sequencing.
 
+### Activate engine_params **v21** (macro-target correction — doc 17 Phase R2)
+
+`20260710000002_engine_params_v21_macro_target.sql` ships v21 **inactive**. It
+adds three `.optional()` params inside `macro_target` over v20 — the doc 17 §2
+target-engine correction (N21): `strength_sex_factor` {1.0, 1.0} +
+`age_taper_floor_strength` 0.7 (the strength band personalizes by sex/age like
+the hypertrophy path already does) and `bf_proxy_pct` (hypertrophy continuity —
+the FFMI proximity model runs on a BMI-band bf% proxy instead of flipping to
+the training-age decay when only bf% is missing). The §2.3 cut-band
+proportional rescale and the `MacroPlan.strengthRatePctMonth` exposure are
+parameterless code that ships with the same PR. Sequenced **after R1 (v20
+activation)** in doc 17 §8, but independent of it mechanically.
+
+| Step | What / why |
+|---|---|
+| Apply the Phase-1 migrations to hosted | `20260710000001` (macrocycles.plan_inputs + profiles.birthdate, additive nullable columns) and `20260710000002` (v21 insert, `is_active = false`, hash `7017e257…b4316` — verify against `params-provenance.test.ts`). The active row is unchanged; nothing changes for users. |
+| **Replay diff** | `replay_decisions` / `simulate_prescriptions` candidate v21. Targets are display/pacer layer — **the diff on prescriptions is expected ≈ empty; assert that** (v20's `rate_source` is `"band"` and reads the raw bucket table, so even the pacer is untouched until the v22 `"plan"` flip). |
+| **Owner reviews + activates v21** | Prefer the admin MCP `activate_engine_params` (will report "e1rm block unchanged"). What changes on activation: macro create/edit targets + recommended durations personalize (strength taper for 40+, hypertrophy continuity, non-collapsing long-cut bands). Roll back by re-activating the prior row. |
+| **Re-enable the target cards** | After activation: a small code PR transcribing figs 2.2/2.3 per hard rule 8 (PR #140 made the hide a pure view change). |
+| **Owner re-saves the profile birthdate** | The profile page now carries BIRTHDATE (fig 4.5 amendment, 09-changelog 2026-07-10); the legacy static `age` int stays the fallback until re-saved. One-time, no backfill (single-user deployment). |
+
 ---
 
 ## How Claude flags these

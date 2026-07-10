@@ -8,6 +8,7 @@ import {
   type PhaseName,
 } from "@/lib/engine";
 import { getMacroStrength } from "./stats";
+import { profileAge } from "./profiles";
 import type {
   Database,
   MacrocycleRow,
@@ -36,13 +37,66 @@ export function profileToMacroProfile(
   }
   return {
     sex: profile.gender ?? null,
-    age: profile.age,
+    // birthdate-derived age preferred (doc 17 §2.5 — a static int goes stale
+    // a year at a time); the legacy `age` int is the fallback until re-saved
+    age: profileAge(profile, now),
     bodyweight: profile.bodyweight,
     heightIn: profile.height_in,
     experienceLevel: profile.experience_level,
     trainingYears,
     bodyFatPct: profile.body_fat_pct,
   };
+}
+
+/**
+ * The §2.5 contract snapshot stamped into `macrocycles.plan_inputs` whenever
+ * `target_*` is written: the resolved engine inputs + the params version the
+ * plan ran under, so any contract can later be explained ("set when you were
+ * 205 lb / 22% bf under v21"). Display-only provenance — no read path
+ * depends on it in Phase 1.
+ */
+export type PlanInputsSnapshot = {
+  profile: MacroProfile;
+  params_version: number | null;
+  stamped_at: string;
+};
+
+export function planInputsSnapshot(
+  profile: MacroProfile,
+  paramsVersion: number | null,
+  now: Date,
+): PlanInputsSnapshot {
+  return {
+    profile,
+    params_version: paramsVersion,
+    stamped_at: now.toISOString(),
+  };
+}
+
+/**
+ * Whether an edit re-contracts the macro's goals (doc 17 principle 3): only a
+ * change to the plan inputs — goal, duration, block length — rewrites
+ * `target_*`/`rate_*` and restamps `plan_inputs`. Rename/notes edits leave
+ * the stored contract untouched (the live Overview recompute keeps display
+ * honest; the contract moves only on a conscious re-contract). A null
+ * duration is "let the engine recommend" — always a re-contract. Pure.
+ */
+export function isGoalsEdit(
+  macro: Pick<
+    MacrocycleRow,
+    "goal_type" | "duration_months" | "meso_length_weeks"
+  >,
+  input: Pick<
+    EditMacroInput,
+    "goal_type" | "duration_months" | "meso_length_weeks"
+  >,
+): boolean {
+  return (
+    input.goal_type !== macro.goal_type ||
+    input.meso_length_weeks !== macro.meso_length_weeks ||
+    input.duration_months == null ||
+    input.duration_months !== macro.duration_months
+  );
 }
 
 /**
@@ -100,17 +154,18 @@ export async function createMacrocycleWithMesos(
   input: CreateMacroInput,
   profile: ProfileRow,
   params: EngineParams,
+  paramsVersion: number | null = null,
   now: Date = new Date(),
 ): Promise<MacrocycleRow> {
-  const plan = planForMacro(
+  const macroProfile = profileToMacroProfile(profile, now);
+  const plan = planMacrocycle(
     {
-      goal_type: input.goal_type,
-      duration_months: input.duration_months,
-      meso_length_weeks: input.meso_length_weeks,
+      goal: input.goal_type as MacroGoal,
+      profile: macroProfile,
+      durationMonths: input.duration_months,
+      mesoLengthWeeks: input.meso_length_weeks,
     },
-    profile,
     params,
-    now,
   );
 
   // target_end_date = start + chosen/recommended months
@@ -136,6 +191,8 @@ export async function createMacrocycleWithMesos(
       target_direction: plan.target.direction,
       rate_low: plan.perMonthRate.low,
       rate_high: plan.perMonthRate.high,
+      // §2.5 contract snapshot: the inputs this contract was priced from
+      plan_inputs: planInputsSnapshot(macroProfile, paramsVersion, now),
       start_date: input.start_date,
       target_end_date: targetEnd,
       status: "active",
@@ -253,6 +310,7 @@ export async function updateMacrocycle(
   input: EditMacroInput,
   profile: ProfileRow,
   params: EngineParams,
+  paramsVersion: number | null = null,
   now: Date = new Date(),
 ): Promise<void> {
   const { data: macro, error: macroErr } = await supabase
@@ -264,15 +322,29 @@ export async function updateMacrocycle(
   if (macroErr) throw macroErr;
   if (!macro) throw new Error("Macrocycle not found");
 
-  const plan = planForMacro(
+  // §2.5 / principle 3: the stored target is the CONTRACT — only a goals edit
+  // (goal / duration / block length) re-prices and restamps it. A rename or
+  // notes edit leaves target_*/rate_*/plan_inputs untouched (previously any
+  // edit silently refreshed the contract from the current profile).
+  if (!isGoalsEdit(macro, input)) {
+    const { error: updErr } = await supabase
+      .from("macrocycles")
+      .update({ name: input.name, goal_notes: input.goal_notes })
+      .eq("id", macroId)
+      .eq("user_id", userId);
+    if (updErr) throw updErr;
+    return;
+  }
+
+  const macroProfile = profileToMacroProfile(profile, now);
+  const plan = planMacrocycle(
     {
-      goal_type: input.goal_type,
-      duration_months: input.duration_months,
-      meso_length_weeks: input.meso_length_weeks,
+      goal: input.goal_type as MacroGoal,
+      profile: macroProfile,
+      durationMonths: input.duration_months,
+      mesoLengthWeeks: input.meso_length_weeks,
     },
-    profile,
     params,
-    now,
   );
 
   // target_end_date = start + chosen/recommended months
@@ -296,6 +368,8 @@ export async function updateMacrocycle(
       target_direction: plan.target.direction,
       rate_low: plan.perMonthRate.low,
       rate_high: plan.perMonthRate.high,
+      // the re-contract restamps the §2.5 snapshot
+      plan_inputs: planInputsSnapshot(macroProfile, paramsVersion, now),
       target_end_date: targetEnd,
     })
     .eq("id", macroId)

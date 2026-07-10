@@ -2,7 +2,65 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-09 (latest) — Prescribed progression Phase R: activation prep (doc 16 §10, N35)
+## 2026-07-10 (latest) — Macro goals Phase 1: v21 target correction + contract snapshot + birthdate (doc 17 §2, N21)
+
+First build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
+the target-engine correction the 2026-07-09 audit priming scoped, shipped as
+engine_params **v21 INACTIVE** (`20260710000002`) — activation is doc 17
+Phase R2 (`manual-operations.md`). With the three new gated params absent
+(every pre-v21 row) `planMacrocycle` is byte-identical on its pre-existing
+fields; the golden fixtures pin it.
+
+- **§2.1 strength-path personalization.** The strength branch gains the
+  modifier chain the hypertrophy path already had, with strength-specific
+  params: `strength_sex_factor` (default `{male 1, female 1}` — relative 1RM
+  gains ~sex-equal; deliberately NOT the hypertrophy 0.7 lean-mass factor)
+  × the existing age taper with a strength floor `age_taper_floor_strength`
+  (0.7 > hypertrophy 0.6 — preserved neural adaptation). Both endpoints
+  scale; compounding + `strength_cap_total_pct` unchanged;
+  `recommendDuration` reads the same personalized band (a 60-yr-old is now
+  recommended a longer strength block, not the 18-yr-old's).
+- **§2.2 hypertrophy continuity.** `bf_proxy_pct` (per sex × leanness band):
+  with height + bodyweight but no bf%, the FFMI proximity model runs on the
+  BMI band's representative bf% instead of flipping to the training-age
+  decay — entering a bf% equal to the proxy moves the target by exactly 0
+  (continuity golden); the decay path is reserved for profiles missing
+  height/bodyweight. The remaining-potential cap applies on both sides.
+- **§2.3 cut-band guard (parameterless).** When `cut_cap_pct_bw` binds the
+  high endpoint the low endpoint rescales proportionally
+  (`low_raw × cap/high_raw`) instead of clamping onto the cap — a 12-month
+  cut now reads e.g. 37–50 lb instead of the collapsed 50–50.
+- **§2.4 `MacroPlan.strengthRatePctMonth`.** The personalized strength band,
+  computed for EVERY goal (profile-only, unrounded) — the carrier the doc-16
+  `rate_source: "plan"` pacer consumes in Phase 2 (a mass-goal macro paces
+  the strength dimension; `perMonthRate` is lb/mo there, the wrong field).
+- **§2.5 contract snapshot + profile hygiene.** `macrocycles.plan_inputs`
+  (migration `20260710000001`): `createMacrocycleWithMesos`/`updateMacrocycle`
+  stamp the resolved `MacroProfile` + params version whenever they write
+  `target_*`. `updateMacrocycle` now **gates the contract rewrite on a goals
+  edit** (`isGoalsEdit` — goal/duration/block-length change; principle 3):
+  rename/notes saves no longer silently re-price targets from the current
+  profile. `profiles.birthdate` (same migration) replaces the static age as
+  the age source — `profileAge` derives it fresh (int fallback, no backfill);
+  onboarding + profile UI swap the field (09-changelog 2026-07-10, fig 4.5);
+  MCP `get_profile` + the More card read the derived age.
+- **Docs:** doc 10 §5 amended (strength personalization params; the strength
+  target restated as measured by the §6 est-strength rollup — the "% on key
+  lifts" wording predated PR #157; bf-proxy; cut rescale); manual-operations
+  gained the Phase R2 activation runbook (replay diff expected ≈ empty on
+  prescriptions — targets are display/pacer layer).
+- **Tests** (+23, suite 975): strength personalization goldens (legacy
+  60F=18M defect pinned, v21 taper/sex-equality/floor-binding, recommended
+  duration), continuity golden, cut proportional-rescale golden,
+  `strengthRatePctMonth` presence/denomination/fallback, v21 provenance hash
+  + DEFAULT-absence hash guards, birthdate-derived age (preferred/fallback/
+  invalid), snapshot builder, `isGoalsEdit` matrix.
+
+**Remaining for the macro-goals arc:** doc 17 Phases 2–6 + R (next: §3
+plan-rate pacer branch, blocked on this PR; v21 activation + target-card
+re-enable at R2).
+
+## 2026-07-09 — Prescribed progression Phase R: activation prep (doc 16 §10, N35)
 
 Phase R of [doc 16 — prescribed progression](16-prescribed-progression.md) is a
 **runbook, not code** (§10). It gates the activation of engine_params **v20**

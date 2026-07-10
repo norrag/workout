@@ -6,7 +6,7 @@ import type {
   ProfileRow,
   VMesoSummaryRow,
 } from "@/lib/types/database";
-import { getProfile } from "@/lib/queries/profiles";
+import { getProfile, profileAge } from "@/lib/queries/profiles";
 import { getCyclesOverview, getMesoPlan, type CyclesOverview, type MesoPlan } from "@/lib/queries/cycles";
 import {
   getMesoProgressScores,
@@ -88,7 +88,8 @@ export function formatProfile(profile: ProfileRow | null): Record<string, unknow
   return {
     has_profile: true,
     display_name: profile.display_name,
-    age: profile.age,
+    // derived from birthdate when present, legacy static int otherwise
+    age: profileAge(profile),
     gender: profile.gender,
     height_in: profile.height_in,
     bodyweight: profile.bodyweight,

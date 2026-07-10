@@ -529,6 +529,44 @@ export const engineParamsSchema = z.object({
       age_taper_start: z.number().positive(),
       age_taper_per_year: z.number().min(0),
       age_taper_floor: z.number().min(0).max(1),
+      // ----- doc 17 §2 / v21 — target-engine correction (N21) — all gated -----
+      // Each is `.optional()` (the v11+ discipline): ABSENT on every pre-v21 row,
+      // so those parse/hash byte-identically and planMacrocycle falls back to the
+      // prior behavior. v21 seeds them; activation is doc 17 Phase R2.
+      //
+      // Strength-path sex factor. Relative 1RM gains are ~sex-equal (Roberts
+      // 2020; Refalo 2025; doc 10 §5), so the default is {1.0, 1.0} — a DISTINCT
+      // param from the hypertrophy `sex_factor_female` (0.7), which models
+      // lean-mass fraction and must never be reused for strength.
+      strength_sex_factor: z
+        .object({ male: z.number().min(0), female: z.number().min(0) })
+        .optional(),
+      // Strength-path age taper floor: the existing age_taper slope applies to
+      // the strength band, but bottoms out higher than the hypertrophy 0.6 —
+      // neural adaptation is preserved with age (Peterson 2010, ACSM 2009).
+      // ABSENT ⇒ no age taper on the strength path (legacy).
+      age_taper_floor_strength: z.number().min(0).max(1).optional(),
+      // Hypertrophy-continuity proxy (doc 17 §2.2): when height + bodyweight
+      // are present but body-fat % is not, run the FFMI proximity model on a
+      // representative bf% for the profile's BMI leanness band instead of
+      // flipping to the training-age decay — completing the bf% field then
+      // moves the rate continuously, never discontinuously. Values are
+      // mid-band representative bf% consistent with `cut_bf_thresholds`.
+      // ABSENT ⇒ legacy decay fallback whenever bf% is unknown.
+      bf_proxy_pct: z
+        .object({
+          male: z.object({
+            lean: z.number().min(2).max(70),
+            average: z.number().min(2).max(70),
+            high_bf: z.number().min(2).max(70),
+          }),
+          female: z.object({
+            lean: z.number().min(2).max(70),
+            average: z.number().min(2).max(70),
+            high_bf: z.number().min(2).max(70),
+          }),
+        })
+        .optional(),
       recommend_target_lb: z.object({
         male: z.number().positive(),
         female: z.number().positive(),

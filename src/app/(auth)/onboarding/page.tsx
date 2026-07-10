@@ -102,7 +102,7 @@ export default function OnboardingPage() {
           A few details to calibrate your starting prescriptions.
         </p>
         <Input label="Name" name="display_name" required maxLength={60} />
-        <Input label="Age" name="age" type="number" min={13} max={120} required />
+        <Input label="Birthdate" name="birthdate" type="date" required />
         <div className="flex flex-col gap-1.5">
           <span className="label-caps text-[10px] font-semibold text-ink/55">
             Sex — calibrates muscle-gain targets

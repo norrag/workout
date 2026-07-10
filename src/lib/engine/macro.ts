@@ -70,6 +70,16 @@ export interface MacroPlan {
   target: MacroRange;
   /** target ÷ duration for weight goals; the monthly band for strength */
   perMonthRate: MacroRange;
+  /**
+   * The §2.1-personalized monthly strength band (%/mo), computed for EVERY
+   * goal — it depends only on the profile (doc 17 §2.4). This is the carrier
+   * the doc-16 macro-rate pacer reads under `rate_source: "plan"`: a
+   * hypertrophy macro paces the *strength* dimension via `goal_rate_factor`,
+   * so the source rate must be strength-denominated regardless of the macro's
+   * goal (`perMonthRate` is lb/mo for mass goals — the wrong carrier).
+   * Unrounded: an engine input, not a display band.
+   */
+  strengthRatePctMonth: { low: number; high: number };
   /** the engine's suggested timeframe for this goal + profile */
   recommendedDurationMonths: number;
   /** the duration actually used (the user's choice, else the recommendation) */
@@ -116,6 +126,54 @@ function ageMultiplier(
   );
 }
 
+/**
+ * Strength-path sex factor (doc 17 §2.1). Relative 1RM gains are ~sex-equal,
+ * so v21 seeds {1.0, 1.0}; the param exists as a tunable, distinct from the
+ * hypertrophy `sex_factor_female` (lean-mass fraction — never reused here).
+ * Param absent (pre-v21 rows) ⇒ 1 (legacy, no factor).
+ */
+function strengthSexFactor(
+  profile: MacroProfile,
+  mt: EngineParams["macro_target"],
+): number {
+  return mt.strength_sex_factor ? mt.strength_sex_factor[sexKey(profile)] : 1;
+}
+
+/**
+ * Strength-path age taper (doc 17 §2.1): the existing taper slope with the
+ * strength-specific floor (default 0.7 > hypertrophy 0.6 — preserved neural
+ * adaptation). Gated on `age_taper_floor_strength`: absent (pre-v21 rows) ⇒ 1
+ * (legacy — the strength band ignored age entirely).
+ */
+function ageMultiplierStrength(
+  age: number | null,
+  mt: EngineParams["macro_target"],
+): number {
+  if (mt.age_taper_floor_strength == null) return 1;
+  if (!mt.age_taper || age == null || age <= mt.age_taper_start) return 1;
+  return Math.max(
+    mt.age_taper_floor_strength,
+    1 - (age - mt.age_taper_start) * mt.age_taper_per_year,
+  );
+}
+
+/**
+ * The personalized monthly strength band: bucket table × sex factor × age
+ * taper (both endpoints scale; doc 17 §2.1). With the v21 params absent this
+ * is exactly the raw bucket band. Unrounded — `MacroPlan.strengthRatePctMonth`
+ * carries it to the doc-16 pacer; display paths round on the way out.
+ */
+function strengthRateBand(
+  profile: MacroProfile,
+  bucket: ExperienceBucket,
+  mt: EngineParams["macro_target"],
+): { low: number; high: number } {
+  const [low, high] = mt.strength_pct_month[bucket];
+  const f =
+    strengthSexFactor(profile, mt) * ageMultiplierStrength(profile.age, mt);
+  return { low: low * f, high: high * f };
+}
+
 /** pounds → kilograms, for the FFMI/BMI physics computed in metric. */
 function lbToKg(lb: number): number {
   return lb / LB_PER_KG;
@@ -132,17 +190,38 @@ function sexKey(profile: MacroProfile): Sex {
 }
 
 /**
+ * The body-fat % the proximity model runs on (doc 17 §2.2): the measured value
+ * when present, else — gated on `bf_proxy_pct` (v21) — a representative bf%
+ * for the profile's BMI leanness band. The proxy keeps the model continuous
+ * across the "entered a bf%" toggle: completing the field moves the rate
+ * proportionally from the band's representative value, never discontinuously
+ * to a different model. Null ⇒ no body-comp read at all (decay fallback).
+ */
+function effectiveBodyFatPct(
+  profile: MacroProfile,
+  mt: EngineParams["macro_target"],
+): number | null {
+  if (profile.bodyFatPct != null) return profile.bodyFatPct;
+  if (mt.bf_proxy_pct == null) return null;
+  if (bmiOf(profile) == null) return null;
+  // bodyFatPct is null here, so leannessBand reads the BMI thresholds
+  return mt.bf_proxy_pct[sexKey(profile)][leannessBand(profile, mt)];
+}
+
+/**
  * Muscular development from body composition: normalized FFMI vs the genetic
  * ceiling. `fraction` is 0 at the untrained baseline → 1 at the ceiling;
  * `remainingLb` is the muscle left to the ceiling in the user's unit. Returns
- * null when body fat or height is unknown (caller falls back to training age).
+ * null when body fat (measured or §2.2-proxied) or height is unknown (caller
+ * falls back to training age).
  */
 function muscularDevelopment(
   profile: MacroProfile,
   mt: EngineParams["macro_target"],
 ): { fraction: number; remainingLb: number } | null {
+  const bodyFatPct = effectiveBodyFatPct(profile, mt);
   if (
-    profile.bodyFatPct == null ||
+    bodyFatPct == null ||
     profile.heightIn == null ||
     profile.bodyweight == null
   ) {
@@ -151,7 +230,7 @@ function muscularDevelopment(
   const hM = profile.heightIn * M_PER_IN;
   if (hM <= 0) return null;
   const bwKg = lbToKg(profile.bodyweight);
-  const ffmKg = bwKg * (1 - profile.bodyFatPct / 100);
+  const ffmKg = bwKg * (1 - bodyFatPct / 100);
   const ffmi = ffmKg / (hM * hM);
   // normalize to 1.83 m so the ceiling/baseline are height-independent
   const ffmiNorm = ffmi + 6.1 * (1.83 - hM);
@@ -258,6 +337,9 @@ export function planMacrocycle(
   return {
     target: computed.target,
     perMonthRate: computed.perMonthRate,
+    // §2.4: goal-independent — profile-only, so every plan carries the
+    // strength-denominated band the doc-16 pacer needs under rate_source "plan"
+    strengthRatePctMonth: strengthRateBand(profile, bucket, mt),
     recommendedDurationMonths: recommended,
     durationMonths: months,
     mesoCount,
@@ -283,17 +365,20 @@ function computeTarget(
   }
 
   if (goal === "strength") {
-    const rate = mt.strength_pct_month[bucket];
+    // §2.1: the personalized band (sex factor + age taper with the strength
+    // floor); compounding and the total cap are unchanged. With the v21
+    // params absent this is the raw bucket band (legacy).
+    const rate = strengthRateBand(profile, bucket, mt);
     const cap = mt.strength_cap_total_pct[bucket];
     const compound = (r: number) => (Math.pow(1 + r / 100, months) - 1) * 100;
-    const low = Math.min(compound(rate[0]), cap);
-    const high = Math.min(compound(rate[1]), cap);
+    const low = Math.min(compound(rate.low), cap);
+    const high = Math.min(compound(rate.high), cap);
     return {
       target: { low: round1(low), high: round1(high), unit: "%", direction: "gain" },
       // strength is compounding, so the per-month rate is the band itself
       perMonthRate: {
-        low: round1(rate[0]),
-        high: round1(rate[1]),
+        low: round1(rate.low),
+        high: round1(rate.high),
         unit: "%",
         direction: "gain",
       },
@@ -322,8 +407,14 @@ function computeTarget(
     const lossFor = (pctWeek: number) =>
       bw * (1 - Math.pow(1 - pctWeek / 100, weeks));
     const cap = bw * mt.cut_cap_pct_bw;
-    const high = Math.min(lossFor(rate[1]), cap);
-    const low = Math.min(lossFor(rate[0]), high);
+    // §2.3 cut-band guard: when the cap binds the high endpoint, rescale the
+    // low endpoint proportionally instead of clamping both to the cap (which
+    // collapsed the band to a point on long cuts). Parameterless; when the
+    // cap doesn't bind this is byte-identical to the plain min().
+    const highRaw = lossFor(rate[1]);
+    const lowRaw = lossFor(rate[0]);
+    const high = Math.min(highRaw, cap);
+    const low = highRaw > cap ? lowRaw * (cap / highRaw) : lowRaw;
     return {
       target: { low: round1(low), high: round1(high), unit, direction: "loss" },
       perMonthRate: {
@@ -426,8 +517,9 @@ function recommendDuration(
   if (goal === "maintain") return clamp(3, lo, hi);
 
   if (goal === "strength") {
-    const rate = mt.strength_pct_month[bucket];
-    const avg = (rate[0] + rate[1]) / 2;
+    // §2.1: recommend off the same personalized band the target compounds on
+    const rate = strengthRateBand(profile, bucket, mt);
+    const avg = (rate.low + rate.high) / 2;
     const months =
       Math.log(1 + mt.recommend_strength_total_pct / 100) /
       Math.log(1 + avg / 100);
