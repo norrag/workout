@@ -10,7 +10,7 @@ Owner ratified the architecture record (PR #166) with three updates and asked
 for the complete phased implementation plan "similarly to how we just did
 with the progression model." Shipped **`docs/17-macrocycle-goals.md`**
 (authoritative build spec; where it conflicts with the architecture record,
-17 wins; doc 16 untouched). PR #<n>. What changed against the record:
+17 wins; doc 16 untouched). PR #168. What changed against the record:
 
 - **Closeout semantics (owner decision):** natural close when every
   positioned meso is terminal, or explicit **"End macrocycle"** irrevocably
