@@ -4,6 +4,30 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-10 — Session 59: N34 readiness probe — BodySpec build unblocked (doc 15 §8)
+
+Owner asked whether the BodySpec integration is buildable now, and clarified
+the deployment is **private single-user testing** — which reframed doc 15's
+"Phase 0: email BodySpec" gate. A live probe of the auth server answered the
+two questions that actually blocked the build:
+
+- **OAuth client (§7-1): resolved.** The Keycloak realm exposes anonymous
+  OIDC dynamic client registration — a live POST returned a working public
+  PKCE client with arbitrary redirect URIs, no approval. The app self-registers
+  its client at Phase-1 build time. (Probe left one inert throwaway client on
+  their server, documented in §8.1.)
+- **Refresh tokens (§7-2): resolved at realm level.** `offline_access` +
+  `refresh_token` grant supported and granted to the probe client.
+- **Residual risk (one):** a possible undocumented audience/scope check
+  (`ext_api_token`) on the API itself — verifiable only via a real login;
+  it's the first 5-minute check of Phase 1, fallback = the old Phase-0 email.
+
+Doc 15 amended in place: §1.1/§5/§7 pointers + new **§8 addendum**
+("build is unblocked for a private deployment"). N34 row updated —
+Phase 0 is no longer an owner action; remaining owner input is the
+adopt-&-phase decision (doc 15 §5). No code. Shipped as **PR #167**
+(`claude/bodyspec-dexa-api-readiness-q5a25w`).
+
 ## 2026-07-09 — Session 58: N35 Phase R — activation prep + deferred spine filed + N21 primed
 
 Phase R is a **runbook, not code** (doc 16 §10) — shipped as **PR #162**

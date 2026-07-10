@@ -34,8 +34,8 @@ BodySpec runs an OIDC-compliant auth server (Keycloak) with two tiers:
 | **User OAuth2** | Authorization-code + **PKCE** against `https://auth.bodyspec.com/realms/bodyspec/...`; scopes `openid profile email`; JWT bearer tokens | The natural fit for "connect your BodySpec account" — per-user consent, per-user data. |
 | **Partner Auth** | HTTP Basic `base64(partner_id:partner_secret)`; unlocks the `/partners/*` surface (other users' results, webhooks, orders, exports) | Only needed later, if ever — webhooks and PDF export live here. Requires a partner agreement with BodySpec. |
 
-Practical caveats found in the spec (all resolvable only by talking to
-BodySpec — see §7):
+Practical caveats found in the spec (as assessed 2026-07-05; the 2026-07-10
+readiness probe in §8 resolved most of them without BodySpec contact):
 
 - The documented scopes are `openid profile email` only — **no
   `offline_access`**, so refresh-token / long-lived background access is
@@ -353,7 +353,7 @@ Vertical slices, each shippable alone:
 
 | Phase | Scope | Notes |
 |-------|-------|-------|
-| **0. Unblock** | Email dev-support@bodyspec.com: OAuth client registration (redirect URIs), refresh-token/`offline_access` story, rate limits, API stability expectations | Blocks everything; zero code. Outcome recorded in `docs/deployment/manual-operations.md` |
+| **0. Unblock** | ~~Email dev-support@bodyspec.com~~ **Resolved 2026-07-10 (§8):** the realm allows anonymous dynamic client registration and grants `offline_access` — self-register the client at Phase-1 build time, no BodySpec contact required for a private build. Register per environment, store the `registration_access_token`, record in `docs/deployment/manual-operations.md` | Was the blocker; now a build-time step inside Phase 1 |
 | **1. Connect + import** | `external_connections` + `body_scans` migrations (RLS + tests), OAuth PKCE flow, zod-validated import with unit conversion, full backfill, More → integration screen (connect/sync/disconnect status), scan list + detail | The vertical slice that proves the loop. Design per 08/09 discipline — figure(s) needed for the integration screen and scan card |
 | **2. Enrich + view** | Post-sync profile-update proposal (bodyweight, body_fat_pct), `v_body_comp_history`, composition trend on the macro page bracketed-scan verdicts (§3.2), percentile display | First user-visible payoff beyond raw numbers |
 | **3. Engine + MCP** | Measured-FFM pathway in `planMacrocycle` (with N21's correction), RMR context on cut/bulk macros, MCP read tool (`get_body_composition`) reading the same view, coaching-guardrail copy for LSC/comparability | Engine changes ship with golden tests per hard rule 3 |
@@ -399,23 +399,112 @@ machine and should be revisited at build time):
 
 ---
 
-## 7. Open questions (all for BodySpec, none blocking this assessment)
+## 7. Open questions (as of 2026-07-05 — see §8 for what the readiness probe resolved)
 
 1. **OAuth client registration** — process, redirect-URI requirements,
-   allowed token lifetimes for third-party apps.
+   allowed token lifetimes for third-party apps. → **Resolved, §8.1.**
 2. **Refresh tokens / `offline_access`** — can a connected account stay
    connected between visits, or is periodic re-auth the model? Determines
-   whether "sync" is ever silent or always user-present.
+   whether "sync" is ever silent or always user-present. → **Resolved at
+   the realm level, §8.2.**
 3. **Rate limits** — undocumented; need numbers for polite backfill.
+   → **Still unknown; immaterial at single-user scale (§8.3).**
 4. **API stability** — early access; what's the deprecation posture? (Store
    `raw` jsonb regardless — §2.2 — so re-mapping is always possible.)
+   → **Unchanged; mitigation stands (§8.3).**
 5. **Scan availability lag** — how long after `acquire_time` results appear
    on the API (affects the "sync after your appointment" UX copy;
    `results_ready` exists as a webhook concept, but partner-tier only).
+   → **Still unknown; observable directly once connected (§8.3).**
+
+---
+
+## 8. Addendum (2026-07-10): readiness probe — build is unblocked for a private deployment
+
+Context for this addendum: the owner confirmed WORKOUT is **private,
+single-user testing** — not a public product. That changes the §5 Phase-0
+posture, and a live probe of BodySpec's auth server (same OIDC endpoints as
+§1.1, checked 2026-07-10) resolved the two questions that actually gated the
+build. **Net verdict: Phases 1–3 can be built and used today with no
+approval, partner agreement, or contact with BodySpec.** The user tier has no
+application or approval process at all — any BodySpec account holder's
+credentials work; the only gate was mechanical (an OAuth client to run the
+PKCE flow against), and that gate turns out to be self-service.
+
+### 8.1 OAuth client registration is open (was §7-1)
+
+The Keycloak realm exposes anonymous **OIDC dynamic client registration**
+(RFC 7591) at
+`https://auth.bodyspec.com/realms/bodyspec/clients-registrations/openid-connect`,
+verified by a successful live POST: it returned a working `client_id` for a
+public (PKCE, `token_endpoint_auth_method: none`) client with an arbitrary
+localhost redirect URI and `authorization_code` + `refresh_token` grants —
+no credentials, no approval step. So the app registers its **own** client at
+build time — one per environment (localhost dev + the Vercel domain), since
+each registration is independently managed.
+
+Operational notes for Phase 1:
+
+- The registration response includes a `registration_access_token` — the
+  **only** credential that can later update or delete that client. Persist it
+  (Vercel env var / secret store) and record the client in
+  `docs/deployment/manual-operations.md`. A client whose token is lost cannot
+  be managed, only abandoned.
+- The probe itself created one throwaway client
+  (`e6256e0b-2e47-45a1-8b9f-6bf983d48a5b`, name `workout-private-test`,
+  localhost-only redirect, no secret, no data access) whose registration
+  token was **not** retained — it is inert and unusable by anyone, but it
+  cannot be deleted by us. The real Phase-1 registration should be a fresh
+  client, done properly per the point above.
+- The docs' own client (`bodyspec-api-ext-v1`) is not reusable: its redirect
+  URIs are BodySpec's, and the device-code grant is disabled on it
+  (verified: `unauthorized_client`).
+
+### 8.2 Refresh tokens exist (was §7-2)
+
+The realm's discovery document lists `offline_access` in `scopes_supported`
+and `refresh_token` in `grant_types_supported`, and the dynamically
+registered probe client was granted `offline_access` in its scope. So
+long-lived connections ("sync" without re-login) are supported at the realm
+level — request `openid profile email offline_access` in the PKCE flow. The
+§1.1 design stance (tolerate expiry, cheap re-connect path) stays as the
+fallback, since per-client token lifetimes are Keycloak-configurable and only
+observable after the first real login.
+
+### 8.3 What remains unverified (and why none of it blocks)
+
+- **The one real residual risk:** the API might enforce an audience/scope
+  check beyond what `openapi.json` declares (its security scheme asks only
+  for a JWT bearer with `openid profile email`; a realm scope named
+  `ext_api_token` exists and *might* be required and might not be grantable
+  to self-registered clients). This is unverifiable without completing a real
+  login, and is the **first thing Phase 1 verifies**: register client → log
+  in → `GET /api/v1/users/me`. Five minutes, at build time. If it fails,
+  the fallback is exactly the old Phase 0 (email dev-support), with a
+  concrete question instead of an open-ended request.
+- **Rate limits** (§7-3): still undocumented; a single user syncing a few
+  scans a year cannot plausibly hit any limit. Backfill politely (serial
+  requests) and move on.
+- **API stability** (§7-4): unchanged — spec still v0.14.3 as of 2026-07-10;
+  early-access risk is real but fully mitigated by storing `raw` jsonb
+  (§2.2). For a single-user deployment a breaking change is an
+  inconvenience, not an incident.
+- **Scan availability lag** (§7-5): observable directly after the next scan;
+  affects UX copy only.
+
+### 8.4 What "private" does *not* change
+
+The §2 schema (RLS, token handling via `service.ts` only, consented profile
+mutation), the §3 engine boundaries, and the §6 honesty guardrails all stand
+unchanged — they're cheap, and they mean nothing needs re-architecting if
+the app ever stops being single-user. The only thing "private" relaxes is
+the go-ask-BodySpec step and any worry about partner-tier features (webhooks,
+booking) — which were already non-goals.
 
 ---
 
 *Spec sources: `openapi.json` v0.14.3 (2026-07-05); repo state at branch
-point `5f4cea9`. Related: doc 10 §5 (macro target engine), doc 14
+point `5f4cea9`. §8 probe: OIDC discovery + dynamic-registration endpoints
+live-checked 2026-07-10. Related: doc 10 §5 (macro target engine), doc 14
 (fingerprint config-vs-derived), backlog N21 (macro-target correction), N34
 (this integration).*
