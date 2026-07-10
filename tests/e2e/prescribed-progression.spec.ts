@@ -241,16 +241,37 @@ test("earned prescription renders; weight edit re-derives reps off the target an
     .poll(async () => Number(await page.getByLabel("set 1 reps").inputValue()))
     .toBeGreaterThan(repsAtPrescribed);
 
-  // 3a. log set 1 exactly as prescribed ⇒ the shared comparison reads `met`
+  // Focusing the reps cell blurs the weight cell, whose handler ASYNCHRONOUSLY
+  // rewrites the reps input with the re-derived prediction. At robot speed a
+  // plain fill() races that rewrite: the insert lands after the re-render with
+  // the selection collapsed, so the typed digits APPEND to the predicted value
+  // ("11" + "8" → reps 118 → the server rejects > 100 and the set never logs).
+  // A human can't type inside that window; retry until the fill sticks.
+  const fillReps = async (setNumber: number, value: number) => {
+    const repsCell = page.getByLabel(`set ${setNumber} reps`);
+    await expect(async () => {
+      await repsCell.fill(String(value));
+      await expect(repsCell).toHaveValue(String(value));
+    }).toPass();
+  };
+
+  // 3a. log set 1 exactly as prescribed ⇒ the shared comparison reads `met`.
+  // Blur the weight edit and wait for its re-derive to land (back at the
+  // weight-105 prediction we sampled above) so no rewrite is still in flight.
   await weightCell.fill(String(PRESCRIBED_WEIGHT));
-  await page.getByLabel("set 1 reps").fill(String(PRESCRIBED_REPS));
+  await weightCell.blur();
+  await expect
+    .poll(async () => Number(await page.getByLabel("set 1 reps").inputValue()))
+    .toBe(repsAtPrescribed);
+  await fillReps(1, PRESCRIBED_REPS);
   await page.getByRole("button", { name: "log set 1" }).click();
   await expect(page.getByRole("button", { name: "uncheck set 1" })).toBeVisible();
   await expect(page.getByLabel("met prescription")).toBeVisible();
 
   // 3b. log set 2 short ⇒ `under`
   await page.getByLabel("set 2 weight").fill(String(PRESCRIBED_WEIGHT));
-  await page.getByLabel("set 2 reps").fill(String(PRESCRIBED_REPS - 2));
+  await page.getByLabel("set 2 weight").blur();
+  await fillReps(2, PRESCRIBED_REPS - 2);
   await page.getByRole("button", { name: "log set 2" }).click();
   await expect(page.getByRole("button", { name: "uncheck set 2" })).toBeVisible();
   await expect(page.getByLabel("below prescription")).toBeVisible();

@@ -20,6 +20,23 @@ for merge. Merged `origin/main` (post #161/#162/#167) into the branch:
   was a parallel "Session 53" — left dated in place below, marked as a parallel
   branch.
 - Full suite + typecheck re-run green on the merged tree.
+- **Found + fixed the standing CI e2e failure (red since PR #160 — every run
+  from #412 on, incl. main).** Reproduced locally against the local stack and
+  pulled the Playwright trace: the Phase-3 progression e2e logged set 1 with
+  `reps: 118` — the day-view weight-blur handler re-derives the reps input
+  asynchronously, and at robot speed the test's `fill("8")` landed after that
+  re-render with the selection collapsed, APPENDING to the predicted "11";
+  the server correctly rejects reps > 100 (zod), the set never logs, the
+  `uncheck set 1` assertion times out. Test-only fix in
+  `tests/e2e/prescribed-progression.spec.ts`: blur the weight edit and wait
+  for the re-derive to settle, then a fill-and-verify retry (`toPass`) for
+  both sets. The app behaved correctly throughout (validation + rollback
+  toast); no product code touched. PRs #160–#167 were merged over this red
+  e2e — worth keeping an eye on "merged with failing CI" as a process slip.
+- Migration `20260708000001` (e1rm_confidence) applied to the hosted project
+  via the Supabase MCP pre-merge (additive; deployed main code ignores the
+  column). Backfill verified: 10,918 stamped sets banded (all `low` — correct,
+  `rir_reported` has no write surface yet), 1 null-e1RM row null.
 
 ## 2026-07-10 — Session 59: N34 readiness probe — BodySpec build unblocked (doc 15 §8)
 
