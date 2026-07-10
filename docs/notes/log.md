@@ -4,6 +4,53 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-10 — Session 59: N21 macrocycle-goals architecture record (owner's four questions answered)
+
+Owner asked for the end-to-end architecture of the macrocycle goal layer
+around N21: (1) how do we get targets right, (2) how do we use them,
+(3) how do we measure results and close the loop, (4) what persists across
+macro boundaries. Answered in
+**`docs/reviews/2026-07-10-macrocycle-goals-architecture.md`** (design record,
+not a build — doc 16's authority untouched). PR #<n>. Highlights:
+
+- **Frame:** confirmed the owner's cadence+pacing levers / envelope-tunes-
+  within-bounds understanding; sharpened it — the engine-facing product of the
+  whole macro layer is exactly one number (the expected monthly strength rate)
+  plus two per-goal lookups (`goal_rate_factor`, `rep_window`); the loop closes
+  at four nested timescales (entitlement / pacing / position / contract), the
+  fourth of which had no design until now.
+- **Q1 (set):** N21 defect recap + the input-quality ladder (self-reported →
+  derived → measured → observed record); **contract-vs-estimate snapshot
+  semantics named as designed behavior** (stored `target_*` = the contract,
+  overwritten only by an explicit goal edit; live recompute = the estimate;
+  retrospectives grade against the contract) + persist the `MacroProfile`
+  inputs beside the target columns at create/edit (N21 slice). Hygiene finds:
+  `profiles.age` is a static int (→ birthdate), `key_lifts` display uses
+  top-3 vs the param's n=5 (`stats.ts:67-78`).
+- **Q2 (use):** the two levers and the three non-levers (quantum size,
+  entitlement, measured anchor); **N37 shape fixed** — plan rate stays a band
+  lerped by `band_position`, arrives as a doc-14 derived input
+  (fingerprint-excluded, replay-recorded), degrades toward `"band"` never
+  unpaced.
+- **Q3 (measure):** the per-goal measurement asymmetry (strength fully
+  in-app; mass goals honestly ungradable until body data exists); **N36
+  residence fixed** — per-user derived `band_position` fold over trailing
+  decisions at seed time, params value as default, per-user grain, no new
+  table; **macro close + retrospective designed** (nothing happens at macro
+  end today — `status` never leaves `active`); filed as **N40**.
+- **Q4 (carry):** the permanent record is the persistence layer — derive,
+  don't duplicate (decisions + logged history already carry entitlement,
+  pacing, position across every boundary). Persist only two things for
+  measurement: the enriched contract snapshot and a **bodyweight time series**
+  (filed as **N41**); observed-rate priming of the next macro's create flow is
+  derive-on-read, display-only (never silently blended).
+
+Backlog updates in the same PR: N21 row gains the architecture-doc pointer
+(build scope unchanged, still next target); N36/N37 rows carry their decided
+shapes; **N40** (macro close + retrospective, needs-input) and **N41**
+(bodyweight series, needs-input) added to workstream C. Owner decision list in
+the doc's §6 (7 decisions, each with a recommendation).
+
 ## 2026-07-09 — Session 58: N35 Phase R — activation prep + deferred spine filed + N21 primed
 
 Phase R is a **runbook, not code** (doc 16 §10) — shipped as **PR #162**
