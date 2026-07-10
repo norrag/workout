@@ -219,6 +219,44 @@ visible on cut/maintain blocks.
 | **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v19**. Expect diffs ONLY on ramp-hold weeks (e.g. the default 3→2→2→1 ramp's week 2→3): held `weight × reps` where the legacy path emitted a lighter load at +1 rep. Stepped weeks, top-outs, deloads, and seeds must be byte-identical. |
 | **Activate v19** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 19;` (single-active invariant). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v18. |
 
+### Activate engine_params **v20** (prescribed progression — doc 16 Phase R)
+
+`20260709000001_engine_params_v20_prescribed_progression.sql` ships v20
+**inactive**. It adds one `.optional()` `progression` block over v19 —
+**earned-step overload** (`mode: "earned_step"`): the engine leads the
+prescribed demand by one earned quantum off the *measured* anchor
+(`A* = A + δ`), earned by full previous-session compliance in e1RM space,
+metered by the governors (cadence / macro-rate pacer / miss throttle /
+peak-week skip), capped on the realized ask, and always disclosed by a
+status-coded `progression` trace step. The measured e1RM pipeline is untouched
+(T-I5) — performing the led prescription is what raises the measurement. This
+is the **owner-gated activation** for the whole doc-16 build-out (Phases 1–4
+already merged, PRs #158–#161). Full mechanism: `docs/16-prescribed-progression.md`.
+
+> **Applied to hosted 2026-07-09** via the Supabase MCP (`apply_migration`),
+> hash-verified (`cb451a02…c90287`, matches `params-provenance.test.ts`); v19
+> remains the active row, so nothing changed for users. The migration is in the
+> repo chain. Only the **activation** below is outstanding.
+
+| Step | What / why |
+|---|---|
+| **① Research pass on `goal_rate_factor.hypertrophy`** (activation gate, doc 16 §10) | **DONE 2026-07-09** — `docs/reviews/2026-07-09-goal-rate-factor-research.md`. Finding: **keep 0.75** (moderate-load 1RM conversion runs ~0.56–0.73 of heavy-load; 0.75 is the conservative-for-a-governor top of that band; collapsing to 1.0 is contradicted by Schoenfeld 2016/2017, Lasevicius 2018, Campos 2002). No params edit needed — v20 already carries 0.75. |
+| **② Replay diff** | **DONE 2026-07-09** — `replay_decisions` candidate v20 over the caller's recorded decisions. **v19→v20: 15 source decisions, 11 changed, 0 errors** (all diffs on advance/seed working weeks — earned-step reprices up one quantum, e.g. Hack Squat 110→112.5, Bench 125→130, or a +1 rep climb on micro-loadable lifts; a few lattice snaps carry reps to window-bottom). Broader 100-decision replay (v10–v19 sources): 80 unchanged / 20 changed / 0 errors — the 80 unchanged are seeds/deloads/gate-failures (byte-identical, as designed). **This diff is what the owner reviews before activating.** Re-run `simulate_prescriptions` / `replay_decisions` for v20 to reproduce. |
+| **③ Owner reviews the diff** | The changed rows are all *earned* steps under compliant history — confirm the magnitude and cadence read right (≈ one quantum per exercise per microcycle; hypertrophy paced to 75% of the strength band). |
+| **④ Activate v20** | `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 20;` (single-active invariant). **Prefer the admin MCP `activate_engine_params`** (the hook-bearing path — reports the e1RM-restamp status; here it will report "e1rm block unchanged" since v20 doesn't touch the e1RM block). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v19. |
+| **⑤ Monitor** | After activation, watch `get_engine_decisions` (rule `progression`, filter by status: `stepped` / `vanished` / `paced` / `not_earned`) and the `get_progression_history` audit aggregate (doc 16 §8.3): earn/miss/skip mix, `vanished` share (→ increment-sizing signal, doc 10 §8), governor firings. This field data also unblocks the envelope loop + the `goal_rate_factor` revisit. |
+
+> **Recommended alongside (doc 16 §10 Phase R):** doc 10 §8 finer per-class
+> increments, **or** document the existing per-exercise increment override
+> (`set_exercise_increment` MCP / exercise page) as the isolation-lift path for
+> the `vanished`-heavy coarse lifts the monitor surfaces.
+
+> **Blocks nothing user-facing when off; unblocks the deferred work when on.**
+> The `rate_source: "plan"` flip and the envelope loop (doc 16 §11) both need
+> v20 **active** + a few mesos of field data. See
+> `docs/reviews/2026-07-09-n21-strength-rate-priming.md` for the N21 → plan-rate
+> → envelope sequencing.
+
 ---
 
 ## How Claude flags these

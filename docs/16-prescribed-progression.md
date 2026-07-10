@@ -147,7 +147,8 @@ compliance context ⇒ not earned ⇒ today's `seed_anchor` behavior.
 ## 4. Per-goal rates and the macro layer
 
 - `goal_rate_factor` defaults: **strength 1.0; hypertrophy/gain 0.75
-  [HEURISTIC — research pass is an activation gate, §10 Phase R];
+  [research pass complete 2026-07-09 — kept at 0.75;
+  [`docs/reviews/2026-07-09-goal-rate-factor-research.md`](./reviews/2026-07-09-goal-rate-factor-research.md)];
   cut/maintain 0.0** (holds strength honestly per R24; factor 0 disables
   the gate — one mechanism, no separate booleans). Strength vs hypertrophy
   otherwise differ by rep window only (`rep_window` per goal); cut vs
@@ -318,26 +319,39 @@ shared comparison.
 `get_progression_history` over `engine_decisions`; `v_progression_events`
 view only if a stats screen wants it.
 
-**Phase R — activation (owner-gated, runbook not code).**
-(1) research pass on `goal_rate_factor.hypertrophy` (doc-10-style, evidence
-labels; adjust 0.75 or collapse to 1.0); (2) replay diff via
-`simulate_prescriptions` over live users; (3) owner reviews the diff;
-(4) propose → activate v20 per `docs/deployment/manual-operations.md`;
-(5) monitor via the decisions filter (earn/miss/skip mix, `vanished`
-frequency). Recommended alongside: doc 10 §8 finer per-class increments
-(or document the per-exercise override as the isolation-lift path).
+**Phase R — activation (owner-gated, runbook not code).** *Prepared
+2026-07-09 — steps (1)+(2) done, migration applied inactive; (3)–(5) await the
+owner. Runbook: `docs/deployment/manual-operations.md` → "Activate engine_params
+v20".*
+(1) **[done]** research pass on `goal_rate_factor.hypertrophy` — **kept 0.75**
+([`docs/reviews/2026-07-09-goal-rate-factor-research.md`](./reviews/2026-07-09-goal-rate-factor-research.md)):
+moderate-load 1RM conversion ~0.56–0.73 of heavy-load, 0.75 is the
+conservative-for-a-governor top of the band, 1.0 is contradicted by the
+evidence; (2) **[done]** replay diff via `replay_decisions`/`simulate_prescriptions`
+— v19→v20: 11/15 changed, 0 errors, all earned steps on compliant advance/seed
+weeks; (3) owner reviews the diff; (4) propose → activate v20 per the runbook;
+(5) monitor via the decisions filter + `get_progression_history` (earn/miss/skip
+mix, `vanished` frequency). Recommended alongside: doc 10 §8 finer per-class
+increments (or document the per-exercise override as the isolation-lift path).
 
 ## 11. Deferred (recorded, not in scope for Phases 1–3)
 
+Each is filed as a high-priority backlog row pointing back here (persisted
+2026-07-09 during Phase R — see `docs/notes/backlog.md`).
+
 - **Envelope loop** (§4) — Phase-3-of-the-design; needs Phase-1/2 field
-  data for the update rule.
+  data for the update rule. → backlog **N36**. Sequencing +
+  data-source in [`docs/reviews/2026-07-09-n21-strength-rate-priming.md`](./reviews/2026-07-09-n21-strength-rate-priming.md) §5.
 - **`rate_source: "plan"`** — blocked on N21's macro-target correction
-  (which should expose a per-user monthly strength rate).
+  (which should expose a per-user monthly strength rate). → folded into
+  **N21** (the strength-path fix must expose the per-user rate) + tracked as
+  **N37** for the pacer branch; priming in
+  [`docs/reviews/2026-07-09-n21-strength-rate-priming.md`](./reviews/2026-07-09-n21-strength-rate-priming.md).
 - **Periodic required honest-RIR confirmation** — two-part (engine rule +
   per-set RIR capture affordance + narrow doc-11 premise amendment);
-  revisit with field data.
+  revisit with field data. → backlog **N38**.
 - **Per-exercise "progression off" override** — slots into the existing
-  `ExerciseParamOverride` merge (doc 14 §6.1) when wanted.
+  `ExerciseParamOverride` merge (doc 14 §6.1) when wanted. → backlog **N39**.
 - **Cross-doc updates at build time:** doc 10 §4 and doc 13 §9.2 gain
   pointers to this doc in the Phase-1 PR; `docs/PROGRESS.md` records each
   phase; the N35 backlog row moves per the notes protocol.

@@ -2,7 +2,49 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-09 (latest) — Prescribed progression Phase 4: audit aggregate (doc 16 §8.3/§10, N35)
+## 2026-07-09 (latest) — Prescribed progression Phase R: activation prep (doc 16 §10, N35)
+
+Phase R of [doc 16 — prescribed progression](16-prescribed-progression.md) is a
+**runbook, not code** (§10). It gates the activation of engine_params **v20**
+(the earned-step block shipped inactive by Phase 1) on a research pass + a replay
+diff + owner review. No engine or app change this slice — only docs and the
+applied-inactive migration. Steps (1)+(2) are done; (3)–(5) are owner-gated in
+`docs/deployment/manual-operations.md`.
+
+- **Research pass (activation gate) — `goal_rate_factor.hypertrophy` kept 0.75.**
+  New evidence doc `docs/reviews/2026-07-09-goal-rate-factor-research.md`
+  (doc-10 house style, evidence labels). The factor scales the macro-rate
+  pacer's target gain; it is the *residual* (the engine already splits goals by
+  rep window). Moderate-load (8–12) → 1RM conversion runs ~0.56–0.73 of
+  heavy-load (3–5) in the one head-to-head that isolates rep zone (Schoenfeld
+  2016: squat 0.56, bench 0.73), consistent with the load-continuum meta
+  (Schoenfeld 2017) and volume-matched trials (Lasevicius 2018, Campos 2002).
+  0.75 is the conservative-for-a-*governor* top of that band (the pacer only
+  delays, so erring high lets earned performance flow through); collapsing to
+  1.0 is contradicted by every source. v20 already carries 0.75 → **no params
+  edit**; the finding validates the shipped value.
+- **v20 applied INACTIVE + replay diff.** `20260709000001` applied to hosted via
+  the Supabase MCP, hash-verified `cb451a02…c90287`; v19 stays active, no user
+  change. `replay_decisions` candidate v20: **v19→v20 = 15 source / 11 changed /
+  0 errors** (all earned steps on compliant advance/seed working weeks — reprice
+  up one quantum or a +1 rep climb), broader 100-decision replay = 80 unchanged
+  / 20 changed / 0 errors (unchanged = seeds/deloads/gate-failures,
+  byte-identical). This is the owner's pre-activation diff.
+- **Runbook + deferred spine.** `manual-operations.md` gained the "Activate
+  engine_params v20" section (research ✓ / replay ✓ / owner review / activate via
+  admin MCP `activate_engine_params` / monitor). The doc 16 §11 deferred items
+  are filed as backlog **N36–N39** (workstream P): envelope loop, `rate_source:
+  "plan"` pacer branch, required honest-RIR confirmation, per-exercise
+  progression-off override. **N21 primed as the next target**
+  (`docs/reviews/2026-07-09-n21-strength-rate-priming.md`): the strength-path fix
+  must expose the age/sex-aware per-user rate that `rate_source:"plan"` reads —
+  key finding, strength `sexFactor ≈ 1.0`, not the hypertrophy 0.7.
+
+**Remaining / external:** activating v20 (owner review of the replay diff →
+`activate_engine_params` → monitor) per `manual-operations.md`. Until then the
+earned-step mechanism is dormant and every output is byte-identical to v19.
+
+## 2026-07-09 — Prescribed progression Phase 4: audit aggregate (doc 16 §8.3/§10, N35)
 
 Fourth build slice of [doc 16 — prescribed progression](16-prescribed-progression.md):
 the admin-side audit aggregate over the status-coded `progression` trace steps
