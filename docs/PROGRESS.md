@@ -291,6 +291,43 @@ Phase 3 (day-view target-anchor coupling + three-state markers, hard-rule-8
 mockup pass), Phase 4 (audit aggregate, optional), Phase R (owner-gated
 activation incl. the hypertrophy-factor research pass).
 
+## 2026-07-08 — Est-strength rework: recent-vs-baseline rolling trend (N42, filed as N36)
+
+Reworked the aggregated "est. strength" metric bottom-up. Root cause of the
+owner's "it drops when a new meso starts": a pure first→last two-point delta let
+a fresh block's deliberately light RIR-ramp opener become the endpoint and
+crater every continuing lift; and the Overview tile (top-3 key-lift mean) was a
+different aggregation from the Performance muscle rollup and could disagree.
+
+- **`src/lib/engine/strength.ts`** (new, pure, golden-tested): `strengthTrend`
+  scores each lift as best-of-recent-window vs best-of-earliest-window
+  (symmetric non-overlapping windows, `engine_params.strength`). `volumeWeightedMean`.
+- **`queries/stats.ts` + `macro.ts`**: `foldProgressScores` uses it; the headline
+  is now the **volume-weighted mean of the muscle-group rollup** (fractional-set
+  weights), shared by the Overview tile and Performance tab — identical by
+  construction. `keyLiftStrengthPct` removed.
+- **`engine_params.strength` is `.optional()`** (not `.default()`): absent on every
+  stored row, so the params canonical hash / replayability is untouched (verified —
+  params-provenance suite green); stats fall back to `DEFAULT_STRENGTH`.
+- **Confidence persisted**: `logged_sets.e1rm_confidence` (migration
+  `20260708000001` + backfill), stamped at log/amend (`log/actions.ts`) and
+  restamped on e1rm-block change (`e1rm-restamp.ts`). Auditability.
+- **Clarity**: `glossary.ts` rewrites (e1rm now states RIR/effective reps in plain
+  words; new `est_strength`, `e1rm_confidence` cards), InfoDots on the macro
+  Overview tile + strength sections, and RIR denoted next to the e1RM in the
+  history flip view.
+- Session value stays the **session average** e1RM (N2 preserved).
+- **Rule-8 deviation (recorded):** the history flip view (PH32, no strict mockup)
+  now appends `· ~N RIR` to the e1RM read — a minor annotation, owner-requested
+  ("denote RIR with the sets/e1rm"). The strength/muscle sections already carry a
+  no-mockup rule-8 deviation from N9/M8.
+
+Spec updated: `docs/10-metrics-spec.md` §1/§6/§8. Verified on live data through
+`strengthTrend` (Bench −7.3%→−3.8% opener corrected; Machine Chest Supported Row
+−32%→−31.7% genuine decline preserved). Full suite green (858), typecheck + lint
+clean. Migration not yet applied to the live project (ships with the PR).
+
+
 ## 2026-07-05 — Four backlog closures: N29 FilterBar, N18-B per-week RIR, R24 hold-week, R25 MCP pass (PR #152)
 
 One session, one commit per item:

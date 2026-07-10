@@ -7,7 +7,7 @@ import {
   type MacroProfile,
   type PhaseName,
 } from "@/lib/engine";
-import { getProgressScores, keyLiftStrengthPct } from "./stats";
+import { getMacroStrength } from "./stats";
 import type {
   Database,
   MacrocycleRow,
@@ -761,6 +761,7 @@ export async function getMacroOverview(
     userId,
     (mesos ?? []).map((m) => m.id),
     summary ?? null,
+    params,
   );
 
   return {
@@ -841,12 +842,14 @@ export async function deleteMacrocycle(
   if (error) throw error;
 }
 
-/** Est. strength = mean e1RM trend on the macro's key lifts (by frequency). */
+/** Est. strength = volume-weighted mean of the macro's muscle-group e1RM
+ *  changes, rolled up from every qualifying lift (10 §6). */
 async function buildMacroStats(
   supabase: Client,
   userId: string,
   mesoIds: string[],
   summary: VMacroSummaryRow | null,
+  params: EngineParams,
 ): Promise<MacroStats> {
   const totalVolume = summary?.total_volume ?? 0;
   const sessionsLogged = summary?.sessions_logged ?? 0;
@@ -857,15 +860,18 @@ async function buildMacroStats(
       ? Math.round((summary.sessions_attended / summary.sessions_due) * 100)
       : null;
 
-  // N16: one definition with the Performance tab — the same deload-filtered,
-  // ≥3-session qualified scores, key lifts by frequency among them. The old
-  // bespoke fold here included deloads and unqualified lifts, so a cut ending
-  // on a deload week read strongly negative while the tab stayed positive.
-  let estStrengthPct: number | null = null;
-  if (mesoIds.length > 0) {
-    const scores = await getProgressScores(supabase, userId, mesoIds);
-    estStrengthPct = keyLiftStrengthPct(scores);
-  }
+  // N16: one definition with the Performance tab. `getMacroStrength` folds the
+  // SAME deload-filtered, ≥3-session, recent-vs-baseline lift scores up through
+  // the muscle rollup and volume-weights them — so the Overview tile and the
+  // Performance tab render the identical number. (The old path here meaned the
+  // top-3 most-logged lifts, a separate calculation that could and did disagree
+  // with the tab.)
+  const { estStrengthPct } = await getMacroStrength(
+    supabase,
+    userId,
+    mesoIds,
+    params,
+  );
 
   return { estStrengthPct, totalVolume, sessionsLogged, adherencePct };
 }

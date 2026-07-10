@@ -1,9 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  scoreProgress,
+  strengthTrend,
+  volumeWeightedMean,
   pplCategory,
   volumeCountingWeights,
+  DEFAULT_STRENGTH,
+  type StrengthTrendConfig,
+  type StrengthTrendLabel,
   type VolumeCountingWeights,
+  type EngineParams,
 } from "@/lib/engine";
 import type {
   Database,
@@ -32,12 +37,16 @@ type Client = SupabaseClient<Database>;
 export interface ExerciseProgressScore {
   exercise_id: string;
   exercise_name: string;
-  first_e1rm: number | null;
-  last_e1rm: number | null;
-  /** percentage e1RM change first → last non-deload session of the window */
+  /** best session e1RM over the earliest window — the "starting" level */
+  baseline_e1rm: number | null;
+  /** best session e1RM over the most-recent window — the "current" level */
+  current_e1rm: number | null;
+  /** percentage e1RM change: recent best vs baseline best (10 §6) */
   score_pct: number | null;
   /** non-deload sessions with an e1RM — the points the trend is computed over */
   sessions: number;
+  /** direction label with a dead-band: improving / holding / declining */
+  trend: StrengthTrendLabel;
 }
 
 /**
@@ -57,24 +66,10 @@ export function qualifyingScores(
   );
 }
 
-/**
- * N16: the macro "EST. STRENGTH · KEY LIFTS" tile — mean e1RM %-change of the
- * key lifts, where key lifts = the most-logged **qualifying** exercises
- * (doc 10 §7 frequency rule). Derived from the same deload-filtered,
- * ≥3-session scores as the Performance tab so the tile and the tab can never
- * tell different stories about the same window.
- */
-export function keyLiftStrengthPct(
-  scores: ExerciseProgressScore[],
-  topN = 3,
-): number | null {
-  const key = qualifyingScores(scores)
-    .sort((a, b) => b.sessions - a.sessions)
-    .slice(0, topN)
-    .map((s) => s.score_pct)
-    .filter((s): s is number => s != null);
-  if (key.length === 0) return null;
-  return Math.round((key.reduce((a, b) => a + b, 0) / key.length) * 10) / 10;
+/** The strength-trend config from active params, falling back to the code
+ *  default when the (optional) block is absent — every stored row today. */
+export function strengthConfig(params: EngineParams): StrengthTrendConfig {
+  return params.strength ?? DEFAULT_STRENGTH;
 }
 
 /**
@@ -104,15 +99,23 @@ export function dropE1rmOutliers(e1rms: number[]): number[] {
   );
 }
 
-/** Pure first→last e1RM fold shared by the meso and macro scopes (rows must
- *  arrive ordered by performed_on; deload sessions are skipped — T-A2;
- *  outlier sessions are dropped from the endpoints and the count — N14). */
+/**
+ * Pure recent-vs-baseline e1RM fold shared by the meso and macro scopes (rows
+ * must arrive ordered by performed_on; deload sessions are skipped — T-A2;
+ * outlier sessions are dropped — N14). Each lift's ordered session-average
+ * e1RMs are scored by `strengthTrend`: best of the most-recent window vs best of
+ * the earliest window, so a fresh block's light opening session can't crater a
+ * continuing lift (the volatility fix that replaced the old first→last fold).
+ * `cfg` comes from `engine_params.strength`; it defaults to the active-row
+ * values so pure callers (tests) don't need to thread params.
+ */
 export function foldProgressScores(
   rows: Pick<
     VExerciseHistoryRow,
     "exercise_id" | "exercise_name" | "microcycle_id" | "e1rm"
   >[],
   deloadMicroIds: Set<string>,
+  cfg: StrengthTrendConfig = DEFAULT_STRENGTH,
 ): ExerciseProgressScore[] {
   const byExercise = new Map<string, { name: string; e1rms: number[] }>();
   for (const row of rows) {
@@ -128,27 +131,30 @@ export function foldProgressScores(
 
   return [...byExercise.entries()].map(([exercise_id, v]) => {
     const kept = dropE1rmOutliers(v.e1rms);
-    const first = kept.length > 0 ? kept[0] : null;
-    const last = kept.length > 0 ? kept[kept.length - 1] : null;
+    const t = strengthTrend(kept, cfg);
     return {
       exercise_id,
       exercise_name: v.name,
-      first_e1rm: first,
-      last_e1rm: last,
-      score_pct: scoreProgress(first, last),
-      sessions: kept.length,
+      baseline_e1rm: t.baseline_e1rm,
+      current_e1rm: t.current_e1rm,
+      score_pct: t.change_pct,
+      sessions: t.sessions,
+      trend: t.trend,
     };
   });
 }
 
-/** Progress scores across one or more mesocycles (macro scope = all its mesos). */
+/** Progress scores across one or more mesocycles (macro scope = all its mesos).
+ *  `cfg` (from `engine_params.strength`) is loaded from the active row when the
+ *  caller doesn't supply it, so every surface scores the trend identically. */
 export async function getProgressScores(
   supabase: Client,
   userId: string,
   mesoIds: string[],
+  cfg?: StrengthTrendConfig,
 ): Promise<ExerciseProgressScore[]> {
   if (mesoIds.length === 0) return [];
-  const [{ data, error }, { data: micros, error: microError }] =
+  const [{ data, error }, { data: micros, error: microError }, resolvedCfg] =
     await Promise.all([
       supabase
         .from("v_exercise_history")
@@ -161,13 +167,18 @@ export async function getProgressScores(
         .select("id, is_deload")
         .in("mesocycle_id", mesoIds)
         .eq("user_id", userId),
+      cfg
+        ? Promise.resolve(cfg)
+        : getActiveEngineParams(supabase).then(({ params }) =>
+            strengthConfig(params),
+          ),
     ]);
   if (error) throw error;
   if (microError) throw microError;
   const deloadMicroIds = new Set(
     (micros ?? []).filter((m) => m.is_deload).map((m) => m.id),
   );
-  return foldProgressScores(data ?? [], deloadMicroIds);
+  return foldProgressScores(data ?? [], deloadMicroIds, resolvedCfg);
 }
 
 export async function getMesoProgressScores(
@@ -307,6 +318,87 @@ export async function buildStrengthProgress(
     exercises.map((s) => s.exercise_id),
   );
   return { exercises, muscles: rollupMuscleProgress(exercises, links, weights) };
+}
+
+/**
+ * The single "est. strength" headline for a macro (or any set of mesos): the
+ * volume-weighted mean of the muscle-group changes, weighted by each muscle's
+ * fractional set volume over the scope (10 §6). Building it from the SAME
+ * muscle rollup the Performance tab renders is what stops the Overview tile and
+ * the tab from ever disagreeing (N16) — one definition of progress.
+ */
+export function volumeWeightedStrengthTotal(
+  muscles: MuscleGroupProgress[],
+  muscleVolume: Map<string, number>,
+): number | null {
+  return volumeWeightedMean(
+    muscles.map((m) => ({
+      value: m.score_pct,
+      weight: muscleVolume.get(m.muscle_group) ?? 0,
+    })),
+  );
+}
+
+/** Fractional logged-set volume per muscle group across a set of mesos (R14
+ *  1.0/0.5 counting), summed over every week — the weights for the strength
+ *  headline. Shares the volume view + fractional weighting with the Balance
+ *  tab so "how much you trained each muscle" means one thing. */
+export async function getMuscleVolume(
+  supabase: Client,
+  userId: string,
+  mesoIds: string[],
+  weights: VolumeCountingWeights,
+): Promise<Map<string, number>> {
+  const byMuscle = new Map<string, number>();
+  if (mesoIds.length === 0) return byMuscle;
+  const { data, error } = await supabase
+    .from("v_meso_week_muscle_sets")
+    .select("*")
+    .eq("user_id", userId)
+    .in("mesocycle_id", mesoIds);
+  if (error) throw error;
+  const weighted = weightWeekMuscleSets(data ?? [], weights);
+  for (const r of weighted) {
+    if (!r.muscle_group) continue;
+    byMuscle.set(
+      r.muscle_group,
+      (byMuscle.get(r.muscle_group) ?? 0) + (r.logged_sets ?? 0),
+    );
+  }
+  return byMuscle;
+}
+
+/** The strength block + volume-weighted headline for a macro (or meso set).
+ *  Used by BOTH the macro Overview tile and the Performance tab so they share
+ *  one number. */
+export interface MacroStrength extends StrengthProgress {
+  /** volume-weighted mean of the muscle changes — the "est. strength" tile */
+  estStrengthPct: number | null;
+}
+
+export async function getMacroStrength(
+  supabase: Client,
+  userId: string,
+  mesoIds: string[],
+  params: EngineParams,
+): Promise<MacroStrength> {
+  if (mesoIds.length === 0)
+    return { exercises: [], muscles: [], estStrengthPct: null };
+  const weights = volumeCountingWeights(params);
+  const [scores, muscleVolume] = await Promise.all([
+    getProgressScores(supabase, userId, mesoIds, strengthConfig(params)),
+    getMuscleVolume(supabase, userId, mesoIds, weights),
+  ]);
+  const { exercises, muscles } = await buildStrengthProgress(
+    supabase,
+    scores,
+    weights,
+  );
+  return {
+    exercises,
+    muscles,
+    estStrengthPct: volumeWeightedStrengthTotal(muscles, muscleVolume),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -636,7 +728,7 @@ export async function getMesoStats(
   );
   const strength = await buildStrengthProgress(
     supabase,
-    foldProgressScores(history ?? [], deloadMicroIds),
+    foldProgressScores(history ?? [], deloadMicroIds, strengthConfig(params)),
     weights,
   );
 
@@ -758,8 +850,8 @@ export async function getMesoStats(
 // ---------------------------------------------------------------------------
 // macro stats (M8) — Balance + Performance at macrocycle scope. Same views,
 // same folds as the meso stats: v_meso_week_muscle_sets weighted through
-// engine_params.volume + v_exercise_history first→last scores, concatenated
-// across the macro's mesocycles.
+// engine_params.volume + v_exercise_history recent-vs-baseline scores (10 §6),
+// concatenated across the macro's mesocycles.
 // ---------------------------------------------------------------------------
 
 export interface MacroStatsData {
@@ -767,6 +859,9 @@ export interface MacroStatsData {
   /** true when at least one materialized week exists to average over */
   hasVolume: boolean;
   strength: StrengthProgress;
+  /** volume-weighted mean of the muscle changes — the "est. strength" headline,
+   *  identical to the macro Overview tile (N16: one definition) */
+  estStrengthPct: number | null;
 }
 
 export async function getMacroStats(
@@ -787,6 +882,7 @@ export async function getMacroStats(
     balance: { push: 0, pull: 0, legs: 0, bars: [], note: "" },
     hasVolume: false,
     strength: { exercises: [], muscles: [] },
+    estStrengthPct: null,
   };
   if (mesoIds.length === 0) return empty;
 
@@ -816,6 +912,23 @@ export async function getMacroStats(
   const weights = volumeCountingWeights(params);
   const strength = await buildStrengthProgress(supabase, scores, weights);
 
+  // Est. strength headline: volume-weighted mean of the muscle changes, weighted
+  // by each muscle's fractional set volume across the macro (10 §6). Built from
+  // the SAME muscle rollup below so the Performance tab and the Overview tile
+  // (macro.ts buildMacroStats) can't disagree (N16).
+  const macroMuscleVolume = new Map<string, number>();
+  for (const r of weightWeekMuscleSets(weekMuscleSets ?? [], weights)) {
+    if (!r.muscle_group) continue;
+    macroMuscleVolume.set(
+      r.muscle_group,
+      (macroMuscleVolume.get(r.muscle_group) ?? 0) + (r.logged_sets ?? 0),
+    );
+  }
+  const estStrengthPct = volumeWeightedStrengthTotal(
+    strength.muscles,
+    macroMuscleVolume,
+  );
+
   // Concatenate materialized weeks across mesos (meso position order, then
   // week number) into one global week axis so the meso balance fold applies
   // unchanged. Unmaterialized future weeks are skipped — no cross-meso
@@ -835,12 +948,17 @@ export async function getMacroStats(
       status: m.status,
     };
   });
-  if (weeks.length === 0) return { ...empty, strength };
+  if (weeks.length === 0) return { ...empty, strength, estStrengthPct };
 
   const weekSets = weightWeekMuscleSets(weekMuscleSets ?? [], weights, (row) =>
     globalWeekByMicro.get(`${row.mesocycle_id}:${row.week_number}`),
   );
   const volume = buildVolumeMatrix(weeks, weekSets, []);
   const balance = buildBalance(volume, weeks, "across this macrocycle");
-  return { balance, hasVolume: volume.groups.length > 0, strength };
+  return {
+    balance,
+    hasVolume: volume.groups.length > 0,
+    strength,
+    estStrengthPct,
+  };
 }

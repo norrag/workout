@@ -45,23 +45,31 @@ export function e1rmBlockChanged(
 
 export type RestampSetRow = Pick<
   LoggedSetRow,
-  "id" | "weight" | "reps" | "rir_reported" | "e1rm"
+  "id" | "weight" | "reps" | "rir_reported" | "e1rm" | "e1rm_confidence"
 >;
 
 /**
- * Pure: recompute each set's e1RM under `cfg` and return only the rows whose
- * stored stamp differs (weight ≤ 0 / reps ≤ 0 ⇒ null, matching log time).
- * Exported for unit tests; the I/O pager below stays thin.
+ * Pure: recompute each set's e1RM AND its confidence band under `cfg` and return
+ * only the rows whose stored stamp differs on either (weight ≤ 0 / reps ≤ 0 ⇒
+ * null, matching log time). The confidence bands live in the same `e1rm` block,
+ * so a change to that block can move the confidence even when the value holds —
+ * both must restamp together. Exported for unit tests; the I/O pager stays thin.
  */
 export function planRestamps<T extends RestampSetRow>(
   rows: T[],
   cfg: E1rmConfig,
-): { row: T; e1rm: number | null }[] {
-  const out: { row: T; e1rm: number | null }[] = [];
+): { row: T; e1rm: number | null; e1rm_confidence: string | null }[] {
+  const out: {
+    row: T;
+    e1rm: number | null;
+    e1rm_confidence: string | null;
+  }[] = [];
   for (const r of rows) {
-    const fresh =
-      estimateE1rmCore(r.weight, r.reps, r.rir_reported, cfg)?.value ?? null;
-    if (fresh !== r.e1rm) out.push({ row: r, e1rm: fresh });
+    const est = estimateE1rmCore(r.weight, r.reps, r.rir_reported, cfg);
+    const e1rm = est?.value ?? null;
+    const e1rm_confidence = est?.confidence ?? null;
+    if (e1rm !== r.e1rm || e1rm_confidence !== r.e1rm_confidence)
+      out.push({ row: r, e1rm, e1rm_confidence });
   }
   return out;
 }
@@ -108,7 +116,11 @@ export async function restampLoggedSetE1rms(
     for (let i = 0; i < changed.length; i += writeChunk) {
       const chunk = changed
         .slice(i, i + writeChunk)
-        .map((c) => ({ ...c.row, e1rm: c.e1rm }));
+        .map((c) => ({
+          ...c.row,
+          e1rm: c.e1rm,
+          e1rm_confidence: c.e1rm_confidence,
+        }));
       const { error: upsertError } = await service
         .from("logged_sets")
         .upsert(chunk, { onConflict: "id" });

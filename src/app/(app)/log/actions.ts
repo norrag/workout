@@ -62,17 +62,19 @@ async function requireUser() {
 }
 
 /**
- * The engine's per-set e1RM (PH31), stored with the set so it's auditable and
- * can be surfaced (history flip, MCP) without recomputing. Null for bodyweight
- * (weight 0) / non-working input — `estimateE1rm` returns null there.
+ * The engine's per-set e1RM stamp (PH31): the estimate AND its confidence band,
+ * stored with the set so both are auditable and surfaceable (history flip, MCP)
+ * without recomputing. Both null for bodyweight (weight 0) / non-working input —
+ * `estimateE1rm` returns null there.
  */
 function computeSetE1rm(
   params: EngineParams,
   weight: number,
   reps: number,
   rir: number | null,
-): number | null {
-  return estimateE1rm(weight, reps, rir, params)?.value ?? null;
+): { e1rm: number | null; e1rm_confidence: string | null } {
+  const est = estimateE1rm(weight, reps, rir, params);
+  return { e1rm: est?.value ?? null, e1rm_confidence: est?.confidence ?? null };
 }
 
 const logSetSchema = z.object({
@@ -114,7 +116,7 @@ export async function logSetAction(input: {
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
     set_type: parsed.set_type,
-    e1rm: computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
+    ...computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
     // T-I2/#4: capture the lifter's bodyweight at log time (effective-load base for
     // bodyweight movements); locked once the workout completes.
     bodyweight: profile?.bodyweight ?? null,
@@ -157,8 +159,8 @@ export async function amendSetAction(input: {
     weight: parsed.weight,
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
-    // recompute the stored e1RM since weight/reps/RIR all changed
-    e1rm: computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
+    // recompute the stored e1RM + confidence since weight/reps/RIR all changed
+    ...computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");

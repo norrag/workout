@@ -18,6 +18,10 @@ export interface HistoryEntry {
    * exercise — the flip-view metric in place of e1RM there (owner #3). Null for
    * external exercises (the flip shows e1RM) or when no bodyweight was captured. */
   effective_load: number | null;
+  /** session-average reported RIR across the working sets, denoted next to the
+   * e1RM in the flip view so it's clear the estimate is RIR-aware (owner note:
+   * "denote RIR with the sets/e1rm"). Null when no set reported an RIR. */
+  avg_rir: number | null;
   is_deload: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
   session_note: string | null;
@@ -51,6 +55,15 @@ export const HISTORY_PAGE_SETS = 120;
  */
 export function sessionAvgE1rm(e1rms: (number | null)[]): number | null {
   const present = e1rms.filter((v): v is number => v != null);
+  if (present.length === 0) return null;
+  return Math.round((present.reduce((a, b) => a + b, 0) / present.length) * 10) / 10;
+}
+
+/** The session's average reported RIR across its working sets (null-skipped),
+ *  rounded to 1 dp — denoted with the e1RM so the estimate's effort context is
+ *  visible. Null when no working set reported an RIR. */
+export function sessionAvgRir(rirs: (number | null)[]): number | null {
+  const present = rirs.filter((v): v is number => v != null);
   if (present.length === 0) return null;
   return Math.round((present.reduce((a, b) => a + b, 0) / present.length) * 10) / 10;
 }
@@ -217,6 +230,7 @@ export async function getExerciseHistory(
       reps,
       e1rm,
       effective_load,
+      avg_rir: sessionAvgRir(group.map((s) => s.rir_reported)),
       is_deload: micro?.is_deload ?? false,
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };

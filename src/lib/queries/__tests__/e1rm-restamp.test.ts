@@ -23,6 +23,7 @@ function row(over: Partial<RestampSetRow>): RestampSetRow {
     reps: 15,
     rir_reported: null,
     e1rm: 384.2,
+    e1rm_confidence: "low", // 15 reps, unreported RIR → low
     ...over,
   };
 }
@@ -65,7 +66,10 @@ describe("planRestamps", () => {
 
   it("leaves an already-null stamp on a bodyweight row untouched", () => {
     expect(
-      planRestamps([row({ weight: 0, reps: 12, e1rm: null })], V18_PARAMS.e1rm),
+      planRestamps(
+        [row({ weight: 0, reps: 12, e1rm: null, e1rm_confidence: null })],
+        V18_PARAMS.e1rm,
+      ),
     ).toEqual([]);
   });
 

@@ -597,6 +597,28 @@ export const engineParamsSchema = z.object({
     })
     .default({ n: 5, selection: "frequency" }),
 
+  // §6 aggregated strength trend ("est. strength"): the macro/meso rollup folds
+  // each lift's per-session e1RM into a recent-vs-baseline change using two
+  // symmetric rolling windows (best of the most-recent `window_sessions` vs best
+  // of the earliest `window_sessions`). This replaces the volatile first→last
+  // fold that let a fresh block's light opening session define the endpoint.
+  // A lift needs `min_sessions` non-deload sessions to be scored. `tolerance_pct`
+  // is the dead-band inside which the per-lift trend reads "holding".
+  //
+  // `.optional()` (the post-v10 discipline): ABSENT on every stored row, so the
+  // canonical materialization / `params_hash` of each historical engine_params
+  // version is byte-unchanged (replayability preserved) and the stats fall back
+  // to `DEFAULT_STRENGTH` (engine/strength.ts). These are read-model stats, not
+  // a prescription tunable, so they never touch replay; a future version can
+  // seed them explicitly for admin tuning via propose_engine_params.
+  strength: z
+    .object({
+      window_sessions: z.number().int().positive(),
+      min_sessions: z.number().int().positive(),
+      tolerance_pct: z.number().min(0),
+    })
+    .optional(),
+
   // §2 weekly-set volume landmarks (MEV / MAV_high / MRV). The dose-response
   // band (~10–20 hard sets/muscle/week) is evidenced; the per-muscle numbers
   // are heuristic RP/Israetel starting points (10 §2/§8 — tunable, not gospel).

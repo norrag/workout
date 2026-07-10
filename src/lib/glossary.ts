@@ -8,6 +8,8 @@ export type GlossaryKey =
   | "rir_ramp"
   | "deload"
   | "e1rm"
+  | "e1rm_confidence"
+  | "est_strength"
   | "volume_landmarks"
   | "fractional_sets"
   | "pump"
@@ -37,7 +39,15 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   },
   e1rm: {
     label: "ESTIMATED 1RM (E1RM)",
-    body: "The one-rep max a set implies, estimated from its weight and reps. It's a trend indicator, not a tested max — least reliable for high-rep sets or sets stopped far from failure.",
+    body: "The most you could theoretically lift for one all-out rep, worked out from a set you actually did — its weight, its reps, and how many reps you left in the tank (your RIR). Those left-over reps are folded in, so an easy set and a hard one at the same weight and reps don't score the same: closer to failure reads as stronger. It's an estimate that tracks your strength over time, not a number you tested — and it's least reliable on very high-rep sets or ones stopped well short of failure.",
+  },
+  e1rm_confidence: {
+    label: "ESTIMATE CONFIDENCE",
+    body: "Not every estimated 1RM is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number.",
+  },
+  est_strength: {
+    label: "EST. STRENGTH",
+    body: "One read on how your strength is trending. For each exercise we compare the best estimated 1RM of your most recent few sessions against the best of your earliest few in the block — a rolling window, so a single light day (like the opening session of a fresh mesocycle, which is meant to be easy) can't drag the number down. Each exercise's change rolls up into the muscles it trains, and the headline averages those muscle numbers, weighted by how much work each muscle actually got. It's an estimate of the trend, not a tested max.",
   },
   volume_landmarks: {
     label: "MEV / MRV",

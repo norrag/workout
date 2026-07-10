@@ -267,6 +267,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
       rir_reported: 2,
       set_type: "straight",
       e1rm: 133.3,
+      e1rm_confidence: "moderate",
       bodyweight: 180,
       performed_on: "2026-07-03",
     });
@@ -291,6 +292,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
       rir_reported: 2,
       set_type: "straight",
       e1rm: 138,
+      e1rm_confidence: "moderate",
       bodyweight: 180,
       performed_on: "2026-07-03",
     });
@@ -311,6 +313,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
       rir_reported: 2,
       set_type: "straight",
       e1rm: 133.3,
+      e1rm_confidence: "moderate",
       bodyweight: 180,
       performed_on: "2026-07-03",
     });
@@ -421,6 +424,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
       rir_reported: 2,
       set_type: "straight",
       e1rm: 115,
+      e1rm_confidence: "moderate",
       bodyweight: 180,
       performed_on: "2026-07-03",
     });

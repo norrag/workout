@@ -148,6 +148,9 @@ export function ExerciseHistoryList({
                         {flipValue(row) != null ? formatWeight(flipValue(row)!) : "—"} lb{" "}
                         <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/45">
                           {flipLabel}
+                          {row.avg_rir != null && (
+                            <> · ~{row.avg_rir} RIR</>
+                          )}
                         </span>
                       </>
                     ) : (

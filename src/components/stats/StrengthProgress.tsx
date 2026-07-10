@@ -48,7 +48,7 @@ export function StrengthProgressSection({
       <div className="mt-4 border-t-[1.5px] border-ink">
         <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
           EST. STRENGTH {scopeLabel} — ALL EXERCISES
-          <InfoDot term="e1rm" small />
+          <InfoDot term="est_strength" small />
         </div>
         {strength.exercises.map((s) => {
           const inner = (
@@ -57,11 +57,11 @@ export function StrengthProgressSection({
                 <div className="truncate text-sm font-bold">{s.exercise_name}</div>
                 <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
                   <span className="numeral">
-                    {formatWeight(Math.round(s.first_e1rm ?? 0))}
+                    {formatWeight(Math.round(s.baseline_e1rm ?? 0))}
                   </span>{" "}
                   →{" "}
                   <span className="numeral">
-                    {formatWeight(Math.round(s.last_e1rm ?? 0))}
+                    {formatWeight(Math.round(s.current_e1rm ?? 0))}
                   </span>{" "}
                   LB E1RM · <span className="numeral">{s.sessions}</span> SESSIONS
                   {historyScope ? " ›" : ""}
@@ -104,7 +104,7 @@ export function StrengthProgressSection({
         )}
         {strength.exercises.length > 0 && (
           <p className="pt-2 text-[9px] leading-normal tracking-[0.04em] text-ink/45">
-            EXERCISES LOGGED 3+ SESSIONS · FIRST → LAST NON-DELOAD SESSION ·
+            EXERCISES LOGGED 3+ SESSIONS · STARTING BEST → RECENT BEST ·
             E1RM IS AN ESTIMATE
           </p>
         )}
@@ -112,8 +112,9 @@ export function StrengthProgressSection({
 
       {strength.muscles.length > 0 && (
         <div className="mt-4 border-t-[1.5px] border-ink pt-2.5">
-          <div className="mb-1.5 text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.12em] text-ink/50">
             STRENGTH BY MUSCLE GROUP
+            <InfoDot term="est_strength" small />
           </div>
           <div className="grid grid-cols-2 gap-x-5">
             {strength.muscles.map((m) => (

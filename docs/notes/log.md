@@ -4,7 +4,51 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-10 — Session 59: N21 macrocycle-goals architecture record (owner's four questions answered)
+## 2026-07-10 — Session 60: PR #157 refresh — merged main ×2, N36→N40→N42 renumber, CI fixes
+
+Owner asked to freshen the open est-strength PR (#157) against main and advise
+for merge. Merged `origin/main` (post #161/#162/#167) into the branch:
+
+- **All code auto-merged clean** (`engine/index.ts`, `engine/params.ts`,
+  `queries/logging.ts`, doc 10) — conflicts were docs-only (this area +
+  `PROGRESS.md`).
+- **ID collision found and fixed:** the PR session filed the est-strength item
+  as **N36**, but Session 58 (Phase R, merged first) filed the doc-16 deferred
+  spine as **N36–N39**, and the second refresh merge hit the same collision
+  again: PR #166 (N21 macrocycle-goals architecture, merged 2026-07-10) filed
+  **N40/N41** (macro close + retrospective, bodyweight series). The
+  est-strength item is renumbered **N42** (next free ID); main's N36 (envelope
+  loop) and N40/N41 (architecture doc) stand. Code/spec never referenced the
+  ID, so the renumbers are docs-only. Same story for the session number: the PR session
+  was a parallel "Session 53" — left dated in place below, marked as a parallel
+  branch.
+- Full suite + typecheck re-run green on the merged tree.
+- **Found + fixed the standing CI e2e failure (red since PR #160 — every run
+  from #412 on, incl. main).** Reproduced locally against the local stack and
+  pulled the Playwright trace: the Phase-3 progression e2e logged set 1 with
+  `reps: 118` — the day-view weight-blur handler re-derives the reps input
+  asynchronously, and at robot speed the test's `fill("8")` landed after that
+  re-render with the selection collapsed, APPENDING to the predicted "11";
+  the server correctly rejects reps > 100 (zod), the set never logs, the
+  `uncheck set 1` assertion times out. Test-only fix in
+  `tests/e2e/prescribed-progression.spec.ts`: blur the weight edit and wait
+  for the re-derive to settle, then a fill-and-verify retry (`toPass`) for
+  both sets. The app behaved correctly throughout (validation + rollback
+  toast); no product code touched. PRs #160–#167 were merged over this red
+  e2e — worth keeping an eye on "merged with failing CI" as a process slip.
+- Migration `20260708000001` (e1rm_confidence) applied to the hosted project
+  via the Supabase MCP pre-merge (additive; deployed main code ignores the
+  column). Backfill verified: 10,918 stamped sets banded (all `low` — correct,
+  `rir_reported` has no write surface yet), 1 null-e1RM row null.
+- **GitHub Actions runners died account-wide at ~20:58 UTC** — runs #431–#433
+  (incl. the run that would have exercised the e2e fix, and main's #166 merge)
+  all failed in ~5s with `runner_id: 0` and no logs: no runner assigned,
+  nothing executed. Human-only fix (billing/spending limit) — runbook section
+  added to `docs/deployment/manual-operations.md` → "Restore GitHub Actions
+  runners". The e2e fix is verified locally through the real stack; CI can't
+  confirm it until runners return.
+
+## 2026-07-10 — Session 59 (parallel): N21 macrocycle-goals architecture record (owner's four questions answered)
 
 Owner asked for the end-to-end architecture of the macrocycle goal layer
 around N21: (1) how do we get targets right, (2) how do we use them,
@@ -50,6 +94,7 @@ Backlog updates in the same PR: N21 row gains the architecture-doc pointer
 shapes; **N40** (macro close + retrospective, needs-input) and **N41**
 (bodyweight series, needs-input) added to workstream C. Owner decision list in
 the doc's §6 (7 decisions, each with a recommendation).
+
 ## 2026-07-10 — Session 59: N34 readiness probe — BodySpec build unblocked (doc 15 §8)
 
 Owner asked whether the BodySpec integration is buildable now, and clarified
@@ -357,6 +402,44 @@ in the follow-up's §6; N35 stays needs-input.
 
 Reconciliation sweep ran clean (no merged-but-live rows; N1 in-progress,
 N21/N34/N35 open).
+
+## 2026-07-08 — Session 53 (parallel branch): est-strength rework — recent-vs-baseline rolling trend (N42, filed as N36)
+
+Owner flagged that aggregated macrocycle "est. strength" dropped the moment a
+new meso started, and suspected (a) the in-progress block factoring in and
+(b) volatility from a pure first→last two-point delta. Investigation confirmed
+both, compounding: the RIR ramp makes a fresh block open light, so its opener
+became the `last` endpoint and cratered every continuing lift. Also found the
+Overview tile (top-3 key-lift mean) and the Performance tab (muscle rollup)
+were *different* aggregations that could disagree (the archived N16 fix only
+partially closed this).
+
+Reworked the whole metric bottom-up (owner-approved design), shipped as **N42** (filed as N36 in-session; renumbered at merge — see Session 60):
+- **engine/strength.ts** (pure, golden-tested): `strengthTrend` = best of the
+  most-recent window vs best of the earliest, symmetric non-overlapping windows
+  (`engine_params.strength`, `.optional()` so no params-hash churn — replay
+  safe; falls back to `DEFAULT_STRENGTH`). `volumeWeightedMean` helper.
+- **queries/stats.ts + macro.ts**: `foldProgressScores` uses it; muscle rollup
+  unchanged (role-weighted, PH37); headline = **volume-weighted mean of the
+  muscle changes** (fractional-set weights), shared by the Overview tile and
+  Performance tab so they're identical by construction (finishes N16). Dropped
+  `keyLiftStrengthPct`.
+- **Confidence stored** (`logged_sets.e1rm_confidence`, migration
+  `20260708000001` + backfill; stamped at log/amend, restamped on e1rm-block
+  change) — auditability (owner: "log it").
+- **Clarity** (owner: info buttons over terse one-liners): glossary rewrites
+  (e1rm now states RIR/effective-reps plainly; new `est_strength`,
+  `e1rm_confidence` cards), InfoDots on the macro tile + strength sections, and
+  **RIR denoted next to e1RM in the history flip view**.
+- Session value stays the **session average** e1RM (N2 kept, per owner).
+- Verified on live data: Bench Press −7.3%→−3.8% (single opener corrected),
+  Machine Chest Supported Row −32%→−31.7% (genuine decline honestly preserved).
+
+Spec updated: `docs/10-metrics-spec.md` §1 (confidence persisted), §6 (est.
+strength redefined), §8 (`strength` param block). Relates to / supersedes the
+archived N16; extends N9's muscle rollup. Ships as PR on
+`claude/macrocycle-strength-estimates-wdbefl`.
+
 
 ## 2026-07-07 — Session 52: Batch 12 intake — prescribed e1RM progression review (N35)
 
