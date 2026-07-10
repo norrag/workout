@@ -11,6 +11,16 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-10 — est-strength rework merged (PR #157)
+
+Reconciliation sweep at the doc-17 session start: N42's PR merged
+2026-07-10 (after the row was stamped `done` in-PR). Full record in doc 10
+§1/§6/§8, PROGRESS, and the Session-57 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N42 | Est-strength rework: aggregated macro strength dropped the moment a new meso started | B→F | A | **done (PR #157, merged 2026-07-10).** Root cause: the first→last two-point delta let a fresh block's light RIR-ramp opener define the endpoint; and the Overview tile (top-3 key-lift mean) was a different aggregation from the Performance rollup. New pure `engine/strength.ts` `strengthTrend` (recent-best vs baseline-best, symmetric non-overlapping rolling windows; `engine_params.strength` optional → replay-safe, `DEFAULT_STRENGTH` fallback); `foldProgressScores` uses it; headline = volume-weighted mean of the muscle rollup — one definition for tile + tab; **key-lifts fold retired from the metric**. Confidence persisted (`logged_sets.e1rm_confidence`, migration `20260708000001` + backfill/restamp). Glossary rewrites + InfoDots + RIR in the history flip. Supersedes archived N16, extends N9. *(Filed as N36 in the PR session; renumbered twice at merge — N36–N39 were taken by the doc-16 spine, N40/N41 by the architecture doc.)* The doc-17 retrospective (N40) grades with this rollup. |
+
 ## Swept 2026-07-05 (later 2) — Session-51 quad merged (PRs #152/#153)
 
 Session 51 closed the four unblocked items on PR #152; a same-session

@@ -4,6 +4,46 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-10 — Session 61: doc 17 — the macro-goals build spec; owner ratifications folded in; N42 swept
+
+Owner ratified the architecture record (PR #166) with three updates and asked
+for the complete phased implementation plan "similarly to how we just did
+with the progression model." Shipped **`docs/17-macrocycle-goals.md`**
+(authoritative build spec; where it conflicts with the architecture record,
+17 wins; doc 16 untouched). PR #<n>. What changed against the record:
+
+- **Closeout semantics (owner decision):** natural close when every
+  positioned meso is terminal, or explicit **"End macrocycle"** irrevocably
+  ending open work — the `endWorkout`/`endMesocycle` family one level up
+  (logged → `endMesocycle`, never-started → `abandoned`); the record's
+  end-date nudge is dropped (users may overrun the plan). Completed macros
+  freeze.
+- **PR #157 (est-strength rework, merged today) folded in:** the key-lifts
+  fold is retired, so the N40 retrospective grades the **`strengthTrend`
+  rollup** (headline + per-muscle) vs the contract band, and the create-flow
+  priming line uses the same metric; the record's `key_lifts.n` drift note is
+  moot. Doc 10 §5's "% on key lifts" target wording gets restated in the
+  Phase-1 PR.
+- **DEXA unblock (doc 15 §8, PR #167) + owner adoption:** N34 moves to
+  ready — doc 17 Phase 5 (5a connect+import / 5b enrich+verdicts /
+  5c engine+MCP), parallelizable from day one.
+- **One carrier amendment:** the N37 plan rate rides a new goal-independent
+  `MacroPlan.strengthRatePctMonth` (a mass-goal macro paces the strength
+  dimension — `perMonthRate` is lb/mo there, the wrong field). Derived input
+  named `planStrengthRate`.
+
+Phase map (§9, one PR each): 1 = v21 target correction (+ contract
+`plan_inputs`, `birthdate`) → 2 = plan-rate pacer branch → 3 = closeout +
+retrospective → 4 = bodyweight series + priming → 5a–c = DEXA →
+6 = envelope loop (field-data-gated) → R1–R4 = owner activations (v20 first,
+v21 + card re-enable, `"plan"` flip via v22, monitor).
+
+Notes-area maintenance in the same PR: merge-artifact **duplicate N21 and
+N34 rows removed** (kept the newer of each); N21/N34/N36/N37/N40/N41 rows
+point at their doc-17 phases (N34/N40/N41 → **ready**, types D→F); **N42
+swept to `archive.md`** (done + PR #157 merged — the resume-protocol
+reconciliation sweep); doc 17 added to the root `CLAUDE.md` doc list.
+
 ## 2026-07-10 — Session 60: PR #157 refresh — merged main ×2, N36→N40→N42 renumber, CI fixes
 
 Owner asked to freshen the open est-strength PR (#157) against main and advise
