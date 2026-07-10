@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-10 — Session 62: N21 built — doc 17 Phase 1 (v21 target correction + contract snapshot + birthdate)
 
-Owner kicked off the doc-17 build ("implement phase 1"). One PR (#TBD — branch
+Owner kicked off the doc-17 build ("implement phase 1"). One PR (**#169**, branch
 `claude/macrocycle-goals-phase-1-9vs7z4`), everything gated per §2.6:
 
 - **Engine (`macro.ts`):** strength band × `strength_sex_factor` {1,1} × age
@@ -32,7 +32,7 @@ Owner kicked off the doc-17 build ("implement phase 1"). One PR (#TBD — branch
   the pinned legacy 60F=18M defect, continuity, cut rescale, carrier
   denomination, provenance hashes, birthdate derivation, `isGoalsEdit`).
 
-**N21 → done (PR #TBD).** N37 (Phase 2) unblocks on merge; N40/N41/N34 remain
+**N21 → done (PR #169).** N37 (Phase 2) unblocks on merge; N40/N41/N34 remain
 ready per doc 17 §9. Reconciliation sweep: nothing to archive (session-61
 rows all current; #168 merged and already reflected).
 
