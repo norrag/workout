@@ -17,6 +17,11 @@ anchor).
 **Relates to:** archived S4 / PR22 (`docs/notes/A-engine-metrics.md`), owner
 ruling T-I5 (2026-06-25, "never fabricate"), R24 hold-week concern, N21
 (macro-target correction), doc 10 §4, doc 13 §9.2, doc 14.
+**Follow-up (2026-07-08):** owner responses answered and the design amended in
+[`2026-07-08-prescribed-progression-followup.md`](./2026-07-08-prescribed-progression-followup.md)
+— the §6.6 rate ceiling is promoted to a macro-rate *pacer* and the per-goal
+booleans become per-goal rate factors; where the two docs conflict, the
+follow-up wins.
 
 ---
 

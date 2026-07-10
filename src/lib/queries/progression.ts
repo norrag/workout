@@ -18,6 +18,10 @@ import {
 // slot-prescription resolver can sit between logging and progression without a
 // module cycle (N33).
 import { getExerciseE1rmAnchors } from "./anchors";
+import {
+  getProgressionHistories,
+  daysSincePerformed,
+} from "./progression-history";
 import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
   buildConfigInputs,
@@ -91,6 +95,28 @@ export interface AdvanceResult {
   nextLabel: string | null;
 }
 
+// doc 16 §8.2 — the progression governors' derived lookback input. The
+// machinery moved to the LEAF module `progression-history.ts` with Phase 2
+// (the seed path in generation.ts needs it too, and generation ↔ progression
+// cannot import each other); re-exported here so existing importers and tests
+// keep working — same pattern as `engine-goal.ts` above.
+export {
+  deriveProgressionHistory,
+  toProgressionEvent,
+  getProgressionHistories,
+  daysSincePerformed,
+  PROGRESSION_LOOKBACK_DAYS,
+  // §8.3 audit aggregate (Phase 4) — pure fold behind get_progression_history
+  aggregateProgressionEvents,
+  toProgressionAuditEvent,
+  type ProgressionAuditEvent,
+  type ProgressionAuditStep,
+  type ProgressionAuditSummary,
+  type ProgressionGain,
+  type ProgressionDecisionEvent,
+  type ProgressionHistoryInput,
+} from "./progression-history";
+
 /** Assemble pure engine inputs for one exercise from week-N rows. */
 export function buildEngineInputs(args: {
   we: WorkoutExerciseRow;
@@ -108,6 +134,11 @@ export function buildEngineInputs(args: {
   weekPeak: EngineInputs["weekPeak"];
   strengthAnchor: EngineInputs["strengthAnchor"];
   bodyweight: EngineInputs["bodyweight"];
+  /** doc 16 §8.2 derived lookback; omit (undefined) while the mode is inactive
+   *  so recorded decision inputs stay byte-identical to today */
+  progressionHistory?: EngineInputs["progressionHistory"];
+  /** doc 16 §3.4 staleness input; omit while the mode is inactive */
+  daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
 }): EngineInputs {
   const { we } = args;
   // config half resolved through the single shared resolver (doc 14 §3) so the
@@ -157,6 +188,14 @@ export function buildEngineInputs(args: {
     weekPeak: args.weekPeak,
     strengthAnchor: args.strengthAnchor,
     bodyweight: args.bodyweight,
+    // both derived inputs (doc 14 §3 denylist, doc 16 §8.2): included only when
+    // the caller assembled them (progression mode active)
+    ...(args.progressionHistory !== undefined
+      ? { progressionHistory: args.progressionHistory }
+      : {}),
+    ...(args.daysSincePreviousSession !== undefined
+      ? { daysSincePreviousSession: args.daysSincePreviousSession }
+      : {}),
   };
 }
 
@@ -274,6 +313,21 @@ async function generateDay(
     }
   }
 
+  // doc 16: the governors' derived lookback + staleness gap, assembled fresh
+  // per generated day (a step recorded by an earlier day in this same run must
+  // be visible to the cadence governor). Null while the mode is inactive — the
+  // inputs below then omit the fields entirely.
+  const progressionByExercise = await getProgressionHistories(
+    ctx.service,
+    ctx.userId,
+    [...new Set(dayWes.map((we) => we.exercise_id))],
+    ctx.nextMicro.id,
+    ctx.params,
+  );
+  const daysSince = progressionByExercise
+    ? daysSincePerformed(weekNWorkout.performed_at)
+    : undefined;
+
   const decisions: {
     inputs: EngineInputs;
     output: Prescription;
@@ -305,6 +359,13 @@ async function generateDay(
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
       strengthAnchor: ctx.anchorsByExercise.get(we.exercise_id) ?? null,
       bodyweight: ctx.profile.bodyweight ?? null,
+      ...(progressionByExercise
+        ? {
+            progressionHistory:
+              progressionByExercise.get(we.exercise_id) ?? null,
+            daysSincePreviousSession: daysSince,
+          }
+        : {}),
     });
     // effective params = global active + this user×exercise increment override
     // (doc 14 §6.1); the override also feeds the row's fingerprint token below.
@@ -1126,7 +1187,8 @@ export async function projectNextPrescription(
   if (wfError) throw wfError;
   if (mesoWesError) throw mesoWesError;
 
-  // goal context from the macrocycle (standalone → gain)
+  // goal context from the macrocycle (standalone → hypertrophy, the
+  // `engineGoal(null)` default — one shared resolver, engine-goal.ts)
   let macroGoal: MacroGoalType | null = null;
   if (meso.macrocycle_id) {
     const { data: macro, error } = await supabase
@@ -1183,6 +1245,15 @@ export async function projectNextPrescription(
     supabase,
     weekWes.map((we) => we.exercise_id),
   );
+  // doc 16: the same derived progression inputs the advance path assembles, so
+  // the projection reflects live engine behavior when the mode is active
+  const projectionProgression = await getProgressionHistories(
+    supabase,
+    userId,
+    [exerciseId],
+    nextMicro?.id ?? null,
+    params,
+  );
   const inputs = buildEngineInputs({
     we: sourceWe,
     sets: setsByWe.get(sourceWe.id) ?? [],
@@ -1207,6 +1278,14 @@ export async function projectNextPrescription(
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,
     bodyweight: profile.bodyweight ?? null,
+    ...(projectionProgression
+      ? {
+          progressionHistory: projectionProgression.get(exerciseId) ?? null,
+          daysSincePreviousSession: daysSincePerformed(
+            sourceWorkout.performed_at,
+          ),
+        }
+      : {}),
   });
   const override = await getExerciseIncrementOverride(supabase, userId, exerciseId);
   const output = prescribe(

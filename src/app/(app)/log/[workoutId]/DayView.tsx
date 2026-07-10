@@ -43,6 +43,7 @@ import type {
 // so the client chunk never pulls the engine barrel (prescribe/macro/rules) or
 // zod. `params` arrives already validated by the server (getActiveEngineParams).
 import { predictRepsAtWeight, type E1rmConfig } from "@/lib/engine/predict";
+import { complianceBand } from "@/lib/engine/rules/progression";
 import {
   effectiveLoad,
   isBodyweightLoad,
@@ -386,6 +387,7 @@ export function DayView({
           index={i}
           readOnly={readOnly}
           e1rmCfg={params.e1rm}
+          markerBand={complianceBand(params)}
           microTargetRir={microcycle.target_rir}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
@@ -891,6 +893,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   index,
   readOnly,
   e1rmCfg,
+  markerBand,
   microTargetRir,
   menuOpen,
   setMenuTarget,
@@ -913,6 +916,8 @@ const ExerciseBlock = memo(function ExerciseBlock({
   index: number;
   readOnly: boolean;
   e1rmCfg: E1rmConfig;
+  /** shared set-level e1RM band for the ▲/met/▼ markers (doc 16 §5.3) */
+  markerBand: number;
   microTargetRir: number;
   menuOpen: boolean;
   setMenuTarget: number | null;
@@ -1079,6 +1084,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
                 state={state}
                 readOnly={readOnly}
                 e1rmCfg={e1rmCfg}
+                markerBand={markerBand}
                 targetRir={we.target_rir ?? microTargetRir}
                 logged={logged ?? null}
                 isLastRow={setNumber === plannedSets}
@@ -1289,6 +1295,7 @@ function SetRow({
   state,
   readOnly,
   e1rmCfg,
+  markerBand,
   targetRir,
   logged,
   isLastRow,
@@ -1305,6 +1312,8 @@ function SetRow({
   state: "logged" | "skipped" | "next" | "future";
   readOnly: boolean;
   e1rmCfg: E1rmConfig;
+  /** shared set-level e1RM band for the ▲/met/▼ markers (doc 16 §5.3) */
+  markerBand: number;
   targetRir: number;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
   isLastRow: boolean;
@@ -1319,7 +1328,12 @@ function SetRow({
   const prescribedWeight = we.prescribed_weight;
   const prescribedReps = we.prescribed_reps;
   const lastLogged = we.sets.at(-1);
-  const anchor = we.e1rm_anchor;
+  // doc 16 §5.2 live coupling: the predictor prices off the PRESCRIPTION-BASIS
+  // anchor — the target `A*` recorded by the decision that priced this row —
+  // so a weight edit re-derives reps faithful to the prescribed target,
+  // including the earned lead. No recorded target (hold / pre-v20 / block
+  // absent) falls back to the measured anchor: today's behavior.
+  const anchor = we.prescription_anchor ?? we.e1rm_anchor;
   // per-set planned weight override (doc 11): persists an edited weight for an
   // unlogged set, and is where auto-match writes the shared weight
   const plannedWeight = we.set_weights?.[String(setNumber)] ?? null;
@@ -1538,12 +1552,14 @@ function SetRow({
     [staticCells, staticWeight, predictReps],
   );
 
-  // P19: a logged set gets a small marker for whether it landed above or below
-  // its prescription (rule + the N11 equal-RIR comparison live in day-rules.ts).
-  // For bodyweight movements the e1RM compares on EFFECTIVE load: the prescription
-  // against the current bodyweight, the logged set against the bodyweight captured
-  // on that set (historical honesty).
-  const performance = useMemo<"over" | "under" | null>(() => {
+  // P19 → doc 16 §5.3: a logged set gets a small three-state marker for whether
+  // it landed over / met / under its prescription (rule + the N11 equal-RIR
+  // comparison live in day-rules.ts, delegating to the engine's earn-gate
+  // comparison — one band, one curve). For bodyweight movements the e1RM
+  // compares on EFFECTIVE load: the prescription against the current
+  // bodyweight, the logged set against the bodyweight captured on that set
+  // (historical honesty).
+  const performance = useMemo<"over" | "met" | "under" | null>(() => {
     if (state !== "logged" || !logged) return null;
     return loggedSetMarker({
       prescribedEffectiveWeight: isBw
@@ -1556,6 +1572,7 @@ function SetRow({
       loggedReps: logged.reps,
       loggedRir: logged.rir_reported,
       targetRir,
+      band: markerBand,
       e1rmCfg,
     });
   }, [
@@ -1567,6 +1584,7 @@ function SetRow({
     prescribedWeight,
     prescribedReps,
     targetRir,
+    markerBand,
     e1rmCfg,
   ]);
 
@@ -1660,22 +1678,34 @@ function SetRow({
               className={cell}
             />
             {performance ? (
+              // ▲ over / ■ met / ▼ under (doc 16 §5.3). House-style like the
+              // P19 pair (no mockup figure exists — 09-changelog 2026-07-09):
+              // small ink glyphs, no accent; `met` is the on-the-mark square,
+              // vertically centered between over's top and under's bottom.
               <span
                 aria-label={
                   performance === "over"
                     ? "above prescription"
-                    : "below prescription"
+                    : performance === "met"
+                      ? "met prescription"
+                      : "below prescription"
                 }
                 title={
                   performance === "over"
                     ? "above prescription"
-                    : "below prescription"
+                    : performance === "met"
+                      ? "met prescription"
+                      : "below prescription"
                 }
-                className={`pointer-events-none absolute -right-1 text-[8px] leading-none text-ink/50 ${
-                  performance === "over" ? "-top-1" : "-bottom-1"
+                className={`pointer-events-none absolute -right-1 leading-none text-ink/50 ${
+                  performance === "over"
+                    ? "-top-1 text-[8px]"
+                    : performance === "met"
+                      ? "top-1/2 -translate-y-1/2 text-[6px]"
+                      : "-bottom-1 text-[8px]"
                 }`}
               >
-                {performance === "over" ? "▲" : "▼"}
+                {performance === "over" ? "▲" : performance === "met" ? "■" : "▼"}
               </span>
             ) : null}
           </div>

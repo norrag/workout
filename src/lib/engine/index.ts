@@ -9,6 +9,7 @@ import {
   type EngineInputs,
   type Prescription,
   type DecisionTraceStep,
+  type SeedEarnContext,
 } from "./types";
 import { assessPerformance, gradeOnRir } from "./rules/performance";
 import { modulateFromFeedback } from "./rules/feedback";
@@ -21,7 +22,24 @@ import {
   type E1rmAnchor,
 } from "./reps";
 import { prescribeBodyweight, usesBodyweightModel } from "./rules/bodyweight";
+import {
+  PROGRESSION_RULE,
+  assessProgression,
+  progressionActive,
+  type ProgressionAssessment,
+} from "./rules/progression";
+import { estimateE1rm as estimateE1rmCore } from "./predict";
+import { effectiveLoad } from "./load";
 
+export {
+  PROGRESSION_RULE,
+  progressionActive,
+  complianceBand,
+  setComplianceMarker,
+  DEFAULT_COMPLIANCE_BAND,
+  type ProgressionStatus,
+  type ProgressionTraceStep,
+} from "./rules/progression";
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
 export { engineInputsSchema } from "./types";
@@ -99,7 +117,7 @@ export {
   type LoadType,
 } from "./load";
 export type { EquipmentType } from "./params";
-export type { EngineInputs, Prescription, EngineParams };
+export type { EngineInputs, Prescription, EngineParams, SeedEarnContext };
 
 export function prescribe(
   rawInputs: EngineInputs,
@@ -108,6 +126,28 @@ export function prescribe(
   const inputs = engineInputsSchema.parse(rawInputs);
   const params = engineParamsSchema.parse(rawParams);
 
+  // doc 16 — prescribed progression (earned-step overload). Inactive (block
+  // absent / mode off / goal factor 0) ⇒ the core path below runs untouched:
+  // byte-identical output, fingerprint, and trace (§2.7). A deload is not a
+  // working prescription — it neither earns nor takes steps (§3.4), so it
+  // bypasses the progression wrapper entirely.
+  if (!progressionActive(inputs, params) || inputs.week.isDeload) {
+    return prescribeCore(inputs, params);
+  }
+  return prescribeWithProgression(inputs, params);
+}
+
+/**
+ * The pre-doc-16 prescription path, unchanged — everything is expressed
+ * relative to the strength-anchor input, which is exactly what lets the
+ * progression wrapper thread `A* = A + δ` through it (§3.1): the same climb,
+ * deadband, gate-hold, window-bound, and rounding machinery composes on a
+ * substituted anchor with no further changes. Takes ALREADY-PARSED inputs.
+ */
+function prescribeCore(
+  inputs: EngineInputs,
+  params: EngineParams,
+): Prescription {
   // T-I2: bodyweight load types price on effective load (bodyweight ± entered) and
   // progress on reps at a fixed load (bodyweight_only) or the rep-window in effective
   // space (loadable/assisted). Gated on `bodyweight_model`; the external path below
@@ -496,6 +536,194 @@ export function prescribe(
   };
 }
 
+/**
+ * doc 16 — the earned-step wrapper around the core path (working, non-deload
+ * prescriptions while the mode is active). Always emits exactly ONE
+ * status-coded `progression` trace step (§3.6):
+ *
+ *  1. price the UNEARNED prescription (today's behavior) — the baseline;
+ *  2. run the earn gate + governors (§3.4/§3.5) against the previous session;
+ *  3. when earned + offered, re-price the SAME machinery off the target anchor
+ *     `A* = A + δ` — an anchor-input substitution, with the R24b deadband
+ *     disabled on that run only (the deadband's job is absorbing decay on a
+ *     hold; an earned week intends an increase — §3.1);
+ *  4. apply the realized-ask rule AFTER rounding (§3.3): a byte-identical
+ *     realized ask claims nothing and retains the earn (`vanished`, retry per
+ *     §2.3 — never `A + kδ`); an ask past `max_pct_per_step × A` holds today's
+ *     behavior (`paced`); otherwise the led prescription ships (`stepped`).
+ *
+ * Grading stays on the MEASURED anchor throughout (§3.6) — the led run's grade
+ * note is swapped back to the baseline's.
+ */
+function prescribeWithProgression(
+  inputs: EngineInputs,
+  params: EngineParams,
+): Prescription {
+  const baseline = prescribeCore(inputs, params);
+  const gate = assessProgression(inputs, params, baseline);
+
+  if (!gate.offered) {
+    // record why (auditability, §3.6) without touching the prescription or its
+    // rationale — a hold is never narrated as an overload.
+    return withProgressionStep(baseline, holdStep(gate));
+  }
+
+  const anchor = inputs.strengthAnchor!;
+  const led = prescribeCore(
+    {
+      ...inputs,
+      strengthAnchor: { ...anchor, value: gate.targetAnchor! },
+    },
+    { ...params, hold_week_anchor_deadband: false },
+  );
+  // grading stays on the measured anchor (§3.6): the led run graded last week
+  // against A*, which is not the measurement — restore the baseline's grade.
+  const baselineGrade = baseline.trace.find((s) => s.rule === "grade");
+  const ledTrace = led.trace.map((s) =>
+    s.rule === "grade" && baselineGrade ? { ...s, detail: baselineGrade.detail } : s,
+  );
+  return applyRealizedAsk({
+    baseline,
+    led,
+    ledTrace,
+    gate,
+    anchorValue: anchor.value,
+    inputs,
+    params,
+  });
+}
+
+/** The §3.6 step recorded when the gate/governors declined a step (`paced` /
+ *  `not_earned`) — the prescription itself is untouched. */
+function holdStep(gate: ProgressionAssessment): DecisionTraceStep {
+  return {
+    rule: PROGRESSION_RULE,
+    detail: gate.detail,
+    status: gate.status === "paced" ? "paced" : "not_earned",
+    deltaTarget: gate.delta,
+    deltaRealized: null,
+    ...(gate.governor ? { governor: gate.governor } : {}),
+    ...(gate.predicate ? { predicate: gate.predicate } : {}),
+  };
+}
+
+/**
+ * The realized-ask rule (§3.3), AFTER rounding — shared verbatim by the advance
+ * wrapper above and the seed wrapper (§3.7), so the two routes cannot diverge:
+ * a byte-identical realized ask claims nothing and retains the earn
+ * (`vanished`, retry per §2.3 — never `A + kδ`); an ask past
+ * `max_pct_per_step × A` holds today's behavior (`paced`); otherwise the led
+ * prescription ships (`stepped`) with the rationale recomposed from the trace
+ * (P0-4 lockstep).
+ */
+function applyRealizedAsk(args: {
+  baseline: Prescription;
+  led: Prescription;
+  /** the led run's trace, post any caller adjustment (the advance grade swap) */
+  ledTrace: DecisionTraceStep[];
+  gate: ProgressionAssessment;
+  /** the MEASURED anchor value `A` (the max_pct_per_step base) */
+  anchorValue: number;
+  inputs: Pick<EngineInputs, "exercise" | "bodyweight" | "goalType">;
+  params: EngineParams;
+}): Prescription {
+  const { baseline, led, gate, params } = args;
+  const baseE1rm = prescribedE1rm(baseline, args.inputs, params);
+  const ledE1rm = prescribedE1rm(led, args.inputs, params);
+  const deltaRealized =
+    baseE1rm != null && ledE1rm != null
+      ? Math.round((ledE1rm - baseE1rm) * 10) / 10
+      : null;
+
+  const identical = led.weight === baseline.weight && led.reps === baseline.reps;
+  if (identical || deltaRealized == null || deltaRealized <= 0) {
+    // the quantum vanished (window hard cap, `bodyweight_only` rep ceiling,
+    // lattice corner): claim nothing, keep the earn (retry, don't stack —
+    // §2.3). At the bodyweight_only rep cap the rationale carries the
+    // substitution nudge instead of an overload claim.
+    const win = repWindowFor(args.inputs.goalType, params);
+    const atBodyweightCap =
+      args.inputs.exercise.loadType === "bodyweight_only" &&
+      win != null &&
+      baseline.reps != null &&
+      baseline.reps >= win.max;
+    const out = withProgressionStep(baseline, {
+      rule: PROGRESSION_RULE,
+      detail: "earned but unrealizable at this increment; earn retained",
+      status: "vanished",
+      deltaTarget: gate.delta,
+      deltaRealized: deltaRealized ?? 0,
+    });
+    return atBodyweightCap
+      ? {
+          ...out,
+          rationale:
+            out.rationale +
+            " At the rep cap for a bodyweight movement — add load or progress to the loadable variation to keep overloading.",
+        }
+      : out;
+  }
+  if (deltaRealized > params.progression!.max_pct_per_step * args.anchorValue) {
+    // a coarse plate jump on a light lift: the cap binds on the REALIZED ask,
+    // where it can actually fire — skip the step, hold today's behavior.
+    return withProgressionStep(baseline, {
+      rule: PROGRESSION_RULE,
+      detail: `earned; realized step ${deltaRealized} lb exceeds max_pct_per_step (${Math.round(params.progression!.max_pct_per_step * 100)}% of anchor ${args.anchorValue})`,
+      status: "paced",
+      deltaTarget: gate.delta,
+      deltaRealized,
+      governor: "max_pct_per_step",
+    });
+  }
+
+  // stepped: the led prescription ships, the trace announces the target, and
+  // the rationale is recomposed from the adjusted trace (P0-4 lockstep).
+  const step: DecisionTraceStep = {
+    rule: PROGRESSION_RULE,
+    detail: gate.detail,
+    status: "stepped",
+    deltaTarget: gate.delta,
+    deltaRealized,
+    targetAnchor: gate.targetAnchor!,
+  };
+  const fullTrace = [...args.ledTrace, step];
+  return {
+    ...led,
+    trace: fullTrace,
+    rationale: capitalize(fullTrace.map((s) => s.detail).join("; ") + "."),
+  };
+}
+
+/** Append the always-on progression step, leaving the prescription untouched. */
+function withProgressionStep(
+  p: Prescription,
+  step: DecisionTraceStep,
+): Prescription {
+  return { ...p, trace: [...p.trace, step] };
+}
+
+/**
+ * The e1RM a prescription demands (§3.3's realized-ask measure): its effective
+ * load × reps scored at the target RIR through the shared curve. Null when the
+ * triple is incomplete.
+ */
+function prescribedE1rm(
+  p: Pick<Prescription, "weight" | "reps" | "targetRir">,
+  inputs: Pick<EngineInputs, "exercise" | "bodyweight">,
+  params: EngineParams,
+): number | null {
+  if (p.weight == null || p.reps == null) return null;
+  // zod-free mirror of rules/bodyweight.ts::usesBodyweightModel, on a Pick so
+  // the seed wrapper (which has no full EngineInputs) shares this measure.
+  const bwModel =
+    (params.bodyweight_model ?? false) && inputs.exercise.loadType !== "external";
+  const load = bwModel
+    ? effectiveLoad(inputs.exercise.loadType, p.weight, inputs.bodyweight)
+    : p.weight;
+  if (load == null || load <= 0) return null;
+  return estimateE1rmCore(load, p.reps, p.targetRir, params.e1rm)?.value ?? null;
+}
+
 type RepWindow = NonNullable<ReturnType<typeof repWindowFor>>;
 const CONF_RANK: Record<"low" | "moderate" | "high", number> = {
   low: 0,
@@ -611,30 +839,129 @@ export function seedMeso(
     goalType?: EngineInputs["goalType"];
     anchor?: E1rmAnchor | null;
     bodyweight?: number | null;
+    /** the target week is a deload — deloads neither earn nor take steps
+     *  (doc 16 §3.4), so the progression wrapper is bypassed exactly like
+     *  prescribe()'s. Default false (today's callers all seed working weeks). */
+    isDeload?: boolean;
+    /** doc 16 §3.7 — the prior meso's final working session, the seed's earn
+     *  context, assembled by the caller exactly like the advance chain's
+     *  inputs. Omit for swaps/cold starts (no compliance context ⇒ not
+     *  earned ⇒ today's `seed_anchor` behavior). */
+    earn?: EngineInputs["seedEarn"];
+    /** doc 16 §8.2 — the governors' derived lookback, caller-assembled from
+     *  recent engine_decisions like the advance path's */
+    progressionHistory?: EngineInputs["progressionHistory"];
+    /** doc 16 §3.4 staleness gate: days since the earn context's session was
+     *  performed (caller clock — across a deload boundary this is what decides
+     *  whether the earn carries or the athlete re-measures first) */
+    daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
   },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
+  const goalType = opts?.goalType ?? "hypertrophy";
+  const anchor = opts?.anchor ?? null;
+  const bodyweight = opts?.bodyweight ?? null;
+  const baseline = seedCore(
+    priorPeak,
+    initial,
+    exercise,
+    user,
+    startRir,
+    params,
+    goalType,
+    anchor,
+    bodyweight,
+  );
 
+  // doc 16 §3.7 — the earned-step wrapper on the seed route, mirroring
+  // prescribe()'s. Inactive (block absent / mode off / goal factor 0) or a
+  // deload target week ⇒ the baseline ships untouched: byte-identical output,
+  // trace, and recorded inputs (§2.7).
+  if (!progressionActive({ goalType }, params) || (opts?.isDeload ?? false)) {
+    return baseline;
+  }
+
+  // the earn is evaluated through the SAME gate + governors as the advance
+  // chain (§3.4/§3.5) — the earn context stands in for `previous`/`actualSets`
+  // and the quantum δ is priced at the unearned SEED's effective point, so the
+  // two routes share one comparison and one arithmetic (§2.5).
+  const earn = opts?.earn ?? null;
+  const gateInputs: EngineInputs = {
+    exercise,
+    user,
+    goalType,
+    week: { targetRir: startRir, isDeload: false },
+    previous: earn?.previous ?? null,
+    actualSets: earn?.actualSets ?? [],
+    exerciseFeedback: earn?.exerciseFeedback ?? null,
+    workoutFeedback: earn?.workoutFeedback ?? null,
+    muscleGroupWeeklySets: null,
+    weekPeak: null,
+    strengthAnchor: anchor,
+    initial: null,
+    bodyweight,
+    progressionHistory: opts?.progressionHistory ?? null,
+    daysSincePreviousSession: opts?.daysSincePreviousSession ?? null,
+  };
+  const gate = assessProgression(gateInputs, params, baseline);
+  if (!gate.offered) {
+    return withProgressionStep(baseline, holdStep(gate));
+  }
+  const led = seedCore(
+    priorPeak,
+    initial,
+    exercise,
+    user,
+    startRir,
+    params,
+    goalType,
+    { ...anchor!, value: gate.targetAnchor! },
+    bodyweight,
+  );
+  return applyRealizedAsk({
+    baseline,
+    led,
+    ledTrace: led.trace,
+    gate,
+    anchorValue: anchor!.value,
+    inputs: gateInputs,
+    params,
+  });
+}
+
+/** The pre-doc-16 seed path, unchanged — parameterized on the anchor input,
+ *  which is exactly what lets the §3.7 wrapper thread `A* = A + δ` through it
+ *  (the same substitution `prescribe()` uses). Takes ALREADY-PARSED params. */
+function seedCore(
+  priorPeak: { weight: number | null; reps: number | null; sets: number } | null,
+  initial: { weight: number | null; reps: number | null; sets: number } | null,
+  exercise: EngineInputs["exercise"],
+  user: EngineInputs["user"],
+  startRir: number,
+  params: EngineParams,
+  goalType: EngineInputs["goalType"],
+  anchor: E1rmAnchor | null,
+  bodyweight: number | null,
+): Prescription {
   // T-I2: bodyweight load types seed through the bodyweight model (effective load
   // off the anchor; reps-only for bodyweight_only). Gated on `bodyweight_model`.
   if ((params.bodyweight_model ?? false) && exercise.loadType !== "external") {
     const seedInputs = engineInputsSchema.parse({
       exercise,
       user,
-      goalType: opts?.goalType ?? "hypertrophy",
+      goalType,
       week: { targetRir: startRir, isDeload: false },
       previous: null,
       actualSets: [],
-      strengthAnchor: opts?.anchor ?? null,
+      strengthAnchor: anchor,
       initial,
-      bodyweight: opts?.bodyweight ?? null,
+      bodyweight,
     });
     return prescribeBodyweight(seedInputs, params);
   }
 
   // §S1 anchor seed — mirrors prescribe()'s seed_anchor branch (index.ts:103-151)
-  const anchor = opts?.anchor ?? null;
-  const win = repWindowFor(opts?.goalType ?? "hypertrophy", params);
+  const win = repWindowFor(goalType, params);
   if (
     (params.seed_from_anchor ?? false) &&
     params.weight_selection === "rep_window" &&

@@ -4,7 +4,332 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-08 — Session 53: est-strength rework — recent-vs-baseline rolling trend (N36)
+## 2026-07-10 — Session 60: PR #157 refresh — merged main, N36→N40 renumber
+
+Owner asked to freshen the open est-strength PR (#157) against main and advise
+for merge. Merged `origin/main` (post #161/#162/#167) into the branch:
+
+- **All code auto-merged clean** (`engine/index.ts`, `engine/params.ts`,
+  `queries/logging.ts`, doc 10) — conflicts were docs-only (this area +
+  `PROGRESS.md`).
+- **ID collision found and fixed:** the PR session filed the est-strength item
+  as **N36**, but Session 58 (Phase R, merged first) filed the doc-16 deferred
+  spine as **N36–N39**. The est-strength item is renumbered **N40** (next free
+  ID); main's N36 (envelope loop) stands. Code/spec never referenced the ID, so
+  the renumber is docs-only. Same story for the session number: the PR session
+  was a parallel "Session 53" — left dated in place below, marked as a parallel
+  branch.
+- Full suite + typecheck re-run green on the merged tree.
+
+## 2026-07-10 — Session 59: N34 readiness probe — BodySpec build unblocked (doc 15 §8)
+
+Owner asked whether the BodySpec integration is buildable now, and clarified
+the deployment is **private single-user testing** — which reframed doc 15's
+"Phase 0: email BodySpec" gate. A live probe of the auth server answered the
+two questions that actually blocked the build:
+
+- **OAuth client (§7-1): resolved.** The Keycloak realm exposes anonymous
+  OIDC dynamic client registration — a live POST returned a working public
+  PKCE client with arbitrary redirect URIs, no approval. The app self-registers
+  its client at Phase-1 build time. (Probe left one inert throwaway client on
+  their server, documented in §8.1.)
+- **Refresh tokens (§7-2): resolved at realm level.** `offline_access` +
+  `refresh_token` grant supported and granted to the probe client.
+- **Residual risk (one):** a possible undocumented audience/scope check
+  (`ext_api_token`) on the API itself — verifiable only via a real login;
+  it's the first 5-minute check of Phase 1, fallback = the old Phase-0 email.
+
+Doc 15 amended in place: §1.1/§5/§7 pointers + new **§8 addendum**
+("build is unblocked for a private deployment"). N34 row updated —
+Phase 0 is no longer an owner action; remaining owner input is the
+adopt-&-phase decision (doc 15 §5). No code. Shipped as **PR #167**
+(`claude/bodyspec-dexa-api-readiness-q5a25w`).
+
+## 2026-07-09 — Session 58: N35 Phase R — activation prep + deferred spine filed + N21 primed
+
+Phase R is a **runbook, not code** (doc 16 §10) — shipped as **PR #162**
+(`claude/phase-r-implementation-gkmzol`). No engine change, no app change; the
+branch carries docs + the applied-inactive v20 migration. Work done this
+session:
+
+**(1) Research pass — the activation gate.** `goal_rate_factor.hypertrophy`
+resolved: **keep 0.75** (do NOT collapse to 1.0). New evidence doc
+`docs/reviews/2026-07-09-goal-rate-factor-research.md` (doc-10 house style,
+evidence labels): moderate-load (8–12) 1RM conversion runs ~0.56–0.73 of
+heavy-load (3–5) in the one head-to-head that isolates rep zone
+(Schoenfeld 2016 squat 0.56 / bench 0.73), consistent with the load-continuum
+meta (Schoenfeld 2017) + volume-matched trials (Lasevicius 2018, Campos 2002).
+0.75 is the conservative-for-a-*governor* top of that band — the pacer only
+delays, so erring high lets earned performance through. v20 already carries
+0.75, so **no params edit** — the finding validates the shipped value.
+
+**(2) v20 applied INACTIVE + replay diff.** Migration
+`20260709000001_engine_params_v20_prescribed_progression.sql` applied to hosted
+via the Supabase MCP, hash-verified `cb451a02…c90287` (matches
+`params-provenance.test.ts`); v19 remains active, nothing changes for users.
+`replay_decisions` candidate v20: **v19→v20 = 15 source / 11 changed / 0 errors**
+(all diffs are earned steps on compliant advance/seed working weeks — reprice up
+one quantum, e.g. Hack Squat 110→112.5, or a +1 rep climb; lattice snaps to
+window-bottom); broader 100-decision replay = 80 unchanged / 20 changed / 0
+errors (unchanged = seeds/deloads/gate-failures, byte-identical as designed).
+This is the diff the owner reviews before activating.
+
+**(3) Runbook.** `docs/deployment/manual-operations.md` gained the "Activate
+engine_params v20" section (5 steps: research ✓ / replay ✓ / owner review /
+activate via admin MCP `activate_engine_params` / monitor via
+`get_engine_decisions` + `get_progression_history`), plus the increment
+recommendation and the plan-rate/envelope unblock note.
+
+**(4) Deferred spine filed — N36–N39.** The doc 16 §11 deferred items are now
+first-class high-priority backlog rows (workstream **P**, new), each pointing
+back to doc 16 §11: **N36** envelope loop (blocked on v20-active + field data +
+N21), **N37** `rate_source:"plan"` pacer branch (blocked on N21), **N38**
+required honest-RIR confirmation + capture affordance, **N39** per-exercise
+progression-off override. README workstream roster + doc 16 §11 updated with
+the IDs.
+
+**(5) N21 primed as NEXT TARGET.** New scoping doc
+`docs/reviews/2026-07-09-n21-strength-rate-priming.md`: re-verified the audit
+(strength target is bucket-only — age/sex applied only to hypertrophy; model
+flip on profile completeness; cut-range collapse), researched the missing
+modifiers (**strength `sexFactor ≈ 1.0`, NOT the hypertrophy 0.7** — relative
+1RM gains are sex-equal, Roberts 2020 / Refalo 2025; apply `ageMultiplier` with
+a possibly higher strength floor, Peterson 2010 neural-gain preservation),
+proposed a v21 shape that exposes the personalized `perMonthRate` the
+`rate_source:"plan"` flip reads, and laid out the
+Phase-R → N21 → plan-rate → envelope sequence. N21 elevated MED→HIGH (it blocks
+N37 + N36).
+
+N35 row → Phase R prepped; stays live until v20 is activated (owner) and the
+deferred rows are picked up. Next target: **N21**.
+
+## 2026-07-09 — Session 57: N35 build Phase 4 — audit aggregate (doc 16 §8.3/§10)
+
+Fourth (final code) build slice of doc 16 shipped as **PR #161**
+(`claude/prescribed-progression-phase-4-d9pzs5`). Read-side only — no schema
+change, no migration, no engine change; while v20 stays INACTIVE no decision
+carries a progression step, so the new surface honestly reads empty.
+
+Landed: admin MCP tool `get_progression_history` (role-gated Slice-4 roster;
+caller's own decisions only, hard rule 5) — per exercise: earn/miss/skip
+status mix, governor firings (`paced` by governor), gate failures
+(`not_earned` by first failing predicate), the `vanished` share of asks
+(§8.3's increment-sizing signal → the doc 10 §8 finer-increments decision),
+earned-then-met/missed/unanswered ask pairing (the miss throttle's pairing,
+surfaced) + `open_ask`, trailing prescribed vs measured gain (%/30d, pacer's
+7-day span floor, deloads excluded), and a bounded chronological event
+series. Pure fold in `queries/progression-history.ts`
+(`toProgressionAuditEvent` + `aggregateProgressionEvents`, re-exported via
+`queries/progression.ts`); fetch + labels in
+`queries/engine-admin.ts::getProgressionHistory` (trace-rule JSONB
+containment, 2000-row window with truncation note); doc 05 admin table row.
+`v_progression_events` deliberately NOT built — §10 gates the view on a stats
+screen wanting it and none does; deferral recorded in PROGRESS.md. Tests +9
+(suite 941).
+
+N35 row → Phase 4 shipped; doc-16 build-out complete. Remaining: Phase R
+(owner-gated activation incl. the hypertrophy-factor research pass — runbook,
+not code).
+
+## 2026-07-09 — Session 56: N35 build Phase 3 — day-view coupling + three-state markers (doc 16 §10)
+
+Third build slice of doc 16 shipped as **PR #160**
+(`claude/prescribed-progression-phase-3-4etoto`). No engine-output change and
+no migration — with the v20 block (still INACTIVE) absent, no decision ever
+records a target anchor, so every fallback path is byte-identical to today.
+
+Landed: the day read (`queries/logging.ts`) carries `prescription_anchor` per
+exercise — the target `A* = A + δ` from the `stepped` progression step of the
+LATEST `engine_decisions` row (every reprice records a fresh decision, so a
+superseded step can't leak a stale lead; read ungated so the coupling stays
+honest in the deactivation window). `SetRow`'s live predictor prices off
+`prescription_anchor ?? e1rm_anchor` (§5.2) — a weight edit re-derives reps
+faithful to the prescribed target including the earned lead; the measured
+anchor stays the basis everywhere else. Markers go three-state (§5.3):
+`loggedSetMarker` now delegates to the engine's `setComplianceMarker` — the
+earn gate's comparison made visible, structurally unable to diverge — with
+the band params-fed (`progression.compliance_band` absorbed `MARKER_BAND`).
+Glyphs ▲/■/▼ small ink, house-style (rule-8 pass re-verified: no mockup
+figure exists for the set-row marker; 09-changelog 2026-07-09 entry is the
+authoritative treatment). WS-J bundle guard extended to pin
+`rules/progression.ts` + `rules/feedback.ts` zod-free in the client chunk.
+Tests +13 (suite 932): three-state day-rules, the marker ⇄ earn-gate
+agreement fixture (8 scenarios), extended guard; new e2e
+(`prescribed-progression.spec.ts`) drives a fabricated stepped decision
+through the real UI — earned prescription renders, weight edit re-derives
+off the recorded target, met/under markers reflect the shared comparison.
+
+N35 row → Phase 3 shipped. Next per 16 §10: Phase 4 (optional audit
+aggregate, post field data), Phase R (owner-gated activation).
+
+## 2026-07-09 — Session 55: N35 build Phase 2 — seed route / meso-over-meso carry (doc 16 §10)
+
+Second build slice of doc 16 shipped as **PR #159**
+(`claude/prescribed-progression-phase-2-uzc3ff`). No migration — v20
+(INACTIVE) already carries the block; with it absent every seed output,
+recorded input, fingerprint, and trace stays byte-identical (pinned).
+
+Landed: `seedMeso` doc-16 §3.7 wrapper — the caller supplies the prior meso's
+final working session (`earn` opt + `progressionHistory` +
+`daysSincePreviousSession`) and the seed evaluates it through the SAME
+`assessProgression` gate + governors as the advance chain, re-prices the
+anchor-parameterized `seedCore` off `A* = A + δ`, and shares the extracted
+`applyRealizedAsk` §3.3 rule verbatim (vanished retains the earn;
+`max_pct_per_step`; `stepped` announces the target). New derived
+`EngineInputs.seedEarn` (doc 14 §3 denylisted, recorded for replay).
+Earned-at-close derivation in the new leaf `queries/seed-progression.ts`
+(most recent completed WORKING session per exercise — deloads excluded, so
+the earn crosses the deload boundary; `max_gap_days` decides honesty).
+Caller plumbing per the §10 site list: `startMeso` earns; plan-edit adds +
+slot swaps never (no compliance context; slot path forwards `isDeload`);
+`recomputeSeed` + admin `replay_decisions` replay the recorded earn frozen
+with the anchor refreshed. `progressionHistory` assembly moved to the leaf
+`queries/progression-history.ts` (generation ↔ progression cycle), re-exported
+from `progression.ts`. Tests +23 (suite 919): seed↔advance parity (same δ,
+same A* — by construction via the shared gate), meso-over-meso golden (the
+memo's acceptance case: fixed point absent, meso 2 opens above meso 1
+active), deload-boundary carry + staleness cutoff, gate/governor cases on the
+seed, bodyweight rep-cap vanish, doc-14 fingerprint parity, replay
+determinism.
+
+N35 row → Phase 2 shipped. Next per 16 §10: Phase 3 (day-view coupling +
+three-state markers, hard-rule-8 mockup pass), Phase 4 (optional audit
+aggregate), Phase R (owner-gated activation).
+
+## 2026-07-09 — Session 54: N35 build Phase 1 — engine core + advance chain (doc 16 §10)
+
+First build slice of doc 16 shipped as **PR #158**
+(`claude/prescribed-progression-phase-1-vgi63a`). Ships INACTIVE — engine_params **v20**
+(`20260709000001`) carries the `progression` block; with it absent every
+output, fingerprint, and trace is byte-identical (pinned by the treadmill
+golden, which also reproduces the doc-16 §7 worked example verbatim:
+145×8@3 → earned 150×9@2 targeting e1RM 203.0 → measured 205.0).
+
+Landed: `src/lib/engine/rules/progression.ts` (earn gate with e1RM-space
+per-set compliance via the shared three-state comparison, governors —
+cadence / macro-rate pacer / miss throttle / peak-week — and the quantum δ);
+`prescribe()` threading (`A*` as an anchor-input substitution, deadband
+carve-out on earned pricing, realized-ask rule after rounding with
+retry-not-stack `vanished` + `max_pct_per_step` + the `bodyweight_only`
+substitution nudge, always-on status-coded `progression` trace step, grading
+pinned to the measured anchor); `progressionHistory` +
+`daysSincePreviousSession` derived inputs (doc 14 §3 denylist, recorded for
+replay) with assembly in `queries/progression.ts` (90-day lookback,
+normalized %/30d pacer rate, miss/re-arm derivation) wired into `generateDay`
+and `projectNextPrescription`; `get_engine_decisions` rule/status filter
+(§8.3); doc 10 §4 + doc 13 §9.2 pointers to doc 16; the stale
+"standalone → gain" comment corrected (follow-up 2 §5). Full §10 Phase-1
+test matrix green (+49 tests; suite 896).
+
+N35 row → **in-progress, Phase 1 shipped**. Next per 16 §10: Phase 2 (seed
+route), Phase 3 (day-view coupling + markers), Phase 4 (optional audit
+aggregate), Phase R (owner-gated activation).
+
+## 2026-07-09 — Session 53 (cont.): Batch 15 — N35 follow-up #3 + design finalized (doc 16)
+
+Owner's third follow-up (Batch 15 verbatim in the appendix) answered in
+[`docs/reviews/2026-07-09-prescribed-progression-followup-3.md`](../reviews/2026-07-09-prescribed-progression-followup-3.md),
+and the design **finalized** as
+[`docs/16-prescribed-progression.md`](../16-prescribed-progression.md) —
+the authoritative build spec consolidating the memo + review + follow-ups
+1–3 (doc 16 wins over the whole thread; root `CLAUDE.md` docs list updated).
+
+Substance: (1) **Vanished earns — the owner's accumulation assumption is
+corrected** (the "worth discussing before implementation" branch): "earn
+retained" = the single-quantum entitlement is *retried* (re-armed at
+`A + δ` off the measured anchor), never *stacked* (`A + kδ` never exists) —
+stacking is the compounding-unconfirmed-credit failure the no-compounding
+rule forbids, and it would eventually demand a multi-quantum leap on
+exactly the lift least able to absorb it. Coarse-increment lifts don't
+need it: `step: "min"` picks the rep axis, each performed quantum banks in
+the measured anchor (the anchor IS the accumulator), and the top-of-window
+reset — which this design finally makes reachable — converts the banked
+rep gains into the load step. True dead-ends (window cap + oversized plate
+jump; `bodyweight_only` ceiling) get equipment/product answers (increment
+override, doc 10 §8, substitution nudge), not credit. (2) Prefill
+flow-through confirmed automatic. (3) **Owner rulings adopted:** the live
+day-view predictor prices off the prescription-basis target anchor (A*
+when stepped — flips review §7.1's deferral; `logging.ts:335` /
+`DayView.tsx:1339` today read the measured anchor), and the earn gate
+moves to **e1RM-space per-set compliance** — not the literal weight×reps
+pair, which broke under athlete-owned weight edits — sharing the P19
+`loggedSetMarker` comparison (grinder guard intrinsic: reported-low-RIR
+scores under). (4) Markers go **three-state (over/met/under)**;
+`MARKER_BAND` moves into params as `compliance_band` so marker, gate, and
+grading read one tunable; "met" glyph is mockup-governed (09 entry at
+build). N35 → **ready (build)**: phases in doc 16 §10 (engine core → seed
+→ day-view/markers → audit aggregate → owner-gated activation with the
+hypertrophy-factor research pass); implementation in new sessions.
+
+## 2026-07-09 — Session 53 (cont.): Batch 14 — N35 follow-up #2 (auditability, band_position, envelope, standalone)
+
+Owner responded again (same PR #156 thread); captured verbatim as **Batch
+14** and answered in
+[`docs/reviews/2026-07-09-prescribed-progression-followup-2.md`](../reviews/2026-07-09-prescribed-progression-followup-2.md)
+(amends follow-up 1 where they conflict).
+
+Substance: (1) **Auditability** — the substrate already exists
+(`engine_decisions` inputs/output + structured trace + explain/replay/
+simulate MCP tools); amendment: the progression trace becomes **always-on
+and status-coded** (stepped / vanished / paced / not_earned, with a
+structured payload naming the governor or failing predicate) — follow-up 1's
+"no trace when the ask vanishes" refined to "never *claim*, always
+*record*". Line drawn: record at decision grain (Phase 1), aggregate
+read-side only (`get_engine_decisions` filter now; admin
+`get_progression_history` once field data exists), feed back into
+prescriptions only as a doc-14 derived input (= the envelope, Phase 3). The
+history does NOT duplicate `v_exercise_history`: it's demand-side +
+relational (earn/miss/skip stream, governor firings, prescribed-vs-measured
+gap) — none of it exists elsewhere. (2) **Pacing decoupling confirmed**: the
+pacer reads the `strength_pct_month` *band table* (a param), none of
+`planMacrocycle`'s heuristic projections; the quantum is mechanical
+(increment/rep), never band-derived; `rate_source: "plan"` is the one
+explicit opt-in coupling. (3) **`band_position` (0–1, default 0.5)**
+replaces the band_mid/band_top enum — continuous, tunable, and deliberately
+the same knob the owner's **envelope loop** (adopted as the Phase-3 shape)
+will drive: performance moves position *within* the macro envelope, at meso
+boundaries, hysteretic, from demand-side outcomes — bounded by construction,
+replay-exact (position recorded in decision inputs). (4) **Standalone
+mesos**: nothing extra needed — goal resolves via `engineGoal(null)` →
+hypertrophy, the band keys off the profile bucket, history is per
+user × exercise across meso/macro boundaries; post-N21 "plan" works too
+(pure function). Flagged the stale "standalone → gain" comment
+(`progression.ts:1129`) for cleanup in the build PR. N35 stays needs-input;
+updated decision list in follow-up 2 §6.
+
+## 2026-07-08 — Session 53: Batch 13 — N35 follow-up answered, design amended (macro-rate pacing)
+
+Owner responded to the N35 review with four threads; captured verbatim as
+**Batch 13** in the appendix and answered in
+[`docs/reviews/2026-07-08-prescribed-progression-followup.md`](../reviews/2026-07-08-prescribed-progression-followup.md)
+(which amends the 2026-07-07 review — follow-up wins on conflict).
+
+Substance: (1) convergence confirmed; "when" restated as earned + once per
+microcycle at most + rate-paced. (2) The "progressing twice" concern:
+half-dissolved (the ramp rep is reserve drawdown — zero capacity ask;
+capacity ask is exactly one quantum/week), half-adopted (ungoverned
+per-microcycle stepping ≈ 10–15%/mo is too aggressive — resolved by the
+owner's own macro-rate idea). (3) **Design amendment:** the §6.6 rate
+ceiling is promoted to a **macro-rate pacer** (macro sets the expected
+strength rate, meso paces earned quanta to it; hard boundary: budget never
+quota — the rate meters the ask, only performance mints it) and the
+per-goal booleans become **per-goal rate factors** (strength 1.0,
+hypertrophy 0.75 [HEURISTIC — research pass before v20], cut/maintain 0);
+ships in Phase 1 (backward-compatible generalization of the ceiling);
+`rate_source: "plan"` is the post-N21 personalization flip (N21 row
+cross-linked). (4) Misc answered: the `moderate` confidence ceiling under
+compliant hypertrophy is intentional (estimate-accuracy honesty, doc 10 §9
+— only gates needed fixing, already done); "reported RIR" is
+`logged_sets.rir_reported` — a real optional column honored everywhere on
+read but with **no write surface today** (DayView logs null always), so
+review §10 Q6 is now explicitly a two-part decision (engine rule + capture
+affordance + narrow doc-11 premise amendment). Updated owner-decision list
+in the follow-up's §6; N35 stays needs-input.
+
+Reconciliation sweep ran clean (no merged-but-live rows; N1 in-progress,
+N21/N34/N35 open).
+
+## 2026-07-08 — Session 53 (parallel branch): est-strength rework — recent-vs-baseline rolling trend (N40, filed as N36)
 
 Owner flagged that aggregated macrocycle "est. strength" dropped the moment a
 new meso started, and suspected (a) the in-progress block factoring in and
@@ -15,7 +340,7 @@ Overview tile (top-3 key-lift mean) and the Performance tab (muscle rollup)
 were *different* aggregations that could disagree (the archived N16 fix only
 partially closed this).
 
-Reworked the whole metric bottom-up (owner-approved design), shipped as **N36**:
+Reworked the whole metric bottom-up (owner-approved design), shipped as **N40** (filed as N36 in-session; renumbered at merge — see Session 60):
 - **engine/strength.ts** (pure, golden-tested): `strengthTrend` = best of the
   most-recent window vs best of the earliest, symmetric non-overlapping windows
   (`engine_params.strength`, `.optional()` so no params-hash churn — replay
@@ -40,6 +365,7 @@ Spec updated: `docs/10-metrics-spec.md` §1 (confidence persisted), §6 (est.
 strength redefined), §8 (`strength` param block). Relates to / supersedes the
 archived N16; extends N9's muscle rollup. Ships as PR on
 `claude/macrocycle-strength-estimates-wdbefl`.
+
 
 ## 2026-07-07 — Session 52: Batch 12 intake — prescribed e1RM progression review (N35)
 
@@ -1880,7 +2206,7 @@ in lockstep with PRs going forward. Branch `claude/review-notes-section-khtf4p`.
   WS-I tasks (note + archive link left in place); T-A4 annotated as realized via #82. Replaced
   the "done (PR pending)" note with the new status convention.
 - **Process fix (the real ask).** `docs/notes/CLAUDE.md`: new **"Keeping the index in sync
-  with PRs"** section (rule 1: the *building* PR sets `done (PR #<n>)` with the real number +
+  with PRs"** section (rule 1: the *building* PR sets `done (PR #161)` with the real number +
   logs it; rule 2: a merged PR can't sweep its own row; rule 3: a **reconciliation sweep** runs
   at every session start). Wired the sweep into the **resume protocol** as step 3. Root
   `CLAUDE.md`: added the "any PR that resolves a backlog item updates its row in the same PR"

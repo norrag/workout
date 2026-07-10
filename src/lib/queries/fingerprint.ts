@@ -51,6 +51,18 @@ export const DERIVED_INPUT_KEYS = [
   // mass-stale every bodyweight prescription; refreshed from the live profile on
   // recompute (doc 14 §3).
   "bodyweight",
+  // doc 16 §8.2: the progression governors' lookback (assembled from recent
+  // engine_decisions) and the caller-computed staleness gap — both derived,
+  // recomputed on read, recorded in the decision for replay. Excluding them
+  // keeps every pre-v20 fingerprint byte-identical; the `progression` params
+  // block itself rides `paramsToken` (activation is the intended v-bump).
+  "progressionHistory",
+  "daysSincePreviousSession",
+  // doc 16 §3.7: the seed route's earn context (the prior meso's final working
+  // session — logged history, like the anchor). Derived: excluded here so a
+  // seed row's fingerprint is byte-identical with or without an earn, and
+  // recorded in the seed decision for replay.
+  "seedEarn",
 ] as const;
 
 export type DerivedInputKey = (typeof DERIVED_INPUT_KEYS)[number];
@@ -132,6 +144,7 @@ export function seedEngineInputs(
   priorPeak: SeedPeak | null,
   strengthAnchor: EngineInputs["strengthAnchor"] = null,
   bodyweight: EngineInputs["bodyweight"] = null,
+  progression?: SeedProgressionInputs,
 ): EngineInputs {
   return {
     ...config,
@@ -155,7 +168,28 @@ export function seedEngineInputs(
     // T-I2: the lifter's bodyweight (effective-load base for bodyweight movements).
     // Also a DERIVED input — excluded from the fingerprint, refreshed on recompute.
     bodyweight,
+    // doc 16 §3.7/§8.2: the seed route's earn context + governors' lookback +
+    // staleness gap — all DERIVED (denylisted above), recorded in the seed
+    // decision for replay. The keys are spread conditionally so an inactive-mode
+    // (or contextless) seed's recorded inputs stay byte-identical to today.
+    ...(progression?.seedEarn !== undefined
+      ? { seedEarn: progression.seedEarn }
+      : {}),
+    ...(progression?.progressionHistory !== undefined
+      ? { progressionHistory: progression.progressionHistory }
+      : {}),
+    ...(progression?.daysSincePreviousSession !== undefined
+      ? { daysSincePreviousSession: progression.daysSincePreviousSession }
+      : {}),
   };
+}
+
+/** doc 16 §3.7 — the seed route's derived progression inputs (all denylisted;
+ *  present only while the progression mode is active). */
+export interface SeedProgressionInputs {
+  seedEarn?: EngineInputs["seedEarn"];
+  progressionHistory?: EngineInputs["progressionHistory"];
+  daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
 }
 
 export interface SeedInputArgs {
@@ -174,6 +208,8 @@ export interface SeedInputArgs {
   strengthAnchor?: EngineInputs["strengthAnchor"];
   /** T-I2: the lifter's bodyweight (derived; null otherwise) */
   bodyweight?: EngineInputs["bodyweight"];
+  /** doc 16 §3.7: the seed's derived progression inputs (mode-active only) */
+  progression?: SeedProgressionInputs;
 }
 
 /**
@@ -196,6 +232,7 @@ export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
     args.priorPeak,
     args.strengthAnchor ?? null,
     args.bodyweight ?? null,
+    args.progression,
   );
 }
 

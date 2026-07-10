@@ -11,6 +11,7 @@ import type {
   WorkoutExerciseRow,
   WorkoutRow,
 } from "@/lib/types/database";
+import { PROGRESSION_RULE } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseE1rmAnchors } from "./anchors";
 import { getMuscleGroupsCached } from "./reference";
@@ -39,6 +40,15 @@ export interface LoggedExercise extends WorkoutExerciseRow {
   feedback: ExerciseFeedbackRow | null;
   /** recency-weighted strength anchor for the live reps predictor (doc 11) */
   e1rm_anchor: number | null;
+  /** doc 16 §5.2: the prescription-basis anchor — the target `A* = A + δ`
+   *  recorded by the `stepped` progression step of the decision that priced
+   *  this row, or null when the row wasn't stepped (hold / pre-v20 / no
+   *  decision). The live reps predictor prices off this so an athlete-owned
+   *  weight edit re-derives reps faithful to the prescribed target including
+   *  the lead; null falls back to `e1rm_anchor` (today's behavior). The
+   *  measured anchor stays the basis everywhere else (stats, PRs, sampling,
+   *  confidence, grading). */
+  prescription_anchor: number | null;
   /** T-I2: the lifter's current bodyweight (lb), the effective-load base for a
    *  bodyweight movement; null when the profile has none. Same value across the
    *  day's exercises (read from the profile), shown by the editable BW chip. */
@@ -77,6 +87,46 @@ export interface WorkoutDetail {
   /** the week→day navigator grid (fig 1.1 expanded header) */
   navWeeks: NavWeek[];
   exercises: LoggedExercise[];
+}
+
+/**
+ * doc 16 §5.2 — the recorded target anchor per workout exercise: `A*` from the
+ * status-`stepped` progression step of the LATEST decision that priced each
+ * row. Only the newest decision counts — every reprice (advance, seed,
+ * freshness recompute) records a fresh decision, so a superseded step can
+ * never leak a stale lead. Rows whose newest decision held (`not_earned` /
+ * `paced` / `vanished`), pre-v20 rows, and decision-less rows are simply
+ * absent from the map: the day view falls back to the measured anchor. Read
+ * unconditionally (not gated on the mode) so the coupling stays honest in the
+ * deactivation window, when a stored prescription priced off `A*` hasn't been
+ * pulled through the doc-14 recompute yet.
+ */
+async function getRecordedTargetAnchors(
+  supabase: Client,
+  weIds: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (weIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("engine_decisions")
+    .select("workout_exercise_id, created_at, output")
+    .in("workout_exercise_id", weIds)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const weId = row.workout_exercise_id;
+    if (!weId || seen.has(weId)) continue;
+    seen.add(weId);
+    const output = row.output as {
+      trace?: { rule?: string; status?: string; targetAnchor?: number }[];
+    } | null;
+    const step = output?.trace?.find((s) => s.rule === PROGRESSION_RULE);
+    if (step?.status === "stepped" && typeof step.targetAnchor === "number") {
+      out.set(weId, step.targetAnchor);
+    }
+  }
+  return out;
 }
 
 export async function getWorkoutDetail(
@@ -271,14 +321,13 @@ export async function getWorkoutDetail(
     };
   });
 
-  // recency-weighted strength anchors for the live reps predictor (doc 11)
+  // recency-weighted strength anchors for the live reps predictor (doc 11) +
+  // the recorded prescription-basis target anchors (doc 16 §5.2)
   const { params } = await getActiveEngineParams(supabase);
-  const e1rmAnchors = await getExerciseE1rmAnchors(
-    supabase,
-    userId,
-    exerciseIds,
-    params,
-  );
+  const [e1rmAnchors, targetAnchors] = await Promise.all([
+    getExerciseE1rmAnchors(supabase, userId, exerciseIds, params),
+    getRecordedTargetAnchors(supabase, weIds),
+  ]);
   // T-I2: the lifter's current bodyweight — the effective-load base for bodyweight
   // movements (the day-view chip + the live effective-load prediction/marker).
   const { data: bwProfile } = await supabase
@@ -333,6 +382,7 @@ export async function getWorkoutDetail(
       pinned_note: noteByExercise.get(we.exercise_id) ?? null,
       feedback: feedbackByWe.get(we.id) ?? null,
       e1rm_anchor: e1rmAnchors.get(we.exercise_id)?.value ?? null,
+      prescription_anchor: targetAnchors.get(we.id) ?? null,
       bodyweight: userBodyweight,
     })),
   };

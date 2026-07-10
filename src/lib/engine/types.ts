@@ -109,11 +109,59 @@ export const engineInputsSchema = z.object({
   // the live profile on recompute. Null when unknown ⇒ a bodyweight lift defers to
   // a manual seed. Only consulted when `params.bodyweight_model` is on.
   bodyweight: z.number().positive().nullable().default(null),
+  // doc 16 §8.2: the progression governors' lookback, assembled by the caller
+  // from recent `engine_decisions` (same pattern and doc-14 treatment as the
+  // strength anchor: DERIVED — recomputed on read, excluded from the freshness
+  // fingerprint, recorded in the decision for replay). Null ⇒ no history: the
+  // cadence/pacer/throttle governors are permissive (an athlete's first steps
+  // are how the trajectory starts). Only consulted when `params.progression`
+  // is active.
+  // `.nullish()` with NO default, so parsing inputs that predate the feature
+  // injects nothing (stored decision inputs stay byte-identical) and existing
+  // input literals keep compiling.
+  progressionHistory: z
+    .object({
+      /** a `stepped` decision already targets the microcycle being generated */
+      earnedThisMicrocycle: z.boolean(),
+      /** trailing prescribed-e1RM gain, normalized to %/30 days (pacer input) */
+      trailing30dPrescribedGainPct: z.number().nullable(),
+      /** current run of earned-then-missed cycles, 0 once re-armed (§3.5) */
+      consecutiveMissedEarns: z.number().int().min(0),
+    })
+    .nullish(),
+  // doc 16 §3.4 staleness gate: days since the source session was performed,
+  // caller-supplied (the engine is clockless). DERIVED like the anchor — at
+  // normal advance-at-completion it is ~0; a catch-up run or freshness
+  // recompute after a layoff correctly disarms the earn. Null ⇒ unknown ⇒
+  // the gate passes (the advance chain always supplies it).
+  daysSincePreviousSession: z.number().min(0).nullish(),
+  // doc 16 §3.7 — the SEED route's earn context: the prior meso's final WORKING
+  // session (its prescription + what was performed against it + its feedback),
+  // assembled by the caller exactly like the advance chain's inputs, so an earn
+  // at meso close carries across the deload boundary into the next seed.
+  // DERIVED (doc 14 §3 denylist): excluded from the freshness fingerprint,
+  // recorded in the seed decision for replay. `.nullish()` with NO default —
+  // absent on every input that predates the feature (stored decision inputs
+  // parse byte-identically) and on swaps/cold starts, which have no compliance
+  // context and therefore never earn (§3.7). Only consulted by `seedMeso` while
+  // `params.progression` is active; `prescribe` ignores it.
+  seedEarn: z
+    .object({
+      /** the final working session's prescription (the compliance target) */
+      previous: prescriptionSchema,
+      /** what was actually performed against it */
+      actualSets: z.array(loggedSetInputSchema),
+      exerciseFeedback: exerciseFeedbackInputSchema.nullable(),
+      workoutFeedback: workoutFeedbackInputSchema.nullable(),
+    })
+    .nullish(),
 });
 
 export type EngineInputs = z.infer<typeof engineInputsSchema>;
 export type LoggedSetInput = z.infer<typeof loggedSetInputSchema>;
 export type PrescriptionBase = z.infer<typeof prescriptionSchema>;
+/** doc 16 §3.7 — the seed route's caller-assembled earn context. */
+export type SeedEarnContext = NonNullable<EngineInputs["seedEarn"]>;
 
 /**
  * One structured step in the engine's reasoning (P0-4). The human `rationale`
@@ -124,6 +172,23 @@ export type PrescriptionBase = z.infer<typeof prescriptionSchema>;
 export interface DecisionTraceStep {
   rule: string;
   detail: string;
+  /**
+   * doc 16 §3.6 — the `progression` rule's structured payload (absent on every
+   * other rule). Additive JSONB inside the recorded decision output; the
+   * always-on status-coded step is what makes cadence/pacer behavior auditable
+   * (`stepped | vanished | paced | not_earned`).
+   */
+  status?: string;
+  /** the intended quantum δ in e1RM space (lb) */
+  deltaTarget?: number | null;
+  /** the realized (post-rounding) ask above the unearned prescription (lb) */
+  deltaRealized?: number | null;
+  /** which governor skipped an earned step (`paced` only) */
+  governor?: string;
+  /** the first failing gate predicate (`not_earned` only) */
+  predicate?: string;
+  /** the prescription-basis anchor A* recorded for the day view (`stepped` only) */
+  targetAnchor?: number;
 }
 
 export interface Prescription extends PrescriptionBase {

@@ -42,6 +42,34 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-09 — Three-state set marker: `met` glyph joins ▲/▼ (doc 16 §5.3, N35 Phase 3)
+
+- **Change:** the P19 per-set performance marker on logged set rows (Day View,
+  fig 1.1) becomes **three-state**. `over` keeps the small ink `▲` at the top
+  right corner of the reps cell and `under` keeps the `▼` at the bottom right;
+  the in-band case — previously rendered as *absence* — now shows a small ink
+  `■` (6px vs the carets' 8px, same `ink/50`), vertically centered on the
+  cell's right edge between the carets' two positions. Accessible names:
+  "above prescription" / "met prescription" / "below prescription". The
+  on-target band is no longer a UI constant: marker, engine earn gate, and
+  grading read the one shared tunable (`engine_params` →
+  `progression.compliance_band`; ±1.5% default while the block is absent, the
+  same value as the retired module-local `MARKER_BAND`).
+- **Rationale:** doc 16 (prescribed progression) — under the earned-step model
+  an in-band set is a *positive* state (delivering the ask is what earning
+  looks like) and deserves a glyph rather than absence (owner ruling,
+  follow-up 3 §4). Session-level "progression earned" stays disclosed through
+  the existing rationale/audit affordances — no new indicator, display stays
+  uncomplicated.
+- **Affected figures:** 1.1 (set grid). Like the original P19 pair this is
+  **house-style — no mockup figure exists for the marker** (rule-8 pass
+  re-verified against `workout - App Screens v2.dc.html`: the only ▲/▼
+  occurrences are annotation prose, not set-row treatments). Ink-only glyphs
+  per the ledger system; orange stays reserved for position/selection.
+- **Impact:** `RETROFIT` — shipped with N35 Phase 3 (`DayView` `SetRow` +
+  `day-rules.ts::loggedSetMarker` delegating to the engine's shared
+  comparison).
+
 ## 2026-07-05 (session 2, cont.) — Per-week RIR editor (N18-B)
 
 - **Change:** both RIR surfaces — the planner **FinalizeSheet**'s ADVANCED

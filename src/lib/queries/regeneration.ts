@@ -257,6 +257,25 @@ function recomputeSeed(
   const priorPeak: SeedPeak | null = storedPeak
     ? { weight: storedPeak.weight, reps: storedPeak.reps, sets: storedPeak.sets }
     : null;
+  // doc 16 §3.7: the seed's derived progression inputs replay FROZEN from the
+  // stored decision (exactly like the advance replay's `progressionHistory` —
+  // the earn context is immutable completed work), while the refreshed anchor
+  // flows into the gate + target-anchor arithmetic like everywhere else. Only
+  // spread when recorded, so pre-Phase-2 seed inputs rebuild byte-identically.
+  const stored = args.storedInputs as {
+    seedEarn?: EngineInputs["seedEarn"];
+    progressionHistory?: EngineInputs["progressionHistory"];
+    daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
+  };
+  const storedProgression = {
+    ...(stored.seedEarn !== undefined ? { seedEarn: stored.seedEarn } : {}),
+    ...(stored.progressionHistory !== undefined
+      ? { progressionHistory: stored.progressionHistory }
+      : {}),
+    ...(stored.daysSincePreviousSession !== undefined
+      ? { daysSincePreviousSession: stored.daysSincePreviousSession }
+      : {}),
+  };
 
   let output: Prescription;
   try {
@@ -270,7 +289,22 @@ function recomputeSeed(
       // §S1: the anchor (refreshed from live history by the reconcile) drives the
       // anchor-aware seed when seed_from_anchor is active; ignored otherwise.
       // T-I2: bodyweight drives the bodyweight model when active.
-      { goalType: cfg.goalType, anchor: args.anchor, bodyweight: args.bodyweight },
+      {
+        goalType: cfg.goalType,
+        anchor: args.anchor,
+        bodyweight: args.bodyweight,
+        isDeload: cfg.week.isDeload,
+        ...(stored.seedEarn != null
+          ? {
+              earn: stored.seedEarn,
+              daysSincePreviousSession:
+                stored.daysSincePreviousSession ?? null,
+            }
+          : {}),
+        ...(stored.progressionHistory !== undefined
+          ? { progressionHistory: stored.progressionHistory }
+          : {}),
+      },
     );
   } catch {
     return { status: "invalid_source" };
@@ -280,7 +314,13 @@ function recomputeSeed(
     status: prescriptionChanged(args.currentOutput, output)
       ? "changed"
       : "unchanged",
-    inputs: seedEngineInputs(cfg, priorPeak, args.anchor, args.bodyweight),
+    inputs: seedEngineInputs(
+      cfg,
+      priorPeak,
+      args.anchor,
+      args.bodyweight,
+      storedProgression,
+    ),
     output,
   };
 }

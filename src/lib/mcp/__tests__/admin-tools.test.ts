@@ -7,7 +7,7 @@ import {
   type EngineParams,
 } from "@/lib/engine";
 import { buildSeedInputs } from "@/lib/queries/fingerprint";
-import { V16_PARAMS } from "@/lib/engine/__tests__/helpers";
+import { V16_PARAMS, V20_PARAMS } from "@/lib/engine/__tests__/helpers";
 import type { DecisionRecord } from "@/lib/queries/engine-admin";
 import {
   deepMerge,
@@ -19,6 +19,7 @@ import {
   PROPOSE_ENGINE_PARAMS,
   ACTIVATE_ENGINE_PARAMS,
   GET_ENGINE_DECISIONS,
+  GET_PROGRESSION_HISTORY,
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
@@ -222,6 +223,74 @@ describe("replayDecisions", () => {
     expect(outcome.errors).toBe(0);
   });
 
+  it("replays a STEPPED seed with its recorded earn context (doc 16 §3.7)", () => {
+    // a mode-active meso seed that earned at close: the decision inputs carry
+    // the earn context + governors' lookback, so the replay reproduces the led
+    // (stepped) output byte-for-byte under the same params.
+    const anchor = { value: 198.2, confidence: "moderate" as const };
+    const progression = {
+      seedEarn: {
+        previous: { weight: 145, reps: 8, sets: 3, targetRir: 3 },
+        actualSets: [1, 2, 3].map((n) => ({
+          setNumber: n,
+          weight: 145,
+          reps: 8,
+          rirReported: null,
+          isWarmup: false,
+        })),
+        exerciseFeedback: null,
+        workoutFeedback: null,
+      },
+      progressionHistory: {
+        earnedThisMicrocycle: false,
+        trailing30dPrescribedGainPct: null,
+        consecutiveMissedEarns: 0,
+      },
+      daysSincePreviousSession: 8,
+    };
+    const seedIn = buildSeedInputs({
+      equipmentType: "barbell",
+      profile: { experience_level: "intermediate" },
+      goal: "hypertrophy",
+      startRir: 3,
+      isDeload: false,
+      initial: null,
+      priorPeak: null,
+      strengthAnchor: anchor,
+      progression,
+    });
+    const seedOut = seedMeso(
+      null,
+      null,
+      { equipmentType: "barbell", loadType: "external" },
+      { experienceLevel: "intermediate" },
+      3,
+      V20_PARAMS,
+      {
+        goalType: "hypertrophy",
+        anchor,
+        earn: progression.seedEarn,
+        progressionHistory: progression.progressionHistory,
+        daysSincePreviousSession: progression.daysSincePreviousSession,
+      },
+    );
+    expect(
+      seedOut.trace.some((s) => s.rule === "progression" && s.status === "stepped"),
+    ).toBe(true);
+    const stored = decision(
+      seedIn as unknown as Record<string, unknown>,
+      seedOut as unknown as Record<string, unknown>,
+      "seed",
+    );
+    const outcome = replayDecisions([stored], V20_PARAMS);
+    expect(outcome.changed).toBe(0);
+    expect(outcome.outcomes.unchanged).toBe(1);
+    expect(outcome.errors).toBe(0);
+    // ...and a candidate WITHOUT the block honestly diffs the led seed away
+    const reverted = replayDecisions([stored], V16_PARAMS);
+    expect(reverted.changed).toBe(1);
+  });
+
   it("replays a bodyweight seed with the stored bodyweight (R10)", () => {
     // R10: stored seed inputs carry `bodyweight`; the replay used to drop it,
     // so under the live bodyweight model every bodyweight-lift seed replayed
@@ -299,6 +368,7 @@ const ALL_ADMIN_TOOLS = [
   PROPOSE_ENGINE_PARAMS,
   ACTIVATE_ENGINE_PARAMS,
   GET_ENGINE_DECISIONS,
+  GET_PROGRESSION_HISTORY,
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,

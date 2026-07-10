@@ -293,6 +293,77 @@ export const engineParamsSchema = z.object({
   // (pre-v17 rows replay byte-identically). v17 sets it to 3 (the scale's "high").
   pain_cut_gate: z.number().int().min(1).max(3).optional(),
 
+  // ----- doc 16 — prescribed progression (earned-step overload + macro-rate
+  // pacing), v20. Same `.optional()` discipline: the WHOLE block absent ⇒ every
+  // output, fingerprint, and trace byte-identical to today (doc 16 §2.7). While
+  // present with `mode: "earned_step"`, the engine leads the prescribed demand by
+  // one earned quantum off the measured anchor (`A* = A + δ`), gated on full
+  // compliance (§3.4), metered by the governors (§3.5), and always disclosed by a
+  // status-coded `progression` trace step (§3.6). The measured e1RM pipeline is
+  // untouched — the prescription target leads; only performance moves the record
+  // (T-I5). v20 ships the block INACTIVE.
+  progression: z
+    .object({
+      // absent block / "off" ⇒ current behavior. The only active mode is
+      // `earned_step`; `off` exists so an activated row can disable the feature
+      // without deleting the block (keeping its tunables visible).
+      mode: z.enum(["earned_step", "off"]),
+      // the quantum δ (§3.2): "min" = min(one loadable step, one rep at held
+      // load) in e1RM space — the smallest honest step the exercise can express;
+      // "increment"/"rep" force one axis.
+      step: z.enum(["min", "increment", "rep"]).default("min"),
+      // earn-gate anchor floor (§3.4). MUST open at `moderate`: `high` requires
+      // ≤8 effective reps, and compliant hypertrophy sets pin at ~11 — a `high`
+      // floor is provably inert for the flagship goal.
+      min_confidence: z.enum(["high", "moderate", "low"]).default("moderate"),
+      // the shared set-level e1RM comparison band (§5.3): earn gate, ▲/met/▼
+      // markers, and grading read this ONE tunable (absorbed the day view's
+      // module-local MARKER_BAND = 0.015; the UI consumes it via
+      // `complianceBand()` since Phase 3).
+      compliance_band: z.number().min(0).max(0.2).default(0.015),
+      // at most one step per exercise per microcycle (mirrors how the RIR ramp
+      // steps); "session" is the aggressive-novice setting (multiplies by
+      // training frequency).
+      cadence: z.enum(["microcycle", "session"]).default("microcycle"),
+      // macro-rate pacer (§3.5): absent / "off" ⇒ cadence-only. The rate meters
+      // WHEN earned steps are offered; only performance mints them (budget,
+      // never quota — §2.4).
+      pacing: z.enum(["macro_rate", "off"]).optional(),
+      // "band" = macro_target.strength_pct_month keyed by the profile's
+      // experience bucket; "plan" (post-N21) swaps in the personalized
+      // planMacrocycle rate — until N21 lands it falls back to "band".
+      rate_source: z.enum(["band", "plan"]).default("band"),
+      // where in the band the pacer targets: 0 = floor, 1 = top. The Phase-3
+      // envelope loop writes this same knob at meso boundaries (§4).
+      band_position: z.number().min(0).max(1).default(0.5),
+      // × the sourced rate, per goal. 0 disables the earn gate for that goal
+      // (cut/maintain hold strength honestly per R24 — one mechanism, no
+      // separate booleans). hypertrophy/gain 0.75 is a HEURISTIC pending the
+      // Phase-R research pass (doc 16 §4).
+      goal_rate_factor: z
+        .record(z.enum(goalTypes), z.number().min(0))
+        .default({
+          strength: 1.0,
+          hypertrophy: 0.75,
+          gain: 0.75,
+          cut: 0.0,
+          maintain: 0.0,
+        }),
+      // after ≥2 consecutive earned-then-missed cycles, this many fully
+      // compliant sessions re-arm the step (miss throttle, §3.5)
+      miss_rearm_sessions: z.number().int().min(1).default(2),
+      // staleness gate (§3.4): no earn when the source session is older than
+      // this (after a layoff, first reproduce the old anchor)
+      max_gap_days: z.number().positive().default(10),
+      // "skip" ⇒ no step at target RIR 0 (0 RIR is a ceiling, not a PR slot)
+      peak_week: z.enum(["skip", "step"]).default("skip"),
+      // cap on the REALIZED (post-rounding) ask as a fraction of the measured
+      // anchor (§3.3) — a coarse plate jump on a light lift is skipped (`paced`),
+      // never insisted on
+      max_pct_per_step: z.number().positive().max(0.5).default(0.05),
+    })
+    .optional(),
+
   // within `rir_tolerance` RIR of target ⇒ on track; a gap beyond
   // `rir_regress_gap` is flagged in the rationale (the falling anchor, not a
   // fixed −%, carries genuine regression — doc 13 §4.3).

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine/params";
+import { complianceBand } from "@/lib/engine/rules/progression";
 import {
   adoptServerRowState,
   daySetTotals,
@@ -94,29 +95,39 @@ describe("daySetTotals", () => {
   });
 });
 
-describe("loggedSetMarker (P19/N11)", () => {
+describe("loggedSetMarker (P19/N11 → doc 16 §5.3 three-state)", () => {
   const e1rmCfg = DEFAULT_ENGINE_PARAMS.e1rm;
+  // band absent from params ⇒ the shared default (±1.5%, the old MARKER_BAND)
+  const band = complianceBand(DEFAULT_ENGINE_PARAMS);
   const asPrescribed = {
     prescribedEffectiveWeight: 100,
     prescribedReps: 10,
     loggedEffectiveWeight: 100,
     loggedReps: 10,
+    band,
     e1rmCfg,
   };
 
   // the N11 regression: rir_reported defaulted to 0 while the prescription
   // baked in the week's target RIR, so an exactly-as-prescribed quick-logged
-  // set read as a big miss — worst on deloads (the largest target RIR)
-  it("exactly-prescribed with unreported RIR shows no marker on a deload", () => {
+  // set read as a big miss — worst on deloads (the largest target RIR). Under
+  // doc 16 §5.3 the in-band case is the positive `met` state, not absence.
+  it("exactly-prescribed with unreported RIR reads met on a deload", () => {
     expect(
       loggedSetMarker({ ...asPrescribed, loggedRir: null, targetRir: 6 }),
-    ).toBeNull();
+    ).toBe("met");
   });
 
-  it("exactly-prescribed with unreported RIR shows no marker on a working week", () => {
+  it("exactly-prescribed with unreported RIR reads met on a working week", () => {
     expect(
       loggedSetMarker({ ...asPrescribed, loggedRir: null, targetRir: 2 }),
-    ).toBeNull();
+    ).toBe("met");
+  });
+
+  it("reported RIR equal to the target reads met", () => {
+    expect(
+      loggedSetMarker({ ...asPrescribed, loggedRir: 2, targetRir: 2 }),
+    ).toBe("met");
   });
 
   it("more reps than prescribed reads over, fewer reads under (unreported RIR)", () => {
@@ -158,6 +169,17 @@ describe("loggedSetMarker (P19/N11)", () => {
         targetRir: 2,
       }),
     ).toBe("over");
+  });
+
+  it("the band is params-fed: a wide band absorbs a small beat into met", () => {
+    const overAtDefault = {
+      ...asPrescribed,
+      loggedReps: 11,
+      loggedRir: null,
+      targetRir: 2,
+    };
+    expect(loggedSetMarker(overAtDefault)).toBe("over");
+    expect(loggedSetMarker({ ...overAtDefault, band: 0.2 })).toBe("met");
   });
 
   it("returns null without a prescription or a working load", () => {

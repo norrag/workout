@@ -34,6 +34,11 @@ import {
   type SeededDecision,
   type SeedDecisionCoords,
 } from "./seed-decisions";
+import {
+  getProgressionHistories,
+  type ProgressionHistoryInput,
+} from "./progression-history";
+import { getSeedEarnContexts, type SeedEarnBundle } from "./seed-progression";
 
 type Client = SupabaseClient<Database>;
 
@@ -52,6 +57,14 @@ interface SeedCtx {
   overrideByExerciseId: Map<string, ExerciseParamOverride>;
   /** §S1: recency strength anchor per exercise for the anchor-aware meso seed */
   anchorByExerciseId: Map<string, E1rmAnchor>;
+  /** doc 16 §3.7: the earned-at-close context per exercise (meso activation
+   *  only — swaps/mid-meso adds have no compliance context and never earn).
+   *  Null while the progression mode is inactive for this goal. */
+  earnByExerciseId: Map<string, SeedEarnBundle> | null;
+  /** doc 16 §8.2: the governors' derived lookback per exercise. Null while the
+   *  mode is inactive — the recorded seed inputs then omit every progression
+   *  field, staying byte-identical to today (§2.7). */
+  progressionByExerciseId: Map<string, ProgressionHistoryInput> | null;
 }
 
 /** A seeded prescription row plus the engine I/O that produced it, so the caller
@@ -114,6 +127,13 @@ function seedExerciseRow(
   // anchor is a derived input — carried into the seed decision so replay
   // reproduces it, but excluded from the freshness fingerprint (doc 14 §3).
   const anchor = ctx.anchorByExerciseId.get(fill.exercise_id) ?? null;
+  // doc 16 §3.7: the seed-route earn (meso activation carries the prior meso's
+  // final working session across the deload boundary; a mid-meso add has none)
+  // + the §8.2 governors' lookback. All derived inputs — recorded in the seed
+  // decision for replay, excluded from the fingerprint; omitted entirely while
+  // the mode is inactive so recorded inputs stay byte-identical.
+  const earnBundle = ctx.earnByExerciseId?.get(fill.exercise_id) ?? null;
+  const history = ctx.progressionByExerciseId?.get(fill.exercise_id) ?? null;
   const output = seedMeso(
     priorPeak,
     initial,
@@ -121,7 +141,19 @@ function seedExerciseRow(
     { experienceLevel: ctx.experienceLevel ?? "beginner" },
     ctx.targetRir,
     effectiveParams,
-    { goalType: ctx.goal, anchor, bodyweight: ctx.bodyweight },
+    {
+      goalType: ctx.goal,
+      anchor,
+      bodyweight: ctx.bodyweight,
+      isDeload: ctx.isDeload,
+      ...(earnBundle
+        ? {
+            earn: earnBundle.earn,
+            daysSincePreviousSession: earnBundle.daysSincePreviousSession,
+          }
+        : {}),
+      ...(ctx.progressionByExerciseId ? { progressionHistory: history } : {}),
+    },
   );
   const inputs = buildSeedInputs({
     equipmentType: equipment,
@@ -133,6 +165,16 @@ function seedExerciseRow(
     priorPeak,
     strengthAnchor: anchor,
     bodyweight: ctx.bodyweight,
+    ...(ctx.progressionByExerciseId
+      ? {
+          progression: {
+            seedEarn: earnBundle?.earn ?? null,
+            progressionHistory: history,
+            daysSincePreviousSession:
+              earnBundle?.daysSincePreviousSession ?? null,
+          },
+        }
+      : {}),
   });
   return {
     row: {
@@ -472,6 +514,16 @@ export async function startMeso(
     if (pruneError) throw pruneError;
   }
 
+  // doc 16 §3.7: the earned-at-close derivation (the prior meso's final working
+  // session per exercise) + the §8.2 governors' lookback keyed to the week-1
+  // micro (a retried activation must see a step an earlier attempt already
+  // recorded — cadence). Both self-gate: null while the mode is inactive, so
+  // the seed path below is byte-identical to today with the block absent.
+  const [earnByExerciseId, progressionByExerciseId] = await Promise.all([
+    getSeedEarnContexts(supabase, userId, exerciseIds, goal, params),
+    getProgressionHistories(supabase, userId, exerciseIds, week1.id, params),
+  ]);
+
   const seedCtx: SeedCtx = {
     equipmentById,
     prById,
@@ -486,6 +538,8 @@ export async function startMeso(
     paramsVersion,
     overrideByExerciseId,
     anchorByExerciseId,
+    earnByExerciseId,
+    progressionByExerciseId,
   };
 
   // a half-applied prior attempt may have created some week-1 workouts
@@ -666,6 +720,11 @@ export async function regenerateOpenWorkouts(
       paramsVersion,
       overrideByExerciseId,
       anchorByExerciseId,
+      // doc 16 §3.7: a plan-edit add mid-meso is a cold start — no compliance
+      // context, never earned; the seed emits `not_earned` while the mode is
+      // active and stays byte-identical while it is absent.
+      earnByExerciseId: null,
+      progressionByExerciseId: null,
     };
 
     // 1. drop planned workouts whose day was removed from the plan — but never

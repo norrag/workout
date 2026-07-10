@@ -82,6 +82,35 @@ export const V19_PARAMS: EngineParams = {
   hold_week_anchor_deadband: true,
 };
 
+/** v20 = v19 plus the prescribed-progression block (doc 16 Phase 1): earned-step
+ *  overload (`A* = A + δ` off the measured anchor, full-compliance earn gate in
+ *  e1RM space) + macro-rate pacing, always-on status-coded `progression` trace.
+ *  Mirrors `20260709000001_engine_params_v20_prescribed_progression`. */
+export const V20_PARAMS: EngineParams = {
+  ...V19_PARAMS,
+  progression: {
+    mode: "earned_step",
+    step: "min",
+    min_confidence: "moderate",
+    compliance_band: 0.015,
+    cadence: "microcycle",
+    pacing: "macro_rate",
+    rate_source: "band",
+    band_position: 0.5,
+    goal_rate_factor: {
+      strength: 1.0,
+      hypertrophy: 0.75,
+      gain: 0.75,
+      cut: 0.0,
+      maintain: 0.0,
+    },
+    miss_rearm_sessions: 2,
+    max_gap_days: 10,
+    peak_week: "skip",
+    max_pct_per_step: 0.05,
+  },
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

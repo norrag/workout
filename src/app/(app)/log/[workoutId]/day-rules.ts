@@ -4,9 +4,12 @@
  * progress bar over skipped sets — R19).
  */
 
-// zod-free predictor core only — this module rides in the day view's client
-// chunk, which must never pull the engine barrel (WS-J bundle split)
-import { estimateE1rm, type E1rmConfig } from "@/lib/engine/predict";
+// zod-free leaf modules only — this module rides in the day view's client
+// chunk, which must never pull the engine barrel (WS-J bundle split);
+// rules/progression.ts is kept zod-free precisely so the marker can share
+// the earn gate's comparison without regressing the split
+import type { E1rmConfig } from "@/lib/engine/predict";
+import { setComplianceMarker } from "@/lib/engine/rules/progression";
 
 /** The slice of a logged exercise the set-progress math needs. */
 export type SetProgressExercise = {
@@ -86,15 +89,13 @@ export function adoptServerRowState(
   return !hasUncommittedEdits;
 }
 
-/** On-target band for the P19 marker: within ±1.5% e1RM shows no marker. */
-const MARKER_BAND = 0.015;
-
 /**
- * P19: whether a logged set landed above or below its prescription, compared
- * by e1RM so it accounts for both the reps hit and the RIR left in reserve
- * (more reps OR closer to failure ⇒ above). Loads arrive as EFFECTIVE loads —
- * the caller resolves bodyweight arithmetic (prescription against the current
- * bodyweight, the logged set against the bodyweight captured on that set).
+ * P19 → doc 16 §5.3: whether a logged set landed over / met / under its
+ * prescription, compared by e1RM so it accounts for both the reps hit and the
+ * RIR left in reserve (more reps OR closer to failure ⇒ over). Loads arrive as
+ * EFFECTIVE loads — the caller resolves bodyweight arithmetic (prescription
+ * against the current bodyweight, the logged set against the bodyweight
+ * captured on that set).
  *
  * Both sides must be estimated at the SAME RIR when the set's RIR wasn't
  * reported (the quick LOG path always logs null): the prescription bakes in
@@ -102,8 +103,16 @@ const MARKER_BAND = 0.015;
  * exactly-as-prescribed set read as a big miss — worst on deloads, where the
  * target RIR is the largest in the ramp (N11).
  *
- * Returns null when the set is on-target (within the band) or either side
- * can't be estimated (no prescription, non-working load).
+ * A pure delegation to the engine's `setComplianceMarker` — the SAME
+ * comparison the earn gate scores each working set with, so the ▲/met/▼
+ * markers, the gate, and grading cannot diverge (doc 16 §2.5, made
+ * structural). The band is params-fed (`progression.compliance_band`,
+ * absorbing the old module-local `MARKER_BAND`; `complianceBand(params)`
+ * supplies the ±1.5% default while the block is absent).
+ *
+ * Returns `met` for in-band — a positive state under the progression model
+ * (it is what earning looks like); null stays reserved for not-comparable
+ * (no prescription, non-working load).
  */
 export function loggedSetMarker(args: {
   prescribedEffectiveWeight: number | null;
@@ -113,36 +122,9 @@ export function loggedSetMarker(args: {
   /** reported reps-in-reserve, or null when the set was quick-logged */
   loggedRir: number | null;
   targetRir: number;
+  /** shared set-level e1RM band — `complianceBand(params)` (doc 16 §5.3) */
+  band: number;
   e1rmCfg: E1rmConfig;
-}): "over" | "under" | null {
-  const {
-    prescribedEffectiveWeight,
-    prescribedReps,
-    loggedEffectiveWeight,
-    loggedReps,
-    loggedRir,
-    targetRir,
-    e1rmCfg,
-  } = args;
-  const prescriptionE1rm =
-    prescribedEffectiveWeight != null &&
-    prescribedEffectiveWeight > 0 &&
-    prescribedReps != null
-      ? (estimateE1rm(prescribedEffectiveWeight, prescribedReps, targetRir, e1rmCfg)
-          ?.value ?? null)
-      : null;
-  const loggedE1rm =
-    loggedEffectiveWeight != null && loggedEffectiveWeight > 0
-      ? (estimateE1rm(
-          loggedEffectiveWeight,
-          loggedReps,
-          loggedRir ?? targetRir,
-          e1rmCfg,
-        )?.value ?? null)
-      : null;
-  if (prescriptionE1rm == null || loggedE1rm == null || prescriptionE1rm <= 0)
-    return null;
-  if (loggedE1rm > prescriptionE1rm * (1 + MARKER_BAND)) return "over";
-  if (loggedE1rm < prescriptionE1rm * (1 - MARKER_BAND)) return "under";
-  return null;
+}): "over" | "met" | "under" | null {
+  return setComplianceMarker(args);
 }
