@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-11 — Session 64: N40 built — doc 17 Phase 3 (macrocycle closeout + retrospective)
 
-Owner kicked off Phase 3 ("implement phase 3"). One PR (**#<n>**, branch
+Owner kicked off Phase 3 ("implement phase 3"). One PR (**#171**, branch
 `claude/macrocycle-goals-phase-3-qvav73`); **no migration** — `completed` was
 already in the macro status vocabulary (no code path wrote it), and the
 retrospective is derive-on-read per doc 17 principle 5.
@@ -58,7 +58,7 @@ retrospective is derive-on-read per doc 17 principle 5.
   (`macrocycle-closeout.spec.ts`): end-macro flow → COMPLETE badge +
   retrospective renders (INSUFFICIENT DATA + 3 ABANDONED) + affordances gone.
 
-**N40 → done (PR #<n>).** N41 (Phase 4, bodyweight series) unblocks on merge —
+**N40 → done (PR #171).** N41 (Phase 4, bodyweight series) unblocks on merge —
 its mass-verdict rows slot into the retrospective's `bodyData` seam; N34 5b
 likewise. Reconciliation sweep: **N37 archived** (PR #170 merged; row →
 `archive.md`, live index trimmed).
