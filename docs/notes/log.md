@@ -4,6 +4,31 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 71 (cont. 2): N43 research + pacing pressure-test, rollback to v21
+
+Owner directed the research pass + a pacing pressure-test, and the interim
+rollback. Both review docs written; N43 moved needs-input → ready.
+
+- **Rolled back to v21** (`activate_engine_params` 21) per the owner — v22's
+  plan/advanced band understates this profile; v21's intermediate band contains
+  the model-derived rate. Branch restarted from merged main (PR #178) →
+  `claude/macro-goals-r2-r3-envelope-ntaw6h`, **PR #<n2>**.
+- **Strength-rate model research** (`docs/reviews/2026-07-11-strength-rate-model-research.md`):
+  two-component hypothesis EVIDENCED, combine ADDITIVELY (Balshaw 2017). FFM
+  coupling `k ≈ 1.0` (not the ⅔ sketch) ⇒ Garron ~1.4–2.3 %/mo = intermediate,
+  advanced bucket understates. Functional form + coefficient bands + trust-FFM
+  guardrail recommended for v23. Two research agents; allometric-FFM exponent
+  filled the first sweep's flagged gap.
+- **Pacing pressure-test** (`docs/reviews/2026-07-11-pacing-fundamentals-review.md`):
+  harness `scratchpad/pacing-sim.ts` drives the REAL engine through 9 scenarios.
+  Confirms owner's thesis — pacer = rate-limiter on the lead (not the primary
+  progression engine, which is the measured anchor); honest lifter can't be
+  over-prescribed; RIR-mortgaging bounded + self-correcting, worst on 8-wk mesos
+  (4.8% transient, exposed at RIR 0). Key new limit: the envelope loop moves
+  position *within* a band and can't fix a whole-band miscalibration → N43 gates
+  N36's fit.
+- N43 → **ready** (D→F); build v23 next per the research doc §4.
+
 ## 2026-07-11 — Session 71 (cont.): Batch-16 intake — N43, the strength band's calendar-bucket defect
 
 Immediately after the R2/R3 activations the owner reviewed the flip's
