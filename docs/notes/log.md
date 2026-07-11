@@ -15,7 +15,7 @@ but the field data is nowhere near the "few real mesos" the threshold fit
 needs. Scope split accordingly, per §7's own language: **build the whole
 mechanism now, ship it OFF; the fit + params bump + activation stay
 field-data-gated** (new runbook section). Branch
-`claude/macrocycle-goals-phase-6-k6kxf1` (**PR #<n>**).
+`claude/macrocycle-goals-phase-6-k6kxf1` (**PR #177**).
 
 - Engine: `rules/envelope.ts` pure fold (completed-meso boundary steps,
   `MAX_BOUNDARY_STEP 0.25` binding, dwell, clamp [0,1], bounded lookback as
