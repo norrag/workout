@@ -2,10 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, profileAge } from "@/lib/queries/profiles";
+import { getLatestBodyweightPoint } from "@/lib/queries/bodyweight";
 import { signOut } from "@/app/(auth)/actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ThemeToggle } from "./ThemeToggle";
+import { LogBodyweightRow } from "./LogBodyweightRow";
 import { formatHeight } from "@/lib/units";
+import { shortDate } from "@/lib/dates";
 
 /** More tab (fig 4.4): profile card + inline settings. */
 export default async function MorePage() {
@@ -15,7 +18,10 @@ export default async function MorePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const profile = await getProfile(supabase, user.id);
+  const [profile, latestBodyweight] = await Promise.all([
+    getProfile(supabase, user.id),
+    getLatestBodyweightPoint(supabase, user.id),
+  ]);
   const { count: workoutCount, error: countError } = await supabase
     .from("workouts")
     .select("*", { count: "exact", head: true })
@@ -27,7 +33,15 @@ export default async function MorePage() {
   const meta = [
     age != null ? String(age) : null,
     profile?.experience_level?.toUpperCase() ?? null,
-    profile?.bodyweight != null ? `${profile.bodyweight} LB` : null,
+    // "as of" freshness wherever profile bodyweight displays (doc 17 §5,
+    // 09-changelog 2026-07-11 §2)
+    profile?.bodyweight != null
+      ? `${profile.bodyweight} LB${
+          profile.bodyweight_updated_at
+            ? ` · AS OF ${shortDate(profile.bodyweight_updated_at)}`
+            : ""
+        }`
+      : null,
     formatHeight(profile?.height_in ?? null),
   ]
     .filter(Boolean)
@@ -77,6 +91,19 @@ export default async function MorePage() {
         <div className="text-sm font-semibold">Theme</div>
         <ThemeToggle />
       </div>
+      {/* bodyweight quick entry (doc 17 §5, 09-changelog 2026-07-11 §1) —
+          appends a manual measured point; never rewrites the profile scalar */}
+      <LogBodyweightRow
+        latest={
+          latestBodyweight
+            ? {
+                weight: Number(latestBodyweight.weight),
+                measured_on: latestBodyweight.measured_on,
+              }
+            : null
+        }
+        fallbackWeight={profile?.bodyweight ?? null}
+      />
       <Link
         href="/more/connector"
         className="flex items-center justify-between border-b border-ink/15 py-3.5"

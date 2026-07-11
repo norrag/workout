@@ -11,6 +11,16 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-11 — macro goals Phase 3 merged (PR #171)
+
+Reconciliation sweep at the doc-17 Phase-4 session start: N40's PR merged
+2026-07-11 (row stamped `done (PR #171)` in-PR per protocol). Full record in
+doc 17 §4, PROGRESS, and the Session-64 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N40 | Macrocycle close + retrospective (nothing ever wrote `completed`; the Overview stayed a live to-date rollup forever) | D→F | C | **done (PR #171, merged 2026-07-11).** Doc 17 §4 / Phase 3: natural close (`macroClosesNaturally` + `maybeCompleteMacroAfterMeso` cascaded from the final-week advance and `endMesocycle`; placeholders aren't open work), explicit irrevocable `endMacrocycle` (logged → the `endMesocycle` path, never-started/placeholders → `abandoned`; header ⋮ + confirm sheet), terminal-macro freeze (`goalsEditRefusal` + placement/slot guards), `macroRetrospective` pure fold (strength verdict vs the **stored contract**, fixed vocabulary; demand aggregate; mass "not measured" with the N41/N34 `bodyData` seam; block-outcome mix) shared by the completed Overview and `get_macrocycle_summary` (parity-tested). No migration. Tests +24 (suite 1015) + closeout e2e. N41 (Phase 4) built against its seam the next session. |
+
 ## Swept 2026-07-10 — macro goals Phase 2 merged (PR #170)
 
 Reconciliation sweep at the doc-17 Phase-3 session start: N37's PR merged

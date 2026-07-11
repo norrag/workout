@@ -12,6 +12,8 @@ import {
   type MacroProfile,
 } from "@/lib/engine/macro";
 import type { EngineParams } from "@/lib/engine/params";
+// type-only: erased at compile time, so the client chunk stays engine-free
+import type { PriorBlockRate } from "@/lib/queries/macro";
 import { createMacrocycleAction, type FormState } from "../actions";
 
 const initialState: FormState = { error: null };
@@ -30,10 +32,14 @@ export function CreateMacroForm({
   profile,
   params,
   today,
+  priorBlock = null,
 }: {
   profile: MacroProfile;
   params: EngineParams;
   today: string;
+  /** doc 17 §5 — the prior completed block's measured strength rate; display
+   *  only, never an input to `planMacrocycle` (principle 4) */
+  priorBlock?: PriorBlockRate | null;
 }) {
   const [state, formAction, pending] = useActionState(
     createMacrocycleAction,
@@ -229,6 +235,22 @@ export function CreateMacroForm({
           <span>INTENSIFY</span>
           <span>PEAK</span>
         </div>
+        {/* prior-block priming (doc 17 §5, 09-changelog 2026-07-11 §3):
+            display-only measured rate — never blended into the target. The
+            "model band" half of the copy joins at Phase R2 when the target
+            cards return. */}
+        {priorBlock && (
+          <div className="mt-3 flex items-baseline justify-between border-t border-ink/[0.18] pt-2.5">
+            <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/50">
+              LAST BLOCK MEASURED
+            </span>
+            <span className="numeral text-[10.5px] font-bold">
+              {priorBlock.ratePctMonth > 0 ? "+" : ""}
+              {priorBlock.ratePctMonth}%/MO{" "}
+              <span className="font-semibold text-ink/55">EST. STRENGTH</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}

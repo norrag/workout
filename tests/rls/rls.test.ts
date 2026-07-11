@@ -8,6 +8,7 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 
 const URL = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
 const ANON_KEY =
@@ -893,6 +894,111 @@ describe("design-pivot tables (0002)", () => {
       .eq("user_id", aliceId);
     expect(bobError).toBeNull();
     expect(bobView).toEqual([]);
+  });
+});
+
+describe("bodyweight_log (doc 17 §5, N41)", () => {
+  it("owners append their own points; other users see and spoof nothing", async () => {
+    const { error: own } = await alice.from("bodyweight_log").insert({
+      user_id: aliceId,
+      measured_on: "2026-07-01",
+      weight: 205,
+      source: "manual",
+    });
+    expect(own).toBeNull();
+
+    // bob reads nothing of alice's series…
+    const { data: bobView, error: bobReadError } = await bob
+      .from("bodyweight_log")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(bobReadError).toBeNull();
+    expect(bobView).toEqual([]);
+
+    // …and cannot write points into her account
+    const { error: spoof } = await bob.from("bodyweight_log").insert({
+      user_id: aliceId,
+      measured_on: "2026-07-01",
+      weight: 90,
+      source: "manual",
+    });
+    expect(spoof).not.toBeNull();
+  });
+
+  it("source is constrained to the doc-17 vocabulary", async () => {
+    const { error } = await alice.from("bodyweight_log").insert({
+      user_id: aliceId,
+      measured_on: "2026-07-02",
+      weight: 205,
+      source: "guess",
+    });
+    expect(error?.code).toBe("23514"); // check constraint
+  });
+
+  it("one row per (user, day, source); the writer's upsert replaces same-day", async () => {
+    const day = "2026-07-03";
+    const { error: first } = await alice.from("bodyweight_log").insert({
+      user_id: aliceId,
+      measured_on: day,
+      weight: 204,
+      source: "profile",
+    });
+    expect(first).toBeNull();
+
+    // a plain duplicate insert hits the unique key…
+    const { error: dup } = await alice.from("bodyweight_log").insert({
+      user_id: aliceId,
+      measured_on: day,
+      weight: 203,
+      source: "profile",
+    });
+    expect(dup?.code).toBe("23505");
+
+    // …and the appendBodyweightPoint upsert path (what every writer —
+    // profile edit, BW chip, onboarding, quick entry — calls) replaces the
+    // day's point instead: latest same-day entry wins
+    await appendBodyweightPoint(
+      alice as unknown as Parameters<typeof appendBodyweightPoint>[0],
+      aliceId,
+      { measuredOn: day, weight: 202.5, source: "profile" },
+    );
+    const { data: after } = await alice
+      .from("bodyweight_log")
+      .select("weight")
+      .eq("measured_on", day)
+      .eq("source", "profile");
+    expect(after).toHaveLength(1);
+    expect(Number(after![0].weight)).toBe(202.5);
+  });
+
+  it("owners can correct (delete) a fat-fingered point — it is measurement substrate, not logged history", async () => {
+    const { data: created, error } = await alice
+      .from("bodyweight_log")
+      .insert({
+        user_id: aliceId,
+        measured_on: "2026-07-04",
+        weight: 999,
+        source: "manual",
+      })
+      .select()
+      .single();
+    expect(error).toBeNull();
+
+    // bob can't delete it…
+    await bob.from("bodyweight_log").delete().eq("id", created!.id);
+    const { data: still } = await alice
+      .from("bodyweight_log")
+      .select("id")
+      .eq("id", created!.id);
+    expect(still).toHaveLength(1);
+
+    // …alice can
+    await alice.from("bodyweight_log").delete().eq("id", created!.id);
+    const { data: gone } = await alice
+      .from("bodyweight_log")
+      .select("id")
+      .eq("id", created!.id);
+    expect(gone).toEqual([]);
   });
 });
 

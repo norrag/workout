@@ -34,7 +34,9 @@ type Defaulted =
   // doc 17 §2.5: nullable contract snapshot / birthdate — stamped/edited by
   // their dedicated write paths only, optional on insert
   | "plan_inputs"
-  | "birthdate";
+  | "birthdate"
+  // bodyweight_log.source has a DB default ('manual'); writers pass it
+  | "source";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -157,6 +159,18 @@ export type ExerciseMuscleGroupRow = {
   role: "primary" | "secondary";
   created_at: string;
   updated_at: string;
+}
+
+export type BodyweightLogRow = {
+  id: string;
+  user_id: string;
+  /** the calendar day the measurement is FOR (backdating allowed) */
+  measured_on: string;
+  /** pounds */
+  weight: number;
+  /** doc 17 §5 — which explicit user action appended the point */
+  source: "manual" | "profile" | "dexa";
+  created_at: string;
 }
 
 export type MacrocycleRow = {
@@ -556,6 +570,9 @@ export type VMacroSummaryRow = {
   first_week_start: string | null;
   sessions_attended: number;
   sessions_due: number;
+  /** the logged span (doc 17 §5): first/last completed session; null unlogged */
+  first_logged_at: string | null;
+  last_logged_at: string | null;
 }
 
 export type VExerciseOverviewRow = {
@@ -585,6 +602,7 @@ export type Database = {
       excluded_exercises: Table<ExcludedExerciseRow>;
       exercise_notes: Table<ExerciseNoteRow>;
       exercise_param_overrides: Table<ExerciseParamOverrideRow>;
+      bodyweight_log: Table<BodyweightLogRow>;
       macrocycles: Table<MacrocycleRow>;
       mesocycles: Table<MesocycleRow>;
       meso_days: Table<MesoDayRow>;

@@ -42,6 +42,8 @@ import {
   type PrescriptionAudit,
 } from "@/lib/queries/audit";
 import { getProfile, updateProfile } from "@/lib/queries/profiles";
+import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
+import { localDayIso } from "@/lib/dates";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { estimateE1rm } from "@/lib/engine";
 import type { EngineParams } from "@/lib/engine/params";
@@ -187,6 +189,13 @@ export async function updateBodyweightAction(input: {
   await updateProfile(supabase, user.id, {
     bodyweight: parsed.bodyweight,
     bodyweight_updated_at: new Date().toISOString(),
+  });
+  // doc 17 §5: the chip edit IS a profile bodyweight edit (T-I2 — one value),
+  // so it appends today's measured point like the profile editor does
+  await appendBodyweightPoint(supabase, user.id, {
+    measuredOn: localDayIso(),
+    weight: parsed.bodyweight,
+    source: "profile",
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");

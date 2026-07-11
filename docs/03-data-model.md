@@ -42,6 +42,9 @@ Extends `auth.users` 1:1 (`id` = auth uid).
 - `week_starts_on int` — ISO 1–7, set via the day-setup sheet; days auto-sort by it
 - `role text` — user / admin (admin gates the MCP tuning tools)
 
+### `bodyweight_log`
+The measured bodyweight series (doc 17 §5, N41; migration `20260711000001`): `user_id`, `measured_on date`, `weight numeric > 0` (lb), `source text` (`manual` quick entry / `profile` edit append / `dexa` Phase-5 sync), `created_at`; unique `(user_id, measured_on, source)` — a same-day re-entry replaces that day's point, and reads resolve a day to the latest-entered point across sources. Macro-layer measurement substrate ONLY: it grades mass-goal retrospectives and backs "as of" freshness labels; it never feeds prescriptions, and `profiles.bodyweight` remains the engine input (the log is never folded back into it).
+
 ### `excluded_exercises`
 Profile-managed exclusions (fig 4.5): `user_id`, `exercise_id`, `reason text` (e.g. "LOW BACK"). Excluded movements never appear in pickers or templates.
 
