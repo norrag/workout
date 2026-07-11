@@ -71,6 +71,49 @@ export async function upsertBodyScan(
   if (error) throw error;
 }
 
+/** The user's newest scan — the only one the profile-update proposal ever
+ *  considers (doc 15 §2.3; 5b). */
+export async function getNewestBodyScan(
+  supabase: Client,
+  userId: string,
+): Promise<BodyScanRow | null> {
+  const { data, error } = await supabase
+    .from("body_scans")
+    .select("*")
+    .eq("user_id", userId)
+    .order("scanned_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Record the proposal's resolution on the scan (5b): 'applied' after the
+ * profile write + bodyweight_log append succeed, 'dismissed' on keep-current.
+ * Guarded to unresolved rows so a double-submit can't restamp either way.
+ */
+export async function resolveScanProposal(
+  supabase: Client,
+  userId: string,
+  scanId: string,
+  resolution: "applied" | "dismissed",
+): Promise<void> {
+  const stamp = new Date().toISOString();
+  const { error } = await supabase
+    .from("body_scans")
+    .update(
+      resolution === "applied"
+        ? { profile_applied_at: stamp }
+        : { profile_dismissed_at: stamp },
+    )
+    .eq("user_id", userId)
+    .eq("id", scanId)
+    .is("profile_applied_at", null)
+    .is("profile_dismissed_at", null);
+  if (error) throw error;
+}
+
 /** The disconnect purge (doc 15 §2.3): imported third-party health data is
  *  the user's to remove. Logged training history is untouched. */
 export async function deleteAllBodyScans(

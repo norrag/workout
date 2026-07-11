@@ -21,6 +21,7 @@ import {
   macroRetrospective,
   type MacroRetrospective,
   type RetroBodyData,
+  type RetroComposition,
   type RetroDemand,
 } from "./macro-retrospective";
 import {
@@ -28,6 +29,11 @@ import {
   getBodyweightPointsAroundSpan,
   measuredRatePctMonth,
 } from "./bodyweight";
+import {
+  dexaBodyDataForSpan,
+  getBodyScansAroundSpan,
+  scanCompForSpan,
+} from "./body-comp";
 import type {
   Database,
   MacrocycleRow,
@@ -887,27 +893,41 @@ export async function getMacroOverview(
   let retrospective: MacroRetrospective | null = null;
   if (macro.status === "completed") {
     const demand = await getMacroDemandSummary(supabase, userId, mesoIds, params);
-    // §5 (Phase 4): the mass verdict grades measured Δbw ONLY when the
-    // bodyweight series brackets the logged span (±14 days per endpoint);
-    // otherwise bodyData stays null and the row honestly reads "not measured".
-    // Strength-denominated contracts have no mass row — skip the fetch.
+    // §5 (Phase 4) + §6 5b: the mass verdict grades measured Δbw ONLY when
+    // measured data brackets the logged span (±14 days per endpoint) — the
+    // bodyweight series first (denser, user-owned), bracketing same-machine
+    // DEXA scan weights as the fallback; otherwise bodyData stays null and
+    // the row honestly reads "not measured". The composition block (Δlean/
+    // Δfat, informational on every goal) comes from the same scan bracket.
     let bodyData: RetroBodyData | null = null;
-    if (
-      macro.target_unit !== "%" &&
-      summary?.first_logged_at &&
-      summary.last_logged_at
-    ) {
-      const points = await getBodyweightPointsAroundSpan(
+    let composition: RetroComposition | null = null;
+    if (summary?.first_logged_at && summary.last_logged_at) {
+      const scans = await getBodyScansAroundSpan(
         supabase,
         userId,
         summary.first_logged_at,
         summary.last_logged_at,
       );
-      bodyData = bodyDeltaForSpan(
-        points,
+      composition = scanCompForSpan(
+        scans,
         summary.first_logged_at,
         summary.last_logged_at,
       );
+      // strength-denominated contracts have no mass row — skip the fetch
+      if (macro.target_unit !== "%") {
+        const points = await getBodyweightPointsAroundSpan(
+          supabase,
+          userId,
+          summary.first_logged_at,
+          summary.last_logged_at,
+        );
+        bodyData =
+          bodyDeltaForSpan(
+            points,
+            summary.first_logged_at,
+            summary.last_logged_at,
+          ) ?? dexaBodyDataForSpan(composition);
+      }
     }
     retrospective = macroRetrospective(
       {
@@ -939,6 +959,7 @@ export async function getMacroOverview(
         notBuilt: orderedMesos.filter((m) => m.status === "unplanned").length,
       },
       bodyData,
+      composition,
     );
   }
 

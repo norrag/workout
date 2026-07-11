@@ -4,17 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { bodyspecClientId } from "@/lib/bodyspec/oauth";
 import { getBodySpecConnection } from "@/lib/queries/external-connections";
 import { getBodyScans } from "@/lib/queries/body-scans";
+import { scanProfileProposal } from "@/lib/queries/body-comp";
+import { getProfile } from "@/lib/queries/profiles";
 import { shortDateWithYear } from "@/lib/dates";
 import { formatMeasuredLb } from "@/lib/units";
 import { SyncNowForm } from "./SyncNowForm";
 import { DisconnectPanel } from "./DisconnectPanel";
+import { ProposalCard } from "./ProposalCard";
 
 /**
  * BodySpec DEXA integration screen (doc 15 §5 Phase 1, doc 17 §6 / N34 Phase
  * 5a; 09-changelog 2026-07-11 §2 — house-style, no mockup figure exists).
- * Connect / sync / disconnect status plus the imported scan list. Verdicts,
- * trends, and profile-enrichment proposals are 5b — a single scan renders
- * only itself (doc 15 §6 guardrails need the LSC machinery first).
+ * Connect / sync / disconnect status plus the imported scan list, and — 5b —
+ * the consented profile-update proposal for the newest unresolved scan
+ * (import is mechanical, profile mutation is consented; doc 15 §2.3).
  */
 export default async function BodySpecPage(props: {
   searchParams: Promise<{ connected?: string; imported?: string; error?: string }>;
@@ -26,11 +29,17 @@ export default async function BodySpecPage(props: {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [connection, scans] = await Promise.all([
+  const [connection, scans, profile] = await Promise.all([
     getBodySpecConnection(supabase, user.id),
     getBodyScans(supabase, user.id),
+    getProfile(supabase, user.id),
   ]);
   const configured = bodyspecClientId() !== null;
+  // the newest scan only (list is scanned_at desc); resolved scans never nag
+  const proposal =
+    scans.length > 0 && profile
+      ? scanProfileProposal(scans[0], profile)
+      : null;
 
   const flash = flashLine(searchParams, connection?.last_sync_error ?? null);
 
@@ -104,6 +113,10 @@ export default async function BodySpecPage(props: {
           )}
         </>
       )}
+
+      {/* 5b: the consented profile-update proposal — measurement proposes,
+          the user confirms; renders only for the newest unresolved scan */}
+      {proposal && <ProposalCard proposal={proposal} />}
 
       {/* imported scans persist through a disconnect unless purged
           (doc 15 §2.3), so the list renders whenever scans exist */}

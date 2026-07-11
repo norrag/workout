@@ -2,7 +2,77 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase 5a: BodySpec DEXA connect + import (doc 17 §6, doc 15 §5 Phase 1, N34)
+## 2026-07-11 (latest) — Macro goals Phase 5b: BodySpec DEXA enrich + view (doc 17 §6, doc 15 §5 Phase 2, N34)
+
+Sixth build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md)
+(second of the three DEXA PRs): the LSC guardrail machinery lands and every
+surface 5a deliberately deferred builds on it. Started with the hard-rule-8
+pass: 09-changelog entry (2026-07-11, Phase-5b section) for the four
+house-style surfaces — no mockup figure exists for any body-composition
+surface.
+
+- **Schema** (migration `20260711000003`): `v_body_comp_history` — the
+  shared read surface (doc 15 §2.2): per-scan values + deltas vs the
+  previous scan + `same_scanner_as_prev` (null on the first scan, **false
+  when either model is unknown** — unverifiable ⇒ not comparable, doc 15
+  §6.2 rule 2); `security_invoker`, one delta definition for every consumer
+  (scan detail, macro page, retrospective, the 5c MCP tool). Plus
+  `body_scans.profile_applied_at` / `profile_dismissed_at` — the proposal's
+  per-scan resolution (import upserts never touch them, so a re-sync can't
+  reset a decision). Doc 03 updated.
+- **Consented profile-update proposal** (doc 15 §2.3 — "import is
+  mechanical; profile mutation is consented"). `/more/bodyspec` renders a
+  card for the **newest unresolved** scan carrying measured weight/bf%:
+  APPLY writes `profiles.bodyweight`/`body_fat_pct` (bf% now measured, not
+  a band estimate), stamps `bodyweight_updated_at`, and appends the
+  scan-day point to `bodyweight_log` **`source: 'dexa'`** — the Phase-4
+  series' third writer, exactly as its migration comment promised; KEEP
+  CURRENT resolves permanently (never nags). The pure rule
+  (`scanProfileProposal`) refuses resolved scans, scans staler than the
+  profile's own freshness, and no-op proposals; the server action re-runs
+  it so a stale card can't apply anything the rule wouldn't propose.
+- **Scan detail — VS PREVIOUS SCAN** (the 5a deferral): lean/fat/weight/bf%
+  deltas off the view, sub-LSC deltas stated as `WITHIN MEASUREMENT RANGE`
+  (never presented as change), cross-scanner pairs flagged
+  `DIFFERENT SCANNER — DELTAS NOT COMPARABLE` and muted.
+- **Macro page — BODY COMPOSITION** (doc 15 §3.2): Overview-tab section
+  only when ≥ 2 scans fall inside the macro window (±14-day tolerance) —
+  per-scan ledger rows + a first→last CHANGE line via the same
+  `scanCompForSpan` fold, plus the flat cadence footnote (quarterly-plus;
+  lean changes under ~2 lb are noise).
+- **Retrospective + MCP** (one fold, parity preserved):
+  `macroRetrospective` gains a `composition` block (Δlean/Δfat with
+  `withinNoise` flags — informational on every goal, never letter-graded;
+  cross-scanner brackets make no claim), and the **mass verdict's DEXA
+  fallback** — when the bodyweight series doesn't bracket the logged span
+  but ≥ 2 same-machine scans do, measured scan weight grades the contract
+  (`measured via DEXA` note); the series stays first when both bracket.
+  `get_macrocycle_summary` returns the block snake_cased.
+- **LSC constants** (doc 15 §6.1, in `queries/body-comp.ts`): lean/fat
+  ~2 lb, bf% ±1 point, quarterly cadence 60 days — all consumers read
+  these, none hard-codes a band. Percentile display already landed with 5a
+  (scan-detail PERCENTILES section); 5b adds no new percentile surface.
+- **Boundaries held:** no engine touch (5c), nothing stored that's
+  derivable (the view + folds are derive-on-read; the only new state is
+  the two consent stamps), scans still never feed prescriptions or the
+  doc-14 fingerprint.
+- **Tests** +19 unit (suite 1057 green: bracketing/tolerance goldens,
+  cross-scanner + unknown-model flags, LSC within-noise, cadence note,
+  DEXA mass fallback incl. the graded retrospective, proposal rule matrix,
+  MCP composition parity), +2 RLS blocks (view deltas/flags verified
+  against Postgres + cross-user deny; proposal stamps owner-only with the
+  resolve guard never restamping), e2e extended (VS PREVIOUS SCAN renders
+  in-range copy; the proposal card applies/dismisses and never re-renders).
+  Unit/typecheck/lint/build + RLS (local stack) green locally; the
+  pre-existing 5a e2e test was confirmed failing on unmodified main in
+  this sandbox (Chromium build mismatch — it merged green in CI, which
+  installs matching browsers; the new 5b e2e test passes even here).
+- **Remaining / external:** the 5a runbook steps still pending owner action
+  (register clients, hosted migrations — now `20260711000002` **and**
+  `20260711000003` — first real login → §8.3 outcome). 5c (engine + MCP
+  read tool) is the last DEXA PR on the doc 17 §6 plan.
+
+## 2026-07-11 — Macro goals Phase 5a: BodySpec DEXA connect + import (doc 17 §6, doc 15 §5 Phase 1, N34)
 
 Fifth build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md)
 (first of the three DEXA PRs): a BodySpec account can be connected per-user

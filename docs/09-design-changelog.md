@@ -42,6 +42,111 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — BodySpec DEXA: enrich + view (doc 17 §6, N34 Phase 5b)
+
+The second DEXA PR (doc 15 §5 Phase 2): the LSC guardrail machinery lands
+(`v_body_comp_history`), and with it the surfaces 5a deliberately deferred —
+scan-to-scan deltas, the consented profile-update proposal, the macro-page
+composition trend, and the retrospective's DEXA verdict rows. **Rule-8 pass:**
+as with 5a, no mockup figure exists for any body-composition surface
+(re-verified against `workout - App Screens v2.dc.html`); every treatment
+below is **house-style**, composed from established primitives, and this
+entry is the design record. The doc 15 §6 guardrails are binding copy rules
+here: sub-LSC deltas are never presented as change, cross-scanner deltas are
+flagged and never graded, no exclamation marks — health data gets the
+flattest ledger voice in the app.
+
+### 1. `/more/bodyspec` — post-sync profile-update proposal card
+
+- **Change:** when the newest imported scan is unresolved (neither applied
+  nor dismissed), carries a measured weight and/or body-fat %, and is not
+  older than the profile's own bodyweight freshness (`AS OF` date), the
+  integration screen renders a proposal card between `CONNECTION` and
+  `SCANS`: an ink-bordered block titled `SCAN 8 JUL — UPDATE PROFILE?`, one
+  ledger row per proposed value (`BODYWEIGHT 176.3 LB`, `BODY FAT 18.2%`,
+  each beside the current profile value it would replace), and two actions —
+  ink `APPLY TO PROFILE` and quiet `KEEP CURRENT`. Apply writes
+  `profiles.bodyweight` / `body_fat_pct` (body-fat now carries a measured
+  value rather than a band estimate), stamps `bodyweight_updated_at`, and
+  appends the scan-day point to `bodyweight_log` (`source: 'dexa'`) — the
+  Phase-4 series gains its third writer exactly as specified. Keep-current
+  records the dismissal so the card never nags; either resolution is
+  per-scan and permanent. **Never silent** (doc 15 §2.3): no sync ever
+  mutates the profile.
+- **Rationale:** measurement proposes, the user confirms — the MCP
+  draft-then-confirm posture applied to external data (doc 15 §2.3; doc 17
+  §6 5b).
+- **Affected figures:** none.
+- **Impact:** `NET-NEW` + `DATA` — `profile_applied_at` /
+  `profile_dismissed_at` columns on `body_scans`; card + two actions.
+
+### 2. `/more/bodyspec/[scanId]` — `VS PREVIOUS SCAN` section (the 5a deferral)
+
+- **Change:** the scan detail ledger gains a `VS PREVIOUS SCAN` section
+  (between `COMPOSITION` and `REGIONS`) once a prior scan exists, reading
+  the scan's `v_body_comp_history` row: `LEAN` / `FAT` / `WEIGHT` /
+  `BODY FAT` delta rows (`+1.2 LB`, `−0.4%`), each **stated against the
+  noise band** — a lean or fat delta inside the ~2 lb LSC renders its value
+  plus the muted suffix `WITHIN MEASUREMENT RANGE` (doc 15 §6.2 rule 1:
+  never present a sub-LSC delta as a change), body-fat inside ±1 point
+  likewise. When the previous scan came from a **different scanner model**,
+  the section renders the flag line
+  `DIFFERENT SCANNER — DELTAS NOT COMPARABLE` and the rows stay, muted, as
+  flagged context (rule 2: flagged, not charted). The meta line under the
+  section header names the previous scan's date.
+- **Rationale:** 5a's entry promised exactly this: "scan-to-scan comparison
+  ships with `v_body_comp_history` (5b) where the LSC noise bands and
+  same-scanner flags can ride along."
+- **Affected figures:** none.
+- **Impact:** `RETROFIT` + `DATA` — `v_body_comp_history` view; one section
+  on the scan detail.
+
+### 3. Macro page (fig 2.2) — `BODY COMPOSITION` section on OVERVIEW
+
+- **Change:** the macro Overview tab gains a ruled `BODY COMPOSITION`
+  section (below the stats grid) **only when ≥ 2 scans fall within the
+  macro's window** (±14-day bracket tolerance on both ends; doc 15 §3.2 —
+  one scan is not a trend and renders nothing). Per-scan ledger rows (date ·
+  `LEAN LB` · `FAT LB` · `BF%` numerals), then a top-ruled `CHANGE` line
+  folding first → last scan with the same LSC treatment as §2
+  (`LEAN +2.6 LB · FAT −1.9 LB`; sub-LSC values carry
+  `WITHIN MEASUREMENT RANGE`; cross-scanner pairs render the
+  `DIFFERENT SCANNERS — NOT COMPARABLE` flag instead of a graded change).
+  Footnote copy states the cadence honestly: *"DEXA reads quarterly-plus —
+  scan-to-scan lean changes under ~2 lb sit inside measurement noise."*
+- **Rationale:** the outcome layer becomes visible where the goal lives
+  (doc 15 §3.2), without letting a single scan or a noisy pair masquerade
+  as a verdict.
+- **Affected figures:** 2.2 (section added below the stats grid; existing
+  elements unchanged).
+- **Impact:** `RETROFIT` + `DATA` — section reads `v_body_comp_history`
+  filtered to the macro window.
+
+### 4. Completed-macro retrospective — DEXA composition rows + mass verdict
+
+- **Change:** two amendments to the retrospective card (09 2026-07-11 N40
+  entry) and its MCP twin:
+  - **`COMPOSITION` row** — when ≥ 2 scans bracket the macro's logged span
+    (±14 days per endpoint), a row renders the measured Δlean / Δfat over
+    the block with the §2 LSC treatment. **Same-machine scans only** grade;
+    a cross-scanner bracket renders the pair flagged (`DIFFERENT SCANNERS —
+    NOT COMPARABLE`) and makes no claim. Informational on every goal (lean
+    retention is the actual success metric of a cut; doc 15 §3.2) — the
+    row never letter-grades.
+  - **`MASS` row, DEXA fallback** — the Phase-4 mass verdict (measured Δbw
+    vs the contract band) now also grades from bracketing same-machine scan
+    weights when the bodyweight series itself doesn't bracket the span; the
+    note line names the source (`measured via DEXA`). The bodyweight series
+    stays first when both bracket (denser, user-owned); "not measured"
+    remains the honest fallback when neither does.
+- **Rationale:** doc 17 §4.2's mass verdict clause ("a bodyweight series
+  and/or DEXA scans") completes; scans bracketing a macro grade the outcome
+  itself (doc 15 §3.2).
+- **Affected figures:** none (retrospective card is a 09-defined surface).
+- **Impact:** `RETROFIT` — `macroRetrospective` fold gains the composition
+  block; Overview card + `get_macrocycle_summary` render it (one fold,
+  parity preserved).
+
 ## 2026-07-11 — BodySpec DEXA: integration screen + scan ledger (doc 17 §6, N34 Phase 5a)
 
 The optional BodySpec account connection lands (doc 15; doc 17 Phase 5a):

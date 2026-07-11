@@ -76,6 +76,24 @@ third-party health data is the user's to purge — hard rule 5 protects logged
 only**: scans inform targets and verdicts, never prescriptions, and are
 excluded from the doc-14 dependency fingerprint like bodyweight (doc 15 §2.4).
 
+5b (migration `20260711000003`) adds `profile_applied_at` /
+`profile_dismissed_at` — the consented profile-update proposal's per-scan
+resolution (doc 15 §2.3): both null = unresolved (only the newest scan is
+ever proposed); the import upsert never touches them, so a re-sync cannot
+reset a decision.
+
+### `v_body_comp_history`
+The scan-comparison read surface (doc 15 §2.2, N34 5b; migration
+`20260711000003`, `security_invoker`): one row per `body_scans` row in scan
+order — `scanned_at`, `scanner_model`, `weight_lb`, `body_fat_pct`,
+`lean_mass_lb`, `fat_mass_lb`, `almi_kg_m2`, plus `prev_scanned_at`, the
+deltas vs the previous scan (`delta_weight_lb`, `delta_body_fat_pct`,
+`delta_lean_lb`, `delta_fat_lb`), and `same_scanner_as_prev` (null on the
+first scan; **false when either scanner model is unknown** — an unverifiable
+pair is not comparable by default, doc 15 §6.2). One delta definition for
+every consumer: scan detail, macro-page composition trend, retrospective,
+and the 5c MCP tool.
+
 ### `excluded_exercises`
 Profile-managed exclusions (fig 4.5): `user_id`, `exercise_id`, `reason text` (e.g. "LOW BACK"). Excluded movements never appear in pickers or templates.
 

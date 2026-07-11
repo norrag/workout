@@ -84,6 +84,23 @@ test.beforeAll(async () => {
     raw: { composition: {} },
   });
   if (scanError) throw scanError;
+
+  // an earlier same-machine scan (5b): gives the newest scan a VS PREVIOUS
+  // SCAN section from v_body_comp_history
+  const { error: priorError } = await supabase.from("body_scans").insert({
+    user_id: userId,
+    provider: "bodyspec",
+    provider_result_id: "e2e-res-0",
+    scanned_at: "2026-04-08T10:15:00-07:00",
+    scanner_model: "GE Lunar iDXA",
+    weight_lb: 182.9,
+    body_fat_pct: 26.1,
+    lean_mass_lb: 130.5,
+    fat_mass_lb: 46.0,
+    bone_mass_lb: 7.0,
+    raw: { composition: {} },
+  });
+  if (priorError) throw priorError;
 });
 
 test("More row → integration screen → scan list → detail ledger", async ({
@@ -128,6 +145,35 @@ test("More row → integration screen → scan list → detail ledger", async ({
   // percentile rows state flat ledger copy (doc 15 §6.2)
   await expect(page.getByText("APPENDICULAR LMI")).toBeVisible();
   await expect(page.getByText("85TH · 8.5")).toBeVisible();
-  // no deltas/verdicts in 5a — comparison waits for the 5b guardrails
-  await expect(page.getByText(/SINCE LAST SCAN/)).toHaveCount(0);
+
+  // 5b: the VS PREVIOUS SCAN section reads v_body_comp_history — a same-
+  // machine pair, so deltas render, sub-LSC ones stated as in-range
+  await expect(page.getByText("VS PREVIOUS SCAN")).toBeVisible();
+  await expect(page.getByText("+1.78 LB")).toBeVisible();
+  await expect(
+    page.getByText("WITHIN MEASUREMENT RANGE").first(),
+  ).toBeVisible();
+  await expect(page.getByText(/DIFFERENT SCANNER/)).toHaveCount(0);
+});
+
+test("5b: the profile-update proposal is consented and resolves permanently", async ({
+  page,
+}) => {
+  await page.goto("/sign-in");
+  await page.locator('input[name="email"]').fill(EMAIL);
+  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL("**/workout");
+
+  // the newest unresolved scan proposes its measured values — the import
+  // itself wrote nothing to the profile (doc 15 §2.3, never silent)
+  await page.goto("/more/bodyspec");
+  await expect(page.getByText(/UPDATE PROFILE\?/)).toBeVisible();
+  await expect(page.getByText("184.5 LB")).toBeVisible();
+
+  // keep current ⇒ the resolution is per-scan and permanent — no nagging
+  await page.getByRole("button", { name: "KEEP CURRENT" }).click();
+  await expect(page.getByText(/UPDATE PROFILE\?/)).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText(/UPDATE PROFILE\?/)).toHaveCount(0);
 });

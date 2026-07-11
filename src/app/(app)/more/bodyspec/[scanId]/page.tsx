@@ -2,15 +2,20 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getBodyScan } from "@/lib/queries/body-scans";
+import {
+  BF_PCT_NOISE_BAND,
+  FAT_LSC_LB,
+  LEAN_LSC_LB,
+  getBodyCompHistoryForScan,
+} from "@/lib/queries/body-comp";
 import { shortDateWithYear } from "@/lib/dates";
 import { formatHeight, formatMeasuredLb } from "@/lib/units";
 
 /**
  * One scan, read as a ledger (09-changelog 2026-07-11 §3 — house-style; no
- * mockup figure exists). Deliberately NO deltas, trends, or verdicts here in
- * 5a: honest scan-to-scan comparison needs the LSC noise bands and
- * same-scanner flags that ship with `v_body_comp_history` in 5b (doc 15 §6).
- * A single scan renders only itself, stated flat.
+ * mockup figure exists). 5b adds the VS PREVIOUS SCAN section from
+ * `v_body_comp_history` — deltas stated against the LSC noise bands, with
+ * cross-scanner pairs flagged and never graded (doc 15 §6.2).
  */
 export default async function ScanDetailPage(props: {
   params: Promise<{ scanId: string }>;
@@ -24,6 +29,7 @@ export default async function ScanDetailPage(props: {
 
   const scan = await getBodyScan(supabase, user.id, scanId);
   if (!scan) notFound();
+  const history = await getBodyCompHistoryForScan(supabase, user.id, scanId);
 
   const percentiles = readPercentiles(scan.percentiles);
   const regions = readRegions(scan.regions);
@@ -75,6 +81,56 @@ export default async function ScanDetailPage(props: {
           <Row label="ANDROID / GYNOID" value={String(scan.android_gynoid_ratio)} />
         )}
       </Section>
+
+      {history?.prev_scanned_at != null && (
+        <Section title="VS PREVIOUS SCAN">
+          <div className="mt-1.5 text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+            {shortDateWithYear(history.prev_scanned_at)}
+            {history.same_scanner_as_prev === false &&
+              " · DIFFERENT SCANNER — DELTAS NOT COMPARABLE"}
+          </div>
+          <DeltaRow
+            label="LEAN"
+            delta={history.delta_lean_lb}
+            unit=" LB"
+            withinNoise={withinBand(
+              history.delta_lean_lb,
+              LEAN_LSC_LB,
+              history.same_scanner_as_prev,
+            )}
+            muted={history.same_scanner_as_prev === false}
+          />
+          <DeltaRow
+            label="FAT"
+            delta={history.delta_fat_lb}
+            unit=" LB"
+            withinNoise={withinBand(
+              history.delta_fat_lb,
+              FAT_LSC_LB,
+              history.same_scanner_as_prev,
+            )}
+            muted={history.same_scanner_as_prev === false}
+          />
+          <DeltaRow
+            label="WEIGHT"
+            delta={history.delta_weight_lb}
+            unit=" LB"
+            withinNoise={null}
+            muted={history.same_scanner_as_prev === false}
+          />
+          <DeltaRow
+            label="BODY FAT"
+            delta={history.delta_body_fat_pct}
+            unit="%"
+            withinNoise={withinBand(
+              history.delta_body_fat_pct,
+              BF_PCT_NOISE_BAND,
+              history.same_scanner_as_prev,
+            )}
+            muted={history.same_scanner_as_prev === false}
+          />
+        </Section>
+      )}
 
       {regions.length > 0 && (
         <Section title="REGIONS">
@@ -156,6 +212,54 @@ function Section({
       </div>
       {children}
     </>
+  );
+}
+
+/** |Δ| inside the LSC band ⇒ true; null when the pair isn't same-scanner
+ *  (no noise claim on an incomparable pair, doc 15 §6.2) or Δ is missing. */
+function withinBand(
+  delta: number | null,
+  band: number,
+  sameScanner: boolean | null,
+): boolean | null {
+  if (delta == null || sameScanner !== true) return null;
+  return Math.abs(Number(delta)) < band;
+}
+
+/** A signed delta stated against its noise band: sub-LSC values carry the
+ *  WITHIN MEASUREMENT RANGE suffix — never presented as a change. */
+function DeltaRow({
+  label,
+  delta,
+  unit,
+  withinNoise,
+  muted,
+}: {
+  label: string;
+  delta: number | null;
+  unit: string;
+  withinNoise: boolean | null;
+  muted: boolean;
+}) {
+  if (delta == null) return null;
+  const v = Number(delta);
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-ink/15 py-2.5">
+      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+        {label}
+      </div>
+      <div className={`numeral text-sm ${muted ? "text-ink/45" : ""}`}>
+        {v > 0 ? "+" : ""}
+        {v}
+        {unit}
+        {withinNoise === true && (
+          <span className="text-[9px] tracking-[0.08em] text-ink/45">
+            {" "}
+            · WITHIN MEASUREMENT RANGE
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

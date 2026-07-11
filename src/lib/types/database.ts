@@ -36,7 +36,11 @@ type Defaulted =
   | "plan_inputs"
   | "birthdate"
   // bodyweight_log.source has a DB default ('manual'); writers pass it
-  | "source";
+  | "source"
+  // 5b: nullable proposal-resolution stamps on body_scans — written only by
+  // the resolve path, never by the import upsert (a re-sync must not reset)
+  | "profile_applied_at"
+  | "profile_dismissed_at";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -660,8 +664,38 @@ export type BodyScanRow = {
   percentiles: Record<string, unknown> | null;
   /** verbatim API payloads per section */
   raw: Record<string, unknown>;
+  /** 5b (doc 15 §2.3): when the user accepted this scan's profile-update
+   *  proposal. Null with profile_dismissed_at null = unresolved. */
+  profile_applied_at: string | null;
+  /** 5b: when the user declined the proposal (kept current profile values). */
+  profile_dismissed_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** doc 15 §2.2 (N34 Phase 5b): `v_body_comp_history` — per-scan composition
+ *  values + deltas vs the previous scan + the same-scanner comparability
+ *  flag. The one definition every scan-comparison surface reads. */
+export type VBodyCompHistoryRow = {
+  user_id: string;
+  scan_id: string;
+  provider: "bodyspec";
+  scanned_at: string;
+  scanner_model: string | null;
+  weight_lb: number | null;
+  body_fat_pct: number | null;
+  lean_mass_lb: number | null;
+  fat_mass_lb: number | null;
+  almi_kg_m2: number | null;
+  /** null on the user's first scan */
+  prev_scanned_at: string | null;
+  delta_weight_lb: number | null;
+  delta_body_fat_pct: number | null;
+  delta_lean_lb: number | null;
+  delta_fat_lb: number | null;
+  /** null = no previous scan; false when either scanner model is unknown
+   *  (unverifiable ⇒ not comparable by default, doc 15 §6.2) */
+  same_scanner_as_prev: boolean | null;
 };
 
 export type Database = {
@@ -705,6 +739,7 @@ export type Database = {
       v_exercise_prs: { Row: VExercisePrsRow; Relationships: [] };
       v_macro_summary: { Row: VMacroSummaryRow; Relationships: [] };
       v_exercise_overview: { Row: VExerciseOverviewRow; Relationships: [] };
+      v_body_comp_history: { Row: VBodyCompHistoryRow; Relationships: [] };
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };

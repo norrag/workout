@@ -83,6 +83,32 @@ export interface RetroBodyData {
   source: "bodyweight_log" | "dexa";
 }
 
+/**
+ * Measured composition change over the macro span — ≥ 2 DEXA scans bracketing
+ * it (Phase 5b, doc 15 §3.2). Informational on every goal (never letter-
+ * graded): lean retention is the actual success metric of a cut, Δlean the
+ * honest hypertrophy outcome. The doc 15 §6 guardrails ride along as data:
+ * sub-LSC deltas carry `withinNoise` so no consumer presents them as change,
+ * and a cross-scanner bracket (`sameScanner: false`) is flagged, never graded.
+ */
+export interface RetroComposition {
+  startScannedAt: string;
+  endScannedAt: string;
+  /** whole days between the two scans (cadence honesty) */
+  daysApart: number;
+  /** both scanner models known and identical (doc 15 §6.2 rule 2) */
+  sameScanner: boolean;
+  deltaLeanLb: number | null;
+  deltaFatLb: number | null;
+  deltaWeightLb: number | null;
+  deltaBodyFatPct: number | null;
+  /** |Δ| inside the LSC noise band — null when cross-scanner (no claim) or
+   *  the delta is unavailable */
+  leanWithinNoise: boolean | null;
+  fatWithinNoise: boolean | null;
+  note: string;
+}
+
 export interface MacroRetrospective {
   strength: {
     estStrengthPct: number | null;
@@ -104,6 +130,8 @@ export interface MacroRetrospective {
   demand: RetroDemand | null;
   adherence: RetroAdherence;
   blocks: RetroBlocks;
+  /** null unless ≥ 2 DEXA scans bracket the span (Phase 5b) */
+  composition: RetroComposition | null;
 }
 
 /** Band placement with the fixed verdict vocabulary. */
@@ -172,6 +200,8 @@ const MASS_NOT_MEASURED_NOTE =
  * Pure: fold the macro's contract + measured outcomes into the retrospective.
  * `bodyData` stays null until a measured series brackets the span (Phase 4/5);
  * passing it flips the mass row from "not measured" to a graded Δbw.
+ * `composition` (Phase 5b) is the bracketing-scan Δlean/Δfat block — passed
+ * through informationally, never graded against the contract.
  */
 export function macroRetrospective(
   contract: RetroContract,
@@ -180,6 +210,7 @@ export function macroRetrospective(
   adherence: RetroAdherence,
   blocks: RetroBlocks,
   bodyData: RetroBodyData | null = null,
+  composition: RetroComposition | null = null,
 ): MacroRetrospective {
   // strength-denominated contract ⇔ the strength row is the promise
   const strengthDenominated = contract.targetUnit === "%";
@@ -238,5 +269,6 @@ export function macroRetrospective(
     demand,
     adherence,
     blocks,
+    composition,
   };
 }

@@ -60,10 +60,17 @@ export interface ScanSections {
   rmr: BodySpecRmr | null;
 }
 
-/** Everything the DB row needs except identity (id/user_id/timestamps). */
+/** Everything the DB row needs except identity (id/user_id/timestamps) and
+ *  the 5b proposal-resolution stamps — those belong to the user's later
+ *  decision, never to an import (and an upsert re-sync must not reset them). */
 export type BodyScanImport = Omit<
   BodyScanRow,
-  "id" | "user_id" | "created_at" | "updated_at"
+  | "id"
+  | "user_id"
+  | "created_at"
+  | "updated_at"
+  | "profile_applied_at"
+  | "profile_dismissed_at"
 >;
 
 function rmrByFormula(

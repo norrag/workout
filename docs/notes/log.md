@@ -4,6 +4,45 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 67: N34 5b built — doc 17 Phase 5b (BodySpec enrich + view)
+
+Owner kicked off Phase 5b ("implement phase 5b"). Second of the three DEXA
+PRs (**#174**, branch `claude/macrocycle-goals-phase-5b-7o486o`);
+migration `20260711000003` (`v_body_comp_history` + the `body_scans`
+proposal-resolution stamps).
+
+- **Reconciliation sweep first:** no stale `done` rows — N34 correctly
+  live (`in-progress — 5a shipped (PR #173)`, merged); nothing to archive.
+- **Hard-rule-8 gate:** 09-changelog entry (2026-07-11, Phase-5b section)
+  for the four house-style surfaces — proposal card, scan-detail
+  `VS PREVIOUS SCAN`, macro-page `BODY COMPOSITION`, retrospective
+  composition/mass rows. No mockup figure exists for any; re-verified.
+- **The guardrails ship as data, one definition:** `v_body_comp_history`
+  (security_invoker; deltas vs previous scan + `same_scanner_as_prev` —
+  null on the first scan, false when either model is unknown) and the LSC
+  constants (`queries/body-comp.ts`: lean/fat ~2 lb, bf% ±1 pt, quarterly
+  60 d). Every consumer inherits doc 15 §6: sub-LSC deltas say `WITHIN
+  MEASUREMENT RANGE`, cross-scanner pairs are flagged and never graded.
+- **Consented proposal (doc 15 §2.3):** newest unresolved scan only; APPLY
+  writes profile bodyweight/bf% + appends `bodyweight_log source:'dexa'`
+  (the Phase-4 series' third writer); KEEP CURRENT resolves permanently.
+  Pure rule refuses resolved/stale/no-op scans; the action re-runs it
+  server-side. Resolution stamps are the only new mutable state.
+- **Retrospective + MCP, one fold:** `macroRetrospective` gains the
+  informational `composition` block, and the mass verdict gains its DEXA
+  fallback (bracketing same-machine scan weights when the bodyweight
+  series doesn't bracket; series first when both do).
+  `get_macrocycle_summary` returns it snake_cased (parity test).
+- **Tests:** +19 unit (suite 1057), +2 RLS blocks (view semantics against
+  real Postgres; resolve guard never restamps), e2e extended. The
+  pre-existing 5a e2e test fails in this sandbox on unmodified main too
+  (Chromium build mismatch; CI has matching browsers) — verified by
+  stash-run before shipping.
+
+Doc updates riding along: doc 03 (`body_scans` stamps +
+`v_body_comp_history`), doc 15 §5 (Phase-2 row build note), PROGRESS,
+this log + N34 row (`in-progress — 5b shipped`).
+
 ## 2026-07-11 — Session 66: N34 5a built — doc 17 Phase 5a (BodySpec connect + import)
 
 Owner kicked off Phase 5 ("implement phase 5"). First of the three DEXA PRs

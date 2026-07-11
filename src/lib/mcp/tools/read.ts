@@ -500,6 +500,24 @@ export function formatMacroRetrospective(
           note: r.mass.note,
         }
       : null,
+    // 5b: ≥ 2 DEXA scans bracketing the span — informational on every goal
+    // (never graded against the contract); sub-LSC deltas carry within_noise
+    // flags and a cross-scanner bracket is flagged, never compared (15 §6.2)
+    composition: r.composition
+      ? {
+          start_scanned_at: r.composition.startScannedAt,
+          end_scanned_at: r.composition.endScannedAt,
+          days_apart: r.composition.daysApart,
+          same_scanner: r.composition.sameScanner,
+          delta_lean_lb: r.composition.deltaLeanLb,
+          delta_fat_lb: r.composition.deltaFatLb,
+          delta_weight_lb: r.composition.deltaWeightLb,
+          delta_body_fat_pct: r.composition.deltaBodyFatPct,
+          lean_within_noise: r.composition.leanWithinNoise,
+          fat_within_noise: r.composition.fatWithinNoise,
+          note: r.composition.note,
+        }
+      : null,
     demand: r.demand
       ? {
           decisions: r.demand.decisions,
