@@ -253,6 +253,13 @@ already merged, PRs #158–#161). Full mechanism: `docs/16-prescribed-progressio
 > remains the active row, so nothing changed for users. The migration is in the
 > repo chain. Only the **activation** below is outstanding.
 
+> **ACTIVATED.** Verified on hosted via MCP 2026-07-11 (doc-17 Phase-6
+> session): `get_engine_params` reports v20 `is_active: true` and
+> `get_progression_history` is recording live status-coded decisions
+> (stepped/paced/not_earned mix across ~19 exercises). R1 is done — the
+> monitor row (⑤) is the standing instruction, and the field-data clock for
+> the envelope fit (below) and the `goal_rate_factor` revisit has started.
+
 | Step | What / why |
 |---|---|
 | **① Research pass on `goal_rate_factor.hypertrophy`** (activation gate, doc 16 §10) | **DONE 2026-07-09** — `docs/reviews/2026-07-09-goal-rate-factor-research.md`. Finding: **keep 0.75** (moderate-load 1RM conversion runs ~0.56–0.73 of heavy-load; 0.75 is the conservative-for-a-governor top of that band; collapsing to 1.0 is contradicted by Schoenfeld 2016/2017, Lasevicius 2018, Campos 2002). No params edit needed — v20 already carries 0.75. |
@@ -326,6 +333,29 @@ only worth flipping to once v21's personalization is live.
 | **② Replay diff** | `replay_decisions` candidate v22 over recorded decisions. Expected shape: the **paced/stepped mix shifts** on earned working weeks (decisions that recorded a `planStrengthRate` re-judge the trailing rate against the personalized band instead of the bucket band); **no entitlement change** — the earn gate, quantum δ, and anchor arithmetic are untouched, so any diff is a step *deferred or released*, never resized. Decisions recorded before Phase 2 carry no plan rate and must replay byte-identically (band fallback). |
 | **③ Owner reviews + activates** | Confirm the shifted mix reads right (a lifter whose personalized band sits below the bucket band gets paced sooner; above, later). Activate via `activate_engine_params`; roll back by re-activating v21. |
 | **④ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20 monitor row; this field data also feeds the Phase-6 envelope fit. |
+
+### Fit + activate the envelope loop (doc 17 §7 / Phase 6, N36 — field-data-gated)
+
+The doc 17 §7 mechanism ships fully coded and OFF: `band_position` becomes a
+per-user derived input (`EngineInputs.bandPosition` — a pure, clockless fold
+over the trailing completed mesos' recorded decisions, doc-14 §3 treatment)
+the moment a params row carries `progression.envelope`; **no applied row
+carries the block**, so behavior today is byte-identical. The update rule's
+thresholds in the schema (`raise`/`lower`, `min_decisions`, `step 0.1`,
+`lookback_mesos 3`, `dwell_mesos 1`, `max_age_days 180`) are **PROVISIONAL —
+deliberately not shipped in any params row until fit from field data** (doc 17
+§7: v20 active + a few real mesos). Gated on **R1 — v20 verified ACTIVE on
+hosted via MCP 2026-07-11** — plus real training time; independent of the R3
+flip (`band_position` composes identically under `"band"` and `"plan"`).
+
+| Step | What / why |
+|---|---|
+| **① Accumulate field data** | ≥ 2–3 REAL completed mesos under active v20. Nothing to do but train; the always-on trace records everything the fit reads. |
+| **② Fit the thresholds** | Read `get_progression_history` per exercise (earn/miss/skip mix, governor firings, `vanished` share, earned-then-met/missed pairing). Sanity-check the provisional `raise`/`lower` cutoffs against the observed distributions (e.g. does a "good" meso actually clear `earn_rate 0.7` with `miss_ratio ≤ 0.2`? do rate-pacer trips occur at all?). Adjust the block's values in a Claude session — the fold + goldens live in `src/lib/engine/rules/envelope.ts` / `__tests__/envelope.test.ts`. |
+| **③ Propose the params bump** | Admin MCP `propose_engine_params`: the active row's content + the fitted `progression.envelope` block (a micro-bump — no other knob moves). |
+| **④ Replay diff** | `replay_decisions` for the candidate. Expected shape: decisions recorded WITHOUT a `bandPosition` input replay byte-identically (the fold is assembly-time; replay uses recorded inputs); only freshly generated weeks/seeds consume a derived position, and any live diff is the pacer's paced/stepped mix shifting with the position — **never an entitlement or quantum change**. |
+| **⑤ Owner reviews + activates** | Confirm the position the fold currently derives reads right against the athlete's own sense of the block (position 0.5 = today's fixed behavior). Activate via `activate_engine_params`; roll back by re-activating the prior row — the loop is OFF again instantly (derived, no stored state to unwind). |
+| **⑥ Monitor** | Each decision records the position it consumed in its `inputs` (`get_engine_decisions`), so the position's trajectory is reconstructible per meso boundary. Watch for the §7 worst case: a position pinned at 0/1 for consecutive boundaries means the thresholds need a refit (both are defensible programs, but a pin is a signal, not a steady state). |
 
 ### BodySpec: register the OAuth clients + first-login verification (doc 15 §8, doc 17 Phase 5a)
 

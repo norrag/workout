@@ -269,6 +269,7 @@ function recomputeSeed(
     progressionHistory?: EngineInputs["progressionHistory"];
     daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
     planStrengthRate?: EngineInputs["planStrengthRate"];
+    bandPosition?: EngineInputs["bandPosition"];
   };
   const storedProgression = {
     ...(stored.seedEarn !== undefined ? { seedEarn: stored.seedEarn } : {}),
@@ -280,6 +281,9 @@ function recomputeSeed(
       : {}),
     ...(stored.planStrengthRate !== undefined
       ? { planStrengthRate: stored.planStrengthRate }
+      : {}),
+    ...(stored.bandPosition !== undefined
+      ? { bandPosition: stored.bandPosition }
       : {}),
   };
 
@@ -312,6 +316,11 @@ function recomputeSeed(
           : {}),
         ...(stored.planStrengthRate !== undefined
           ? { planStrengthRate: stored.planStrengthRate }
+          : {}),
+        // doc 17 §7: the recorded envelope position replays frozen, exactly
+        // like the plan rate — the decision consumed it, so replay must too
+        ...(stored.bandPosition !== undefined
+          ? { bandPosition: stored.bandPosition }
           : {}),
       },
     );

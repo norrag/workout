@@ -40,6 +40,14 @@ export {
   type ProgressionStatus,
   type ProgressionTraceStep,
 } from "./rules/progression";
+export {
+  envelopeActive,
+  deriveBandPosition,
+  boundaryStep,
+  MAX_BOUNDARY_STEP,
+  type EnvelopeMesoOutcome,
+  type EnvelopeParams,
+} from "./rules/envelope";
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
 export { engineInputsSchema } from "./types";
@@ -859,6 +867,10 @@ export function seedMeso(
      *  reads under `rate_source: "plan"`, caller-derived like the advance
      *  path's. Null/omitted ⇒ the pacer degrades to the bucket band. */
     planStrengthRate?: EngineInputs["planStrengthRate"];
+    /** doc 17 §7 (N36): the envelope loop's derived per-user band position,
+     *  caller-derived like the advance path's. Null/omitted ⇒ the pacer reads
+     *  the fixed params `band_position` (loop off). */
+    bandPosition?: EngineInputs["bandPosition"];
   },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
@@ -907,6 +919,7 @@ export function seedMeso(
     progressionHistory: opts?.progressionHistory ?? null,
     daysSincePreviousSession: opts?.daysSincePreviousSession ?? null,
     planStrengthRate: opts?.planStrengthRate ?? null,
+    bandPosition: opts?.bandPosition ?? null,
   };
   const gate = assessProgression(gateInputs, params, baseline);
   if (!gate.offered) {

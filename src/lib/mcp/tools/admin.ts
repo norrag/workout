@@ -251,6 +251,10 @@ export function replayDecisions(
                 ...(parsed.data.planStrengthRate !== undefined
                   ? { planStrengthRate: parsed.data.planStrengthRate }
                   : {}),
+                // doc 17 §7: the recorded envelope position replays verbatim
+                ...(parsed.data.bandPosition !== undefined
+                  ? { bandPosition: parsed.data.bandPosition }
+                  : {}),
               },
             )
           : prescribe(parsed.data, effectiveCandidate);

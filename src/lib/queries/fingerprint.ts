@@ -68,6 +68,12 @@ export const DERIVED_INPUT_KEYS = [
   // config dimensions (a routine bodyweight edit must not churn open rows).
   // Recomputed at assembly, recorded in the decision for replay.
   "planStrengthRate",
+  // doc 17 §7 (N36): the envelope loop's per-user band position — a pure fold
+  // over recorded engine_decisions (logged history, like the anchor), so it is
+  // derived by definition; a boundary that moves the position must not stale
+  // every open row. Recomputed at assembly, recorded in the decision for
+  // replay (the recorded position replays frozen).
+  "bandPosition",
 ] as const;
 
 export type DerivedInputKey = (typeof DERIVED_INPUT_KEYS)[number];
@@ -189,16 +195,20 @@ export function seedEngineInputs(
     ...(progression?.planStrengthRate !== undefined
       ? { planStrengthRate: progression.planStrengthRate }
       : {}),
+    ...(progression?.bandPosition !== undefined
+      ? { bandPosition: progression.bandPosition }
+      : {}),
   };
 }
 
-/** doc 16 §3.7 / doc 17 §3 — the seed route's derived progression inputs (all
- *  denylisted; present only while the progression mode is active). */
+/** doc 16 §3.7 / doc 17 §3+§7 — the seed route's derived progression inputs
+ *  (all denylisted; present only while the progression mode is active). */
 export interface SeedProgressionInputs {
   seedEarn?: EngineInputs["seedEarn"];
   progressionHistory?: EngineInputs["progressionHistory"];
   daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
   planStrengthRate?: EngineInputs["planStrengthRate"];
+  bandPosition?: EngineInputs["bandPosition"];
 }
 
 export interface SeedInputArgs {

@@ -40,6 +40,7 @@ import {
 } from "./progression-history";
 import { getSeedEarnContexts, type SeedEarnBundle } from "./seed-progression";
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
+import { getBandPosition } from "./envelope";
 
 type Client = SupabaseClient<Database>;
 
@@ -70,6 +71,11 @@ interface SeedCtx {
    *  goal, derived once per operation. Recorded (and passed to the engine) only
    *  under the same mode gate as `progressionByExerciseId`. */
   planStrengthRate: PlanStrengthRate | null;
+  /** doc 17 §7 (N36): the envelope loop's per-user band position — derived once
+   *  per operation from the trailing completed mesos' decisions. Null while the
+   *  loop is off (envelope block absent/disabled): recorded and passed only
+   *  when non-null, so everything stays byte-identical without it. */
+  bandPosition: number | null;
 }
 
 /** A seeded prescription row plus the engine I/O that produced it, so the caller
@@ -163,6 +169,7 @@ function seedExerciseRow(
             planStrengthRate: ctx.planStrengthRate,
           }
         : {}),
+      ...(ctx.bandPosition != null ? { bandPosition: ctx.bandPosition } : {}),
     },
   );
   const inputs = buildSeedInputs({
@@ -183,6 +190,11 @@ function seedExerciseRow(
             daysSincePreviousSession:
               earnBundle?.daysSincePreviousSession ?? null,
             planStrengthRate: ctx.planStrengthRate,
+            // key present only when the loop is on — a recorded seed input
+            // without it stays byte-identical to pre-envelope decisions
+            ...(ctx.bandPosition != null
+              ? { bandPosition: ctx.bandPosition }
+              : {}),
           },
         }
       : {}),
@@ -539,6 +551,10 @@ export async function startMeso(
   // (standalone mesos resolve to hypertrophy). Self-gates: null while the
   // progression mode is inactive.
   const planStrengthRate = derivePlanStrengthRate(profile, goal, params);
+  // doc 17 §7: the envelope loop's per-user band position, folded from the
+  // trailing completed mesos' decisions — the meso boundary IS this seed.
+  // Self-gates: null while the loop is off.
+  const bandPosition = await getBandPosition(supabase, userId, params);
 
   const seedCtx: SeedCtx = {
     equipmentById,
@@ -557,6 +573,7 @@ export async function startMeso(
     earnByExerciseId,
     progressionByExerciseId,
     planStrengthRate,
+    bandPosition,
   };
 
   // a half-applied prior attempt may have created some week-1 workouts
@@ -744,6 +761,7 @@ export async function regenerateOpenWorkouts(
       earnByExerciseId: null,
       progressionByExerciseId: null,
       planStrengthRate: null,
+      bandPosition: null,
     };
 
     // 1. drop planned workouts whose day was removed from the plan — but never

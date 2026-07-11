@@ -23,6 +23,7 @@ import {
   daysSincePerformed,
 } from "./progression-history";
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
+import { getBandPosition } from "./envelope";
 import { maybeCompleteMacroAfterMeso } from "./macro-close";
 import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
@@ -143,6 +144,9 @@ export function buildEngineInputs(args: {
   daysSincePreviousSession?: EngineInputs["daysSincePreviousSession"];
   /** doc 17 §3 pacer plan-rate input; omit while the mode is inactive */
   planStrengthRate?: EngineInputs["planStrengthRate"];
+  /** doc 17 §7 envelope band position; omit while the loop is off so recorded
+   *  decision inputs stay byte-identical without it */
+  bandPosition?: EngineInputs["bandPosition"];
 }): EngineInputs {
   const { we } = args;
   // config half resolved through the single shared resolver (doc 14 §3) so the
@@ -202,6 +206,9 @@ export function buildEngineInputs(args: {
       : {}),
     ...(args.planStrengthRate !== undefined
       ? { planStrengthRate: args.planStrengthRate }
+      : {}),
+    ...(args.bandPosition !== undefined
+      ? { bandPosition: args.bandPosition }
       : {}),
   };
 }
@@ -293,6 +300,10 @@ interface WeekContext {
   /** doc 17 §3 (N37): the pacer's personalized plan strength band — per user ×
    *  goal, derived once per advance run; null while the mode is inactive */
   planStrengthRate: PlanStrengthRate | null;
+  /** doc 17 §7 (N36): the envelope loop's per-user band position — derived once
+   *  per advance run (constant within a meso: only completed mesos feed the
+   *  fold); null while the loop is off, and then never recorded */
+  bandPosition: number | null;
 }
 
 /**
@@ -377,6 +388,7 @@ async function generateDay(
             planStrengthRate: ctx.planStrengthRate,
           }
         : {}),
+      ...(ctx.bandPosition != null ? { bandPosition: ctx.bandPosition } : {}),
     });
     // effective params = global active + this user×exercise increment override
     // (doc 14 §6.1); the override also feeds the row's fingerprint token below.
@@ -872,6 +884,9 @@ export async function advanceWeekAfterWorkout(
     // from the live profile under the resolved goal (standalone → hypertrophy);
     // null while the progression mode is inactive.
     planStrengthRate: derivePlanStrengthRate(profile, goal, params),
+    // doc 17 §7: the envelope loop's per-user band position; null (and never
+    // recorded) while the loop is off.
+    bandPosition: await getBandPosition(service, userId, params),
   };
 
   // -------------------------------------------------------------------------
@@ -1273,6 +1288,9 @@ export async function projectNextPrescription(
     nextMicro?.id ?? null,
     params,
   );
+  // doc 17 §7: the envelope position the live advance would consume (self-
+  // gating — null, and omitted below, while the loop is off)
+  const projectionBandPosition = await getBandPosition(supabase, userId, params);
   const projectionGoal = engineGoal(macroGoal);
   const inputs = buildEngineInputs({
     we: sourceWe,
@@ -1310,6 +1328,9 @@ export async function projectNextPrescription(
             params,
           ),
         }
+      : {}),
+    ...(projectionBandPosition != null
+      ? { bandPosition: projectionBandPosition }
       : {}),
   });
   const override = await getExerciseIncrementOverride(supabase, userId, exerciseId);
