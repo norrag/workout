@@ -2,11 +2,20 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
+  BodyScanRow,
   ExerciseNoteRow,
   ProfileRow,
+  VBodyCompHistoryRow,
   VMesoSummaryRow,
 } from "@/lib/types/database";
 import { getProfile, profileAge } from "@/lib/queries/profiles";
+import {
+  getBodyCompHistory,
+  LEAN_LSC_LB,
+  FAT_LSC_LB,
+  BF_PCT_NOISE_BAND,
+} from "@/lib/queries/body-comp";
+import { getNewestBodyScan } from "@/lib/queries/body-scans";
 import { getCyclesOverview, getMesoPlan, type CyclesOverview, type MesoPlan } from "@/lib/queries/cycles";
 import {
   getMesoProgressScores,
@@ -51,6 +60,7 @@ import {
   feedbackCoverage,
   FEEDBACK_SCALES,
   round1,
+  roundTo,
   type EnvelopeOpts,
 } from "../envelope";
 import {
@@ -95,6 +105,9 @@ export function formatProfile(profile: ProfileRow | null): Record<string, unknow
     height_in: profile.height_in,
     bodyweight: profile.bodyweight,
     body_fat_pct: profile.body_fat_pct,
+    // 5c: 'dexa' = measured (applied from a scan), 'estimate' = self-reported,
+    // null = legacy/unset — read it before treating the % as ground truth
+    body_fat_source: profile.body_fat_source,
     experience_level: profile.experience_level,
     training_since: profile.training_since,
     training_age_years: trainingYears,
@@ -1137,6 +1150,137 @@ function registerExplainPrescription(server: McpServer) {
   );
 }
 
+// --- get_body_composition ---------------------------------------------------
+
+/**
+ * The doc 15 §6 measurement guardrails, stated as data so a consumer can apply
+ * them without reading the spec — the same LSC constants every screen reads
+ * (`queries/body-comp.ts`, one definition).
+ */
+export const BODY_COMP_GUARDRAILS = {
+  lean_fat_lsc_lb: LEAN_LSC_LB,
+  body_fat_pct_noise_band: BF_PCT_NOISE_BAND,
+  notes: [
+    `Scan-to-scan lean or fat changes under ~${LEAN_LSC_LB} lb, and body-fat moves under ±${BF_PCT_NOISE_BAND} point, sit inside DEXA measurement noise — never present them as change.`,
+    "Only same-scanner-model pairs are comparable; a delta flagged comparable:false is context, never a trend or a verdict.",
+    "DEXA reads quarterly-plus: scans closer than ~2 months apart are a hint, not a trend; verdict-grade claims want ≥2 same-machine scans bracketing the block.",
+    "Scans inform targets and verdicts, never prescriptions (doc 15 §3.3).",
+  ],
+} as const;
+
+/** One scan row + its guarded delta block, from the shared view. Pure. */
+export function formatBodyComposition(
+  rows: VBodyCompHistoryRow[],
+  newestScan: Pick<
+    BodyScanRow,
+    "scanned_at" | "rmr_kcal_cunningham" | "rmr_kcal_mifflin"
+  > | null,
+): Record<string, unknown> {
+  if (rows.length === 0) {
+    return {
+      has_scans: false,
+      summary:
+        "No body scans imported. The user can connect a BodySpec account " +
+        "(More → BodySpec DEXA) to bring their DEXA history in.",
+    };
+  }
+  // numeric view columns arrive as raw floats — coerce + round once here so
+  // the tool never disagrees with a screen on the same number (§5.7)
+  const num = (v: number | null): number | null => (v == null ? null : Number(v));
+  const scans = rows.map((r) => {
+    const deltaLean = round1(num(r.delta_lean_lb));
+    const deltaFat = round1(num(r.delta_fat_lb));
+    const deltaBf = round1(num(r.delta_body_fat_pct));
+    const comparable = r.same_scanner_as_prev === true;
+    return {
+      scanned_at: r.scanned_at,
+      scanner_model: r.scanner_model,
+      weight_lb: round1(num(r.weight_lb)),
+      body_fat_pct: round1(num(r.body_fat_pct)),
+      lean_mass_lb: round1(num(r.lean_mass_lb)),
+      fat_mass_lb: round1(num(r.fat_mass_lb)),
+      almi_kg_m2: roundTo(num(r.almi_kg_m2), 2),
+      // null on the first scan; within-noise flags only exist where the pair
+      // is comparable (cross-scanner deltas are flagged context, never graded)
+      delta_vs_previous:
+        r.prev_scanned_at == null
+          ? null
+          : {
+              prev_scanned_at: r.prev_scanned_at,
+              weight_lb: round1(num(r.delta_weight_lb)),
+              body_fat_pct: deltaBf,
+              lean_mass_lb: deltaLean,
+              fat_mass_lb: deltaFat,
+              comparable,
+              lean_within_noise:
+                comparable && deltaLean != null
+                  ? Math.abs(deltaLean) < LEAN_LSC_LB
+                  : null,
+              fat_within_noise:
+                comparable && deltaFat != null
+                  ? Math.abs(deltaFat) < FAT_LSC_LB
+                  : null,
+              body_fat_within_noise:
+                comparable && deltaBf != null
+                  ? Math.abs(deltaBf) < BF_PCT_NOISE_BAND
+                  : null,
+            },
+    };
+  });
+  const rmr =
+    newestScan &&
+    (newestScan.rmr_kcal_cunningham != null ||
+      newestScan.rmr_kcal_mifflin != null)
+      ? {
+          scanned_at: newestScan.scanned_at,
+          // Cunningham is FFM-based (genuinely DEXA-informed); Mifflin is
+          // height/weight arithmetic, included for reference only
+          kcal_per_day_cunningham: newestScan.rmr_kcal_cunningham,
+          kcal_per_day_mifflin: newestScan.rmr_kcal_mifflin,
+          note: "Resting metabolic rate — display context only; prescriptions, targets, and nutrition scope never build on it.",
+        }
+      : null;
+  return {
+    has_scans: true,
+    scan_count: rows.length,
+    scans,
+    latest_rmr: rmr,
+    measurement_guardrails: BODY_COMP_GUARDRAILS,
+  };
+}
+
+export const GET_BODY_COMPOSITION = "get_body_composition";
+function registerGetBodyComposition(server: McpServer) {
+  server.registerTool(
+    GET_BODY_COMPOSITION,
+    {
+      title: "Get body composition",
+      description:
+        "DEXA body-composition history from the user's connected BodySpec " +
+        "account: per-scan weight, body-fat %, lean/fat mass, ALMI, plus " +
+        "deltas vs the previous scan with comparability flags, and the newest " +
+        "scan's measured RMR. Honesty rules ride along: lean/fat changes " +
+        "under ~2 lb (or ±1 body-fat point) are inside measurement noise, and " +
+        "cross-scanner deltas are never comparable — read the " +
+        "measurement_guardrails block before making any claim. Weights are in " +
+        "pounds. Takes no arguments.",
+      inputSchema: {},
+    },
+    async (_args: Record<string, never>, extra: McpExtra) => {
+      const { client, userId } = resolveSession(extra);
+      const rows = await getBodyCompHistory(client, userId);
+      const newest =
+        rows.length > 0 ? await getNewestBodyScan(client, userId) : null;
+      return jsonResult(formatBodyComposition(rows, newest), {
+        dataQuality: {
+          source:
+            "v_body_comp_history — the same view every in-app scan surface reads (one definition of the deltas and comparability flags)",
+        },
+      });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 
 export function registerReadTools(server: McpServer) {
@@ -1152,4 +1296,5 @@ export function registerReadTools(server: McpServer) {
   registerGetExerciseNotes(server);
   registerGetExclusions(server);
   registerExplainPrescription(server);
+  registerGetBodyComposition(server);
 }

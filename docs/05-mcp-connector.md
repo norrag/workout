@@ -40,6 +40,7 @@ The MCP connector lets users plug their training data into the LLM of their choi
 | `get_macrocycle_summary` | macrocycle rollup (fig 2.2): goal, realistic target + per-month rate, meso timeline with phases/status, est. strength, total volume, sessions, adherence |
 | `search_exercises` / `search_templates` | library queries with the same filters the UI uses |
 | `explain_prescription` | surface the engine's `engine_decisions` rationale for a given prescription |
+| `get_body_composition` | DEXA scan history over `v_body_comp_history` (the same view the screens read — one definition of deltas + comparability): per-scan weight/bf%/lean/fat/ALMI, deltas vs the previous scan with same-scanner flags and LSC within-noise verdicts, the newest scan's measured RMR, and the doc 15 §6 guardrails shipped as a `measurement_guardrails` data block (added 2026-07-11, doc 17 Phase 5c) |
 
 ### Coaching & analysis (read-only; added 2026-06-16 — "deep access" expansion)
 

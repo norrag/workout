@@ -10,6 +10,7 @@ import {
   getBodyCompHistoryInRange,
   scanCompForSpan,
 } from "@/lib/queries/body-comp";
+import { getNewestBodyScan } from "@/lib/queries/body-scans";
 import { BRACKET_TOLERANCE_DAYS } from "@/lib/queries/bodyweight";
 import { dateAtLocalNoon, localDayIso, shortDate } from "@/lib/dates";
 import { formatMeasuredLb } from "@/lib/units";
@@ -132,6 +133,19 @@ export default async function MacroOverviewPage({
           compRows[compRows.length - 1].scanned_at,
           Number.POSITIVE_INFINITY,
         )
+      : null;
+  // 5c (doc 15 §3.4): measured-RMR context on the goals that manage an energy
+  // balance — cut and hypertrophy. Cunningham only (FFM-based, i.e. genuinely
+  // DEXA-informed; Mifflin is height/weight arithmetic and doesn't qualify as
+  // "measured from your lean mass"). Display-only — prescriptions, targets,
+  // and verdicts never read it, and it must not grow nutrition tracking.
+  const rmrScan =
+    macro.goal_type === "cut" || macro.goal_type === "hypertrophy"
+      ? await getNewestBodyScan(supabase, user.id)
+      : null;
+  const rmrKcal =
+    rmrScan?.rmr_kcal_cunningham != null
+      ? Math.round(Number(rmrScan.rmr_kcal_cunningham))
       : null;
   // §4.1: a terminal macro is frozen — no planning affordances on its timeline
   const frozen = macro.status !== "active";
@@ -423,6 +437,34 @@ export default async function MacroOverviewPage({
           <div className="mb-6 mt-[9px] text-[9px] leading-normal tracking-[0.04em] text-ink/45">
             DEXA READS QUARTERLY-PLUS — SCAN-TO-SCAN LEAN CHANGES UNDER ~2 LB
             SIT INSIDE MEASUREMENT NOISE
+          </div>
+        </div>
+      )}
+
+      {/* 5c (doc 15 §3.4; 09 2026-07-11 5c §3): maintenance context on the
+          energy-balance goals, from the newest scan's FFM-based RMR.
+          Display-only — nothing downstream reads it. */}
+      {rmrKcal != null && rmrScan && (
+        <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
+          <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+            MEASURED RMR
+          </div>
+          <div className="mt-[11px] flex items-baseline justify-between">
+            <div className="numeral text-[22px] font-extrabold tracking-[-0.01em]">
+              {rmrKcal.toLocaleString("en-US")}{" "}
+              <span className="text-[11px] font-semibold tracking-[0.08em] text-ink/55">
+                KCAL/DAY
+              </span>
+            </div>
+            <div className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+              SCAN {shortDate(rmrScan.scanned_at)}
+            </div>
+          </div>
+          <div className="mb-6 mt-[9px] text-[9px] leading-normal tracking-[0.04em] text-ink/45">
+            RESTING METABOLIC RATE FROM YOUR LEAN MASS (CUNNINGHAM) — DAILY
+            MAINTENANCE SITS ABOVE IT ONCE ACTIVITY IS ADDED. CONTEXT FOR THIS{" "}
+            {macro.goal_type === "cut" ? "CUT" : "GAINING"} BLOCK ONLY —
+            PRESCRIPTIONS AND TARGETS NEVER READ IT
           </div>
         </div>
       )}

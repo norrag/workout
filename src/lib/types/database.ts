@@ -40,7 +40,9 @@ type Defaulted =
   // 5b: nullable proposal-resolution stamps on body_scans — written only by
   // the resolve path, never by the import upsert (a re-sync must not reset)
   | "profile_applied_at"
-  | "profile_dismissed_at";
+  | "profile_dismissed_at"
+  // 5c: nullable body-fat provenance — written by the bf% write paths only
+  | "body_fat_source";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -89,6 +91,9 @@ export type ProfileRow = {
   bodyweight_updated_at: string | null;
   /** estimated body-fat % (optional) — feeds the FFMI proximity target model */
   body_fat_pct: number | null;
+  /** provenance of body_fat_pct (doc 17 Phase 5c): self-estimate vs applied
+   *  DEXA measurement; null = legacy/unset */
+  body_fat_source: "estimate" | "dexa" | null;
   training_since: string | null;
   experience_level: ExperienceLevel | null;
   preferred_equipment: string[];

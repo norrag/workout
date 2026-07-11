@@ -12,8 +12,8 @@ import {
 import { shortDate } from "@/lib/dates";
 import {
   addExclusionAction,
-  clearBodyFatAction,
   removeExclusionAction,
+  setBodyFatEstimateAction,
   setEquipment,
   setExperience,
   setGender,
@@ -61,14 +61,21 @@ const FIELD_META: Record<
 
 // body-fat estimate bands (store the midpoint %); a visual/text picker keeps
 // it accessible — feeds the FFMI proximity target model (10-spec §5).
+// Normalized to even 5-point steps (owner, 2026-07-11 — the old 10/14/18/23/29
+// increments read as arbitrary); anything between bands goes in as a CUSTOM
+// value. A stored value only lights a band on exact match — a custom or
+// legacy-band value lights the CUSTOM chip with its figure instead.
 const BODY_FAT_BANDS = [
   { mid: 10, label: "~10%" },
-  { mid: 14, label: "~14%" },
-  { mid: 18, label: "~18%" },
-  { mid: 23, label: "~23%" },
-  { mid: 29, label: "~29%" },
+  { mid: 15, label: "~15%" },
+  { mid: 20, label: "~20%" },
+  { mid: 25, label: "~25%" },
+  { mid: 30, label: "~30%" },
   { mid: 35, label: "35%+" },
 ] as const;
+
+const SHEET_INPUT_CLASS =
+  "h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink focus:outline-none";
 
 
 /** Profile (fig 4.5): data rows, experience, equipment access, exclusions. */
@@ -76,10 +83,14 @@ export function ProfileEditor({
   profile,
   exclusions,
   exercises,
+  dexaBodyFat,
 }: {
   profile: ProfileRow;
   exclusions: ExclusionWithExercise[];
   exercises: { id: string; name: string }[];
+  /** non-null ⇒ body_fat_pct is a DEXA measurement from a live connection —
+   *  render the measured panel instead of the estimate bands (5c) */
+  dexaBodyFat: { scannedAt: string | null } | null;
 }) {
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState<EditableField | null>(null);
@@ -100,9 +111,20 @@ export function ProfileEditor({
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("");
   const [bodyFat, setBodyFatLocal] = useState<number | null>(
-    profile.body_fat_pct,
+    profile.body_fat_pct != null ? Number(profile.body_fat_pct) : null,
   );
+  // flips to false the moment the user overrides the measurement (5c)
+  const [bfMeasured, setBfMeasured] = useState(dexaBodyFat != null);
+  const [bfSheetOpen, setBfSheetOpen] = useState(false);
+  const [bfValue, setBfValue] = useState("");
+  const [bfError, setBfError] = useState<string | null>(null);
   const [gender, setGenderLocal] = useState(profile.gender ?? "undisclosed");
+
+  const saveBodyFat = (next: number | null) => {
+    setBodyFatLocal(next);
+    setBfMeasured(false);
+    startTransition(() => setBodyFatEstimateAction(next).then(() => undefined));
+  };
 
   const rows: { field: EditableField; value: React.ReactNode; raw: string }[] = [
     {
@@ -255,50 +277,98 @@ export function ProfileEditor({
         Calibrates the realistic muscle-gain target on your macrocycles.
       </p>
 
-      {/* body fat estimate (optional) */}
+      {/* body fat — measured (DEXA) while connected, else estimate bands +
+          custom value (5c; 09-changelog 2026-07-11 Phase-5c entry) */}
       <div className="mt-5 flex items-baseline justify-between">
         <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-          BODY FAT — ESTIMATE
+          {bfMeasured ? "BODY FAT — MEASURED" : "BODY FAT — ESTIMATE"}
         </div>
         <div className="text-[9px] font-medium tracking-[0.1em] text-ink/45">
-          OPTIONAL
+          {bfMeasured ? "BODYSPEC DEXA" : "OPTIONAL"}
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-6 gap-1.5">
-        {BODY_FAT_BANDS.map(({ mid, label }) => {
-          const on = bodyFat != null && Math.abs(bodyFat - mid) < 2.5;
-          return (
-            <button
-              key={mid}
-              type="button"
-              aria-pressed={on}
-              onClick={() => {
-                const next = on ? null : mid;
-                setBodyFatLocal(next);
-                startTransition(() =>
-                  next == null
-                    ? clearBodyFatAction()
-                    : updateProfileField("body_fat_pct", String(next)).then(
-                        () => undefined,
-                      ),
-                );
-              }}
-              className={`py-2 text-center text-[10px] tracking-[0.04em] ${
-                on
-                  ? "bg-ink font-bold text-bg-base"
-                  : "border border-ink/35 font-medium text-ink/55"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
-        Pick the closest. With your height and weight this estimates how much
-        muscle you carry vs. your potential — the single biggest input to a
-        realistic macrocycle target. Skip it and we fall back to training age.
-      </p>
+      {bfMeasured ? (
+        <>
+          <div className="mt-2 flex items-baseline justify-between border-[1.5px] border-ink px-3.5 py-3">
+            <div className="numeral text-[15px] font-bold">
+              {bodyFat != null ? `${bodyFat}%` : "—"}
+            </div>
+            {dexaBodyFat?.scannedAt && (
+              <div className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+                SCAN {shortDate(dexaBodyFat.scannedAt)}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setBfValue(bodyFat != null ? String(bodyFat) : "");
+              setBfError(null);
+              setBfSheetOpen(true);
+            }}
+            className="mt-2 w-full border border-dashed border-ink/40 py-[11px] text-center text-[10.5px] font-semibold tracking-[0.1em] text-ink/60"
+          >
+            OVERRIDE WITH AN ESTIMATE
+          </button>
+          <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
+            Measured by DEXA — applying a new scan updates it. Override to use
+            your own estimate instead, or disconnect BodySpec to return to the
+            estimate bands.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="mt-2 grid grid-cols-6 gap-1.5">
+            {BODY_FAT_BANDS.map(({ mid, label }) => {
+              const on = bodyFat === mid;
+              return (
+                <button
+                  key={mid}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => saveBodyFat(on ? null : mid)}
+                  className={`py-2 text-center text-[10px] tracking-[0.04em] ${
+                    on
+                      ? "bg-ink font-bold text-bg-base"
+                      : "border border-ink/35 font-medium text-ink/55"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {(() => {
+            const custom =
+              bodyFat != null &&
+              !BODY_FAT_BANDS.some((b) => b.mid === bodyFat);
+            return (
+              <button
+                type="button"
+                aria-pressed={custom}
+                onClick={() => {
+                  setBfValue(bodyFat != null ? String(bodyFat) : "");
+                  setBfError(null);
+                  setBfSheetOpen(true);
+                }}
+                className={`mt-1.5 w-full py-2 text-center text-[10px] tracking-[0.06em] ${
+                  custom
+                    ? "bg-ink font-bold text-bg-base"
+                    : "border border-dashed border-ink/40 font-medium text-ink/55"
+                }`}
+              >
+                {custom ? `CUSTOM — ${bodyFat}%` : "CUSTOM VALUE"}
+              </button>
+            );
+          })()}
+          <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
+            Pick the closest band, or enter an exact value if you know it. With
+            your height and weight this estimates how much muscle you carry vs.
+            your potential — the single biggest input to a realistic macrocycle
+            target. Skip it and we fall back to training age.
+          </p>
+        </>
+      )}
 
       {/* equipment access */}
       <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
@@ -462,6 +532,53 @@ export function ProfileEditor({
             </BottomSheet>
           );
         })()}
+
+      {/* custom body-fat value (5c — between-band entry; also the override
+          path off a DEXA measurement) */}
+      <BottomSheet
+        open={bfSheetOpen}
+        onClose={() => setBfSheetOpen(false)}
+        title="body fat"
+        subtitle="PERCENT · ESTIMATE"
+      >
+        <input
+          type="number"
+          inputMode="decimal"
+          min={2}
+          max={70}
+          step={0.5}
+          value={bfValue}
+          onChange={(e) => setBfValue(e.target.value)}
+          aria-label="body fat percent"
+          autoFocus
+          className={SHEET_INPUT_CLASS}
+        />
+        {bfError && <p className="mt-2 text-sm text-accent">{bfError}</p>}
+        <div className="mt-4 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setBfSheetOpen(false)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const n = Number(bfValue);
+              if (bfValue.trim() === "" || !Number.isFinite(n) || n < 2 || n > 70) {
+                setBfError("Enter a body-fat % between 2 and 70.");
+                return;
+              }
+              saveBodyFat(Math.round(n * 10) / 10);
+              setBfSheetOpen(false);
+            }}
+            className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+          >
+            SAVE
+          </button>
+        </div>
+      </BottomSheet>
 
       {/* exclusion picker */}
       <BottomSheet

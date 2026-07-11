@@ -42,6 +42,85 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — BodySpec DEXA: engine + MCP, and the profile body-fat control rework (doc 17 §6, N34 Phase 5c)
+
+The third DEXA PR (doc 15 §5 Phase 3) plus an owner-directed rework of the
+profile's body-fat control (owner note, 2026-07-11: after a scan updates the
+profile, the estimate bands still rendered with a stale band lit; the old
+band increments — 10/14/18/23/29 — read as arbitrary; and there was no way
+to enter a between-band value). **Rule-8 pass:** fig 4.5 shows the profile
+data rows but predates the body-fat picker's DEXA states; no figure covers
+an RMR surface (re-verified against `workout - App Screens v2.dc.html`).
+Treatments below are house-style; this entry is the design record.
+
+### 1. Profile (fig 4.5) — body-fat estimate bands normalized + custom value
+
+- **Change:** the six estimate bands move to even 5-point steps —
+  `~10% · ~15% · ~20% · ~25% · ~30% · 35%+` (was 10/14/18/23/29/35) — and a
+  full-width **`CUSTOM VALUE`** chip lands under the grid (dashed idle, the
+  `+ ADD EXCLUSION` grammar). It opens a bottom sheet with a single numeric
+  input (2–70, half-point steps); a saved value that matches no band
+  midpoint lights the custom chip as `CUSTOM — 17.5%` (pressed ink style)
+  instead of approximately lighting a band. Band highlight becomes **exact
+  match** (was ±2.5 fuzzy): a value is either a band pick, a custom entry,
+  or a measurement — never a guess at which chip it "counts as". Helper
+  copy gains the custom path ("Pick the closest band, or enter an exact
+  value if you know it.").
+- **Rationale:** normalized increments read as a scale, not a lookup table;
+  a between-band user shouldn't have to lie by a band's width (owner note).
+- **Affected figures:** 4.5 (body-fat block only).
+- **Impact:** `RETROFIT` — picker rework + `setBodyFatEstimateAction`.
+
+### 2. Profile (fig 4.5) — DEXA-measured body-fat state
+
+- **Change:** while the profile's body-fat carries **DEXA provenance**
+  (`profiles.body_fat_source = 'dexa'`, written by the consented scan-apply)
+  **and** a BodySpec connection exists, the estimate picker gives way to a
+  measured panel: header reads `BODY FAT — MEASURED` / `BODYSPEC DEXA`
+  (replacing `— ESTIMATE` / `OPTIONAL`), an ink-bordered row shows the
+  measured figure (`18.2%`) beside `SCAN <date>` (the newest applied scan's
+  date — derived, never duplicated), and a dashed
+  **`OVERRIDE WITH AN ESTIMATE`** action opens the §1 custom sheet (saving
+  flips provenance back to `'estimate'` and restores the bands). Helper
+  copy states the lifecycle flat: *"Measured by DEXA — applying a new scan
+  updates it. Override to use your own estimate instead, or disconnect
+  BodySpec to return to the estimate bands."* Disconnecting BodySpec
+  reverts the control to the picker (the value itself stays until edited —
+  it's still the best current belief).
+- **Rationale:** a connected, current user has better data than any band —
+  showing six unlit estimate chips beside a measurement misstates what the
+  app knows (owner note). Estimate bands are for when estimating is all
+  there is.
+- **Affected figures:** 4.5 (body-fat block only).
+- **Impact:** `RETROFIT` + `DATA` — `profiles.body_fat_source` column
+  (migration `20260711000005`); apply-action stamps `'dexa'`, picker/custom
+  stamp `'estimate'`.
+
+### 3. Macro page (fig 2.2) — `MEASURED RMR` context on cut/gain macros
+
+- **Change:** the macro Overview tab gains a ruled `MEASURED RMR` section
+  (below `BODY COMPOSITION`) **only** on `cut` and `hypertrophy` macros and
+  only when the newest scan carries a Cunningham RMR (the FFM-based
+  formula — genuinely DEXA-informed; Mifflin is height/weight arithmetic
+  and never qualifies as "measured"). One stat-grade numeral
+  (`1,798 KCAL/DAY`) beside `SCAN <date>`, with the honesty footnote:
+  *"Resting metabolic rate from your lean mass (Cunningham) — daily
+  maintenance sits above it once activity is added. Context for this
+  cut/gaining block only — prescriptions and targets never read it."*
+- **Rationale:** doc 15 §3.4 — a measured metabolic anchor as display-only
+  context on the energy-balance goals, without opening nutrition scope.
+- **Affected figures:** 2.2 (section added; existing elements unchanged).
+- **Impact:** `RETROFIT` — reads the newest `body_scans` row.
+
+### 4. MCP `get_body_composition` (not a screen — noted for completeness)
+
+- **Change:** the connector gains the 5c read tool over
+  `v_body_comp_history` (the same view every in-app scan surface reads),
+  with the doc 15 §6 guardrails shipped as data (`measurement_guardrails`:
+  LSC bands, same-scanner rule, quarterly cadence, targets-never-
+  prescriptions) and the newest scan's RMR as labeled context.
+- **Affected figures:** none. **Impact:** `NET-NEW` (doc 05 tool table).
+
 ## 2026-07-11 — BodySpec DEXA: return-to-app page for the cookie-free connect flow (doc 15 §8.5, N34)
 
 The connect round trip moved server-side after the owner's first real

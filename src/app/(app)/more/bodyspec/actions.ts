@@ -98,7 +98,9 @@ export async function applyScanToProfileAction(input: {
         }
       : {}),
     ...(proposal.bodyFatPct != null
-      ? { body_fat_pct: proposal.bodyFatPct }
+      ? // 5c: provenance rides the value — the profile screen shows the
+        // measured figure instead of the estimate bands while it holds
+        { body_fat_pct: proposal.bodyFatPct, body_fat_source: "dexa" as const }
       : {}),
   });
   if (proposal.weightLb != null)

@@ -32,6 +32,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     bodyweight: 198,
     bodyweight_updated_at: null,
     body_fat_pct: null,
+    body_fat_source: null,
     training_since: null,
     experience_level: "intermediate",
     preferred_equipment: [],
@@ -83,6 +84,22 @@ describe("profileToMacroProfile", () => {
   it("falls back to the static age int when birthdate is unset or invalid", () => {
     expect(profileToMacroProfile(profile({ birthdate: null })).age).toBe(34);
     expect(profileToMacroProfile(profile({ birthdate: "not-a-date" })).age).toBe(34);
+  });
+
+  // doc 17 §6 5c / doc 15 §3.1: measured values ride the SAME bodyFatPct input
+  // as an estimate — provenance is display-layer only, the engine path is one
+  it("carries a DEXA-measured body-fat identically to a self-estimate", () => {
+    const now = new Date("2026-07-11T12:00:00Z");
+    const measured = profileToMacroProfile(
+      profile({ body_fat_pct: 18.2, body_fat_source: "dexa" }),
+      now,
+    );
+    const estimated = profileToMacroProfile(
+      profile({ body_fat_pct: 18.2, body_fat_source: "estimate" }),
+      now,
+    );
+    expect(measured).toEqual(estimated);
+    expect(measured.bodyFatPct).toBe(18.2);
   });
 });
 
