@@ -50,6 +50,7 @@ export async function updateProfile(
       | "bodyweight"
       | "bodyweight_updated_at"
       | "body_fat_pct"
+      | "body_fat_source"
       | "training_since"
       | "experience_level"
       | "preferred_equipment"

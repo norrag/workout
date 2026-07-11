@@ -4,6 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 69: N34 Phase 5c — engine + MCP, and the profile body-fat rework
+
+Doc 17 §6 Phase 5c (the last DEXA build PR), plus an owner note pinned to
+the same PR: after a scan's proposal updated the profile, the profile still
+rendered the estimate bands with a stale band lit; the band increments
+(10/14/18/23/29) read as arbitrary; and there was no between-band entry.
+Branch `claude/macrocycle-phase-5c-dexa-4hyegu` (**PR #176**).
+
+- **Engine path (no engine change, by design):** measured bf% rides the
+  existing `bodyFatPct` profile input (doc 15 §3.1) — the 5b apply already
+  writes the profile, so `planMacrocycle` was consuming measured values the
+  moment they were accepted. Pinned with a mapping-equality test
+  (dexa-sourced ≡ same-value estimate). Passing measured FFM directly stays
+  the noted later refinement.
+- **Provenance (migration `20260711000005`):** `profiles.body_fat_source`
+  (`'estimate'` | `'dexa'`, null legacy) — the scan APPLY stamps `'dexa'`,
+  the picker/custom entry stamps `'estimate'`, clearing nulls it. Covered by
+  the existing column-agnostic owner RLS (birthdate-migration shape).
+- **Profile control rework (owner note; 09 2026-07-11 Phase-5c entry §§1–2):**
+  bands normalized to even 5-pt steps (~10…~30, 35%+), exact-match
+  highlight (no more fuzzy ±2.5 lighting), full-width CUSTOM VALUE chip →
+  bottom-sheet numeric entry (2–70) rendering as `CUSTOM — 17.5%` when a
+  non-band value holds; while provenance is `'dexa'` AND the BodySpec
+  connection exists, the picker gives way to a measured panel (value +
+  `SCAN <date>` from the newest applied scan, derived on read) with
+  OVERRIDE WITH AN ESTIMATE; disconnecting reverts to the picker, the value
+  stays until edited.
+- **RMR context (doc 15 §3.4; 09 entry §3):** MEASURED RMR section on cut/
+  hypertrophy macro Overviews from the newest scan's Cunningham (FFM-based)
+  estimate — display-only, prescriptions/targets never read it, Mifflin
+  never shown as "measured".
+- **MCP (doc 17 5c; 09 entry §4):** `get_body_composition` over
+  `v_body_comp_history` (shared-view rule) with deltas + same-scanner
+  comparability + LSC within-noise flags computed from the one constant set
+  (`queries/body-comp.ts`), newest-scan RMR, and the doc 15 §6 guardrails
+  shipped as a `measurement_guardrails` data block; `get_profile` now
+  reports `body_fat_source`. Doc 05 tool table updated.
+- Suite green (1062), typecheck + lint clean. Docs: 09 Phase-5c entry,
+  doc 15 §5 row-3 build note, doc 05 table, this row + PROGRESS.md.
+- N34 build-out is complete (5a/5b/5c + field fix); the row stays live for
+  the one human residual — the owner's first real connect recording the
+  §8.3 outcome in doc 15.
+
 ## 2026-07-11 — Session 68: N34 field fix — cookie-free connect round trip (+ prod migration catch-up)
 
 Owner reported two things from first real use: the More tab erroring, and

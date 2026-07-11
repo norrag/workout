@@ -2,7 +2,49 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — BodySpec connect flow: server-side OAuth round trip (doc 15 §8.5, N34 5a follow-up)
+## 2026-07-11 (latest) — Macro goals Phase 5c: BodySpec DEXA engine + MCP, and the profile body-fat rework (doc 17 §6, doc 15 §5 Phase 3, N34)
+
+The last DEXA build PR, plus the owner's pinned profile note (2026-07-11):
+after a scan updated the profile, the estimate bands still rendered with a
+stale band lit; the band increments read as arbitrary; no between-band
+entry existed.
+
+- **Engine path — deliberately no engine change** (doc 15 §3.1): measured
+  bf% rides the existing `bodyFatPct` profile input; the 5b consented apply
+  already writes the profile, so `planMacrocycle` (with the v21 correction)
+  consumes measured values through the one path. Pinned by a
+  mapping-equality test (dexa-sourced ≡ same-value estimate). Passing
+  measured FFM directly remains the noted later refinement.
+- **Provenance** (migration `20260711000005`): `profiles.body_fat_source`
+  (`'estimate'` | `'dexa'`; null legacy). The scan APPLY stamps `'dexa'`;
+  the picker/custom entry stamps `'estimate'` (also the override path);
+  clearing nulls it. Existing column-agnostic owner RLS covers it (the
+  birthdate-migration shape). `get_profile` reports it.
+- **Profile body-fat control rework** (fig 4.5; 09 2026-07-11 Phase-5c
+  entry): bands normalized to even 5-point steps (`~10 … ~30, 35%+`) with
+  exact-match highlighting, a `CUSTOM VALUE` chip → bottom-sheet numeric
+  entry (2–70, renders `CUSTOM — 17.5%` when a non-band value holds), and a
+  **measured state**: while provenance is `'dexa'` and a BodySpec
+  connection exists, the picker gives way to `BODY FAT — MEASURED` (value +
+  `SCAN <date>` from the newest applied scan, derived on read) with
+  `OVERRIDE WITH AN ESTIMATE`; disconnecting reverts the control to the
+  picker (`ProfileEditor` + `setBodyFatEstimateAction`).
+- **RMR context** (doc 15 §3.4): `MEASURED RMR` section on cut/hypertrophy
+  macro Overviews — the newest scan's Cunningham (FFM-based) estimate,
+  stat-grade numeral + honesty footnote; display-only, prescriptions and
+  targets never read it; Mifflin never presented as "measured".
+- **MCP** — `get_body_composition` over `v_body_comp_history` (shared-view
+  rule; same delta/comparability definition as every screen), LSC
+  within-noise flags from the one constant set (`queries/body-comp.ts`),
+  newest-scan RMR as labeled context, and the doc 15 §6 guardrails shipped
+  as a `measurement_guardrails` data block. Doc 05 tool table updated.
+
+Suite green (1062, +5), typecheck + lint clean. Docs: 09 Phase-5c entry,
+doc 15 §5 row-3 build note, doc 05, backlog N34 row + log (session 69).
+N34's build phases are complete; the §8.3 first-login outcome remains the
+owner's step.
+
+## 2026-07-11 — BodySpec connect flow: server-side OAuth round trip (doc 15 §8.5, N34 5a follow-up)
 
 Field fix from the owner's first real connect. From the installed PWA, iOS
 runs the BodySpec login in an in-app browser sheet with a separate cookie

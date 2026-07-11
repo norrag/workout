@@ -3,6 +3,7 @@ import type {
   ExerciseNoteRow,
   ProfileRow,
   TemplateRow,
+  VBodyCompHistoryRow,
   VMesoSummaryRow,
 } from "@/lib/types/database";
 import type { CyclesOverview, MesoPlan } from "@/lib/queries/cycles";
@@ -35,6 +36,7 @@ import {
   formatPinnedNotes,
   formatExclusions,
   formatPrescriptionDecision,
+  formatBodyComposition,
   registerReadTools,
   GET_PROFILE,
   GET_MACROCYCLES,
@@ -48,6 +50,7 @@ import {
   GET_EXERCISE_NOTES,
   GET_EXCLUSIONS,
   EXPLAIN_PRESCRIPTION,
+  GET_BODY_COMPOSITION,
 } from "../tools/read";
 import { registerResources } from "../resources";
 import { captureServer, fakeExtra } from "./harness";
@@ -65,6 +68,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     bodyweight: 198,
     bodyweight_updated_at: null,
     body_fat_pct: 15,
+    body_fat_source: null,
     training_since: null,
     experience_level: "advanced",
     preferred_equipment: ["barbell", "dumbbell"],
@@ -908,6 +912,107 @@ describe("formatPrescriptionDecision", () => {
   });
 });
 
+// --- formatBodyComposition ---------------------------------------------------
+
+function compRow(
+  overrides: Partial<VBodyCompHistoryRow> = {},
+): VBodyCompHistoryRow {
+  return {
+    user_id: "u1",
+    scan_id: "s1",
+    provider: "bodyspec",
+    scanned_at: "2026-07-08T17:00:00Z",
+    scanner_model: "GE Lunar iDXA",
+    weight_lb: 176.3,
+    body_fat_pct: 18.2,
+    lean_mass_lb: 137.4,
+    fat_mass_lb: 32.1,
+    almi_kg_m2: 9.13,
+    prev_scanned_at: null,
+    delta_weight_lb: null,
+    delta_body_fat_pct: null,
+    delta_lean_lb: null,
+    delta_fat_lb: null,
+    same_scanner_as_prev: null,
+    ...overrides,
+  };
+}
+
+describe("formatBodyComposition", () => {
+  it("reports no scans with the connect pointer", () => {
+    const out = formatBodyComposition([], null);
+    expect(out.has_scans).toBe(false);
+    expect(String(out.summary)).toMatch(/BodySpec/);
+  });
+
+  it("first scan carries no delta block; a comparable pair gets LSC noise flags", () => {
+    const rows = [
+      compRow(),
+      compRow({
+        scan_id: "s2",
+        scanned_at: "2026-10-08T17:00:00Z",
+        prev_scanned_at: "2026-07-08T17:00:00Z",
+        delta_weight_lb: 1.1,
+        delta_body_fat_pct: -0.4,
+        delta_lean_lb: 1.4,
+        delta_fat_lb: -2.3,
+        same_scanner_as_prev: true,
+      }),
+    ];
+    const out = formatBodyComposition(rows, null) as unknown as {
+      scan_count: number;
+      scans: { delta_vs_previous: Record<string, unknown> | null }[];
+    };
+    expect(out.scan_count).toBe(2);
+    expect(out.scans[0].delta_vs_previous).toBeNull();
+    // lean +1.4 sits inside the ~2 lb LSC (never a change); fat −2.3 is outside
+    expect(out.scans[1].delta_vs_previous).toMatchObject({
+      comparable: true,
+      lean_within_noise: true,
+      fat_within_noise: false,
+      body_fat_within_noise: true,
+    });
+  });
+
+  it("cross-scanner pairs are flagged not-comparable, no noise verdicts (doc 15 §6.2)", () => {
+    const rows = [
+      compRow(),
+      compRow({
+        scan_id: "s2",
+        scanned_at: "2026-10-08T17:00:00Z",
+        scanner_model: "GE Lunar Prodigy",
+        prev_scanned_at: "2026-07-08T17:00:00Z",
+        delta_lean_lb: 4.2,
+        same_scanner_as_prev: false,
+      }),
+    ];
+    const out = formatBodyComposition(rows, null) as unknown as {
+      scans: { delta_vs_previous: Record<string, unknown> | null }[];
+    };
+    expect(out.scans[1].delta_vs_previous).toMatchObject({
+      comparable: false,
+      lean_within_noise: null,
+      fat_within_noise: null,
+    });
+  });
+
+  it("carries the newest scan's RMR (Cunningham = lean-mass based) and the guardrail block", () => {
+    const out = formatBodyComposition([compRow()], {
+      scanned_at: "2026-07-08T17:00:00Z",
+      rmr_kcal_cunningham: 1798,
+      rmr_kcal_mifflin: 1780,
+    });
+    expect(out.latest_rmr).toMatchObject({
+      kcal_per_day_cunningham: 1798,
+      kcal_per_day_mifflin: 1780,
+    });
+    expect(out.measurement_guardrails).toMatchObject({
+      lean_fat_lsc_lb: 2,
+      body_fat_pct_noise_band: 1,
+    });
+  });
+});
+
 // --- registration + identity contract --------------------------------------
 
 describe("read-tool registration", () => {
@@ -927,6 +1032,7 @@ describe("read-tool registration", () => {
       GET_EXERCISE_NOTES,
       GET_EXCLUSIONS,
       EXPLAIN_PRESCRIPTION,
+      GET_BODY_COMPOSITION,
     ]) {
       expect(tools.has(name), name).toBe(true);
     }

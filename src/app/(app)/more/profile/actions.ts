@@ -54,7 +54,6 @@ const fieldSchemas = {
   height_in: z.coerce.number().min(36).max(96),
   bodyweight: z.coerce.number().positive().max(1000),
   training_since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  body_fat_pct: z.coerce.number().min(2).max(70),
 } as const;
 
 export async function updateProfileField(
@@ -85,10 +84,28 @@ export async function updateProfileField(
   return { error: null };
 }
 
-export async function clearBodyFatAction(): Promise<void> {
+// half-percent precision is plenty for a self-estimate; range per the engine's
+// macroProfileSchema (2–70)
+const bodyFatSchema = z.number().min(2).max(70).nullable();
+
+/**
+ * Set (or clear, with null) a SELF-ESTIMATED body-fat % — a band pick or a
+ * custom value; either way `body_fat_source` records 'estimate' (5c), which is
+ * also how the user overrides a DEXA-applied value: the profile screen swaps
+ * the measured panel back to the picker the moment provenance flips.
+ */
+export async function setBodyFatEstimateAction(
+  value: number | null,
+): Promise<{ error: string | null }> {
+  const parsed = bodyFatSchema.safeParse(value);
+  if (!parsed.success) return { error: "Enter a body-fat % between 2 and 70." };
   const { supabase, user } = await requireUser();
-  await updateProfile(supabase, user.id, { body_fat_pct: null });
+  await updateProfile(supabase, user.id, {
+    body_fat_pct: parsed.data,
+    body_fat_source: parsed.data == null ? null : "estimate",
+  });
   revalidate();
+  return { error: null };
 }
 
 export async function setExperience(level: string): Promise<void> {

@@ -26,6 +26,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     bodyweight: 198,
     bodyweight_updated_at: null,
     body_fat_pct: null,
+    body_fat_source: null,
     training_since: null,
     experience_level: "intermediate",
     preferred_equipment: [],

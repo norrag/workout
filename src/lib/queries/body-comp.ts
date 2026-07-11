@@ -72,6 +72,22 @@ export async function getBodyScansAroundSpan(
   return data ?? [];
 }
 
+/** The full `v_body_comp_history` series, scan order — the 5c MCP tool's read
+ *  (`get_body_composition` shares the one delta/comparability definition with
+ *  every screen; doc 15 §2.2). Scans arrive a few times a year — no paging. */
+export async function getBodyCompHistory(
+  supabase: Client,
+  userId: string,
+): Promise<VBodyCompHistoryRow[]> {
+  const { data, error } = await supabase
+    .from("v_body_comp_history")
+    .select("*")
+    .eq("user_id", userId)
+    .order("scanned_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** `v_body_comp_history` rows inside a window (inclusive), scan order — the
  *  macro-page composition trend's read. Deltas are vs each scan's true
  *  previous scan (full-history window function), not the window's first. */

@@ -89,6 +89,27 @@ export async function getNewestBodyScan(
 }
 
 /**
+ * The newest scan whose proposal was APPLIED — the measurement behind the
+ * profile's current DEXA-sourced body-fat (5c): its scanned_at is the
+ * value's "as of" date. Derived on read, never duplicated onto the profile.
+ */
+export async function getNewestAppliedBodyScan(
+  supabase: Client,
+  userId: string,
+): Promise<BodyScanRow | null> {
+  const { data, error } = await supabase
+    .from("body_scans")
+    .select("*")
+    .eq("user_id", userId)
+    .not("profile_applied_at", "is", null)
+    .order("scanned_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Record the proposal's resolution on the scan (5b): 'applied' after the
  * profile write + bodyweight_log append succeed, 'dismissed' on keep-current.
  * Guarded to unresolved rows so a double-submit can't restamp either way.
