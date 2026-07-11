@@ -12,7 +12,7 @@ rollback. Both review docs written; N43 moved needs-input → ready.
 - **Rolled back to v21** (`activate_engine_params` 21) per the owner — v22's
   plan/advanced band understates this profile; v21's intermediate band contains
   the model-derived rate. Branch restarted from merged main (PR #178) →
-  `claude/macro-goals-r2-r3-envelope-ntaw6h`, **PR #<n2>**.
+  `claude/macro-goals-r2-r3-envelope-ntaw6h`, **PR #179**.
 - **Strength-rate model research** (`docs/reviews/2026-07-11-strength-rate-model-research.md`):
   two-component hypothesis EVIDENCED, combine ADDITIVELY (Balshaw 2017). FFM
   coupling `k ≈ 1.0` (not the ⅔ sketch) ⇒ Garron ~1.4–2.3 %/mo = intermediate,
