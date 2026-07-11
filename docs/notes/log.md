@@ -9,7 +9,7 @@ Append a dated entry whenever a session moves work. Newest first.
 Owner reported two things from first real use: the More tab erroring, and
 the first real BodySpec connect dying at Keycloak's "Cookie not found" from
 the installed PWA (screenshot; login + consent had succeeded). Branch
-`claude/macrocycle-phase-5b-migrations-1jagpf` (**PR #TBD**); migration
+`claude/macrocycle-phase-5b-migrations-1jagpf` (**PR #175**); migration
 `20260711000004`.
 
 - **Prod catch-up first (the More tab):** the 5a/5b PRs had merged but
