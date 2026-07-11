@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, profileAge } from "@/lib/queries/profiles";
 import { getLatestBodyweightPoint } from "@/lib/queries/bodyweight";
+import { getBodySpecConnection } from "@/lib/queries/external-connections";
 import { signOut } from "@/app/(auth)/actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { ThemeToggle } from "./ThemeToggle";
@@ -18,10 +19,12 @@ export default async function MorePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [profile, latestBodyweight] = await Promise.all([
+  const [profile, latestBodyweight, bodySpecConnection] = await Promise.all([
     getProfile(supabase, user.id),
     getLatestBodyweightPoint(supabase, user.id),
+    getBodySpecConnection(supabase, user.id),
   ]);
+  const bodySpecStatus = bodySpecConnection?.status ?? null;
   const { count: workoutCount, error: countError } = await supabase
     .from("workouts")
     .select("*", { count: "exact", head: true })
@@ -111,6 +114,21 @@ export default async function MorePage() {
         <div className="text-sm font-semibold">AI connector</div>
         <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
           SET UP ›
+        </div>
+      </Link>
+      {/* BodySpec DEXA integration (doc 17 §6 / N34 Phase 5a; 09-changelog
+          2026-07-11 §1) — quiet settings row, never a nav item */}
+      <Link
+        href="/more/bodyspec"
+        className="flex items-center justify-between border-b border-ink/15 py-3.5"
+      >
+        <div className="text-sm font-semibold">BodySpec DEXA</div>
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+          {bodySpecStatus === "connected"
+            ? "CONNECTED"
+            : bodySpecStatus === "error"
+              ? "RECONNECT ›"
+              : "SET UP ›"}
         </div>
       </Link>
       <Link

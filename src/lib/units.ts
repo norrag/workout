@@ -44,6 +44,16 @@ export function formatWeight(value: number): string {
 }
 
 /**
+ * A measured mass (DEXA import) in lb, shown as stored — 2 dp max, no
+ * trailing zeros. Deliberately NOT snapped to the half-pound logging step:
+ * measurement display keeps measurement precision (doc 15 §6 — lean-mass
+ * changes live below 0.5 lb resolution).
+ */
+export function formatMeasuredLb(value: number): string {
+  return String(Math.round(value * 100) / 100);
+}
+
+/**
  * A prescription as one clean line for display/verification, e.g.
  * "110 lb × 8 reps · 3 sets · 2 RIR". A null weight (the T-I5 manual-seed
  * deferral: no confident data, awaiting a user-entered start) reads "Unseeded".

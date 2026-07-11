@@ -45,6 +45,37 @@ Extends `auth.users` 1:1 (`id` = auth uid).
 ### `bodyweight_log`
 The measured bodyweight series (doc 17 §5, N41; migration `20260711000001`): `user_id`, `measured_on date`, `weight numeric > 0` (lb), `source text` (`manual` quick entry / `profile` edit append / `dexa` Phase-5 sync), `created_at`; unique `(user_id, measured_on, source)` — a same-day re-entry replaces that day's point, and reads resolve a day to the latest-entered point across sources. Macro-layer measurement substrate ONLY: it grades mass-goal retrospectives and backs "as of" freshness labels; it never feeds prescriptions, and `profiles.bodyweight` remains the engine input (the log is never folded back into it).
 
+### `external_connections` / `external_connection_secrets`
+The per-user link to an external data provider (doc 15 §2.2, N34; migration
+`20260711000002`) — BodySpec is the only provider. `external_connections`
+carries status/timestamps/identity-for-display only (`provider`, `status
+connected|error`, `provider_user_id`, `provider_email`, `connected_at`,
+`last_synced_at`, `last_sync_error`; unique `(user_id, provider)`) and is
+owner-RLS; deleting the row IS the disconnect of record.
+`external_connection_secrets` (`connection_id` PK → cascade, `user_id`,
+`access_token`, `refresh_token`, `access_token_expires_at`, `scope`) is
+**deny-all**: RLS enabled with no policies AND client grants revoked — token
+material moves exclusively through service-role call sites
+(`src/lib/queries/external-connections.ts`) with explicit user scoping (hard
+rule 4). Nothing token-shaped is ever selectable by a client role.
+
+### `body_scans`
+Imported DEXA scan results, one row per provider result (doc 15 §2.2, N34;
+migration `20260711000002`): `provider` + `provider_result_id` (unique with
+`user_id` — re-syncs are idempotent upserts), `scanned_at`, `scanner_model`
+(same-machine comparability, doc 15 §6), the intake snapshot (`weight_lb`,
+`height_in`, `age_years`), the composition decomposition (`body_fat_pct` =
+total tissue fat %, `lean/fat/bone_mass_lb`), `vat_mass_lb`/`vat_volume_cm3`,
+`android_gynoid_ratio`, `lmi_kg_m2`/`almi_kg_m2`, `bmd_total_g_cm2`,
+`rmr_kcal_cunningham`/`rmr_kcal_mifflin`, `regions jsonb` (per-region
+composition, converted), `percentiles jsonb`, and `raw jsonb` — the verbatim
+API payloads for early-access re-mapping fidelity. All masses converted
+kg→lb at the import boundary and only there. Owner-RLS incl. delete (imported
+third-party health data is the user's to purge — hard rule 5 protects logged
+*training* history, which this is not). **Macro-layer measurement substrate
+only**: scans inform targets and verdicts, never prescriptions, and are
+excluded from the doc-14 dependency fingerprint like bodyweight (doc 15 §2.4).
+
 ### `excluded_exercises`
 Profile-managed exclusions (fig 4.5): `user_id`, `exercise_id`, `reason text` (e.g. "LOW BACK"). Excluded movements never appear in pickers or templates.
 

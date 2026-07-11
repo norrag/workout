@@ -592,6 +592,78 @@ export type VExerciseOverviewRow = {
   best_session_volume: number | null;
 }
 
+/** doc 15 §2.2 (N34): per-user link to an external data provider. Status and
+ *  timestamps only — token material lives in `external_connection_secrets`
+ *  (deny-all; service-role call sites only). */
+export type ExternalConnectionRow = {
+  id: string;
+  user_id: string;
+  provider: "bodyspec";
+  /** 'error' = sync/token refresh failed; the screen offers a reconnect.
+   *  Disconnect deletes the row — there is no revoked resting state. */
+  status: "connected" | "error";
+  provider_user_id: string | null;
+  provider_email: string | null;
+  connected_at: string;
+  last_synced_at: string | null;
+  last_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** doc 15 §2.2 (N34): OAuth token material for a connection. DENY-ALL at the
+ *  database (RLS with no policies + client grants revoked): only the service
+ *  role reaches it, exclusively via `src/lib/queries/external-connections.ts`
+ *  call sites with explicit user scoping (hard rule 4). The row type exists
+ *  for those call sites — client roles get permission-denied regardless. */
+export type ExternalConnectionSecretRow = {
+  connection_id: string;
+  user_id: string;
+  access_token: string;
+  refresh_token: string | null;
+  access_token_expires_at: string | null;
+  scope: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** doc 15 §2.2 (N34): one imported DEXA scan result. Canonical imperial
+ *  columns (converted once at the import boundary) + verbatim provider
+ *  payloads in `raw` for early-access re-mapping fidelity. */
+export type BodyScanRow = {
+  id: string;
+  user_id: string;
+  provider: "bodyspec";
+  provider_result_id: string;
+  scanned_at: string;
+  scanner_model: string | null;
+  /** intake snapshot at scan time */
+  weight_lb: number | null;
+  height_in: number | null;
+  age_years: number | null;
+  /** total tissue_fat_pct — fat % of soft tissue */
+  body_fat_pct: number | null;
+  lean_mass_lb: number | null;
+  fat_mass_lb: number | null;
+  bone_mass_lb: number | null;
+  vat_mass_lb: number | null;
+  vat_volume_cm3: number | null;
+  android_gynoid_ratio: number | null;
+  lmi_kg_m2: number | null;
+  almi_kg_m2: number | null;
+  bmd_total_g_cm2: number | null;
+  rmr_kcal_cunningham: number | null;
+  rmr_kcal_mifflin: number | null;
+  /** per-region composition converted to lb: {region: {lean_mass_lb, …}} */
+  regions: Record<string, unknown> | null;
+  /** {params, metrics: {metric: {value, percentile}}} — provider shape */
+  percentiles: Record<string, unknown> | null;
+  /** verbatim API payloads per section */
+  raw: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -603,6 +675,9 @@ export type Database = {
       exercise_notes: Table<ExerciseNoteRow>;
       exercise_param_overrides: Table<ExerciseParamOverrideRow>;
       bodyweight_log: Table<BodyweightLogRow>;
+      external_connections: Table<ExternalConnectionRow>;
+      external_connection_secrets: Table<ExternalConnectionSecretRow>;
+      body_scans: Table<BodyScanRow>;
       macrocycles: Table<MacrocycleRow>;
       mesocycles: Table<MesocycleRow>;
       meso_days: Table<MesoDayRow>;

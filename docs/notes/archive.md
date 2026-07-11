@@ -11,6 +11,16 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-11 — macro goals Phase 4 merged (PR #172)
+
+Reconciliation sweep at the doc-17 Phase-5a session start: N41's PR merged
+2026-07-11 (row stamped `done (PR #172)` in-PR per protocol). Full record in
+doc 17 §5, PROGRESS, and the Session-65 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N41 | Bodyweight time series (`profiles.bodyweight` is a scalar ⇒ every mass-denominated macro goal was ungradable in-app) | D→F | C | **done (PR #172, merged 2026-07-11).** Doc 17 §5 / Phase 4: `bodyweight_log` migration `20260711000001` (owner RLS + tests, unique `(user_id, measured_on, source)`, same-day replace; `v_macro_summary` gains the logged-span columns), appends from every profile-bodyweight edit + the More-page quick entry (backdatable, never writes the profile scalar), `bodyDeltaForSpan` ±14-day bracketing feeds the N40 retrospective's `bodyData` seam ("not measured" → graded Δbw off one fold), "as of" freshness labels, fig-2.3 `LAST BLOCK MEASURED` priming line (display-only; model-band half waits for Phase R2). Tests +12 unit / +4 RLS / e2e. N34 5a's DEXA points join the series next (the `source: 'dexa'` writer lands with 5b's consented proposal flow). |
+
 ## Swept 2026-07-11 — macro goals Phase 3 merged (PR #171)
 
 Reconciliation sweep at the doc-17 Phase-4 session start: N40's PR merged

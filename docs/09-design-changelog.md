@@ -42,6 +42,82 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — BodySpec DEXA: integration screen + scan ledger (doc 17 §6, N34 Phase 5a)
+
+The optional BodySpec account connection lands (doc 15; doc 17 Phase 5a):
+connect via OAuth, import the full scan history, and read each scan as a
+ledger. **Rule-8 pass:** no mockup figure exists for an integrations surface,
+a connection screen, or a scan view (re-verified against
+`workout - App Screens v2.dc.html`: fig 4.4 shows the More settings list
+without an integrations row; no 3.x/4.x figure covers external data). All
+treatments below are **house-style**, composed from established primitives
+(settings-row grammar, section rules, ledger data rows, `BottomSheet`); this
+entry is the design record. Health data gets the strictest ledger voice —
+stated flat, no interpretation beyond what doc 15 §6 allows.
+
+### 1. More page (fig 4.4) — "BodySpec DEXA" settings row
+
+- **Change:** the SETTINGS list gains a **"BodySpec DEXA"** row (below "AI
+  connector", same grammar): right side reads `SET UP ›` when disconnected,
+  `CONNECTED` (muted tracked caps) once linked, `RECONNECT ›` when the
+  connection has erred. Links to `/more/bodyspec`.
+- **Rationale:** the integration is optional and quiet — one row in settings,
+  never a nav item (doc 15 is macro-layer measurement, not a daily surface).
+- **Affected figures:** none (fig 4.4's settings-list grammar).
+- **Impact:** `NET-NEW` — row on the More page.
+
+### 2. `/more/bodyspec` — integration screen (connect / sync / disconnect / scan list)
+
+- **Change:** a More detail screen in the connector-page pattern (`‹ MORE`
+  backlink, logotype, lowercase title `bodyspec dexa`):
+  - **Disconnected:** an intro paragraph (what connecting does: imports your
+    scan history; scans inform targets and verdicts, never prescriptions),
+    then a full-width ink-bordered `CONNECT BODYSPEC ACCOUNT` action that
+    starts the OAuth flow at BodySpec. When the integration isn't configured
+    for the environment (no client id), the action is replaced by a muted
+    `NOT AVAILABLE IN THIS ENVIRONMENT` line.
+  - **Connected:** a `CONNECTION` section — ledger rows for `CONNECTED AS`
+    (the BodySpec account email), `LAST SYNCED` (`—` before the first sync),
+    and, on failure, a plain-stated error line with the retry path. A
+    full-width `SYNC NOW` action pulls new scans on demand (pull-based per
+    doc 15 §2.3 — scans arrive a few times a year; no polling).
+  - **`SCANS` section:** one row per imported scan, newest first — date
+    (bold) + scanner model (muted caps) left; `BODY FAT %` and
+    `LEAN LB` numerals right. Rows link to the scan detail (§3). Empty
+    state is a dashed-border block: `NO SCANS IMPORTED YET` /
+    `SYNC AFTER YOUR APPOINTMENT — RESULTS APPEAR WITHIN A FEW DAYS`.
+  - **Disconnect:** a `DISCONNECT` section at the foot — copy states tokens
+    are destroyed, plus a checkbox `ALSO DELETE IMPORTED SCANS` (imported
+    third-party health data is the user's to remove, doc 15 §2.3; logged
+    training history is never touched). Confirm via `BottomSheet` (the
+    End-macrocycle confirm weight).
+- **Rationale:** doc 15 §5 Phase 1 — the vertical slice that proves the
+  loop; connect/sync/disconnect status is the whole surface, everything else
+  waits for 5b.
+- **Affected figures:** none.
+- **Impact:** `NET-NEW` + `DATA` — `external_connections` + `body_scans`
+  migrations, OAuth flow, import pipeline, screen.
+
+### 3. `/more/bodyspec/[scanId]` — scan detail ledger
+
+- **Change:** one scan, read as a ledger (`‹ BODYSPEC` backlink; title =
+  scan date, e.g. `14 jul 2026`; scanner model + scan time as the meta
+  line). Sections, in order, each the standard ruled header + data rows:
+  `MEASURED AT SCAN` (weight lb / height / age), `COMPOSITION` (body fat %,
+  lean / fat / bone mass lb), `REGIONS` (per-region lean + fat lb: arms,
+  legs, trunk, android, gynoid), `VISCERAL FAT` (mass lb, volume cm³),
+  `BONE DENSITY` (total g/cm²), `PERCENTILES` (age/sex-matched rows —
+  `85TH · MEN 35–45`, stated flat per doc 15 §6.2), `RMR` (Cunningham +
+  Mifflin-St. Jeor kcal/day, labeled `MEASURED FROM LEAN MASS` /
+  `HEIGHT-WEIGHT ESTIMATE`). **No deltas, trends, or verdicts on this
+  screen in 5a** — scan-to-scan comparison ships with `v_body_comp_history`
+  (5b) where the LSC noise bands and same-scanner flags can ride along
+  (doc 15 §6 guardrails); a single scan renders only itself.
+- **Rationale:** store-then-show fidelity first; honest comparison needs the
+  guardrail machinery, so it waits for its phase rather than shipping bare.
+- **Affected figures:** none.
+- **Impact:** `NET-NEW` — detail route over `body_scans`.
+
 ## 2026-07-11 — Bodyweight series: quick-entry, freshness labels, create-flow priming (doc 17 §5, N41 Phase 4)
 
 The bodyweight measurement series (`bodyweight_log`) lands: profile bodyweight

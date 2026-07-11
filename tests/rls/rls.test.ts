@@ -1002,6 +1002,161 @@ describe("bodyweight_log (doc 17 §5, N41)", () => {
   });
 });
 
+describe("bodyspec connect tables (doc 15 §2.2, N34 Phase 5a)", () => {
+  let aliceConnectionId: string;
+
+  it("owners manage their own connection row; other users see and spoof nothing", async () => {
+    const { data: created, error: own } = await alice
+      .from("external_connections")
+      .insert({
+        user_id: aliceId,
+        provider: "bodyspec",
+        provider_email: "alice@example.com",
+      })
+      .select()
+      .single();
+    expect(own).toBeNull();
+    aliceConnectionId = created!.id;
+
+    const { data: bobView, error: bobReadError } = await bob
+      .from("external_connections")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(bobReadError).toBeNull();
+    expect(bobView).toEqual([]);
+
+    const { error: spoof } = await bob.from("external_connections").insert({
+      user_id: aliceId,
+      provider: "bodyspec",
+    });
+    expect(spoof).not.toBeNull();
+  });
+
+  it("one connection per (user, provider); provider vocabulary constrained", async () => {
+    const { error: dup } = await alice.from("external_connections").insert({
+      user_id: aliceId,
+      provider: "bodyspec",
+    });
+    expect(dup?.code).toBe("23505");
+
+    const { error: vocab } = await alice.from("external_connections").insert({
+      user_id: aliceId,
+      provider: "fitbit",
+    });
+    expect(vocab?.code).toBe("23514");
+  });
+
+  it("token material is deny-all: not even the owner can read or write secrets", async () => {
+    // seed a secrets row as the service role (the only legitimate writer)
+    const service = createClient(URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: seeded } = await service
+      .from("external_connection_secrets")
+      .insert({
+        connection_id: aliceConnectionId,
+        user_id: aliceId,
+        access_token: "test-access-token",
+        refresh_token: "test-refresh-token",
+      });
+    expect(seeded).toBeNull();
+
+    // the owner cannot select it (grants revoked / no policies)…
+    const { data: ownRead, error: ownReadError } = await alice
+      .from("external_connection_secrets")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(ownRead ?? []).toEqual([]);
+    expect(ownReadError).not.toBeNull();
+
+    // …nor write one, nor read anyone else's
+    const { error: ownWrite } = await alice
+      .from("external_connection_secrets")
+      .update({ access_token: "forged" })
+      .eq("connection_id", aliceConnectionId);
+    expect(ownWrite).not.toBeNull();
+    const { data: bobRead, error: bobReadError } = await bob
+      .from("external_connection_secrets")
+      .select("*");
+    expect(bobRead ?? []).toEqual([]);
+    expect(bobReadError).not.toBeNull();
+  });
+
+  it("owner-deleting the connection cascades the secrets (disconnect of record)", async () => {
+    await alice
+      .from("external_connections")
+      .delete()
+      .eq("id", aliceConnectionId);
+    const service = createClient(URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: orphans } = await service
+      .from("external_connection_secrets")
+      .select("connection_id")
+      .eq("connection_id", aliceConnectionId);
+    expect(orphans).toEqual([]);
+  });
+
+  it("body_scans: owner-only read/write/delete; idempotent upsert key; cross-user deny", async () => {
+    const { data: scan, error: own } = await alice
+      .from("body_scans")
+      .insert({
+        user_id: aliceId,
+        provider: "bodyspec",
+        provider_result_id: "res-1",
+        scanned_at: "2026-07-08T10:00:00Z",
+        scanner_model: "GE Lunar iDXA",
+        body_fat_pct: 18.2,
+        lean_mass_lb: 158.4,
+        raw: { composition: { total: {} } },
+      })
+      .select()
+      .single();
+    expect(own).toBeNull();
+
+    // duplicate (user, provider, provider_result_id) hits the unique key —
+    // the sync path upserts on it
+    const { error: dup } = await alice.from("body_scans").insert({
+      user_id: aliceId,
+      provider: "bodyspec",
+      provider_result_id: "res-1",
+      scanned_at: "2026-07-08T10:00:00Z",
+      raw: {},
+    });
+    expect(dup?.code).toBe("23505");
+
+    // bob sees nothing, spoofs nothing, deletes nothing
+    const { data: bobView } = await bob
+      .from("body_scans")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(bobView).toEqual([]);
+    const { error: spoof } = await bob.from("body_scans").insert({
+      user_id: aliceId,
+      provider: "bodyspec",
+      provider_result_id: "res-2",
+      scanned_at: "2026-07-08T10:00:00Z",
+      raw: {},
+    });
+    expect(spoof).not.toBeNull();
+    await bob.from("body_scans").delete().eq("id", scan!.id);
+    const { data: still } = await alice
+      .from("body_scans")
+      .select("id")
+      .eq("id", scan!.id);
+    expect(still).toHaveLength(1);
+
+    // the owner may purge imported scans (doc 15 §2.3 — third-party health
+    // data, not logged training history)
+    await alice.from("body_scans").delete().eq("id", scan!.id);
+    const { data: gone } = await alice
+      .from("body_scans")
+      .select("id")
+      .eq("id", scan!.id);
+    expect(gone).toEqual([]);
+  });
+});
+
 describe("engine tables", () => {
   it("authenticated users can read engine params", async () => {
     // `.single()` also asserts exactly ONE active row. The version is not
