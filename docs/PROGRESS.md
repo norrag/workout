@@ -2,7 +2,40 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase 6: the envelope loop, mechanism shipped OFF (doc 17 §7, N36)
+## 2026-07-11 (latest) — Macro goals Phase R2 + R3 executed: v21 + v22 active, target cards return (doc 17 §8)
+
+The owner-gated activations on the doc-17 spine, run from a Claude session
+with the owner directing. Full replay evidence in
+[`manual-operations.md`](deployment/manual-operations.md) (the two struck
+sections); the deltas:
+
+- **R2 — v21 activated.** Replay asserted the runbook's expectation exactly:
+  0/20 changed on v20-sourced decisions; candidate v21 and candidate v20
+  produce identical diff sets over 100 mixed-version sources (the 14 diffs are
+  the legacy v19→v20 earned-step delta). Target-layer review via the pure
+  engine: the owner's live profile is byte-identical on every goal (age < 40,
+  male, bf% present); the §2.1/§2.2 corrections land where designed
+  (continuity proxy, age taper with the 0.7 strength floor).
+- **R3 — v22 proposed (`propose_engine_params`, base v21 +
+  `rate_source: "plan"`) and activated.** Replay byte-identical over all
+  recorded decisions (the one recorded `rate_pacer` firing stays paced under
+  the tighter band; granted steps had no trailing history to re-judge). The
+  forward-looking change is real: the pacer's source band moves from the
+  self-reported bucket (intermediate 1.5–3 %/mo) to the training-years
+  personalized plan band (advanced 0.5–1.5 %/mo) — pacer target ≈ 1.69 →
+  0.75 %/mo for the owner's hypertrophy macro.
+- **Target cards restored** (the R2 code follow-up, PR #140's hide lifted):
+  fig 2.2 `REALISTIC TARGET` card + fig 2.3 `YOUR TARGET`/rate/rationale,
+  re-transcribed with two amendments recorded in the 09 entry — strength
+  nouns become est-strength (doc 17 §2.5 / PR #157) and the create-card
+  priming line gains its model-band half (the 09 2026-07-11 §3 deferred
+  half), sourced from `MacroPlan.strengthRatePctMonth`.
+- **Remaining on the spine:** the owner's one-time birthdate re-save
+  (non-binding until 40) and the field-data-gated envelope fit (runbook
+  section unchanged — ≥ 2–3 real completed mesos under the now-active
+  progression engine before the thresholds can be fit).
+
+## 2026-07-11 — Macro goals Phase 6: the envelope loop, mechanism shipped OFF (doc 17 §7, N36)
 
 The last code phase of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
 the demand-side loop that slides *where within the bounded macro rate band*
