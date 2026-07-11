@@ -145,6 +145,20 @@ export const engineInputsSchema = z.object({
   planStrengthRate: z
     .object({ low: z.number(), high: z.number() })
     .nullish(),
+  // doc 17 §7 (N36): the envelope loop's per-USER band position — where within
+  // the macro rate band the pacer targets (0 = floor, 1 = top). A pure fold
+  // over the trailing completed mesos' demand-side outcomes, assembled in the
+  // queries layer (queries/envelope.ts → rules/envelope.ts) at the same sites
+  // as `progressionHistory`; constant for the whole meso being generated
+  // (updates land at meso boundaries only, by construction). DERIVED (doc 14
+  // §3 denylist): recorded decisions are its only source — excluded from the
+  // freshness fingerprint, recorded in the decision for replay (the recorded
+  // position replays frozen; position history is reconstructible from the
+  // decisions that consumed it). Null/absent ⇒ loop off: the pacer reads the
+  // fixed params `progression.band_position`, byte-identical to today.
+  // `.nullish()` with NO default, so inputs that predate the feature parse
+  // byte-identically and existing input literals keep compiling.
+  bandPosition: z.number().min(0).max(1).nullish(),
   // doc 16 §3.4 staleness gate: days since the source session was performed,
   // caller-supplied (the engine is clockless). DERIVED like the anchor — at
   // normal advance-at-completion it is ~0; a catch-up run or freshness

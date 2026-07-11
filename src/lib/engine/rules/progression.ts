@@ -386,8 +386,11 @@ function quantum(
  * `planStrengthRate` (the §2.1-personalized `strengthRatePctMonth` — always
  * strength-denominated, whatever the macro's goal); `"band"` — and `"plan"`
  * with no plan rate assembled — reads the bucket table. Degradation is always
- * toward `"band"`, never unpaced; `band_position` and the goal factor compose
- * identically under either source (so the Phase-6 envelope is source-agnostic).
+ * toward `"band"`, never unpaced; the position and the goal factor compose
+ * identically under either source (so the doc 17 §7 envelope is
+ * source-agnostic). The position itself is the envelope loop's derived
+ * per-user `inputs.bandPosition` when assembled (N36), else the fixed params
+ * `band_position` — the default, and the value while the loop is off.
  * Null disables the pacer (no evidenced band for the bucket).
  */
 function pacerTargetRate(
@@ -396,14 +399,15 @@ function pacerTargetRate(
 ): number | null {
   const p = params.progression!;
   const factor = p.goal_rate_factor[inputs.goalType] ?? 0;
+  const position = inputs.bandPosition ?? p.band_position;
   if (p.rate_source === "plan" && inputs.planStrengthRate != null) {
     const { low, high } = inputs.planStrengthRate;
-    return (low + (high - low) * p.band_position) * factor;
+    return (low + (high - low) * position) * factor;
   }
   const band = params.macro_target.strength_pct_month[inputs.user.experienceLevel];
   if (!band) return null;
   const [low, high] = band;
-  return (low + (high - low) * p.band_position) * factor;
+  return (low + (high - low) * position) * factor;
 }
 
 function round1(n: number): number {

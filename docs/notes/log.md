@@ -4,6 +4,41 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 70: N36 envelope loop — mechanism built, shipped OFF (doc 17 Phase 6)
+
+Owner kicked off doc 17 Phase 6. Reconciliation sweep first: no stale `done`
+rows (N34 stays live on its human residual, correctly). Session finding that
+reshaped the plan: **v20 is now ACTIVE on hosted** (verified via
+`get_engine_params`; `get_progression_history` already records live decisions
+— ~20 across 19 exercises, span < 1 day) — so Phase 6's R1 gate is cleared,
+but the field data is nowhere near the "few real mesos" the threshold fit
+needs. Scope split accordingly, per §7's own language: **build the whole
+mechanism now, ship it OFF; the fit + params bump + activation stay
+field-data-gated** (new runbook section). Branch
+`claude/macrocycle-goals-phase-6-k6kxf1` (**PR #177**).
+
+- Engine: `rules/envelope.ts` pure fold (completed-meso boundary steps,
+  `MAX_BOUNDARY_STEP 0.25` binding, dwell, clamp [0,1], bounded lookback as
+  the return-from-absence decay; demand-side inputs only; down wins over up;
+  raises require real up-pressure — pacer trips or beat share);
+  `progression.envelope` `.optional()` params block (PROVISIONAL thresholds,
+  absent everywhere ⇒ byte-identical); `EngineInputs.bandPosition` derived
+  input; the pacer lerps `inputs.bandPosition ?? params.band_position`
+  under either rate source; `seedMeso` threads it through the shared gate.
+- Queries: `queries/envelope.ts` leaf assembly (decisions → completed-meso
+  outcomes via the §8.3 fold per exercise + `setComplianceMarker` beat
+  share → position), wired at the `planStrengthRate` sites (activation
+  seed, advance, projection); doc-14 treatment (denylist + recorded +
+  replays frozen through `recomputeRow` and `replay_decisions`).
+- Tests +27 (suite 1089): loop-off byte-identity, movement/dwell/clamp +
+  floor/top-pin goldens, fingerprint invariance, boundary selection, replay
+  determinism, source-agnostic pacer composition. Lint + typecheck clean.
+- Docs: PROGRESS entry; runbook "Fit + activate the envelope loop" + the
+  v20 section stamped ACTIVATED (verified); this row + N36 updated.
+
+Doc 17 Phases 1–6 are now all built. Next on this spine: owner-side only
+(R2 v21 activation, R3 plan flip, the envelope fit once field data exists).
+
 ## 2026-07-11 — Session 69: N34 Phase 5c — engine + MCP, and the profile body-fat rework
 
 Doc 17 §6 Phase 5c (the last DEXA build PR), plus an owner note pinned to

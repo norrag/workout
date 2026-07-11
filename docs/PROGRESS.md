@@ -2,7 +2,68 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase 5c: BodySpec DEXA engine + MCP, and the profile body-fat rework (doc 17 §6, doc 15 §5 Phase 3, N34)
+## 2026-07-11 (latest) — Macro goals Phase 6: the envelope loop, mechanism shipped OFF (doc 17 §7, N36)
+
+The last code phase of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
+the demand-side loop that slides *where within the bounded macro rate band*
+the pacer targets. Performance never modifies the envelope (principle 4) —
+only the position within [0, 1]. Session context: **v20 is now ACTIVE on
+hosted** (verified via MCP — Phase R1 done, the field-data clock started), so
+the mechanism ships now and the threshold **fit** stays field-data-gated per
+§7's own sequencing.
+
+- **Residence as fixed by the architecture record §3.3:** `band_position`
+  becomes a per-user DERIVED input — `EngineInputs.bandPosition`, a pure
+  clockless fold over the trailing completed mesos' recorded
+  `engine_decisions`. No new table, no write path, no RLS surface; the params
+  `progression.band_position` stays the default/starting value and the fixed
+  value while the loop is off. Doc-14 §3 treatment: fingerprint-denylisted
+  (`DERIVED_INPUT_KEYS`), recorded in each decision's `inputs`, replayed
+  frozen (position history reconstructible from the decisions that consumed
+  it).
+- **Update rule (`engine/rules/envelope.ts`, pure):** boundary steps at
+  COMPLETED mesos only (the fold's value is constant for the meso being
+  generated), each step bounded — `MAX_BOUNDARY_STEP 0.25` binds over any
+  tuned `step` — with `dwell_mesos` hold and clamp [0, 1]; bounded lookback
+  (count + `max_age_days`) doubles as the return-from-absence decay. Inputs
+  are demand-side ONLY: earn rate, earned-then-missed ratio, miss-throttle
+  trips, workload-gate firings, rate-pacer trips + `over`/beat share as the
+  up-pressure signals (down wins over up). Never the measured rate.
+- **Params (`progression.envelope`, `.optional()`):** ships in the schema with
+  PROVISIONAL defaults (raise: earn_rate 0.7 / miss ≤ 0.2 / pacer_trips 2 /
+  over_share 0.25; lower: miss ≥ 0.5 / throttle 2 / workload 3; step 0.1,
+  lookback 3, dwell 1, min_decisions 8) — **no applied params row carries the
+  block** (deliberately no migration: doc 17 §7 ships the bump only after the
+  rule is fit), so everything live is byte-identical.
+- **Assembly (`queries/envelope.ts`, leaf):** trailing decisions →
+  completed-meso boundary outcomes (reusing the §8.3
+  `aggregateProgressionEvents` fold per exercise; beat share recomputed
+  through the ONE shared `setComplianceMarker` comparison) → fold. Wired at
+  the same sites as `planStrengthRate`: meso activation (seed), week advance,
+  the projection, recompute/replay (frozen from stored inputs, incl. the
+  admin `replay_decisions` seed branch); swaps/backfills omit it exactly as
+  they omit the plan rate. Pacer (`pacerTargetRate`) reads
+  `inputs.bandPosition ?? params.band_position` — source-agnostic under
+  `"band"` and `"plan"`.
+- **Tests (+27, suite 1089):** loop-off byte-identity (absent block, disabled
+  block, block-present-but-unassembled at both prescribe and seedMeso);
+  bounded movement/dwell/clamp goldens incl. the worst-case floor/top pins;
+  |Δ| ≤ 0.25 binding; fingerprint invariance (denylist) with write/check
+  parity; per-meso aggregation + boundary selection (completed-only,
+  trailing window); replay determinism (a recorded floor position replays
+  frozen through `recomputeRow`); pacer composition under both rate sources
+  and through the seed gate.
+- **Runbook:** `manual-operations.md` gains "Fit + activate the envelope
+  loop" (accumulate ≥ 2–3 real mesos → fit thresholds from
+  `get_progression_history` → propose the micro-bump → replay diff → activate
+  → monitor recorded positions); the v20 section now records the activation
+  as verified.
+
+With this, doc 17 Phases 1–6 are all built; what remains on the macro-goals
+spine is owner-side (Phase R activations + the envelope fit) and the N34
+first-connect residual.
+
+## 2026-07-11 — Macro goals Phase 5c: BodySpec DEXA engine + MCP, and the profile body-fat rework (doc 17 §6, doc 15 §5 Phase 3, N34)
 
 The last DEXA build PR, plus the owner's pinned profile note (2026-07-11):
 after a scan updated the profile, the estimate bands still rendered with a

@@ -192,6 +192,51 @@ describe("computeDepFingerprint", () => {
     // ...and the derived field actually rode along for replay/recording
     expect(withRate.planStrengthRate).toEqual({ low: 2.1, high: 4.2 });
   });
+
+  it("is INVARIANT to bandPosition (doc 17 §7 / doc 14 §3 denylist)", () => {
+    // the envelope position derives from recorded decisions (logged history);
+    // a boundary that moves it must never stale open rows — presence, absence,
+    // or value never moves the fingerprint, while write/check parity holds.
+    const bare = buildEngineInputs(engineArgs());
+    const withPosition = buildEngineInputs({
+      ...engineArgs(),
+      bandPosition: 0.7,
+    });
+    expect(configProjection(withPosition)).toEqual(configProjection(bare));
+    expect(computeDepFingerprint(configProjection(withPosition), token)).toBe(
+      computeDepFingerprint(configProjection(bare), token),
+    );
+    expect(configProjection(withPosition)).toEqual(
+      buildConfigInputs(configArgs()),
+    );
+    // ...and the derived field actually rode along for replay/recording
+    expect(withPosition.bandPosition).toBe(0.7);
+    // the seed construction path carries it under the same contract
+    const seed = buildSeedInputs({
+      equipmentType: "barbell",
+      profile: { experience_level: "intermediate" },
+      goal: "hypertrophy",
+      startRir: 3,
+      isDeload: false,
+      initial: null,
+      priorPeak: null,
+      progression: { bandPosition: 0.7 },
+    });
+    expect(seed.bandPosition).toBe(0.7);
+    expect(configProjection(seed)).toEqual(
+      configProjection(
+        buildSeedInputs({
+          equipmentType: "barbell",
+          profile: { experience_level: "intermediate" },
+          goal: "hypertrophy",
+          startRir: 3,
+          isDeload: false,
+          initial: null,
+          priorPeak: null,
+        }),
+      ),
+    );
+  });
 });
 
 describe("paramsTokenFor — increment override (doc 14 phase 3)", () => {

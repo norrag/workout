@@ -363,6 +363,68 @@ export const engineParamsSchema = z.object({
       // anchor (§3.3) — a coarse plate jump on a light lift is skipped (`paced`),
       // never insisted on
       max_pct_per_step: z.number().positive().max(0.5).default(0.05),
+      // ----- doc 17 §7 (N36) — the envelope loop. ABSENT ⇒ off: callers
+      // assemble no `bandPosition` input and the pacer reads the fixed
+      // `band_position` above — byte-identical to pre-envelope behavior.
+      // PRESENT + enabled ⇒ the per-user position is a pure fold over the
+      // trailing completed mesos' demand-side outcomes (rules/envelope.ts):
+      // boundary steps bounded (|Δ| ≤ 0.25 binding, whatever `step` says),
+      // minimum dwell, clamp [0, 1]; inputs are demand-side ONLY — never the
+      // measured rate. Performance moves the position within the band, never
+      // the band (doc 17 principle 4). Every threshold below is PROVISIONAL
+      // pending the field-data fit (v20 active + a few real mesos through
+      // get_progression_history) — the block ships in no applied params row
+      // until the fit lands (manual-operations runbook).
+      envelope: z
+        .object({
+          // `false` lets an activated row switch the loop off without
+          // deleting the block (tunables stay visible) — the `mode: "off"`
+          // pattern one level down.
+          enabled: z.boolean().default(true),
+          // how many trailing COMPLETED mesos the fold may consume; older
+          // boundaries age out and the position regresses to the default
+          lookback_mesos: z.number().int().min(1).max(6).default(3),
+          // hard age bound on the lookback (the return-from-absence decay:
+          // after this long away, the position is the default again)
+          max_age_days: z.number().positive().default(180),
+          // a meso with fewer status-coded decisions than this is no
+          // evidence — its boundary steps nothing
+          min_decisions: z.number().int().min(1).default(8),
+          // per-boundary step size; MAX_BOUNDARY_STEP (0.25) binds above it
+          step: z.number().min(0).max(0.25).default(0.1),
+          // boundaries a new position must hold before the next move;
+          // 1 = held exactly one meso (the doc 17 §7 minimum)
+          dwell_mesos: z.number().int().min(1).default(1),
+          // up-pressure: consistently earning + answering, AND the pacer
+          // actually bound (or the athlete beat prescriptions outright)
+          raise: z
+            .object({
+              earn_rate: z.number().min(0).max(1).default(0.7),
+              max_miss_ratio: z.number().min(0).max(1).default(0.2),
+              pacer_trips: z.number().int().min(1).default(2),
+              over_share: z.number().min(0).max(1).default(0.25),
+            })
+            .default({
+              earn_rate: 0.7,
+              max_miss_ratio: 0.2,
+              pacer_trips: 2,
+              over_share: 0.25,
+            }),
+          // down-pressure: asks going unanswered, or the throttle/workload
+          // gates firing repeatedly — down wins over up (conservative)
+          lower: z
+            .object({
+              miss_ratio: z.number().min(0).max(1).default(0.5),
+              throttle_trips: z.number().int().min(1).default(2),
+              workload_firings: z.number().int().min(1).default(3),
+            })
+            .default({
+              miss_ratio: 0.5,
+              throttle_trips: 2,
+              workload_firings: 3,
+            }),
+        })
+        .optional(),
     })
     .optional(),
 
