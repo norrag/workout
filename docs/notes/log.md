@@ -7,7 +7,7 @@ Append a dated entry whenever a session moves work. Newest first.
 ## 2026-07-11 — Session 71: Phase R2 + R3 executed (v21 + v22 active), target cards return
 
 Owner-directed activation session on the doc-17 spine (branch
-`claude/macro-goals-r2-r3-envelope-ntaw6h`, **PR #<n>**). No new intake.
+`claude/macro-goals-r2-r3-envelope-ntaw6h`, **PR #178**). No new intake.
 
 - **R2 (v21):** replay evidence gathered exactly as the runbook demanded
   (0/20 changed on v20 sources; v21 ≡ v20 diff sets on 100 mixed sources) +
