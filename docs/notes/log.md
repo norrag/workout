@@ -7,7 +7,7 @@ Append a dated entry whenever a session moves work. Newest first.
 ## 2026-07-11 — Session 66: N34 5a built — doc 17 Phase 5a (BodySpec connect + import)
 
 Owner kicked off Phase 5 ("implement phase 5"). First of the three DEXA PRs
-(**#<n>**, branch `claude/macrocycle-goals-phase-5-2xfwkf`); migration
+(**#173**, branch `claude/macrocycle-goals-phase-5-2xfwkf`); migration
 `20260711000002` (`external_connections` + deny-all
 `external_connection_secrets` + `body_scans`).
 
