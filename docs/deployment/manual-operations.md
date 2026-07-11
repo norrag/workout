@@ -285,9 +285,22 @@ proportional rescale and the `MacroPlan.strengthRatePctMonth` exposure are
 parameterless code that ships with the same PR. Sequenced **after R1 (v20
 activation)** in doc 17 §8, but independent of it mechanically.
 
+> **Applied to hosted 2026-07-11** (doc-17 Phase-4 session) via the Supabase
+> MCP (`apply_migration`): `20260710000001` and `20260710000002`. Found MISSING
+> during the Phase-4 session — main's merged Phase-1 code already writes
+> `plan_inputs`/`birthdate`, so hosted macro create/goals-edit and birthdate
+> saves were failing until this apply. v21 content verified structurally
+> against the hosted (hash-verified) v20 row + the documented three-param
+> delta: `v21 = v20 + {strength_sex_factor, age_taper_floor_strength,
+> bf_proxy_pct}` ⇒ true; `is_active = false`, active row still v20. The
+> Phase-4 migration `20260711000001` (bodyweight_log + v_macro_summary span
+> columns) was applied the same way (advisor-clean after an initplan
+> `alter policy` that is also reflected in the repo file). Only the steps
+> below remain.
+
 | Step | What / why |
 |---|---|
-| Apply the Phase-1 migrations to hosted | `20260710000001` (macrocycles.plan_inputs + profiles.birthdate, additive nullable columns) and `20260710000002` (v21 insert, `is_active = false`, hash `7017e257…b4316` — verify against `params-provenance.test.ts`). The active row is unchanged; nothing changes for users. |
+| ~~Apply the Phase-1 migrations to hosted~~ | **DONE 2026-07-11** (see note above). |
 | **Replay diff** | `replay_decisions` / `simulate_prescriptions` candidate v21. Targets are display/pacer layer — **the diff on prescriptions is expected ≈ empty; assert that** (v20's `rate_source` is `"band"` and reads the raw bucket table, so even the pacer is untouched until the v22 `"plan"` flip). |
 | **Owner reviews + activates v21** | Prefer the admin MCP `activate_engine_params` (will report "e1rm block unchanged"). What changes on activation: macro create/edit targets + recommended durations personalize (strength taper for 40+, hypertrophy continuity, non-collapsing long-cut bands). Roll back by re-activating the prior row. |
 | **Re-enable the target cards** | After activation: a small code PR transcribing figs 2.2/2.3 per hard rule 8 (PR #140 made the hide a pure view change). |

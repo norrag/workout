@@ -132,9 +132,11 @@ export function ProfileEditor({
       value: (
         <span className="numeral">
           {profile.bodyweight != null ? `${profile.bodyweight} LB` : "—"}{" "}
+          {/* one freshness vocabulary across bodyweight displays (doc 17 §5,
+              09-changelog 2026-07-11 §2) */}
           {profile.bodyweight_updated_at && (
             <span className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
-              UPDATED {shortDate(profile.bodyweight_updated_at)}
+              AS OF {shortDate(profile.bodyweight_updated_at)}
             </span>
           )}
         </span>

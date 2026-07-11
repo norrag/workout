@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/queries/profiles";
+import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 import { addExclusion, removeExclusion } from "@/lib/queries/exercises";
+import { localDayIso } from "@/lib/dates";
 
 const experienceSchema = z.enum(["beginner", "intermediate", "advanced"]);
 const equipmentSchema = z.array(
@@ -71,6 +73,14 @@ export async function updateProfileField(
       ? { bodyweight_updated_at: new Date().toISOString() }
       : {}),
   });
+  // doc 17 §5: a profile bodyweight edit also appends today's measured point —
+  // an explicit user action, so a direct write (no proposal flow)
+  if (field === "bodyweight")
+    await appendBodyweightPoint(supabase, user.id, {
+      measuredOn: localDayIso(),
+      weight: parsed.data as number,
+      source: "profile",
+    });
   revalidate();
   return { error: null };
 }

@@ -2,8 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveEngineParams } from "@/lib/queries/generation";
-import { profileToMacroProfile } from "@/lib/queries/macro";
+import {
+  getPriorBlockMeasuredRate,
+  profileToMacroProfile,
+} from "@/lib/queries/macro";
 import { getProfile } from "@/lib/queries/profiles";
+import { shortDate } from "@/lib/dates";
 import { CreateMacroForm } from "./CreateMacroForm";
 
 const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
@@ -23,6 +27,10 @@ export default async function NewMacroPage() {
   const now = new Date();
   const macroProfile = profileToMacroProfile(profile, now);
 
+  // doc 17 §5: the prior completed block's MEASURED strength rate — display
+  // context only, never blended into the target (principle 4)
+  const priorBlock = await getPriorBlockMeasuredRate(supabase, user.id, params);
+
   // profile chips shown on the engine card (fig 2.2/2.3)
   const chips: string[] = [];
   if (profile.training_since) {
@@ -33,7 +41,15 @@ export default async function NewMacroPage() {
     }
   }
   if (profile.bodyweight)
-    chips.push(`${Math.round(profile.bodyweight)} LB`);
+    chips.push(
+      // "as of" freshness wherever profile bodyweight displays (doc 17 §5) —
+      // the contract is priced off this number
+      `${Math.round(profile.bodyweight)} LB${
+        profile.bodyweight_updated_at
+          ? ` · AS OF ${shortDate(profile.bodyweight_updated_at)}`
+          : ""
+      }`,
+    );
   if (profile.experience_level)
     chips.push(profile.experience_level.toUpperCase());
 
@@ -67,6 +83,7 @@ export default async function NewMacroPage() {
         profile={macroProfile}
         params={params}
         today={now.toISOString().slice(0, 10)}
+        priorBlock={priorBlock}
       />
     </div>
   );

@@ -147,4 +147,11 @@ test("end macrocycle from the header menu → completed Overview renders the ret
   await page.getByRole("button", { name: "macrocycle options" }).click();
   await expect(page.getByRole("menuitem", { name: "Edit macrocycle" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "End macrocycle" })).not.toBeVisible();
+
+  // ---- create-flow priming (doc 17 §5): a completed prior block exists, but
+  // nothing was ever logged — no measurable rate, so the line honestly stays
+  // away (it renders only off a gradable ≥28-day logged span) ----
+  await page.goto("/cycles/new");
+  await expect(page.getByText("PLAN", { exact: true })).toBeVisible();
+  await expect(page.getByText("LAST BLOCK MEASURED")).not.toBeVisible();
 });

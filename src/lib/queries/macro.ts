@@ -20,8 +20,14 @@ import {
   combineDemandSummaries,
   macroRetrospective,
   type MacroRetrospective,
+  type RetroBodyData,
   type RetroDemand,
 } from "./macro-retrospective";
+import {
+  bodyDeltaForSpan,
+  getBodyweightPointsAroundSpan,
+  measuredRatePctMonth,
+} from "./bodyweight";
 import type {
   Database,
   MacrocycleRow,
@@ -881,6 +887,28 @@ export async function getMacroOverview(
   let retrospective: MacroRetrospective | null = null;
   if (macro.status === "completed") {
     const demand = await getMacroDemandSummary(supabase, userId, mesoIds, params);
+    // §5 (Phase 4): the mass verdict grades measured Δbw ONLY when the
+    // bodyweight series brackets the logged span (±14 days per endpoint);
+    // otherwise bodyData stays null and the row honestly reads "not measured".
+    // Strength-denominated contracts have no mass row — skip the fetch.
+    let bodyData: RetroBodyData | null = null;
+    if (
+      macro.target_unit !== "%" &&
+      summary?.first_logged_at &&
+      summary.last_logged_at
+    ) {
+      const points = await getBodyweightPointsAroundSpan(
+        supabase,
+        userId,
+        summary.first_logged_at,
+        summary.last_logged_at,
+      );
+      bodyData = bodyDeltaForSpan(
+        points,
+        summary.first_logged_at,
+        summary.last_logged_at,
+      );
+    }
     retrospective = macroRetrospective(
       {
         goalType: macro.goal_type,
@@ -910,6 +938,7 @@ export async function getMacroOverview(
         abandoned: orderedMesos.filter((m) => m.status === "abandoned").length,
         notBuilt: orderedMesos.filter((m) => m.status === "unplanned").length,
       },
+      bodyData,
     );
   }
 
@@ -967,6 +996,75 @@ async function getMacroDemandSummary(
   return combineDemandSummaries(
     [...byExercise.values()].map(aggregateProgressionEvents),
   );
+}
+
+// ---------------------------------------------------------------------------
+// create-flow priming (doc 17 §5, fig 2.3 amendment 09 2026-07-11 §3)
+// ---------------------------------------------------------------------------
+
+export interface PriorBlockRate {
+  macroName: string;
+  /** the block's est-strength headline normalized to %/mo over its logged span */
+  ratePctMonth: number;
+}
+
+/**
+ * The most recent completed macrocycle's MEASURED strength rate — the
+ * display-only priming line on the create engine card. Display context for
+ * the human only (principle 4): nothing here feeds `planMacrocycle` or any
+ * stored target. Null when no completed block exists, its rollup has no
+ * headline, or its logged span is too short to denominate a monthly rate.
+ */
+export async function getPriorBlockMeasuredRate(
+  supabase: Client,
+  userId: string,
+  params: EngineParams,
+): Promise<PriorBlockRate | null> {
+  const { data: completed, error } = await supabase
+    .from("macrocycles")
+    .select("id, name")
+    .eq("user_id", userId)
+    .eq("status", "completed");
+  if (error) throw error;
+  if (!completed || completed.length === 0) return null;
+
+  const { data: summaries, error: sumError } = await supabase
+    .from("v_macro_summary")
+    .select("macrocycle_id, first_logged_at, last_logged_at")
+    .eq("user_id", userId)
+    .in(
+      "macrocycle_id",
+      completed.map((m) => m.id),
+    );
+  if (sumError) throw sumError;
+
+  // "prior block" = the completed macro that trained most recently
+  const latest = (summaries ?? [])
+    .filter((s) => s.first_logged_at && s.last_logged_at)
+    .sort((a, b) => (a.last_logged_at! < b.last_logged_at! ? 1 : -1))[0];
+  if (!latest) return null;
+
+  const { data: mesos, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select("id")
+    .eq("macrocycle_id", latest.macrocycle_id)
+    .eq("user_id", userId);
+  if (mesoError) throw mesoError;
+
+  const strength = await getMacroStrength(
+    supabase,
+    userId,
+    (mesos ?? []).map((m) => m.id),
+    params,
+  );
+  const rate = measuredRatePctMonth(
+    strength.estStrengthPct,
+    latest.first_logged_at,
+    latest.last_logged_at,
+  );
+  if (rate == null) return null;
+  const macro = completed.find((m) => m.id === latest.macrocycle_id);
+  return { macroName: macro?.name ?? "", ratePctMonth: rate };
 }
 
 // ---------------------------------------------------------------------------

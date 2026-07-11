@@ -2,7 +2,57 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase 3: macrocycle closeout + retrospective (doc 17 §4, N40)
+## 2026-07-11 (latest) — Macro goals Phase 4: bodyweight series + create-flow priming (doc 17 §5, N41)
+
+Fourth build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
+the measured bodyweight series lands, giving mass-denominated macro goals
+their first honest grade and the create flow its measured-rate context.
+Started with the hard-rule-8 pass: 09-changelog entry (2026-07-11, Phase-4
+section) for the three net-new house-style surfaces (quick-entry row + sheet,
+"as of" freshness labels, the fig-2.3 priming line) — no mockup figure exists
+for any of them.
+
+- **Schema.** `bodyweight_log` (migration `20260711000001`): `user_id`,
+  `measured_on date`, `weight numeric > 0`, `source
+  ('manual'|'profile'|'dexa')`, unique `(user_id, measured_on, source)`;
+  owner-only RLS + RLS tests in the same PR (hard rule 1). Same migration
+  appends `first_logged_at`/`last_logged_at` (first/last completed session)
+  to `v_macro_summary` — the macro's logged span, shared by the retrospective
+  and the priming line (one definition). Doc 03 updated.
+- **Writers.** Every profile-bodyweight edit appends a `source:'profile'`
+  point (profile editor field, day-view BW chip, onboarding — all explicit
+  user actions, direct writes); the More-page quick entry appends
+  `source:'manual'` points (backdatable; same-day re-entry replaces via
+  upsert) and deliberately **never rewrites `profiles.bodyweight`** — the
+  scalar stays the engine/profile input (doc 15 §3.3 boundary). Phase 5's
+  DEXA sync will append `source:'dexa'`.
+- **Readers.** `queries/bodyweight.ts`: pure `resolveDailyBodyweight` (one
+  point per day, latest entry wins across sources) + `bodyDeltaForSpan`
+  (points within ±14 days of EACH span endpoint, distinct days ⇒ measured
+  Δbw). `getMacroOverview` feeds it into `macroRetrospective`'s Phase-3
+  `bodyData` seam for mass-denominated contracts, so the completed Overview
+  and `get_macrocycle_summary` flip from "not measured" to a graded Δbw off
+  the same fold. "As of" freshness labels wherever profile bodyweight
+  displays (More profile card, create-engine chip, profile editor — one
+  vocabulary).
+- **Create-flow priming (fig 2.3).** `getPriorBlockMeasuredRate`: the most
+  recently trained completed macro's est-strength headline normalized to
+  %/mo over its logged span (`measuredRatePctMonth`, ≥28-day floor), rendered
+  as a display-only `LAST BLOCK MEASURED` ledger line on the PLAN card —
+  never blended into the target (doc 17 principle 4); nothing feeds
+  `planMacrocycle`. The "model band" half of the doc-17 copy joins at Phase
+  R2 when the hidden target cards return (N21 ruling). Create-only; the edit
+  engine is unchanged.
+- **Tests** +12 unit (suite 1027 green: same-day resolution, tolerance
+  windows incl. the 14/15-day edge, both-endpoints/distinct-days rules,
+  not-measured → graded flip through the real fold, rate normalization +
+  span floor), +4 RLS (cross-user deny, source vocabulary, unique key +
+  query-layer upsert replace, owner-corrects-a-point), new e2e
+  (`bodyweight-quick-entry.spec.ts`: manual entry → replace → profile-edit
+  append → freshness labels) + a priming-negative assertion in the closeout
+  e2e (completed-but-unlogged block ⇒ no line).
+
+## 2026-07-11 — Macro goals Phase 3: macrocycle closeout + retrospective (doc 17 §4, N40)
 
 Third build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
 a macrocycle can now end — naturally when its last real block reaches a

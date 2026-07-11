@@ -4,6 +4,52 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 65: N41 built — doc 17 Phase 4 (bodyweight series + create-flow priming)
+
+Owner kicked off Phase 4 ("implement phase 4"). One PR (**#<n>**, branch
+`claude/macrocycle-goals-phase-4-flvrc9`); migration `20260711000001`
+(`bodyweight_log` + the `v_macro_summary` logged-span columns).
+
+- **Hard-rule-8 gate first:** 09-changelog entry (2026-07-11, Phase-4
+  section) for the quick-entry row + sheet (More page settings grammar), the
+  "as of" freshness suffix (one vocabulary — the profile editor's `UPDATED`
+  reworded to `AS OF`), and the fig-2.3 `LAST BLOCK MEASURED` ledger line.
+  Rule-8 pass re-verified: no mockup figure covers any of them.
+- **Series (§5):** `bodyweight_log` — owner-only RLS, `source
+  ('manual'|'profile'|'dexa')`, unique `(user_id, measured_on, source)`;
+  writers append on every profile-bodyweight edit (editor field, day-view BW
+  chip via T-I2, onboarding) and from the new quick entry (manual,
+  backdatable, same-day replace; **never** writes the profile scalar).
+  Reads resolve a day to the latest-entered point across sources.
+- **Mass verdict:** `bodyDeltaForSpan` (±14-day bracketing of the
+  `v_macro_summary` logged span, distinct-day endpoints) feeds the Phase-3
+  `bodyData` seam in `getMacroOverview` — the completed Overview and
+  `get_macrocycle_summary` flip from "not measured" to a graded Δbw off one
+  fold. Never proxy-graded (principle 6).
+- **Priming (§4-carry):** `getPriorBlockMeasuredRate` — the last trained
+  completed block's est-strength headline normalized to %/mo
+  (`measuredRatePctMonth`, ≥28-day logged-span floor), display-only on the
+  create card; never an input to `planMacrocycle` (principle 4). The model-
+  band half of the copy waits for Phase R2 (target cards still hidden per
+  the N21 ruling). Create-only.
+- **Tests:** +12 unit (suite 1027), +4 RLS blocks, e2e quick-entry flow +
+  a priming-negative in the closeout spec. Unit/typecheck/lint green
+  locally; RLS + e2e ride the CI local stack as usual.
+
+**Hosted repair + deploy:** found the hosted DB **behind merged code** — the
+Phase-1 migrations (`20260710000001/2`) were never applied (macro create/
+goals-edit and birthdate saves were failing in prod since PR #169 deployed).
+Applied both + this phase's `20260711000001` via the Supabase MCP; v21
+verified structurally (= hosted v20 + the documented three-param delta),
+INACTIVE, active row still v20; bodyweight_log advisor-clean (initplan-wrapped
+policy, reflected in the repo file). Runbook R2 row checked off
+(`manual-operations.md`); v21 activation itself stays owner-gated.
+
+N41 → done pending merge; N34 Phase 5b's verdict rows now have both the
+retrospective seam AND real bodyweight substrate to slot beside.
+Reconciliation sweep: **N40 archived** (PR #171 merged; row → `archive.md`,
+live index trimmed).
+
 ## 2026-07-11 — Session 64: N40 built — doc 17 Phase 3 (macrocycle closeout + retrospective)
 
 Owner kicked off Phase 3 ("implement phase 3"). One PR (**#171**, branch

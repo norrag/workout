@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/queries/profiles";
+import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
+import { localDayIso } from "@/lib/dates";
 
 // birthdate replaces the static age int (doc 17 §2.5) — age is derived fresh
 // at plan time from this, so it never goes stale a year at a time
@@ -61,6 +63,14 @@ export async function completeOnboarding(
       : null,
     onboarded_at: new Date().toISOString(),
   });
+
+  // doc 17 §5: onboarding's bodyweight is the series' first measured point
+  if (parsed.data.bodyweight != null)
+    await appendBodyweightPoint(supabase, user.id, {
+      measuredOn: localDayIso(),
+      weight: parsed.data.bodyweight,
+      source: "profile",
+    });
 
   // land on Cycles with the create-macro empty state (08 §4)
   redirect("/cycles");

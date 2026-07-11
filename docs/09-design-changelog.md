@@ -42,6 +42,75 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — Bodyweight series: quick-entry, freshness labels, create-flow priming (doc 17 §5, N41 Phase 4)
+
+The bodyweight measurement series (`bodyweight_log`) lands: profile bodyweight
+edits now also append a dated point, and three small surfaces ride along.
+**Rule-8 pass:** no mockup figure exists for a bodyweight quick-entry, a
+freshness label, or the create-card priming line (re-verified against
+`workout - App Screens v2.dc.html`: fig 4.4/4.5 show the profile card and data
+rows without dates; fig 2.3's engine card has no measured-rate line). All three
+treatments below are **house-style**, composed from established primitives;
+this entry is the design record.
+
+### 1. More page — "Log bodyweight" quick-entry row + sheet
+
+- **Change:** the More page (fig 4.4) SETTINGS list gains a **"Log
+  bodyweight"** row (above "AI connector"), right side showing the latest
+  measured point as `205 LB · 30 JUN` (muted tracked caps, the settings-row
+  grammar; `—` when no point exists). Tapping opens a `BottomSheet` — title
+  `log bodyweight`, subtitle `MEASUREMENT · LB`, a weight input (prefilled
+  with the latest known value) and a date input (defaults to today, may be
+  backdated), Cancel + ink `SAVE` action. Saving appends a
+  `source: 'manual'` point to `bodyweight_log`; **it never rewrites
+  `profiles.bodyweight`** — the profile scalar stays the engine/profile
+  input, edited only in the profile editor (doc 17 §5; doc 15 §3.3 boundary).
+  Same-day re-entry overwrites that day's manual point (latest wins).
+- **Rationale:** mass-denominated macro goals are ungradable without a
+  measured series (N41); the quick entry is the cheapest honest writer, and
+  backdating lets the owner bracket a block that just closed.
+- **Affected figures:** none (fig 4.4's settings-list grammar).
+- **Impact:** `NET-NEW` + `DATA` — `bodyweight_log` migration, quick-entry
+  action + sheet component.
+
+### 2. "As of" freshness label wherever profile bodyweight displays
+
+- **Change:** profile-bodyweight displays gain a muted as-of suffix naming
+  the date the value was last measured/updated: the More profile card's meta
+  token and the create-engine profile chip (figs 2.2/2.3) read
+  `205 LB · AS OF 30 JUN`; the profile editor's existing `UPDATED 30 JUN`
+  suffix on the BODYWEIGHT row is reworded to `AS OF 30 JUN` (one vocabulary).
+  The day-view BW chip (09 2026-07-04, T-I2) is exempt — it is a live editor
+  whose value is current by construction, and the chip line has no room.
+- **Rationale:** doc 17 §5 — the macro contract is priced off this number;
+  a stale scalar should say so (doc 10 §9 honesty).
+- **Affected figures:** 2.3 (chip row), 4.4 (profile card meta), 4.5
+  (BODYWEIGHT data row).
+- **Impact:** `RETROFIT` — suffix on three existing displays; no layout
+  change.
+
+### 3. Create engine card (fig 2.3) — prior-block measured-rate priming line
+
+- **Change:** the create-macro engine card gains **one display-only line**
+  when a prior **completed** macrocycle exists with a gradable strength
+  rollup: below the PLAN card's phase strip, a top-ruled ledger line
+  `LAST BLOCK MEASURED` / `+1.9%/MO EST. STRENGTH` (muted label left, numeral
+  right). The rate is the block's est-strength headline (PR #157 rollup)
+  normalized to %/mo over its logged span; blocks spanning under 28 days of
+  logging don't qualify (a near-empty block can't honestly denominate a
+  monthly rate). **Never blended into the target** (doc 17 principle 4) —
+  the line is informational context for the human choosing a goal.
+- **Deferred half:** doc 17 §5 composes this beside the model band
+  (*"model band 1.5–3%/mo · your last block measured 1.9%/mo"*). The model
+  band is currently hidden (N21 owner ruling 2026-07-04, pending v21
+  activation), so the band half of the copy joins at **Phase R2** when the
+  target cards are re-transcribed from figs 2.2/2.3; until then the line
+  stands alone.
+- **Affected figures:** 2.3.
+- **Impact:** `NET-NEW` — prior-block rate lookup on the create page; line
+  in `CreateMacroForm`'s PLAN card. Edit-macro (same engine, prefilled) does
+  not show the line — priming is a create-time affordance.
+
 ## 2026-07-11 — Macrocycle closeout + retrospective (doc 17 §4, N40 Phase 3)
 
 A macrocycle can now end — naturally when its last real block closes, or by an
