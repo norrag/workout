@@ -950,3 +950,39 @@ implementation plan)]*
 *[→ N43. Raised immediately after the R2/R3 activations (PR #178 session);
 the envelope-loop half of the same message was a process question answered
 in chat (the loop is OFF until the field-data fit — no backlog item).]*
+
+### Batch 17 — field notes (2026-07-11)
+
+Owner: "Here is another batch of notes and issues to add to notes. Please do a
+precursor look into each of these issues to understand a little bit about the
+underlying issue when adding them to the notes."
+
+- "I would like to be able to see the prescribed calculated e1RM in the
+  prescription detail, not just the anchor" *[→ N44]*
+- "When a prescription anchor is listed in prescription detail, it would be
+  nice to know the coordinate from which that anchor was derived as well"
+  *[→ N45]*
+- "no ability to edit custom templates" *[→ N46]*
+- "HIGH - Sometimes there is a bug which causes the page switcher bar to not
+  stay at the bottom of the screen. Sometimes when you scroll down on a page,
+  the bar will scroll up to about mid screen. The bar is also non-functional
+  when this bug exists. A full close and reopen rids it. See screenshot."
+  *[→ N47; the referenced screenshot was not attached to the batch]*
+- "need filters in the replace exercise modal" *[→ N48]*
+- "Replace exercise needs a confirm/add button, not just a tap. Too easy to
+  mistake click" *[→ N49]*
+- "Past workouts allow you to edit weight / rep boxes, though they do not
+  save. UI should lock them from edit." *[→ N50]*
+- "Prescriptions in new meso seed with reps as low as 6 reps and I'm not sure
+  why, when an increment down would land in the 8-12 window." *[→ N51]*
+- "DEXA scans currently say that they don't/never impact prescriptions. Is
+  that really true? Technically it may be indirect, but an updated, more
+  accurate body fat and lean mass % will affect FFMI, which is affects macro
+  strength bands, which affect pacing, which ultimately affects
+  prescriptions. This is intended (and valuable) behavior. Just a thought."
+  *[→ N52]*
+- "HIGH, I am no longer ever seeing the loading splash page on the app. Just
+  long black screens to load. I really hate seeing the black screen and we
+  need to invest the time needed to get this right." *[→ N53]*
+- "I don't think I like the goal target estimates in macro cycle views. I
+  want to disable them again for now." *[→ N54]*
