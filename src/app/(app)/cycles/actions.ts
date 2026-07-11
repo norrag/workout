@@ -33,6 +33,7 @@ import {
   planUnplannedMeso,
   updateMacrocycle,
 } from "@/lib/queries/macro";
+import { endMacrocycle } from "@/lib/queries/logging";
 import {
   getActiveEngineParams,
   regenerateOpenWorkouts,
@@ -139,15 +140,22 @@ export async function editMacrocycleAction(
   const { params, version } = await getActiveEngineParams(supabase);
 
   const { macro_id, ...input } = parsed.data;
-  await updateMacrocycle(
-    supabase,
-    user.id,
-    macro_id,
-    input,
-    profile,
-    params,
-    version,
-  );
+  try {
+    await updateMacrocycle(
+      supabase,
+      user.id,
+      macro_id,
+      input,
+      profile,
+      params,
+      version,
+    );
+  } catch (e) {
+    // e.g. the doc 17 §4.1 frozen-contract refusal on a completed macro
+    return {
+      error: e instanceof Error ? e.message : "Couldn't save the changes.",
+    };
+  }
   revalidatePath("/cycles");
   revalidatePath(`/cycles/macro/${macro_id}`);
   redirect(`/cycles/macro/${macro_id}`);
@@ -787,6 +795,26 @@ export async function updateMesoDetailsAction(
   revalidatePath("/cycles");
   revalidatePath(`/cycles/meso/${parsed.data.meso_id}`);
   return { error: null, saved: true };
+}
+
+/**
+ * End a macrocycle (doc 17 §4.1, N40) — explicit, irrevocable: blocks with
+ * logged work are completed via the endMesocycle path (open sets skipped),
+ * never-started blocks and placeholders are abandoned, the macro completes.
+ * Logged history is never touched.
+ */
+export async function endMacrocycleAction(input: {
+  macro_id: string;
+}): Promise<FormState> {
+  const parsed = z.object({ macro_id: z.string().uuid() }).parse(input);
+  const { supabase, user } = await requireUser();
+  const result = await endMacrocycle(supabase, user.id, parsed.macro_id);
+  if (!result.ok)
+    return { error: result.error ?? "Couldn't end the macrocycle." };
+  revalidatePath("/cycles");
+  revalidatePath(`/cycles/macro/${parsed.macro_id}`);
+  revalidatePath("/workout");
+  return { error: null };
 }
 
 /**

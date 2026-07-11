@@ -1,14 +1,27 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   planMacrocycle,
+  PROGRESSION_RULE,
   type EngineParams,
   type MacroGoal,
   type MacroPlan,
   type MacroProfile,
   type PhaseName,
 } from "@/lib/engine";
-import { getMacroStrength } from "./stats";
+import { getMacroStrength, strengthConfig } from "./stats";
 import { profileToMacroProfile } from "./plan-rate";
+import { isTerminalMacroStatus } from "./macro-close";
+import {
+  aggregateProgressionEvents,
+  toProgressionAuditEvent,
+  type ProgressionAuditEvent,
+} from "./progression-history";
+import {
+  combineDemandSummaries,
+  macroRetrospective,
+  type MacroRetrospective,
+  type RetroDemand,
+} from "./macro-retrospective";
 import type {
   Database,
   MacrocycleRow,
@@ -16,7 +29,6 @@ import type {
   MesocycleRow,
   MesoPhase,
   ProfileRow,
-  VMacroSummaryRow,
 } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
@@ -77,6 +89,21 @@ export function isGoalsEdit(
     input.duration_months == null ||
     input.duration_months !== macro.duration_months
   );
+}
+
+/**
+ * doc 17 §4.1: a terminal macro's contract is frozen — the retrospective
+ * grades against it. Rename/notes edits stay allowed (harmless); a goals edit
+ * (re-contract) is refused, same rule as completed mesos. Returns the refusal
+ * message, or null when the edit may proceed. Pure.
+ */
+export function goalsEditRefusal(
+  status: string,
+  goalsEdit: boolean,
+): string | null {
+  return isTerminalMacroStatus(status) && goalsEdit
+    ? `a ${status} macrocycle is frozen — its goals can't be re-contracted.`
+    : null;
 }
 
 /**
@@ -301,6 +328,9 @@ export async function updateMacrocycle(
     .maybeSingle();
   if (macroErr) throw macroErr;
   if (!macro) throw new Error("Macrocycle not found");
+
+  const refusal = goalsEditRefusal(macro.status, isGoalsEdit(macro, input));
+  if (refusal) throw new Error(refusal);
 
   // §2.5 / principle 3: the stored target is the CONTRACT — only a goals edit
   // (goal / duration / block length) re-prices and restamps it. A rename or
@@ -567,12 +597,18 @@ export async function attachMesoToMacro(
 
   const { data: macro, error: macroErr } = await supabase
     .from("macrocycles")
-    .select("id")
+    .select("id, status")
     .eq("id", macroId)
     .eq("user_id", userId)
     .maybeSingle();
   if (macroErr) throw macroErr;
   if (!macro) return { ok: false, error: "Macrocycle not found." };
+  // doc 17 §4.1: a terminal macro is frozen — no new blocks land on it
+  if (isTerminalMacroStatus(macro.status))
+    return {
+      ok: false,
+      error: `this macrocycle is ${macro.status} — mesocycles can't be placed into it.`,
+    };
 
   const { data: siblings, error: sibErr } = await supabase
     .from("mesocycles")
@@ -675,12 +711,18 @@ export async function manageMacroSlots(
 ): Promise<SlotActionResult> {
   const { data: macro, error: macroErr } = await supabase
     .from("macrocycles")
-    .select("id")
+    .select("id, status")
     .eq("id", macroId)
     .eq("user_id", userId)
     .maybeSingle();
   if (macroErr) throw macroErr;
   if (!macro) return { ok: false, error: "Macrocycle not found." };
+  // doc 17 §4.1: a terminal macro is frozen — its timeline can't change
+  if (isTerminalMacroStatus(macro.status))
+    return {
+      ok: false,
+      error: `this macrocycle is ${macro.status} — its blocks are frozen.`,
+    };
 
   const { data: mesos, error: mesoErr } = await supabase
     .from("mesocycles")
@@ -774,6 +816,9 @@ export interface MacroOverview {
   mesos: MesocycleRow[];
   plan: MacroPlan;
   stats: MacroStats;
+  /** doc 17 §4.2 — present once the macro is `completed`; the SAME fold backs
+   *  the Overview card and `get_macrocycle_summary` (one verdict definition) */
+  retrospective: MacroRetrospective | null;
 }
 
 export async function getMacroOverview(
@@ -810,20 +855,118 @@ export async function getMacroOverview(
   if (mesoError) throw mesoError;
   if (sumError) throw sumError;
 
-  const stats = await buildMacroStats(
-    supabase,
-    userId,
-    (mesos ?? []).map((m) => m.id),
-    summary ?? null,
-    params,
-  );
+  const orderedMesos = mesos ?? [];
+  const mesoIds = orderedMesos.map((m) => m.id);
+
+  // N16: one definition with the Performance tab. `getMacroStrength` folds the
+  // SAME deload-filtered, ≥3-session, recent-vs-baseline lift scores up through
+  // the muscle rollup and volume-weights them — so the Overview tile, the
+  // Performance tab, and the retrospective verdict render the identical number.
+  const strength = await getMacroStrength(supabase, userId, mesoIds, params);
+
+  // adherence = attended / due over working (non-deload) weeks, counting only
+  // decided days (completed|skipped); planned/in_progress and deload are excluded
+  const stats: MacroStats = {
+    estStrengthPct: strength.estStrengthPct,
+    totalVolume: summary?.total_volume ?? 0,
+    sessionsLogged: summary?.sessions_logged ?? 0,
+    adherencePct:
+      summary && summary.sessions_due > 0
+        ? Math.round((summary.sessions_attended / summary.sessions_due) * 100)
+        : null,
+  };
+
+  // §4.2: the retrospective exists only once the macro is completed — graded
+  // against the stored contract, derived on read, never stored
+  let retrospective: MacroRetrospective | null = null;
+  if (macro.status === "completed") {
+    const demand = await getMacroDemandSummary(supabase, userId, mesoIds, params);
+    retrospective = macroRetrospective(
+      {
+        goalType: macro.goal_type,
+        targetLow: macro.target_low,
+        targetHigh: macro.target_high,
+        targetUnit: macro.target_unit,
+        targetDirection: macro.target_direction,
+      },
+      {
+        estStrengthPct: strength.estStrengthPct,
+        qualifyingLifts: strength.exercises.length,
+        minQualifyingLifts: strengthConfig(params).min_sessions,
+        muscles: strength.muscles.map((m) => ({
+          muscleGroup: m.muscle_group,
+          scorePct: m.score_pct,
+          lifts: m.lifts,
+        })),
+      },
+      demand,
+      {
+        adherencePct: stats.adherencePct,
+        sessionsLogged: stats.sessionsLogged,
+        totalVolume: stats.totalVolume,
+      },
+      {
+        completed: orderedMesos.filter((m) => m.status === "completed").length,
+        abandoned: orderedMesos.filter((m) => m.status === "abandoned").length,
+        notBuilt: orderedMesos.filter((m) => m.status === "unplanned").length,
+      },
+    );
+  }
 
   return {
     macro,
-    mesos: mesos ?? [],
+    mesos: orderedMesos,
     plan: planForMacro(macro, profile, params, now),
     stats,
+    retrospective,
   };
+}
+
+/**
+ * §4.2 demand-side input: the user's own recorded progression decisions over
+ * the macro span (its mesos' microcycles), folded per exercise through
+ * `aggregateProgressionEvents` and combined to the aggregate grain. Null while
+ * the span holds no progression decisions (mode inactive) — the retrospective
+ * then omits the row rather than rendering zeros.
+ */
+async function getMacroDemandSummary(
+  supabase: Client,
+  userId: string,
+  mesoIds: string[],
+  params: EngineParams,
+): Promise<RetroDemand | null> {
+  if (mesoIds.length === 0) return null;
+  const { data: micros, error: microError } = await supabase
+    .from("microcycles")
+    .select("id")
+    .in("mesocycle_id", mesoIds)
+    .eq("user_id", userId);
+  if (microError) throw microError;
+  const microIds = (micros ?? []).map((m) => m.id);
+  if (microIds.length === 0) return null;
+
+  const { data, error } = await supabase
+    .from("engine_decisions")
+    .select("id, kind, exercise_id, workout_id, microcycle_id, created_at, inputs, output")
+    .eq("user_id", userId)
+    .in("microcycle_id", microIds)
+    // only decisions carrying a status-coded progression step — while the mode
+    // is inactive this matches nothing, so the row reads absent, not zero
+    .contains("output", { trace: [{ rule: PROGRESSION_RULE }] })
+    .order("created_at", { ascending: true })
+    .limit(2000);
+  if (error) throw error;
+
+  const byExercise = new Map<string, ProgressionAuditEvent[]>();
+  for (const row of data ?? []) {
+    if (!row.exercise_id) continue;
+    const cur = byExercise.get(row.exercise_id) ?? [];
+    cur.push(toProgressionAuditEvent(row, params));
+    byExercise.set(row.exercise_id, cur);
+  }
+  return combineDemandSummaries(
+    [...byExercise.values()].map(aggregateProgressionEvents),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -896,36 +1039,3 @@ export async function deleteMacrocycle(
   if (error) throw error;
 }
 
-/** Est. strength = volume-weighted mean of the macro's muscle-group e1RM
- *  changes, rolled up from every qualifying lift (10 §6). */
-async function buildMacroStats(
-  supabase: Client,
-  userId: string,
-  mesoIds: string[],
-  summary: VMacroSummaryRow | null,
-  params: EngineParams,
-): Promise<MacroStats> {
-  const totalVolume = summary?.total_volume ?? 0;
-  const sessionsLogged = summary?.sessions_logged ?? 0;
-  // adherence = attended / due over working (non-deload) weeks, counting only
-  // decided days (completed|skipped); planned/in_progress and deload are excluded
-  const adherencePct =
-    summary && summary.sessions_due > 0
-      ? Math.round((summary.sessions_attended / summary.sessions_due) * 100)
-      : null;
-
-  // N16: one definition with the Performance tab. `getMacroStrength` folds the
-  // SAME deload-filtered, ≥3-session, recent-vs-baseline lift scores up through
-  // the muscle rollup and volume-weights them — so the Overview tile and the
-  // Performance tab render the identical number. (The old path here meaned the
-  // top-3 most-logged lifts, a separate calculation that could and did disagree
-  // with the tab.)
-  const { estStrengthPct } = await getMacroStrength(
-    supabase,
-    userId,
-    mesoIds,
-    params,
-  );
-
-  return { estStrengthPct, totalVolume, sessionsLogged, adherencePct };
-}

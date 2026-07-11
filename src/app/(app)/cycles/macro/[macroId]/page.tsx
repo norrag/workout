@@ -12,6 +12,11 @@ import type { GlossaryKey } from "@/lib/glossary";
 import { BalanceView } from "@/components/stats/MesoStatsViews";
 import { MuscleStrengthSection } from "@/components/stats/MuscleStrengthSection";
 import type { MesocycleRow } from "@/lib/types/database";
+import type {
+  RetroBlocks,
+  RetroDemand,
+  RetroVerdict,
+} from "@/lib/queries/macro-retrospective";
 import { planMesoAction } from "../../actions";
 
 const MONTHS = [
@@ -93,7 +98,9 @@ export default async function MacroOverviewPage({
     getMacroStats(supabase, user.id, macroId),
   ]);
   if (!overview) notFound();
-  const { macro, mesos, plan, stats } = overview;
+  const { macro, mesos, plan, stats, retrospective } = overview;
+  // §4.1: a terminal macro is frozen — no planning affordances on its timeline
+  const frozen = macro.status !== "active";
 
   const months = macro.duration_months ?? plan.durationMonths;
   const metaLine = `GOAL ${macro.goal_type.toUpperCase()} · ${span(
@@ -143,7 +150,9 @@ export default async function MacroOverviewPage({
                   ? parts("IN PROGRESS")
                   : isUnplanned
                     ? [`SUGGESTED ${phase}`.trim(), "UNPLANNED"].join(" · ")
-                    : parts("PLANNED");
+                    : meso.status === "abandoned"
+                      ? parts("ABANDONED")
+                      : parts("PLANNED");
             const inner = (
               <>
                 <TimelineMark meso={meso} pos={pos} />
@@ -173,15 +182,23 @@ export default async function MacroOverviewPage({
               return (
                 <div key={meso.id} className="flex items-center gap-[11px]">
                   {inner}
-                  <form action={planMesoAction}>
-                    <input type="hidden" name="meso_id" value={meso.id} />
-                    <button
-                      type="submit"
-                      className="border-[1.5px] border-dashed border-ink/45 px-[7px] py-1 text-[8.5px] font-bold tracking-[0.08em] text-ink/60"
-                    >
-                      + PLAN
-                    </button>
-                  </form>
+                  {/* §4.1: on a closed macro a placeholder was never built and
+                      never will be — the plan affordance goes with the close */}
+                  {frozen ? (
+                    <div className="border-[1.5px] border-dashed border-ink/30 px-[7px] py-1 text-[8.5px] font-bold tracking-[0.08em] text-ink/45">
+                      NOT BUILT
+                    </div>
+                  ) : (
+                    <form action={planMesoAction}>
+                      <input type="hidden" name="meso_id" value={meso.id} />
+                      <button
+                        type="submit"
+                        className="border-[1.5px] border-dashed border-ink/45 px-[7px] py-1 text-[8.5px] font-bold tracking-[0.08em] text-ink/60"
+                      >
+                        + PLAN
+                      </button>
+                    </form>
+                  )}
                 </div>
               );
             return (
@@ -215,11 +232,85 @@ export default async function MacroOverviewPage({
         </div>
       </div>
 
-      {/* macrocycle stats */}
+      {/* macrocycle stats — doc 17 §4.2: once the macro completes the "to
+          date" framing gives way to the retrospective, graded against the
+          stored contract (09-changelog 2026-07-11) */}
       <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
         <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
-          MACROCYCLE STATS · TO DATE
+          {retrospective ? "RETROSPECTIVE" : "MACROCYCLE STATS · TO DATE"}
         </div>
+        {retrospective && (
+          <div className="mt-[11px] flex flex-col gap-[9px]">
+            {/* strength verdict vs the contract band — informational on a
+                mass-goal macro (strength was never the promise) */}
+            <RetroRow label="STRENGTH">
+              {retrospective.strength.informational ? (
+                <span className="text-[11px] font-semibold text-ink/55">
+                  EST. {fmtPct(retrospective.strength.estStrengthPct)} · NOT
+                  THE PROMISE
+                </span>
+              ) : (
+                <>
+                  <span className="text-[11px] font-semibold">
+                    {fmtPct(retrospective.strength.estStrengthPct)}
+                    {retrospective.strength.band && (
+                      <span className="text-ink/55">
+                        {" "}
+                        · TARGET {fmtBandPct(retrospective.strength.band)}
+                      </span>
+                    )}
+                  </span>
+                  {retrospective.strength.verdict && (
+                    <VerdictTag verdict={retrospective.strength.verdict} />
+                  )}
+                </>
+              )}
+            </RetroRow>
+            {/* mass verdict: only ever graded against measured body data —
+                "not measured" until a bodyweight series / DEXA exists */}
+            {retrospective.mass && (
+              <RetroRow
+                label="MASS"
+                note={retrospective.mass.note}
+              >
+                {retrospective.mass.measured ? (
+                  <>
+                    <span className="text-[11px] font-semibold">
+                      {retrospective.mass.measuredDeltaLb! > 0 ? "+" : ""}
+                      {retrospective.mass.measuredDeltaLb} LB
+                    </span>
+                    {retrospective.mass.verdict && (
+                      <VerdictTag verdict={retrospective.mass.verdict} />
+                    )}
+                  </>
+                ) : (
+                  <span className="text-[11px] font-semibold text-ink/45">
+                    NOT MEASURED
+                  </span>
+                )}
+              </RetroRow>
+            )}
+            {/* demand-side aggregate — absent while no progression decisions
+                exist over the span */}
+            {retrospective.demand && (
+              <RetroRow
+                label="PROGRESSION"
+                note={demandBreakdown(retrospective.demand)}
+              >
+                <span className="text-[11px] font-semibold">
+                  {retrospective.demand.stepped} EARNED ·{" "}
+                  {retrospective.demand.paced} PACED ·{" "}
+                  {retrospective.demand.notEarned} HELD
+                </span>
+              </RetroRow>
+            )}
+            <RetroRow label="BLOCKS">
+              <span className="text-[11px] font-semibold">
+                {blocksLine(retrospective.blocks)}
+              </span>
+            </RetroRow>
+          </div>
+        )}
         <div className="mt-[11px] grid grid-cols-2 gap-[1.5px] border-[1.5px] border-ink bg-ink">
           <Stat
             value={stats.estStrengthPct == null ? "—" : `${stats.estStrengthPct > 0 ? "+" : ""}${stats.estStrengthPct}%`}
@@ -234,6 +325,12 @@ export default async function MacroOverviewPage({
           />
         </div>
         <div className="mb-6 mt-[9px] text-[10px] leading-normal text-ink/55">
+          {retrospective && (
+            <>
+              Strength is an estimate graded against the goal set when this
+              macrocycle was planned.{" "}
+            </>
+          )}
           Per-meso detail on each meso&apos;s{" "}
           <strong className="text-ink">BALANCE · PERFORMANCE</strong> tabs.
         </div>
@@ -264,6 +361,82 @@ export default async function MacroOverviewPage({
           </div>,
         ]}
       />
+    </div>
+  );
+}
+
+// --- retrospective helpers (doc 17 §4.2, 09-changelog 2026-07-11) -----------
+
+function fmtPct(v: number | null): string {
+  return v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`;
+}
+
+/** The contract band, e.g. `+4–8%` (magnitudes are stored positive). */
+function fmtBandPct(band: { low: number; high: number }): string {
+  const lo = Math.min(band.low, band.high);
+  const hi = Math.max(band.low, band.high);
+  return `${lo > 0 ? "+" : ""}${lo}–${hi}%`;
+}
+
+function blocksLine(blocks: RetroBlocks): string {
+  const parts = [`${blocks.completed} DONE`];
+  if (blocks.abandoned > 0) parts.push(`${blocks.abandoned} ABANDONED`);
+  if (blocks.notBuilt > 0) parts.push(`${blocks.notBuilt} NOT BUILT`);
+  return parts.join(" · ");
+}
+
+/** Muted breakdown under the PROGRESSION row: pacer vs gate mix + the
+ *  vanished share (the increment-sizing signal). */
+function demandBreakdown(demand: RetroDemand): string {
+  const parts: string[] = [];
+  const ratePaced = demand.governorFirings["rate_pacer"] ?? 0;
+  if (ratePaced > 0) parts.push(`${ratePaced} by the rate pacer`);
+  if (demand.vanished > 0) {
+    const share =
+      demand.vanishedShare != null
+        ? ` (${Math.round(demand.vanishedShare * 100)}% of earned asks)`
+        : "";
+    parts.push(`${demand.vanished} vanished${share}`);
+  }
+  return parts.length > 0
+    ? parts.join(" · ")
+    : `${demand.decisions} progression decisions over this macrocycle`;
+}
+
+/** Verdict tag — the PLANNED badge geometry in ink (the macro is over,
+ *  nothing is "current"; orange stays position/selection only). */
+function VerdictTag({ verdict }: { verdict: RetroVerdict }) {
+  return (
+    <div className="flex-shrink-0 border-[1.5px] border-ink px-[7px] py-[3px] text-[8.5px] font-bold tracking-[0.12em] text-ink">
+      {verdict.toUpperCase()}
+    </div>
+  );
+}
+
+/** Ledger row: tracked caps label left, value (+ optional tag) right; an
+ *  optional muted note line spans underneath. */
+function RetroRow({
+  label,
+  note,
+  children,
+}: {
+  label: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+          {label}
+        </div>
+        <div className="flex items-center gap-2">{children}</div>
+      </div>
+      {note && (
+        <div className="mt-0.5 text-right text-[9px] leading-normal text-ink/45">
+          {note}
+        </div>
+      )}
     </div>
   );
 }

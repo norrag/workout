@@ -42,6 +42,72 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — Macrocycle closeout + retrospective (doc 17 §4, N40 Phase 3)
+
+A macrocycle can now end — naturally when its last real block closes, or by an
+explicit "End macrocycle" — and a completed macro's Overview grades the block
+against the goal contract. **Rule-8 pass:** no mockup figure exists for a
+completed-macro Overview, a retrospective card, or an End-macrocycle dialog
+(re-verified against `workout - App Screens v2.dc.html`: fig 2.2 shows only the
+live `MACROCYCLE STATS · TO DATE` block; the only "complete" surfaces are the
+Workout Complete sheet). All three treatments below are **house-style**,
+composed from established primitives; this entry is the design record.
+
+### 1. Macro header ⋮ — "End macrocycle" + confirm sheet
+
+- **Change:** the macro header's `⋮` menu (N24 grammar) gains a destructive
+  **"End macrocycle"** row, shown only while the macro is `active`. It opens a
+  `BottomSheet` confirm — title `End macrocycle`, subtitle
+  `END OPEN BLOCKS · COMPLETE`, body copy: *"This ends every remaining block:
+  anything with logged work is completed (open sets skipped), blocks never
+  started are abandoned. Logged history is kept. This can't be undone."* —
+  Cancel + accent `END MACROCYCLE` action. Exactly the End-mesocycle dialog's
+  weight and geometry (fig 1.1 options menu, 09 session-5 §9), one level up.
+- **Rationale:** owner's closeout semantics (2026-07-10): the close is a
+  deliberate, irrevocable act mirroring the workout/meso closeout family —
+  never end-date-driven. No history is deleted, so the delete-dialog's
+  acknowledge-checkbox weight is not required.
+- **Affected figures:** none (house-style; macro header per fig 2.2's header
+  region).
+- **Impact:** `NET-NEW` — `endMacrocycle` query + server action + MacroHeader
+  menu/sheet.
+
+### 2. Completed-macro Overview — retrospective replaces "to date"
+
+- **Change (a):** once a macro is `completed`, the stats section header swaps
+  `MACROCYCLE STATS · TO DATE` → **`RETROSPECTIVE`**, and a verdict list
+  renders above the (unchanged) 2×2 stat tiles, in the ledger row grammar
+  (tracked caps label left, value right, `1.5px` ink top rule):
+  - **STRENGTH** — the est-strength headline vs the stored contract band,
+    e.g. `+6.2% · TARGET +4–8%`, with a verdict tag `WITHIN BAND` /
+    `ABOVE BAND` / `BELOW BAND` / `INSUFFICIENT DATA` (ink-bordered box, the
+    PLANNED badge geometry — never orange; the macro is over, nothing is
+    "current"). On a mass-goal macro the row is informational:
+    `EST. STRENGTH +6.2% · NOT THE PROMISE` (factor-0.75/0 pacing — strength
+    was never this macro's contract).
+  - **MASS** — only on mass-denominated contracts (hypertrophy/cut/maintain):
+    `NOT MEASURED` with a muted pointer line (*"needs a bodyweight series or
+    DEXA scans bracketing the block"*) until N41/N34 land body data. Never
+    proxy-graded.
+  - **PROGRESSION** — the demand-side aggregate when progression decisions
+    exist: `12 EARNED · 3 PACED · 5 HELD` with a muted breakdown line (pacer
+    vs gate mix, vanished share). Hidden while the progression mode is
+    inactive (no decisions recorded).
+  - **BLOCKS** — the block outcome mix: `4 DONE · 1 ABANDONED · 2 NOT BUILT`.
+- **Change (b):** on a completed macro the timeline's unplanned placeholders
+  drop the `+ PLAN` affordance and read `NOT BUILT` (muted, dashed mark
+  unchanged) — the macro is frozen; planning into it is over. The tiles keep
+  their live definitions (adherence/volume restated at close reads the same
+  numbers the macro accrued).
+- **Rationale:** doc 17 §4.2 — grade against the contract
+  (`target_low/high`), estimate-vs-estimate copy per doc 10 §9, verdict
+  vocabulary fixed (never letter grades); derive-on-read, no new stored
+  state.
+- **Affected figures:** 2.2 (Overview stats region + timeline rows).
+- **Impact:** `NET-NEW` + `DATA` — `macroRetrospective` fold shared by the
+  Overview and `get_macrocycle_summary` (one definition of the verdict);
+  natural close fires when the last real block reaches a terminal state.
+
 ## 2026-07-10 — Profile AGE row becomes BIRTHDATE (doc 17 §2.5, N21 Phase 1)
 
 - **Change:** the profile data row **AGE** (fig 4.5) and the onboarding ABOUT

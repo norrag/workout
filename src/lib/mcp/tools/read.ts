@@ -18,6 +18,7 @@ import {
   type StrengthProgress,
 } from "@/lib/queries/stats";
 import { getMacroOverview, type MacroOverview } from "@/lib/queries/macro";
+import type { MacroRetrospective } from "@/lib/queries/macro-retrospective";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
   loadMesoSetProjection,
@@ -469,6 +470,68 @@ function registerGetMesoSummary(server: McpServer) {
 
 // --- get_macrocycle_summary ------------------------------------------------
 
+/**
+ * doc 17 §4.2 — the retrospective block, a pure renaming of the SAME
+ * `macroRetrospective` fold the completed-macro Overview renders (parity is a
+ * tested invariant: values pass through unchanged, keys go snake_case).
+ */
+export function formatMacroRetrospective(
+  r: MacroRetrospective,
+): Record<string, unknown> {
+  return {
+    strength: {
+      est_strength_change_pct: r.strength.estStrengthPct,
+      // fixed vocabulary: within band / above band / below band /
+      // insufficient data; null on mass-goal macros (informational row)
+      verdict: r.strength.verdict,
+      informational: r.strength.informational,
+      contract_band: r.strength.band,
+      muscle_changes: r.strength.muscles.map((m) => ({
+        muscle_group: m.muscleGroup,
+        e1rm_change_pct: m.scorePct,
+        lifts: m.lifts,
+      })),
+    },
+    mass: r.mass
+      ? {
+          measured: r.mass.measured,
+          verdict: r.mass.verdict,
+          measured_delta_lb: r.mass.measuredDeltaLb,
+          note: r.mass.note,
+        }
+      : null,
+    demand: r.demand
+      ? {
+          decisions: r.demand.decisions,
+          earned: r.demand.stepped,
+          vanished: r.demand.vanished,
+          paced: r.demand.paced,
+          not_earned: r.demand.notEarned,
+          governor_firings: r.demand.governorFirings,
+          gate_failures: r.demand.gateFailures,
+          vanished_share: r.demand.vanishedShare,
+          earned_then_met: r.demand.earnedThenMet,
+          earned_then_missed: r.demand.earnedThenMissed,
+        }
+      : null,
+    adherence: {
+      adherence_pct: r.adherence.adherencePct,
+      sessions_logged: r.adherence.sessionsLogged,
+      total_volume: r.adherence.totalVolume,
+    },
+    blocks: {
+      completed: r.blocks.completed,
+      abandoned: r.blocks.abandoned,
+      not_built: r.blocks.notBuilt,
+    },
+    note:
+      "graded against the goal contract stored at create/goals-edit (target_*), " +
+      "never a live recompute; est. strength is an estimate-vs-estimate " +
+      "comparison (10 §9). Mass outcomes grade only against measured body data " +
+      "and read 'not measured' otherwise.",
+  };
+}
+
 export function formatMacroSummary(
   overview: MacroOverview | null,
   strength: StrengthProgress | null = null,
@@ -482,6 +545,7 @@ export function formatMacroSummary(
     macrocycle_id: macro.id,
     name: macro.name,
     goal_type: macro.goal_type,
+    status: macro.status,
     duration_months: macro.duration_months,
     target: {
       low: plan.target.low,
@@ -506,6 +570,11 @@ export function formatMacroSummary(
       sessions_logged: stats.sessionsLogged,
       adherence_pct: stats.adherencePct,
     },
+    // doc 17 §4.2: present once the macro is completed — the same fold the
+    // in-app Overview renders (one definition of the verdict)
+    ...(overview.retrospective
+      ? { retrospective: formatMacroRetrospective(overview.retrospective) }
+      : {}),
     // I11/PH37 at macro scope — same rules as get_mesocycle_summary, window =
     // the whole macrocycle. Matches the in-app macro Performance tab (M8).
     ...(strength
