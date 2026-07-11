@@ -500,6 +500,7 @@ const RETRO: MacroRetrospective = {
   },
   adherence: { adherencePct: 92, sessionsLogged: 60, totalVolume: 200000 },
   blocks: { completed: 4, abandoned: 1, notBuilt: 2 },
+  composition: null,
 };
 
 describe("formatMacroRetrospective", () => {
@@ -548,6 +549,39 @@ describe("formatMacroRetrospective", () => {
     expect(out.mass).toMatchObject({ measured: false, verdict: null });
     expect(out.demand).toBeNull();
     expect((out.strength as Record<string, unknown>).verdict).toBeNull();
+  });
+
+  it("carries the 5b composition block verbatim (and null when absent)", () => {
+    expect(formatMacroRetrospective(RETRO).composition).toBeNull();
+    const out = formatMacroRetrospective({
+      ...RETRO,
+      composition: {
+        startScannedAt: "2026-03-01T10:00:00Z",
+        endScannedAt: "2026-06-28T10:00:00Z",
+        daysApart: 119,
+        sameScanner: true,
+        deltaLeanLb: 2.6,
+        deltaFatLb: -0.4,
+        deltaWeightLb: 2.1,
+        deltaBodyFatPct: -0.6,
+        leanWithinNoise: false,
+        fatWithinNoise: true,
+        note: "119 days between scans",
+      },
+    });
+    expect(out.composition).toEqual({
+      start_scanned_at: "2026-03-01T10:00:00Z",
+      end_scanned_at: "2026-06-28T10:00:00Z",
+      days_apart: 119,
+      same_scanner: true,
+      delta_lean_lb: 2.6,
+      delta_fat_lb: -0.4,
+      delta_weight_lb: 2.1,
+      delta_body_fat_pct: -0.6,
+      lean_within_noise: false,
+      fat_within_noise: true,
+      note: "119 days between scans",
+    });
   });
 
   it("rides get_macrocycle_summary once the macro is completed", () => {

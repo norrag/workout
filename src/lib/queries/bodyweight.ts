@@ -143,8 +143,10 @@ function dayAnchorMs(iso: string): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).getTime();
 }
 
-/** Whole calendar days between two values (rounding absorbs DST hours). */
-function daysBetween(aIso: string, bIso: string): number {
+/** Whole calendar days between two values (rounding absorbs DST hours).
+ *  Exported for the scan-bracketing fold (`body-comp.ts`) — one distance
+ *  definition for every ±tolerance bracket check. */
+export function daysBetween(aIso: string, bIso: string): number {
   return Math.round(Math.abs(dayAnchorMs(aIso) - dayAnchorMs(bIso)) / MS_PER_DAY);
 }
 

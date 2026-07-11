@@ -6,14 +6,22 @@ import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMacroOverview, phaseLabel } from "@/lib/queries/macro";
 import { getMacroStats } from "@/lib/queries/stats";
 import { getProfile } from "@/lib/queries/profiles";
+import {
+  getBodyCompHistoryInRange,
+  scanCompForSpan,
+} from "@/lib/queries/body-comp";
+import { BRACKET_TOLERANCE_DAYS } from "@/lib/queries/bodyweight";
+import { dateAtLocalNoon, localDayIso, shortDate } from "@/lib/dates";
+import { formatMeasuredLb } from "@/lib/units";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { InfoDot } from "@/components/ui/InfoDot";
 import type { GlossaryKey } from "@/lib/glossary";
 import { BalanceView } from "@/components/stats/MesoStatsViews";
 import { MuscleStrengthSection } from "@/components/stats/MuscleStrengthSection";
-import type { MesocycleRow } from "@/lib/types/database";
+import type { MesocycleRow, VBodyCompHistoryRow } from "@/lib/types/database";
 import type {
   RetroBlocks,
+  RetroComposition,
   RetroDemand,
   RetroVerdict,
 } from "@/lib/queries/macro-retrospective";
@@ -99,6 +107,32 @@ export default async function MacroOverviewPage({
   ]);
   if (!overview) notFound();
   const { macro, mesos, plan, stats, retrospective } = overview;
+
+  // 5b (doc 15 §3.2): scans inside the macro's window (±14-day bracket
+  // tolerance) — the BODY COMPOSITION trend. One scan is not a trend and
+  // renders nothing; the first→last change reuses the same fold as the
+  // retrospective (tolerance ∞ — the endpoints ARE the window's scans).
+  const compWindowMs = BRACKET_TOLERANCE_DAYS * 24 * 60 * 60 * 1000;
+  const compRows = await getBodyCompHistoryInRange(
+    supabase,
+    user.id,
+    new Date(
+      dateAtLocalNoon(macro.start_date).getTime() - compWindowMs,
+    ).toISOString(),
+    new Date(
+      dateAtLocalNoon(macro.target_end_date ?? localDayIso()).getTime() +
+        compWindowMs,
+    ).toISOString(),
+  );
+  const compChange =
+    compRows.length >= 2
+      ? scanCompForSpan(
+          compRows,
+          compRows[0].scanned_at,
+          compRows[compRows.length - 1].scanned_at,
+          Number.POSITIVE_INFINITY,
+        )
+      : null;
   // §4.1: a terminal macro is frozen — no planning affordances on its timeline
   const frozen = macro.status !== "active";
 
@@ -290,6 +324,24 @@ export default async function MacroOverviewPage({
                 )}
               </RetroRow>
             )}
+            {/* 5b: measured Δlean/Δfat from scans bracketing the span —
+                informational on every goal, LSC treatment per doc 15 §6.2 */}
+            {retrospective.composition && (
+              <RetroRow
+                label="COMPOSITION"
+                note={retrospective.composition.note}
+              >
+                {retrospective.composition.sameScanner ? (
+                  <span className="text-[11px] font-semibold">
+                    {compositionLine(retrospective.composition)}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-ink/45">
+                    NOT COMPARABLE
+                  </span>
+                )}
+              </RetroRow>
+            )}
             {/* demand-side aggregate — absent while no progression decisions
                 exist over the span */}
             {retrospective.demand && (
@@ -335,6 +387,45 @@ export default async function MacroOverviewPage({
           <strong className="text-ink">BALANCE · PERFORMANCE</strong> tabs.
         </div>
       </div>
+
+      {/* 5b (doc 15 §3.2; 09 2026-07-11 5b §3): the composition trend —
+          renders ONLY with ≥ 2 in-window scans (one scan is not a trend) */}
+      {compRows.length >= 2 && (
+        <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
+          <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+            BODY COMPOSITION
+          </div>
+          <div className="mt-[11px] grid grid-cols-[1fr_auto_auto_auto] gap-x-5 gap-y-0">
+            <div />
+            <CompColHead label="LEAN LB" />
+            <CompColHead label="FAT LB" />
+            <CompColHead label="BF%" />
+            {compRows.map((row) => (
+              <CompScanRow key={row.scan_id} row={row} />
+            ))}
+          </div>
+          {compChange && (
+            <div className="mt-[9px] flex items-center justify-between gap-3 border-t-[1.5px] border-ink pt-[9px]">
+              <div className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+                CHANGE
+              </div>
+              {compChange.sameScanner ? (
+                <span className="text-[11px] font-semibold">
+                  {compositionLine(compChange)}
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold text-ink/45">
+                  DIFFERENT SCANNERS — NOT COMPARABLE
+                </span>
+              )}
+            </div>
+          )}
+          <div className="mb-6 mt-[9px] text-[9px] leading-normal tracking-[0.04em] text-ink/45">
+            DEXA READS QUARTERLY-PLUS — SCAN-TO-SCAN LEAN CHANGES UNDER ~2 LB
+            SIT INSIDE MEASUREMENT NOISE
+          </div>
+        </div>
+      )}
           </div>,
           <div key="balance">
             <BalanceView balance={macroStats.balance} />
@@ -401,6 +492,61 @@ function demandBreakdown(demand: RetroDemand): string {
   return parts.length > 0
     ? parts.join(" · ")
     : `${demand.decisions} progression decisions over this macrocycle`;
+}
+
+/** One line for a same-scanner composition change: sub-LSC deltas carry the
+ *  RANGE marker — never presented as a change (doc 15 §6.2 rule 1). */
+function compositionLine(c: RetroComposition): string {
+  const part = (
+    label: string,
+    delta: number | null,
+    withinNoise: boolean | null,
+  ): string | null => {
+    if (delta == null) return null;
+    const v = `${label} ${delta > 0 ? "+" : ""}${delta} LB`;
+    return withinNoise ? `${v} (IN RANGE)` : v;
+  };
+  const parts = [
+    part("LEAN", c.deltaLeanLb, c.leanWithinNoise),
+    part("FAT", c.deltaFatLb, c.fatWithinNoise),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function CompColHead({ label }: { label: string }) {
+  return (
+    <div className="pb-1 text-right text-[9px] font-semibold tracking-[0.1em] text-ink/45">
+      {label}
+    </div>
+  );
+}
+
+/** One scan in the BODY COMPOSITION trend (values as measured, no deltas —
+ *  the CHANGE line below carries the guarded first→last comparison). */
+function CompScanRow({ row }: { row: VBodyCompHistoryRow }) {
+  const cell = (v: string) => (
+    <div className="numeral border-b border-ink/15 py-2 text-right text-sm">
+      {v}
+    </div>
+  );
+  return (
+    <>
+      <div className="border-b border-ink/15 py-2 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+        {shortDate(row.scanned_at)}
+      </div>
+      {cell(
+        row.lean_mass_lb != null
+          ? formatMeasuredLb(Number(row.lean_mass_lb))
+          : "—",
+      )}
+      {cell(
+        row.fat_mass_lb != null
+          ? formatMeasuredLb(Number(row.fat_mass_lb))
+          : "—",
+      )}
+      {cell(row.body_fat_pct != null ? `${row.body_fat_pct}` : "—")}
+    </>
+  );
 }
 
 /** Verdict tag — the PLANNED badge geometry in ink (the macro is over,

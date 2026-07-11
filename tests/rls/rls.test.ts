@@ -1155,6 +1155,124 @@ describe("bodyspec connect tables (doc 15 §2.2, N34 Phase 5a)", () => {
       .eq("id", scan!.id);
     expect(gone).toEqual([]);
   });
+
+  it("v_body_comp_history: deltas + same-scanner flag per the view definition; security_invoker denies cross-user (5b)", async () => {
+    const base = {
+      user_id: aliceId,
+      provider: "bodyspec" as const,
+      raw: {},
+    };
+    const { error: seedError } = await alice.from("body_scans").insert([
+      {
+        ...base,
+        provider_result_id: "hist-1",
+        scanned_at: "2026-03-01T10:00:00Z",
+        scanner_model: "GE Lunar iDXA",
+        weight_lb: 184,
+        body_fat_pct: 25.5,
+        lean_mass_lb: 132,
+        fat_mass_lb: 45,
+      },
+      {
+        ...base,
+        provider_result_id: "hist-2",
+        scanned_at: "2026-06-01T10:00:00Z",
+        scanner_model: "GE Lunar iDXA",
+        weight_lb: 186.5,
+        body_fat_pct: 24.9,
+        lean_mass_lb: 134.6,
+        fat_mass_lb: 44.2,
+      },
+      {
+        ...base,
+        provider_result_id: "hist-3",
+        scanned_at: "2026-09-01T10:00:00Z",
+        scanner_model: "GE Lunar Prodigy",
+        lean_mass_lb: 137,
+        fat_mass_lb: 44,
+      },
+    ]);
+    expect(seedError).toBeNull();
+
+    const { data: rows, error } = await alice
+      .from("v_body_comp_history")
+      .select("*")
+      .eq("user_id", aliceId)
+      .order("scanned_at", { ascending: true });
+    expect(error).toBeNull();
+    expect(rows).toHaveLength(3);
+    // first scan: nothing to compare
+    expect(rows![0].prev_scanned_at).toBeNull();
+    expect(rows![0].delta_lean_lb).toBeNull();
+    expect(rows![0].same_scanner_as_prev).toBeNull();
+    // second: same machine, deltas vs the first
+    expect(Number(rows![1].delta_lean_lb)).toBe(2.6);
+    expect(Number(rows![1].delta_fat_lb)).toBe(-0.8);
+    expect(Number(rows![1].delta_weight_lb)).toBe(2.5);
+    expect(Number(rows![1].delta_body_fat_pct)).toBe(-0.6);
+    expect(rows![1].same_scanner_as_prev).toBe(true);
+    // third: different machine — flagged, and a missing weight degrades to null
+    expect(rows![2].same_scanner_as_prev).toBe(false);
+    expect(rows![2].delta_weight_lb).toBeNull();
+    expect(Number(rows![2].delta_lean_lb)).toBe(2.4);
+
+    // security_invoker: bob sees nothing of alice's history
+    const { data: bobRows } = await bob
+      .from("v_body_comp_history")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(bobRows).toEqual([]);
+
+    await alice.from("body_scans").delete().like("provider_result_id", "hist-%");
+  });
+
+  it("body_scans proposal stamps: owner may resolve; a resolved scan stays resolved (5b)", async () => {
+    const { data: scan, error: seedError } = await alice
+      .from("body_scans")
+      .insert({
+        user_id: aliceId,
+        provider: "bodyspec",
+        provider_result_id: "prop-1",
+        scanned_at: "2026-07-08T10:00:00Z",
+        weight_lb: 184.5,
+        raw: {},
+      })
+      .select()
+      .single();
+    expect(seedError).toBeNull();
+    expect(scan!.profile_applied_at).toBeNull();
+    expect(scan!.profile_dismissed_at).toBeNull();
+
+    // the resolve path's guard: update only while both stamps are null
+    const stamp = new Date().toISOString();
+    const { data: resolved } = await alice
+      .from("body_scans")
+      .update({ profile_dismissed_at: stamp })
+      .eq("id", scan!.id)
+      .is("profile_applied_at", null)
+      .is("profile_dismissed_at", null)
+      .select();
+    expect(resolved).toHaveLength(1);
+    // a second resolution (either kind) matches no rows — never restamped
+    const { data: again } = await alice
+      .from("body_scans")
+      .update({ profile_applied_at: stamp })
+      .eq("id", scan!.id)
+      .is("profile_applied_at", null)
+      .is("profile_dismissed_at", null)
+      .select();
+    expect(again).toEqual([]);
+
+    // cross-user: bob cannot resolve alice's proposal
+    const { data: bobResolve } = await bob
+      .from("body_scans")
+      .update({ profile_applied_at: stamp })
+      .eq("id", scan!.id)
+      .select();
+    expect(bobResolve).toEqual([]);
+
+    await alice.from("body_scans").delete().eq("id", scan!.id);
+  });
 });
 
 describe("engine tables", () => {
