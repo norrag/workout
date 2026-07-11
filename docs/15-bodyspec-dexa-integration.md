@@ -507,6 +507,46 @@ the app ever stops being single-user. The only thing "private" relaxes is
 the go-ask-BodySpec step and any worry about partner-tier features (webhooks,
 booking) — which were already non-goals.
 
+### 8.5 Addendum (2026-07-11): the round trip is server-side, not cookies — the installed-PWA two-context reality
+
+**Field failure, owner's first real connect (installed PWA, iOS):** login and
+consent at BodySpec succeeded, then the flow died at the final hop
+(Keycloak's "Cookie not found"). The cause is structural, not a fluke. From a
+home-screen web app, the OAuth round trip spans **two browsing contexts**:
+CONNECT is tapped in the app's own context, but iOS opens the out-of-scope
+provider login in an **in-app browser sheet with a separate, ephemeral cookie
+jar** — and the redirect back lands the callback in that sheet. The 5a flow
+carried the PKCE verifier + state in httpOnly cookies and required the
+Supabase session cookie at the callback; none of the three exist in the
+sheet's jar, so the flow could never complete from the installed app,
+regardless of provider behavior.
+
+**Design (migration `20260711000004`):** the round trip rides a server-side
+**`oauth_transactions`** row instead of cookies — `state` (PK; 32 bytes of
+URL-safe entropy), `user_id`, `provider`, `code_verifier`, `expires_at`
+(10-minute TTL). Deny-all like the secrets table (RLS with no policies +
+client grants revoked; `src/lib/queries/oauth-transactions.ts` call sites
+only). `/connect` writes it while the app context still holds the session —
+the user id is bound at flow start; `/callback` **consumes it single-use**
+(delete-returning by `state`) and completes with **no cookies at all**:
+token exchange with the stored verifier, the §8.3 first-login verification,
+then service-role persistence scoped to the transaction's user (hard rule 4;
+the consume-by-state lookup is the one deliberate exception to user-scoped
+service calls — the callback context has no identity, the single-use state
+IS the credential, and the row can only ever connect the account of the user
+who started the flow).
+
+**The response adapts to where it lands:** a context holding the initiating
+user's app session (desktop/same-tab flow) gets the original redirect to
+`/more/bodyspec` with the flash line; any other context — in practice the
+sheet — gets the same outcome rendered as a minimal **return-to-app page**
+(house-style, 09-changelog 2026-07-11) that never bounces to sign-in. The
+user closes the sheet and finds the connection live in the app, because
+nothing about it ever depended on the sheet's storage. (This required a
+middleware public-path exemption for `/api/integrations/bodyspec` — the
+blanket signed-out→/sign-in redirect would otherwise dead-end the callback
+before the handler ran; both routes manage their own auth.)
+
 ---
 
 *Spec sources: `openapi.json` v0.14.3 (2026-07-05); repo state at branch

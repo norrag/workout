@@ -631,6 +631,22 @@ export type ExternalConnectionSecretRow = {
   updated_at: string;
 };
 
+/** doc 15 §8.5 (N34): an in-flight OAuth connect round trip. DENY-ALL at the
+ *  database (RLS with no policies + client grants revoked): only the service
+ *  role reaches it, exclusively via `src/lib/queries/oauth-transactions.ts`.
+ *  Created with a session-derived user_id at /connect; consumed single-use by
+ *  `state` at /callback, so the callback needs no cookies (the installed-PWA
+ *  flow spans two browsing contexts with separate cookie jars). */
+export type OAuthTransactionRow = {
+  /** the OAuth `state` value — 32 bytes of URL-safe entropy, single-use */
+  state: string;
+  user_id: string;
+  provider: "bodyspec";
+  code_verifier: string;
+  expires_at: string;
+  created_at: string;
+};
+
 /** doc 15 §2.2 (N34): one imported DEXA scan result. Canonical imperial
  *  columns (converted once at the import boundary) + verbatim provider
  *  payloads in `raw` for early-access re-mapping fidelity. */
@@ -711,6 +727,7 @@ export type Database = {
       bodyweight_log: Table<BodyweightLogRow>;
       external_connections: Table<ExternalConnectionRow>;
       external_connection_secrets: Table<ExternalConnectionSecretRow>;
+      oauth_transactions: Table<OAuthTransactionRow>;
       body_scans: Table<BodyScanRow>;
       macrocycles: Table<MacrocycleRow>;
       mesocycles: Table<MesocycleRow>;

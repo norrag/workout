@@ -2,7 +2,42 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase 5b: BodySpec DEXA enrich + view (doc 17 §6, doc 15 §5 Phase 2, N34)
+## 2026-07-11 (latest) — BodySpec connect flow: server-side OAuth round trip (doc 15 §8.5, N34 5a follow-up)
+
+Field fix from the owner's first real connect. From the installed PWA, iOS
+runs the BodySpec login in an in-app browser sheet with a separate cookie
+jar; the 5a flow kept the PKCE verifier + state in cookies and needed the
+Supabase session at the callback, so it could never complete there (the
+owner hit Keycloak's "Cookie not found" at the final hop, after login +
+consent had already succeeded).
+
+- **Schema** (migration `20260711000004`, **applied + verified on the live
+  project via MCP**): `oauth_transactions` — `state` PK / `user_id` /
+  `provider` / `code_verifier` / `expires_at` (10-min TTL). Deny-all (RLS,
+  no policies, client grants revoked) like the secrets table; RLS test
+  block added. Doc 03 updated.
+- **Connect** writes the transaction server-side (user id bound from the
+  app-context session at flow start); **callback** consumes it single-use
+  by `state` — no cookies required at all — then exchanges/verifies/persists
+  through service-role call sites scoped to the transaction's user. The
+  cookie constants are gone from `bodyspec/oauth.ts`.
+- **Response adapts to context:** initiating user's session present →
+  original redirect + flash; otherwise (the sheet) → a house-style
+  return-to-app interstitial (09 2026-07-11 entry) sharing the same flash
+  copy (`more/bodyspec/flash.ts`), never a sign-in bounce. Caught by
+  actually driving the built app: the middleware's blanket
+  signed-out→/sign-in redirect was intercepting the session-less callback
+  before the handler ran — `/api/integrations/bodyspec` joins the
+  middleware public paths (both routes manage their own auth; verified
+  against the production build: bare callback → 400 interstitial,
+  signed-out connect → `/sign-in?redirect=/more/bodyspec`).
+- Earlier the same day, migrations `20260711000002`/`03`/`04` were applied
+  to the live project via MCP (5a/5b had merged unapplied; the More tab
+  errored on the missing tables) — advisors clean, deny-all posture verified.
+
+Suite green (1057), typecheck + lint clean; RLS block rides the CI job.
+
+## 2026-07-11 — Macro goals Phase 5b: BodySpec DEXA enrich + view (doc 17 §6, doc 15 §5 Phase 2, N34)
 
 Sixth build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md)
 (second of the three DEXA PRs): the LSC guardrail machinery lands and every

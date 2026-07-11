@@ -1273,6 +1273,64 @@ describe("bodyspec connect tables (doc 15 §2.2, N34 Phase 5a)", () => {
 
     await alice.from("body_scans").delete().eq("id", scan!.id);
   });
+
+  it("oauth_transactions is deny-all: not even the flow's own user can touch a round trip (§8.5)", async () => {
+    // seed a transaction as the service role (the only legitimate writer —
+    // the /connect route binds the session-derived user id server-side)
+    const service = createClient(URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const state = `rls-test-state-${Date.now()}`;
+    const { error: seeded } = await service.from("oauth_transactions").insert({
+      state,
+      user_id: aliceId,
+      provider: "bodyspec",
+      code_verifier: "test-verifier",
+      expires_at: new Date(Date.now() + 600_000).toISOString(),
+    });
+    expect(seeded).toBeNull();
+
+    // the initiating user cannot read their own row (grants revoked / no
+    // policies) — the state + verifier never reach a client role…
+    const { data: ownRead, error: ownReadError } = await alice
+      .from("oauth_transactions")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(ownRead ?? []).toEqual([]);
+    expect(ownReadError).not.toBeNull();
+
+    // …nor forge one, nor consume (delete) one
+    const { error: forge } = await alice.from("oauth_transactions").insert({
+      state: "forged-state",
+      user_id: aliceId,
+      provider: "bodyspec",
+      code_verifier: "forged",
+      expires_at: new Date(Date.now() + 600_000).toISOString(),
+    });
+    expect(forge).not.toBeNull();
+    const { error: burn } = await bob
+      .from("oauth_transactions")
+      .delete()
+      .eq("state", state);
+    expect(burn).not.toBeNull();
+
+    // single-use consumption: the service role's delete-returning redeems the
+    // row exactly once (the callback's replay defense)
+    const { data: consumed } = await service
+      .from("oauth_transactions")
+      .delete()
+      .eq("state", state)
+      .select()
+      .maybeSingle();
+    expect(consumed?.user_id).toBe(aliceId);
+    const { data: replay } = await service
+      .from("oauth_transactions")
+      .delete()
+      .eq("state", state)
+      .select()
+      .maybeSingle();
+    expect(replay).toBeNull();
+  });
 });
 
 describe("engine tables", () => {

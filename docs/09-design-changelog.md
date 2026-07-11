@@ -42,6 +42,37 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — BodySpec DEXA: return-to-app page for the cookie-free connect flow (doc 15 §8.5, N34)
+
+The connect round trip moved server-side after the owner's first real
+connect failed from the installed PWA (doc 15 §8.5: iOS runs the provider
+login in an in-app browser sheet with its own cookie jar, so the callback
+may execute in a context with no app session). One net-new surface rides
+along. **Rule-8 pass:** no mockup figure exists for any out-of-app
+interstitial; house-style, composed from the established tokens — this entry
+is the design record.
+
+### 1. OAuth callback — return-to-app interstitial
+
+- **Change:** when the connect callback lands in a browsing context that
+  does not hold the initiating user's session (the installed-PWA sheet), it
+  renders a minimal standalone page instead of redirecting into the app:
+  logotype, lowercase title (`bodyspec connected` / `connection not
+  completed`), the same one-shot outcome line the `/more/bodyspec` flash
+  shows (one copy definition, shared), a muted note telling the user this
+  window opened outside the app and to close it, and a full-width
+  ink-bordered `OPEN WORKOUT` link to `/more/bodyspec`. Cream/ink tokens
+  inlined (the page exists outside the app shell); square corners; no
+  exclamation marks. A context that does hold the session keeps the
+  original redirect + flash — the interstitial only appears where a
+  redirect would have bounced to sign-in.
+- **Rationale:** the sheet cannot render the app (no session in its jar)
+  and must never dead-end at a sign-in screen for a flow that has already
+  succeeded server-side.
+- **Affected figures:** none.
+- **Impact:** `NET-NEW` + `DATA` — `oauth_transactions` migration
+  (`20260711000004`), connect/callback rework, interstitial response.
+
 ## 2026-07-11 — BodySpec DEXA: enrich + view (doc 17 §6, N34 Phase 5b)
 
 The second DEXA PR (doc 15 §5 Phase 2): the LSC guardrail machinery lands
