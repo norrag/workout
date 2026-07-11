@@ -4,6 +4,19 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 71 (cont.): Batch-16 intake — N43, the strength band's calendar-bucket defect
+
+Immediately after the R2/R3 activations the owner reviewed the flip's
+consequences and raised a design inconsistency: the strength band buckets by
+calendar training years (12.7 y → advanced 0.5–1.5 %/mo) while the
+hypertrophy path prices FFMI proximity (owner's developed fraction ≈ 0 →
+novice-rate lean-mass projection) — the same calendar-vs-body-comp defect
+N21 fixed on the hypertrophy side, now **metering the pacer** since the R3
+flip. Filed as **N43** (D, HIGH, WS C, needs-input): research pass →
+proximity-derived strength band (v23); interim keep-v22 vs roll-back-v21
+decision framed in-row. Verbatim in Batch 16. N36 unaffected (envelope is
+source-agnostic). Committed to the open PR #178 branch.
+
 ## 2026-07-11 — Session 71: Phase R2 + R3 executed (v21 + v22 active), target cards return
 
 Owner-directed activation session on the doc-17 spine (branch
