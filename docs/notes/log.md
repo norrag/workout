@@ -6,7 +6,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-07-11 — Session 65: N41 built — doc 17 Phase 4 (bodyweight series + create-flow priming)
 
-Owner kicked off Phase 4 ("implement phase 4"). One PR (**#<n>**, branch
+Owner kicked off Phase 4 ("implement phase 4"). One PR (**#172**, branch
 `claude/macrocycle-goals-phase-4-flvrc9`); migration `20260711000001`
 (`bodyweight_log` + the `v_macro_summary` logged-span columns).
 
