@@ -11,6 +11,16 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-10 — macro goals Phase 2 merged (PR #170)
+
+Reconciliation sweep at the doc-17 Phase-3 session start: N37's PR merged
+2026-07-10 (row stamped `done (PR #170)` in-PR per protocol). Full record in
+doc 17 §3, doc 16 §6, PROGRESS, and the Session-63 `log.md` entry.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N37 | `rate_source: "plan"` pacer branch (doc 16 §6, §11 — the macro-rate pacer paces against the profile-personalized plan band instead of the bucket table) | F | P | **done (PR #170, merged 2026-07-10).** Doc 17 §3 / Phase 2: `EngineInputs.planStrengthRate` derived input (doc-14 denylisted from the fingerprint, recorded in decision inputs, replays frozen through recompute + admin replay), leaf `queries/plan-rate.ts` (`derivePlanStrengthRate` over `planMacrocycle.strengthRatePctMonth`; self-gates on mode; never throws) assembled at the `progressionHistory` sites, `pacerTargetRate` `"plan"` branch (lerp × goal factor, degrades to `"band"` — never unpaced; source-agnostic for N36), `seedMeso` opt. No migration, no behavior change — every params row keeps `rate_source: "band"`; the flip is the v22 micro-bump at doc 17 Phase R3 (after R1 + R2). Tests +16 (suite 991). |
+
 ## Swept 2026-07-10 — macro goals Phase 1 merged (PR #169)
 
 Reconciliation sweep at the doc-17 Phase-2 session start: N21's PR merged

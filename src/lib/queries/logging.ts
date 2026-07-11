@@ -17,6 +17,11 @@ import { getExerciseE1rmAnchors } from "./anchors";
 import { getMuscleGroupsCached } from "./reference";
 import { computeSlotPrescriptions } from "./slot-prescription";
 import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
+import {
+  isTerminalMacroStatus,
+  maybeCompleteMacroAfterMeso,
+  planEndMacrocycle,
+} from "./macro-close";
 
 type Client = SupabaseClient<Database>;
 
@@ -1497,10 +1502,107 @@ export async function endMesocycle(
     if (microUpdError) throw microUpdError;
   }
 
-  const { error: mesoUpdError } = await supabase
+  const { data: endedMeso, error: mesoUpdError } = await supabase
     .from("mesocycles")
     .update({ status: "completed" })
     .eq("id", mesoId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("macrocycle_id")
+    .single();
   if (mesoUpdError) throw mesoUpdError;
+
+  // doc 17 §4.1 natural close: ending the macro's last open block closes the
+  // macro itself (placeholders don't count as open work)
+  await maybeCompleteMacroAfterMeso(supabase, userId, endedMeso.macrocycle_id);
+}
+
+// ---------------------------------------------------------------------------
+// end a macrocycle (doc 17 §4.1, N40) — the meso closeout family one level up.
+// Explicit and irrevocable: every open block is driven terminal (logged work ⇒
+// the endMesocycle path, never started ⇒ abandoned), then the macro completes.
+// Logged history is never touched (hard rule 5).
+// ---------------------------------------------------------------------------
+
+export interface EndMacroResult {
+  ok: boolean;
+  error?: string;
+  /** open mesos closed through the endMesocycle path (had logged work) */
+  ended: number;
+  /** open mesos + placeholders marked abandoned (never started) */
+  abandoned: number;
+}
+
+/**
+ * End a macrocycle: in position order, every non-terminal meso with logged
+ * work is ended via {@link endMesocycle} (open sets skipped, `completed`);
+ * never-started mesos and unplanned placeholders go `abandoned`; then the
+ * macro goes `completed`. Refused when the macro is already terminal.
+ */
+export async function endMacrocycle(
+  supabase: Client,
+  userId: string,
+  macroId: string,
+): Promise<EndMacroResult> {
+  const { data: macro, error: macroError } = await supabase
+    .from("macrocycles")
+    .select("id, status")
+    .eq("id", macroId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (macroError) throw macroError;
+  if (!macro)
+    return { ok: false, error: "Macrocycle not found.", ended: 0, abandoned: 0 };
+  if (isTerminalMacroStatus(macro.status))
+    return {
+      ok: false,
+      error: `this macrocycle is already ${macro.status}.`,
+      ended: 0,
+      abandoned: 0,
+    };
+
+  const { data: mesos, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select("id, status")
+    .eq("macrocycle_id", macroId)
+    .eq("user_id", userId)
+    .order("position", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (mesoError) throw mesoError;
+
+  // which open blocks hold logged work (few open blocks; per-block head count)
+  const withLogged = new Set<string>();
+  for (const m of mesos ?? []) {
+    if (m.status === "completed" || m.status === "abandoned") continue;
+    const { count, error } = await supabase
+      .from("logged_sets")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("mesocycle_id", m.id);
+    if (error) throw error;
+    if ((count ?? 0) > 0) withLogged.add(m.id);
+  }
+
+  const plan = planEndMacrocycle(
+    (mesos ?? []).map((m) => ({ ...m, hasLogged: withLogged.has(m.id) })),
+  );
+  for (const id of plan.endIds) {
+    await endMesocycle(supabase, userId, id);
+  }
+  if (plan.abandonIds.length > 0) {
+    const { error } = await supabase
+      .from("mesocycles")
+      .update({ status: "abandoned" })
+      .in("id", plan.abandonIds)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  const { error: macroUpdError } = await supabase
+    .from("macrocycles")
+    .update({ status: "completed" })
+    .eq("id", macroId)
+    .eq("user_id", userId);
+  if (macroUpdError) throw macroUpdError;
+
+  return { ok: true, ended: plan.endIds.length, abandoned: plan.abandonIds.length };
 }

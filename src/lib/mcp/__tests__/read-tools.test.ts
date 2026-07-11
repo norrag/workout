@@ -8,6 +8,7 @@ import type {
 import type { CyclesOverview, MesoPlan } from "@/lib/queries/cycles";
 import type { WeightedWeekSets } from "@/lib/queries/volume-projection";
 import type { MacroOverview } from "@/lib/queries/macro";
+import type { MacroRetrospective } from "@/lib/queries/macro-retrospective";
 import type { HistoryEntry } from "@/lib/queries/history";
 import type {
   ExclusionWithExercise,
@@ -26,6 +27,7 @@ import {
   type RolesByExercise,
   formatMesoSummary,
   formatMacroSummary,
+  formatMacroRetrospective,
   formatExerciseHistory,
   formatMuscleGroupVolume,
   formatExerciseSearch,
@@ -467,6 +469,114 @@ describe("formatMacroSummary", () => {
       is_estimate: true,
     });
     expect((out.stats as Record<string, unknown>).est_strength_change_pct).toBe(6.2);
+    // no retrospective block on a live macro
+    expect(out.retrospective).toBeUndefined();
+  });
+});
+
+// --- formatMacroRetrospective (doc 17 §4.2 parity) ---------------------------
+
+/** A completed-macro fold output, as `getMacroOverview` assembles it. */
+const RETRO: MacroRetrospective = {
+  strength: {
+    estStrengthPct: 6.2,
+    verdict: "within band",
+    informational: false,
+    band: { low: 4, high: 8 },
+    muscles: [{ muscleGroup: "Chest", scorePct: 6.5, lifts: 2 }],
+  },
+  mass: null,
+  demand: {
+    decisions: 16,
+    stepped: 7,
+    vanished: 2,
+    paced: 3,
+    notEarned: 4,
+    governorFirings: { rate_pacer: 3 },
+    gateFailures: { compliance: 3 },
+    vanishedShare: 0.22,
+    earnedThenMet: 5,
+    earnedThenMissed: 2,
+  },
+  adherence: { adherencePct: 92, sessionsLogged: 60, totalVolume: 200000 },
+  blocks: { completed: 4, abandoned: 1, notBuilt: 2 },
+};
+
+describe("formatMacroRetrospective", () => {
+  it("is a pure renaming of the shared fold — values pass through unchanged (parity)", () => {
+    const out = formatMacroRetrospective(RETRO);
+    expect(out.strength).toMatchObject({
+      est_strength_change_pct: 6.2,
+      verdict: "within band",
+      informational: false,
+      contract_band: { low: 4, high: 8 },
+      muscle_changes: [{ muscle_group: "Chest", e1rm_change_pct: 6.5, lifts: 2 }],
+    });
+    expect(out.demand).toMatchObject({
+      decisions: 16,
+      earned: 7,
+      vanished: 2,
+      paced: 3,
+      not_earned: 4,
+      governor_firings: { rate_pacer: 3 },
+      vanished_share: 0.22,
+      earned_then_met: 5,
+      earned_then_missed: 2,
+    });
+    expect(out.adherence).toEqual({
+      adherence_pct: 92,
+      sessions_logged: 60,
+      total_volume: 200000,
+    });
+    expect(out.blocks).toEqual({ completed: 4, abandoned: 1, not_built: 2 });
+    expect(out.mass).toBeNull();
+    expect(String(out.note)).toMatch(/contract/);
+  });
+
+  it("carries the unmeasured mass row verbatim", () => {
+    const out = formatMacroRetrospective({
+      ...RETRO,
+      strength: { ...RETRO.strength, verdict: null, informational: true, band: null },
+      mass: {
+        measured: false,
+        verdict: null,
+        measuredDeltaLb: null,
+        note: "not measured — a bodyweight series or DEXA scans bracketing this block would grade it",
+      },
+      demand: null,
+    });
+    expect(out.mass).toMatchObject({ measured: false, verdict: null });
+    expect(out.demand).toBeNull();
+    expect((out.strength as Record<string, unknown>).verdict).toBeNull();
+  });
+
+  it("rides get_macrocycle_summary once the macro is completed", () => {
+    const overview = {
+      macro: {
+        id: "M1",
+        name: "Summer Bulk",
+        goal_type: "strength",
+        status: "completed",
+        duration_months: 4,
+      },
+      mesos: [],
+      plan: {
+        target: { low: 4, high: 8, unit: "%", direction: "gain" },
+        perMonthRate: { low: 1, high: 2, unit: "%", direction: "gain" },
+        recommendedDurationMonths: 4,
+      },
+      stats: {
+        estStrengthPct: 6.2,
+        totalVolume: 200000,
+        sessionsLogged: 60,
+        adherencePct: 92,
+      },
+      retrospective: RETRO,
+    } as unknown as MacroOverview;
+    const out = formatMacroSummary(overview) as Record<string, unknown>;
+    expect(out.status).toBe("completed");
+    // the block IS the shared fold, snake_cased — parity by construction
+    expect(out.retrospective).toEqual(formatMacroRetrospective(RETRO));
   });
 });
 

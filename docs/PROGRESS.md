@@ -2,7 +2,74 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-10 (latest) — Macro goals Phase 2: `rate_source: "plan"` pacer branch (doc 17 §3, N37)
+## 2026-07-11 (latest) — Macro goals Phase 3: macrocycle closeout + retrospective (doc 17 §4, N40)
+
+Third build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
+a macrocycle can now end — naturally when its last real block reaches a
+terminal state, or by an explicit, irrevocable "End macrocycle" — and a
+completed macro's Overview grades the block against the stored goal contract.
+**No migration** — `completed` was already in the `macrocycles.status`
+vocabulary (no code path ever wrote it); the retrospective is derive-on-read
+(doc 17 principle 5). Started with the hard-rule-8 pass: 09-changelog entry
+(2026-07-11) for the three net-new house-style surfaces (End-macrocycle menu
+row + confirm sheet, retrospective card, `NOT BUILT` placeholder treatment) —
+no mockup figure exists for any of them.
+
+- **Close transitions (§4.1).** New leaf `queries/macro-close.ts`:
+  `macroClosesNaturally` (every real block `completed`/`abandoned`; unbuilt
+  `unplanned` placeholders don't count as open work; an all-placeholder macro
+  never self-closes) + `maybeCompleteMacroAfterMeso`, cascaded from both
+  meso-terminal sites — the final-week close in the week-advance path
+  (`queries/progression.ts`) and `endMesocycle`. Explicit `endMacrocycle`
+  (`queries/logging.ts`, beside `endWorkout`/`endMesocycle`): in position
+  order, open blocks with logged work close through the `endMesocycle` path
+  (open sets skipped, `completed`), never-started blocks and placeholders go
+  `abandoned`, then the macro completes. Logged history is never touched
+  (hard rule 5). Surface: MacroHeader ⋮ → "End macrocycle" (active macros
+  only) → BottomSheet confirm → `endMacrocycleAction`.
+- **Freeze (§4.1).** `goalsEditRefusal` (pure): a terminal macro refuses a
+  goals edit (re-contract) while rename/notes edits stay allowed — surfaced
+  as a form error by `editMacrocycleAction` and a tool error via
+  `update_macrocycle_goals`. `attachMesoToMacro` and `manageMacroSlots` now
+  refuse a terminal macro (the doc's "already blocked by position guards"
+  didn't hold — guards added). The completed Overview drops `+ PLAN`
+  (placeholders read `NOT BUILT`) and renders abandoned blocks honestly.
+- **Retrospective (§4.2).** Pure `macroRetrospective` fold
+  (`queries/macro-retrospective.ts`), assembled in `getMacroOverview` once
+  `status = 'completed'` so the Overview page and `get_macrocycle_summary`
+  read **one fold**: strength verdict = the est-strength rollup
+  (`getMacroStrength`, PR #157) vs the **stored contract** (`target_*` —
+  never the live recompute), verdict vocabulary fixed (`within band` /
+  `above band` / `below band` / `insufficient data`; the latter on a null
+  headline, < `strength.min_sessions` qualifying lifts, or a bandless
+  contract); informational on mass-goal macros (factor-0.75/0 pacing —
+  strength was never the promise); mass row renders **"not measured"** with
+  the pointer copy until measured body data brackets the span (the
+  `bodyData` parameter is the Phase-4/5 seam, loss-direction grading
+  included) — never proxy-graded; demand aggregate = per-exercise
+  `aggregateProgressionEvents` combined by `combineDemandSummaries`
+  (earned/paced/held mix, pacer-vs-gate pressure, vanished share; the row is
+  absent while the progression mode is inactive); adherence/volume tiles
+  restated at close; block-outcome mix (`DONE · ABANDONED · NOT BUILT`).
+  MCP: `formatMacroRetrospective` (a pure snake_case renaming of the fold,
+  parity-tested) rides `get_macrocycle_summary` with a new top-level
+  `status` field.
+- **Tests** +24 (suite 1015 green): natural-close matrix (incl. the §4 mixed
+  placeholder fixture), `planEndMacrocycle` matrix (logged → completed via
+  the meso path, untouched → abandoned, terminal untouched, order
+  preserved), freeze refusals, retrospective goldens (verdict per band
+  position, boundary-inclusive; insufficient-data rules; mass "not measured"
+  without body data + graded with the bracketing seam), demand-combiner
+  sums, Overview/MCP parity. New e2e `macrocycle-closeout.spec.ts`: end-macro
+  flow through the real UI → COMPLETE badge, retrospective renders
+  (INSUFFICIENT DATA verdict, 3 ABANDONED blocks), planning affordances and
+  the End row gone.
+
+Remaining / external: none for this phase — Phase 4 (N41 bodyweight series)
+slots its mass verdicts into the retrospective's `bodyData` seam; N34 5b
+likewise. The doc 17 Phase R activations (v20/v21/v22) remain owner steps.
+
+## 2026-07-10 — Macro goals Phase 2: `rate_source: "plan"` pacer branch (doc 17 §3, N37)
 
 Second build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
 the macro-rate pacer can now pace against the profile-personalized

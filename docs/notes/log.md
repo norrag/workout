@@ -4,6 +4,65 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 64: N40 built — doc 17 Phase 3 (macrocycle closeout + retrospective)
+
+Owner kicked off Phase 3 ("implement phase 3"). One PR (**#171**, branch
+`claude/macrocycle-goals-phase-3-qvav73`); **no migration** — `completed` was
+already in the macro status vocabulary (no code path wrote it), and the
+retrospective is derive-on-read per doc 17 principle 5.
+
+- **Hard-rule-8 gate first:** 09-changelog entry (2026-07-11) for the three
+  net-new surfaces — the header-⋮ "End macrocycle" + confirm sheet (the
+  End-mesocycle dialog's weight, one level up), the completed-Overview
+  retrospective card (ledger rows + verdict tags above the unchanged 2×2
+  tiles), and the timeline's `NOT BUILT` placeholder treatment. Rule-8 pass
+  re-verified: no mockup figure exists for any of them (fig 2.2 shows only
+  the live "to date" block); house-style from established primitives.
+- **Close transitions (§4.1):** new leaf `queries/macro-close.ts` —
+  `macroClosesNaturally` (every real block terminal; `unplanned` placeholders
+  aren't open work; all-placeholder macros never self-close) +
+  `maybeCompleteMacroAfterMeso`, cascaded from BOTH meso-terminal sites (the
+  final-week advance in `queries/progression.ts` and `endMesocycle`);
+  `endMacrocycle` (logging.ts, beside its family) drives every open block
+  terminal in position order — logged work ⇒ the `endMesocycle` path
+  (`completed`, open sets skipped), never started + placeholders ⇒
+  `abandoned` — then completes the macro. Irrevocable; logged history never
+  touched (hard rule 5).
+- **Freeze (§4.1):** `goalsEditRefusal` — a terminal macro refuses goals
+  edits (rename/notes stay allowed); `attachMesoToMacro` +
+  `manageMacroSlots` refuse placement/slot changes on a terminal macro (the
+  spec's "already blocked by position guards" turned out not to exist — added
+  them); the timeline's `+ PLAN` affordance and the End row disappear once
+  frozen. The edit action surfaces the refusal as a form error.
+- **Retrospective (§4.2):** pure `macroRetrospective` fold
+  (`queries/macro-retrospective.ts`) — strength verdict = the PR #157
+  est-strength rollup vs the **stored contract** (`target_*`, never the live
+  recompute), fixed vocabulary (`within band` / `above band` / `below band` /
+  `insufficient data` — the latter on a null headline, <
+  `strength.min_sessions` qualifying lifts, or a bandless contract);
+  informational (never lb-graded) on mass-goal macros; mass row **"not
+  measured"** until N41/N34 body data brackets the span (the `bodyData` seam
+  is in place, loss-direction grading included); demand aggregate =
+  per-exercise `aggregateProgressionEvents` combined by
+  `combineDemandSummaries` (earn/paced/held mix, pacer-vs-gate pressure,
+  vanished share; null while the mode is inactive); adherence/volume tiles
+  restated; block-outcome mix (`DONE · ABANDONED · NOT BUILT`). Assembled in
+  `getMacroOverview` once `status = 'completed'`, so the Overview page and
+  `get_macrocycle_summary` (new `retrospective` block + `status` field,
+  `formatMacroRetrospective`) read **one fold** — parity-tested.
+- **Tests** +24 (suite 1015 green): natural-close matrix incl. the mixed
+  placeholder fixture, `planEndMacrocycle` matrix, freeze refusals, verdict
+  goldens per band position + insufficient-data rules + never-proxy-graded
+  mass + the Phase-4/5 bodyData seam, demand-combiner sums, MCP parity
+  (values pass through unchanged; the summary block IS the fold). New e2e
+  (`macrocycle-closeout.spec.ts`): end-macro flow → COMPLETE badge +
+  retrospective renders (INSUFFICIENT DATA + 3 ABANDONED) + affordances gone.
+
+**N40 → done (PR #171).** N41 (Phase 4, bodyweight series) unblocks on merge —
+its mass-verdict rows slot into the retrospective's `bodyData` seam; N34 5b
+likewise. Reconciliation sweep: **N37 archived** (PR #170 merged; row →
+`archive.md`, live index trimmed).
+
 ## 2026-07-10 — Session 63: N37 built — doc 17 Phase 2 (`rate_source: "plan"` pacer branch)
 
 Owner kicked off Phase 2 ("implement phase 2"). One PR (**#170**, branch

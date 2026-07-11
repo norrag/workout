@@ -23,6 +23,7 @@ import {
   daysSincePerformed,
 } from "./progression-history";
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
+import { maybeCompleteMacroAfterMeso } from "./macro-close";
 import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
   buildConfigInputs,
@@ -705,6 +706,9 @@ export async function advanceWeekAfterWorkout(
         .eq("id", meso.id)
         .eq("user_id", userId);
       if (error) throw error;
+      // doc 17 §4.1 natural close: the macro completes when its last real
+      // block does (placeholders don't count as open work)
+      await maybeCompleteMacroAfterMeso(service, userId, meso.macrocycle_id);
     }
     const nextSibling = weekWorkouts.find(
       (w) =>
