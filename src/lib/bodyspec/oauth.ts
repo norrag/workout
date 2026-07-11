@@ -20,13 +20,6 @@ export const BODYSPEC_TOKEN_ENDPOINT = `${BODYSPEC_REALM}/protocol/openid-connec
 export const BODYSPEC_REVOCATION_ENDPOINT = `${BODYSPEC_REALM}/protocol/openid-connect/revoke`;
 export const BODYSPEC_SCOPES = "openid profile email offline_access";
 
-/** PKCE round-trip cookies (shared by the connect + callback routes; route
- *  modules may only export handlers, so the names live here). */
-export const BODYSPEC_PKCE_COOKIE = "bodyspec_pkce_verifier";
-export const BODYSPEC_STATE_COOKIE = "bodyspec_oauth_state";
-/** path-prefix covers /connect and /callback */
-export const BODYSPEC_COOKIE_PATH = "/api/integrations/bodyspec";
-
 /** The per-environment client id from dynamic registration. Null ⇒ the
  *  integration is not configured here (the screen says so; connect refuses). */
 export function bodyspecClientId(): string | null {

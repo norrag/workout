@@ -59,6 +59,21 @@ material moves exclusively through service-role call sites
 (`src/lib/queries/external-connections.ts`) with explicit user scoping (hard
 rule 4). Nothing token-shaped is ever selectable by a client role.
 
+### `oauth_transactions`
+An in-flight OAuth connect round trip (doc 15 §8.5, N34; migration
+`20260711000004`): `state` PK (32 bytes URL-safe entropy), `user_id`,
+`provider`, `code_verifier`, `expires_at`. The installed-PWA connect flow
+spans two browsing contexts with separate cookie jars (iOS runs the provider
+login — and the redirect back — in an in-app browser sheet), so the round
+trip lives server-side instead of in cookies. **Deny-all** like the secrets
+table: RLS enabled with no policies AND client grants revoked — created by
+`/connect` with the session-derived user id, consumed **single-use**
+(delete-returning by `state`) by `/callback`, exclusively through
+`src/lib/queries/oauth-transactions.ts`. The single-use state + 10-minute
+TTL is the round trip's credential; a transaction can only ever connect a
+provider account to the user who started the flow. Expired rows are pruned
+opportunistically on the next connect.
+
 ### `body_scans`
 Imported DEXA scan results, one row per provider result (doc 15 §2.2, N34;
 migration `20260711000002`): `provider` + `provider_result_id` (unique with

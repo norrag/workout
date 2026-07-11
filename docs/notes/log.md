@@ -4,6 +4,48 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 68: N34 field fix — cookie-free connect round trip (+ prod migration catch-up)
+
+Owner reported two things from first real use: the More tab erroring, and
+the first real BodySpec connect dying at Keycloak's "Cookie not found" from
+the installed PWA (screenshot; login + consent had succeeded). Branch
+`claude/macrocycle-phase-5b-migrations-1jagpf` (**PR #TBD**); migration
+`20260711000004`.
+
+- **Prod catch-up first (the More tab):** the 5a/5b PRs had merged but
+  their migrations were never applied to the live project. Diffed
+  `supabase/migrations/` against the live ledger — everything through
+  `20260711000001_bodyweight_log` was applied; applied `20260711000002`
+  (connect tables) + `20260711000003` (enrich + view) via MCP in order,
+  verified tables/view/policies/deny-all, advisors clean. More tab fixed.
+- **Root cause of the connect failure (structural, not a fluke):** from a
+  home-screen web app the OAuth round trip spans two browsing contexts —
+  iOS runs the provider login (and the redirect back) in an in-app browser
+  sheet with its own ephemeral cookie jar. The 5a flow carried PKCE
+  verifier + state in httpOnly cookies and required the Supabase session at
+  the callback: none of the three exist in the sheet. Recorded as doc 15
+  §8.5.
+- **Fix:** server-side `oauth_transactions` (deny-all; state PK = 256-bit
+  single-use credential, 10-min TTL, user id bound at /connect while the
+  app context still has the session). The callback consumes it by `state`
+  alone — zero cookies — and persists via service-role call sites scoped to
+  the transaction's user. Response adapts: initiating user's session
+  present → the original redirect + flash; otherwise a house-style
+  return-to-app interstitial (09 2026-07-11 entry; shared flash copy in
+  `more/bodyspec/flash.ts`) — never a sign-in bounce.
+- **Middleware catch (from driving the production build):** the blanket
+  signed-out→/sign-in redirect intercepted the session-less callback before
+  the handler ran — `/api/integrations/bodyspec` added to the middleware
+  public paths (both routes manage their own auth). Verified live: bare
+  callback → 400 interstitial, provider-error → interstitial, signed-out
+  connect → `/sign-in?redirect=/more/bodyspec`.
+- **Tests:** RLS deny-all + single-use-consumption block; suite green
+  (1057), typecheck + lint clean. Migration applied + posture verified on
+  the live project via MCP.
+
+Doc updates riding along: doc 03 (`oauth_transactions`), doc 15 §8.5,
+09-changelog (interstitial), PROGRESS, this log + N34 row.
+
 ## 2026-07-11 — Session 67: N34 5b built — doc 17 Phase 5b (BodySpec enrich + view)
 
 Owner kicked off Phase 5b ("implement phase 5b"). Second of the three DEXA

@@ -18,6 +18,13 @@ const PUBLIC_PATHS = [
   // blanket-redirected to /sign-in by the middleware.
   "/oauth/consent",
   "/api/oauth/decision",
+  // BodySpec OAuth round trip (doc 15 §8.5): the callback must complete in a
+  // browsing context that holds NO app session (the installed-PWA in-app
+  // sheet) — it authenticates by the single-use server-side transaction, and
+  // a redirect-to-/sign-in here would dead-end the flow the moment BodySpec
+  // sends the user back. The connect route handles its own signed-out case
+  // (preserving ?redirect=/more/bodyspec, which a blanket bounce would drop).
+  "/api/integrations/bodyspec",
   // Client error intake (R20): the (auth) + root error boundaries must be able
   // to report a crash from a signed-out state. Same-origin-guarded + zod-capped
   // in the route itself; a redirect-to-/sign-in here would eat every report.
