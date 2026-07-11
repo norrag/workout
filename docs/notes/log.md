@@ -7,7 +7,7 @@ Append a dated entry whenever a session moves work. Newest first.
 ## 2026-07-11 — Session 67: N34 5b built — doc 17 Phase 5b (BodySpec enrich + view)
 
 Owner kicked off Phase 5b ("implement phase 5b"). Second of the three DEXA
-PRs (**PR #TBD**, branch `claude/macrocycle-goals-phase-5b-7o486o`);
+PRs (**#174**, branch `claude/macrocycle-goals-phase-5b-7o486o`);
 migration `20260711000003` (`v_body_comp_history` + the `body_scans`
 proposal-resolution stamps).
 
