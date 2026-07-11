@@ -279,7 +279,33 @@ already merged, PRs #158–#161). Full mechanism: `docs/16-prescribed-progressio
 > `docs/reviews/2026-07-09-n21-strength-rate-priming.md` for the N21 → plan-rate
 > → envelope sequencing.
 
-### Activate engine_params **v21** (macro-target correction — doc 17 Phase R2)
+### ~~Activate engine_params **v21** (macro-target correction — doc 17 Phase R2)~~ (DONE 2026-07-11)
+
+> **ACTIVATED 2026-07-11** from a Claude session (doc-17 Phase-R session), with
+> the replay evidence the runbook demanded:
+> - **Prescription diff asserted ≈ empty, exactly:** `replay_decisions`
+>   candidate v21 over the 20 v20-sourced decisions → **0 changed / 0 errors**;
+>   candidate v21 vs candidate v20 over the same 100 mixed-version sources →
+>   **identical 14-diff sets** (those 14 are the already-reviewed v19→v20
+>   earned-step delta showing through old sources, not a v21 effect).
+> - **Target-layer review (the thing v21 actually changes):** pure-engine
+>   comparison v20 vs v21 params on the owner's live profile (36 M, 73 in,
+>   160.1 lb, 20.4 % bf, 12.7 training yrs → advanced bucket) — **byte-identical
+>   on every goal** (age < taper start, male factor 1.0, bf% present). The
+>   changes land where designed: the §2.2 continuity case (owner's profile
+>   minus bf%: 0.8–1.1 lb nonsense target → 9.1–13.7 lb via the BMI-band
+>   proxy, ≈ the measured-bf% 9.6–14.4 lb), the §2.1 age taper (60 F beginner
+>   ×0.7 floor; 45 M ×0.9; 18 M unchanged), and longer recommended durations
+>   for tapered lifters.
+> - Activated via admin MCP `activate_engine_params` (reported "e1rm block
+>   unchanged", as expected). Rollback = re-activate v20.
+> - **Target cards re-enabled** in the same session's PR (figs 2.2/2.3
+>   transcription; the `KEY-LIFT` nouns updated to est-strength per doc 17
+>   §2.5, the priming line gained its model-band half per the 09 2026-07-11
+>   §3 deferred note).
+>
+> Only the birthdate re-save below remains a human step. Original steps kept
+> for the record.
 
 `20260710000002_engine_params_v21_macro_target.sql` ships v21 **inactive**. It
 adds three `.optional()` params inside `macro_target` over v20 — the doc 17 §2
@@ -308,12 +334,38 @@ activation)** in doc 17 §8, but independent of it mechanically.
 | Step | What / why |
 |---|---|
 | ~~Apply the Phase-1 migrations to hosted~~ | **DONE 2026-07-11** (see note above). |
-| **Replay diff** | `replay_decisions` / `simulate_prescriptions` candidate v21. Targets are display/pacer layer — **the diff on prescriptions is expected ≈ empty; assert that** (v20's `rate_source` is `"band"` and reads the raw bucket table, so even the pacer is untouched until the v22 `"plan"` flip). |
-| **Owner reviews + activates v21** | Prefer the admin MCP `activate_engine_params` (will report "e1rm block unchanged"). What changes on activation: macro create/edit targets + recommended durations personalize (strength taper for 40+, hypertrophy continuity, non-collapsing long-cut bands). Roll back by re-activating the prior row. |
-| **Re-enable the target cards** | After activation: a small code PR transcribing figs 2.2/2.3 per hard rule 8 (PR #140 made the hide a pure view change). |
-| **Owner re-saves the profile birthdate** | The profile page now carries BIRTHDATE (fig 4.5 amendment, 09-changelog 2026-07-10); the legacy static `age` int stays the fallback until re-saved. One-time, no backfill (single-user deployment). |
+| ~~Replay diff~~ | **DONE 2026-07-11** (see activation note above — asserted exactly empty on prescriptions). |
+| ~~Owner reviews + activates v21~~ | **DONE 2026-07-11** via `activate_engine_params`. |
+| ~~Re-enable the target cards~~ | **DONE 2026-07-11** — same session's PR (figs 2.2/2.3 restored; est-strength nouns; priming model-band half). |
+| **Owner re-saves the profile birthdate** | The profile page now carries BIRTHDATE (fig 4.5 amendment, 09-changelog 2026-07-10); the legacy static `age` int stays the fallback until re-saved. One-time, no backfill (single-user deployment). **Still open.** Low stakes today: at 36 the taper doesn't bind, so the static int and the birthdate produce the same plan until 40. |
 
-### Flip `rate_source` to **"plan"** (v22 micro-bump — doc 17 Phase R3)
+### ~~Flip `rate_source` to **"plan"** (v22 micro-bump — doc 17 Phase R3)~~ (DONE 2026-07-11)
+
+> **FLIPPED 2026-07-11** from the same Claude session, after R2:
+> - **① Proposed v22** via admin MCP `propose_engine_params` (base v21, single
+>   change `progression.rate_source: "plan"`; hash `e127b0bf…4a31`).
+> - **② Replay diff:** candidate v22 over the 20 v20-sourced decisions →
+>   **0 changed / 0 errors** (byte-identical); over 100 mixed-version sources →
+>   the same 14 legacy v19→v20 diffs as v21, i.e. **no v22-specific diff at
+>   all**. Why byte-identical even though decisions recorded a
+>   `planStrengthRate`: the one recorded `rate_pacer` firing stays paced under
+>   the tighter plan band (trailing ≥ the 1.69 %/mo bucket target implies ≥
+>   the 0.75 %/mo plan target), and the granted steps had no trailing
+>   prescribed-gain history to re-judge (v20 activated the same day).
+> - **③ Activated** via `activate_engine_params` ("e1rm block unchanged").
+>   Rollback = re-activate v21.
+> - **The real change is forward-looking, and material for the owner:** the
+>   `"band"` branch read `strength_pct_month[experience_level]` — the
+>   self-reported **intermediate** 1.5–3 %/mo — while `planMacrocycle` buckets
+>   by training years (12.7 → **advanced** 0.5–1.5 %/mo; age 36 ⇒ no taper,
+>   male ⇒ factor 1). At `band_position 0.5` × `goal_rate_factor 0.75`
+>   (hypertrophy) the pacer target drops **≈ 1.69 → 0.75 %/mo**: earned steps
+>   defer noticeably sooner once trailing prescribed-gain history accumulates.
+>   That is the designed honesty correction, not a regression — monitor it
+>   (④ below) rather than re-loosening.
+> - **④ Monitor** stays the standing instruction (unchanged, below).
+>
+> Original steps kept for the record.
 
 The doc 17 §3 / Phase 2 code (N37) ships the pacer's `"plan"` branch fully
 plumbed but **unflipped**: every params row still carries

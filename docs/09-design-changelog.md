@@ -42,6 +42,49 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-11 — Phase R2: the target cards return (figs 2.2/2.3), with the est-strength nouns
+
+v21 (the doc 17 §2 target-engine correction) is **active on hosted**, so the
+N21 owner hide of 2026-07-04 is lifted — the cards are re-transcribed from
+figs 2.2/2.3 (the geometry, sizes, and copy of the pre-hide build, which was
+itself the mockup transcription; verified against
+`workout - App Screens v2.dc.html`).
+
+### 1. Macro Overview (fig 2.2) — `REALISTIC TARGET` card restored
+
+- **Change:** the card returns at the top of the OVERVIEW panel, above the
+  mesocycle timeline (which regains its `mt-[18px]` ruled offset): tracked
+  header `REALISTIC TARGET · <noun>`, 34 px range numeral + `over N mo`,
+  accent `≈ +low–high / month` rate line, profile chips (training age /
+  bodyweight / experience), and the estimate fine print. One wording
+  amendment vs the pre-hide build: the strength-goal noun is
+  **`EST. STRENGTH`**, not `KEY-LIFT STRENGTH` — key lifts were retired as a
+  measurement by PR #157 (doc 17 §2.5); the target is graded by the
+  est-strength rollup, so the card must name what will actually be measured.
+- **Affected figures:** 2.2.
+- **Impact:** `RETROFIT` — pure view restore (`planMacrocycle` kept running
+  throughout; PR #140 made the hide view-only).
+
+### 2. Create engine card (fig 2.3) — `YOUR TARGET` + rate + rationale restored
+
+- **Change:** the engine card's accent `YOUR TARGET` header, range numeral
+  with the goal noun (`lean mass` / `est. strength` — same PR #157 amendment
+  — / `bodyweight`; maintain renders the recomposition line), the accent
+  per-month rate, and the closing rationale paragraph under the CREATE button
+  all return. The PLAN block (block math + phase strip) is unchanged.
+- **Change (the 09 2026-07-11 §3 deferred half):** the prior-block priming
+  line gains its **model band** — the top-ruled ledger area now stacks two
+  rows when a prior completed macro qualifies: `MODEL BAND` /
+  `<low>–<high>%/MO EST. STRENGTH` (the §2.1-personalized
+  `strengthRatePctMonth` — strength-denominated to match the measured row,
+  whatever the goal) above `LAST BLOCK MEASURED` / `+X%/MO EST. STRENGTH`.
+  Composition per doc 17 §5 (*"model band 1.5–3%/mo · your last block
+  measured 1.9%/mo"*), rendered in the established ledger-row grammar; still
+  display-only, never blended into the target (principle 4).
+- **Affected figures:** 2.3.
+- **Impact:** `RETROFIT` — view restore + one new ledger row in the priming
+  area.
+
 ## 2026-07-11 — BodySpec DEXA: engine + MCP, and the profile body-fat control rework (doc 17 §6, N34 Phase 5c)
 
 The third DEXA PR (doc 15 §5 Phase 3) plus an owner-directed rework of the

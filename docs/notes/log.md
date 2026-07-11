@@ -4,6 +4,45 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 71 (cont.): Batch-16 intake — N43, the strength band's calendar-bucket defect
+
+Immediately after the R2/R3 activations the owner reviewed the flip's
+consequences and raised a design inconsistency: the strength band buckets by
+calendar training years (12.7 y → advanced 0.5–1.5 %/mo) while the
+hypertrophy path prices FFMI proximity (owner's developed fraction ≈ 0 →
+novice-rate lean-mass projection) — the same calendar-vs-body-comp defect
+N21 fixed on the hypertrophy side, now **metering the pacer** since the R3
+flip. Filed as **N43** (D, HIGH, WS C, needs-input): research pass →
+proximity-derived strength band (v23); interim keep-v22 vs roll-back-v21
+decision framed in-row. Verbatim in Batch 16. N36 unaffected (envelope is
+source-agnostic). Committed to the open PR #178 branch.
+
+## 2026-07-11 — Session 71: Phase R2 + R3 executed (v21 + v22 active), target cards return
+
+Owner-directed activation session on the doc-17 spine (branch
+`claude/macro-goals-r2-r3-envelope-ntaw6h`, **PR #178**). No new intake.
+
+- **R2 (v21):** replay evidence gathered exactly as the runbook demanded
+  (0/20 changed on v20 sources; v21 ≡ v20 diff sets on 100 mixed sources) +
+  a pure-engine target-band review (owner profile byte-identical; §2.1/§2.2
+  corrections verified on sample profiles) → activated via
+  `activate_engine_params`. Target cards re-enabled in this PR (figs 2.2/2.3;
+  est-strength nouns per doc 17 §2.5; priming model-band half joins). N21's
+  archived row gains the activation postscript.
+- **R3 (v22):** proposed via `propose_engine_params` (base v21 +
+  `rate_source: "plan"`), replay byte-identical (0/20 + no v22-specific diff
+  on mixed sources), activated. Key forward-looking fact recorded in the
+  runbook: owner's pacer target drops ≈ 1.69 → 0.75 %/mo (self-reported
+  intermediate bucket → training-years advanced plan band). N37's archived
+  row gains the postscript.
+- **Envelope (N36):** no code change — confirmed still field-data-gated
+  (v20/v22 progression decisions span < 1 day; the fit needs ≥ 2–3 real
+  completed mesos). Explained to the owner in-session (why the fit data
+  isn't backfillable: pre-v20 history contains no engine-led asks, so no
+  earn/miss/governor outcomes exist to fit thresholds against).
+- Human steps remaining: birthdate re-save (non-binding until 40); the
+  envelope fit clock runs on training time.
+
 ## 2026-07-11 — Session 70: N36 envelope loop — mechanism built, shipped OFF (doc 17 Phase 6)
 
 Owner kicked off doc 17 Phase 6. Reconciliation sweep first: no stale `done`
