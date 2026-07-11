@@ -4,6 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 66: N34 5a built — doc 17 Phase 5a (BodySpec connect + import)
+
+Owner kicked off Phase 5 ("implement phase 5"). First of the three DEXA PRs
+(**#173**, branch `claude/macrocycle-goals-phase-5-2xfwkf`); migration
+`20260711000002` (`external_connections` + deny-all
+`external_connection_secrets` + `body_scans`).
+
+- **Reconciliation sweep first:** N41 (PR #172) merged → row archived
+  ("Swept 2026-07-11 — macro goals Phase 4").
+- **Hard-rule-8 gate:** 09-changelog entry (2026-07-11, Phase-5a section)
+  for the More settings row, the `/more/bodyspec` integration screen, and
+  the scan detail ledger — all house-style, no mockup figure exists.
+  Re-verified the live `openapi.json` (still v0.14.3) before writing the
+  zod schemas.
+- **Connect (doc 15 §8):** PKCE S256 + `offline_access` against the
+  Keycloak realm; per-environment self-registered clients
+  (`scripts/register-bodyspec-client.ts` — human-run so the one-shot
+  `registration_access_token` lands in a secret store, not a transcript;
+  runbook section in `manual-operations.md`). The callback runs the §8.3
+  first-login verification (`GET /users/me`) BEFORE persisting anything;
+  `api_denied` fails the connect with its own copy + runbook pointer.
+- **Secrets posture (hard rule 4):** token material in a deny-all table
+  (RLS, no policies, client grants revoked) reached only via service-role
+  call sites in `queries/external-connections.ts`, always user-scoped;
+  refresh rotation there too; dead grant ⇒ row `error` ⇒ RECONNECT.
+- **Import:** serial identity-from-token fetchers, full-history backfill,
+  zod at the boundary (lenient on unmapped fields), kg→lb / cm→in in
+  `convert.ts` only, verbatim `raw` per section, pure `mapScanToImport`
+  fold, idempotent upserts on `(user_id, provider, provider_result_id)`;
+  results without a composition section skip as non-DEXA.
+- **Deliberately NOT in 5a:** deltas/trends/verdicts (5b —
+  `v_body_comp_history` + LSC guardrails), `source:'dexa'` bodyweight
+  points + profile proposal (5b), engine/MCP (5c). Scans persist through a
+  disconnect unless the user opts into the purge (doc 15 §2.3).
+- **Tests:** +12 unit (suite 1039: conversion + map goldens off provider
+  examples, RFC 7636 vector, schema leniency), +5 RLS blocks (secrets
+  deny-all even to the owner; disconnect cascade), e2e integration-screen
+  spec. Unit/typecheck/lint/build green locally.
+
+Doc updates riding along: doc 03 (three tables), doc 15 §8.3 (build-status
+note — verification outcome pending the owner's first real login),
+PROGRESS, this log + N34 row (`in-progress — 5a shipped`).
+
 ## 2026-07-11 — Session 65: N41 built — doc 17 Phase 4 (bodyweight series + create-flow priming)
 
 Owner kicked off Phase 4 ("implement phase 4"). One PR (**#172**, branch

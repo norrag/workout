@@ -2,7 +2,78 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase 4: bodyweight series + create-flow priming (doc 17 §5, N41)
+## 2026-07-11 (latest) — Macro goals Phase 5a: BodySpec DEXA connect + import (doc 17 §6, doc 15 §5 Phase 1, N34)
+
+Fifth build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md)
+(first of the three DEXA PRs): a BodySpec account can be connected per-user
+via OAuth, the full scan history imports as canonical imperial rows, and the
+More tab gains the integration + scan-ledger screens. Started with the
+hard-rule-8 pass: 09-changelog entry (2026-07-11, Phase-5a section) for the
+three net-new house-style surfaces (More settings row, `/more/bodyspec`
+integration screen, scan detail ledger) — no mockup figure exists for any.
+Re-verified the live `openapi.json` (still v0.14.3, shapes unchanged since
+the doc 15 assessment) before transcribing the zod schemas.
+
+- **Schema** (migration `20260711000002`, RLS + tests in the same PR):
+  `external_connections` (status/timestamps/display identity, owner-RLS,
+  unique `(user_id, provider)`; delete = disconnect of record),
+  `external_connection_secrets` (**deny-all**: RLS with no policies + client
+  grants revoked — token material moves only through service-role call sites
+  in `queries/external-connections.ts`, explicitly user-scoped, hard rule 4),
+  `body_scans` (doc 15 §2.2 canonical columns + `regions`/`percentiles`/
+  verbatim `raw` jsonb; unique `(user_id, provider, provider_result_id)` ⇒
+  idempotent re-syncs; owner delete allowed — third-party health data, not
+  logged training history). Doc 03 updated.
+- **OAuth (PKCE, `offline_access`).** `lib/bodyspec/oauth.ts`: S256 PKCE
+  against the Keycloak realm; short-lived httpOnly cookies carry
+  verifier/state through `/api/integrations/bodyspec/connect` → `/callback`.
+  The callback runs the **doc 15 §8.3 first-login verification**
+  (`GET /users/me` with the fresh token) *before persisting anything* —
+  rejection fails the connect with `api_denied` copy instead of
+  half-connecting. Clients are self-registered per environment
+  (`scripts/register-bodyspec-client.ts`, human-run — the one-shot
+  `registration_access_token` must land in a secret store, not a session
+  transcript); runbook section added to `manual-operations.md`
+  (`BODYSPEC_CLIENT_ID` env var; screen shows `NOT AVAILABLE IN THIS
+  ENVIRONMENT` until set). Token refresh rotates through the service-role
+  path; a dead refresh grant marks the row `error` and the screen offers
+  RECONNECT (cheap re-connect posture, doc 15 §1.1).
+- **Import.** `lib/bodyspec/api.ts` (serial, identity-from-token fetchers;
+  paginated full-history backfill) + `schemas.ts` (zod at the boundary,
+  lenient on unmapped fields — early-access API) + `convert.ts` (kg→lb /
+  cm→in at the import boundary ONLY; pure `mapScanToImport` fold →
+  canonical row; RMR matched by formula name; results without a composition
+  section skipped as non-DEXA). `lib/bodyspec/sync.ts`: pull-based sync
+  (connect backfills inline; SYNC NOW re-pulls) — already-imported results
+  are never re-fetched, outcome stamps `last_synced_at`/`last_sync_error`.
+- **UI.** More settings row (`SET UP ›` / `CONNECTED` / `RECONNECT ›`);
+  `/more/bodyspec` (connect CTA, CONNECTION ledger rows, SYNC NOW,
+  disconnect via BottomSheet confirm with an opt-in "also delete imported
+  scans" purge — tokens always destroyed, doc 15 §2.3); scan list renders
+  whenever scans exist (they persist through a disconnect unless purged);
+  `/more/bodyspec/[scanId]` scan ledger (measured-at-scan, composition,
+  regions, VAT, BMD, percentiles stated flat, RMR pair). **No deltas,
+  trends, or verdicts in 5a** — comparison ships with `v_body_comp_history`
+  + LSC guardrails in 5b (doc 15 §6). New `formatMeasuredLb` keeps
+  measurement precision (deliberately not the half-pound logging snap).
+- **Boundaries held:** no engine touch (5c), no profile mutation (5b's
+  consented proposal), scans never feed prescriptions or the doc-14
+  fingerprint (doc 15 §2.4/§3.3).
+- **Tests** +12 unit (suite 1039 green: conversion goldens off the provider's
+  published examples, full-map golden, composition-only degradation, RMR
+  matching, RFC 7636 S256 vector, authorization-URL shape, boundary-schema
+  leniency), +5 RLS blocks (cross-user deny both tables, secrets deny-all
+  even to the owner, disconnect cascade, provider vocabulary, scan upsert
+  key + owner purge), new e2e (`bodyspec-integration.spec.ts`: More row →
+  unconfigured state → seeded scan list + detail ledger). Unit/typecheck/
+  lint/build green locally; RLS + e2e ride the CI local stack as usual.
+- **Remaining / external:** the `manual-operations.md` → "BodySpec" steps —
+  register clients (①–④), apply `20260711000002` to hosted (⑤), first
+  real login resolves the §8.3 residual (⑥; outcome to be recorded in doc
+  15 §8.3). 5b (enrich + view + retrospective verdict rows) and 5c
+  (engine + MCP) are the next two PRs on the doc 17 §6 plan.
+
+## 2026-07-11 — Macro goals Phase 4: bodyweight series + create-flow priming (doc 17 §5, N41)
 
 Fourth build slice of [doc 17 — macrocycle goal layer](17-macrocycle-goals.md):
 the measured bodyweight series lands, giving mass-denominated macro goals

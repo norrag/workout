@@ -327,6 +327,28 @@ only worth flipping to once v21's personalization is live.
 | **③ Owner reviews + activates** | Confirm the shifted mix reads right (a lifter whose personalized band sits below the bucket band gets paced sooner; above, later). Activate via `activate_engine_params`; roll back by re-activating v21. |
 | **④ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20 monitor row; this field data also feeds the Phase-6 envelope fit. |
 
+### BodySpec: register the OAuth clients + first-login verification (doc 15 §8, doc 17 Phase 5a)
+
+The Phase-5a build (N34 — connect + import) ships fully coded but inert until
+each environment has its own self-registered BodySpec OAuth client (doc 15
+§8.1: anonymous OIDC dynamic client registration — no BodySpec contact or
+approval involved). Until `BODYSPEC_CLIENT_ID` is set, the More → BodySpec
+screen shows `NOT AVAILABLE IN THIS ENVIRONMENT` and nothing else changes.
+
+| Step | What / why |
+|---|---|
+| **① Register a client per environment** | On a local machine: `npx tsx scripts/register-bodyspec-client.ts http://localhost:3000` (dev) and `npx tsx scripts/register-bodyspec-client.ts https://workout-zeta-murex.vercel.app` (prod — use the custom domain instead if/when one lands). Each registration is independent; the redirect URI is pinned to `<origin>/api/integrations/bodyspec/callback` and must match the environment byte-for-byte. |
+| **② Persist the `registration_access_token`** | The script prints it once. Store it in the env secret store (e.g. Vercel env var `BODYSPEC_REGISTRATION_TOKEN`, unused at runtime, or the household password manager) and note the `client_id` + registration date **here**. It is the ONLY credential that can later update or delete that client — lost token = the client can only be abandoned (doc 15 §8.1). |
+| **③ Set `BODYSPEC_CLIENT_ID`** | Vercel → Settings → Environment Variables (Production; Preview optional — preview aliases rotate and are not registered redirect URIs) and local `.env.local`. Server-only — deliberately NOT `NEXT_PUBLIC_*`. |
+| **④ Local dev only: `NEXT_PUBLIC_APP_URL`** | Must be `http://localhost:3000` locally so the app derives the localhost redirect URI that was registered in ①. |
+| **⑤ Apply migration `20260711000002` to hosted** | `bodyspec_connect` — `external_connections` + deny-all `external_connection_secrets` + `body_scans`. Additive (three new tables, RLS from birth); apply via Supabase MCP `apply_migration` or `supabase db push` at/after merge. |
+| **⑥ First login = the §8.3 verification** | More → BodySpec DEXA → CONNECT. The callback runs `GET /api/v1/users/me` with the fresh token **before persisting anything**. Success ⇒ the §8.3 `ext_api_token` audience residual is cleared — record that in doc 15 §8.3 and this row is done. Failure shows "rejected the app's access token" (`?error=api_denied`) ⇒ the residual is real: email `dev-support@bodyspec.com` with the concrete question (self-registered PKCE client, `openid profile email offline_access`, API returns 401/403 on `/users/me` — what grants the API audience?), per doc 15 §8.3's fallback. |
+
+> Registration itself is deliberately left to a human even though the sandbox
+> could reach the endpoint: the response contains the one-shot
+> `registration_access_token`, which must land directly in a secret store —
+> not in a session transcript or CI log.
+
 ---
 
 ## How Claude flags these

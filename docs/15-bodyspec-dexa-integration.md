@@ -482,6 +482,12 @@ observable after the first real login.
   in → `GET /api/v1/users/me`. Five minutes, at build time. If it fails,
   the fallback is exactly the old Phase 0 (email dev-support), with a
   concrete question instead of an open-ended request.
+  *Build status (2026-07-11, Phase 5a):* the check is wired as the connect
+  flow's gate — the OAuth callback calls `/users/me` **before persisting
+  anything** and fails the connect with its own error state (`api_denied`)
+  if rejected; runbook steps in `docs/deployment/manual-operations.md` →
+  "BodySpec". **Outcome to be recorded here after the owner's first real
+  login.**
 - **Rate limits** (§7-3): still undocumented; a single user syncing a few
   scans a year cannot plausibly hit any limit. Backfill politely (serial
   requests) and move on.
