@@ -10,7 +10,7 @@ Doc 17 §6 Phase 5c (the last DEXA build PR), plus an owner note pinned to
 the same PR: after a scan's proposal updated the profile, the profile still
 rendered the estimate bands with a stale band lit; the band increments
 (10/14/18/23/29) read as arbitrary; and there was no between-band entry.
-Branch `claude/macrocycle-phase-5c-dexa-4hyegu` (PR #<n>).
+Branch `claude/macrocycle-phase-5c-dexa-4hyegu` (**PR #176**).
 
 - **Engine path (no engine change, by design):** measured bf% rides the
   existing `bodyFatPct` profile input (doc 15 §3.1) — the 5b apply already
