@@ -452,28 +452,34 @@ opposite direction from the R3 tightening, and the point of N43.
 | **④ Re-flip `rate_source` to `"plan"`** | After v23 is active + reviewed, propose a micro-bump over v23 with `progression.rate_source: "plan"` (the R3 flip, now reading the corrected band) and run its own replay diff — the paced/stepped mix shifts on earned working weeks (now toward *more* headroom for the undermuscled case), no entitlement change. Roll back by re-activating v23 (source `"band"`). |
 | **⑤ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20/R3 monitor rows; this also feeds the Phase-6 envelope fit, which **must** run on the corrected band (N36 is blocked-by N43). |
 
-### Fit + activate the envelope loop (doc 17 §7 / Phase 6, N36 — field-data-gated)
+### Activate the envelope loop (doc 17 §7 / Phase 6, N36 — self-gating per user)
 
 The doc 17 §7 mechanism ships fully coded and OFF: `band_position` becomes a
 per-user derived input (`EngineInputs.bandPosition` — a pure, clockless fold
 over the trailing completed mesos' recorded decisions, doc-14 §3 treatment)
 the moment a params row carries `progression.envelope`; **no applied row
-carries the block**, so behavior today is byte-identical. The update rule's
-thresholds in the schema (`raise`/`lower`, `min_decisions`, `step 0.1`,
-`lookback_mesos 3`, `dwell_mesos 1`, `max_age_days 180`) are **PROVISIONAL —
-deliberately not shipped in any params row until fit from field data** (doc 17
-§7: v20 active + a few real mesos). Gated on **R1 — v20 verified ACTIVE on
-hosted via MCP 2026-07-11** — plus real training time; independent of the R3
-flip (`band_position` composes identically under `"band"` and `"plan"`).
+carries the block**, so behavior today is byte-identical.
+
+**Reframed 2026-07-12 (owner; doc 17 §7 amendment):** activation no longer
+waits on a field-data threshold fit. The loop **self-gates per user** — until
+`min_history_mesos` (default 2) qualifying completed mesos (≥ `min_decisions`
+status-coded decisions each) sit inside the lookback window, the fold
+short-circuits to the **tunable** `progression.band_position` default (0.5 =
+today's fixed behavior), and it kicks in automatically as each user's own
+history accrues (and degrades back when it ages out). So enabling is a single
+global act, safe for data-rich and data-poor users alike; the schema's
+provisional thresholds are conservative starting points that the monitor step
+below **refits** from field data. Prereqs all cleared: v20 active
+(2026-07-11), N43's corrected band active as v24 (2026-07-12); independent of
+the rate-source flip (`band_position` composes identically under `"band"` and
+`"plan"`). Run whenever ready — nothing further to wait for.
 
 | Step | What / why |
 |---|---|
-| **① Accumulate field data** | ≥ 2–3 REAL completed mesos under active v20. Nothing to do but train; the always-on trace records everything the fit reads. |
-| **② Fit the thresholds** | Read `get_progression_history` per exercise (earn/miss/skip mix, governor firings, `vanished` share, earned-then-met/missed pairing). Sanity-check the provisional `raise`/`lower` cutoffs against the observed distributions (e.g. does a "good" meso actually clear `earn_rate 0.7` with `miss_ratio ≤ 0.2`? do rate-pacer trips occur at all?). Adjust the block's values in a Claude session — the fold + goldens live in `src/lib/engine/rules/envelope.ts` / `__tests__/envelope.test.ts`. |
-| **③ Propose the params bump** | Admin MCP `propose_engine_params`: the active row's content + the fitted `progression.envelope` block (a micro-bump — no other knob moves). |
-| **④ Replay diff** | `replay_decisions` for the candidate. Expected shape: decisions recorded WITHOUT a `bandPosition` input replay byte-identically (the fold is assembly-time; replay uses recorded inputs); only freshly generated weeks/seeds consume a derived position, and any live diff is the pacer's paced/stepped mix shifting with the position — **never an entitlement or quantum change**. |
-| **⑤ Owner reviews + activates** | Confirm the position the fold currently derives reads right against the athlete's own sense of the block (position 0.5 = today's fixed behavior). Activate via `activate_engine_params`; roll back by re-activating the prior row — the loop is OFF again instantly (derived, no stored state to unwind). |
-| **⑥ Monitor** | Each decision records the position it consumed in its `inputs` (`get_engine_decisions`), so the position's trajectory is reconstructible per meso boundary. Watch for the §7 worst case: a position pinned at 0/1 for consecutive boundaries means the thresholds need a refit (both are defensible programs, but a pin is a signal, not a steady state). |
+| **① Propose the params bump** | Admin MCP `propose_engine_params`: the active row's content + the `progression.envelope` block at the schema defaults (a micro-bump — no other knob moves). To start data-poor users elsewhere than mid-band, tune `progression.band_position` in the same bump — it is the short-circuited position AND the fold's starting value. |
+| **② Replay diff** | `replay_decisions` for the candidate. Expected shape: decisions recorded WITHOUT a `bandPosition` input replay byte-identically (the fold is assembly-time; replay uses recorded inputs); only freshly generated weeks/seeds consume a derived position, and any live diff is the pacer's paced/stepped mix shifting with the position — **never an entitlement or quantum change**. |
+| **③ Owner reviews + activates** | Sanity-check the position the fold currently derives for the owner's own history (reads from the same `get_progression_history` evidence; short of `min_history_mesos` qualifying mesos it is exactly the default). Activate via `activate_engine_params`; roll back by re-activating the prior row — the loop is OFF again instantly (derived, no stored state to unwind). |
+| **④ Monitor + refit (standing)** | Each decision records the position it consumed in its `inputs` (`get_engine_decisions`), so the position's trajectory is reconstructible per meso boundary. As real mesos complete, check the provisional `raise`/`lower` cutoffs against the observed `get_progression_history` distributions (does a "good" meso clear `earn_rate 0.7` with `miss_ratio ≤ 0.2`? do rate-pacer trips occur at all?) and refit via a further micro-bump if not. Watch for the §7 worst case: a position pinned at 0/1 for consecutive boundaries means the thresholds need a refit (both are defensible programs, but a pin is a signal, not a steady state). The fold + goldens live in `src/lib/engine/rules/envelope.ts` / `__tests__/envelope.test.ts`. |
 
 ### BodySpec: register the OAuth clients + first-login verification (doc 15 §8, doc 17 Phase 5a)
 

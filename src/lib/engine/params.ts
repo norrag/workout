@@ -371,10 +371,15 @@ export const engineParamsSchema = z.object({
       // boundary steps bounded (|Δ| ≤ 0.25 binding, whatever `step` says),
       // minimum dwell, clamp [0, 1]; inputs are demand-side ONLY — never the
       // measured rate. Performance moves the position within the band, never
-      // the band (doc 17 principle 4). Every threshold below is PROVISIONAL
-      // pending the field-data fit (v20 active + a few real mesos through
-      // get_progression_history) — the block ships in no applied params row
-      // until the fit lands (manual-operations runbook).
+      // the band (doc 17 principle 4). The loop is SELF-GATING per user
+      // (owner, 2026-07-12): until `min_history_mesos` qualifying completed
+      // mesos exist in the window the fold short-circuits to the tunable
+      // `band_position` default, so one global activation is safe for every
+      // user regardless of their history — data-rich users get modulated,
+      // data-poor users pace at the default until their evidence accrues.
+      // The step/threshold values below are PROVISIONAL starting points;
+      // field data refines them via the monitor/refit loop
+      // (manual-operations runbook), no longer as an activation gate.
       envelope: z
         .object({
           // `false` lets an activated row switch the loop off without
@@ -390,6 +395,11 @@ export const engineParamsSchema = z.object({
           // a meso with fewer status-coded decisions than this is no
           // evidence — its boundary steps nothing
           min_decisions: z.number().int().min(1).default(8),
+          // the per-user data-sufficiency gate: with fewer than this many
+          // QUALIFYING mesos (≥ min_decisions each) in the window, the fold
+          // short-circuits to the `band_position` default — the loop kicks
+          // in automatically once a user's own history supports it
+          min_history_mesos: z.number().int().min(1).default(2),
           // per-boundary step size; MAX_BOUNDARY_STEP (0.25) binds above it
           step: z.number().min(0).max(0.25).default(0.1),
           // boundaries a new position must hold before the next move;

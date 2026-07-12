@@ -4,6 +4,43 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 75: N36 envelope loop goes self-gating (owner Batch-18 note, PR #184)
+
+Owner note (Batch 18, verbatim in the appendix): why gate the envelope loop on
+a remembered future enable at all — it should default to the current portion of
+the band while a user lacks history, kick in automatically when the data
+exists, and the short-circuited position should be tunable. Reconciliation
+sweep first: PRs #182/#183 merged (N43's row was already stamped `done (PR
+#182)` — left live pending its archival sweep with the open N52/N54 riders).
+
+Assessment: the old "fit thresholds from field data, then ship the params
+block" gate conflated **global threshold calibration** (refinable any time
+from the monitor instruments) with **per-user data availability** (which must
+be automatic — the owner's multi-user point is decisive). The mechanism (PR
+#177) already started every fold at the tunable `progression.band_position`
+and treated sparse mesos as no evidence, but a single qualifying meso could
+move the position, and nothing made the sufficiency rule explicit or tunable.
+
+Built (PR #184):
+
+- **Engine:** `progression.envelope.min_history_mesos` (int ≥ 1, default 2) —
+  `deriveBandPosition` short-circuits to the `band_position` default until
+  that many qualifying (≥ `min_decisions`) completed mesos sit in the lookback
+  window; symmetric on the way out (aging past `lookback_mesos`/`max_age_days`
+  re-engages the gate — same return-from-absence decay). Off →
+  short-circuited → modulating all pace off the same tunable knob, so the
+  transition is continuous. Block still `.optional()` ⇒ absent = byte-identical
+  (suite 1112, +5 gate goldens).
+- **Doc 17 §7** amended (self-gating design, thresholds demoted from
+  activation gate to provisional-refit); §9 row 6 + intro spine updated.
+- **Runbook** rewritten: "Fit + activate" → "Activate the envelope loop"
+  (propose defaults bump → replay diff → owner review/activate → standing
+  monitor/refit). All prereqs cleared (v20 2026-07-11, N43's v24 2026-07-12) —
+  the activation can run whenever the owner says go, no field-data wait.
+
+N36 row updated to **self-gating built (PR #184)**; remaining scope is the
+owner-gated activation runbook itself.
+
 ## 2026-07-12 — Session 74 (cont.): N43 Phase-R activation — v23 applied + v24 plan-flip live
 
 After PR #182 merged, ran the doc 17 Phase-R activation from the same session

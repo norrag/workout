@@ -2,6 +2,8 @@
  * Envelope loop (doc 17 §7, N36): the demand-side band-position fold —
  * loop-off byte-identity (absent/disabled block ⇒ null position, and the
  * params block's mere presence never changes prescribe/seedMeso output),
+ * the per-user data-sufficiency short-circuit (< min_history_mesos
+ * qualifying mesos ⇒ the tunable default; auto-kick-in as history accrues),
  * bounded movement + dwell + clamp goldens, the worst-case floor/top pins,
  * and source-agnostic composition with the Phase-2 pacer (the derived
  * `inputs.bandPosition` lerps identically under `"band"` and `"plan"`,
@@ -28,13 +30,14 @@ const ENVELOPE: EnvelopeParams = {
   lookback_mesos: 3,
   max_age_days: 180,
   min_decisions: 8,
+  min_history_mesos: 2,
   step: 0.1,
   dwell_mesos: 1,
   raise: { earn_rate: 0.7, max_miss_ratio: 0.2, pacer_trips: 2, over_share: 0.25 },
   lower: { miss_ratio: 0.5, throttle_trips: 2, workload_firings: 3 },
 };
 
-/** v20 + the envelope block on — the shape a fitted params bump would ship. */
+/** v20 + the envelope block on — the shape an activating params bump ships. */
 const ENVELOPE_PARAMS: EngineParams = {
   ...V20_PARAMS,
   progression: { ...V20_PARAMS.progression!, envelope: ENVELOPE },
@@ -47,6 +50,10 @@ const envelopeAt = (over: Partial<EnvelopeParams>): EngineParams => ({
     envelope: { ...ENVELOPE, ...over },
   },
 });
+
+/** Sufficiency gate open at a single meso — isolates the per-boundary step
+ *  semantics from the data-sufficiency short-circuit tested separately. */
+const FOLD_PARAMS = envelopeAt({ min_history_mesos: 1 });
 
 /** A meso that moves nothing: mid earn rate, no misses, no pressure. */
 const outcome = (
@@ -135,18 +142,23 @@ describe("the fold: bounded movement, dwell, clamp", () => {
   });
 
   it("a neutral meso steps nothing", () => {
-    expect(deriveBandPosition([outcome()], ENVELOPE_PARAMS)).toBe(0.5);
+    expect(deriveBandPosition([outcome()], FOLD_PARAMS)).toBe(0.5);
   });
 
   it("raise/lower move by one bounded step per boundary", () => {
-    expect(deriveBandPosition([RAISE], ENVELOPE_PARAMS)).toBe(0.6);
-    expect(deriveBandPosition([LOWER], ENVELOPE_PARAMS)).toBe(0.4);
-    expect(deriveBandPosition([RAISE, LOWER], ENVELOPE_PARAMS)).toBe(0.5);
+    expect(deriveBandPosition([RAISE], FOLD_PARAMS)).toBe(0.6);
+    expect(deriveBandPosition([LOWER], FOLD_PARAMS)).toBe(0.4);
+    expect(deriveBandPosition([RAISE, LOWER], FOLD_PARAMS)).toBe(0.5);
   });
 
   it("a sparse meso (< min_decisions) is no evidence", () => {
+    // paired with a qualifying neutral meso so the sufficiency gate is open:
+    // the sparse boundary itself still steps nothing
     expect(
-      deriveBandPosition([{ ...RAISE, decisions: 5, earned: 5 }], ENVELOPE_PARAMS),
+      deriveBandPosition(
+        [outcome(), { ...RAISE, decisions: 5, earned: 5 }],
+        FOLD_PARAMS,
+      ),
     ).toBe(0.5);
   });
 
@@ -157,22 +169,22 @@ describe("the fold: bounded movement, dwell, clamp", () => {
       earnedThenMissed: 3, // miss ratio 0.6 ≥ 0.5
       pacerTrips: 2,
     });
-    expect(deriveBandPosition([both], ENVELOPE_PARAMS)).toBe(0.4);
+    expect(deriveBandPosition([both], FOLD_PARAMS)).toBe(0.4);
   });
 
   it("no answered asks: raise still needs real up-pressure", () => {
     // earning 10/12 with zero answered asks — pacer trips carry the raise
     const unanswered = outcome({ earned: 10, earnedThenMet: 0, pacerTrips: 2 });
-    expect(deriveBandPosition([unanswered], ENVELOPE_PARAMS)).toBe(0.6);
+    expect(deriveBandPosition([unanswered], FOLD_PARAMS)).toBe(0.6);
     // same earn rate but the pacer never bound and nothing was beaten:
     // a raise would be invisible — hold
     const noPressure = outcome({ earned: 10, earnedThenMet: 8, overShare: 0.1 });
-    expect(deriveBandPosition([noPressure], ENVELOPE_PARAMS)).toBe(0.5);
+    expect(deriveBandPosition([noPressure], FOLD_PARAMS)).toBe(0.5);
   });
 
   it("beat share is the alternate up-pressure signal", () => {
     const beats = outcome({ earned: 10, earnedThenMet: 8, overShare: 0.3 });
-    expect(deriveBandPosition([beats], ENVELOPE_PARAMS)).toBe(0.6);
+    expect(deriveBandPosition([beats], FOLD_PARAMS)).toBe(0.6);
   });
 
   it("dwell: a new position holds dwell_mesos boundaries before the next move", () => {
@@ -201,6 +213,43 @@ describe("the fold: bounded movement, dwell, clamp", () => {
     const oversized = { ...ENVELOPE, step: 0.4 }; // schema forbids; belt anyway
     expect(boundaryStep(RAISE, oversized)).toBe(MAX_BOUNDARY_STEP);
     expect(boundaryStep(LOWER, oversized)).toBe(-MAX_BOUNDARY_STEP);
+  });
+});
+
+describe("per-user data-sufficiency short-circuit (doc 17 §7 self-gating)", () => {
+  it("below min_history_mesos ⇒ the tunable default, however loud the evidence", () => {
+    // one qualifying meso is not enough history at the shipped default (2)
+    expect(deriveBandPosition([RAISE], ENVELOPE_PARAMS)).toBe(0.5);
+    expect(deriveBandPosition([LOWER], ENVELOPE_PARAMS)).toBe(0.5);
+  });
+
+  it("kicks in automatically once the user's history reaches the minimum", () => {
+    expect(deriveBandPosition([outcome(), RAISE], ENVELOPE_PARAMS)).toBe(0.6);
+  });
+
+  it("sparse mesos (< min_decisions) do not count toward the minimum", () => {
+    expect(
+      deriveBandPosition([{ ...outcome(), decisions: 5 }, RAISE], ENVELOPE_PARAMS),
+    ).toBe(0.5);
+  });
+
+  it("the short-circuited position IS the tunable params band_position", () => {
+    const lowDefault: EngineParams = {
+      ...ENVELOPE_PARAMS,
+      progression: { ...ENVELOPE_PARAMS.progression!, band_position: 0.3 },
+    };
+    expect(deriveBandPosition([RAISE], lowDefault)).toBe(0.3);
+  });
+
+  it("re-engages when qualifying history falls out of the lookback window", () => {
+    const sparse = { ...outcome(), decisions: 2 };
+    // an older qualifying meso outside the window is not sufficiency
+    expect(
+      deriveBandPosition(
+        [outcome(), RAISE, sparse, sparse],
+        envelopeAt({ lookback_mesos: 2 }),
+      ),
+    ).toBe(0.5);
   });
 });
 
