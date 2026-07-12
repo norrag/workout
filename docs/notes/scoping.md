@@ -955,7 +955,7 @@ splash), collapse the serialized `auth.getUser()` round-trips
 `Splash` fallback paints on a cold stream. Cross-link: N47's force-relaunch
 workaround makes every cold launch visible, amplifying this.
 
-**Resolution (2026-07-12, PR #<n>).** Deeper pass sharpened the diagnosis: the
+**Resolution (2026-07-12, PR #187).** Deeper pass sharpened the diagnosis: the
 owner's remembered "splash" is the in-document `Splash` (logotype + dots) — the
 startup PNGs were **solid** background, and in dark appearance a solid
 `#14110C` sheet is perceptually identical to the OS-default black it replaces.

@@ -68,7 +68,7 @@ already-installed app keeps its old launch image (or none) until it is removed
 and re-added — a deploy alone changes nothing on the device (this is how PR #90
 shipped inert, per commit `b0faa88`). Whenever `public/splash/*` or the class
 list in `src/lib/pwa/ios-launch-screens.ts` changes (e.g. the N53 branded
-launch images, PR pending), the owner must once, after the deploy: delete the
+launch images, PR #187), the owner must once, after the deploy: delete the
 home-screen app → open the deployed site at `/` in Safari (signed in) → Share →
 Add to Home Screen. The path-versioned manifest keeps `id: "/"` so the re-add
 updates the same app, not a duplicate.

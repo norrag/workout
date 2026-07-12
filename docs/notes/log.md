@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-12 — Session 77: N53 splash regression — branded launch images + first-byte fast path (PR #<n>)
+## 2026-07-12 — Session 77: N53 splash regression — branded launch images + first-byte fast path (PR #187)
 
 Owner: "investigate the N53 splash regression … the ideal resolution durably
 displays the loading splash, correctly themed, as early as possible, and
