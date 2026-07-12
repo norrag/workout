@@ -2,7 +2,7 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-12 (latest) — N47: iOS standalone tab-bar detach fix in progress
+## 2026-07-12 (latest) — N47: iOS standalone tab-bar detach fix (PR #185)
 
 The tab bar itself was correct; the shared overlay scroll lock was changing
 `body` to `position:fixed` while text fields resized the iOS visual viewport.
@@ -28,6 +28,8 @@ from updated `main` (`path.relative()` backslashes vs a POSIX allowlist); the te
 now normalizes separators before comparison, with no runtime change. Full suite:
 1,116 green; typecheck, lint, and production build green. The installed-iOS
 keyboard-close-scroll repro and N7 spot-check remain before close.
+PR #185 remains draft so its installed-iOS Vercel preview can supply that final
+acceptance check before merge.
 
 ## 2026-07-12 (latest) — N36: envelope loop goes self-gating on per-user data (doc 17 §7 amendment, PR #184)
 

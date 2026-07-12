@@ -832,7 +832,7 @@ corroborating hypotheses 1+2 as a combined trigger: the keyboard resized the
 visual viewport *while* `useScrollLock` had `body{position:fixed}`, and the
 fixed nav never re-anchored after both released.
 
-**Build in progress (`codex/n47-tabbar-detach`, 2026-07-12):** replaced the
+**Built (PR #185, 2026-07-12):** replaced the
 body-position lock with a ref-counted `html/body { overflow:hidden }` lock plus
 a non-passive document `touchmove` guard. `BottomSheet` and the bespoke workout-
 complete sheet opt their native scroll regions back in and retain overscroll

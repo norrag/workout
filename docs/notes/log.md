@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-12 — Session 76: N47 tab-bar detach fix in progress
+## 2026-07-12 — Session 76: N47 tab-bar detach fix (PR #185)
 
 Owner asked to begin the HIGH N47 fix robustly and noted the checkout might be
 behind. Fast-forwarded local `main` by 43 commits to `origin/main` first, then
@@ -25,7 +25,8 @@ suite initially exposed an unrelated Windows-only source-scan defect inherited
 from updated `main` (`path.relative()` backslashes vs its POSIX allowlist); the
 test now normalizes separators before comparison, with no runtime change. Full
 suite: 1,116 green; typecheck, lint, and production build green. Installed-iOS
-repro/N7 regression spot-check remains. N47 → `in-progress`.
+repro/N7 regression spot-check requested on the Vercel preview before merge.
+N47 → `done (PR #185)`.
 
 ## 2026-07-12 — Session 75: N36 envelope loop goes self-gating (owner Batch-18 note, PR #184)
 
