@@ -832,6 +832,22 @@ corroborating hypotheses 1+2 as a combined trigger: the keyboard resized the
 visual viewport *while* `useScrollLock` had `body{position:fixed}`, and the
 fixed nav never re-anchored after both released.
 
+**Build in progress (`codex/n47-tabbar-detach`, 2026-07-12):** replaced the
+body-position lock with a ref-counted `html/body { overflow:hidden }` lock plus
+a non-passive document `touchmove` guard. `BottomSheet` and the bespoke workout-
+complete sheet opt their native scroll regions back in and retain overscroll
+containment. Unlock restores the captured x/y immediately and on the next
+frame; when an input/textarea/select or a shrunken `visualViewport` indicates
+the keyboard is still open, resize-driven restores continue only until 160 ms
+quiet (1.2 s safety cutoff), avoiding a later user-scroll snapback. The canon
+`BottomNav` is deliberately untouched: removing the containing-block trigger
+fixes both its placement and hit-testing. Unit coverage pins no mutation of
+`body.position/top/width`, nested-overlay ref counting, the touch allowlist,
+style restoration, and the exact scroll coordinate. Remaining acceptance:
+full suite/build, then reproduce the create-meso NAME-keyboard-close-scroll
+sequence in an installed iOS PWA and confirm the bar stays bottom-anchored and
+tappable; also spot-check N7's note-sheet scroll restoration.
+
 ### N48 — Filters in the replace-exercise sheet · **UX / small**
 
 `ReplaceSheet` (`log/[workoutId]/DayView.tsx:2019-2143`) has text search only

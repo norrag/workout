@@ -2,6 +2,33 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-07-12 (latest) — N47: iOS standalone tab-bar detach fix in progress
+
+The tab bar itself was correct; the shared overlay scroll lock was changing
+`body` to `position:fixed` while text fields resized the iOS visual viewport.
+After keyboard dismissal, WebKit could retain that stale shortened viewport for
+fixed placement and hit-testing, leaving the bar mid-page and dead (confirmed by
+the two Batch-17 screenshots).
+
+- `useScrollLock` now leaves `body.position/top/width` untouched. A ref-counted
+  root/body overflow lock plus non-passive background `touchmove` guard freezes
+  the document; marked sheet panels retain native scrolling and overscroll
+  containment. Desktop scrollbar-gap compensation is preserved.
+- Unlock restores the captured x/y immediately + next frame. If a text-entry
+  control/shrunken `visualViewport` shows the keyboard is still active, restores
+  follow resize events only until quiet, with a safety cutoff—preserving N7's
+  exact-position contract without allowing a later snapback.
+- Unit tests pin positioning-context invariance, nested overlays, touch
+  allowlisting, style restoration, idempotent cleanup, and exact x/y restore.
+  Canon `BottomNav` structure and styling are unchanged.
+
+Focused tests (4), typecheck, lint, and production build are green. Full-suite
+verification also exposed an unrelated Windows-only source-scan defect inherited
+from updated `main` (`path.relative()` backslashes vs a POSIX allowlist); the test
+now normalizes separators before comparison, with no runtime change. Full suite:
+1,116 green; typecheck, lint, and production build green. The installed-iOS
+keyboard-close-scroll repro and N7 spot-check remain before close.
+
 ## 2026-07-12 (latest) — N36: envelope loop goes self-gating on per-user data (doc 17 §7 amendment, PR #184)
 
 Owner note (notes Batch 18): the loop should not wait on a remembered future

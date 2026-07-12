@@ -80,6 +80,7 @@ export function BottomSheet({
       />
       <div
         ref={panelRef}
+        data-scroll-lock-scrollable
         role="dialog"
         aria-modal="true"
         aria-label={title}

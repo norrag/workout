@@ -14,7 +14,7 @@
  * write through an existing path.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SRC = join(__dirname, "../../../../src");
@@ -50,7 +50,7 @@ describe("prescription writers (N33 S3 invariant)", () => {
   it("only allowlisted modules build prescribed_* write payloads", () => {
     const offenders = walk(SRC)
       .filter((p) => readFileSync(p, "utf8").includes("prescribed_weight:"))
-      .map((p) => relative(SRC, p))
+      .map((p) => relative(SRC, p).split(sep).join("/"))
       .filter((p) => !ALLOWED.has(p));
     expect(offenders).toEqual([]);
   });

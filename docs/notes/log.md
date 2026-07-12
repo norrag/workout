@@ -4,6 +4,29 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 76: N47 tab-bar detach fix in progress
+
+Owner asked to begin the HIGH N47 fix robustly and noted the checkout might be
+behind. Fast-forwarded local `main` by 43 commits to `origin/main` first, then
+reviewed the Batch-17 screenshots + scoping and built on
+`codex/n47-tabbar-detach`.
+
+The screenshots establish the combined trigger: a BottomSheet text field opens
+the iOS keyboard while the shared scroll lock has `body{position:fixed}`; after
+close, the tab bar remains attached to the stale shortened visual viewport and
+its hit-test plane. The fix removes that containing-block mutation entirely:
+ref-counted root/body overflow + a non-passive background touch guard, explicit
+sheet-scroll allowlisting, exact x/y restoration, and bounded
+`visualViewport.resize` restoration while keyboard dismissal settles. Canon
+tab-bar markup/CSS stays unchanged. Added focused tests for positioning-context
+invariance, nested locks, background-vs-sheet touch behavior, and restoration.
+Focused suite (4), typecheck, lint, and production build are green. The full
+suite initially exposed an unrelated Windows-only source-scan defect inherited
+from updated `main` (`path.relative()` backslashes vs its POSIX allowlist); the
+test now normalizes separators before comparison, with no runtime change. Full
+suite: 1,116 green; typecheck, lint, and production build green. Installed-iOS
+repro/N7 regression spot-check remains. N47 → `in-progress`.
+
 ## 2026-07-12 — Session 75: N36 envelope loop goes self-gating (owner Batch-18 note, PR #184)
 
 Owner note (Batch 18, verbatim in the appendix): why gate the envelope loop on
