@@ -91,6 +91,20 @@ export const engineInputsSchema = z.object({
     .object({
       value: z.number().positive(),
       confidence: z.enum(["high", "moderate", "low"]),
+      // N45: the winning set behind the anchor — pure provenance, never read by
+      // any rule. `.nullish()` with NO default so historical shapes (stored
+      // decision inputs, existing literals) parse byte-identically; the anchor
+      // is already on the doc-14 §3 derived denylist, so the widened shape is
+      // fingerprint-neutral by construction.
+      source: z
+        .object({
+          weight: z.number(),
+          reps: z.number(),
+          ageDays: z.number(),
+          sessionKey: z.string().nullable(),
+          performedAt: z.string().nullish(),
+        })
+        .nullish(),
     })
     .nullable()
     .default(null),

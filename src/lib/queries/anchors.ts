@@ -156,9 +156,24 @@ export async function getExerciseE1rmAnchors(
     byExercise.set(s.exercise_id, cur);
   }
 
+  // N45: resolve the winning set's timestamp for the anchor's provenance —
+  // sessionKey is the workout_exercise_id, and every set in a session shares a
+  // day, so the session's newest performed_at is the coordinate's date.
+  const performedAtBySession = new Map<string, string>();
+  for (const s of completedSets) {
+    if (!performedAtBySession.has(s.workout_exercise_id)) {
+      performedAtBySession.set(s.workout_exercise_id, s.performed_at);
+    }
+  }
+
   for (const [exerciseId, samples] of byExercise) {
     const anchor = recencyWeightedE1rm(samples, params);
-    if (anchor) out.set(exerciseId, anchor);
+    if (!anchor) continue;
+    if (anchor.source?.sessionKey) {
+      anchor.source.performedAt =
+        performedAtBySession.get(anchor.source.sessionKey) ?? null;
+    }
+    out.set(exerciseId, anchor);
   }
   return out;
 }

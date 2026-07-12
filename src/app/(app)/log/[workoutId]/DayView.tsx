@@ -21,6 +21,7 @@ import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
 import { FetchRetry } from "@/components/ui/FetchRetry";
+import { FilterBar } from "@/components/ui/FilterBar";
 import dynamic from "next/dynamic";
 
 // Secondary reveal surfaces (WS-J): both render null until opened, so their
@@ -42,7 +43,11 @@ import type {
 // WS-J bundle split: import the zod-free predictor core + load helpers directly
 // so the client chunk never pulls the engine barrel (prescribe/macro/rules) or
 // zod. `params` arrives already validated by the server (getActiveEngineParams).
-import { predictRepsAtWeight, type E1rmConfig } from "@/lib/engine/predict";
+import {
+  estimateE1rm,
+  predictRepsAtWeight,
+  type E1rmConfig,
+} from "@/lib/engine/predict";
 import { complianceBand } from "@/lib/engine/rules/progression";
 import {
   effectiveLoad,
@@ -445,16 +450,45 @@ export function DayView({
       <PrescriptionDetailSheet
         target={
           auditFor
-            ? {
-                workoutExerciseId: auditFor.id,
-                exerciseName: auditFor.exercise_name,
-                equipmentType: auditFor.equipment_type,
-                paramsVersion: auditFor.params_version,
-                prescribedWeight: auditFor.prescribed_weight,
-                prescribedReps: auditFor.prescribed_reps,
-                prescribedSets: auditFor.prescribed_sets,
-                targetRir: auditFor.target_rir ?? microcycle.target_rir,
-              }
+            ? (() => {
+                const targetRir = auditFor.target_rir ?? microcycle.target_rir;
+                // N44: the e1RM the prescribed set implies — priced on
+                // effective load for bodyweight movements, like the marker
+                const lt = coerceLoadType(
+                  auditFor.load_type,
+                  auditFor.equipment_type,
+                );
+                const effWeight = isBodyweightLoad(lt)
+                  ? effectiveLoad(
+                      lt,
+                      auditFor.prescribed_weight ?? 0,
+                      auditFor.bodyweight,
+                    )
+                  : auditFor.prescribed_weight;
+                const prescribedE1rm =
+                  effWeight != null && auditFor.prescribed_reps != null
+                    ? (estimateE1rm(
+                        effWeight,
+                        auditFor.prescribed_reps,
+                        targetRir,
+                        params.e1rm,
+                      )?.value ?? null)
+                    : null;
+                return {
+                  workoutExerciseId: auditFor.id,
+                  exerciseName: auditFor.exercise_name,
+                  equipmentType: auditFor.equipment_type,
+                  paramsVersion: auditFor.params_version,
+                  prescribedWeight: auditFor.prescribed_weight,
+                  prescribedReps: auditFor.prescribed_reps,
+                  prescribedSets: auditFor.prescribed_sets,
+                  targetRir,
+                  prescribedE1rm,
+                  targetAnchor: auditFor.prescription_anchor,
+                  measuredAnchor: auditFor.e1rm_anchor,
+                  anchorSource: auditFor.e1rm_anchor_source,
+                };
+              })()
             : null
         }
         onClose={() => setAuditFor(null)}
@@ -1492,6 +1526,9 @@ function SetRow({
   };
 
   const save = () => {
+    // N50: belt-and-suspenders with staticCells — never write against a
+    // completed/skipped session (the completion-lock RLS would no-op it anyway)
+    if (readOnly) return;
     const w = Number(weight);
     const r = Number(reps);
     if (Number.isNaN(w) || Number.isNaN(r)) return;
@@ -1541,15 +1578,21 @@ function SetRow({
     }
   };
 
-  const staticCells = state === "future" || state === "skipped";
+  // N50: a completed/skipped session's logged rows must render as static text
+  // too — the completion-lock RLS silently no-ops their blur-saves, so live
+  // inputs there are edits that never land
+  const staticCells = readOnly || state === "future" || state === "skipped";
 
   // static (future/skipped) rows show the reps that hit target RIR at the
   // planned weight — memoized so a parent re-render (menu/sheet state) doesn't
-  // re-run the bisection for every row (WS-J)
+  // re-run the bisection for every row (WS-J). Logged rows show their recorded
+  // actuals instead, so skip the bisection for them.
   const staticPredictedReps = useMemo(
     () =>
-      staticCells && staticWeight != null ? predictReps(staticWeight) : null,
-    [staticCells, staticWeight, predictReps],
+      staticCells && state !== "logged" && staticWeight != null
+        ? predictReps(staticWeight)
+        : null,
+    [staticCells, state, staticWeight, predictReps],
   );
 
   // P19 → doc 16 §5.3: a logged set gets a small three-state marker for whether
@@ -1588,6 +1631,36 @@ function SetRow({
     e1rmCfg,
   ]);
 
+  // ▲ over / ■ met / ▼ under (doc 16 §5.3) — shared by the live-input and the
+  // N50 locked-session renderings of a logged row
+  const markerGlyph = performance ? (
+    <span
+      aria-label={
+        performance === "over"
+          ? "above prescription"
+          : performance === "met"
+            ? "met prescription"
+            : "below prescription"
+      }
+      title={
+        performance === "over"
+          ? "above prescription"
+          : performance === "met"
+            ? "met prescription"
+            : "below prescription"
+      }
+      className={`pointer-events-none absolute -right-1 leading-none text-ink/50 ${
+        performance === "over"
+          ? "-top-1 text-[8px]"
+          : performance === "met"
+            ? "top-1/2 -translate-y-1/2 text-[6px]"
+            : "-bottom-1 text-[8px]"
+      }`}
+    >
+      {performance === "over" ? "▲" : performance === "met" ? "■" : "▼"}
+    </span>
+  ) : null;
+
   return (
     <div
       className={`relative grid grid-cols-[20px_1fr_1fr_44px] items-center gap-2.5 py-[5px] ${
@@ -1608,12 +1681,24 @@ function SetRow({
       {staticCells ? (
         <>
           <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
-            {staticWeight != null ? formatWeight(staticWeight) : "—"}
+            {/* a locked logged row shows its recorded actuals (N50) */}
+            {state === "logged"
+              ? weight
+              : staticWeight != null
+                ? formatWeight(staticWeight)
+                : "—"}
           </div>
-          <div className={cell.replace("w-full", "") + " flex items-center justify-center"}>
+          <div
+            className={
+              "relative " +
+              cell.replace("w-full", "") +
+              " flex items-center justify-center"
+            }
+          >
             {/* future rows show the reps that hit target RIR at the planned
                 weight, falling back to the prescription without an anchor */}
-            {staticPredictedReps ?? prescribedReps ?? "—"}
+            {state === "logged" ? reps : (staticPredictedReps ?? prescribedReps ?? "—")}
+            {markerGlyph}
           </div>
         </>
       ) : (
@@ -1677,37 +1762,11 @@ function SetRow({
               onBlur={() => state === "logged" && save()}
               className={cell}
             />
-            {performance ? (
-              // ▲ over / ■ met / ▼ under (doc 16 §5.3). House-style like the
-              // P19 pair (no mockup figure exists — 09-changelog 2026-07-09):
-              // small ink glyphs, no accent; `met` is the on-the-mark square,
-              // vertically centered between over's top and under's bottom.
-              <span
-                aria-label={
-                  performance === "over"
-                    ? "above prescription"
-                    : performance === "met"
-                      ? "met prescription"
-                      : "below prescription"
-                }
-                title={
-                  performance === "over"
-                    ? "above prescription"
-                    : performance === "met"
-                      ? "met prescription"
-                      : "below prescription"
-                }
-                className={`pointer-events-none absolute -right-1 leading-none text-ink/50 ${
-                  performance === "over"
-                    ? "-top-1 text-[8px]"
-                    : performance === "met"
-                      ? "top-1/2 -translate-y-1/2 text-[6px]"
-                      : "-bottom-1 text-[8px]"
-                }`}
-              >
-                {performance === "over" ? "▲" : performance === "met" ? "■" : "▼"}
-              </span>
-            ) : null}
+            {/* house-style like the P19 pair (no mockup figure exists —
+                09-changelog 2026-07-09): small ink glyphs, no accent; `met` is
+                the on-the-mark square, vertically centered between over's top
+                and under's bottom. */}
+            {markerGlyph}
           </div>
         </>
       )}
@@ -2013,7 +2072,10 @@ function NoteSheet({
 }
 
 // ---------------------------------------------------------------------------
-// replace exercise (from the 1.2 menu) — picker filtered to the slot's group
+// replace exercise (from the 1.2 menu) — picker filtered to the slot's group.
+// N48/N49: shares the planner ExercisePicker's grammar — an EQUIP FilterBar
+// axis and single-select + a disabled-until-picked confirm button (this was
+// the only picker that committed on a bare row tap).
 // ---------------------------------------------------------------------------
 
 function ReplaceSheet({
@@ -2031,6 +2093,8 @@ function ReplaceSheet({
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [search, setSearch] = useState("");
+  const [equip, setEquip] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   // #4: repeat the substitution on the same day in future incomplete weeks
   const [repeat, setRepeat] = useState(false);
 
@@ -2038,6 +2102,8 @@ function ReplaceSheet({
     setCandidates(null);
     setFailed(false);
     setSearch("");
+    setEquip(null);
+    setPicked(null);
     setRepeat(false);
     if (!we?.muscle_group_id) return;
     // catch + stale-guard so a rejected fetch shows RETRY instead of a
@@ -2056,10 +2122,12 @@ function ReplaceSheet({
   }, [we, attempt]);
 
   if (!we) return null;
+  const pool = (candidates ?? []).filter((c) => c.id !== we.exercise_id);
+  const equipTypes = [...new Set(pool.map((c) => c.equipment_type))].sort();
   const q = search.trim().toLowerCase();
-  const visible = (candidates ?? []).filter(
-    (c) => c.id !== we.exercise_id && (!q || c.name.toLowerCase().includes(q)),
-  );
+  const visible = pool
+    .filter((c) => !equip || c.equipment_type === equip)
+    .filter((c) => !q || c.name.toLowerCase().includes(q));
 
   return (
     <BottomSheet
@@ -2079,6 +2147,22 @@ function ReplaceSheet({
           {we.muscle_group.toUpperCase()}
         </div>
       </div>
+
+      {/* equipment filter — shared chip grammar (N29/N48) */}
+      {equipTypes.length > 1 && (
+        <FilterBar
+          className="mt-2.5"
+          axes={[
+            {
+              key: "equip",
+              label: "EQUIP",
+              options: equipTypes.map((t) => ({ value: t, label: t })),
+              value: equip,
+            },
+          ]}
+          onChange={(_key, value) => setEquip(value)}
+        />
+      )}
 
       {/* #4: repeat across the same day in future weeks (incomplete only) */}
       <button
@@ -2107,37 +2191,60 @@ function ReplaceSheet({
         ) : visible.length === 0 ? (
           <p className="py-4 text-sm text-ink/45">No matches.</p>
         ) : (
-          visible.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                commit(async () => {
-                  await replaceExerciseAction({
-                    workout_id: we.workout_id,
-                    workout_exercise_id: we.id,
-                    exercise_id: c.id,
-                    propagate: repeat,
-                  });
-                });
-                onClose();
-              }}
-              className="flex w-full items-center justify-between border-b border-ink/[0.18] px-0.5 py-[13px] text-left"
-            >
-              <div>
-                <div className="text-[15px] font-bold">{c.name}</div>
-                <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
-                  {c.equipment_type.toUpperCase()} ·{" "}
-                  {c.last_performed_at
-                    ? `LAST ${shortDate(c.last_performed_at)}`
-                    : "NEVER PERFORMED"}
+          visible.map((c) => {
+            const sel = picked === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={sel}
+                onClick={() => setPicked(sel ? null : c.id)}
+                className="flex w-full items-center gap-3 border-b border-ink/[0.18] px-0.5 py-[13px] text-left"
+              >
+                <div
+                  className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-[12px] ${
+                    sel ? "bg-ink text-bg-base" : "border-[1.5px] border-ink/40"
+                  }`}
+                >
+                  {sel ? "✓" : ""}
                 </div>
-              </div>
-              <div className="text-[15px] text-ink/40">›</div>
-            </button>
-          ))
+                <div className="flex-1">
+                  <div className="text-[15px] font-bold">{c.name}</div>
+                  <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                    {c.equipment_type.toUpperCase()} ·{" "}
+                    {c.last_performed_at
+                      ? `LAST ${shortDate(c.last_performed_at)}`
+                      : "NEVER PERFORMED"}
+                  </div>
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
+
+      {/* N49: select-then-confirm, mirroring the planner picker — a bare row
+          tap must never commit the swap */}
+      <button
+        type="button"
+        disabled={picked == null}
+        onClick={() => {
+          if (picked == null) return;
+          const exerciseId = picked;
+          commit(async () => {
+            await replaceExerciseAction({
+              workout_id: we.workout_id,
+              workout_exercise_id: we.id,
+              exercise_id: exerciseId,
+              propagate: repeat,
+            });
+          });
+          onClose();
+        }}
+        className="mt-3 w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+      >
+        REPLACE EXERCISE
+      </button>
     </BottomSheet>
   );
 }
@@ -2232,9 +2339,6 @@ function AddExerciseSheet({
     });
   };
 
-  const chip =
-    "flex h-8 flex-shrink-0 items-center px-3 text-[10px] font-bold tracking-[0.1em]";
-
   return (
     <BottomSheet
       open
@@ -2250,49 +2354,30 @@ function AddExerciseSheet({
         className="h-[42px] w-full border-[1.5px] border-ink bg-paper px-3 text-[13px] text-ink placeholder:text-ink/45 focus:outline-none"
       />
 
-      {/* muscle-group filter */}
-      <div className="mt-2.5 flex gap-1.5 overflow-x-auto">
-        <button
-          type="button"
-          onClick={() => setMg(null)}
-          className={`${chip} ${mg === null ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
-        >
-          ALL GROUPS
-        </button>
-        {muscleGroups.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            onClick={() => setMg(mg === g.id ? null : g.id)}
-            className={`${chip} ${mg === g.id ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
-          >
-            {g.name.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
-      {/* equipment filter */}
-      {equipTypes.length > 1 && (
-        <div className="mt-1.5 flex gap-1.5 overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setEquip(null)}
-            className={`${chip} ${equip === null ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
-          >
-            ALL EQUIP
-          </button>
-          {equipTypes.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setEquip(equip === t ? null : t)}
-              className={`${chip} ${equip === t ? "bg-ink text-bg-base" : "border border-ink/40 text-ink/70"}`}
-            >
-              {t.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* muscle-group + equipment filters — folded onto the shared chip
+          grammar (N29/N48; these were the last pre-N29 hand-rolled chips) */}
+      <FilterBar
+        className="mt-2.5"
+        axes={[
+          {
+            key: "group",
+            label: "GROUP",
+            options: muscleGroups.map((g) => ({ value: g.id, label: g.name })),
+            value: mg,
+          },
+          ...(equipTypes.length > 1
+            ? [
+                {
+                  key: "equip",
+                  label: "EQUIP",
+                  options: equipTypes.map((t) => ({ value: t, label: t })),
+                  value: equip,
+                },
+              ]
+            : []),
+        ]}
+        onChange={(key, value) => (key === "group" ? setMg(value) : setEquip(value))}
+      />
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
         {failed ? (

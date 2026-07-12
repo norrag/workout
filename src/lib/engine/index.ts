@@ -202,7 +202,8 @@ function prescribeCore(
           finalWeight,
           anchor.value,
           win,
-          inputs,
+          deloadRir,
+          inputs.exercise.equipmentType,
           params,
         );
         const predicted = predictRepsAtWeight(
@@ -263,8 +264,15 @@ function prescribeCore(
         params,
       );
       if (raw != null) {
-        const fw = roundToStep(
-          raw,
+        // N51: rounding to the nearest increment lands heavy half the time —
+        // re-price through the same window bound the working path applies, so
+        // the seed never prescribes below target_low (e.g. 6 when the window
+        // is 8–12) when stepping the weight down one increment fixes it.
+        const fw = boundRepsToWindow(
+          roundToStep(raw, inputs.exercise.equipmentType, params),
+          anchorCS.value,
+          winCS,
+          inputs.week.targetRir,
           inputs.exercise.equipmentType,
           params,
         );
@@ -497,7 +505,8 @@ function prescribeCore(
         finalWeight,
         repWindow.anchorValue,
         repWindow.win,
-        inputs,
+        inputs.week.targetRir,
+        inputs.exercise.equipmentType,
         params,
       );
       if ((mod.painGated || mod.sessionDampened) && finalWeight > baseWeight) {
@@ -760,20 +769,16 @@ function boundRepsToWindow(
   weight: number,
   anchorValue: number,
   win: RepWindow,
-  inputs: EngineInputs,
+  targetRir: number,
+  equipmentType: EngineInputs["exercise"]["equipmentType"],
   params: EngineParams,
 ): number {
-  const predicted = predictRepsAtWeight(
-    anchorValue,
-    weight,
-    inputs.week.targetRir,
-    params,
-  );
+  const predicted = predictRepsAtWeight(anchorValue, weight, targetRir, params);
   if (predicted == null) return weight;
-  const step = params.rounding[inputs.exercise.equipmentType] ?? 0;
+  const step = params.rounding[equipmentType] ?? 0;
   if (step <= 0) return weight;
   const predAt = (w: number) =>
-    predictRepsAtWeight(anchorValue, w, inputs.week.targetRir, params);
+    predictRepsAtWeight(anchorValue, w, targetRir, params);
 
   // §v12 #2: prefer landing in the TARGET band [target_low, target_high]. If the
   // rounded load predicts above target_high, take one step up — but only when it
@@ -782,14 +787,14 @@ function boundRepsToWindow(
   // the buffer would breach a hard bound, step anyway. Symmetric below target_low.
   if (params.bound_to_target_window ?? false) {
     if (predicted > win.target_high) {
-      const up = roundToStep(weight + step, inputs.exercise.equipmentType, params);
+      const up = roundToStep(weight + step, equipmentType, params);
       const pu = predAt(up);
       if (pu != null && pu >= win.target_low) return up; // lands in the window
       if (predicted > win.max) return up; // buffer breaches the hard max → must step
       return weight;
     }
     if (predicted < win.target_low) {
-      const down = roundToStep(weight - step, inputs.exercise.equipmentType, params);
+      const down = roundToStep(weight - step, equipmentType, params);
       const pd = predAt(down);
       if (pd != null && pd <= win.target_high) return down;
       if (predicted < win.min) return down; // breaches the hard min → must step
@@ -800,10 +805,10 @@ function boundRepsToWindow(
 
   // legacy: only correct when the prediction breaches the hard [min,max] bounds.
   if (predicted > win.max) {
-    return roundToStep(weight + step, inputs.exercise.equipmentType, params);
+    return roundToStep(weight + step, equipmentType, params);
   }
   if (predicted < win.min) {
-    return roundToStep(weight - step, inputs.exercise.equipmentType, params);
+    return roundToStep(weight - step, equipmentType, params);
   }
   return weight;
 }
@@ -989,7 +994,17 @@ function seedCore(
   ) {
     const raw = weightForRepsAtRir(anchor.value, win.target_low, startRir, params);
     if (raw != null) {
-      const fw = roundToStep(raw, exercise.equipmentType, params);
+      // N51: same window bound as the working prescribe path — nearest-step
+      // rounding lands heavy half the time and the hard [min,max] clamp alone
+      // let 6–7 reps through an 8–12 target window.
+      const fw = boundRepsToWindow(
+        roundToStep(raw, exercise.equipmentType, params),
+        anchor.value,
+        win,
+        startRir,
+        exercise.equipmentType,
+        params,
+      );
       const predicted = predictRepsAtWeight(anchor.value, fw, startRir, params);
       const reps =
         predicted == null

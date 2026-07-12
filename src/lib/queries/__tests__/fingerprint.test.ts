@@ -157,7 +157,19 @@ describe("computeDepFingerprint", () => {
     noisy.sets = [
       { set_number: 1, weight: 999, reps: 20, rir_reported: 0, is_warmup: false, id: "x" },
     ] as unknown as typeof noisy.sets;
-    noisy.strengthAnchor = { value: 1, confidence: "low" as "high" };
+    noisy.strengthAnchor = {
+      value: 1,
+      confidence: "low" as "high",
+      // N45: the anchor's provenance rides inside the denylisted anchor — the
+      // widened shape must stay fingerprint-neutral
+      source: {
+        weight: 115,
+        reps: 11,
+        ageDays: 3,
+        sessionKey: "we-1",
+        performedAt: "2026-07-08T10:00:00Z",
+      },
+    } as typeof noisy.strengthAnchor;
     noisy.muscleGroupWeeklySets = 99;
     const b = buildEngineInputs(noisy);
     expect(computeDepFingerprint(configProjection(a), token)).toBe(

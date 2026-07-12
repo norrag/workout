@@ -45,6 +45,14 @@ export interface LoggedExercise extends WorkoutExerciseRow {
   feedback: ExerciseFeedbackRow | null;
   /** recency-weighted strength anchor for the live reps predictor (doc 11) */
   e1rm_anchor: number | null;
+  /** N45: the winning set the anchor keyed on — its weight × reps and date —
+   *  surfaced in the prescription detail sheet as the anchor's coordinate.
+   *  Null when there's no anchor (or a shape that predates provenance). */
+  e1rm_anchor_source: {
+    weight: number;
+    reps: number;
+    performed_at: string | null;
+  } | null;
   /** doc 16 §5.2: the prescription-basis anchor — the target `A* = A + δ`
    *  recorded by the `stepped` progression step of the decision that priced
    *  this row, or null when the row wasn't stepped (hold / pre-v20 / no
@@ -387,6 +395,16 @@ export async function getWorkoutDetail(
       pinned_note: noteByExercise.get(we.exercise_id) ?? null,
       feedback: feedbackByWe.get(we.id) ?? null,
       e1rm_anchor: e1rmAnchors.get(we.exercise_id)?.value ?? null,
+      e1rm_anchor_source: (() => {
+        const src = e1rmAnchors.get(we.exercise_id)?.source;
+        return src
+          ? {
+              weight: src.weight,
+              reps: src.reps,
+              performed_at: src.performedAt ?? null,
+            }
+          : null;
+      })(),
       prescription_anchor: targetAnchors.get(we.id) ?? null,
       bodyweight: userBodyweight,
     })),
