@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 77: N53 splash regression — branded launch images + first-byte fast path (PR #<n>)
+
+Owner: "investigate the N53 splash regression … the ideal resolution durably
+displays the loading splash, correctly themed, as early as possible, and
+minimizes black screen time."
+
+Reconciliation sweep first: PR #181 merged → its eight terminal rows
+(N44/N45/N48/N49/N50/N51/N54/N55) archived. N43 (PR #182, activation runbook
+open) and N47 (PR #186, owner device re-check) stay live.
+
+Investigation upheld the addendum-2 code audit (mechanism byte-unchanged since
+PR #119) and sharpened the cause into three stacked facts: the startup PNGs
+were **solid** background (in dark appearance = perceptually the OS-default
+black — a "working" launch image still reads as a black screen); the
+in-document `Splash` window is one warm `(app)`-layout auth RTT — a blink;
+and the LONG window is pre-document, where middleware blocked every first
+byte on a network `auth.getUser()`. The 7/2 forced re-add (PR #109) is the
+likely H1 trigger (iOS re-resolves startup images at add time, cf. #90/`b0faa88`);
+no public evidence of a general iOS 26.5 startup-image regression was found.
+
+Shipped (all branches attacked, whichever H is true on-device): launch PNGs
+now render the full `Splash` composition both themes (woff2 → glyph outlines →
+sharp; new devDeps sharp/wawoff2/opentype.js); middleware `getUser()` →
+`getSession()` (no network on valid token, on-demand refresh, presence-only
+routing — verified auth stays in layouts/pages, RLS unchanged);
+`getRequestAuth` React-`cache()` dedup (layout + Workout tab + day-view deep
+link); `LaunchScreenAudit` class-miss telemetry through the R20 funnel (new
+`"launch"` boundary); `launch-screens.test.ts` pixel guards (79 tests — dims,
+brand-bg corners, ink-in-center). Manual step added to
+`manual-operations.md`: owner must remove + re-add the PWA once after deploy.
+Suite 1200 green, lint/typecheck/build clean. N53 → done.
+
 ## 2026-07-12 — Session 76: N47 tab-bar detach — scroll-lock rework (PR #186)
 
 Owner: "begin work on the HIGH bug N47 tab-bar detach; resolve robustly."

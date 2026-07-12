@@ -5,10 +5,15 @@
  * (it ignores the manifest `background_color`). Without these, that pre-document
  * window is black.
  *
- * The images are solid brand-background PNGs (cream `#f4f0e6` / dark `#14110c`) that
- * match the in-document `Splash`, so the launch reads as one continuous branded load:
- * solid background → the same background with the logotype → content. Regenerate the
- * PNGs with `scripts/gen-ios-splash.mjs` if this list changes.
+ * The images reproduce the in-document `Splash` composition (logotype + resting
+ * activity dots on the brand background, cream `#f4f0e6` / dark `#14110c`), so the
+ * launch reads as one continuous branded splash from the icon tap: static splash →
+ * the same splash streamed live → content. A solid-color image is NOT enough — in
+ * dark appearance it reads as the OS-default black, which is how N53's "no splash,
+ * just long black screens" happened. Regenerate the PNGs with
+ * `scripts/gen-ios-splash.mjs` if this list, the Splash composition, or the theme
+ * tokens change — and note iOS only picks up changed images after the app is
+ * removed and re-added (they resolve at Add-to-Home-Screen time).
  *
  * Each class is a portrait iPhone (css width/height + device-pixel-ratio); the media
  * query must match exactly for iOS to pick the image. Light/dark variants are chosen

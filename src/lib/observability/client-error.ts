@@ -5,9 +5,12 @@ import { z } from "zod";
  * endpoint is reachable pre-auth (the `(auth)` and root boundaries must be able
  * to report), so the schema is deliberately tight: enum'd boundary, hard length
  * caps, no free-form objects — a junk payload is a 400, not a Sentry event.
+ * "launch" is not an error boundary: it's the installed-PWA launch-screen
+ * audit (LaunchScreenAudit.tsx, N53) reporting a device class with no startup
+ * image through the same funnel.
  */
 export const clientErrorSchema = z.object({
-  boundary: z.enum(["root", "app", "auth"]),
+  boundary: z.enum(["root", "app", "auth", "launch"]),
   message: z.string().min(1).max(2_000),
   stack: z.string().max(8_000).optional(),
   /** Next's server-error digest, when present — ties the client report to the

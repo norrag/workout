@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Suspense } from "react";
+import { LaunchScreenAudit } from "@/components/pwa/LaunchScreenAudit";
 import { Splash } from "@/components/ui/Splash";
 import {
   IOS_LAUNCH_SCREENS,
@@ -101,6 +102,10 @@ export default function RootLayout({
             page data resolve (perf WS-J). Only the initial/hard load hits this;
             soft tab navigations are handled by per-route loading.tsx. */}
         <Suspense fallback={<Splash />}>{children}</Suspense>
+        {/* N53: report (once) when this device has no matching launch-screen
+            class, so a black pre-document launch is a Sentry event, not a
+            mystery. Renders nothing; hydrates after the shell. */}
+        <LaunchScreenAudit />
       </body>
     </html>
   );

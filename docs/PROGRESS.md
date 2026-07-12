@@ -2,7 +2,46 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-12 (latest) — N47: tab bar detach on iOS standalone — scroll-lock rework
+## 2026-07-12 (latest) — N53: launch splash regression — branded launch images + first-byte fast path
+
+The HIGH Batch-17 report: "no longer ever seeing the loading splash — just long
+black screens." Investigation (scoping.md N53): no code regression — the whole
+chain is byte-unchanged since PR #119. The compound cause: (1) the startup PNGs
+were **solid** brand background, and in dark appearance `#14110C` is
+perceptually identical to the OS-default black they exist to replace, so even a
+correctly-applied launch image reads as "black screen"; (2) the July-2 scope
+crisis (PR #109) forced a delete+re-add, exactly where iOS re-resolves startup
+images version-whimsically (cf. #90 shipping inert until a re-add); (3) the
+pre-document window is the LONG one — middleware blocked every first byte on a
+network `auth.getUser()` — while the visible `Splash` window is a single warm
+auth RTT, a blink. Fixes attack all three:
+
+- **Launch images ARE the splash now:** `gen-ios-splash.mjs` renders the
+  `Splash` composition (Archivo-600 tracked logotype + resting activity dots,
+  both themes) into all 26 PNGs via the app's own woff2 → glyph outlines →
+  sharp (new devDeps: `sharp`, `wawoff2`, `opentype.js` — no font install
+  needed). The pre-document window shows the branded splash from the icon tap,
+  and the streamed `Splash` takes over seamlessly.
+- **First byte no longer waits on auth:** middleware `getUser()` (network RTT
+  before any HTML) → `getSession()` (cookie parse; on-demand refresh with
+  cookie write-back when expired). Presence-only routing — every (app)
+  layout/page still gates with verified `getUser()`, data stays RLS-scoped.
+- **One verified auth RTT behind the splash, not two:** new `getRequestAuth`
+  (React `cache()`) in `lib/supabase/server.ts`, adopted by `(app)/layout` +
+  the Workout tab + the day-view deep link.
+- **Silent-failure telemetry:** `LaunchScreenAudit` (root layout) reports a
+  device whose CSS dims/dpr match no `IOS_LAUNCH_SCREENS` class — the exact
+  mode where iOS silently falls back to black — once per class through the R20
+  funnel (new `"launch"` boundary value).
+- **Pixel-level guards:** `launch-screens.test.ts` (79 tests) pins
+  file-per-class, exact pixel dimensions, brand-bg corners, and **ink pixels in
+  the center band** — a solid/black launch image can never ship silently again.
+
+Deploy note: startup images bind at Add-to-Home-Screen — the owner must remove
++ re-add the installed app once after this deploys (manual-operations.md).
+Suite 1200 (+79), typecheck + lint + prod build clean. Notes: N53 → done.
+
+## 2026-07-12 — N47: tab bar detach on iOS standalone — scroll-lock rework
 
 The HIGH Batch-17 bug: after a BottomSheet + keyboard session the fixed tab bar
 rendered mid-screen with dead taps until relaunch. Root cause per the scoping:

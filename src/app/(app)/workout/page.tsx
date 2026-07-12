@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestAuth } from "@/lib/supabase/server";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getProfile } from "@/lib/queries/profiles";
@@ -18,10 +18,7 @@ import { DayView } from "../log/[workoutId]/DayView";
  * With no active workout, fall back to the latest completed meso's summary.
  */
 export default async function WorkoutPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRequestAuth();
   if (!user) redirect("/sign-in");
 
   const profile = await getProfile(supabase, user.id);
