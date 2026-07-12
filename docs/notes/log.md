@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-12 — Session 76: N47 tab-bar detach — scroll-lock rework
+## 2026-07-12 — Session 76: N47 tab-bar detach — scroll-lock rework (PR #186)
 
 Owner: "begin work on the HIGH bug N47 tab-bar detach; resolve robustly."
 Reconciliation sweep first: PR #184 (N36 self-gating) merged — N36's row stays
