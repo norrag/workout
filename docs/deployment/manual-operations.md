@@ -386,6 +386,38 @@ only worth flipping to once v21's personalization is live.
 | **③ Owner reviews + activates** | Confirm the shifted mix reads right (a lifter whose personalized band sits below the bucket band gets paced sooner; above, later). Activate via `activate_engine_params`; roll back by re-activating v21. |
 | **④ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20 monitor row; this field data also feeds the Phase-6 envelope fit. |
 
+### Activate engine_params **v23** (two-component strength-rate model — doc 17 §2.7 / Phase 7, N43)
+
+`20260712000001_engine_params_v23_strength_model.sql` ships v23 **inactive**
+(migration applied, `is_active false`). It is v21's content plus one gated block,
+`macro_target.strength_model` (`enabled`, `neural_n0 {3,5}`, `neural_floor
+{0.1,0.4}`, `neural_tau_years 0.5`, `ffm_coupling_k 1`, `undermuscled_unbank
+0.5`, `rate_ceiling_pct_month 8`). With it present + enabled AND body composition
+readable, `strengthRateBand` replaces the calendar bucket with the additive
+`neural(effectiveTrainingAge) + k × hypertrophyRate_FFM` model (doc 17 §2.7,
+research §4); it degrades to the v21 bucket band when no FFMI can be computed. The
+block is `.optional()`, so every pre-v23 row parses/hashes byte-identically.
+
+**Interaction with the rate-source flip.** v23 changes the *plan* strength band
+(`planMacrocycle.strengthRatePctMonth`), which the pacer reads only under
+`progression.rate_source: "plan"`. The current active row is **v21**
+(`rate_source: "band"`, per the 2026-07-11 rollback), so activating v23 alone
+changes **display/target-layer numbers only** — no stored prescription moves
+until the plan source is (re-)flipped. Sequence: **activate v23 first**, review,
+then re-flip `rate_source` to `"plan"` (a further micro-bump over v23) so the
+pacer meters demand off the corrected two-component band. For Garron the band
+moves from the calendar-**advanced** bucket (0.5–1.5 %/mo) to the model's
+**intermediate**-class **≈ 1.36–2.28 %/mo** — *raising* the pacer target, the
+opposite direction from the R3 tightening, and the point of N43.
+
+| Step | What / why |
+|---|---|
+| **① Verify v23 applied** | Confirm the migration ran and the row is present + `is_active false` (`get_engine_params` / migration list). |
+| **② Replay diff** | `replay_decisions` candidate v23 over recorded decisions. Expected shape: **≈ empty on stored prescriptions** — targets are display/pacer-layer and the active source is still `"band"`, so decisions recorded under v21/v22 replay byte-identically. Assert that; any non-empty diff means a stored prescription unexpectedly reads the plan band and must be understood before activation. |
+| **③ Owner reviews + activates** | Confirm the corrected strength band reads right on the live profile (an undermuscled long-time lifter should land intermediate-class, above the advanced calendar bucket; a genuinely jacked lifter near the FFMI ceiling should still land low). Activate via `activate_engine_params`; roll back by re-activating v21. **Re-enable the macro goal-target cards (N54) and amend the DEXA-indirect-chain copy (N52)** as small code PRs after activation — both were gated on the band becoming trustworthy. |
+| **④ Re-flip `rate_source` to `"plan"`** | After v23 is active + reviewed, propose a micro-bump over v23 with `progression.rate_source: "plan"` (the R3 flip, now reading the corrected band) and run its own replay diff — the paced/stepped mix shifts on earned working weeks (now toward *more* headroom for the undermuscled case), no entitlement change. Roll back by re-activating v23 (source `"band"`). |
+| **⑤ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20/R3 monitor rows; this also feeds the Phase-6 envelope fit, which **must** run on the corrected band (N36 is blocked-by N43). |
+
 ### Fit + activate the envelope loop (doc 17 §7 / Phase 6, N36 — field-data-gated)
 
 The doc 17 §7 mechanism ships fully coded and OFF: `band_position` becomes a

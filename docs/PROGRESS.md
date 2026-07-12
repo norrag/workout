@@ -2,7 +2,60 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-12 (latest) — Batch-17 roundup: N44/N45/N48/N49/N50/N51/N54/N55 in one PR
+## 2026-07-12 (latest) — N43: two-component strength-rate model (engine_params v23, inactive)
+
+Doc 17 Phase 7. The strength-path analogue of the N21/v21 hypertrophy
+correction: v21's personalized strength band still buckets by **calendar
+training years**, so a long-training but undermuscled lifter (FFMI below the
+untrained baseline) is priced at the *advanced* strength floor even as the same
+profile's hypertrophy path projects near-novice muscle gain — internally
+inconsistent by 2–3×. Built per
+[`docs/reviews/2026-07-11-strength-rate-model-research.md`](reviews/2026-07-11-strength-rate-model-research.md)
+§4 (evidence + modeling recommendation) and its companion pacing pressure-test.
+
+- **Engine (`src/lib/engine/macro.ts`).** `strengthRateBand` now dispatches:
+  when `macro_target.strength_model` is present + enabled **and** body
+  composition is readable, the calendar bucket is replaced by the additive
+  `strengthRate%/mo = neural(effectiveTrainingAge) + k × hypertrophyRate_FFM`
+  (new pure helper `twoComponentStrengthRate`). The hypertrophic term reuses the
+  N21 proximity rate re-expressed as %/mo of FFM (÷ fat-free fraction) × coupling
+  `k ≈ 1.0`; the neural term is a decaying band `N0·e^(−effYears/τ) + floor`
+  (front-loaded, small non-zero floor — Pearcey 2021); the §4 un-bank guardrail
+  discounts effective training age when realized FFM is low. The sum takes the
+  **same v21 strength sex factor + age taper** and is clamped to a ceiling. When
+  no FFMI can be computed it degrades to the v21 bucket band — the strength-path
+  mirror of the hypertrophy training-age-decay fallback. Because the dispatch is
+  inside `strengthRateBand`, all three call sites (`strengthRatePctMonth`, the
+  strength target, `recommendDuration`) get it.
+- **Params (`src/lib/engine/params.ts`).** New `macro_target.strength_model`
+  block (`enabled`, `neural_n0`, `neural_floor`, `neural_tau_years`,
+  `ffm_coupling_k`, `undermuscled_unbank`, `rate_ceiling_pct_month`),
+  `.optional()` — absent on every pre-v23 row ⇒ parse/hash byte-identical, v21
+  behavior. DEFAULT (v10) unchanged.
+- **Migration `20260712000001_engine_params_v23_strength_model.sql`.** v21 +
+  `strength_model`, applied **inactive**; full materialization + canonical
+  sha256 `ed12c6a0…` (guarded in `params-provenance.test.ts`). v22 was the
+  hosted-only `rate_source:"plan"` micro-bump rolled back to v21 this session —
+  no committed migration — so this lands as v23.
+- **Goldens (`macro.test.ts`, +10).** The research §4 corners: Garron-shaped
+  lifter (13 yr, FFMI ≈ 16.7) → **1.36–2.28 %/mo** (intermediate-class, above the
+  advanced calendar bucket); a true novice at the same FFMI → **4.36–7.28**
+  (beginner — the whole gap is the neural term); advanced FFMI-ceiling lifter →
+  **0.14–0.50**; ceiling clamp; un-bank raises a mid-career undermuscled lifter;
+  body-comp-missing ⇒ the bucket band byte-identical; `strength_model` absent ⇒
+  the v21 band.
+- **Docs.** doc 17 §2.7 (new) + §9 Phase-7 row + §10 cross-doc + backlog spine;
+  doc 10 §5 strength paragraph + params list; manual-operations Phase-R
+  activation entry (activate v23 → review → re-flip `rate_source` to `"plan"`).
+
+Shipped **INACTIVE** (hard rule 3, doc 17 principle 7): the active row stays
+v21, so runtime behavior is byte-identical; activation is Phase R (replay diff —
+expected ≈ empty on stored prescriptions until `rate_source:"plan"` — then owner
+review). Suite 1107 green, lint/typecheck clean. Unblocks N36 (the envelope fit
+must run on the corrected band) and N52/N54 (DEXA-copy amendment + target-card
+re-enable ride the v23 activation). Notes: N43 → `done (PR #182)`.
+
+## 2026-07-12 — Batch-17 roundup: N44/N45/N48/N49/N50/N51/N54/N55 in one PR
 
 The easy Batch-17 items swept together (the tough ones — N43 v23 band, N46
 template editing, N47/N53 device-verification work — stay open). Design deltas

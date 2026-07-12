@@ -251,6 +251,32 @@ ACSM 2009). Both endpoints scale; the recommended timeframe reads the same perso
 `rate_source: "plan"` pacer carrier). *(ACSM 2009 — ~40% untrained vs ~16% trained; SBS/Nuckols;
 Moritani & DeVries 1979 neural time-course.)*
 
+**Two-component model (v23, doc 17 §2.7 / N43 — supersedes the calendar bucket wherever body comp
+is readable):** bucketing the strength rate on **calendar training years** is the same
+calendar-vs-body-composition defect N21 fixed for hypertrophy — a lifter with 13 years under the bar
+but a below-baseline FFMI has near-novice headroom the *advanced* bucket denies. Strength gain has
+two separable, roughly **additive** parts (Moritani/deVries 1979; Balshaw 2017 decomposed individual
+strength-change variance into neural drive 30.6% / muscle volume 18.7% / pre-strength 10.6%): a
+**neural/skill** term (large in novices, decaying toward a small non-zero floor with effective
+training age — Pearcey 2021: plasticity persists) and a **hypertrophy-driven** term (tracks FFM
+gain, governed by FFMI proximity — the N21 model). So:
+`strengthRate%/mo = neural(effectiveTrainingAge) + k × hypertrophyRate_FFM`, where
+`hypertrophyRate_FFM` is the §above proximity rate re-expressed as %/mo of FFM (÷ fat-free fraction)
+and `k ≈ 1.0` [HEURISTIC, band 0.8–1.3] — the allometric FFM exponent (~0.8–1.1, Bamman 2007) ×
+trained-muscle amplification (~1.1–1.3), i.e. ≈1:1 with whole-body FFM % once skill is fixed. The
+neural band is `N0·e^(−effYears/τ) + floor` (`neural_n0 {3,5}`, `neural_tau_years 0.5`,
+`neural_floor {0.1,0.4}` %/mo); an **un-bank** guardrail (`undermuscled_unbank`, default 0.5)
+discounts effective training age when realized FFM is low (long calendar time, little to show is
+itself evidence of ineffective training; neural adaptation is effective-practice-specific). The sum
+takes the same v21 sex factor + age taper and is clamped to `rate_ceiling_pct_month` (8%/mo). When
+body composition can't be read (no FFMI) the model **degrades to the calendar-bucket band** — the
+strength-path mirror of the hypertrophy fallback. NOT adopted: an FFMI-only model (drops the
+evidenced neural term), a multiplicative combination (zeroes on either term), or per-user coefficient
+tuning (the envelope loop moves position within a band, never the band). All coefficients are
+**[HEURISTIC — magnitude a modeling estimate; direction evidenced]**. *(Balshaw 2017; Del Vecchio
+2019; Mattocks 2017 — 1RM is partly a trainable skill; Reggiani & Schiaffino 2020 — size↔strength
+change coupling is real but weak; Bamman 2007 — allometric FFM exponent.)*
+
 **Cut — fat loss as %BW/week, scaled by leanness/bodyweight (the user's emphasis):**
 | Leanness | %BW / week |
 |---|---|
@@ -278,7 +304,9 @@ phases spread accumulate → intensify → peak (`params.phase_plan`).
 Params: `macro_target.<goal>` rate tables, `macro_target.sex_factor`, `macro_target.age_taper`,
 `macro_target.career_cap`, `phase_plan`; v21 (doc 17 §2, gated — absent ⇒ prior behavior):
 `macro_target.strength_sex_factor`, `macro_target.age_taper_floor_strength`,
-`macro_target.bf_proxy_pct`.
+`macro_target.bf_proxy_pct`; v23 (doc 17 §2.7 / N43, gated — absent ⇒ v21 bucket band):
+`macro_target.strength_model` (`enabled`, `neural_n0`, `neural_floor`, `neural_tau_years`,
+`ffm_coupling_k`, `undermuscled_unbank`, `rate_ceiling_pct_month`).
 
 ## 6. Performance metrics (exercise page 3.1a/b, performance tab 4.2)
 

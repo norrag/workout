@@ -19,7 +19,8 @@ doc-16 pattern.
 
 **Backlog spine:** N21 (Phase 1) → N37 (Phase 2) → N40 (Phase 3) → N41
 (Phase 4) → N34 (Phase 5, parallelizable from day one) → N36 (Phase 6,
-field-data-gated) → Phase R (owner-gated activations). N38/N39 stay on the
+field-data-gated) → N43 (Phase 7, the strength-rate model — parallelizable,
+builds on Phase 1) → Phase R (owner-gated activations). N38/N39 stay on the
 doc-16 spine, untouched here.
 
 ---
@@ -149,6 +150,83 @@ collapses; cap non-binding ⇒ byte-identical); `strengthRatePctMonth` present
 for all four goals; v20-params (block absent) ⇒ byte-identical `MacroPlan`;
 snapshot stamped at create + goals-edit (and not on unrelated edits);
 birthdate-derived age preferred, int fallback.
+
+### 2.7 Two-component strength-rate model (N43, `engine_params` v23 inactive)
+
+**The strength-path analogue of the §2.1/§2.2 hypertrophy correction.** After
+the Phase-2 `rate_source: "plan"` flip, the personalized strength band still
+**buckets by calendar training years** (`bucketFor` → `strength_pct_month`) —
+the exact calendar-vs-body-composition defect N21 fixed for hypertrophy. A
+lifter can have 13 years under the bar and still be undermuscled (FFMI below
+the untrained baseline) with near-novice headroom, yet the calendar bucket
+prices him at the *advanced* strength floor — internally inconsistent with the
+same profile's near-novice hypertrophy projection by a factor of two to three.
+Evidence + the modeling recommendation:
+[`docs/reviews/2026-07-11-strength-rate-model-research.md`](./reviews/2026-07-11-strength-rate-model-research.md)
+(companion pacing pressure-test:
+[`2026-07-11-pacing-fundamentals-review.md`](./reviews/2026-07-11-pacing-fundamentals-review.md)).
+
+**Functional form — additive two-term** (research §4; the empirical
+decompositions — Moritani/deVries 1979, Balshaw 2017 — *sum* independent
+contributions, and additive gives the right corners for free):
+
+```
+strengthRate%/mo = neural(effectiveTrainingAge) + k × hypertrophyRate_FFM(profile)
+```
+
+applied inside `strengthRateBand` (`src/lib/engine/macro.ts`) so **all three
+call sites** (`strengthRatePctMonth`, the strength target, `recommendDuration`)
+get it, then multiplied by the SAME §2.1 strength sex factor + age taper and
+clamped to a ceiling. Gated on a new `macro_target.strength_model` block:
+
+- **`hypertrophyRate_FFM`** — reuse the N21 proximity rate
+  (`hypertrophyRate`, %BW/mo) re-expressed as **%/mo of FFM** (÷ the fat-free
+  fraction) and scaled by `ffm_coupling_k`. This is the term that makes an
+  undermuscled long-time lifter progress like they have headroom.
+- **`ffm_coupling_k`** — the FFM-scaled coupling, default **1.0** [HEURISTIC,
+  band 0.8–1.3] (research §2.5: allometric FFM exponent ~0.8–1.1 ×
+  trained-muscle amplification ~1.1–1.3 ⇒ ≈1:1 with whole-body FFM %, once
+  skill is fixed — *higher* than the naïve sub-linear read).
+- **`neural`** — a decaying band `N0·e^(−effYears/τ) + floor`,
+  `neural_n0 {3, 5}` %/mo, `neural_tau_years 0.5` (≈6 mo), `neural_floor
+  {0.1, 0.4}` %/mo (non-zero per Pearcey 2021 — plasticity continues into
+  chronic training). Calendar training age is the honest argument here, and
+  *only* here.
+- **`undermuscled_unbank`** — the §4 guardrail: discount effective training
+  age toward `trainingYears × undermuscled_unbank` as realized FFM falls (FFMI
+  16.7 after 13 years is itself evidence of ineffective training; neural
+  adaptation is effective-practice-specific). Default **0.5**; 1 disables it.
+- **`rate_ceiling_pct_month`** — clamp the total (default **8** %/mo) for the
+  genuine-novice corner.
+- **Fallback** — when body composition can't be read (no FFMI), the
+  hypertrophic term is uncomputable, so the model degrades to **today's
+  calendar-bucket band** (the strength-path mirror of how `hypertrophyRate`
+  degrades to training-age decay). The bucket stops being the primary model
+  and becomes graceful degradation.
+
+**Explicitly NOT adopted** (research §4): an FFMI-only model (drops the
+evidenced neural term — the mirror of the calendar error); a multiplicative
+combination (zeroes strength when either term is near zero); any per-user
+coefficient tuning (that is the envelope loop's job — it moves position
+*within* a band, never the band; principle 4).
+
+**Ship shape.** `engine_params` **v23, applied inactive** (append-only
+migration over v21; v22 was the hosted-only `rate_source: "plan"` micro-bump
+rolled back to v21 this session, so it carries no committed migration). The
+whole `strength_model` block is `.optional()` — ABSENT on every pre-v23 row ⇒
+parse/hash byte-identical and `strengthRateBand` behaves exactly as v21.
+Activation is Phase R (§8): replay diff (targets are display/pacer layer, so
+the diff is expected ≈ empty on stored prescriptions until `rate_source` is
+`"plan"`), then owner review.
+
+*Tests (research §4 sanity checks, pinned as goldens):* Garron-shaped lifter
+(13 yr, FFMI ≈ 16.7) lands in the **intermediate** band ≈ 1.4–2.3 %/mo,
+*above* the advanced calendar bucket; a true novice at the same FFMI lands in
+the **beginner** band ≈ 4.3–7.3 %/mo (the whole gap is the neural term); an
+advanced well-muscled lifter (FFMI ≈ 24) lands ≈ 0.3–0.8 %/mo; the ceiling
+clamps the novice corner; body-comp-missing ⇒ byte-identical bucket band;
+`strength_model` absent (every pre-v23 row) ⇒ byte-identical `MacroPlan`;
+the un-bank modestly raises a mid-career undermuscled lifter.
 
 ## 3. Phase 2 — `rate_source: "plan"` pacer branch (N37)
 
@@ -364,6 +442,7 @@ order:
 | 4 | §5 bodyweight series + priming | PR 3 (retrospective rows) | small |
 | 5a–5c | §6 DEXA phase-in | — (5b's verdict rows want PR 3) | **parallelizable from day one**; 5a's first login resolves the §8.3 residual |
 | 6 | §7 envelope loop | v20 active + field data + PR 1 | params bump ships inactive |
+| 7 | §2.7 two-component strength-rate model (N43) | PR 1 (§2 correction) | `engine_params` v23 inactive; doc 10 §5 amendment rides along |
 | R1–R4 | §8 activations | as listed | owner steps, runbook |
 
 Every phase lands green with its params/blocks absent (byte-identical),
@@ -374,7 +453,10 @@ touches transcribe mockups or add 09 entries first (hard rule 8).
 ## 10. Cross-doc effects at build time
 
 - **Doc 10 §5** — Phase-1 amendments (§2.5): strength personalization
-  params, est-strength-denominated strength targets, bf-proxy params.
+  params, est-strength-denominated strength targets, bf-proxy params. **N43
+  (§2.7):** the strength-rate model amendment — the two-component additive
+  band (`strength_model` params) supersedes the calendar bucket wherever an
+  FFMI can be read.
 - **Doc 10 §6/§8** — unchanged (PR #157 already landed the est-strength
   rework this doc grades with).
 - **Doc 15** — Phase 5 records the §8.3 verification outcome; §3.2's
