@@ -325,6 +325,80 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v23 is a complete, replayable snapshot matching the migration hash", () => {
+    // v23 = v21 + macro_target.strength_model (N43, doc 17 §2.7 — the
+    // two-component strength-rate model). The block is `.optional()`, so
+    // v21/earlier rows are byte-identical and the new row stays replayable.
+    // (v22 was the hosted-only rate_source "plan" micro-bump, rolled back — no
+    // committed migration.)
+    const v23 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+      session_fatigue_dampen_threshold: 8,
+      session_performance_dampen_threshold: 3,
+      climb_requires_rir_step: true,
+      hold_week_anchor_deadband: true,
+      progression: {
+        mode: "earned_step",
+        step: "min",
+        min_confidence: "moderate",
+        compliance_band: 0.015,
+        cadence: "microcycle",
+        pacing: "macro_rate",
+        rate_source: "band",
+        band_position: 0.5,
+        goal_rate_factor: {
+          strength: 1.0,
+          hypertrophy: 0.75,
+          gain: 0.75,
+          cut: 0.0,
+          maintain: 0.0,
+        },
+        miss_rearm_sessions: 2,
+        max_gap_days: 10,
+        peak_week: "skip",
+        max_pct_per_step: 0.05,
+      },
+      macro_target: {
+        ...V11_PARAMS.macro_target,
+        strength_sex_factor: { male: 1.0, female: 1.0 },
+        age_taper_floor_strength: 0.7,
+        bf_proxy_pct: {
+          male: { lean: 10, average: 16, high_bf: 25 },
+          female: { lean: 18, average: 26, high_bf: 35 },
+        },
+        strength_model: {
+          enabled: true,
+          neural_n0: { low: 3, high: 5 },
+          neural_floor: { low: 0.1, high: 0.4 },
+          neural_tau_years: 0.5,
+          ffm_coupling_k: 1,
+          undermuscled_unbank: 0.5,
+          rate_ceiling_pct_month: 8,
+        },
+      },
+    });
+    const p = resolveProvenance(v23 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION); // optional block: no shape bump
+    expect(p.params_hash).toBe(
+      "ed12c6a0072bea554d102744353a248ec7f0222b85a5cd3bb2fe95f361e92417",
+    );
+  });
+
+  it("strength_model is absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("strength_model");
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("the v21 macro_target fields are absent from DEFAULT (v10), preserving its hash", () => {
     for (const key of [
       "strength_sex_factor",

@@ -631,6 +631,57 @@ export const engineParamsSchema = z.object({
           }),
         })
         .optional(),
+      // ----- doc 17 §2.7 / v23 — two-component strength-rate model (N43) -----
+      // The strength-path analogue of the N21 hypertrophy correction
+      // (docs/reviews/2026-07-11-strength-rate-model-research.md §4). ABSENT on
+      // every pre-v23 row ⇒ parse/hash byte-identical and `strengthRateBand`
+      // falls back to the v21 bucket band × sex/age (legacy). PRESENT + enabled
+      // ⇒ whenever body composition can be read, the calendar-bucketed band is
+      // replaced by an ADDITIVE model:
+      //   strengthRate%/mo = neural(trainingAge) + k × hypertrophyRate_FFM
+      // — a decaying neural/skill term (large near zero training age, small
+      // floor for the experienced; Balshaw 2017, Moritani/deVries 1979,
+      // Pearcey 2021) plus the N21 FFMI-proximity hypertrophy rate re-expressed
+      // as %/mo of FFM and coupled ~1:1 (allometric FFM exponent × trained-
+      // muscle amplification; Bamman 2007). Both terms are bands; the sum then
+      // takes the SAME strength sex factor + age taper as v21 and is clamped to
+      // `rate_ceiling_pct_month`. Degrades to the bucket band when body comp is
+      // missing (no FFMI → hypertrophic term uncomputable), mirroring how the
+      // hypertrophy path degrades to training-age decay.
+      strength_model: z
+        .object({
+          // `false` lets an activated row disable the model without deleting
+          // the block (tunables stay visible) — the `mode: "off"` pattern.
+          enabled: z.boolean().default(true),
+          // neural/skill term N0·e^(−effectiveYears/τ) + floor, a decaying
+          // BAND. N0 ≈ {3, 5} %/mo at zero training age; floor ≈ {0.1, 0.4}
+          // %/mo — non-zero because cortical/spinal plasticity continues into
+          // chronic training (Pearcey 2021). Its argument is EFFECTIVE training
+          // age (see `undermuscled_unbank`); τ in years (≈0.5 = 6 mo).
+          neural_n0: z.object({ low: z.number().min(0), high: z.number().min(0) }),
+          neural_floor: z.object({
+            low: z.number().min(0),
+            high: z.number().min(0),
+          }),
+          neural_tau_years: z.number().positive(),
+          // FFM-scaled hypertrophic coupling k (research §2.5): the allometric
+          // FFM exponent (~0.8–1.1) × trained-muscle amplification (~1.1–1.3)
+          // nets ≈1.0 [HEURISTIC, defensible band 0.8–1.3]. A single tunable.
+          ffm_coupling_k: z.number().min(0),
+          // "un-bank" (research §4 guardrail): discount EFFECTIVE training age
+          // toward `trainingYears × undermuscled_unbank` when realized FFM is
+          // low (developed fraction → 0), because FFMI 16.7 after 13 calendar
+          // years is itself evidence of ineffective training and neural gains
+          // are effective-practice-specific, not calendar-specific. 1 = no
+          // discount; <1 raises the neural residual for a long-calendar-age but
+          // undermuscled lifter. HEURISTIC. Default 1 (off) in the schema; v23
+          // seeds a modest 0.5.
+          undermuscled_unbank: z.number().min(0).max(1).default(1),
+          // total-rate ceiling (%/mo) — clamps the genuine-novice corner so a
+          // very light / high-bf beginner can't project past plausible rates.
+          rate_ceiling_pct_month: z.number().positive(),
+        })
+        .optional(),
       recommend_target_lb: z.object({
         male: z.number().positive(),
         female: z.number().positive(),

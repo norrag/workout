@@ -21,7 +21,7 @@ grouping.
 |----|-----------|-------------|----------------|
 | **A** | Engine & metrics Q&A | [`A-engine-metrics.md`](./A-engine-metrics.md) | How e1RM, strength gain, progression, misses, baselining, set-planning, deloads work — answered from code + spec. |
 | **B** | e1RM audit & exposure | _shipped_ | Store per-set e1RM, expose to MCP, tap-to-flip e1RM view in history. |
-| **C** | Stats unification | _tbd_ | Meso ↔ macro stats parity, planned-sets definition, aggregate strength gains. Open: strength-rate band v23 (N43), DEXA-copy amendment (N52, rides N43). Shipped: target-card disable (N54, 2026-07-12). |
+| **C** | Stats unification | _tbd_ | Meso ↔ macro stats parity, planned-sets definition, aggregate strength gains. Shipped: strength-rate band v23 (N43, PR #182 — inactive, awaits Phase-R activation), target-card disable (N54, 2026-07-12). Open: DEXA-copy amendment + target-card re-enable (N52/N54, ride the v23 activation). |
 | **D** | Macrocycle & meso management | _tbd_ | Custom-duration input bug, unplanned-meso display, meso management under a macro. Open: custom-template editing (N46). |
 | **E** | Logging & feedback UX | _tbd_ | Feedback slider resolution, note icon, back-button clutter, set-type removal, over/under marker, soreness capture. Shipped: replace-sheet filters + confirm step (N48/N49, 2026-07-12). |
 | **F** | Settings, profile & search | _tbd_ | Settings cleanup, template-code flow, profile height units, live search filter, bodyweight-exercise settings. |

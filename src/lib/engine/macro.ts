@@ -158,9 +158,18 @@ function ageMultiplierStrength(
 }
 
 /**
- * The personalized monthly strength band: bucket table × sex factor × age
- * taper (both endpoints scale; doc 17 §2.1). With the v21 params absent this
- * is exactly the raw bucket band. Unrounded — `MacroPlan.strengthRatePctMonth`
+ * The personalized monthly strength band. Two models, gated (doc 17 §2.1/§2.7):
+ *
+ * - v23 (`strength_model` present + enabled) AND body composition readable ⇒
+ *   the two-component ADDITIVE model `neural(trainingAge) + k × hypRate_FFM`
+ *   (see `twoComponentStrengthRate`), then × sex factor × age taper, clamped to
+ *   the ceiling. This replaces the calendar bucket wherever an FFMI can be read.
+ * - Otherwise (v23 absent, or v23 present but no body comp) ⇒ the v21 bucket
+ *   band × sex factor × age taper. With v21 params also absent this degrades to
+ *   the raw bucket band (legacy).
+ *
+ * Both endpoints scale by the SAME strength sex factor + age taper (doc 17 §2.1,
+ * research §4 "applied to the sum"). Unrounded — `MacroPlan.strengthRatePctMonth`
  * carries it to the doc-16 pacer; display paths round on the way out.
  */
 function strengthRateBand(
@@ -168,10 +177,73 @@ function strengthRateBand(
   bucket: ExperienceBucket,
   mt: EngineParams["macro_target"],
 ): { low: number; high: number } {
-  const [low, high] = mt.strength_pct_month[bucket];
   const f =
     strengthSexFactor(profile, mt) * ageMultiplierStrength(profile.age, mt);
+  const sm = mt.strength_model;
+  if (sm?.enabled) {
+    const model = twoComponentStrengthRate(profile, bucket, mt, sm);
+    if (model) {
+      const ceil = sm.rate_ceiling_pct_month;
+      return {
+        low: Math.min(model.low * f, ceil),
+        high: Math.min(model.high * f, ceil),
+      };
+    }
+    // body comp unreadable ⇒ fall through to the bucket band (graceful degrade)
+  }
+  const [low, high] = mt.strength_pct_month[bucket];
   return { low: low * f, high: high * f };
+}
+
+/**
+ * The v23 two-component additive strength rate (research 2026-07-11 §4), BEFORE
+ * the sex factor / age taper / ceiling the caller applies:
+ *
+ *   strengthRate%/mo = neural(effectiveTrainingAge) + k × hypertrophyRate_FFM
+ *
+ * - hypertrophic term: the N21 proximity rate (`hypertrophyRate`, %BW/mo) re-
+ *   expressed as %/mo of FFM (÷ the fat-free fraction) and scaled by the FFM
+ *   coupling `k`. An undermuscled long-time lifter gets headroom here, the whole
+ *   point of N21 carried to strength.
+ * - neural term: a decaying band `N0·e^(−effYears/τ) + floor`, front-loaded and
+ *   never exactly zero. Its argument is EFFECTIVE training age — calendar years
+ *   discounted toward `undermuscled_unbank` when realized FFM is low (§4).
+ *
+ * Returns null when body composition can't be read (no FFMI), so the caller
+ * degrades to the bucket band — the strength-path mirror of `hypertrophyRate`'s
+ * training-age-decay fallback.
+ */
+function twoComponentStrengthRate(
+  profile: MacroProfile,
+  bucket: ExperienceBucket,
+  mt: EngineParams["macro_target"],
+  sm: NonNullable<EngineParams["macro_target"]["strength_model"]>,
+): { low: number; high: number } | null {
+  const dev = muscularDevelopment(profile, mt);
+  if (!dev) return null;
+  const bodyFatPct = effectiveBodyFatPct(profile, mt);
+  if (bodyFatPct == null) return null; // dev implies a bf%, but stay defensive
+  const ffmFraction = 1 - bodyFatPct / 100;
+  if (ffmFraction <= 0) return null;
+
+  // hypertrophic component: proximity %BW band → %FFM band × coupling k. `dev`
+  // is non-null, so hypertrophyRate takes its proximity branch here.
+  const hyp = hypertrophyRate(profile, bucket, mt);
+  const k = sm.ffm_coupling_k;
+  const hypFfmLow = (hyp.low / ffmFraction) * k;
+  const hypFfmHigh = (hyp.high / ffmFraction) * k;
+
+  // neural component: decaying band on EFFECTIVE training age. Un-bank discounts
+  // the calendar years toward `unbank` as realized FFM (developed fraction)
+  // falls; unbank = 1 leaves calendar years intact.
+  const years = profile.trainingYears ?? assumedYears(bucket);
+  const effectiveYears =
+    years * (sm.undermuscled_unbank + (1 - sm.undermuscled_unbank) * dev.fraction);
+  const decay = Math.exp(-effectiveYears / sm.neural_tau_years);
+  const neuralLow = sm.neural_n0.low * decay + sm.neural_floor.low;
+  const neuralHigh = sm.neural_n0.high * decay + sm.neural_floor.high;
+
+  return { low: neuralLow + hypFfmLow, high: neuralHigh + hypFfmHigh };
 }
 
 /** pounds → kilograms, for the FFMI/BMI physics computed in metric. */

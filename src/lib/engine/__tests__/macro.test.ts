@@ -28,6 +28,24 @@ const v21 = engineParamsSchema.parse({
   },
 });
 
+// the v23 two-component strength-rate model (doc 17 §2.7 / N43), built the same
+// way the 20260712000001 migration materializes it: v21 + macro_target.strength_model
+const v23 = engineParamsSchema.parse({
+  ...v21,
+  macro_target: {
+    ...v21.macro_target,
+    strength_model: {
+      enabled: true,
+      neural_n0: { low: 3, high: 5 },
+      neural_floor: { low: 0.1, high: 0.4 },
+      neural_tau_years: 0.5,
+      ffm_coupling_k: 1,
+      undermuscled_unbank: 0.5,
+      rate_ceiling_pct_month: 8,
+    },
+  },
+});
+
 const intermediateMale: MacroProfile = {
   sex: "male",
   age: 34,
@@ -640,6 +658,142 @@ describe("v21 §2.3 — cut-band proportional rescale (parameterless)", () => {
     // low rescales by cap/high_raw instead of clamping onto the cap
     expect(plan.target.low).toBeLessThan(plan.target.high);
     expect(plan.target.low).toBeCloseTo(37.4, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 17 §2.7 / v23 — two-component strength-rate model (N43). Gated on the new
+// macro_target.strength_model block; with it absent (v21 / DEFAULT / every
+// pre-v23 row) the strength band is the v21 bucket band × sex/age, pinned above.
+// The three sanity checks below are the research doc §4 corners.
+// ---------------------------------------------------------------------------
+
+describe("v23 §2.7 — two-component strength-rate model", () => {
+  // strength band (%/mo) for a strength-goal plan under v23, via the goal-
+  // independent carrier the pacer reads.
+  const band = (p: Partial<MacroProfile>, engineParams = v23) =>
+    planMacrocycle(
+      {
+        goal: "strength",
+        profile: {
+          sex: "male",
+          age: 30,
+          bodyweight: 160,
+          heightIn: 73,
+          experienceLevel: "intermediate",
+          trainingYears: 13,
+          bodyFatPct: 20.4,
+          ...p,
+        },
+        durationMonths: 6,
+        mesoLengthWeeks: 5,
+      },
+      engineParams,
+    ).strengthRatePctMonth;
+
+  it("Garron corner: 13-yr, FFMI ≈ 16.7 lands in the intermediate band, above the advanced calendar bucket", () => {
+    // research §3: neural_floor [0.1,0.4] + 1.0 × hyp_FFM [1.26,1.88] ≈ 1.4–2.3 %/mo
+    const g = band({});
+    expect(g.low).toBeCloseTo(1.356, 2);
+    expect(g.high).toBeCloseTo(2.284, 2);
+    // strictly above the advanced calendar bucket [0.5, 1.5] the 13-yr bucket assigns
+    expect(g.low).toBeGreaterThan(0.5);
+    expect(g.high).toBeGreaterThan(1.5);
+    // and within the intermediate band [1.5, 3]
+    expect(g.high).toBeLessThanOrEqual(3);
+  });
+
+  it("neural term is the whole gap: a true novice at the same FFMI gets beginner-class rate", () => {
+    const novice = band({ trainingYears: 0 });
+    // research §4: N0 [3,5] × 1 (decay) + neural_floor + hyp_FFM ≈ 4.3–7.3 %/mo
+    expect(novice.low).toBeCloseTo(4.356, 2);
+    expect(novice.high).toBeCloseTo(7.284, 2);
+    // squarely in the beginner band, far above the same-FFMI 13-yr lifter
+    expect(novice.low).toBeGreaterThan(4);
+    expect(novice.low).toBeGreaterThan(band({}).high);
+  });
+
+  it("advanced & well-muscled corner: FFMI at the ceiling gets a small residual", () => {
+    const adv = band({ bodyweight: 200, heightIn: 70, bodyFatPct: 10 });
+    // headroom ≈ 0, so ≈ neural_floor + a thin hypertrophic residual — well below
+    // the intermediate band, the genuine advanced case the bucket was after
+    expect(adv.high).toBeLessThan(1);
+    expect(adv.low).toBeGreaterThan(0);
+    expect(adv.high).toBeLessThan(band({}).low);
+  });
+
+  it("degrades to the calendar bucket band when body composition can't be read", () => {
+    // no height/bf% ⇒ no FFMI ⇒ the model returns null and the bucket band stands
+    const noBodyComp = band({ heightIn: null, bodyFatPct: null });
+    // 13 training yrs ⇒ advanced bucket [0.5, 1.5], age 30 no taper, sex 1
+    expect(noBodyComp).toEqual({ low: 0.5, high: 1.5 });
+  });
+
+  it("the ceiling clamps the genuine-novice corner (a light, high-bf beginner)", () => {
+    const clamped = engineParamsSchema.parse({
+      ...v23,
+      macro_target: {
+        ...v23.macro_target,
+        strength_model: {
+          ...v23.macro_target.strength_model!,
+          rate_ceiling_pct_month: 5,
+        },
+      },
+    });
+    // an untrained, undermuscled lifter would otherwise exceed 5 %/mo at the top
+    const capped = band({ trainingYears: 0 }, clamped);
+    expect(capped.high).toBe(5);
+  });
+
+  it("the un-bank guardrail raises a mid-career undermuscled lifter", () => {
+    const noUnbank = engineParamsSchema.parse({
+      ...v23,
+      macro_target: {
+        ...v23.macro_target,
+        strength_model: { ...v23.macro_target.strength_model!, undermuscled_unbank: 1 },
+      },
+    });
+    // 3 calendar years but below-baseline FFMI: discounting effective training
+    // age (unbank 0.5) leaves a larger neural residual than calendar years alone
+    const with05 = band({ trainingYears: 3 });
+    const with1 = band({ trainingYears: 3 }, noUnbank);
+    expect(with05.low).toBeGreaterThan(with1.low);
+    expect(with05.high).toBeGreaterThan(with1.high);
+  });
+
+  it("v23 absent ⇒ byte-identical to the v21 bucket band (no strength_model)", () => {
+    const withModel = band({});
+    const v21Band = band({}, v21);
+    // the model changes the number; without it, the v21 bucket band stands
+    expect(withModel).not.toEqual(v21Band);
+    // 13 yr ⇒ advanced bucket [0.5, 1.5] under v21, age 30 no taper
+    expect(v21Band).toEqual({ low: 0.5, high: 1.5 });
+  });
+
+  it("the strength target compounds off the personalized rate and stays capped", () => {
+    // the model flows through computeTarget's strength branch, not just the carrier
+    const plan = planMacrocycle(
+      {
+        goal: "strength",
+        profile: {
+          sex: "male",
+          age: 30,
+          bodyweight: 160,
+          heightIn: 73,
+          experienceLevel: "intermediate",
+          trainingYears: 13,
+          bodyFatPct: 20.4,
+        },
+        durationMonths: 6,
+        mesoLengthWeeks: 5,
+      },
+      v23,
+    );
+    // per-month rate is the (rounded) model band, not the advanced bucket
+    expect(plan.perMonthRate.low).toBeCloseTo(1.4, 1);
+    expect(plan.perMonthRate.high).toBeCloseTo(2.3, 1);
+    expect(plan.target.unit).toBe("%");
+    expect(plan.target.direction).toBe("gain");
   });
 });
 

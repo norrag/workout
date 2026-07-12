@@ -4,6 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 74: N43 build — two-component strength-rate model (engine_params v23, inactive, PR #182)
+
+Owner: "Review docs/reviews/2026-07-11-strength-rate-model-research.md and
+implement N43." Reconciliation sweep first: PR #181 merged into main (all its
+`done (PR #181)` rows already stamped, verbatim text preserved) — nothing new to
+archive. Then built N43 per the research doc §4, doc 17 Phase 7:
+
+- **Engine** (`macro.ts`): `strengthRateBand` now dispatches. With
+  `macro_target.strength_model` present + enabled AND body composition readable,
+  the calendar bucket is replaced by the additive
+  `neural(effectiveTrainingAge) + k × hypertrophyRate_FFM` (new
+  `twoComponentStrengthRate`): the N21 proximity rate re-expressed as %/mo of FFM
+  (÷ fat-free fraction) × coupling `k`, plus a decaying neural band
+  `N0·e^(−effYears/τ)+floor`; the §4 un-bank guardrail discounts effective
+  training age when realized FFM is low. Sum takes the same v21 sex factor + age
+  taper, clamped to the ceiling. Degrades to the bucket band when no FFMI — the
+  strength-path mirror of the hypertrophy training-age-decay fallback. All three
+  call sites (`strengthRatePctMonth`, strength target, `recommendDuration`) get
+  it for free.
+- **Params** (`params.ts`): `macro_target.strength_model` block, `.optional()`
+  (enabled/neural_n0/neural_floor/neural_tau_years/ffm_coupling_k/
+  undermuscled_unbank/rate_ceiling_pct_month). Absent ⇒ parse/hash
+  byte-identical, v21 behavior.
+- **Migration** `20260712000001_engine_params_v23_strength_model.sql`, applied
+  **inactive**; full materialization + canonical sha256
+  (`ed12c6a0…`, guarded in params-provenance.test.ts). v22 was the hosted-only
+  `rate_source:"plan"` micro-bump rolled back to v21 — no committed migration, so
+  this lands as v23.
+- **Goldens**: macro.test.ts pins the research §4 corners — Garron (13 yr, FFMI
+  ≈16.7) → **1.36–2.28 %/mo** (intermediate, above the advanced calendar bucket);
+  true novice same FFMI → **4.36–7.28** (beginner, the gap is the neural term);
+  advanced FFMI-ceiling → **0.14–0.50**; ceiling clamp; un-bank raises a
+  mid-career undermuscled lifter; body-comp-missing ⇒ the bucket band
+  byte-identical; strength_model absent ⇒ v21 band.
+- **Docs**: doc 17 §2.7 (new) + §9 Phase-7 row + §10 cross-doc; doc 10 §5
+  strength paragraph + params list; PROGRESS.md; manual-operations Phase-R entry.
+
+Suite 1107 green (+10 macro goldens), lint/typecheck clean. Activation is
+Phase R (replay diff — expected ≈ empty on stored prescriptions until
+`rate_source:"plan"` — then owner review). **N43 → done (PR #182)**; unblocks
+N36 (must land before the envelope fit) and N52/N54 (copy + target-card re-enable
+ride the v23 activation).
+
 ## 2026-07-12 — Session 73: Batch-17 easy-roundup build — N44/N45/N48/N49/N50/N51/N54/N55 in one PR (#181)
 
 Owner: "round up the easy ones and get as much of them done in one PR as
