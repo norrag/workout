@@ -748,6 +748,240 @@ variant (`PlannerBoard.tsx:1605-1649`). **Quick win (small):** render
 vs URL-sync adapter, consumed by templates, picker, exercises (and eventually the
 planner picker). Keep two-axis AND semantics.
 
+## Batch 17 — 2026-07-11 (N44–N54)
+
+Precursor investigation done at intake (five parallel code sweeps); each entry
+below is the condensed finding. Verbatim notes in the backlog appendix Batch 17.
+
+### N44 — Prescribed/target e1RM in prescription detail · **F / small**
+
+The sheet (`src/components/PrescriptionDetailSheet.tsx:167-201`) shows the anchor
+e1RM only incidentally — baked into the rationale/trace *strings* the engine
+writes (`engine/index.ts:227` deload, `:281` seed; `rules/progression.ts:269`
+stepped). No clean e1RM field exists on `PrescriptionDetailTarget`
+(`DayView.tsx:448-456`). Two notions of "prescribed e1RM", both already
+computed: (a) the v20 target anchor **A\*** — computed at
+`rules/progression.ts:229`, recorded on the trace step (`types.ts:221`), already
+threaded to the day view as `LoggedExercise.prescription_anchor`
+(`queries/logging.ts:56,109-135,390`) but consumed only by the rep predictor
+(`DayView.tsx:1336`) and populated only for `stepped` rows; (b) the e1RM implied
+by the prescribed weight×reps×RIR — a one-call derivation via `estimateE1rm`
+(`engine/e1rm.ts:33`) from fields the sheet already has. **Build:** add both as
+first-class rows in the sheet (PRESCRIBED e1RM always; TARGET ANCHOR A\* when
+present); consider explicit fields in `explain_prescription` output
+(`mcp/tools/read.ts:1079-1151` — anchor value already rides
+`inputs.strengthAnchor`). Ship with N45 (same sheet).
+
+### N45 — Anchor source coordinate in prescription detail · **F / small-medium**
+
+Provenance is computed then discarded: `recencyWeightedE1rm`
+(`engine/reps.ts:135-226`) knows the winning session (`bestEntry.sessionKey` =
+`workout_exercise_id`, `:201-204`) and the winning set, but returns only
+`{value, confidence}` (`reps.ts:106-109`); the sample builder
+(`queries/anchors.ts:146-163`) drops the `performed_at`/`workout_id` it already
+selects (`:57`). Three additive layers: (1) carry date/coordinate onto
+`E1rmSample`; (2) extend `E1rmAnchor` with source (winning set weight×reps,
+date, session key); (3) thread through `inputs.strengthAnchor`
+(`engine/types.ts:90-104` — lands in `engine_decisions` and thus
+`explain_prescription` for free) and `LoggedExercise` → the sheet. The W·D
+coordinate needs a workouts→microcycles join the anchor query doesn't do today;
+the date is free. Engine-adjacent change ⇒ unit tests (hard rule 3); verify
+doc-14 fingerprint neutrality of the widened recorded shape.
+
+### N46 — Edit custom templates · **F / medium**
+
+Confirmed: no update path anywhere. Queries have list/detail/apply/delete/save
+but no update (`src/lib/queries/templates.ts:22,70,213,295,346`); MCP has
+`create_template`/`delete_template` only (`mcp/tools/write.ts:429,808`); the
+detail page (`templates/[templateId]/page.tsx`) is read-only + start-meso +
+share — no edit affordance, and **no delete button either** (delete is MCP-only
+today). **Build:** prefill the meso planner board from `getTemplateDetail` (its
+shape is deliberately planner-ready, `templates.ts:65-69`) → new
+`updateTemplate` mirroring `saveMesoAsTemplate` (`:346`) with the same ownership
+guard; EDIT (and DELETE) affordances on the owned detail page; MCP
+`update_template` parity (doc 05).
+
+### N47 — Tab bar detaches from the bottom / goes dead (iOS standalone) · **B / HIGH / medium**
+
+`BottomNav` is `position:fixed bottom-0` (`components/ui/BottomNav.tsx:57`);
+its only real ancestors (`(app)/layout.tsx:18` wrapper → body → html) never
+carry a transform/filter, so containing-block reparenting is ruled out
+(PullToRefresh animates `height`, not transform, and is a *sibling*:
+`PullToRefresh.tsx:90-96`). **Top hypothesis:** `useScrollLock`
+(`components/ui/useScrollLock.ts:31-53`) sets `body{position:fixed; top:-Y;
+overflow:hidden}` on every overlay open (`BottomSheet.tsx:57`, `AnchoredMenu`,
+`InfoDot`) and restores on close — the well-documented iOS-standalone trigger
+for fixed elements binding to a stale viewport afterwards (bar rides up on
+scroll, hit-testing stale so taps go dead, only a relaunch resets — matches all
+three symptoms). Secondary: keyboard/visual-viewport churn under
+`viewportFit:"cover"`. **Fix directions:** move the scroll lock off
+body-position-fixed (overflow-only lock, `touch-action`, or
+`overscroll-behavior` containment) and/or composite the nav on its own layer;
+verify the repro on device before/after.
+
+**Screenshot evidence (Batch-17 addendum, [`assets/`](./assets/)):** two
+captures show the detach live — on /cycles (bar mid-screen, MACROCYCLE STATS
+tiles flowing below it) and on the planner board (bar mid-screen above the
+sheet-footer buttons, a full-width hairline at the stale viewport edge above
+it). The bar renders exactly as if the viewport bottom were mid-screen —
+i.e. anchored to a stale (keyboard-shrunk) viewport, not scrolled. The planner
+capture is timestamped the **same minute** as an open create-meso BottomSheet
+with its NAME text input (the N55 screenshot) — so the detach followed a
+BottomSheet (scroll-lock) + keyboard (visual-viewport resize) sequence,
+corroborating hypotheses 1+2 as a combined trigger: the keyboard resized the
+visual viewport *while* `useScrollLock` had `body{position:fixed}`, and the
+fixed nav never re-anchored after both released.
+
+### N48 — Filters in the replace-exercise sheet · **UX / small**
+
+`ReplaceSheet` (`log/[workoutId]/DayView.tsx:2019-2143`) has text search only
+(`:2072-2077`) plus a static, non-interactive muscle chip (`:2078`). Candidates
+are already muscle-scoped server-side (`log/actions.ts:622-636`) and carry
+`equipment_type` (`:614-619`), so an EQUIP axis needs no new data. Drop in the
+shared `FilterBar` (`components/ui/FilterBar.tsx`, the N29 grammar) exactly as
+the planner picker already does (`PlannerBoard.tsx:1910-1924`). Bonus in the
+same pass: the sibling `AddExerciseSheet` (`DayView.tsx:2150-2370`) still uses
+pre-N29 hand-rolled chip rows (`:2253-2295`) — fold onto `FilterBar`. Ship with
+N49 (same sheet).
+
+### N49 — Replace commits on a bare tap; needs a confirm step · **UX / small**
+
+The candidate row `onClick` commits the swap and closes inline
+(`DayView.tsx:2110-2124` → `replaceExerciseAction`, `log/actions.ts:523`). The
+day-view Replace sheet is the odd one out: the planner `ExercisePicker` uses
+single-select + a disabled-until-changed `REPLACE EXERCISE` button
+(`PlannerBoard.tsx:1849-1996`, the N31 spec) and the day-view `AddExerciseSheet`
+also confirms via `ADD N EXERCISES` (`:2355-2367`). Mirror the planner pattern.
+
+### N50 — Lock past-workout weight/rep inputs · **B / small (near-trivial)**
+
+`readOnly` exists and already gates the LOG checkbox and menus
+(`DayView.tsx:236,1722,1774…`), but the cells' `staticCells` gate (`:1544`)
+covers only `future`/`skipped` — on a *completed* workout the logged rows still
+render live inputs (`:1636,1667`) whose blur-save fires `amendSetAction`, which
+RLS silently no-ops (0 rows matched:
+`supabase/migrations/20260615000002_completion_lock.sql:25-40`; the R5
+hardening `20260702000006` closed the rest of the write surface). Server side
+is correct — purely a client gate. **Fix:** `staticCells = readOnly || …` at
+`:1544` (plus guard the two blur-saves).
+
+### N51 — New-meso seed prescribes below the rep window (6 when 8–12) · **B / HIGH / small fix + engine tests**
+
+Mechanism confirmed: `seedCore` (`engine/index.ts:990-997`) prices the load for
+`target_low` (8 reps) at start RIR, `roundToStep` rounds to the **nearest**
+increment (up half the time, `rules/rounding.ts:9-17`), re-predicts reps at the
+heavier load, then clamps only to the **hard** window `[min=6, max=15]`
+(`params.ts:451` hypertrophy `{target 8–12, hard 6–15}`) — so 6–7 reps pass
+straight through. The cold-start/swap-in seed branch (`index.ts:259-280`) has
+the identical defect. The working prescribe path already contains the intended
+correction: `boundRepsToWindow` under `bound_to_target_window` steps the weight
+**down** one increment when predicted < `target_low` (`index.ts:759-809`,
+applied at `:401-431`; deload at `:201-207`) — the two seed branches simply
+never call it. RIR ramp ruled out (the RIR term cancels exactly in the
+inversion). **Fix:** apply `boundRepsToWindow` in both seed branches; hard rule
+3 ⇒ unit/golden tests (worst case: light exercises / large relative
+increments). The doc-16 §3.7 `seedMeso` wrapper inherits the fix via `seedCore`.
+
+### N52 — "DEXA never changes prescriptions" copy vs the indirect chain · **Q / answered**
+
+Copy sites: `more/bodyspec/page.tsx:58-63`, `mcp/tools/read.ts:1167`, binding
+statements in doc 15 §3.3 and doc 17 principle 1. **Verdict: the copy is
+factually correct today.** The owner's chain (bf% → FFMI → strength band →
+pacer → prescriptions) is broken at two links right now: the strength band
+still buckets by calendar training years (the N43 defect — FFMI feeds only the
+mass target: `engine/macro.ts:99-106,166-175`), and the pacer consumes the plan
+rate only under `rate_source:"plan"` (v22 — rolled back; v21 `"band"` is
+active: `rules/progression.ts:403-404`, `params.ts:337`). The doc-14
+fingerprint never retro-stales on bf% (`queries/fingerprint.ts:49-53,66-70`),
+so even when live the effect is forward-looking only. Once N43's v23
+FFMI-proximity band + the plan rate source are both active, the chain the owner
+wants (and calls intended/valuable) exists ⇒ amend all four copy sites to
+"indirect, forward-looking via macro pacing". **Action rides on N43.**
+
+### N53 — No launch splash; long black screens · **B+UX / HIGH / medium**
+
+The splash code is unchanged since PR #119 (`Splash.tsx`; root Suspense
+fallback `layout.tsx:103`; manifest `background_color` cream) — not a splash
+regression. Two stacked causes. (1) **Black-not-cream:** every launch surface
+is theme-aware and flips to `#14110C` under OS dark mode (default theme
+`"system"`: `globals.css:33-51`; dark launch PNGs `ios-launch-screens.ts:10`;
+dark `themeColor` `layout.tsx:62`) — the splash still renders but reads as "a
+black screen", even though dark mode is out of scope per doc 08. (2) **Long:**
+the pre-document window the in-app splash structurally cannot cover —
+middleware blocks on `supabase.auth.getUser()` before any HTML streams
+(`lib/supabase/middleware.ts:65`, `/`→`/workout` rewrite `:85-93`), then
+`(app)/layout.tsx:12` and `page.tsx:9` repeat the call serially, and the SW
+keeps documents `NetworkOnly` by design (`sw.ts:57-64`), so cold launches wait
+on the network with only the `apple-touch-startup-image` (all 26 PNGs present
+and name-matched) to cover. **Fix directions:** collapse the triple serialized
+`auth.getUser()` round-trips (unconditional); for the splash color, see the
+owner decision below. Relates N1 / WS-J (perceived-speed north star).
+
+**Update (Batch-17 addendum 2) — owner correction, item re-framed as a
+regression.** The owner saw the dark splash working, legibly, plenty of times
+after it shipped; it no longer displays at all. The earlier
+"illegible-dark-splash" reading and its (a)/(b)/(c) color options are
+**withdrawn**. What the code says: the launch was designed as one continuous
+branded sequence (`ios-launch-screens.ts` header comment — solid brand-bg
+startup PNG → same bg + logotype via `Splash` → content), and **none of it has
+changed since PR #119** (root layout, `Splash`, middleware auth + `/`→
+`/workout` rewrite, and the SW all shipped there; the only shell commits since
+— N6 PullToRefresh, R22 env boot, N34 OAuth — touch none of the mechanism).
+So the regression is environmental/timing:
+
+- **H1 (primary): the `apple-touch-startup-image` stopped applying** on the
+  owner's device — an iOS update, a PWA re-add (iOS resolves startup images at
+  install/launch in version-specific ways; cf. the iOS-26.5 scope workaround
+  already documented in `lib/supabase/middleware.ts`), or a device whose CSS
+  dims/dpr miss the 13-class exact-match list (`ios-launch-screens.ts:26-40`).
+  Without a match the **entire pre-document window is iOS-default black** —
+  exactly "long black screens".
+- **H2: the in-document `Splash` window is structurally tiny** — the root
+  Suspense fallback only spans the `(app)/layout` `auth.getUser()` await;
+  the long waits sit *before* the document (middleware auth round-trip, network
+  fetch of the never-cached shell) and *after* the splash (route skeletons).
+  With H1 the sequence collapses to long-black → (blink) → content.
+- **H3 (weaker): response buffering** suppressing the streamed fallback paint
+  entirely (would need deployment-level confirmation).
+
+**Investigation plan (device + instrumentation):** confirm whether ANY startup
+image applies (test with a deliberately loud PNG); read the device's real CSS
+`device-width/height/dpr` against the class list; time pre-document vs
+in-document phases (server-timing / WebInspector). **Fix levers regardless of
+which H lands:** restore/guarantee the pre-document branded surface (consider
+baking the logotype into the startup PNGs so even that window reads as the
+splash), collapse the serialized `auth.getUser()` round-trips
+(`middleware.ts:65` → `(app)/layout.tsx:12` → `page.tsx:9`), and re-verify the
+`Splash` fallback paints on a cold stream. Cross-link: N47's force-relaunch
+workaround makes every cold launch visible, amplifying this.
+
+### N54 — Disable the macro goal-target estimate cards (again) · **F / small / owner-decided**
+
+Re-enabled by PR #178 (`9522c98`); the original N21 hide (`ca51efe`, PR #140)
+was a plain JSX edit — no flag exists. **Disable = revert the #178 JSX hunks:**
+macro-overview REALISTIC TARGET card
+(`cycles/macro/[macroId]/page.tsx:224-262` + its helpers), create-flow YOUR
+TARGET card + closing rationale + the MODEL BAND priming row
+(`CreateMacroForm.tsx:247-267`, `~:301-310`, `~:344` — keep LAST BLOCK
+MEASURED, which is measured, not an estimate). Third surface the note didn't
+name: the goals-edit YOUR TARGET card (`edit/EditMacroForm.tsx:265-284`,
+pre-#178 from PR #119) — include it for consistency. `planMacrocycle` and the
+persisted target columns stay (pure view change). Re-enable when N43's v23 band
+makes the numbers trustworthy — cross-linked there.
+
+### N55 — Create-meso WEEKS label claims a deload the checkbox controls · **UX / trivial**
+
+Owner-annotated screenshot
+([`assets/2026-07-11-n55-create-meso-deload-copy.jpeg`](./assets/2026-07-11-n55-create-meso-deload-copy.jpeg)):
+the create-meso sheet always says "WEEKS — INCLUDING DELOAD"
+(`PlannerBoard.tsx:1318`, hard-coded) while "Final week is a deload" is a
+toggle (`:1429-1441`) shown unchecked — the label asserts something the
+control contradicts. The edit-details sheet already solved this:
+`MesoHeader.tsx:605` renders `WEEKS{deload ? " — INCLUDING DELOAD" : ""}`.
+Mirror that conditional on `ramp.deload`; the collapsed RIR summary line
+(`:1353`) already appends the deload suffix conditionally, so the label is the
+only stale copy.
+
 ## Items still needing their own scoping pass (not yet researched)
 - **PH30** (LLM prescription analysis) — deferred 2026-07-02; see workstream H.
 

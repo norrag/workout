@@ -4,6 +4,65 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-11 — Session 72: Batch-17 intake — N44–N54 (11 notes, all investigated at intake)
+
+Owner handed over 11 notes and asked for a precursor look into each. Five
+parallel code sweeps ran at intake; every item landed `ready`/`triaged` with a
+scoping entry (no `inbox` residue). Reconciliation sweep first: clean — N34/N36
+stay live on field-gated residuals, N43 `ready`, no stale `done` rows.
+
+- **New items:** N44 (prescribed/target e1RM in prescription detail, MED),
+  N45 (anchor source coordinate, MED — provenance computed then discarded in
+  `recencyWeightedE1rm`), N46 (edit custom templates, MED — confirmed zero
+  update path anywhere; detail page lacks delete too), N47 (**HIGH** tab bar
+  detaches/goes dead on iOS standalone — top hypothesis: `useScrollLock`'s
+  body-position-fixed toggling; ancestor-transform ruled out), N48+N49
+  (replace-sheet EQUIP filter + confirm step — the sheet is the only
+  tap-to-commit picker left; ship together), N50 (past-workout inputs editable
+  but RLS no-ops the save — one-conditional client fix), N51 (**HIGH** seed
+  prescribes 6 reps under an 8–12 window — both seed branches skip
+  `boundRepsToWindow`, the exact correction the prescribe path applies),
+  N52 (DEXA→prescriptions question — **answered**: copy correct today, the
+  indirect chain goes live only with N43's v23 + `rate_source:"plan"`; copy
+  amendment rides N43), N53 (**HIGH** no splash / long black launch — splash
+  code unchanged; dark-mode launch surfaces read black + the pre-document
+  triple-`getUser()` window the splash can't cover), N54 (disable macro target
+  cards again — owner-decided in the note; revert the #178 JSX hunks + the
+  goals-edit surface).
+- **Relationships:** N44↔N45 one PR (same sheet + threading); N48↔N49 one PR
+  (same sheet); N52 + N54 cross-linked into N43's row (both ride v23); N53
+  filed under WS J next to N1's north star; N47/N50/N51 to WS G.
+- **Suggested attack order:** N50+N51 (small, high-value correctness), N54
+  (owner-decided, small), N47 device verification, N48+N49, N44+N45, N53, N46.
+- README workstream roster refreshed (stale G "Open" list corrected — N5/N11
+  shipped long ago; C/D/E/J/P rows gained the new items).
+
+**Addendum (same session):** owner sent three screenshots (preserved in
+`assets/`). (1) N47 evidence: the detach captured live on /cycles AND the
+planner board — the fixed bar renders against a stale mid-screen viewport
+bottom, and the planner capture is the same minute as an open create-meso
+BottomSheet + keyboard, corroborating the scroll-lock (+ visual-viewport)
+trigger; row stays `triaged` but the hypothesis is now evidence-backed.
+(2) N53: the screenshots confirm the device runs the app in dark appearance —
+cause (1) established; since the app *stays* dark after launch, the
+splash-color half became an owner decision (cream-always vs legible-dark-splash
+vs retire-dark-theme) → row moved to `needs-input` with the options framed;
+the pre-paint auth collapse remains unconditional. (3) New **N55** (UX, LOW,
+WS D, `ready`): the create-meso sheet hard-codes "WEEKS — INCLUDING DELOAD"
+(`PlannerBoard.tsx:1318`) while the deload checkbox is toggleable —
+`MesoHeader.tsx:605` already has the conditional to mirror. Trivial.
+
+**Addendum 2 (same session):** owner corrected the N53 assessment — the dark
+splash used to display legibly and no longer displays at all ⇒ re-framed as a
+**regression**, needs-input color options withdrawn, row back to `triaged`.
+Code audit: the entire launch chain is unchanged since PR #119, so the cause
+is environmental/timing. Hypotheses recorded in scoping (H1 primary: the iOS
+startup image stopped applying → pre-document window falls back to
+iOS-default black; H2: the `Splash` fallback window only spans the layout
+auth await; H3 weak: response buffering), plus a device-verification plan and
+theme-independent fix levers (branded startup PNGs, collapse the triple
+`getUser()`, verify the fallback streams).
+
 ## 2026-07-11 — Session 71 (cont. 2): N43 research + pacing pressure-test, rollback to v21
 
 Owner directed the research pass + a pacing pressure-test, and the interim
