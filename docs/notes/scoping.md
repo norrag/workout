@@ -917,17 +917,43 @@ and name-matched) to cover. **Fix directions:** collapse the triple serialized
 `auth.getUser()` round-trips (unconditional); for the splash color, see the
 owner decision below. Relates N1 / WS-J (perceived-speed north star).
 
-**Update (Batch-17 addendum):** the N47 screenshots show the owner's whole app
-rendering in **dark appearance** — cause (1) is confirmed, not hypothesized.
-That also reframes the color fix: the app *stays* dark after launch on this
-device, so forcing a cream splash would flash cream → dark. Options framed for
-the owner (row status `needs-input`): (a) all launch surfaces cream per the
-light-only design (doc 08), accepting the flash; (b) keep theme-aware launch
-surfaces but make the dark splash legible — a visible logotype/brand treatment
-on `#14110C` so it reads as a splash rather than a dead black screen; (c)
-retire the dark theme entirely (doc 08 rules dark mode out of scope, yet a
-full dark theme ships today via `data-theme`/`"system"`). The pre-paint
-shortening ships under any option.
+**Update (Batch-17 addendum 2) — owner correction, item re-framed as a
+regression.** The owner saw the dark splash working, legibly, plenty of times
+after it shipped; it no longer displays at all. The earlier
+"illegible-dark-splash" reading and its (a)/(b)/(c) color options are
+**withdrawn**. What the code says: the launch was designed as one continuous
+branded sequence (`ios-launch-screens.ts` header comment — solid brand-bg
+startup PNG → same bg + logotype via `Splash` → content), and **none of it has
+changed since PR #119** (root layout, `Splash`, middleware auth + `/`→
+`/workout` rewrite, and the SW all shipped there; the only shell commits since
+— N6 PullToRefresh, R22 env boot, N34 OAuth — touch none of the mechanism).
+So the regression is environmental/timing:
+
+- **H1 (primary): the `apple-touch-startup-image` stopped applying** on the
+  owner's device — an iOS update, a PWA re-add (iOS resolves startup images at
+  install/launch in version-specific ways; cf. the iOS-26.5 scope workaround
+  already documented in `lib/supabase/middleware.ts`), or a device whose CSS
+  dims/dpr miss the 13-class exact-match list (`ios-launch-screens.ts:26-40`).
+  Without a match the **entire pre-document window is iOS-default black** —
+  exactly "long black screens".
+- **H2: the in-document `Splash` window is structurally tiny** — the root
+  Suspense fallback only spans the `(app)/layout` `auth.getUser()` await;
+  the long waits sit *before* the document (middleware auth round-trip, network
+  fetch of the never-cached shell) and *after* the splash (route skeletons).
+  With H1 the sequence collapses to long-black → (blink) → content.
+- **H3 (weaker): response buffering** suppressing the streamed fallback paint
+  entirely (would need deployment-level confirmation).
+
+**Investigation plan (device + instrumentation):** confirm whether ANY startup
+image applies (test with a deliberately loud PNG); read the device's real CSS
+`device-width/height/dpr` against the class list; time pre-document vs
+in-document phases (server-timing / WebInspector). **Fix levers regardless of
+which H lands:** restore/guarantee the pre-document branded surface (consider
+baking the logotype into the startup PNGs so even that window reads as the
+splash), collapse the serialized `auth.getUser()` round-trips
+(`middleware.ts:65` → `(app)/layout.tsx:12` → `page.tsx:9`), and re-verify the
+`Splash` fallback paints on a cold stream. Cross-link: N47's force-relaunch
+workaround makes every cold launch visible, amplifying this.
 
 ### N54 — Disable the macro goal-target estimate cards (again) · **F / small / owner-decided**
 

@@ -52,6 +52,17 @@ WS D, `ready`): the create-meso sheet hard-codes "WEEKS — INCLUDING DELOAD"
 (`PlannerBoard.tsx:1318`) while the deload checkbox is toggleable —
 `MesoHeader.tsx:605` already has the conditional to mirror. Trivial.
 
+**Addendum 2 (same session):** owner corrected the N53 assessment — the dark
+splash used to display legibly and no longer displays at all ⇒ re-framed as a
+**regression**, needs-input color options withdrawn, row back to `triaged`.
+Code audit: the entire launch chain is unchanged since PR #119, so the cause
+is environmental/timing. Hypotheses recorded in scoping (H1 primary: the iOS
+startup image stopped applying → pre-document window falls back to
+iOS-default black; H2: the `Splash` fallback window only spans the layout
+auth await; H3 weak: response buffering), plus a device-verification plan and
+theme-independent fix levers (branded startup PNGs, collapse the triple
+`getUser()`, verify the fallback streams).
+
 ## 2026-07-11 — Session 71 (cont. 2): N43 research + pacing pressure-test, rollback to v21
 
 Owner directed the research pass + a pacing pressure-test, and the interim
