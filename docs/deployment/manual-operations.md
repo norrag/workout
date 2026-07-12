@@ -386,7 +386,41 @@ only worth flipping to once v21's personalization is live.
 | **③ Owner reviews + activates** | Confirm the shifted mix reads right (a lifter whose personalized band sits below the bucket band gets paced sooner; above, later). Activate via `activate_engine_params`; roll back by re-activating v21. |
 | **④ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20 monitor row; this field data also feeds the Phase-6 envelope fit. |
 
-### Activate engine_params **v23** (two-component strength-rate model — doc 17 §2.7 / Phase 7, N43)
+### ~~Activate engine_params **v23** + flip `rate_source` to **"plan"** (v24) — two-component strength-rate model (doc 17 §2.7 / Phase 7, N43)~~ (DONE 2026-07-12)
+
+> **DONE 2026-07-12** from the same Claude session, after PR #182 merged:
+> - **Applied v23** via Supabase `apply_migration` (the committed
+>   `20260712000001` migration; hosted migrations are applied via MCP, so it was
+>   pending) — inactive row, hash `ed12c6a0…` verified `is_replayable`. Param
+>   diff v21→v23 = exactly the `strength_model` block, nothing else.
+> - **Replay diff:** candidate v23 over the last 100 recorded decisions →
+>   **25 changed / 0 errors**, and candidate v21 over the same 100 → the
+>   **identical** 25 diffs. So the v23-specific delta on stored prescriptions is
+>   **empty** (the 25 are pre-existing legacy drift from v15–v22 source rows the
+>   active v21 already implies); with `rate_source: "band"` the new band is
+>   computed but never read by a prescription.
+> - **Proposed v24** (`propose_engine_params`, base v23, single change
+>   `progression.rate_source: "plan"`; hash `b58a0f1d…`) — the re-flip of the
+>   rolled-back v22, now reading the **N43-corrected** band. Replay v24 over the
+>   same 100 → the **identical** 25 diffs: the flip is **byte-identical on stored
+>   prescriptions** (forward-looking only, exactly as the original v22 flip was).
+> - **The forward-looking change, for Garron's live profile** (36 M, 73",
+>   160.1 lb, 20.4% bf, 12.7 yr → FFMI ≈ 16.7): the pacer source band moves from
+>   the calendar-**advanced** bucket **0.5–1.5 %/mo** (v21 `"band"`) to the
+>   two-component **intermediate**-class **≈ 1.36–2.28 %/mo** (v24 `"plan"`) —
+>   *raising* the pacer target, the opposite of the R3 tightening, and the point
+>   of N43. No entitlement/quantum change; the measured anchor + earn gate stay
+>   the honesty mechanism.
+> - **Activated v23, then v24** via `activate_engine_params` ("e1rm block
+>   unchanged", no restamp). **v24 is now the single active version**
+>   (`rate_source: "plan"`, `strength_model.enabled: true`), owner-approved.
+>   Rollback = re-activate v21 (bucket band) or v23 (corrected band, `"band"`).
+> - **Now unblocked:** re-enable the macro goal-target cards (N54) and amend the
+>   DEXA-indirect-chain copy (N52) — both were gated on the band becoming
+>   trustworthy; N36's envelope fit now runs on the corrected band.
+> - **④ Monitor** stays the standing instruction (unchanged, below).
+>
+> Original steps kept for the record.
 
 `20260712000001_engine_params_v23_strength_model.sql` ships v23 **inactive**
 (migration applied, `is_active false`). It is v21's content plus one gated block,

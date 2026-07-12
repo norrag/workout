@@ -4,6 +4,33 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 74 (cont.): N43 Phase-R activation — v23 applied + v24 plan-flip live
+
+After PR #182 merged, ran the doc 17 Phase-R activation from the same session
+(owner: "replay and review the new version diff to current via MCP, and activate
+and flip to plan once approved"):
+
+- **Applied v23** via Supabase `apply_migration` (the `20260712000001` migration
+  was pending — hosted migrations apply via MCP, not the deploy). Inactive row,
+  hash `ed12c6a0…`, `is_replayable`. Param diff v21→v23 = exactly `strength_model`.
+- **Replay review:** candidate v23 and candidate v21 over the same 100 recorded
+  decisions produce the **identical** 25-diff set → the v23-specific delta on
+  stored prescriptions is **empty** (the 25 are legacy v15–v22 drift the active
+  v21 already implies). Proposed **v24** (base v23, `rate_source: "plan"`, hash
+  `b58a0f1d…`) — the re-flip of the rolled-back v22 on the corrected band; its
+  replay is **also** the identical 25 diffs (flip is forward-looking only).
+- **Forward-looking effect (Garron's live profile, FFMI ≈ 16.7):** pacer source
+  band 0.5–1.5 %/mo (advanced bucket) → **1.36–2.28 %/mo** (two-component
+  intermediate) — *raising* the target, N43's intent.
+- **Owner approved → activated v23 then v24.** v24 is the single active version
+  (`rate_source: "plan"`, `strength_model.enabled true`); e1rm unchanged, no
+  restamp. Rollback = re-activate v21 or v23. Recorded in
+  `manual-operations.md` (v23/v24 section → DONE).
+- **Now unblocked (separate items, not started here):** N52 (DEXA-indirect-chain
+  copy amendment) and N54 (re-enable the macro goal-target cards) — both gated on
+  the band becoming trustworthy, now live; N36's envelope fit runs on the
+  corrected band.
+
 ## 2026-07-12 — Session 74: N43 build — two-component strength-rate model (engine_params v23, inactive, PR #182)
 
 Owner: "Review docs/reviews/2026-07-11-strength-rate-model-research.md and
