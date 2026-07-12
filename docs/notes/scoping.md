@@ -819,6 +819,19 @@ body-position-fixed (overflow-only lock, `touch-action`, or
 `overscroll-behavior` containment) and/or composite the nav on its own layer;
 verify the repro on device before/after.
 
+**Screenshot evidence (Batch-17 addendum, [`assets/`](./assets/)):** two
+captures show the detach live — on /cycles (bar mid-screen, MACROCYCLE STATS
+tiles flowing below it) and on the planner board (bar mid-screen above the
+sheet-footer buttons, a full-width hairline at the stale viewport edge above
+it). The bar renders exactly as if the viewport bottom were mid-screen —
+i.e. anchored to a stale (keyboard-shrunk) viewport, not scrolled. The planner
+capture is timestamped the **same minute** as an open create-meso BottomSheet
+with its NAME text input (the N55 screenshot) — so the detach followed a
+BottomSheet (scroll-lock) + keyboard (visual-viewport resize) sequence,
+corroborating hypotheses 1+2 as a combined trigger: the keyboard resized the
+visual viewport *while* `useScrollLock` had `body{position:fixed}`, and the
+fixed nav never re-anchored after both released.
+
 ### N48 — Filters in the replace-exercise sheet · **UX / small**
 
 `ReplaceSheet` (`log/[workoutId]/DayView.tsx:2019-2143`) has text search only
@@ -900,11 +913,21 @@ middleware blocks on `supabase.auth.getUser()` before any HTML streams
 `(app)/layout.tsx:12` and `page.tsx:9` repeat the call serially, and the SW
 keeps documents `NetworkOnly` by design (`sw.ts:57-64`), so cold launches wait
 on the network with only the `apple-touch-startup-image` (all 26 PNGs present
-and name-matched) to cover. **Fix directions:** force the launch surfaces cream
-regardless of theme (Splash bg, dark `themeColor`, dark startup PNGs) per the
-light-only design system; collapse the triple serialized `auth.getUser()`
-round-trips; confirm the owner's device appearance (likely dark/auto). Relates
-N1 / WS-J (perceived-speed north star).
+and name-matched) to cover. **Fix directions:** collapse the triple serialized
+`auth.getUser()` round-trips (unconditional); for the splash color, see the
+owner decision below. Relates N1 / WS-J (perceived-speed north star).
+
+**Update (Batch-17 addendum):** the N47 screenshots show the owner's whole app
+rendering in **dark appearance** — cause (1) is confirmed, not hypothesized.
+That also reframes the color fix: the app *stays* dark after launch on this
+device, so forcing a cream splash would flash cream → dark. Options framed for
+the owner (row status `needs-input`): (a) all launch surfaces cream per the
+light-only design (doc 08), accepting the flash; (b) keep theme-aware launch
+surfaces but make the dark splash legible — a visible logotype/brand treatment
+on `#14110C` so it reads as a splash rather than a dead black screen; (c)
+retire the dark theme entirely (doc 08 rules dark mode out of scope, yet a
+full dark theme ships today via `data-theme`/`"system"`). The pre-paint
+shortening ships under any option.
 
 ### N54 — Disable the macro goal-target estimate cards (again) · **F / small / owner-decided**
 
@@ -919,6 +942,19 @@ name: the goals-edit YOUR TARGET card (`edit/EditMacroForm.tsx:265-284`,
 pre-#178 from PR #119) — include it for consistency. `planMacrocycle` and the
 persisted target columns stay (pure view change). Re-enable when N43's v23 band
 makes the numbers trustworthy — cross-linked there.
+
+### N55 — Create-meso WEEKS label claims a deload the checkbox controls · **UX / trivial**
+
+Owner-annotated screenshot
+([`assets/2026-07-11-n55-create-meso-deload-copy.jpeg`](./assets/2026-07-11-n55-create-meso-deload-copy.jpeg)):
+the create-meso sheet always says "WEEKS — INCLUDING DELOAD"
+(`PlannerBoard.tsx:1318`, hard-coded) while "Final week is a deload" is a
+toggle (`:1429-1441`) shown unchecked — the label asserts something the
+control contradicts. The edit-details sheet already solved this:
+`MesoHeader.tsx:605` renders `WEEKS{deload ? " — INCLUDING DELOAD" : ""}`.
+Mirror that conditional on `ramp.deload`; the collapsed RIR summary line
+(`:1353`) already appends the deload suffix conditionally, so the label is the
+only stale copy.
 
 ## Items still needing their own scoping pass (not yet researched)
 - **PH30** (LLM prescription analysis) — deferred 2026-07-02; see workstream H.

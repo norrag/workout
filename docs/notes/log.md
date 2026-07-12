@@ -37,6 +37,21 @@ stay live on field-gated residuals, N43 `ready`, no stale `done` rows.
 - README workstream roster refreshed (stale G "Open" list corrected — N5/N11
   shipped long ago; C/D/E/J/P rows gained the new items).
 
+**Addendum (same session):** owner sent three screenshots (preserved in
+`assets/`). (1) N47 evidence: the detach captured live on /cycles AND the
+planner board — the fixed bar renders against a stale mid-screen viewport
+bottom, and the planner capture is the same minute as an open create-meso
+BottomSheet + keyboard, corroborating the scroll-lock (+ visual-viewport)
+trigger; row stays `triaged` but the hypothesis is now evidence-backed.
+(2) N53: the screenshots confirm the device runs the app in dark appearance —
+cause (1) established; since the app *stays* dark after launch, the
+splash-color half became an owner decision (cream-always vs legible-dark-splash
+vs retire-dark-theme) → row moved to `needs-input` with the options framed;
+the pre-paint auth collapse remains unconditional. (3) New **N55** (UX, LOW,
+WS D, `ready`): the create-meso sheet hard-codes "WEEKS — INCLUDING DELOAD"
+(`PlannerBoard.tsx:1318`) while the deload checkbox is toggleable —
+`MesoHeader.tsx:605` already has the conditional to mirror. Trivial.
+
 ## 2026-07-11 — Session 71 (cont. 2): N43 research + pacing pressure-test, rollback to v21
 
 Owner directed the research pass + a pacing pressure-test, and the interim
