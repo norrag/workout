@@ -54,7 +54,11 @@ export function BottomNav() {
   const activeId = tapped ?? committed;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 border-t-2 border-ink bg-bg-base pb-[env(safe-area-inset-bottom)]">
+    // transform-gpu: keep the bar on its own compositor layer so WebKit
+    // re-anchors it independently after visual-viewport churn (keyboard
+    // open/close in the installed PWA) — N47 hardening alongside the
+    // useScrollLock rework that removed the stale-viewport trigger itself
+    <nav className="fixed inset-x-0 bottom-0 transform-gpu border-t-2 border-ink bg-bg-base pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex max-w-lg">
         {items.map((item) => {
           const href = item.id === "/workout" ? workoutHref : item.id;

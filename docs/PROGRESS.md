@@ -2,7 +2,41 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-12 (latest) — N36: envelope loop goes self-gating on per-user data (doc 17 §7 amendment, PR #184)
+## 2026-07-12 (latest) — N47: tab bar detach on iOS standalone — scroll-lock rework
+
+The HIGH Batch-17 bug: after a BottomSheet + keyboard session the fixed tab bar
+rendered mid-screen with dead taps until relaunch. Root cause per the scoping:
+`useScrollLock` toggled `body{position:fixed; top:-Y}` on every overlay
+open/close — the documented iOS-standalone trigger for `position:fixed`
+elements binding to a stale viewport when interleaved with the soft keyboard's
+visual-viewport resize.
+
+- **`useScrollLock` rework:** the lock never touches body position now — body
+  `overflow:hidden` (scroll offset preserved, so nothing ever needs
+  re-anchoring) + `overscroll-behavior:none`, plus a document-level non-passive
+  capture `touchmove` guard covering the touch scrolling older WebKit leaks
+  through `overflow:hidden`. The guard's decision walk is a pure exported
+  function (`touchMoveAllowed`, `scroll-lock.test.ts`): interactive controls
+  and genuinely scrollable overlay regions keep native behavior, scrim/static
+  chrome is prevented. N7's exact scroll restore stays as the unlock backstop
+  (keyboard focus-reveal can still shift an overflow-hidden document
+  programmatically). `isScrollLocked()` semantics unchanged (N32 pull-to-refresh
+  guard still applies — `window.scrollY` now stays real while locked).
+- **Overscroll containment:** `overscroll-contain` added to the overlay scroll
+  regions that could chain to the document (CompleteSheet panel + the two
+  fullHeight sheet lists in DayView/PlannerBoard), so guard-allowed inner
+  scrolling can never reach the page.
+- **Hardening:** `BottomNav` composited on its own layer (`transform-gpu`) so
+  WebKit re-anchors it independently after visual-viewport churn.
+
+Verified end-to-end headless (real app + local Supabase, CDP raw-touch drive,
+24/24 checks incl. lock-at-depth with `scrollY` un-zeroed, inert scrim drags,
+scrolling sheet lists, exact N7 restore, nav re-anchored + alive after the
+overlay/keyboard-shaped session). The iOS visual-viewport half of the repro
+isn't emulatable headless — owner device pass is the residual. Suite 1121
+(+9), typecheck + lint clean. Notes: N47 → done.
+
+## 2026-07-12 — N36: envelope loop goes self-gating on per-user data (doc 17 §7 amendment, PR #184)
 
 Owner note (notes Batch 18): the loop should not wait on a remembered future
 "enable" — it should default to the current portion of the band while a user

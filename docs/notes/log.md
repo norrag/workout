@@ -4,6 +4,39 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 76: N47 tab-bar detach — scroll-lock rework
+
+Owner: "begin work on the HIGH bug N47 tab-bar detach; resolve robustly."
+Reconciliation sweep first: PR #184 (N36 self-gating) merged — N36's row stays
+live pending its owner-gated activation runbook, nothing to archive.
+
+Built the scoped fix (scoping.md N47 entry, hypothesis corroborated by the
+Batch-17-addendum screenshots): `useScrollLock` no longer toggles
+`body{position:fixed; top:-Y}` — the iOS-standalone trigger that left every
+`position:fixed` element (the tab bar) bound to a stale viewport after a
+BottomSheet + keyboard session. The lock is now:
+
+- body `overflow:hidden` (propagates to the viewport; scroll offset preserved —
+  no jump, nothing to re-anchor) + `overscroll-behavior:none` on html+body;
+- a document-level non-passive capture `touchmove` guard for the touch
+  scrolling older WebKit leaks through `overflow:hidden` — pure
+  `touchMoveAllowed` walk (new `scroll-lock.test.ts`, 9 tests): interactive
+  controls and genuinely scrollable sub-regions allowed, scrim/static chrome
+  prevented;
+- N7's exact scroll restore kept as the unlock backstop (keyboard focus-reveal
+  can still shift an overflow-hidden document programmatically);
+- `overscroll-contain` on the three overlay scroll regions that could chain to
+  the document (CompleteSheet panel, both fullHeight sheet lists);
+- `BottomNav` on its own compositor layer (`transform-gpu`) as hardening.
+
+Verified end-to-end headless (real app + local Supabase, CDP raw-touch drive,
+24/24): lock at depth keeps `scrollY` un-zeroed, scrim drags inert, sheet lists
+scroll, exact N7 restore at depth, nav re-anchored + taps navigate after an
+overlay+keyboard-shaped session, page scroll alive post-close (guard fully
+removed), menu→sheet refcount handoff holds. Residual: the iOS
+keyboard/visual-viewport half of the repro is not emulatable headless — owner
+re-checks on device after merge. N47 row → done.
+
 ## 2026-07-12 — Session 75: N36 envelope loop goes self-gating (owner Batch-18 note, PR #184)
 
 Owner note (Batch 18, verbatim in the appendix): why gate the envelope loop on
