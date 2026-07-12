@@ -59,16 +59,30 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // do not run code between createServerClient and getUser()
+  // do not run code between createServerClient and getSession()
+  //
+  // getSession(), not getUser() (N53): getUser() is a network round-trip to
+  // Supabase, and the middleware runs before a single byte of HTML can stream
+  // — it put a full auth RTT of pure black screen in front of every cold PWA
+  // launch, ahead of any splash the document could paint. getSession() parses
+  // the auth cookie with NO network call while the access token is valid, and
+  // when it has expired it refreshes on demand through the refresh token
+  // (writing the new cookies via setAll above), so session maintenance still
+  // happens exactly where Server Components can't do it. The trade-off: the
+  // session is asserted by the client-held JWT, not verified against Supabase.
+  // That is safe HERE because middleware only makes routing decisions on its
+  // *presence* — every (app) layout/page re-checks with a verified
+  // auth.getUser() and redirects, and all data access is RLS-scoped. A forged
+  // cookie buys an HTML shell that immediately bounces to /sign-in, never data.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const { pathname } = request.nextUrl;
   const isPublic =
     pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  if (!user && !isPublic) {
+  if (!session && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/sign-in";
     return NextResponse.redirect(url);
@@ -82,7 +96,7 @@ export async function updateSession(request: NextRequest) {
   // route in the in-app browser. With the app living at "/", the added-from
   // page, manifest start_url, and scope all agree on "/" under every scope
   // derivation iOS uses. Do not turn this back into a redirect.
-  if (user && pathname === "/") {
+  if (session && pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/workout";
     const rewritten = NextResponse.rewrite(url, { request });

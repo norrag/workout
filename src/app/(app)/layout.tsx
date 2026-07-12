@@ -2,15 +2,12 @@ import { redirect } from "next/navigation";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { ToastProvider } from "@/components/ui/Toast";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestAuth } from "@/lib/supabase/server";
 
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getRequestAuth();
   if (!user) redirect("/sign-in");
 
   return (

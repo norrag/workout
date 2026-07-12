@@ -61,6 +61,18 @@ domain, or an Auth-config change** is a human step.
 | Run the local Supabase stack | `supabase start`; needed for `npm run test:rls` and Playwright e2e (the sandbox has no local stack). |
 | Apply OAuth config locally | Add `[auth.oauth_server]` to `supabase/config.toml` (see connector setup doc). |
 
+### On-device (iOS): remove + re-add the installed PWA after launch-image changes
+
+iOS resolves `apple-touch-startup-image` at **Add-to-Home-Screen time** and the
+already-installed app keeps its old launch image (or none) until it is removed
+and re-added — a deploy alone changes nothing on the device (this is how PR #90
+shipped inert, per commit `b0faa88`). Whenever `public/splash/*` or the class
+list in `src/lib/pwa/ios-launch-screens.ts` changes (e.g. the N53 branded
+launch images, PR #187), the owner must once, after the deploy: delete the
+home-screen app → open the deployed site at `/` in Safari (signed in) → Share →
+Add to Home Screen. The path-versioned manifest keeps `id: "/"` so the re-add
+updates the same app, not a duplicate.
+
 ### ~~Migration reconciliation — clean-DB apply is broken~~ (RESOLVED 2026-07-01, R2)
 
 No longer a manual step — the premise ("a Claude session can't read the hosted

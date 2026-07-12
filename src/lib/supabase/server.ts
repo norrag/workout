@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { supabasePublicEnv } from "@/lib/env";
 import type { Database } from "@/lib/types/database";
 
@@ -25,3 +26,19 @@ export async function createClient() {
     },
   });
 }
+
+/**
+ * Request-deduped verified auth (N53): on a hard load the (app) layout gates
+ * with `auth.getUser()` and the page then repeats the same call for its own
+ * queries — two serialized Supabase round-trips behind the splash. React
+ * `cache()` collapses them to one per server render pass. The middleware
+ * deliberately does NOT verify (see lib/supabase/middleware.ts), so this is
+ * the single authoritative auth check of a request.
+ */
+export const getRequestAuth = cache(async () => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return { supabase, user };
+});

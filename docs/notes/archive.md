@@ -11,6 +11,26 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-12 — Batch-17 roundup merged (PR #181)
+
+Reconciliation sweep at the N53 session start: PR #181 (Batch-17 roundup)
+merged 2026-07-12; its eight terminal rows move here. N43 (PR #182) stays live
+pending the v23/v24 activation runbook, and N47 (PR #186) stays live pending
+the owner's on-device re-check. Full implementation records in
+`docs/PROGRESS.md` ("Batch-17 roundup") and the 09-changelog 2026-07-12
+entries; raw note text in the backlog appendix.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N44 | Prescription detail: show the prescribed/target e1RM, not just the anchor | F | P | **done (PR #181, merged 2026-07-12).** Sheet's `EST. STRENGTH (e1RM)` block: PRESCRIBED IMPLIES (implied e1RM via `estimateE1rm`, effective load for bodyweight) + TARGET ANCHOR A\* + N45's MEASURED ANCHOR row; `explain_prescription` already carried the inputs. |
+| N45 | Prescription detail: show the coordinate the anchor was derived from | F | P | **done (PR #181, merged 2026-07-12).** `recencyWeightedE1rm` returns `source` → `.nullish()` on the stored-decision schema (fingerprint-neutral, pinned) → MEASURED ANCHOR row with the `115 × 11 ON JUN 28` coordinate; W·D coordinate deliberately skipped. |
+| N48 | Filters in the replace-exercise sheet | UX | E | **done (PR #181, merged 2026-07-12).** EQUIP `FilterBar` axis on `ReplaceSheet`; `AddExerciseSheet`'s hand-rolled chips folded onto `FilterBar` (GROUP + EQUIP) — one filter idiom app-wide. |
+| N49 | Replace exercise commits on a bare tap; needs a confirm button | UX | E | **done (PR #181, merged 2026-07-12).** Single-select rows + disabled-until-picked `REPLACE EXERCISE` button (planner `ExercisePicker` pattern); no picker tap-commits anywhere. |
+| N50 | Past workouts: weight/rep boxes editable but edits silently don't save | B | G | **done (PR #181, merged 2026-07-12).** `staticCells` includes `readOnly` — completed/skipped sessions render logged rows static (marker preserved); `save()` hard-guards on `readOnly`. |
+| N51 | New-meso seed prescribes reps below the target window | B | G | **done (PR #181, merged 2026-07-12).** Both seed branches route the rounded load through `boundRepsToWindow`, gated `bound_to_target_window` (pre-v12 replay byte-identical); `seed-window.test.ts`. Accepted residual: already-stored seed rows keep pre-fix numbers until a fingerprint input changes (forward-looking by design). |
+| N54 | Disable the macro goal-target estimates again for now | F | C | **done (PR #181, merged 2026-07-12).** PR #178's src hunks reverse-applied + the goals-edit YOUR TARGET card hidden for consistency; pure view change, `planMacrocycle` + persisted targets untouched. Re-enable rides N43's v23 activation (cross-linked on N43's live row). |
+| N55 | Create-meso "WEEKS — INCLUDING DELOAD" label contradicts the deload checkbox | UX | D | **done (PR #181, merged 2026-07-12).** Label mirrors `MesoHeader.tsx`'s conditional on `ramp.deload`. |
+
 ## Swept 2026-07-11 — macro goals Phase 4 merged (PR #172)
 
 Reconciliation sweep at the doc-17 Phase-5a session start: N41's PR merged

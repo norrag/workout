@@ -955,6 +955,36 @@ splash), collapse the serialized `auth.getUser()` round-trips
 `Splash` fallback paints on a cold stream. Cross-link: N47's force-relaunch
 workaround makes every cold launch visible, amplifying this.
 
+**Resolution (2026-07-12, PR #187).** Deeper pass sharpened the diagnosis: the
+owner's remembered "splash" is the in-document `Splash` (logotype + dots) — the
+startup PNGs were **solid** background, and in dark appearance a solid
+`#14110C` sheet is perceptually identical to the OS-default black it replaces.
+So H1 need not even be fully true for the report to hold: (pre-doc = solid
+near-black or black) + (Splash window = one warm `(app)`-layout auth RTT — a
+blink) + (pre-doc TTFB long: middleware blocked every first byte on a network
+`auth.getUser()`) ⇒ "long black screens, no splash". The 7/2 re-add (PR #109
+scope fix) sits exactly on the regression boundary as the H1 trigger candidate
+(iOS re-resolves startup images at add time — cf. #90 shipping inert,
+`b0faa88`). Shipped, attacking every branch: (1) launch PNGs now carry the
+full `Splash` composition (both themes; `gen-ios-splash.mjs` renders the
+app's woff2 via wawoff2+opentype.js glyph outlines → sharp) so the earliest
+paintable frame IS the branded splash; (2) middleware `getUser()` →
+`getSession()` — cookie-parse, no network while the token is valid, on-demand
+refresh with cookie write-back; presence-only routing (verified `getUser()`
+stays in the (app) layout/pages, data RLS-scoped) — first byte no longer waits
+on Supabase; (3) `getRequestAuth` (React `cache()`) dedups layout+page
+`getUser()` to one verified RTT behind the splash ((app)/layout, Workout tab,
+day-view deep link); (4) `LaunchScreenAudit` reports any device whose CSS
+dims/dpr match no class — the silent-black H1 sub-case — once per class via
+the R20 funnel (`"launch"` boundary); (5) `launch-screens.test.ts` pins
+existence, exact pixel dims, brand-bg corners, and **ink-in-center** per class
+× theme, so an unbranded/black launch image can't ship again. Residual, owner:
+**remove + re-add the PWA once after deploy** (startup images bind at add
+time; manual-operations.md has the step) — and if black persists on 26.5.1
+after re-add, the audit + short TTFB narrow it to a true iOS
+startup-image-suppression bug (H1-hard, Apple-side; nothing web-side can paint
+pre-document, but the window is now short).
+
 ### N54 — Disable the macro goal-target estimate cards (again) · **F / small / owner-decided**
 
 Re-enabled by PR #178 (`9522c98`); the original N21 hide (`ca51efe`, PR #140)

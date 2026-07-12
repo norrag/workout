@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestAuth } from "@/lib/supabase/server";
 import { getWorkoutDetail } from "@/lib/queries/logging";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import { ensureFreshPrescriptions } from "@/lib/queries/regeneration";
@@ -12,10 +12,7 @@ export default async function LogWorkoutPage({
   params: Promise<{ workoutId: string }>;
 }) {
   const { workoutId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRequestAuth();
   if (!user) redirect("/sign-in");
 
   const [initialDetail, active] = await Promise.all([
