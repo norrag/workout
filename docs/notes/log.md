@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-12 — Session 73: Batch-17 easy-roundup build — N44/N45/N48/N49/N50/N51/N54/N55 in one PR (#<n>)
+## 2026-07-12 — Session 73: Batch-17 easy-roundup build — N44/N45/N48/N49/N50/N51/N54/N55 in one PR (#181)
 
 Owner: "round up the easy ones and get as much of them done in one PR as
 possible." Reconciliation sweep first: clean — no `done` rows awaiting archive
