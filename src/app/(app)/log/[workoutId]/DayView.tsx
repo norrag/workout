@@ -2379,7 +2379,7 @@ function AddExerciseSheet({
         onChange={(key, value) => (key === "group" ? setMg(value) : setEquip(value))}
       />
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {failed ? (
           <FetchRetry onRetry={() => setAttempt((a) => a + 1)} />
         ) : data === null ? (
@@ -2765,7 +2765,7 @@ function CompleteSheet({
         aria-modal="true"
         aria-label={`week ${microcycle.week_number} day ${workout.day_number} complete`}
         tabIndex={-1}
-        className={`absolute inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto border-t-2 border-ink bg-bg-base px-5 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-6 focus:outline-none transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
+        className={`absolute inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto overscroll-contain border-t-2 border-ink bg-bg-base px-5 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-6 focus:outline-none transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
       >
         <div className="flex items-baseline justify-between">
           <div className="text-[30px] font-extrabold tracking-[-0.02em]">

@@ -48,10 +48,11 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const startY = useRef<number | null>(null);
 
   const onTouchStart = (e: React.TouchEvent) => {
-    // N32: never arm while an overlay holds the body lock — the lock's
-    // position:fixed zeroes window.scrollY, so every drag on an open sheet
-    // read as "at the top" and pulled the page behind the scrim (and a long
-    // enough drag fired router.refresh() mid-interaction).
+    // N32: never arm while an overlay holds the body lock — drags on an open
+    // sheet are the sheet's own, and at the top of the page they would
+    // otherwise read as a pull (and a long enough one fired router.refresh()
+    // mid-interaction). The N47 lock rework keeps window.scrollY real while
+    // locked, so this guard is what keeps sheet drags from arming.
     startY.current =
       window.scrollY <= 0 && !refreshing && !isScrollLocked()
         ? e.touches[0].clientY

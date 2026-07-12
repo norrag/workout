@@ -1923,7 +1923,7 @@ function ExercisePicker({
         />
       )}
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {visible.map((e) => {
           const sel = selected.has(e.id);
           // replace mode: an exercise already filling ANOTHER slot of this
