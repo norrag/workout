@@ -17,6 +17,11 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # mcp-handler pins an exact peer of @modelcontextprotocol/sdk (1.26.0 as
+      # of 1.1.0); any solo SDK bump breaks `npm ci` with ERESOLVE (PR #126
+      # took prod builds down). Bump the SDK only together with an mcp-handler
+      # release whose peer range admits it.
+      - dependency-name: "@modelcontextprotocol/sdk"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
