@@ -10,7 +10,6 @@ import {
   type MacroGoal,
   type MacroPlan,
   type MacroProfile,
-  type MacroRange,
 } from "@/lib/engine/macro";
 import type { EngineParams } from "@/lib/engine/params";
 // type-only: erased at compile time, so the client chunk stays engine-free
@@ -28,42 +27,6 @@ const GOALS: { value: MacroGoal; label: string }[] = [
 
 const DURATIONS = [3, 6, 12] as const;
 const MESO_LENGTHS = [4, 5, 6] as const;
-
-// doc 17 §2.5 / PR #157: strength targets are measured by the est-strength
-// rollup — the pre-#140 "on key lifts" wording is retired with the fold.
-const GOAL_NOUN: Record<MacroGoal, string> = {
-  hypertrophy: "lean mass",
-  strength: "est. strength",
-  cut: "bodyweight",
-  maintain: "",
-};
-
-function fmtRange(r: MacroRange): string {
-  const unit = r.unit === "%" ? "%" : ` ${r.unit}`;
-  const sign = r.direction === "loss" ? "−" : "+";
-  if (r.direction === "none") return "—";
-  return r.low === r.high
-    ? `${sign}${r.low}${unit}`
-    : `${sign}${r.low}–${r.high}${unit}`;
-}
-
-function fmtRate(r: MacroRange): string {
-  const unit = r.unit === "%" ? "%" : ` ${r.unit}`;
-  const sign = r.direction === "loss" ? "−" : "+";
-  if (r.direction === "none") return "";
-  const body =
-    r.low === r.high ? `${r.low}${unit}` : `${r.low}–${r.high}${unit}`;
-  return `≈ ${sign}${body} / month`;
-}
-
-// the §2.1-personalized strength band, for the priming line's model-band half
-// (doc 17 §5 copy: "model band 1.5–3%/mo · your last block measured 1.9%/mo")
-const round1 = (x: number) => Math.round(x * 10) / 10;
-function fmtStrengthBand(b: { low: number; high: number }): string {
-  const lo = round1(b.low);
-  const hi = round1(b.high);
-  return lo === hi ? `${lo}%/MO` : `${lo}–${hi}%/MO`;
-}
 
 export function CreateMacroForm({
   profile,
@@ -117,8 +80,6 @@ export function CreateMacroForm({
       ),
     [goal, durationMonths, mesoLength, profile, params],
   );
-
-  const noun = GOAL_NOUN[goal];
 
   return (
     <form action={formAction}>
@@ -240,32 +201,15 @@ export function CreateMacroForm({
         ))}
       </div>
 
-      {/* engine output (recomputed live) — fig 2.3, restored at Phase R2
-          (v21 active; the N21 owner hide of 2026-07-04 is lifted) */}
+      {/* engine plan shape (recomputed live). The YOUR TARGET range + rate +
+          rationale + MODEL BAND priming row are hidden again (N54, owner
+          2026-07-11 — the Phase-R2 restore is rolled back until N43's v23 band
+          makes the numbers trustworthy) — `planMacrocycle` still runs for the
+          block math; LAST BLOCK MEASURED stays (it's measured, not modeled). */}
       <div className="mt-[18px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-accent">
-          YOUR TARGET
+        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+          PLAN
         </div>
-        {plan.target.direction === "none" ? (
-          <div className="mt-1.5 text-[20px] font-extrabold leading-tight tracking-[-0.01em]">
-            Recomposition — no weight target
-          </div>
-        ) : (
-          <div className="mt-1.5 flex items-baseline gap-2">
-            <div className="text-[30px] font-extrabold leading-none tracking-[-0.02em]">
-              {fmtRange(plan.target)}
-            </div>
-            <div className="text-[12px] font-semibold text-ink/60">
-              {noun ? `${noun} · ` : ""}
-              {plan.durationMonths} mo
-            </div>
-          </div>
-        )}
-        {plan.target.direction !== "none" && (
-          <div className="mt-[7px] text-[11px] font-semibold tracking-[0.02em] text-accent">
-            {fmtRate(plan.perMonthRate)}
-          </div>
-        )}
         <div className="mt-[7px] text-[11px] leading-normal text-ink/65">
           {plan.durationMonths} months at {mesoLength}-week blocks fits{" "}
           <strong className="text-ink">
@@ -294,29 +238,19 @@ export function CreateMacroForm({
           <span>PEAK</span>
         </div>
         {/* prior-block priming (doc 17 §5, 09-changelog 2026-07-11 §3):
-            display-only measured rate beside the §2.1-personalized model band
-            (the Phase-R2 "model band" half) — never blended into the target. */}
+            display-only measured rate — never blended into the target. The
+            "model band" half of the copy returns with the target cards (N54
+            re-hide; re-enable rides N43/v23). */}
         {priorBlock && (
-          <div className="mt-3 flex flex-col gap-1.5 border-t border-ink/[0.18] pt-2.5">
-            <div className="flex items-baseline justify-between">
-              <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/50">
-                MODEL BAND
-              </span>
-              <span className="numeral text-[10.5px] font-bold">
-                {fmtStrengthBand(plan.strengthRatePctMonth)}{" "}
-                <span className="font-semibold text-ink/55">EST. STRENGTH</span>
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/50">
-                LAST BLOCK MEASURED
-              </span>
-              <span className="numeral text-[10.5px] font-bold">
-                {priorBlock.ratePctMonth > 0 ? "+" : ""}
-                {priorBlock.ratePctMonth}%/MO{" "}
-                <span className="font-semibold text-ink/55">EST. STRENGTH</span>
-              </span>
-            </div>
+          <div className="mt-3 flex items-baseline justify-between border-t border-ink/[0.18] pt-2.5">
+            <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/50">
+              LAST BLOCK MEASURED
+            </span>
+            <span className="numeral text-[10.5px] font-bold">
+              {priorBlock.ratePctMonth > 0 ? "+" : ""}
+              {priorBlock.ratePctMonth}%/MO{" "}
+              <span className="font-semibold text-ink/55">EST. STRENGTH</span>
+            </span>
           </div>
         )}
       </div>
@@ -338,10 +272,6 @@ export function CreateMacroForm({
         >
           {pending ? "CREATING" : "CREATE MACROCYCLE"}
         </button>
-      </div>
-
-      <div className="mb-4 text-[10px] leading-normal text-ink/50">
-        {plan.rationale}
       </div>
     </form>
   );

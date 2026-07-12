@@ -13,18 +13,13 @@ import {
 import { getNewestBodyScan } from "@/lib/queries/body-scans";
 import { BRACKET_TOLERANCE_DAYS } from "@/lib/queries/bodyweight";
 import { dateAtLocalNoon, localDayIso, shortDate } from "@/lib/dates";
-import { formatMeasuredLb, formatWeight } from "@/lib/units";
+import { formatMeasuredLb } from "@/lib/units";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { InfoDot } from "@/components/ui/InfoDot";
 import type { GlossaryKey } from "@/lib/glossary";
 import { BalanceView } from "@/components/stats/MesoStatsViews";
 import { MuscleStrengthSection } from "@/components/stats/MuscleStrengthSection";
-import type { MacroRange } from "@/lib/engine";
-import type {
-  MacroGoalType,
-  MesocycleRow,
-  VBodyCompHistoryRow,
-} from "@/lib/types/database";
+import type { MesocycleRow, VBodyCompHistoryRow } from "@/lib/types/database";
 import type {
   RetroBlocks,
   RetroComposition,
@@ -45,40 +40,6 @@ function ym(iso: string): string {
 
 function span(start: string, end: string | null): string {
   return end ? `${ym(start)} — ${ym(end)}` : ym(start);
-}
-
-// doc 17 §2.5 / PR #157: strength targets are measured by the est-strength
-// rollup — the pre-#140 "KEY-LIFT STRENGTH" noun is retired with the fold.
-const TARGET_NOUN: Record<MacroGoalType, string> = {
-  hypertrophy: "LEAN MASS",
-  strength: "EST. STRENGTH",
-  cut: "BODYWEIGHT",
-  maintain: "RECOMPOSITION",
-};
-
-// weight ranges snap to 0.5 for display; percent goals pass through
-function fmtNum(value: number, isPct: boolean): string {
-  return isPct ? String(value) : formatWeight(value);
-}
-
-function fmtRange(r: MacroRange): string {
-  const isPct = r.unit === "%";
-  const unit = isPct ? "%" : ` ${r.unit}`;
-  const sign = r.direction === "loss" ? "−" : "+";
-  return r.low === r.high
-    ? `${sign}${fmtNum(r.low, isPct)}${unit}`
-    : `${sign}${fmtNum(r.low, isPct)}–${fmtNum(r.high, isPct)}${unit}`;
-}
-
-function fmtRate(r: MacroRange): string {
-  const isPct = r.unit === "%";
-  const unit = isPct ? "%" : ` ${r.unit}`;
-  const sign = r.direction === "loss" ? "−" : "+";
-  const body =
-    r.low === r.high
-      ? `${fmtNum(r.low, isPct)}${unit}`
-      : `${fmtNum(r.low, isPct)}–${fmtNum(r.high, isPct)}${unit}`;
-  return `≈ ${sign}${body} / month`;
 }
 
 function fmtVolume(v: number): string {
@@ -115,10 +76,10 @@ type View = (typeof VIEWS)[number];
  * OVERVIEW, plus the same BALANCE | PERFORMANCE tabs the meso page carries —
  * the macro-scope muscle-volume view and the est-strength trends (I11/PH37).
  * No mockup exists for the two stats tabs (owner-approved rule-8 deviation);
- * they reuse the meso stats views. The REALISTIC TARGET card (fig 2.2) is
- * restored at Phase R2 (v21 active — the N21 owner hide of 2026-07-04 is
- * lifted); it renders the live plan (doc 17 principle 3: display may recompute
- * from the current profile; grading always uses the stored contract).
+ * they reuse the meso stats views. The REALISTIC TARGET card is hidden again
+ * (N54, owner 2026-07-11 — the Phase-R2 restore is rolled back until N43's v23
+ * band makes the numbers trustworthy) — `planMacrocycle` and the persisted
+ * target columns stay, so re-enabling is a pure view change.
  */
 export default async function MacroOverviewPage({
   params,
@@ -190,14 +151,6 @@ export default async function MacroOverviewPage({
   // §4.1: a terminal macro is frozen — no planning affordances on its timeline
   const frozen = macro.status !== "active";
 
-  const hasTarget = plan.target.direction !== "none";
-  const trainingAge = profile.training_since
-    ? Math.max(
-        0,
-        (Date.now() - new Date(`${profile.training_since}T12:00:00`).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000),
-      )
-    : null;
   const months = macro.duration_months ?? plan.durationMonths;
   const metaLine = `GOAL ${macro.goal_type.toUpperCase()} · ${span(
     macro.start_date,
@@ -222,48 +175,9 @@ export default async function MacroOverviewPage({
         initial={view === "performance" ? 2 : view === "balance" ? 1 : 0}
         panels={[
           <div key="overview">
-      {/* realistic target (engine output) — fig 2.2, restored at Phase R2 */}
-      <div className="mt-4 border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
-          REALISTIC TARGET · {TARGET_NOUN[macro.goal_type]}
-        </div>
-        {hasTarget ? (
-          <>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <div className="text-[34px] font-extrabold leading-none tracking-[-0.02em]">
-                {fmtRange(plan.target)}
-              </div>
-              <div className="text-[12px] font-semibold text-ink/60">
-                over {months} mo
-              </div>
-            </div>
-            <div className="mt-[7px] text-[11px] font-semibold tracking-[0.02em] text-accent">
-              {fmtRate(plan.perMonthRate)}
-            </div>
-          </>
-        ) : (
-          <div className="mt-1.5 text-[20px] font-extrabold tracking-[-0.01em]">
-            Recomposition — no weight target
-          </div>
-        )}
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {trainingAge != null && (
-            <Chip>{trainingAge < 1 ? "<1" : Math.round(trainingAge)} YR TRAINING AGE</Chip>
-          )}
-          {profile.bodyweight && (
-            <Chip>{Math.round(profile.bodyweight)} LB</Chip>
-          )}
-          {profile.experience_level && (
-            <Chip>{profile.experience_level.toUpperCase()}</Chip>
-          )}
-        </div>
-        <div className="mt-2 text-[9px] leading-normal text-ink/45">
-          Estimate from your profile — a planning framework, not a guarantee.
-        </div>
-      </div>
-
-      {/* mesocycle timeline */}
-      <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
+      {/* mesocycle timeline (the REALISTIC TARGET card that led here is
+          hidden again — N54, re-enable rides N43/v23) */}
+      <div className="mt-4 border-t-[1.5px] border-ink pt-[13px]">
         <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
           MESOCYCLE TIMELINE
         </div>
@@ -713,14 +627,6 @@ function RetroRow({
         </div>
       )}
     </div>
-  );
-}
-
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="border border-ink/30 px-2 py-1 text-[8.5px] font-semibold tracking-[0.1em] text-ink/70">
-      {children}
-    </span>
   );
 }
 

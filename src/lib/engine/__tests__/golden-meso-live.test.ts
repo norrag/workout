@@ -78,7 +78,12 @@ describe("golden meso (live v18 params): anchored lifter, intermediate gain, 5 w
 
     const prescriptions: Prescription[] = [];
     let anchor = anchorAt(history, 0);
-    expect(anchor).toEqual({ value: 132, confidence: "moderate" });
+    expect(anchor).toEqual({
+      value: 132,
+      confidence: "moderate",
+      // N45: the anchor names its winning set — the day −7 session's 100×9
+      source: { weight: 100, reps: 9, ageDays: 7, sessionKey: "p3" },
+    });
 
     // seed_from_anchor: weight for window-low reps (8) at start RIR 3 off
     // e1RM 132 → 96.6 lb → rounds to 95 on the 5 lb barbell step.

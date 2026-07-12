@@ -4,6 +4,39 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-12 — Session 73: Batch-17 easy-roundup build — N44/N45/N48/N49/N50/N51/N54/N55 in one PR (#<n>)
+
+Owner: "round up the easy ones and get as much of them done in one PR as
+possible." Reconciliation sweep first: clean — no `done` rows awaiting archive
+(N34/N36 stay live on field-gated residuals). Then all eight `ready` Batch-17
+items shipped in one PR, in scoping's suggested order:
+
+- **N51** (HIGH, engine): both seed branches now `boundRepsToWindow`, gated on
+  `bound_to_target_window` (pre-v12 replay pinned byte-identical). New
+  `seed-window.test.ts`. Accepted residual noted in-row: code-only fix, stored
+  seed rows refresh only when a fingerprint input changes.
+- **N50**: `staticCells` includes `readOnly`; locked logged rows render their
+  actuals as static text, marker preserved; `save()` guards.
+- **N48+N49**: `ReplaceSheet` gains the EQUIP FilterBar axis + single-select +
+  disabled-until-picked REPLACE EXERCISE confirm; `AddExerciseSheet`'s
+  hand-rolled chips folded onto FilterBar — no tap-commit picker and no
+  pre-N29 chips remain anywhere.
+- **N44+N45**: prescription detail's `EST. STRENGTH (e1RM)` block (PRESCRIBED
+  IMPLIES / TARGET ANCHOR A\* / MEASURED ANCHOR + winning-set coordinate);
+  `recencyWeightedE1rm` returns provenance, schema-widened `.nullish()` on
+  `inputs.strengthAnchor`, fingerprint-neutral (pinned), threaded to
+  `LoggedExercise.e1rm_anchor_source`. W·D coordinate skipped deliberately
+  (set+date is the owner's own phrasing of the complaint).
+- **N54** (owner-decided): #178's target cards reverse-applied + the
+  goals-edit card hidden for consistency; re-enable rides N43/v23.
+- **N55**: label conditional mirrored.
+
+Suite 1097 green (+9), lint/typecheck clean. 09-changelog 2026-07-12 entry +
+PROGRESS.md entry in the same PR. **Still open from Batch 17:** N43 (build
+v23 — the next big one), N46 (template editing, own slice), N47 (scroll-lock
+rework + device verify), N53 (launch-splash regression, device investigation),
+N52 (rides N43).
+
 ## 2026-07-11 — Session 72: Batch-17 intake — N44–N54 (11 notes, all investigated at intake)
 
 Owner handed over 11 notes and asked for a precursor look into each. Five

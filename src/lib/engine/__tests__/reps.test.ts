@@ -169,6 +169,48 @@ describe("recencyWeightedE1rm", () => {
       2;
     expect(anchor).toBeCloseTo(sessionAMean, 1);
   });
+
+  // N45: the anchor reports the winning set it keyed on, so the app can show
+  // the coordinate ("115 × 11 on Jun 28") instead of a bare number
+  describe("source provenance", () => {
+    it("best/session_best: source is the winning set (not another session's)", () => {
+      const samples: E1rmSample[] = [
+        { weight: 150, reps: 5, targetRir: 1, ageDays: 1, sessionKey: "A" },
+        { weight: 150, reps: 4, targetRir: 1, ageDays: 1, sessionKey: "A" },
+        { weight: 90, reps: 12, targetRir: 1, ageDays: 0, sessionKey: "B" },
+      ];
+      const anchor = recencyWeightedE1rm(samples, params)!;
+      expect(anchor.source).toEqual({
+        weight: 150,
+        reps: 5,
+        ageDays: 1,
+        sessionKey: "A",
+      });
+      const best = recencyWeightedE1rm(samples, bestParams)!;
+      expect(best.source?.sessionKey).toBe("A");
+      expect(best.source?.weight).toBe(150);
+    });
+
+    it("mean: source is the highest-value sample", () => {
+      const samples: E1rmSample[] = [
+        { weight: 120, reps: 8, targetRir: 2, ageDays: 90 },
+        { weight: 100, reps: 8, targetRir: 2, ageDays: 0 },
+      ];
+      const anchor = recencyWeightedE1rm(samples, meanParams)!;
+      expect(anchor.source?.weight).toBe(120);
+      expect(anchor.source?.reps).toBe(8);
+    });
+
+    it("recency outweighs raw value in picking the winning set", () => {
+      // an ancient monster set loses to a fresh working set once decay bites
+      const samples: E1rmSample[] = [
+        { weight: 200, reps: 10, targetRir: 1, ageDays: 400, sessionKey: "old" },
+        { weight: 150, reps: 10, targetRir: 1, ageDays: 1, sessionKey: "new" },
+      ];
+      const anchor = recencyWeightedE1rm(samples, params)!;
+      expect(anchor.source?.sessionKey).toBe("new");
+    });
+  });
 });
 
 describe("weightForRepsAtRir (converse of predictRepsAtWeight)", () => {

@@ -7,7 +7,7 @@ import {
   type PrescriptionAudit,
 } from "@/lib/queries/audit";
 import { getPrescriptionAuditAction } from "@/app/(app)/log/actions";
-import { formatPrescription } from "@/lib/units";
+import { formatPrescription, formatWeight } from "@/lib/units";
 import { shortDate } from "@/lib/dates";
 
 export interface PrescriptionDetailTarget {
@@ -21,6 +21,19 @@ export interface PrescriptionDetailTarget {
   prescribedReps: number | null;
   prescribedSets: number | null;
   targetRir: number | null;
+  /** N44: the e1RM the prescribed weight × reps @ RIR implies (computed by the
+   *  caller from active params; effective load for bodyweight movements) */
+  prescribedE1rm: number | null;
+  /** N44: the doc-16 target anchor A* that priced this row (`stepped` rows
+   *  only); null = hold / pre-v20 / no decision */
+  targetAnchor: number | null;
+  /** N45: the measured recency anchor + the winning set it keyed on */
+  measuredAnchor: number | null;
+  anchorSource: {
+    weight: number;
+    reps: number;
+    performed_at: string | null;
+  } | null;
 }
 
 /** A version number as a tracked label, or an em dash when unknown. Pure. */
@@ -178,6 +191,48 @@ export function PrescriptionDetailSheet({
               </p>
             )}
           </div>
+
+          {/* N44/N45: the e1RM ledger behind the numbers — what the sheet
+              previously buried inside rationale strings. Estimates, per the
+              honesty guardrails (doc 10 §9): labeled EST., one decimal. */}
+          {(target.prescribedE1rm != null ||
+            target.targetAnchor != null ||
+            target.measuredAnchor != null) && (
+            <div className="mt-4">
+              <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+                EST. STRENGTH (e1RM)
+              </div>
+              <div className="mt-0.5">
+                {target.prescribedE1rm != null && (
+                  <FieldRow label="PRESCRIBED IMPLIES">
+                    <span className="numeral">{target.prescribedE1rm} LB</span>
+                  </FieldRow>
+                )}
+                {target.targetAnchor != null && (
+                  <FieldRow label="TARGET ANCHOR A*">
+                    <span className="numeral">{target.targetAnchor} LB</span>
+                  </FieldRow>
+                )}
+                {target.measuredAnchor != null && (
+                  <FieldRow label="MEASURED ANCHOR">
+                    <span className="numeral">{target.measuredAnchor} LB</span>
+                    {target.anchorSource && (
+                      <span className="ml-1.5 text-[10px] text-ink/45">
+                        ·{" "}
+                        <span className="numeral">
+                          {formatWeight(target.anchorSource.weight)} ×{" "}
+                          {target.anchorSource.reps}
+                        </span>
+                        {target.anchorSource.performed_at
+                          ? ` ON ${shortDate(target.anchorSource.performed_at).toUpperCase()}`
+                          : ""}
+                      </span>
+                    )}
+                  </FieldRow>
+                )}
+              </div>
+            </div>
+          )}
 
           {audit && audit.trace.length > 0 && (
             <div className="mt-4">

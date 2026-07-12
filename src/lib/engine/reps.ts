@@ -103,9 +103,26 @@ export interface E1rmSample {
   sessionKey?: string | null;
 }
 
+/** Provenance of the anchor's winning set (N45): which performed set the
+ *  anchor keyed on. The engine reports the sample's own fields (it is
+ *  clockless — `ageDays` is relative to the caller's reference point); the
+ *  caller may enrich with `performedAt` before threading into inputs. */
+export interface E1rmAnchorSource {
+  weight: number;
+  reps: number;
+  ageDays: number;
+  sessionKey: string | null;
+  /** ISO timestamp of the winning set, resolved in query land */
+  performedAt?: string | null;
+}
+
 export interface E1rmAnchor {
   value: number;
   confidence: E1rmConfidence;
+  /** N45: the winning set behind the number — `best`/`session_best` key on it
+   *  directly; `mean` reports the highest-value sample as the closest thing.
+   *  Optional so historical shapes (stored decision inputs) stay valid. */
+  source?: E1rmAnchorSource | null;
 }
 
 const CONF_WEIGHT: Record<E1rmConfidence, number> = {
@@ -148,6 +165,8 @@ export function recencyWeightedE1rm(
     confidence: E1rmConfidence;
     recency: number;
     sessionKey?: string | null;
+    /** the sample behind this entry, kept for the anchor's provenance (N45) */
+    sample: E1rmSample;
   }[] = [];
   for (const s of samples) {
     const est = estimateE1rmCore(s.weight, s.reps, s.targetRir, cfg);
@@ -159,14 +178,22 @@ export function recencyWeightedE1rm(
       confidence: est.confidence,
       recency,
       sessionKey: s.sessionKey,
+      sample: s,
     });
   }
   if (entries.length === 0) return null;
 
+  const sourceOf = (e: (typeof entries)[number]): E1rmAnchorSource => ({
+    weight: e.sample.weight,
+    reps: e.sample.reps,
+    ageDays: e.sample.ageDays,
+    sessionKey: e.sessionKey ?? null,
+  });
+
   if (method === "mean") {
     let weightedSum = 0;
     let weightTotal = 0;
-    let best: { value: number; confidence: E1rmConfidence } | null = null;
+    let best: (typeof entries)[number] | null = null;
     for (const e of entries) {
       const w = e.recency * CONF_WEIGHT[e.confidence];
       if (w <= 0) continue;
@@ -178,6 +205,7 @@ export function recencyWeightedE1rm(
     return {
       value: Math.round((weightedSum / weightTotal) * 10) / 10,
       confidence: best!.confidence,
+      source: sourceOf(best!),
     };
   }
 
@@ -191,6 +219,7 @@ export function recencyWeightedE1rm(
     return {
       value: Math.round(bestEntry.value * 10) / 10,
       confidence: bestEntry.confidence,
+      source: sourceOf(bestEntry),
     };
   }
 
@@ -222,5 +251,8 @@ export function recencyWeightedE1rm(
   return {
     value: Math.round(mean * 10) / 10,
     confidence: bestConfidence(session.map((e) => e.confidence)),
+    // the winning SET is the coordinate even though the value averages its
+    // session — it's what put the session in front (doc 13 §9.3)
+    source: sourceOf(bestEntry),
   };
 }

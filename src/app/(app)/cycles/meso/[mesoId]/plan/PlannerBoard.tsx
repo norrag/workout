@@ -1315,7 +1315,7 @@ function FinalizeSheet({
         />
 
         <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
-          WEEKS — INCLUDING DELOAD
+          WEEKS{ramp.deload ? " — INCLUDING DELOAD" : ""}
         </div>
         <div className="mt-2 flex border-[1.5px] border-ink">
           {[4, 5, 6, 7, 8].map((w, i) => (

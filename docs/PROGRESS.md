@@ -2,7 +2,59 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-11 (latest) — Macro goals Phase R2 + R3 executed: v21 + v22 active, target cards return (doc 17 §8)
+## 2026-07-12 (latest) — Batch-17 roundup: N44/N45/N48/N49/N50/N51/N54/N55 in one PR
+
+The easy Batch-17 items swept together (the tough ones — N43 v23 band, N46
+template editing, N47/N53 device-verification work — stay open). Design deltas
+in the [09-changelog 2026-07-12 entry](09-design-changelog.md); notes rows
+updated in the same PR.
+
+- **N51 (HIGH bug, engine).** Both seed branches (`seedCore` §S1 anchor seed +
+  prescribe's cold-start/swap-in) now route the rounded load through
+  `boundRepsToWindow` — nearest-increment rounding landed heavy half the time
+  and the hard `[6,15]` clamp let 6–7 reps through an 8–12 target window. The
+  helper's signature narrowed to `(…, targetRir, equipmentType, …)` so seed
+  contexts without full `EngineInputs` share the exact working-path bound.
+  Gated on `bound_to_target_window` like the working path, so pre-v12 params
+  rows replay byte-identically (pinned by test). New
+  `engine/__tests__/seed-window.test.ts` (worked example: anchor 100 / machine
+  step 5 / RIR 3 → old 75×7, new 70×10; sweep asserts in-window across
+  anchors; gating pinned both routes). NOTE: code-only fix — stored seed
+  prescriptions keep their pre-fix numbers until any fingerprint input changes
+  (doc 14 has no engine-code dimension); forward-looking by design.
+- **N50 (bug).** `SetRow.staticCells` now includes `readOnly` — completed/
+  skipped sessions render logged rows as static text (logged values, marker
+  preserved) instead of live inputs whose blur-save the completion-lock RLS
+  silently no-ops. `save()` also hard-guards on `readOnly`.
+- **N48+N49 (UX).** Day-view `ReplaceSheet`: EQUIP `FilterBar` axis + single-
+  select + disabled-until-picked `REPLACE EXERCISE` confirm (was the only
+  tap-to-commit picker). `AddExerciseSheet`'s pre-N29 hand-rolled chips folded
+  onto `FilterBar` (GROUP + EQUIP axes).
+- **N44+N45 (F).** Prescription detail sheet gains the `EST. STRENGTH (e1RM)`
+  block: PRESCRIBED IMPLIES (via `estimateE1rm` off the sheet's own fields,
+  effective load for bodyweight), TARGET ANCHOR A\* (`prescription_anchor`,
+  stepped rows), MEASURED ANCHOR + coordinate. Provenance plumbing:
+  `recencyWeightedE1rm` now returns `source` (winning set weight/reps/ageDays/
+  sessionKey; the `mean` method reports its highest-value sample) →
+  `E1rmAnchor.source` widened in the engine-inputs schema as `.nullish()` (no
+  default — stored decision inputs parse byte-identically) → `anchors.ts`
+  enriches `performedAt` → `LoggedExercise.e1rm_anchor_source` → sheet.
+  `strengthAnchor` is already on the doc-14 §3 derived denylist, so the
+  widened shape is fingerprint-neutral (pinned in `fingerprint.test.ts`);
+  newly recorded decisions and `explain_prescription` carry the source for
+  free. Engine tests: provenance per anchor method + recency-beats-value;
+  golden-meso-live anchor shape updated.
+- **N54 (owner-decided).** PR #178's target-card JSX reverse-applied (macro
+  Overview REALISTIC TARGET; create-flow YOUR TARGET + MODEL BAND row — LAST
+  BLOCK MEASURED stays) + the goals-edit YOUR TARGET card (pre-#178) hidden
+  for consistency. Pure view change; re-enable rides N43/v23.
+- **N55 (trivial).** Create-meso `WEEKS` label suffix now conditional on
+  `ramp.deload`, mirroring `MesoHeader`.
+
+Suite 1097 green (+9 over baseline: 5 seed-window, 3 anchor-provenance, 1
+widened fingerprint invariance); lint/typecheck clean.
+
+## 2026-07-11 — Macro goals Phase R2 + R3 executed: v21 + v22 active, target cards return (doc 17 §8)
 
 The owner-gated activations on the doc-17 spine, run from a Claude session
 with the owner directing. Full replay evidence in

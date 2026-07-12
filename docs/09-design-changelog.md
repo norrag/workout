@@ -42,6 +42,78 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-12 — Batch-17 roundup: day-view picker unification, prescription e1RM ledger, locked sessions, target cards re-hidden (N44/N45/N48/N49/N50/N54/N55)
+
+One PR sweeping the small Batch-17 items. All `RETROFIT`.
+
+### 1. Day View — replace-exercise sheet gets filters + a confirm step (fig 1.2 menu path)
+
+- **Change (N48):** the replace sheet gains the shared `EQUIP` FilterBar axis
+  (N29 grammar), exactly as the planner's picker carries it. Candidates were
+  already muscle-scoped; equipment was the missing cut.
+- **Change (N49):** picking a candidate no longer commits the swap on a bare
+  row tap. Rows are single-select (checkbox square, radio behavior) and the
+  swap commits via a full-width `REPLACE EXERCISE` button, disabled until a
+  pick exists — mirroring the planner `ExercisePicker` (N31) and the day-view
+  `AddExerciseSheet`, which were already select-then-confirm.
+- **Rationale:** owner note (Batch 17); the sheet was the only tap-to-commit
+  picker left, and an accidental tap committed a swap instantly.
+- **Impact:** `RETROFIT` — shipped in the same PR as this entry.
+
+### 2. Day View — add-exercise sheet chips fold onto `FilterBar`
+
+- **Change:** the hand-rolled `ALL GROUPS` / `ALL EQUIP` chip rows (pre-N29)
+  become two FilterBar axes (`GROUP`, `EQUIP`) — same behavior, shared
+  primitive, standard ✕-to-clear affordance.
+- **Impact:** `RETROFIT` — the last pre-N29 chips are gone; FilterBar is now
+  the only filter idiom in the app.
+
+### 3. Day View — prescription detail sheet gains an `EST. STRENGTH (e1RM)` block
+
+- **Change (N44/N45):** below the PRESCRIPTION block, a new ledger section
+  with up to three rows: `PRESCRIBED IMPLIES` (the e1RM the prescribed
+  weight × reps @ RIR inverts to; effective load for bodyweight movements),
+  `TARGET ANCHOR A*` (the doc-16 target anchor that priced the row — stepped
+  rows only), and `MEASURED ANCHOR` with its coordinate — the winning set the
+  recency anchor keyed on, e.g. `115 × 11 ON JUN 28`.
+- **Rationale:** owner notes (Batch 17): the anchor e1RM appeared only baked
+  into rationale strings, and the anchor's provenance was computed then
+  discarded — the number was unauditable ("e1RM 110.1, but I did 115×11 on
+  May 22", PH39's ghost). Estimates stay labeled EST. per doc 10 §9.
+- **Impact:** `RETROFIT` + `DATA` (the anchor's source coordinate now threads
+  from the engine through `inputs.strengthAnchor`, so newly recorded decisions
+  and `explain_prescription` carry it). No mockup figure exists for this sheet
+  (pre-existing rule-8 deviation, PROGRESS.md).
+
+### 4. Day View — completed/skipped sessions render logged sets as static text (fig 1.2)
+
+- **Change (N50):** on a completed or skipped workout, logged rows' weight/rep
+  cells are static text (logged styling and the over/met/under marker
+  preserved) instead of live inputs. Editing was an illusion — the
+  completion-lock RLS silently discarded the writes.
+- **Impact:** `RETROFIT`.
+
+### 5. Create-meso sheet — `WEEKS` label reflects the deload toggle
+
+- **Change (N55):** "WEEKS — INCLUDING DELOAD" renders the suffix only while
+  "Final week is a deload" is checked, mirroring the edit-details sheet's
+  existing conditional.
+- **Impact:** `RETROFIT` (one label).
+
+### 6. Macro surfaces — the goal-target estimate cards are hidden again (figs 2.2/2.3)
+
+- **Change (N54, owner-decided):** the 2026-07-11 Phase-R2 restore below is
+  rolled back — macro Overview `REALISTIC TARGET` card, create-flow
+  `YOUR TARGET` + rate + closing rationale + `MODEL BAND` priming row, and the
+  goals-edit `YOUR TARGET` card (pre-R2; hidden for consistency) all come off
+  again. `LAST BLOCK MEASURED` stays (measured, not modeled). `planMacrocycle`
+  and the persisted targets are untouched — a pure view change.
+- **Rationale:** the strength-rate band still buckets by calendar training
+  years (N43); the owner wants the numbers hidden until the v23
+  FFMI-proximity band makes them trustworthy. Re-enable rides N43/v23.
+- **Impact:** `RETROFIT` — supersedes the fig 2.2/2.3 halves of the
+  2026-07-11 Phase-R2 entry below until re-enabled.
+
 ## 2026-07-11 — Phase R2: the target cards return (figs 2.2/2.3), with the est-strength nouns
 
 v21 (the doc 17 §2 target-engine correction) is **active on hosted**, so the
