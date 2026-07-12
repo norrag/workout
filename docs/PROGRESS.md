@@ -2,7 +2,28 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-12 (latest) — N43: two-component strength-rate model (engine_params v23, inactive)
+## 2026-07-12 (latest) — N36: envelope loop goes self-gating on per-user data (doc 17 §7 amendment, PR #184)
+
+Owner note (notes Batch 18): the loop should not wait on a remembered future
+"enable" — it should default to the current portion of the band while a user
+lacks history, kick in automatically when the data exists, and the
+short-circuited position should be tunable. Built exactly that:
+
+- **`progression.envelope.min_history_mesos`** (default 2): `deriveBandPosition`
+  short-circuits to the tunable `progression.band_position` default until that
+  many qualifying (≥ `min_decisions`) completed mesos sit in the lookback
+  window; the gate re-engages symmetrically when history ages out (the same
+  return-from-absence decay). Off → short-circuited → modulating is continuous —
+  all three pace off the same knob. Block stays `.optional()`; every applied
+  params row lacks it ⇒ byte-identical (suite 1112, +5 gate goldens).
+- **Doc 17 §7 amended** (self-gating design; the field-data threshold fit is
+  demoted from activation gate to a standing monitor/refit) and the
+  `manual-operations.md` runbook rewritten as "Activate the envelope loop" —
+  propose the defaults bump → replay diff → owner review/activate → monitor +
+  refit. Prereqs all cleared (v20 active 2026-07-11; N43's corrected band
+  active as v24 2026-07-12), so activation is runnable on demand.
+
+## 2026-07-12 — N43: two-component strength-rate model (engine_params v23, inactive)
 
 Doc 17 Phase 7. The strength-path analogue of the N21/v21 hypertrophy
 correction: v21's personalized strength band still buckets by **calendar

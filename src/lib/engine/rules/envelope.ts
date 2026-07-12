@@ -27,9 +27,15 @@
  * forgetting is the return-from-absence decay: as completed mesos age out of
  * the window, the position regresses to the default.
  *
- * The `progression.envelope` thresholds are PROVISIONAL until fit from field
- * data (doc 17 §7: v20 active + a few real mesos read through
- * `get_progression_history`); the block ships absent ⇒ byte-identical.
+ * The loop is SELF-GATING per user (doc 17 §7, owner amendment 2026-07-12):
+ * until `min_history_mesos` qualifying completed mesos (≥ `min_decisions`
+ * status-coded decisions each) sit inside the lookback window, the fold
+ * short-circuits to the tunable `band_position` default. Activation is
+ * therefore a single global act — every user's loop kicks in automatically
+ * when (and only while) their own history supports it; nothing per-user to
+ * remember to enable. The step/threshold values are PROVISIONAL starting
+ * points refined from field data via the monitor/refit runbook loop; the
+ * block ships absent ⇒ byte-identical.
  */
 import type { EngineParams } from "../params";
 
@@ -92,6 +98,15 @@ export function deriveBandPosition(
   const p = params.progression!;
   const env = p.envelope!;
   const window = outcomes.slice(-env.lookback_mesos);
+
+  // per-user data-sufficiency short-circuit: too little qualifying history
+  // in the window ⇒ the tunable default, and the loop takes over
+  // automatically once the user's own evidence accrues (or degrades back
+  // when it ages out).
+  const qualifying = window.filter((o) => o.decisions >= env.min_decisions);
+  if (qualifying.length < env.min_history_mesos) {
+    return round3(p.band_position);
+  }
 
   let position = p.band_position;
   let dwellRemaining = 0;

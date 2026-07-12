@@ -26,6 +26,7 @@ const ENVELOPE_PARAMS: EngineParams = {
       lookback_mesos: 3,
       max_age_days: 180,
       min_decisions: 8,
+      min_history_mesos: 2,
       step: 0.1,
       dwell_mesos: 1,
       raise: { earn_rate: 0.7, max_miss_ratio: 0.2, pacer_trips: 2, over_share: 0.25 },

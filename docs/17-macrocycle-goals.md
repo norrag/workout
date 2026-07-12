@@ -19,6 +19,7 @@ doc-16 pattern.
 
 **Backlog spine:** N21 (Phase 1) → N37 (Phase 2) → N40 (Phase 3) → N41
 (Phase 4) → N34 (Phase 5, parallelizable from day one) → N36 (Phase 6,
+self-gating per user since the 2026-07-12 §7 amendment; formerly
 field-data-gated) → N43 (Phase 7, the strength-rate model — parallelizable,
 builds on Phase 1) → Phase R (owner-gated activations). N38/N39 stay on the
 doc-16 spine, untouched here.
@@ -385,9 +386,17 @@ Non-goals unchanged (doc 15): no booking, no webhooks, no nutrition, no
 automatic engine writes from scans; scans inform **targets and verdicts,
 never prescriptions**.
 
-## 7. Phase 6 — envelope loop (N36; gated on field data)
+## 7. Phase 6 — envelope loop (N36; self-gating on per-user data)
 
-As fixed in the architecture record §3.3 (residence) + doc 16 §4 (shape):
+As fixed in the architecture record §3.3 (residence) + doc 16 §4 (shape),
+**amended 2026-07-12 (owner):** the loop gates on **per-user data
+availability**, not on a global fit-before-activate step. Two reasons, both
+the owner's: an owner-gated "come back in three months and enable it" step
+would be forgotten, and — decisive on its own — users differ: some have the
+history, some don't, so the loop **must** control for data availability
+per user and short-circuit itself until enough quality data exists to act
+on. Activation is therefore a **single global act**; each user's loop kicks
+in automatically when their own evidence supports it.
 
 - **Residence:** per-user **derived** `band_position` — a pure, clockless
   fold over the trailing ~2–3 mesos of `engine_decisions`, evaluated at
@@ -398,18 +407,38 @@ As fixed in the architecture record §3.3 (residence) + doc 16 §4 (shape):
 - **Update rule:** at meso boundaries only, bounded steps (|Δ| ≤ 0.25),
   minimum dwell one meso, clamp [0,1]; inputs are **demand-side outcomes**
   (earn rate, earned-then-missed ratio, throttle trips, workload-gate
-  firings, `over`/beat share) — never the measured rate. Thresholds are
-  **fit from field data**: v20 active + a few real mesos read through
-  `get_progression_history` (doc 16 §8.3). Bounded-lookback forgetting is
-  the return-from-absence decay.
+  firings, `over`/beat share) — never the measured rate. Bounded-lookback
+  forgetting is the return-from-absence decay.
+- **Data-sufficiency gate (the 2026-07-12 amendment):** until
+  `min_history_mesos` (default 2) **qualifying** completed mesos — each
+  carrying ≥ `min_decisions` status-coded decisions — sit inside the
+  lookback window, the fold short-circuits to the **tunable**
+  `progression.band_position` default (the owner's asked-for
+  short-circuited position; admin-tunable like any params knob). The gate is
+  symmetric: when qualifying history ages out of the window (`lookback_mesos`
+  / `max_age_days`), the position degrades back to the default — the same
+  return-from-absence decay, now explicit at the entry edge too. Off →
+  short-circuited → modulating is continuous: all three states pace off the
+  same knob until the fold has grounds to move.
+- **Thresholds:** the `raise`/`lower`/step values are **provisional starting
+  points**, deliberately conservative (bounded step, dwell, down-pressure
+  wins, a raise needs visible up-pressure; worst case pins the band floor/top
+  — both defensible programs). Field data read through
+  `get_progression_history` (doc 16 §8.3) **refines** them via the Phase-R
+  monitor/refit loop; it is no longer an activation precondition. N43's
+  corrected band (v23/v24, active 2026-07-12) was the one true blocker and
+  has landed.
 - **Params:** `progression.envelope` block (`.optional()`, off ⇒
-  byte-identical), shipped inactive in a params bump after the rule is fit.
+  byte-identical), shipped enabled-with-defaults in a params micro-bump
+  whenever the owner runs the activation runbook — no field-data wait.
 
-*Tests:* loop-off byte-identical; bounded movement + dwell + clamp goldens;
-worst-case (broken outer loop pins band floor/top — both defensible
-programs); replay determinism on recorded positions; source-agnostic
-composition with Phase 2 (`"band"` and `"plan"` both lerp the derived
-position).
+*Tests:* loop-off byte-identical; data-sufficiency short-circuit (below the
+minimum ⇒ the tunable default however loud the evidence; auto-kick-in at the
+minimum; sparse mesos don't count; re-engages when history ages out);
+bounded movement + dwell + clamp goldens; worst-case (broken outer loop pins
+band floor/top — both defensible programs); replay determinism on recorded
+positions; source-agnostic composition with Phase 2 (`"band"` and `"plan"`
+both lerp the derived position).
 
 ## 8. Phase R — owner-gated activations (runbook, not code)
 
@@ -430,7 +459,7 @@ order:
    activate.
 4. **Monitor** via `get_engine_decisions` (rule/status filter) +
    `get_progression_history` (earn/miss/paced mix, `vanished` share) —
-   the same instruments that later fit Phase 6.
+   the same instruments that refit Phase 6's thresholds.
 
 ## 9. Implementation plan (one phase per PR)
 
@@ -441,7 +470,7 @@ order:
 | 3 | §4 closeout + retrospective | — (soft: PR 1 for `plan_inputs` explainability; grading uses the existing `target_*`) | starts with the 09/mockup pass |
 | 4 | §5 bodyweight series + priming | PR 3 (retrospective rows) | small |
 | 5a–5c | §6 DEXA phase-in | — (5b's verdict rows want PR 3) | **parallelizable from day one**; 5a's first login resolves the §8.3 residual |
-| 6 | §7 envelope loop | v20 active + field data + PR 1 | params bump ships inactive |
+| 6 | §7 envelope loop | v20 active + PR 1; N43 for the band it moves within | mechanism PR #177; per-user data-sufficiency gate + self-gating activation per the 2026-07-12 §7 amendment — field data refits thresholds, no longer gates activation |
 | 7 | §2.7 two-component strength-rate model (N43) | PR 1 (§2 correction) | `engine_params` v23 inactive; doc 10 §5 amendment rides along |
 | R1–R4 | §8 activations | as listed | owner steps, runbook |
 
