@@ -19,7 +19,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
     "@serwist/next": "^9.0.0",
-    "@supabase/ssr": "^0.12.0",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.2",
     "jose": "^6.2.3",
     "mcp-handler": "^1.1.0",
