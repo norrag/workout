@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-19 — Session 79: Batch 20 — prescription presentation split (N57 built) + LLM explanation spec (N58/doc 18)
+## 2026-07-19 — Session 79: Batch 20 — prescription presentation split (N57, PR #194) + LLM explanation spec (N58/doc 18)
 
 Owner (Batch 20, verbatim in the appendix, after #193 merged): the details
 panel "feels more like a debugging panel than a useful prescription detail" —
