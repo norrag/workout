@@ -3,10 +3,19 @@ import type { Database, EngineDecisionKind } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
 
-/** One step of an engine decision's trace (rule + human-readable detail). */
+/** One step of an engine decision's trace (rule + human-readable detail).
+ *  Progression steps (doc 16 §3.6) additionally carry their status coding —
+ *  preserved here so the quick-read narrative and the audit panel can read the
+ *  state structurally instead of parsing the detail prose. */
 export interface AuditTraceStep {
   rule: string;
   detail: string;
+  /** doc 16 §3.6 status vocabulary on `progression` steps */
+  status?: string;
+  /** which governor declined an earned step (status `paced`) */
+  governor?: string;
+  /** the first failing gate predicate (status `not_earned`) */
+  predicate?: string;
 }
 
 /**
@@ -36,6 +45,10 @@ export interface PrescriptionAudit {
    *  out-of-band write (numbers the engine never produced) is surfaced instead
    *  of being passed off as "re-verified" (N33 S4 tripwire) */
   output: DecisionOutputNumbers | null;
+  /** the previous session's prescription the decision advanced from
+   *  (`inputs.previous`) — feeds the quick-read's plain-language delta; null on
+   *  seeds and cold rows */
+  previous: DecisionOutputNumbers | null;
 }
 
 /** The prescription tuple recorded on a decision's output. */
@@ -81,12 +94,24 @@ export function prescriptionMatchesDecision(
 export function readTrace(output: unknown): AuditTraceStep[] {
   const raw = (output as { trace?: unknown } | null)?.trace;
   if (!Array.isArray(raw)) return [];
+  const str = (v: unknown): string | undefined =>
+    typeof v === "string" ? v : undefined;
   return raw
-    .filter((s): s is { rule?: unknown; detail?: unknown } => !!s && typeof s === "object")
-    .map((s) => ({
-      rule: typeof s.rule === "string" ? s.rule : "",
-      detail: typeof s.detail === "string" ? s.detail : "",
-    }));
+    .filter(
+      (s): s is Record<string, unknown> => !!s && typeof s === "object",
+    )
+    .map((s) => {
+      const status = str(s.status);
+      const governor = str(s.governor);
+      const predicate = str(s.predicate);
+      return {
+        rule: typeof s.rule === "string" ? s.rule : "",
+        detail: typeof s.detail === "string" ? s.detail : "",
+        ...(status !== undefined ? { status } : {}),
+        ...(governor !== undefined ? { governor } : {}),
+        ...(predicate !== undefined ? { predicate } : {}),
+      };
+    });
 }
 
 /**
@@ -103,7 +128,7 @@ export async function getPrescriptionAudit(
 ): Promise<PrescriptionAudit | null> {
   const { data, error } = await client
     .from("engine_decisions")
-    .select("kind, params_version, created_at, output")
+    .select("kind, params_version, created_at, output, inputs")
     .eq("user_id", userId)
     .eq("workout_exercise_id", workoutExerciseId)
     .order("created_at", { ascending: false })
@@ -120,5 +145,8 @@ export async function getPrescriptionAudit(
     rationale: typeof rationale === "string" ? rationale : null,
     trace: readTrace(data.output),
     output: readOutputNumbers(data.output),
+    previous: readOutputNumbers(
+      (data.inputs as { previous?: unknown } | null)?.previous ?? null,
+    ),
   };
 }

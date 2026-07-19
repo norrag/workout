@@ -2,7 +2,41 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-19 (latest) — N56: deadlift prescription mismatch — code-side investigation + MCP freshness parity
+## 2026-07-19 (latest) — N57/N58: prescription presentation split — quick-read strip + Engine audit; LLM explanation spec'd (doc 18)
+
+Owner (Batch 20): the prescription details panel reads as a debugging panel;
+split the presentation into a user-friendly quick-read (deployable now,
+deterministic) and a retained, better-organized audit panel — and spec the
+LLM-generated explanation as a later drop-in.
+
+- **Quick-read (N57):** pure composer `src/lib/prescription-narrative.ts` —
+  an ask line composed from the row alone ("3 sets of 9 at 250 lb, each
+  stopped 2 reps short of failure."), then the delta vs last session in
+  reps-to-failure language (the RIR ramp explains itself), the doc-16 §3.6
+  progression state in plain sentences (`stepped`/`paced`/`vanished`/
+  `not_earned` + predicate — the paced hold is finally visible on the day
+  view, closing N56 §8.5), and the N33-S4 hand-adjusted caveat. 20 unit
+  tests; the N56 W2·D4 case is the canonical fixture. Revealed per exercise
+  by a target-glyph button next to the note button, as a notes-style strip
+  (fetch-on-open via `getPrescriptionAuditAction`, ask renders instantly);
+  `ENGINE AUDIT ›` micro-label drills into the audit sheet.
+- **Engine audit (N57):** `PrescriptionDetailSheet` retitled and regrouped
+  into a ledger — PRESCRIPTION (tuple + rationale + out-of-band tripwire),
+  DECISION (kind/computed-under/verified-as-of + re-verified note),
+  EST. STRENGTH (e1RM), TRACE with structural doc-16 §3.6 status labels
+  (`PROGRESSION · PACED (RATE_PACER)`). The ⋮-menu raw-rationale row became
+  `Engine audit ›`. Plumbing: `readTrace` preserves
+  status/governor/predicate; `PrescriptionAudit` gains `previous` (from
+  decision inputs) for the delta line. **Rule-8 deviation:** no mockup figure
+  exists for the strip or the audit sheet — light-ledger styling, notes-strip
+  pattern mirrored; recorded in the 09-changelog 2026-07-19 entry.
+- **LLM explanation (N58):** spec'd, not built — `docs/18` (GPT-5.6 Luna,
+  payload/output token budgets, decision-id-keyed storage + free
+  invalidation, MCP reuse + delivery, ≈$0.001/generation ⇒ ≈$0.25/month at
+  measured volume). The strip's `lines` array is the drop-in seam; the
+  deterministic composer is the permanent fallback.
+
+## 2026-07-19 — N56: deadlift prescription mismatch — code-side investigation + MCP freshness parity
 
 Owner report (Batch 19): the next deadlift session's prescription "does not
 match what is shown on screen" (day view W2·D4: 250×8×3 @ 2 RIR). Full

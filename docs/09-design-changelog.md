@@ -42,7 +42,54 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
-## 2026-07-12 — Batch-17 roundup: day-view picker unification, prescription e1RM ledger, locked sessions, target cards re-hidden (N44/N45/N48/N49/N50/N54/N55)
+## 2026-07-19 — Day View: prescription quick-read strip + the detail sheet becomes the Engine audit (N57)
+
+Owner-directed rework of prescription presentation: "what we have now feels
+more like a debugging panel than a useful prescription detail." The
+presentation splits into a user-facing **quick-read** and a technical
+**Engine audit**. All `RETROFIT` on fig 1.1/1.2 surfaces; no mockup figure
+exists for either half — light-ledger styling per rule 8, deviation recorded
+in PROGRESS.md.
+
+### 1. Exercise card — prescription (target) button + quick-read strip (fig 1.1)
+
+- **Change:** each exercise card's header icon row gains a leftmost
+  **target-glyph button** (circle + center dot, 14×14 stroke style, matching
+  the note/history buttons) that toggles a **prescription quick-read strip**
+  rendered exactly where and how notes render (left-border strip, `11px`
+  medium ink/70, above PINNED). The button carries the menu-style active
+  state (`border-ink bg-ink text-bg-base`) while open.
+- **Content (deterministic composer `src/lib/prescription-narrative.ts`):**
+  an **ask line** composed from the row alone (instant, e.g. "3 sets of 9 at
+  250 lb, each stopped 2 reps short of failure."), then up to three body
+  lines once the recorded decision loads: the delta vs last session (the RIR
+  ramp explained in reps-to-failure language), the progression state —
+  `stepped` / `paced` / `vanished` / `not_earned` with its predicate, in
+  plain sentences (surfacing the previously invisible paced/not-earned hold,
+  N56 §8.5) — and a hand-adjusted-numbers caveat when the live tuple
+  diverges from the decision (N33 S4). Copy voice per 06: plain sentences,
+  no hype, no exclamation marks.
+- **Drill-in:** a subtle `ENGINE AUDIT ›` micro-label (9px tracked caps,
+  ink/40) at the strip's bottom-right opens the audit sheet.
+- **Rationale:** the only in-app explanation was the raw engine rationale
+  string buried in the ⋮ menu — technical, and silent about paced holds.
+
+### 2. Exercise ⋮ menu — rationale row replaced by "Engine audit" (fig 1.2)
+
+- **Change:** the menu row that printed the raw rationale prose now reads
+  `Engine audit ›` (standard MenuRow), always present. The prose lives in
+  the audit sheet.
+
+### 3. Prescription detail sheet → **Engine audit** (no figure)
+
+- **Change:** retitled `Engine audit`; content regrouped into a ledger:
+  PRESCRIPTION (tuple + engine rationale + out-of-band tripwire), DECISION
+  (KIND / COMPUTED UNDER Vx · date / VERIFIED AS OF Vx + re-verified note),
+  EST. STRENGTH (e1RM) (unchanged N44/N45 ledger), TRACE — trace steps now
+  label their doc-16 §3.6 status coding structurally
+  (`PROGRESSION · PACED (RATE_PACER)`) instead of relying on the prose.
+- **Rationale:** the sheet is the retained auditability half of the split;
+  same information, organized as the record it is.
 
 One PR sweeping the small Batch-17 items. All `RETROFIT`.
 
