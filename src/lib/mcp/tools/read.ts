@@ -52,9 +52,11 @@ import {
   type PrescriptionDecision,
   type ProjectedPrescription,
 } from "@/lib/queries/progression";
+import { ensureFreshPrescriptions } from "@/lib/queries/regeneration";
+import { reportError } from "@/lib/observability/report";
 import type { TemplateRow, EquipmentType } from "@/lib/types/database";
 import { equipmentTypeValues } from "@/lib/types/equipment";
-import { resolveSession, type McpExtra } from "../session";
+import { resolveSession, type McpExtra, type McpSession } from "../session";
 import {
   toolResult,
   feedbackCoverage,
@@ -1122,6 +1124,41 @@ export function formatPrescriptionDecision(
   };
 }
 
+/**
+ * Doc 14 §5 parity (N56): the read-path freshness reconcile runs on EVERY
+ * surface that displays prescriptions — this tool included, so the decision it
+ * reports can never disagree with what the app shows for the same row. Brings
+ * the caller's active meso in line with the live inputs (params, profile,
+ * macro goal, meso config, overrides) before the decision read; a no-op behind
+ * the reconcile gate when nothing changed. Degrades loudly-but-safely
+ * (mirrors `ensureFreshPrescriptions`' own contract): a freshness hiccup must
+ * surface the stored numbers, never fail the tool call.
+ */
+export async function freshenActivePrescriptions(
+  client: McpSession["client"],
+  userId: string,
+): Promise<void> {
+  try {
+    const { data: activeMeso, error } = await client
+      .from("mesocycles")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!activeMeso) return;
+    await ensureFreshPrescriptions(
+      userId,
+      activeMeso.id,
+      await getActiveEngineParams(client),
+    );
+  } catch (error) {
+    await reportError("mcp:explain-prescription-freshness", error, { userId });
+  }
+}
+
 export const EXPLAIN_PRESCRIPTION = "explain_prescription";
 function registerExplainPrescription(server: McpServer) {
   server.registerTool(
@@ -1138,6 +1175,9 @@ function registerExplainPrescription(server: McpServer) {
     },
     async ({ exercise_id }: { exercise_id: string }, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
+      // doc 14 §5: reconcile the active meso's open rows before reading, so
+      // this tool and the app screens report one prescription (N56)
+      await freshenActivePrescriptions(client, userId);
       const decision = await getLatestPrescriptionDecision(client, userId, exercise_id);
       // only pay for the projection assembly when there's no recorded decision
       const projected = decision

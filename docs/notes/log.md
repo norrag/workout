@@ -4,6 +4,42 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-19 — Session 78: N56 intake — W2·D4 deadlift prescription mismatch (code-side)
+
+Owner (Batch 19, screenshot attached): "Please look at my next deadlift
+session prescription it does not match what is shown on screen. Please assess
+and address." Day view W2·D4 (SAT 18 JUL, TARGET 2 RIR): Deadlift 250×8×3,
+unlogged.
+
+Reconciliation sweep first: PRs #186 (N47) and #187 (N53) are merged, but both
+rows carry open owner residuals (device re-check of the tab-bar repro; PWA
+remove+re-add after deploy), so per the purge policy both stay live — nothing
+archived.
+
+**Session constraint:** no live data — the `workout` connector was toggled off
+for the chat and the session was non-interactive, so the N33-style
+`engine_decisions` pull and a clarifying question were both impossible. The
+investigation is therefore code-side, recorded in
+`docs/reviews/2026-07-19-deadlift-w2d4-prescription-mismatch.md`: the screen is
+the freshness-reconciled stored row; stable-params recompute cannot drift (the
+anchor's recency weighting is relative; progression context replays frozen);
+worked v21 numbers make 250×8@2RIR the self-consistent paced/`not_earned`
+output for an anchor ≈333 (a plain hold prices 255 only off a 250×8@3 anchor);
+one deadlift quantum ≈1.95% vs the 1.69 %/mo paced budget means heavy-lift
+steps land ~monthly by construction. Ranked hypotheses + the exact
+discriminating queries for a connector-enabled session are in the doc's §5/§6.
+
+**Shipped in the same PR:** the one structural gap found — doc 14 §5 requires
+the read-path reconcile on EVERY prescription-displaying surface, but no MCP
+tool ran it — closed for `explain_prescription` (`freshenActivePrescriptions`:
+active-meso reconcile before the decision read, degrade-loudly contract; +3
+tests in `explain-prescription-freshness.test.ts`). MCP and the app now report
+one prescription.
+
+N56 filed (B, HIGH, WS-P, in-progress): blocked on the owner saying where the
+mismatching number was seen (+ its value) and on a connector-enabled session
+running the evidence checklist. §7 design questions parked in the row.
+
 ## 2026-07-12 — Session 77: N53 splash regression — branded launch images + first-byte fast path (PR #187)
 
 Owner: "investigate the N53 splash regression … the ideal resolution durably

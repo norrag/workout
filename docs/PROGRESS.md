@@ -2,7 +2,29 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-12 (latest) — N53: launch splash regression — branded launch images + first-byte fast path
+## 2026-07-19 (latest) — N56: deadlift prescription mismatch — code-side investigation + MCP freshness parity
+
+Owner report (Batch 19): the next deadlift session's prescription "does not
+match what is shown on screen" (day view W2·D4: 250×8×3 @ 2 RIR). Full
+code-side investigation in
+`docs/reviews/2026-07-19-deadlift-w2d4-prescription-mismatch.md` — the session
+had no live-data access, so the doc pins what the code guarantees (the day
+view's numbers are freshness-reconciled on open; stable-params recompute
+cannot drift; worked v21 pacer/quantum numbers make the screen self-consistent
+as a paced/not-earned hold), ranks the candidate mechanisms, and lists the
+`engine_decisions` queries that settle it from a connector-enabled session.
+
+Shipped: **doc 14 §5 freshness parity for MCP** — `explain_prescription` (the
+one public tool that reports a specific open prescription) now runs
+`ensureFreshPrescriptions` for the caller's active meso before reading the
+decision (`freshenActivePrescriptions` in `src/lib/mcp/tools/read.ts`;
+degrade-loudly, no-op behind the reconcile gate), so a coaching chat can never
+quote a number the app contradicts on next open. +3 tests
+(`explain-prescription-freshness.test.ts`): reconcile-before-read with the
+resolved active params, skipped with no active meso, hiccup degrades to the
+stored numbers without failing the call.
+
+## 2026-07-12 — N53: launch splash regression — branded launch images + first-byte fast path
 
 The HIGH Batch-17 report: "no longer ever seeing the loading splash — just long
 black screens." Investigation (scoping.md N53): no code regression — the whole
