@@ -1,5 +1,16 @@
 # 2026-07-19 — W2·D4 deadlift prescription mismatch (N56): code-side investigation
 
+> **RESOLVED same day — see §8.** The owner enabled the `workout` connector
+> mid-session; the live `engine_decisions` + DB evidence confirmed the
+> mechanism, which is none of §6's top guesses in the form written: the stored
+> W2·D4 prescription was **250 × 9 @ 2 RIR**, and the day view's *unlogged rep
+> cells display the live reps prediction* — re-priced off a measured anchor
+> that W2·D2 (Jul 15) had moved down — so the screen showed **250 × 8**. Fixed
+> in the same PR: set rows now price off the prescription-basis e1RM.
+> §§1–7 are kept as the pre-evidence record; §3's inversion arithmetic located
+> the anchor discrepancy but attributed the 8 to the stored row instead of the
+> display layer.
+
 **Report (owner, 2026-07-19, verbatim in `docs/notes/backlog.md` → Batch 19):**
 "Please look at my next deadlift session prescription it does not match what is
 shown on screen. Please assess and address." Attached screenshot: the day view
@@ -177,3 +188,81 @@ claimed as the confirmed cause of the owner's observation.
   concern is narrower than feared: it requires new logged data or a config
   change, both auditable. Recorded here so the next reprice-down report starts
   from this baseline.
+
+---
+
+## 8. Resolution (same session, connector enabled)
+
+The owner enabled the `workout` MCP connector and the §5 checklist ran against
+live data (decisions via `get_engine_decisions`, stored rows via SQL).
+
+### 8.1 The verified timeline
+
+| When | Event | Evidence |
+|------|-------|----------|
+| Jul 5 / Jul 10 | W1·D4 seeded 245×8@3 (v18), recomputed to **250×8@3** under v20 (fingerprint change) | seed decisions `99e86504`, `f96cdbd1` |
+| Jul 12 | W1·D4 performed 250×8,8,8. Advance generated W2·D4 = **250 × 9 × 3 @ 2 RIR** — hold off anchor **341.7**; step **earned but `rate_pacer` deferred** (trailing 3.35 %/mo ≥ target 1.7) | decision `e8881072` (v21), trace `status:"paced"` |
+| Jul 15 | W2·D2 performed 255×8,7,7 — a weaker e1RM session; the recency-weighted anchor moved **341.7 → ≈333.1** | decision `eea1b8dd` records anchor 333.1 |
+| Jul 18 20:02 | **Screenshot**: day view shows 250 × **8**. Stored prescription still 250 × **9** (confirmed by SQL: `prescribed_weight 250, prescribed_reps 9`, never rewritten; `previous` in the Jul 19 decision also reads 250×9) | the N56 report |
+| Jul 19 | Owner self-raises to 255 (`set_weights {1:255,2:255,3:255}`), logs 255×8,8,8 → e1RM 340.0 vs prescribed 341.7 → within the ±1.5 % band → **met → earned**; pacer passes (trailing 0.9) → W3·D4 = **260×9@1**, `stepped`, A* 346.7 | decision `d1b2abff` (v25) |
+
+### 8.2 The mechanism
+
+`SetRow` (DayView) displays, for **unlogged** rows, `predictReps(weight)` — the
+live reps prediction — and only falls back to the stored `prescribed_reps`
+when there is no anchor at all. The predictor priced off
+`prescription_anchor ?? e1rm_anchor`, and `prescription_anchor` is recorded
+only by `stepped` decisions — the W2·D4 decision was `paced`, so the row fell
+back to the **live measured anchor**: `predictRepsAtWeight(333.1, 250 lb,
+2 RIR) = round(9.98 − 2) = 8`. Screen 250×8; stored prescription 250×9; every
+reporting surface (Prescription Detail sheet, `explain_prescription`, a coach
+chat) shows the stored 250×9 — the exact reported mismatch.
+
+**Why it's a defect, not a nuance:** the earn gate and the ▲/met/▼ markers
+score logged sets against the STORED prescription (341.7 e1RM basis).
+Performing exactly what the screen displayed — 250×8@2 ⇒ ≈333 — would have
+scored `under` (outside the ±1.5 % band) and forfeited the earn. The display
+was showing an un-earnable ask. (The owner dodged it by self-raising to 255,
+which landed `met`.) Doc 16 §5.2's coupling fixed this for `stepped` rows;
+the measured-anchor fallback left every hold/paced row exposed to anchor
+drift from the other weekly day-slot's session.
+
+### 8.3 The fix (this PR)
+
+`prescriptionBasisE1rm` (`day-rules.ts`, pure, unit-tested with these exact
+numbers): unlogged set rows price their cells and weight-edit re-derivations
+against the **graded ask** —
+
+1. the recorded target `A*` (stepped rows, unchanged);
+2. else the stored prescription's own implied e1RM (hold/paced/not-earned
+   rows — new; `predictRepsAtWeight(basis, prescribed_weight)` round-trips to
+   `prescribed_reps`, so the cells now show the prescription);
+3. else the measured anchor (rows with no prescription — cold slots only).
+
+`impliedPrescriptionE1rm` is shared with the detail sheet's PRESCRIBED
+IMPLIES line (one definition). Display, markers, and the earn gate now read
+one number. A weight edit still re-derives reps live — but faithful to the
+prescription's target (edit 250→255 at the W2·D4 basis yields 8, exactly the
+ask the owner's 255×8 session was graded `met` against).
+
+### 8.4 What §§1–7 got right and wrong
+
+Right: the stored row could not have drifted (§1 — confirmed: never
+rewritten, re-verified under v25); the anchor value the screen implied (≈333,
+§3 — it was the post-W2·D2 measured anchor to the decimal); the pacer holding
+the earned step at W2 (§3/§6 H1 — trace `paced`, trailing 3.35 ≥ 1.7). Wrong:
+§3 attributed the screen's 8 to the stored prescription (implying a lighter
+W1·D4) — W1·D4 was in fact 250×8@3 and the stored prescription was 250×**9**;
+the 8 lived in the display layer, which §§1–7 treated as a faithful renderer
+of the stored row. The §4 MCP freshness-parity gap is real but was not the
+cause here.
+
+### 8.5 Residuals
+
+- The §7 design questions stand (now sharpened): the coarse-lift step cadence
+  under the pacer (~2 % quantum vs ~1.7 %/mo budget) and surfacing
+  `paced`/`not_earned` on the day view rather than only in the detail sheet.
+- Owner re-checks the day view on device once deployed: unlogged rows should
+  read exactly the stored prescription (verify against the Prescription
+  Detail sheet), and a weight edit should re-derive reps off the prescribed
+  target.

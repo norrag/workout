@@ -24,6 +24,21 @@ quote a number the app contradicts on next open. +3 tests
 resolved active params, skipped with no active meso, hiccup degrades to the
 stored numbers without failing the call.
 
+**Resolved same session** (owner enabled the connector; review doc §8): the
+stored W2·D4 prescription was 250×9@2 (hold; earned step `paced`), and the
+screen's 250×8 came from the day view's unlogged rep cells rendering the LIVE
+reps prediction off the measured anchor (a `paced` row carries no recorded
+`A*`), which the other day-slot's Jul-15 session had moved 341.7→333.1 — an
+**un-earnable displayed ask** (would grade `under` the ±1.5% band). Root-cause
+fix shipped in the same PR: `prescriptionBasisE1rm` / `impliedPrescriptionE1rm`
+(`day-rules.ts`, pure, +7 tests pinning the field numbers) — unlogged set rows
+price their cells and weight-edit re-derivations off the **graded ask**
+(recorded `A*` for stepped rows → the stored prescription's own implied e1RM
+for holds → measured anchor only when the row has no prescription), and the
+Prescription Detail sheet's PRESCRIBED IMPLIES line shares the same helper.
+Display, ▲/met/▼ markers, and the earn gate now read one definition of the
+ask (doc 16 §5.2 completed for non-stepped rows).
+
 ## 2026-07-12 — N53: launch splash regression — branded launch images + first-byte fast path
 
 The HIGH Batch-17 report: "no longer ever seeing the loading splash — just long

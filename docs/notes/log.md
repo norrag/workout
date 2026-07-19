@@ -40,6 +40,29 @@ N56 filed (B, HIGH, WS-P, in-progress): blocked on the owner saying where the
 mismatching number was seen (+ its value) and on a connector-enabled session
 running the evidence checklist. §7 design questions parked in the row.
 
+**Same-session resolution (owner enabled the connector mid-session; review doc
+§8):** the live trail settled it. Stored W2·D4 prescription = **250×9@2**
+(decision `e8881072`, v21: hold off anchor 341.7; the earned step `paced` by
+the rate pacer at trailing 3.35 ≥ target 1.7 %/mo) — never rewritten, and the
+Jul-19 advance still read `previous` 250×9. The screen's 250×**8** came from
+the DISPLAY layer: unlogged set rows render the live reps prediction, and a
+`paced` row has no `prescription_anchor` (it's `stepped`-only), so the
+predictor fell back to the measured anchor — which W2·D2 (Jul 15: 255×8,7,7)
+had dragged 341.7→333.1; `predictRepsAtWeight(333.1, 250, 2) = 8`. The
+display was an **un-earnable ask** (250×8@2 ≈ 333 would score `under` the
+±1.5% band vs the graded 341.7 basis); the owner self-raised to 255×8 → `met`
+→ earned → W3·D4 = 260×9@1 `stepped` (A* 346.7, v25).
+
+Fix shipped in the same PR #193: `prescriptionBasisE1rm` +
+`impliedPrescriptionE1rm` in `day-rules.ts` (pure; +7 tests pinning the field
+numbers), `SetRow` prices cells and weight-edit re-derivations off the graded
+ask — recorded `A*` → the stored prescription's implied e1RM → measured
+anchor only for prescription-less rows; the detail sheet's PRESCRIBED IMPLIES
+line now shares the same helper. Display ⇄ markers ⇄ earn gate read one
+definition of the ask. N56 → done (PR #193); residuals: owner device check
+post-deploy + the §8.5 design questions (coarse-lift step cadence under the
+pacer; surfacing `paced`/`not_earned` on the day view).
+
 ## 2026-07-12 — Session 77: N53 splash regression — branded launch images + first-byte fast path (PR #187)
 
 Owner: "investigate the N53 splash regression … the ideal resolution durably

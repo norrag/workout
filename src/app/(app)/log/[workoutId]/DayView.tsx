@@ -43,11 +43,7 @@ import type {
 // WS-J bundle split: import the zod-free predictor core + load helpers directly
 // so the client chunk never pulls the engine barrel (prescribe/macro/rules) or
 // zod. `params` arrives already validated by the server (getActiveEngineParams).
-import {
-  estimateE1rm,
-  predictRepsAtWeight,
-  type E1rmConfig,
-} from "@/lib/engine/predict";
+import { predictRepsAtWeight, type E1rmConfig } from "@/lib/engine/predict";
 import { complianceBand } from "@/lib/engine/rules/progression";
 import {
   effectiveLoad,
@@ -62,8 +58,10 @@ import {
   adoptServerRowState,
   daySetTotals,
   exerciseDone,
+  impliedPrescriptionE1rm,
   loggedSetMarker,
   plannedSetCount,
+  prescriptionBasisE1rm,
 } from "./day-rules";
 import {
   addSetAction,
@@ -454,26 +452,18 @@ export function DayView({
                 const targetRir = auditFor.target_rir ?? microcycle.target_rir;
                 // N44: the e1RM the prescribed set implies — priced on
                 // effective load for bodyweight movements, like the marker
-                const lt = coerceLoadType(
-                  auditFor.load_type,
-                  auditFor.equipment_type,
-                );
-                const effWeight = isBodyweightLoad(lt)
-                  ? effectiveLoad(
-                      lt,
-                      auditFor.prescribed_weight ?? 0,
-                      auditFor.bodyweight,
-                    )
-                  : auditFor.prescribed_weight;
-                const prescribedE1rm =
-                  effWeight != null && auditFor.prescribed_reps != null
-                    ? (estimateE1rm(
-                        effWeight,
-                        auditFor.prescribed_reps,
-                        targetRir,
-                        params.e1rm,
-                      )?.value ?? null)
-                    : null;
+                // (shared with the set rows' pricing basis, day-rules N56)
+                const prescribedE1rm = impliedPrescriptionE1rm({
+                  prescribedWeight: auditFor.prescribed_weight,
+                  prescribedReps: auditFor.prescribed_reps,
+                  targetRir,
+                  loadType: coerceLoadType(
+                    auditFor.load_type,
+                    auditFor.equipment_type,
+                  ),
+                  bodyweight: auditFor.bodyweight,
+                  e1rmCfg: params.e1rm,
+                });
                 return {
                   workoutExerciseId: auditFor.id,
                   exerciseName: auditFor.exercise_name,
@@ -1362,12 +1352,6 @@ function SetRow({
   const prescribedWeight = we.prescribed_weight;
   const prescribedReps = we.prescribed_reps;
   const lastLogged = we.sets.at(-1);
-  // doc 16 §5.2 live coupling: the predictor prices off the PRESCRIPTION-BASIS
-  // anchor — the target `A*` recorded by the decision that priced this row —
-  // so a weight edit re-derives reps faithful to the prescribed target,
-  // including the earned lead. No recorded target (hold / pre-v20 / block
-  // absent) falls back to the measured anchor: today's behavior.
-  const anchor = we.prescription_anchor ?? we.e1rm_anchor;
   // per-set planned weight override (doc 11): persists an edited weight for an
   // unlogged set, and is where auto-match writes the shared weight
   const plannedWeight = we.set_weights?.[String(setNumber)] ?? null;
@@ -1380,6 +1364,23 @@ function SetRow({
   const isBw = isBodyweightLoad(loadType);
   const bwOnly = loadType === "bodyweight_only";
   const bw = we.bodyweight;
+
+  // doc 16 §5.2 live coupling: the predictor prices off the PRESCRIPTION-BASIS
+  // e1RM — the recorded target `A*` for a stepped row, else the stored
+  // prescription's own implied e1RM (N56: holds/paced rows too — the earn gate
+  // and markers score against exactly this number, so the cells and any weight
+  // edit must re-derive off it, never off the drifting live measurement). Only
+  // a row with no prescription at all falls back to the measured anchor.
+  const anchor = prescriptionBasisE1rm({
+    prescriptionAnchor: we.prescription_anchor,
+    prescribedWeight,
+    prescribedReps,
+    targetRir,
+    loadType,
+    bodyweight: bw,
+    measuredAnchor: we.e1rm_anchor,
+    e1rmCfg,
+  });
 
   // reps that land on the target RIR at a given weight, from the recency-
   // weighted strength anchor (doc 11); null when there's no usable history. For
