@@ -8,7 +8,12 @@
 // chunk, which must never pull the engine barrel (WS-J bundle split);
 // rules/progression.ts is kept zod-free precisely so the marker can share
 // the earn gate's comparison without regressing the split
-import type { E1rmConfig } from "@/lib/engine/predict";
+import { estimateE1rm, type E1rmConfig } from "@/lib/engine/predict";
+import {
+  effectiveLoad,
+  isBodyweightLoad,
+  type LoadType,
+} from "@/lib/engine/load";
 import { setComplianceMarker } from "@/lib/engine/rules/progression";
 
 /** The slice of a logged exercise the set-progress math needs. */
@@ -127,4 +132,67 @@ export function loggedSetMarker(args: {
   e1rmCfg: E1rmConfig;
 }): "over" | "met" | "under" | null {
   return setComplianceMarker(args);
+}
+
+/**
+ * The e1RM the stored prescription itself implies — `prescribed weight × reps
+ * @ the week's target RIR`, priced on effective load for bodyweight movements
+ * (N44; the same arithmetic the detail sheet's PRESCRIBED IMPLIES line shows).
+ * Null when the row carries no comparable prescription.
+ */
+export function impliedPrescriptionE1rm(args: {
+  prescribedWeight: number | null;
+  prescribedReps: number | null;
+  targetRir: number;
+  loadType: LoadType;
+  bodyweight: number | null;
+  e1rmCfg: E1rmConfig;
+}): number | null {
+  if (args.prescribedWeight == null || args.prescribedReps == null) return null;
+  const eff = isBodyweightLoad(args.loadType)
+    ? effectiveLoad(args.loadType, args.prescribedWeight, args.bodyweight)
+    : args.prescribedWeight;
+  if (eff == null || eff <= 0) return null;
+  return (
+    estimateE1rm(eff, args.prescribedReps, args.targetRir, args.e1rmCfg)?.value ??
+    null
+  );
+}
+
+/**
+ * N56: the e1RM basis an UNLOGGED set row prices its cells and weight-edit
+ * re-derivations against — the GRADED ask, not the live measurement:
+ *
+ *   1. the recorded target `A*` (a `stepped` decision's prescription-basis
+ *      anchor, doc 16 §5.2) — the earned lead;
+ *   2. else the stored prescription's own implied e1RM (hold / paced /
+ *      not-earned rows) — the number the earn gate and the ▲/met/▼ markers
+ *      score every working set against;
+ *   3. else the measured anchor — only when the row has no prescription to be
+ *      faithful to (a cold slot).
+ *
+ * Before this rule the fallback for non-stepped rows was the LIVE measured
+ * anchor, so another session landing mid-week (the other weekly day-slot)
+ * silently re-priced the displayed reps away from the stored prescription —
+ * the day view showed an ask that the earn gate would score `under` (the
+ * N56 field report: stored 250×9@2, screen 250×8 off the moved anchor).
+ * Display, markers, and the gate must read ONE definition of the ask.
+ */
+export function prescriptionBasisE1rm(args: {
+  /** recorded `A*` from the row's latest `stepped` decision, when any */
+  prescriptionAnchor: number | null;
+  prescribedWeight: number | null;
+  prescribedReps: number | null;
+  targetRir: number;
+  loadType: LoadType;
+  bodyweight: number | null;
+  /** the live recency-weighted measured anchor (doc 11) — last resort */
+  measuredAnchor: number | null;
+  e1rmCfg: E1rmConfig;
+}): number | null {
+  return (
+    args.prescriptionAnchor ??
+    impliedPrescriptionE1rm(args) ??
+    args.measuredAnchor
+  );
 }

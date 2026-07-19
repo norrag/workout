@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_PARAMS } from "@/lib/engine/params";
 import { complianceBand } from "@/lib/engine/rules/progression";
+import { predictRepsAtWeight } from "@/lib/engine/predict";
 import {
   adoptServerRowState,
   daySetTotals,
   exerciseDone,
+  impliedPrescriptionE1rm,
   loggedSetMarker,
   plannedSetCount,
+  prescriptionBasisE1rm,
   type SetProgressExercise,
 } from "../day-rules";
 
@@ -230,5 +233,113 @@ describe("adoptServerRowState (R13)", () => {
   it("always adopts a prescription reset, even over a typed-in row", () => {
     expect(adoptServerRowState("prescription-reset", true)).toBe(true);
     expect(adoptServerRowState("prescription-reset", false)).toBe(true);
+  });
+});
+
+// --- prescriptionBasisE1rm (N56) -------------------------------------------
+// The set rows must price against the GRADED ask. Numbers below are the real
+// N56 field case (2026-07-19 review doc): stored W2·D4 prescription 250×9@2
+// (implied e1RM 341.7) vs a live measured anchor of 333.1 after the other
+// day-slot's weaker session — the old measured-anchor fallback displayed 8
+// reps for an ask the earn gate scored at 9.
+
+describe("impliedPrescriptionE1rm", () => {
+  const e1rmCfg = DEFAULT_ENGINE_PARAMS.e1rm;
+
+  it("prices the stored prescription at the target RIR (external load)", () => {
+    const v = impliedPrescriptionE1rm({
+      prescribedWeight: 250,
+      prescribedReps: 9,
+      targetRir: 2,
+      loadType: "external",
+      bodyweight: null,
+      e1rmCfg,
+    });
+    // 250 × k(9 + 2 effective reps) under the default averaged Epley/Brzycki
+    // curve — the same number the detail sheet's PRESCRIBED IMPLIES line and
+    // the earn gate's comparison see
+    expect(v).toBeCloseTo(343.9, 1);
+  });
+
+  it("prices bodyweight-loadable prescriptions on effective load", () => {
+    const external = impliedPrescriptionE1rm({
+      prescribedWeight: 185,
+      prescribedReps: 8,
+      targetRir: 2,
+      loadType: "external",
+      bodyweight: null,
+      e1rmCfg,
+    });
+    const loadable = impliedPrescriptionE1rm({
+      prescribedWeight: 25,
+      prescribedReps: 8,
+      targetRir: 2,
+      loadType: "bodyweight_loadable",
+      bodyweight: 160,
+      e1rmCfg,
+    });
+    expect(loadable).not.toBeNull();
+    expect(loadable).toBeCloseTo(external!, 5);
+  });
+
+  it("is null without a comparable prescription", () => {
+    expect(
+      impliedPrescriptionE1rm({
+        prescribedWeight: null,
+        prescribedReps: 9,
+        targetRir: 2,
+        loadType: "external",
+        bodyweight: null,
+        e1rmCfg,
+      }),
+    ).toBeNull();
+    expect(
+      impliedPrescriptionE1rm({
+        prescribedWeight: 25,
+        prescribedReps: 8,
+        targetRir: 2,
+        loadType: "bodyweight_loadable",
+        bodyweight: null, // no bodyweight → no effective load
+        e1rmCfg,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("prescriptionBasisE1rm (N56)", () => {
+  const e1rmCfg = DEFAULT_ENGINE_PARAMS.e1rm;
+  const holdRow = {
+    prescriptionAnchor: null,
+    prescribedWeight: 250,
+    prescribedReps: 9,
+    targetRir: 2,
+    loadType: "external" as const,
+    bodyweight: null,
+    measuredAnchor: 333.1,
+    e1rmCfg,
+  };
+
+  it("a stepped row prices off the recorded target A*", () => {
+    expect(
+      prescriptionBasisE1rm({ ...holdRow, prescriptionAnchor: 346.7 }),
+    ).toBe(346.7);
+  });
+
+  it("a hold/paced row prices off the prescription's own implied e1RM, not the live measurement", () => {
+    expect(prescriptionBasisE1rm(holdRow)).toBeCloseTo(343.9, 1);
+  });
+
+  it("only a row with no prescription falls back to the measured anchor", () => {
+    expect(
+      prescriptionBasisE1rm({ ...holdRow, prescribedReps: null }),
+    ).toBe(333.1);
+  });
+
+  it("display faithfulness: predicting reps at the prescribed weight off the basis returns the prescribed reps", () => {
+    const basis = prescriptionBasisE1rm(holdRow);
+    // the fix: the cells show the graded ask (9), where the old measured-anchor
+    // fallback showed 8 — the un-earnable ask of the N56 report
+    expect(predictRepsAtWeight(basis, 250, 2, e1rmCfg)).toBe(9);
+    expect(predictRepsAtWeight(holdRow.measuredAnchor, 250, 2, e1rmCfg)).toBe(8);
   });
 });

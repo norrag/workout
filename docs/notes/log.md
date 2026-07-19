@@ -4,6 +4,65 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-19 — Session 78: N56 intake — W2·D4 deadlift prescription mismatch (code-side, PR #193)
+
+Owner (Batch 19, screenshot attached): "Please look at my next deadlift
+session prescription it does not match what is shown on screen. Please assess
+and address." Day view W2·D4 (SAT 18 JUL, TARGET 2 RIR): Deadlift 250×8×3,
+unlogged.
+
+Reconciliation sweep first: PRs #186 (N47) and #187 (N53) are merged, but both
+rows carry open owner residuals (device re-check of the tab-bar repro; PWA
+remove+re-add after deploy), so per the purge policy both stay live — nothing
+archived.
+
+**Session constraint:** no live data — the `workout` connector was toggled off
+for the chat and the session was non-interactive, so the N33-style
+`engine_decisions` pull and a clarifying question were both impossible. The
+investigation is therefore code-side, recorded in
+`docs/reviews/2026-07-19-deadlift-w2d4-prescription-mismatch.md`: the screen is
+the freshness-reconciled stored row; stable-params recompute cannot drift (the
+anchor's recency weighting is relative; progression context replays frozen);
+worked v21 numbers make 250×8@2RIR the self-consistent paced/`not_earned`
+output for an anchor ≈333 (a plain hold prices 255 only off a 250×8@3 anchor);
+one deadlift quantum ≈1.95% vs the 1.69 %/mo paced budget means heavy-lift
+steps land ~monthly by construction. Ranked hypotheses + the exact
+discriminating queries for a connector-enabled session are in the doc's §5/§6.
+
+**Shipped in the same PR:** the one structural gap found — doc 14 §5 requires
+the read-path reconcile on EVERY prescription-displaying surface, but no MCP
+tool ran it — closed for `explain_prescription` (`freshenActivePrescriptions`:
+active-meso reconcile before the decision read, degrade-loudly contract; +3
+tests in `explain-prescription-freshness.test.ts`). MCP and the app now report
+one prescription.
+
+N56 filed (B, HIGH, WS-P, in-progress): blocked on the owner saying where the
+mismatching number was seen (+ its value) and on a connector-enabled session
+running the evidence checklist. §7 design questions parked in the row.
+
+**Same-session resolution (owner enabled the connector mid-session; review doc
+§8):** the live trail settled it. Stored W2·D4 prescription = **250×9@2**
+(decision `e8881072`, v21: hold off anchor 341.7; the earned step `paced` by
+the rate pacer at trailing 3.35 ≥ target 1.7 %/mo) — never rewritten, and the
+Jul-19 advance still read `previous` 250×9. The screen's 250×**8** came from
+the DISPLAY layer: unlogged set rows render the live reps prediction, and a
+`paced` row has no `prescription_anchor` (it's `stepped`-only), so the
+predictor fell back to the measured anchor — which W2·D2 (Jul 15: 255×8,7,7)
+had dragged 341.7→333.1; `predictRepsAtWeight(333.1, 250, 2) = 8`. The
+display was an **un-earnable ask** (250×8@2 ≈ 333 would score `under` the
+±1.5% band vs the graded 341.7 basis); the owner self-raised to 255×8 → `met`
+→ earned → W3·D4 = 260×9@1 `stepped` (A* 346.7, v25).
+
+Fix shipped in the same PR #193: `prescriptionBasisE1rm` +
+`impliedPrescriptionE1rm` in `day-rules.ts` (pure; +7 tests pinning the field
+numbers), `SetRow` prices cells and weight-edit re-derivations off the graded
+ask — recorded `A*` → the stored prescription's implied e1RM → measured
+anchor only for prescription-less rows; the detail sheet's PRESCRIBED IMPLIES
+line now shares the same helper. Display ⇄ markers ⇄ earn gate read one
+definition of the ask. N56 → done (PR #193); residuals: owner device check
+post-deploy + the §8.5 design questions (coarse-lift step cadence under the
+pacer; surfacing `paced`/`not_earned` on the day view).
+
 ## 2026-07-12 — Session 77: N53 splash regression — branded launch images + first-byte fast path (PR #187)
 
 Owner: "investigate the N53 splash regression … the ideal resolution durably
