@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-19 — Session 78: N56 intake — W2·D4 deadlift prescription mismatch (code-side)
+## 2026-07-19 — Session 78: N56 intake — W2·D4 deadlift prescription mismatch (code-side, PR #193)
 
 Owner (Batch 19, screenshot attached): "Please look at my next deadlift
 session prescription it does not match what is shown on screen. Please assess
