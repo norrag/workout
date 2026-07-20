@@ -97,7 +97,10 @@ import {
   prescriptionMatchesDecision,
   type PrescriptionAudit,
 } from "@/lib/queries/audit";
-import { composePrescriptionNarrative } from "@/lib/prescription-narrative";
+import {
+  composePrescriptionNarrative,
+  substituteExplanation,
+} from "@/lib/prescription-narrative";
 
 /**
  * T-I2: the bodyweight chip in a bodyweight exercise's header. The load is the
@@ -1020,19 +1023,25 @@ const ExerciseBlock = memo(function ExerciseBlock({
       },
       rxAudit.output,
     );
-  const narrative = composePrescriptionNarrative({
-    weight: we.prescribed_weight,
-    reps: we.prescribed_reps,
-    sets: we.prescribed_sets,
-    targetRir: we.target_rir ?? microTargetRir,
-    loadType: coerceLoadType(we.load_type, we.equipment_type),
-    isDeload,
-    kind: rxAudit?.kind ?? null,
-    trace: rxAudit?.trace ?? [],
-    previous: rxAudit?.previous ?? null,
-    outOfBand: rxOutOfBand,
-    decisionOutput: rxAudit?.output ?? null,
-  });
+  // doc 18 §6: a stored LLM explanation (served only when the feature is on)
+  // replaces the composed body lines; the ask line stays deterministic
+  const narrative = substituteExplanation(
+    composePrescriptionNarrative({
+      weight: we.prescribed_weight,
+      reps: we.prescribed_reps,
+      sets: we.prescribed_sets,
+      targetRir: we.target_rir ?? microTargetRir,
+      loadType: coerceLoadType(we.load_type, we.equipment_type),
+      isDeload,
+      kind: rxAudit?.kind ?? null,
+      trace: rxAudit?.trace ?? [],
+      previous: rxAudit?.previous ?? null,
+      outOfBand: rxOutOfBand,
+      decisionOutput: rxAudit?.output ?? null,
+    }),
+    rxAudit?.explanation,
+    rxOutOfBand,
+  );
 
   const iconBtn =
     "flex h-7 w-7 items-center justify-center border border-ink/35";

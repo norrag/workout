@@ -1,10 +1,24 @@
 # 18 — LLM prescription explanation (build spec)
 
-> **Status: SPEC — not yet built.** Owner-commissioned 2026-07-19 alongside the
-> deterministic quick-read (PR pending, same session). This is the PH30 idea
+> **Status: v1 BUILT (2026-07-20, N58) — activation is owner-gated.** §7
+> phases 1–5 shipped in one PR: `decision_explanations` (+RLS, migration
+> applied to hosted), `src/lib/llm/` (config/kill-switch, Responses-API
+> client, payload + prompt + post-check, fire-and-forget write-site hook at
+> the doc-16 §10 sites), and the read seam (strip substitution + MCP
+> `explain_prescription.explanation`). The §9 voice gate is operational as
+> **shadow mode**: `OPENAI_API_KEY` set + `LLM_EXPLANATIONS` unset generates
+> and stores but serves nothing; `on` flips the strip. Both §2 build-time
+> checks passed (model id `gpt-5.6-luna` + pricing verified against the
+> official page 2026-07-20; `reasoning.effort` exists, defaults `medium`,
+> pinned to `"none"` in code). Owner steps in
+> [`deployment/openai-api-setup.md`](deployment/openai-api-setup.md). §7.6
+> monitoring and the §10 v2 coaching layer remain.
+>
+> Owner-commissioned 2026-07-19 alongside the
+> deterministic quick-read (PR #194, same session). This is the PH30 idea
 > ("LLM narrative layer", parked 2026-07-02) made concrete: model, payload,
 > budgets, storage, invalidation, delivery, and cost. The deterministic
-> composer (`src/lib/prescription-narrative.ts`) ships first and remains the
+> composer (`src/lib/prescription-narrative.ts`) shipped first and remains the
 > permanent fallback; the LLM output is a **drop-in replacement for the
 > quick-read's body lines only** (§6). The engine — never the model — computes
 > every number (root CLAUDE.md rule 3; PH30 owner framing).

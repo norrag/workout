@@ -12,6 +12,7 @@ import {
   composePrescriptionNarrative,
   composeProgressionLine,
   composeWhyLines,
+  substituteExplanation,
 } from "../prescription-narrative";
 
 const w2d4 = {
@@ -331,5 +332,39 @@ describe("composePrescriptionNarrative", () => {
     expect(n.lines.at(-1)).toBe(
       "These numbers were adjusted by hand — the engine's last computed target was 250 lb for 9 at 2 in reserve.",
     );
+  });
+});
+
+describe("substituteExplanation (doc 18 §6 — the LLM drop-in seam)", () => {
+  const composed = composePrescriptionNarrative(w2d4);
+  const explanation =
+    "You met last week's target and earned an increase, but the pacer is deferring it.";
+
+  it("replaces the body lines only — the ask stays deterministic", () => {
+    const n = substituteExplanation(composed, explanation, false);
+    expect(n.ask).toBe(composed.ask);
+    expect(n.lines).toEqual([explanation]);
+  });
+
+  it("falls back to the composed lines when no explanation is stored", () => {
+    expect(substituteExplanation(composed, null, false)).toBe(composed);
+    expect(substituteExplanation(composed, undefined, false)).toBe(composed);
+    expect(substituteExplanation(composed, "", false)).toBe(composed);
+  });
+
+  it("keeps the composed lines on an out-of-band row (the N33 S4 caveat wins)", () => {
+    const outOfBand = composePrescriptionNarrative({ ...w2d4, outOfBand: true });
+    const n = substituteExplanation(outOfBand, explanation, true);
+    expect(n).toBe(outOfBand);
+    expect(n.lines.at(-1)).toContain("adjusted by hand");
+  });
+
+  it("never substitutes onto an unpriced row", () => {
+    const cold = composePrescriptionNarrative({
+      ...w2d4,
+      weight: null,
+      reps: null,
+    });
+    expect(substituteExplanation(cold, explanation, false)).toBe(cold);
   });
 });
