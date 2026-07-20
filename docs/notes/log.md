@@ -4,6 +4,50 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-20 — Session 80: N58 build — LLM prescription explanation v1 (PR #195)
+
+Owner go on N58: build the doc-18 spec + a first-time OpenAI API setup
+walkthrough (owner's first API use).
+
+**Built (doc 18 §7 phases 1–5, one PR):**
+
+- **Schema** — `decision_explanations` keyed 1:1 to `engine_decisions.id`
+  (invalidation free: a recompute is a new decision ⇒ a new explanation; the
+  read path joins the row's latest decision), owner-or-admin SELECT +
+  service-role-only writes + 320-char DB backstop + token counts; RLS tests;
+  migration **applied to hosted** (verified RLS on / 1 policy / 0 rows).
+- **Client** — `src/lib/llm/openai.ts`, thin zod-validated Responses-API
+  fetch (10s timeout, one transient-only retry, `store:false`). Both §2/§9
+  build-time gates passed against the official docs (2026-07-20): id
+  `gpt-5.6-luna` at exactly the doc-18 pricing; `reasoning.effort` exists,
+  defaults `medium`, **pinned `"none"`** (reasoning bills as output).
+  `OPENAI_EXPLANATION_MODEL` env override for upstream renames.
+- **Payload/prompt/post-check** — pure `prescription-explainer.ts`: §3
+  projection off the recorded decision (trace verbatim minus quanta, anchor
+  "from" line, ≤3 history lines, feedback; no PII/notes), system prompt w/
+  paced-hold + deload few-shots, §4 post-check (every output numeral must be
+  in the payload's number set — plus engine-derived ask-vs-previous deltas;
+  failure ⇒ discard + R20 + deterministic fallback).
+- **Write-site hook** — fire-and-forget (`after()`, detached fallback) at the
+  doc-16 §10 sites: advance (post-`insert_generated_day`), seeds/slots
+  (`recordSeedDecisions` now selects ids), reconcile recompute (ids collected
+  across the pass). Never blocks a write; per-decision isolation; idempotent
+  upsert.
+- **Read seam (§6)** — `PrescriptionAudit.explanation` (fetched only when
+  serving), `substituteExplanation` swaps ONLY the strip body (ask + ENGINE
+  AUDIT stay deterministic; out-of-band rows keep the N33-S4 caveat), MCP
+  `explain_prescription.explanation` = the same stored sentence.
+- **Gating** — off / **shadow** (key set, var unset: generate + store, serve
+  nothing — the §9 voice gate operationalized) / on. Ships fully inert.
+- **Owner runbook** — `docs/deployment/openai-api-setup.md`: billing + $5
+  budget cap, dedicated project + restricted key, Vercel env, shadow
+  verification SQL, voice review, flip, month-one cost rollup;
+  manual-operations entry added.
+
+Tests +35 (suite 1272); typecheck + lint clean. Doc 18 status header → v1
+BUILT. Residuals on the N58 row: owner runs the runbook; §7.6 cost rollup a
+month in; §10 v2 coaching layer parked until v1 proves out.
+
 ## 2026-07-19 — Session 79: Batch 20 — prescription presentation split (N57, PR #194) + LLM explanation spec (N58/doc 18)
 
 Owner (Batch 20, verbatim in the appendix, after #193 merged): the details
