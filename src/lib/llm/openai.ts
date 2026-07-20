@@ -20,9 +20,14 @@ const RESPONSES_URL = "https://api.openai.com/v1/responses";
 const TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 500;
 
-/** §2: env-overridable so a model rename never needs a deploy. */
+/** §2: env-overridable so a model rename never needs a deploy. An EMPTY or
+ *  whitespace-only `OPENAI_EXPLANATION_MODEL` must fall back to the default —
+ *  `??` alone would pass `""` through and every call 400s `model_not_found`
+ *  (the empty-env-var footgun, hit in the field 2026-07-20). */
+export const DEFAULT_EXPLANATION_MODEL = "gpt-5.6-luna";
 export function explanationModel(): string {
-  return process.env.OPENAI_EXPLANATION_MODEL ?? "gpt-5.6-luna";
+  const configured = process.env.OPENAI_EXPLANATION_MODEL?.trim();
+  return configured ? configured : DEFAULT_EXPLANATION_MODEL;
 }
 
 /** The slice of the Responses API result we consume. Extra fields ignored. */

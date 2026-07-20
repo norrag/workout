@@ -54,6 +54,13 @@ describe("explanationModel", () => {
     process.env.OPENAI_EXPLANATION_MODEL = "gpt-5.7-luna";
     expect(explanationModel()).toBe("gpt-5.7-luna");
   });
+
+  it("falls back to the default on an empty or whitespace override (field footgun)", () => {
+    process.env.OPENAI_EXPLANATION_MODEL = "";
+    expect(explanationModel()).toBe("gpt-5.6-luna");
+    process.env.OPENAI_EXPLANATION_MODEL = "   ";
+    expect(explanationModel()).toBe("gpt-5.6-luna");
+  });
 });
 
 describe("createCompletion", () => {

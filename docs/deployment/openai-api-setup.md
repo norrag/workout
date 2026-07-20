@@ -122,13 +122,20 @@ post-check) but know it's happening.
 ## 3. Verify shadow generation + do the voice review (doc 18 §9 gate)
 
 With the key live and `LLM_EXPLANATIONS` unset, the app is in **shadow
-mode**. Generation fires on every decision write: completing a workout
-(advance), activating a meso (seed), or any config change that recomputes
-open rows.
+mode**. Generation fires whenever the engine writes a **new** decision.
 
-1. **Produce a batch:** just train — or nudge one decision by editing
-   something harmless that triggers a reconcile (e.g. toggle a per-exercise
-   increment override and back).
+1. **Produce a batch — use a trigger that actually writes decisions:**
+   - **Complete a workout** (the reliable one): the advance job writes a
+     fresh decision for every exercise of the next session — generation fires
+     on each. This is the honest end-to-end test.
+   - **Activate a new mesocycle**: writes a seed decision per slot.
+   - **Do NOT rely on toggling a per-exercise increment** (an earlier version
+     of this doc suggested it — it's unreliable). A config change only writes
+     a new decision when it actually **moves a prescription's numbers**; on a
+     held or paced week the open rows recompute to the *same* tuple, the
+     freshness framework records `unchanged`, and **no decision — and so no
+     generation — occurs** (it returns HTTP 200 with nothing written, which
+     looks like a failure but is the framework working as designed).
 2. **Check rows landed** (Supabase SQL editor, or ask Claude — the Supabase
    MCP can run this):
 
