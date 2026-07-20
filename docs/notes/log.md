@@ -4,6 +4,54 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-20 — Session 81: N58 live-test diagnosis + admin test loop (PR #196)
+
+Owner report after running the #195 runbook: workout completed → "8 attempted
+writes errored" with a model-related message; repeated load-step edits (incl.
+a deliberate odd 17 lb) visually re-prescribed but wrote no
+`decision_explanations`, no OpenAI tokens; a later session claimed "no
+increment-override write since 7-15"; and testing exposed the need for a
+recompute/reprocess lever.
+
+**Diagnosis (from the hosted DB — engine_decisions is the audit trail):**
+
+- The pipeline DOES fire: 8 advance decisions at workout completion (15:22)
+  and three reconcile pairs (16:17–16:18) all scheduled generations; every
+  attempt failed at the OpenAI call (0 rows, 0 tokens — consistent with a
+  key/billing/model-access refusal). The exact upstream error was only in
+  Vercel function logs — the testability gap this session closes. Root cause
+  on the OpenAI side still needs the owner to run one live probe (below).
+- The **increment-override scare is a false alarm**: recompute provenance
+  records `incrementOverride: 25 → 17 → null` across the three reconciles —
+  every app edit landed, recomputed under the right effective params, and the
+  "round" 255 lb IS a 17-multiple (15×17; likewise 250=10×25, 260/265 = 5s).
+  The final USE DEFAULT deleted the row, which is why the other session found
+  nothing after 7-15 — `exercise_param_overrides` keeps no history; the
+  provenance trail does.
+
+**Built (one PR):**
+
+- `llm_explanation_failures` — durable failure log written beside every R20
+  report (burst / generate / post_check stages, exact error text; owner-or-
+  admin SELECT, service-only writes; +RLS tests; hosted migration applied).
+- Admin MCP tools (admin-llm.ts, PH33-hidden, `resolveAdmin`-gated):
+  `get_llm_explanation_status` (deployed env config + stored rows + recent
+  failures), `test_llm_explanation` (one live call, raw upstream error;
+  per-decision dry-run/store), `generate_explanations` (synchronous scoped
+  (re)generation, `overwrite`, 40-cap), `recompute_prescriptions` (forced
+  re-decide of open rows: `all` / week+day / exercise — reconcile gains a
+  `force` scope that skips both freshness short-circuits and writes a new
+  decision even when numbers are unchanged, provenance reason
+  "forced recompute"; explanations generated synchronously with outcomes).
+- `generateDecisionExplanations` now returns per-decision outcomes;
+  `reconcilePrescriptions` returns `writtenDecisionIds` (+ details under
+  force). Doc 18 status header + runbook §3.4 troubleshooting rewritten
+  around the new loop.
+
+Tests +8 (suite 1278); typecheck + lint clean. Next owner step: run
+`test_llm_explanation` on the deployed connector and fix what the raw error
+names (§1 billing / key / model access).
+
 ## 2026-07-20 — Session 80: N58 build — LLM prescription explanation v1 (PR #195)
 
 Owner go on N58: build the doc-18 spec + a first-time OpenAI API setup

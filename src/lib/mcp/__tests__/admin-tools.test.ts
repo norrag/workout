@@ -24,6 +24,13 @@ import {
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
 } from "../tools/admin";
+import {
+  GET_LLM_EXPLANATION_STATUS,
+  TEST_LLM_EXPLANATION,
+  GENERATE_EXPLANATIONS,
+  RECOMPUTE_PRESCRIPTIONS,
+  validateRecomputeScope,
+} from "../tools/admin-llm";
 import { captureServer, fakeExtra } from "./harness";
 
 // --- deepMerge -------------------------------------------------------------
@@ -446,6 +453,11 @@ const ALL_ADMIN_TOOLS = [
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
+  // N58 follow-up: the LLM-explanation test loop + forced recompute
+  GET_LLM_EXPLANATION_STATUS,
+  TEST_LLM_EXPLANATION,
+  GENERATE_EXPLANATIONS,
+  RECOMPUTE_PRESCRIPTIONS,
 ];
 
 describe("admin-tool registration", () => {
@@ -492,5 +504,37 @@ describe("get_engine_params consolidation (R25)", () => {
     const { ADMIN_TOOL_NAMES } = await import("../tools/admin");
     expect(ADMIN_TOOL_NAMES.has("list_engine_params")).toBe(false);
     expect(ADMIN_TOOL_NAMES.has(GET_ENGINE_PARAMS)).toBe(true);
+  });
+});
+
+// --- N58 follow-up: LLM/recompute admin tools --------------------------------
+
+describe("llm admin tools (N58 follow-up)", () => {
+  it("the visibility roster hides them from non-admins (PH33)", async () => {
+    const { ADMIN_TOOL_NAMES } = await import("../tools/admin");
+    for (const name of [
+      GET_LLM_EXPLANATION_STATUS,
+      TEST_LLM_EXPLANATION,
+      GENERATE_EXPLANATIONS,
+      RECOMPUTE_PRESCRIPTIONS,
+    ]) {
+      expect(ADMIN_TOOL_NAMES.has(name), name).toBe(true);
+    }
+  });
+
+  it("recompute scope validation: unscoped calls are refused (all=true is the explicit opt-in)", () => {
+    expect(validateRecomputeScope({})).toMatch(/scope/i);
+    expect(validateRecomputeScope({ all: true })).toBeNull();
+    expect(validateRecomputeScope({ exercise_id: "e1" })).toBeNull();
+    expect(validateRecomputeScope({ week: 2, day: 1 })).toBeNull();
+  });
+
+  it("recompute scope validation: all=true cannot combine with a narrower scope", () => {
+    expect(validateRecomputeScope({ all: true, week: 2 })).toMatch(
+      /cannot be combined/i,
+    );
+    expect(validateRecomputeScope({ all: true, exercise_id: "e1" })).toMatch(
+      /cannot be combined/i,
+    );
   });
 });

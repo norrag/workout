@@ -485,6 +485,22 @@ export type DecisionExplanationRow = {
   created_at: string;
 }
 
+/** N58 follow-up — durable failure log for the LLM explanation pipeline: one
+ *  row per failed generation attempt (API error, §4 post-check discard, or a
+ *  burst-level fault), so failures are queryable instead of living only in
+ *  Vercel function logs. Service-role writes only; owner-or-admin SELECT. */
+export type LlmExplanationFailureRow = {
+  id: string;
+  user_id: string;
+  /** null for burst-level failures that precede any single decision */
+  decision_id: string | null;
+  stage: "burst" | "generate" | "post_check";
+  /** ≤2000 chars, truncated by the writer */
+  error: string;
+  context: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export type EngineDecisionRow = {
   id: string;
   user_id: string;
@@ -768,6 +784,7 @@ export type Database = {
       engine_params: Table<EngineParamsRow>;
       engine_decisions: Table<EngineDecisionRow>;
       decision_explanations: Table<DecisionExplanationRow>;
+      llm_explanation_failures: Table<LlmExplanationFailureRow>;
       mcp_write_audit: Table<McpWriteAuditRow>;
     };
     Views: {

@@ -353,6 +353,62 @@ export interface ReconcileResult {
   generated: number;
   /** stale prescriptions whose recompute changed the prescribed numbers */
   refreshed: number;
+  /** every engine_decisions row this pass wrote (recomputes + backfills) */
+  writtenDecisionIds: string[];
+  /** per-row recompute detail, populated only under `force` (admin tooling) */
+  details?: RecomputedRowDetail[];
+}
+
+/**
+ * N58 follow-up — admin-scoped FORCED recompute (the `recompute_prescriptions`
+ * MCP tool). A fresh fingerprint normally short-circuits a row, which is
+ * correct for production but makes iterative testing impossible: identical
+ * inputs ⇒ no new decision ⇒ no new LLM explanation to inspect. Under a force
+ * scope, matching open rows re-decide even when fresh (a NEW engine_decisions
+ * row is written even if the numbers come out unchanged, so the explanation
+ * pipeline re-keys), and the meso-level reconcile gate is skipped. All the
+ * standing invariants hold: only planned workouts, only rows with no logged
+ * set (hard rule #5).
+ */
+export interface ForceRecomputeScope {
+  /** limit to one exercise's open rows */
+  exerciseId?: string;
+  /** limit to one week (pair with dayNumber for a single day coordinate) */
+  weekNumber?: number;
+  dayNumber?: number;
+}
+
+export interface ReconcileOptions {
+  /** present ⇒ forced mode; an empty object forces every open row */
+  force?: ForceRecomputeScope;
+  /** "schedule" (default): fire-and-forget explanation generation for written
+   *  decisions; "skip": the caller generates synchronously itself */
+  explanations?: "schedule" | "skip";
+}
+
+/** Pure: does an open row fall inside a force scope? Empty scope = all. */
+export function rowMatchesForce(
+  row: { exerciseId: string; weekNumber: number; dayNumber: number },
+  force: ForceRecomputeScope,
+): boolean {
+  return (
+    (force.exerciseId == null || force.exerciseId === row.exerciseId) &&
+    (force.weekNumber == null || force.weekNumber === row.weekNumber) &&
+    (force.dayNumber == null || force.dayNumber === row.dayNumber)
+  );
+}
+
+export interface RecomputedRowDetail {
+  workoutExerciseId: string;
+  decisionId: string;
+  exerciseId: string;
+  weekNumber: number;
+  dayNumber: number;
+  kind: EngineDecisionKind;
+  /** false = re-decided with identical numbers (forced) */
+  changed: boolean;
+  from: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
+  to: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
 }
 
 /** A planned, not-yet-started prescription row + the cycle context to check it. */
@@ -443,6 +499,7 @@ function recomputeProvenance(
   fromFingerprint: string | null,
   toFingerprint: string,
   incrementOverride: number | null,
+  forced = false,
 ): Record<string, unknown> {
   const working = inputs.actualSets.filter((s) => !s.isWarmup);
   const assumed = working.filter((s) => s.rirReported == null).length;
@@ -455,7 +512,9 @@ function recomputeProvenance(
       applied: assumed > 0,
     },
     recomputed: {
-      reason: "dependency fingerprint changed",
+      reason: forced
+        ? "forced recompute (admin recompute_prescriptions)"
+        : "dependency fingerprint changed",
       from_fingerprint: fromFingerprint,
       to_fingerprint: toFingerprint,
       // the resolved dependency component values that fed the new fingerprint, so
@@ -691,7 +750,9 @@ export async function reconcilePrescriptions(
   userId: string,
   mesoId: string,
   activeParams?: { version: number; params: EngineParams },
+  opts?: ReconcileOptions,
 ): Promise<ReconcileResult> {
+  const force = opts?.force ?? null;
   // active engine params: reuse the caller's already-resolved value when given
   // (the page resolves it once for the predictor — avoids a duplicate read on the
   // hot path, #8). The active row is global, so it's identical to a service read.
@@ -702,7 +763,8 @@ export async function reconcilePrescriptions(
   // generation gap can have opened (a gap only opens when a workout closes, which
   // moves the completed-work watermark) — so skip the whole pass. A null/absent
   // stamp or any change falls through to the full reconcile, which re-stamps. The
-  // gate is ~2 cheap round-trips vs. the full pass's ~8-10.
+  // gate is ~2 cheap round-trips vs. the full pass's ~8-10. A forced pass exists
+  // to re-decide FRESH rows, so it never short-circuits here.
   const staleSig = mesoStaleSignature(
     await loadMesoStaleInputs(service, userId, mesoId, version),
   );
@@ -713,8 +775,8 @@ export async function reconcilePrescriptions(
     .eq("user_id", userId)
     .maybeSingle();
   if (stampError) throw stampError;
-  if (mesoStamp?.last_reconcile_sig === staleSig) {
-    return { generated: 0, refreshed: 0 };
+  if (!force && mesoStamp?.last_reconcile_sig === staleSig) {
+    return { generated: 0, refreshed: 0, writtenDecisionIds: [] };
   }
 
   // 1. heal generation gaps first; freshly generated days are stamped current, so
@@ -728,7 +790,7 @@ export async function reconcilePrescriptions(
     .eq("mesocycle_id", mesoId)
     .eq("user_id", userId);
   if (microsError) throw microsError;
-  if (!micros || micros.length === 0) return { generated, refreshed: 0 };
+  if (!micros || micros.length === 0) return { generated, refreshed: 0, writtenDecisionIds: [] };
   const microById = new Map(micros.map((m) => [m.id, m]));
   const microIds = micros.map((m) => m.id);
 
@@ -740,7 +802,7 @@ export async function reconcilePrescriptions(
     .in("microcycle_id", microIds)
     .eq("user_id", userId);
   if (workoutsError) throw workoutsError;
-  if (!workouts || workouts.length === 0) return { generated, refreshed: 0 };
+  if (!workouts || workouts.length === 0) return { generated, refreshed: 0, writtenDecisionIds: [] };
   const workoutById = new Map(workouts.map((w) => [w.id, w]));
   const plannedWorkoutIds = new Set(
     workouts.filter((w) => w.status === "planned").map((w) => w.id),
@@ -787,7 +849,7 @@ export async function reconcilePrescriptions(
     )
     .in("workout_id", [...workoutById.keys()]);
   if (wesError) throw wesError;
-  if (!wes || wes.length === 0) return { generated, refreshed: 0 };
+  if (!wes || wes.length === 0) return { generated, refreshed: 0, writtenDecisionIds: [] };
 
   // live prescribed map for `previous` resolution + week-order propagation
   const livePrescribed = new Map<
@@ -807,7 +869,7 @@ export async function reconcilePrescriptions(
 
   // the open (planned) rows we may rewrite
   const openWes = wes.filter((we) => plannedWorkoutIds.has(we.workout_id));
-  if (openWes.length === 0) return { generated, refreshed: 0 };
+  if (openWes.length === 0) return { generated, refreshed: 0, writtenDecisionIds: [] };
   const openWeIds = openWes.map((we) => we.id);
 
   // 5. exclude any open row that already has a logged set (defensive — a planned
@@ -900,7 +962,7 @@ export async function reconcilePrescriptions(
     })
     .sort((a, b) => a.weekNumber - b.weekNumber || a.dayNumber - b.dayNumber);
 
-  if (rows.length === 0) return { generated, refreshed: 0 };
+  if (rows.length === 0) return { generated, refreshed: 0, writtenDecisionIds: [] };
 
   // 7b. seed-backfill basis for any open row with NO decision (a pre-phase-2 seed,
   //     or one whose best-effort decision write failed). Such a row can't replay a
@@ -1153,8 +1215,10 @@ export async function reconcilePrescriptions(
   // N58 / doc 18 §5: a recompute is a NEW decision, so it gets a new
   // explanation — collected across the pass, generated fire-and-forget below
   const writtenDecisionIds: string[] = [];
+  const details: RecomputedRowDetail[] = [];
 
   for (const row of rows) {
+    const rowForced = force != null && rowMatchesForce(row, force);
     const decision = latestByWe.get(row.id) ?? null;
     // a decision-bearing row replays its recorded kind; a decision-less row is
     // backfilled as an ADVANCE when its completed prior-week counterpart is known
@@ -1239,11 +1303,13 @@ export async function reconcilePrescriptions(
       liveConfig,
       paramsTokenFor(version, override?.weightIncrement),
     );
-    if (expected === row.depFingerprint) {
+    if (expected === row.depFingerprint && !rowForced) {
       // fresh — the numbers are accurate under the active version. Advance the
       // legible "accurate as of Vx" stamp if it is behind (a one-time catch-up
       // after a version bump; a no-op once current), so a row whose recompute
       // wouldn't change anything still advertises the latest verified version.
+      // A forced row skips the short-circuit: re-deciding fresh rows is the
+      // entire point of the admin recompute tool.
       if (row.paramsVersion !== version) {
         await stampParamsVersion(service, row.id, version);
       }
@@ -1292,7 +1358,7 @@ export async function reconcilePrescriptions(
     }
 
     const isBackfill = !decision;
-    if (result.status === "unchanged" && !isBackfill) {
+    if (result.status === "unchanged" && !isBackfill && !rowForced) {
       // the change didn't move THIS row's prescription; stamp it current so the
       // next read short-circuits (the fingerprint, not the numbers, was stale).
       await stampFingerprint(service, row.id, expected, version);
@@ -1301,7 +1367,9 @@ export async function reconcilePrescriptions(
 
     // Either the prescription changed, OR this is a decision-less row we're
     // normalizing into the framework for the first time (record its seed decision
-    // now so it replays cleanly forever after — even if the numbers matched).
+    // now so it replays cleanly forever after — even if the numbers matched),
+    // OR the row was FORCED: a forced re-decide writes a new decision even with
+    // identical numbers, so the explanation pipeline gets a fresh key.
     const output = result.output!;
     const inputs = result.inputs!;
     const changed = result.status === "changed";
@@ -1345,6 +1413,7 @@ export async function reconcilePrescriptions(
         row.depFingerprint,
         expected,
         override?.weightIncrement ?? null,
+        rowForced,
       ),
       // a recompute preserves the row's origin kind, so a re-seeded row stays a
       // seed (and replays through seedMeso) on its next divergence.
@@ -1354,6 +1423,24 @@ export async function reconcilePrescriptions(
       .single();
     if (insertError) throw insertError;
     writtenDecisionIds.push(insertedDecision.id);
+    if (force) {
+      details.push({
+        workoutExerciseId: row.id,
+        decisionId: insertedDecision.id,
+        exerciseId: row.exerciseId,
+        weekNumber: row.weekNumber,
+        dayNumber: row.dayNumber,
+        kind,
+        changed,
+        from: row.currentOutput,
+        to: {
+          weight: output.weight,
+          reps: output.reps,
+          sets: output.sets,
+          targetRir: output.targetRir,
+        },
+      });
+    }
 
     if (changed) {
       livePrescribed.set(row.id, output);
@@ -1376,10 +1463,18 @@ export async function reconcilePrescriptions(
 
   // N58 / doc 18 §5: fire-and-forget explanations for every decision this pass
   // wrote (a no-op unless the LLM feature is enabled; a failure leaves no row
-  // and the deterministic quick-read renders)
-  scheduleDecisionExplanations(userId, writtenDecisionIds);
+  // and the deterministic quick-read renders). The admin recompute tool opts
+  // out and generates synchronously so it can return per-decision outcomes.
+  if (opts?.explanations !== "skip") {
+    scheduleDecisionExplanations(userId, writtenDecisionIds);
+  }
 
-  return { generated, refreshed };
+  return {
+    generated,
+    refreshed,
+    writtenDecisionIds,
+    ...(force ? { details } : {}),
+  };
 }
 
 /**

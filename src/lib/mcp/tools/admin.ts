@@ -9,7 +9,6 @@ import {
   type EngineParams,
   type Prescription,
 } from "@/lib/engine";
-import { getProfile } from "@/lib/queries/profiles";
 import {
   listEngineParams,
   getEngineParamsVersion,
@@ -30,7 +29,9 @@ import {
 } from "@/lib/queries/e1rm-restamp";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
-import { resolveSession, type McpExtra, type McpClient } from "../session";
+import { registerLlmAdminTools, LLM_ADMIN_TOOL_NAMES } from "./admin-llm";
+import { resolveAdmin } from "./admin-gate";
+import type { McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
 
@@ -46,15 +47,7 @@ function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
   return toolResult(payload, opts);
 }
 
-/** Fetch the session and assert the caller is an admin (else deny). */
-async function resolveAdmin(extra: McpExtra): Promise<{ client: McpClient; userId: string }> {
-  const { client, userId } = resolveSession(extra);
-  const profile = await getProfile(client, userId);
-  if (!profile || profile.role !== "admin") {
-    throw new Error("this tool requires an admin session");
-  }
-  return { client, userId };
-}
+// call-time admin gate: shared with admin-llm.ts via ./admin-gate
 
 // --- pure helpers ----------------------------------------------------------
 
@@ -922,6 +915,9 @@ export function registerAdminTools(server: McpServer) {
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
+  // N58 follow-up: the LLM-explanation test loop + forced recompute
+  // (admin-llm.ts) — registered here so the one entry point stays true.
+  registerLlmAdminTools(server);
 }
 
 /** Every role-gated tool this module registers — the roster the tools/list
@@ -935,4 +931,5 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
+  ...LLM_ADMIN_TOOL_NAMES,
 ]);

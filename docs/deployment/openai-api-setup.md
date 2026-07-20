@@ -145,11 +145,32 @@ open rows.
 3. **Read the batch against the doc 06 voice** (plain, no hype, no
    exclamation marks, lb only, multi-cause why per doc 18 §1). This is the
    §9 gate: the strip does not flip until you're satisfied.
-4. **If generation isn't happening:** Vercel → the project's function logs,
-   grep `report:llm:explanations` — every failure (API error, post-check
-   discard) lands there as a structured line (and in Sentry if `SENTRY_DSN`
-   is set). No lines + no rows usually means the env var didn't take
-   (re-check §2, redeploy).
+4. **If generation isn't happening** (2026-07-20 revision — the first live
+   test showed Vercel-log spelunking is the wrong loop), diagnose from a
+   Claude session with the admin MCP tools, in this order:
+
+   1. **`get_llm_explanation_status`** — shows the env config exactly as the
+      DEPLOYED function resolves it (mode, key presence + prefix, model id,
+      any `OPENAI_EXPLANATION_MODEL` override), stored-row counts, and the
+      most recent rows of **`llm_explanation_failures`** — every failed
+      attempt (API error, post-check discard) is durably recorded there with
+      the exact error text. `mode: off` = the env var didn't take (re-check
+      §2, redeploy).
+   2. **`test_llm_explanation`** — one live call from the deployed
+      environment; on failure it returns the raw upstream error (invalid
+      key, `insufficient_quota` billing, model-access refusal, …), which is
+      the §1 dashboard item to fix. Pass a `decision_id` to dry-run the full
+      §3→§4 pipeline for a real decision, `store: true` to keep the result.
+   3. **`recompute_prescriptions`** (e.g. `{exercise_id: …}` or
+      `{week: 2, day: 4}`, or `{all: true}`) — force-re-decides open rows and
+      generates their explanations synchronously, returning each body or
+      error. This is the cheap iterate loop: no workout completion or config
+      nudge needed, and a narrow scope keeps the token spend at ~$0.001/row.
+      `generate_explanations` (re)generates for existing decisions without
+      recomputing — `overwrite: true` to replace while iterating on voice.
+
+   Failures also still land in the Vercel function logs
+   (`report:llm:explanations`) and Sentry if `SENTRY_DSN` is set.
 
 A few discards are normal (the §4 post-check rejects any output whose
 numbers aren't in the payload — those rows simply fall back to the
