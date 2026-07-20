@@ -851,6 +851,7 @@ describe("formatPrescriptionDecision", () => {
 
   it("surfaces a recorded decision's inputs/output and the engine-owns-numbers note", () => {
     const decision: PrescriptionDecision = {
+      decision_id: "d1",
       exercise_id: "e1",
       exercise_name: "Hack Squat",
       workout_exercise_id: "we1",
@@ -865,6 +866,33 @@ describe("formatPrescriptionDecision", () => {
     expect(out.source).toBe("recorded");
     expect(out.output).toMatchObject({ weight: 255 });
     expect(out.params_version).toBe(6);
+    // doc 18 §6: no stored explanation ⇒ the field is absent, not null
+    expect("explanation" in out).toBe(false);
+  });
+
+  it("attaches the stored LLM explanation when one is served (doc 18 §6)", () => {
+    const decision: PrescriptionDecision = {
+      decision_id: "d1",
+      exercise_id: "e1",
+      exercise_name: "Hack Squat",
+      workout_exercise_id: "we1",
+      coordinate: "W3·D2",
+      decided_at: "2026-06-15T00:00:00Z",
+      params_version: 6,
+      inputs: {},
+      output: { weight: 255 },
+    };
+    const out = formatPrescriptionDecision(
+      "e1",
+      decision,
+      null,
+      "You earned the step; the pacer is deferring it.",
+    );
+    expect(out.explanation).toBe(
+      "You earned the step; the pacer is deferring it.",
+    );
+    // the engine-owns-numbers note stays regardless
+    expect(out.note).toMatch(/engine/i);
   });
 
   it("falls back to a projection when no decision is recorded (§5.5)", () => {
@@ -888,6 +916,7 @@ describe("formatPrescriptionDecision", () => {
 
   it("prefers the recorded decision over a projection when both are present", () => {
     const decision: PrescriptionDecision = {
+      decision_id: "d1",
       exercise_id: "e1",
       exercise_name: "Hack Squat",
       workout_exercise_id: "we1",

@@ -57,6 +57,7 @@ import { reportError } from "@/lib/observability/report";
 import type { TemplateRow, EquipmentType } from "@/lib/types/database";
 import { equipmentTypeValues } from "@/lib/types/equipment";
 import { resolveSession, type McpExtra, type McpSession } from "../session";
+import { llmExplanationsServe } from "@/lib/llm/config";
 import {
   toolResult,
   feedbackCoverage,
@@ -1082,6 +1083,7 @@ export function formatPrescriptionDecision(
   exerciseId: string,
   decision: PrescriptionDecision | null,
   projected: ProjectedPrescription | null = null,
+  explanation: string | null = null,
 ): Record<string, unknown> {
   if (decision) {
     return {
@@ -1094,6 +1096,10 @@ export function formatPrescriptionDecision(
       params_version: decision.params_version,
       inputs: decision.inputs,
       output: decision.output,
+      // N58 / doc 18 §6: the stored LLM explanation of this decision — the
+      // same sentence the app's quick-read strip shows (one definition of the
+      // story, like one definition of the numbers). Absent unless serving.
+      ...(explanation != null ? { explanation } : {}),
       note: "Recorded engine decision. The engine — not the model — computes every prescribed load, rep, and set; this surfaces its recorded rationale.",
     };
   }
@@ -1183,8 +1189,21 @@ function registerExplainPrescription(server: McpServer) {
       const projected = decision
         ? null
         : await projectNextPrescription(client, userId, exercise_id);
+      // doc 18 §6: attach the stored LLM explanation when the feature serves —
+      // the connector coach reads the same sentence the app shows
+      let explanation: string | null = null;
+      if (decision && llmExplanationsServe()) {
+        const { data: stored, error: explanationError } = await client
+          .from("decision_explanations")
+          .select("body")
+          .eq("decision_id", decision.decision_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (explanationError) throw explanationError;
+        explanation = stored?.body ?? null;
+      }
       return jsonResult(
-        formatPrescriptionDecision(exercise_id, decision, projected),
+        formatPrescriptionDecision(exercise_id, decision, projected, explanation),
       );
     },
   );

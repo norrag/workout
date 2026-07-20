@@ -23,6 +23,7 @@ import {
   daysSincePerformed,
 } from "./progression-history";
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
+import { scheduleWorkoutExplanations } from "@/lib/llm/explanations";
 import { getBandPosition } from "./envelope";
 import { maybeCompleteMacroAfterMeso } from "./macro-close";
 import { getMuscleRoleIdsForExercises } from "./exercises";
@@ -475,6 +476,13 @@ async function generateDay(
   if (!generated?.created) {
     // a concurrent writer generated this day between our check and the insert
     return { workoutId: generated?.workout_id ?? null, deltas: [] };
+  }
+
+  // N58 / doc 18 §5: the RPC doesn't return decision ids, so the advance site
+  // schedules by workout — the hook looks the batch up itself. Fire-and-forget;
+  // a no-op unless the LLM feature is enabled.
+  if (generated.workout_id) {
+    scheduleWorkoutExplanations(ctx.userId, generated.workout_id);
   }
 
   return { workoutId: generated.workout_id, deltas };
@@ -986,6 +994,8 @@ export async function advanceWeekAfterWorkout(
 // ---------------------------------------------------------------------------
 
 export interface PrescriptionDecision {
+  /** the engine_decisions row id — the explanation cache key (doc 18 §5) */
+  decision_id: string;
   exercise_id: string;
   exercise_name: string;
   workout_exercise_id: string;
@@ -1058,6 +1068,7 @@ export async function getLatestPrescriptionDecision(
   }
 
   return {
+    decision_id: decision.id,
     exercise_id: exerciseId,
     exercise_name: exercise?.name ?? "",
     workout_exercise_id: decision.workout_exercise_id ?? "",

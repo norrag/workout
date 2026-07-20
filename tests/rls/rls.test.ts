@@ -1577,6 +1577,118 @@ describe("write integrity (R3/R4)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// decision_explanations (N58 / doc 18 §7 phase 1): owner-or-admin SELECT,
+// service-role-only writes — the stored LLM explanation is a display artifact
+// of an engine decision and follows engine_decisions' write posture exactly.
+// ---------------------------------------------------------------------------
+
+describe("decision_explanations (doc 18)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  /** A decision row for alice (service-written, like the engine job) plus the
+   *  explanation the generation hook would attach to it. */
+  async function seedExplainedDecision(): Promise<string> {
+    const { data: decision, error: decisionError } = await service
+      .from("engine_decisions")
+      .insert({
+        user_id: aliceId,
+        inputs: {},
+        output: {},
+        params_version: 1,
+      })
+      .select("id")
+      .single();
+    if (decisionError) throw decisionError;
+    const { error: explanationError } = await service
+      .from("decision_explanations")
+      .insert({
+        decision_id: decision!.id,
+        user_id: aliceId,
+        body: "Holding last week's numbers; the earned step is paced.",
+        model: "gpt-5.6-luna",
+        prompt_version: 1,
+        tokens_in: 600,
+        tokens_out: 40,
+      });
+    if (explanationError) throw explanationError;
+    return decision!.id as string;
+  }
+
+  it("owner can read their explanation; the other user cannot", async () => {
+    const decisionId = await seedExplainedDecision();
+
+    const { data: own, error: ownError } = await alice
+      .from("decision_explanations")
+      .select("body")
+      .eq("decision_id", decisionId)
+      .maybeSingle();
+    expect(ownError).toBeNull();
+    expect(own?.body).toContain("paced");
+
+    const { data: cross } = await bob
+      .from("decision_explanations")
+      .select("body")
+      .eq("decision_id", decisionId)
+      .maybeSingle();
+    expect(cross).toBeNull();
+  });
+
+  it("users cannot write explanations directly (insert, update, delete)", async () => {
+    const decisionId = await seedExplainedDecision();
+
+    const { error: insertError } = await alice
+      .from("decision_explanations")
+      .insert({
+        decision_id: crypto.randomUUID(),
+        user_id: aliceId,
+        body: "forged",
+        model: "gpt-5.6-luna",
+        prompt_version: 1,
+        tokens_in: 0,
+        tokens_out: 0,
+      });
+    expect(insertError).not.toBeNull();
+
+    // update/delete silently match zero rows under RLS — prove the row survived
+    await alice
+      .from("decision_explanations")
+      .update({ body: "tampered" })
+      .eq("decision_id", decisionId);
+    await alice
+      .from("decision_explanations")
+      .delete()
+      .eq("decision_id", decisionId);
+    const { data: after } = await service
+      .from("decision_explanations")
+      .select("body")
+      .eq("decision_id", decisionId)
+      .single();
+    expect(after!.body).not.toBe("tampered");
+  });
+
+  it("the 320-char §4 clamp is enforced at the DB as a backstop", async () => {
+    const { data: decision } = await service
+      .from("engine_decisions")
+      .insert({ user_id: aliceId, inputs: {}, output: {}, params_version: 1 })
+      .select("id")
+      .single();
+    const { error } = await service.from("decision_explanations").insert({
+      decision_id: decision!.id,
+      user_id: aliceId,
+      body: "x".repeat(321),
+      model: "gpt-5.6-luna",
+      prompt_version: 1,
+      tokens_in: 0,
+      tokens_out: 0,
+    });
+    expect(error).not.toBeNull();
+    expect(error!.code).toBe("23514"); // check constraint violation
+  });
+});
+
 describe("single active meso (R15)", () => {
   const service = createClient(URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },

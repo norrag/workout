@@ -261,6 +261,24 @@ export function composeWhyLines(
 }
 
 /**
+ * N58 / doc 18 §6 — the LLM drop-in seam: a stored explanation replaces ONLY
+ * the composed body lines; the ask line stays deterministic so the numbers on
+ * screen are never model-rendered. No explanation ⇒ the composed lines render
+ * (the composer is the permanent fallback). An out-of-band row keeps the
+ * composed lines too: the stored explanation narrates the DECISION's numbers,
+ * and the hand-adjusted caveat (N33 S4) must win over a story that no longer
+ * matches the row.
+ */
+export function substituteExplanation(
+  narrative: PrescriptionNarrative,
+  explanation: string | null | undefined,
+  outOfBand: boolean,
+): PrescriptionNarrative {
+  if (!explanation || outOfBand || narrative.ask == null) return narrative;
+  return { ask: narrative.ask, lines: [explanation] };
+}
+
+/**
  * The full quick-read. The ask is always composable from the row; the body
  * lines want the recorded decision (pass `kind: null` while it loads and only
  * the ask renders).

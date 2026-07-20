@@ -49,6 +49,12 @@ export interface PrescriptionAudit {
    *  (`inputs.previous`) — feeds the quick-read's plain-language delta; null on
    *  seeds and cold rows */
   previous: DecisionOutputNumbers | null;
+  /** N58 / doc 18 §6 — the stored LLM explanation of THIS decision, fetched
+   *  only when the caller says the feature is serving (`llmExplanationsServe`).
+   *  Replaces the quick-read's body lines only; the ask line and the ENGINE
+   *  AUDIT panel stay deterministic. Null ⇒ the composer renders (permanent
+   *  fallback). */
+  explanation: string | null;
 }
 
 /** The prescription tuple recorded on a decision's output. */
@@ -125,10 +131,11 @@ export async function getPrescriptionAudit(
   client: Client,
   userId: string,
   workoutExerciseId: string,
+  includeExplanation = false,
 ): Promise<PrescriptionAudit | null> {
   const { data, error } = await client
     .from("engine_decisions")
-    .select("kind, params_version, created_at, output, inputs")
+    .select("id, kind, params_version, created_at, output, inputs")
     .eq("user_id", userId)
     .eq("workout_exercise_id", workoutExerciseId)
     .order("created_at", { ascending: false })
@@ -136,6 +143,21 @@ export async function getPrescriptionAudit(
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
+
+  // doc 18 §6: the explanation is keyed to the decision id, so joining the
+  // row's LATEST decision (above) makes staleness structurally impossible.
+  // Fetched only when serving is on — shadow mode stores but never shows.
+  let explanation: string | null = null;
+  if (includeExplanation) {
+    const { data: stored, error: explanationError } = await client
+      .from("decision_explanations")
+      .select("body")
+      .eq("decision_id", data.id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (explanationError) throw explanationError;
+    explanation = stored?.body ?? null;
+  }
 
   const rationale = (data.output as { rationale?: unknown } | null)?.rationale;
   return {
@@ -148,5 +170,6 @@ export async function getPrescriptionAudit(
     previous: readOutputNumbers(
       (data.inputs as { previous?: unknown } | null)?.previous ?? null,
     ),
+    explanation,
   };
 }

@@ -470,6 +470,21 @@ export type EngineParamsRow = {
  *  (prescribe) or a cold-start seed (seedMeso). */
 export type EngineDecisionKind = "seed" | "advance";
 
+/** N58 / doc 18 — the stored LLM prescription explanation, keyed 1:1 to the
+ *  engine decision it explains (the decision id IS the cache key; a recompute
+ *  writes a new decision + a new explanation). Service-role writes only. */
+export type DecisionExplanationRow = {
+  decision_id: string;
+  user_id: string;
+  /** §4 output contract: plain text, ≤320 chars */
+  body: string;
+  model: string;
+  prompt_version: number;
+  tokens_in: number;
+  tokens_out: number;
+  created_at: string;
+}
+
 export type EngineDecisionRow = {
   id: string;
   user_id: string;
@@ -752,6 +767,7 @@ export type Database = {
       shares: Table<ShareRow>;
       engine_params: Table<EngineParamsRow>;
       engine_decisions: Table<EngineDecisionRow>;
+      decision_explanations: Table<DecisionExplanationRow>;
       mcp_write_audit: Table<McpWriteAuditRow>;
     };
     Views: {

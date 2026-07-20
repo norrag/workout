@@ -3,6 +3,7 @@ import type { EngineInputs, EngineParams, Prescription } from "@/lib/engine";
 import type { EngineDecisionKind } from "@/lib/types/database";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
+import { scheduleDecisionExplanations } from "@/lib/llm/explanations";
 import { engineCodeSha, hashParams } from "./params-provenance";
 
 /**
@@ -142,8 +143,18 @@ export async function recordSeedDecisions(
       paramsHash,
       engineCodeSha(),
     );
-    const { error } = await service.from("engine_decisions").insert(inserts);
+    const { data, error } = await service
+      .from("engine_decisions")
+      .insert(inserts)
+      .select("id");
     if (error) throw error;
+    // N58 / doc 18 §5: explanations generate at decision-write, fire-and-forget
+    // (a no-op unless the LLM feature is enabled; failures leave no row ⇒ the
+    // deterministic quick-read renders)
+    scheduleDecisionExplanations(
+      userId,
+      (data ?? []).map((d) => d.id),
+    );
     return inserts.length;
   } catch (e) {
     // non-fatal: the row keeps its stamped fingerprint but no decision, so the

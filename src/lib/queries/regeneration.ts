@@ -31,6 +31,7 @@ import {
 } from "./slot-prescription";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
+import { scheduleDecisionExplanations } from "@/lib/llm/explanations";
 import { engineGoal } from "./engine-goal";
 import { engineCodeSha, hashParams } from "./params-provenance";
 import type {
@@ -1149,6 +1150,9 @@ export async function reconcilePrescriptions(
   let refreshed = 0;
   const paramsHash = hashParams(params as unknown as Record<string, unknown>);
   const codeSha = engineCodeSha();
+  // N58 / doc 18 §5: a recompute is a NEW decision, so it gets a new
+  // explanation — collected across the pass, generated fire-and-forget below
+  const writtenDecisionIds: string[] = [];
 
   for (const row of rows) {
     const decision = latestByWe.get(row.id) ?? null;
@@ -1320,7 +1324,9 @@ export async function reconcilePrescriptions(
       await stampFingerprint(service, row.id, expected, version);
     }
 
-    const { error: insertError } = await service.from("engine_decisions").insert({
+    const { data: insertedDecision, error: insertError } = await service
+      .from("engine_decisions")
+      .insert({
       user_id: userId,
       workout_exercise_id: row.id,
       exercise_id: row.exerciseId,
@@ -1343,8 +1349,11 @@ export async function reconcilePrescriptions(
       // a recompute preserves the row's origin kind, so a re-seeded row stays a
       // seed (and replays through seedMeso) on its next divergence.
       kind,
-    });
+      })
+      .select("id")
+      .single();
     if (insertError) throw insertError;
+    writtenDecisionIds.push(insertedDecision.id);
 
     if (changed) {
       livePrescribed.set(row.id, output);
@@ -1364,6 +1373,11 @@ export async function reconcilePrescriptions(
     .eq("id", mesoId)
     .eq("user_id", userId);
   if (stampWriteError) throw stampWriteError;
+
+  // N58 / doc 18 §5: fire-and-forget explanations for every decision this pass
+  // wrote (a no-op unless the LLM feature is enabled; a failure leaves no row
+  // and the deterministic quick-read renders)
+  scheduleDecisionExplanations(userId, writtenDecisionIds);
 
   return { generated, refreshed };
 }

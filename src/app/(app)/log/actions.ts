@@ -42,6 +42,7 @@ import {
   type PrescriptionAudit,
 } from "@/lib/queries/audit";
 import { getProfile, updateProfile } from "@/lib/queries/profiles";
+import { llmExplanationsServe } from "@/lib/llm/config";
 import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 import { localDayIso } from "@/lib/dates";
 import { getActiveEngineParams } from "@/lib/queries/generation";
@@ -503,13 +504,15 @@ export async function getExerciseHistoryAction(
   );
 }
 
-/** Latest engine decision behind a prescription (day-view audit reveal). */
+/** Latest engine decision behind a prescription (day-view audit reveal). The
+ *  stored LLM explanation rides along only when the feature is serving
+ *  (N58 / doc 18 §6) — in shadow mode the quick-read stays deterministic. */
 export async function getPrescriptionAuditAction(
   workoutExerciseId: string,
 ): Promise<PrescriptionAudit | null> {
   const parsed = z.string().uuid().parse(workoutExerciseId);
   const { supabase, user } = await requireUser();
-  return getPrescriptionAudit(supabase, user.id, parsed);
+  return getPrescriptionAudit(supabase, user.id, parsed, llmExplanationsServe());
 }
 
 const replaceSchema = z.object({
