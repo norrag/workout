@@ -61,16 +61,21 @@ in PROGRESS.md.
   state (`border-ink bg-ink text-bg-base`) while open.
 - **Content (deterministic composer `src/lib/prescription-narrative.ts`):**
   an **ask line** composed from the row alone (instant, e.g. "3 sets of 9 at
-  250 lb, each stopped 2 reps short of failure."), then up to three body
-  lines once the recorded decision loads: the delta vs last session (the RIR
-  ramp explained in reps-to-failure language), the progression state —
-  `stepped` / `paced` / `vanished` / `not_earned` with its predicate, in
-  plain sentences (surfacing the previously invisible paced/not-earned hold,
-  N56 §8.5) — and a hand-adjusted-numbers caveat when the live tuple
-  diverges from the decision (N33 S4). Copy voice per 06: plain sentences,
-  no hype, no exclamation marks.
-- **Drill-in:** a subtle `ENGINE AUDIT ›` micro-label (9px tracked caps,
-  ink/40) at the strip's bottom-right opens the audit sheet.
+  250 lb, each stopped 2 reps short of failure."), then body lines once the
+  recorded decision loads: the delta vs last session (the RIR ramp explained
+  in reps-to-failure language) plus the **why, with room for multiple
+  contributing factors** (owner follow-up 2026-07-19) — feedback-modulation
+  causes (pain-capped load, hot-workload set removal, rough-session
+  dampening, set additions/vetoes) rendered alongside the progression state
+  (`stepped` / `paced` / `vanished` / `not_earned` with its predicate,
+  surfacing the previously invisible paced/not-earned hold, N56 §8.5), with
+  the earn-gate echo of a feedback cause deduplicated so one cause never
+  reads as two; capped at three why-lines; a hand-adjusted-numbers caveat
+  when the live tuple diverges from the decision (N33 S4). Copy voice per
+  06: plain sentences, no hype, no exclamation marks.
+- **Drill-in:** via the ⋮ menu's `Engine audit ›` row only (owner follow-up
+  2026-07-19 — an in-strip link was built and removed; the strip stays
+  purely the story).
 - **Rationale:** the only in-app explanation was the raw engine rationale
   string buried in the ⋮ menu — technical, and silent about paced holds.
 

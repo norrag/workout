@@ -40,6 +40,20 @@ drop-in seam = the strip's `lines`. Cost ≈ $0.001/generation; measured volume
 (~44 performed rows/wk both users → ~250 decisions/mo) ⇒ ≈ $0.25/mo. Root
 CLAUDE.md doc index updated. N58 `ready`, build on owner go.
 
+**Batch-20 addendum (same session, owner review of the built PR):** (1) the
+strip's `ENGINE AUDIT ›` link removed — drill-in lives in the ⋮ menu only;
+(2) the quick-read's why went **multi-factor**: `composeWhyLines` renders
+feedback-modulation causes (pain-capped load, hot-workload set removal,
+rough-session dampening, set adds/vetoes — engine note strings translated,
+unknown notes surfaced verbatim) alongside the progression state, deduping
+the earn-gate echo of a feedback cause, capped at three lines, with a legacy
+grade fallback for pre-v20 decisions (+6 tests → 26); (3) doc 18 amended —
+§1 requires what+why with multiple contributing factors (binds both
+versions), new §10 v2 coaching layer (user notes + progression-history
+trends in the payload, hard targets first + brief focus direction,
+Mentzer-style scientific-coach register, ≤480 chars, after the v1 MVP).
+09-changelog entry amended in place (same PR).
+
 ## 2026-07-19 — Session 78: N56 intake — W2·D4 deadlift prescription mismatch (code-side, PR #193)
 
 Owner (Batch 19, screenshot attached): "Please look at my next deadlift

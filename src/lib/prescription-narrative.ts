@@ -149,6 +149,43 @@ export function composeDelta(
   return `${base}${effort}${setsPart}.`;
 }
 
+/**
+ * Plain-language translations of the engine's feedback-modulation notes
+ * (rules/feedback.ts — engine-authored stable strings, keyword-matched and
+ * pinned by tests). These are the "backed down / shaped by how last session
+ * felt" half of the why; anything unrecognized falls through verbatim so a
+ * new engine note is surfaced rather than silently dropped.
+ */
+export function composeFeedbackLine(detail: string): string {
+  if (detail.includes("set removed") && detail.includes("joint pain"))
+    return "A set was removed because of the joint pain you reported — worth considering a substitute for this movement.";
+  if (detail.includes("load increase blocked"))
+    return "Reported joint pain is capping the load — no increases while it persists.";
+  if (detail.includes("set removed"))
+    return "A set was removed — last session's workload ran past just right.";
+  if (detail.includes("set addition vetoed"))
+    return "A planned extra set was skipped because of reported joint pain.";
+  if (detail.includes("set added"))
+    return "A set was added — the workload read easy with a strong pump.";
+  if (detail.includes("increases dampened"))
+    return "Increases are dampened after the rough session you reported.";
+  if (detail.includes("consider a different exercise"))
+    return "Pump has read low here at the right dose — a different movement for this muscle may fit better.";
+  const line = detail.charAt(0).toUpperCase() + detail.slice(1);
+  return line.endsWith(".") ? line : `${line}.`;
+}
+
+/** The legacy grade-based why (pre-v20 decisions with no progression step). */
+function composeGradeLine(trace: AuditTraceStep[]): string | null {
+  const grade = trace.find((s) => s.rule === "grade");
+  if (!grade) return null;
+  if (grade.detail.includes("harder than asked"))
+    return "Last session ran harder than asked, so the load holds rather than climbs.";
+  if (grade.detail.includes("easier than asked"))
+    return "Last session read easier than asked — that feeds the estimate this ask is priced from.";
+  return null;
+}
+
 /** The progression-state sentence (doc 16 §3.6 status vocabulary). */
 export function composeProgressionLine(
   trace: AuditTraceStep[],
@@ -186,6 +223,44 @@ export function composeProgressionLine(
 }
 
 /**
+ * The why, with room for MORE THAN ONE contributing factor (owner 2026-07-19
+ * follow-up): a hold can be a pacer deferral AND sit on top of a pain-capped
+ * load — every cause the trace records gets its sentence, capped at three so
+ * the strip stays a quick-read. Order: feedback modulation (how last session
+ * felt shaped the dose), then the progression state (earn/pace/miss), then
+ * the legacy grade fallback for pre-progression decisions.
+ *
+ * Dedup: a `not_earned` line whose predicate is pain/workload/dampener is the
+ * earn-gate echo of a feedback note already rendered — it is skipped when the
+ * feedback line said it first, so one cause never reads as two.
+ */
+export function composeWhyLines(
+  input: Pick<PrescriptionNarrativeInput, "trace">,
+): string[] {
+  const lines: string[] = [];
+  const feedbackSteps = input.trace.filter((s) => s.rule === "feedback");
+  for (const step of feedbackSteps.slice(0, 2)) {
+    lines.push(composeFeedbackLine(step.detail));
+  }
+
+  const progressionStep = input.trace.find((s) => s.rule === "progression");
+  const progression = composeProgressionLine(input.trace);
+  const feedbackAlreadySaidIt =
+    progressionStep?.status === "not_earned" &&
+    ["pain", "workload", "dampener"].includes(progressionStep.predicate ?? "") &&
+    feedbackSteps.length > 0;
+  if (progression && !feedbackAlreadySaidIt) lines.push(progression);
+
+  // pre-v20 decisions carry no progression step — the grade colors the why
+  if (!progressionStep && feedbackSteps.length === 0) {
+    const grade = composeGradeLine(input.trace);
+    if (grade) lines.push(grade);
+  }
+
+  return lines.slice(0, 3);
+}
+
+/**
  * The full quick-read. The ask is always composable from the row; the body
  * lines want the recorded decision (pass `kind: null` while it loads and only
  * the ask renders).
@@ -220,8 +295,7 @@ export function composePrescriptionNarrative(
   } else if (input.kind === "advance") {
     const delta = composeDelta(input);
     if (delta) lines.push(delta);
-    const progression = composeProgressionLine(input.trace);
-    if (progression) lines.push(progression);
+    lines.push(...composeWhyLines(input));
   }
 
   if (input.outOfBand && input.decisionOutput) {

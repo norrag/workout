@@ -1147,17 +1147,8 @@ const ExerciseBlock = memo(function ExerciseBlock({
                 {line}
               </div>
             ))}
-          {/* subtle drill-in to the full engine audit (debug panel) */}
-          <div className="mt-1.5 flex justify-end">
-            <button
-              type="button"
-              aria-label={`${we.exercise_name} engine audit`}
-              onClick={() => onAudit(we)}
-              className="text-[9px] font-semibold tracking-[0.16em] text-ink/40"
-            >
-              ENGINE AUDIT ›
-            </button>
-          </div>
+          {/* drill-in to the Engine audit lives in the ⋮ menu only (owner
+              2026-07-19 follow-up) — the strip stays purely the story */}
         </div>
       )}
       {we.pinned_note && (

@@ -8,8 +8,10 @@ import { describe, expect, it } from "vitest";
 import {
   composeAsk,
   composeDelta,
+  composeFeedbackLine,
   composePrescriptionNarrative,
   composeProgressionLine,
+  composeWhyLines,
 } from "../prescription-narrative";
 
 const w2d4 = {
@@ -167,6 +169,112 @@ describe("composeProgressionLine", () => {
       ]),
     ).toBeNull();
     expect(composeProgressionLine([{ rule: "load", detail: "x" }])).toBeNull();
+  });
+});
+
+describe("composeFeedbackLine", () => {
+  it("translates each engine feedback note into plain language", () => {
+    expect(
+      composeFeedbackLine("joint pain 2/3: load increase blocked"),
+    ).toContain("capping the load");
+    expect(
+      composeFeedbackLine(
+        "joint pain 2/3: set removed — consider substituting this exercise",
+      ),
+    ).toContain("A set was removed because of the joint pain");
+    expect(
+      composeFeedbackLine("workload 9/10 past just right: set removed"),
+    ).toContain("workload ran past just right");
+    expect(
+      composeFeedbackLine("workload 3/10 easy with strong pump: set added"),
+    ).toContain("A set was added");
+    expect(
+      composeFeedbackLine("joint pain 2/3: set addition vetoed"),
+    ).toContain("extra set was skipped");
+    expect(
+      composeFeedbackLine("rough session reported: increases dampened"),
+    ).toContain("dampened");
+    expect(
+      composeFeedbackLine("low pump at the right workload: consider a different exercise"),
+    ).toContain("different movement");
+  });
+
+  it("surfaces an unrecognized note verbatim rather than dropping it", () => {
+    expect(composeFeedbackLine("a brand new engine note")).toBe(
+      "A brand new engine note.",
+    );
+  });
+});
+
+describe("composeWhyLines — multiple contributing factors", () => {
+  it("renders feedback AND progression causes together", () => {
+    const lines = composeWhyLines({
+      trace: [
+        { rule: "feedback", detail: "joint pain 2/3: load increase blocked" },
+        {
+          rule: "progression",
+          detail: "earned; skipped by rate pacer",
+          status: "paced",
+          governor: "rate_pacer",
+        },
+      ],
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("capping the load");
+    expect(lines[1]).toContain("deferred");
+  });
+
+  it("dedups the earn-gate echo of a feedback cause (one cause, one line)", () => {
+    const lines = composeWhyLines({
+      trace: [
+        { rule: "feedback", detail: "joint pain 2/3: load increase blocked" },
+        {
+          rule: "progression",
+          detail: "not earned: joint pain reported last session",
+          status: "not_earned",
+          predicate: "pain",
+        },
+      ],
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("capping the load");
+  });
+
+  it("keeps the not-earned line when no feedback note carried the cause", () => {
+    const lines = composeWhyLines({
+      trace: [
+        {
+          rule: "progression",
+          detail: "not earned: joint pain reported last session",
+          status: "not_earned",
+          predicate: "pain",
+        },
+      ],
+    });
+    expect(lines).toEqual(["Held steady — joint pain was reported last session."]);
+  });
+
+  it("falls back to the grade for pre-progression decisions only", () => {
+    const legacy = composeWhyLines({
+      trace: [
+        { rule: "load", detail: "hold 250 lb" },
+        {
+          rule: "grade",
+          detail: "harder than asked (~1 vs 2 RIR) — held, not a miss",
+        },
+      ],
+    });
+    expect(legacy).toEqual([
+      "Last session ran harder than asked, so the load holds rather than climbs.",
+    ]);
+    const modern = composeWhyLines({
+      trace: [
+        { rule: "grade", detail: "harder than asked (~1 vs 2 RIR) — held, not a miss" },
+        { rule: "progression", detail: "", status: "stepped" },
+      ],
+    });
+    expect(modern).toHaveLength(1);
+    expect(modern[0]).toContain("earned increase");
   });
 });
 

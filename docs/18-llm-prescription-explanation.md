@@ -11,16 +11,23 @@
 
 ## 1. Goal and non-goals
 
-**Goal.** For each open prescription, a 1–3 sentence explanation that is more
-contextual than the deterministic composer: it can connect the ask to the
-athlete's recent sessions ("third week holding 250 while the pacer catches
-up"), the meso position, and the feedback that shaped it — in the app's plain,
-no-hype voice.
+**Goal.** For each open prescription, a short explanation that answers both
+**what** and **why** (owner requirement, 2026-07-19): if reps are held by the
+pacer, backed down from feedback like joint pain or fatigue, or unchanged
+because last week's target wasn't hit, the user is told so — **including when
+several factors contribute at once** (a pacer deferral can sit on top of a
+pain-capped load; every recorded cause gets named). This requirement binds the
+deterministic composer too — `prescription-narrative.ts` walks the full
+decision trace (feedback modulation notes, the doc-16 §3.6 progression state,
+the legacy grade) and renders up to three why-lines with the earn-gate echo of
+a feedback cause deduplicated — and the LLM is expected to do it *better*
+(fluid multi-cause sentences instead of stacked lines).
 
-**Non-goals.** The model never chooses or adjusts a number, never sees data
-the deterministic path doesn't, never coaches beyond the prescription at hand
-(the connector's coaching surface already exists for that), and the feature
-never blocks a screen: no explanation ⇒ the deterministic lines render.
+**Non-goals (v1).** The model never chooses or adjusts a number, never sees
+data the deterministic path doesn't, and the feature never blocks a screen: no
+explanation ⇒ the deterministic lines render. v1 explains the prescription at
+hand and stops there — the coaching register is **v2** (§10), gated on the v1
+MVP proving out.
 
 ## 2. Model choice: OpenAI GPT-5.6 Luna
 
@@ -212,6 +219,50 @@ constraint is latency/complexity, which the fire-and-forget design absorbs.
   read a first batch against doc 06's voice before the strip flips on
   (ship phases 1–4 with the strip still deterministic; flip in phase 5).
 - **Session notes in the payload** (the PH30 "incorporate session notes"
-  idea): deferred to v2 behind its own decision — notes are the one input
-  that can carry personal information.
+  idea): deferred to the §10 v2 coaching layer, where their admission gets
+  its own privacy review — notes are the one input that can carry personal
+  information.
 - **Multi-language:** out of scope; the app is English-only.
+
+## 10. v2 — the coaching layer (owner direction, 2026-07-19; build after the v1 MVP proves out)
+
+> Owner framing: the generations are "a natural place to marry some of the
+> coaching aspects from the MCP with the prescriptions … a little bit of both
+> the explanation of why you're being asked to do what you're being asked
+> today, and maybe a little bit of focus direction for the user based on
+> what's been going on. Think of a kind of a Mike Mentzer sort of scientific
+> coaching personality to keep you informed, focused, and on track. It still
+> needs to be short."
+
+**What changes vs v1** (everything else — storage, invalidation, seam,
+post-check — carries over unchanged):
+
+- **Payload additions** (~+150–250 tokens; still comfortably under a 600-token
+  input ceiling):
+  - the user's **exercise notes** (pinned note + last session note) — the one
+    v1 privacy exclusion, admitted deliberately here with its own review
+    (notes can carry personal information; they stay out of any log line);
+  - a **trend block** from the progression-history aggregate
+    (`get_progression_history` / `queries/progression-history.ts`, shipped
+    PR #161): earn/miss mix, governor firings, trailing prescribed-vs-measured
+    gain — the structured evidence for "you've been parked here three weeks"
+    or "four straight earned steps";
+  - last workout-level feedback (fatigue/effort/performance), which v1
+    already carries at exercise grain.
+- **Output contract:** budget rises to **≤ 480 chars / 2–4 sentences**
+  (~120 output tokens; `max_output_tokens` 160). Structure: hard targets and
+  the multi-factor why FIRST (never displaced by coaching), then at most one
+  or two clauses of **focus direction** grounded in the payload ("the misses
+  are all on set three — protect rest before it", "pump has read low here
+  two weeks running; a substitution is on the table").
+- **Voice:** informed, focused, matter-of-fact — a scientific-coach register
+  (the owner's Mentzer reference), expressed through the few-shots. Bounded by
+  the same house rules: no hype, no exclamation marks, no promises, no medical
+  advice; evidence named from the payload only. The §4 number post-check
+  applies unchanged.
+- **Cost:** ~600 in + ~120 out ⇒ ≈ **$0.0013/generation** cache-missed —
+  materially identical to v1 (≈ $0.33/month at current volume).
+- **Sequencing:** ship v1 (§7 phases 1–6), let the owner read a real month of
+  generations, then flip v2 as a prompt + payload revision — no schema or
+  seam change; `decision_explanations.model`/prompt-version columns already
+  distinguish generations for comparison.
