@@ -4,6 +4,56 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-19 — Session 79: Batch 20 — prescription presentation split (N57, PR #194) + LLM explanation spec (N58/doc 18)
+
+Owner (Batch 20, verbatim in the appendix, after #193 merged): the details
+panel "feels more like a debugging panel than a useful prescription detail" —
+build a deterministic user-friendly quick-read now (toggle next to the notes
+button, notes-style reveal), revamp the details panel into a debug panel, and
+spec the LLM explanation (OpenAI Luna, budgets, MCP reuse, per-generation +
+monthly cost) as a drop-in for the deterministic text later.
+
+Sweep first: #193 merged, but N56 stays live per the residual rule (owner
+device check + the step-cadence design question); its paced-surfacing residual
+is closed by this session's N57. PH30 → `superseded → N58` (archive next
+sweep).
+
+**N57 built (this PR):** pure composer `src/lib/prescription-narrative.ts`
+(ask from the row alone; delta vs last session in reps-to-failure language —
+the RIR ramp finally explains itself; doc-16 §3.6 progression state in plain
+sentences incl. paced/not-earned; N33-S4 hand-adjusted caveat; 20 tests, the
+N56 W2·D4 case is the canonical fixture), target-glyph button + notes-style
+strip in the exercise card (fetch-on-open, instant ask, `ENGINE AUDIT ›`
+drill-in), detail sheet retitled **Engine audit** and regrouped
+(PRESCRIPTION / DECISION / EST. STRENGTH / TRACE, status-coded trace labels),
+⋮-menu raw-rationale row replaced with `Engine audit ›`. Plumbing:
+`readTrace` preserves status/governor/predicate; `PrescriptionAudit` gains
+`previous` (decision inputs). 09-changelog entry 2026-07-19; no mockup figure
+— deviation recorded in PROGRESS.md.
+
+**N58 spec'd:** `docs/18-llm-prescription-explanation.md` — GPT-5.6 Luna
+(verified $1/M in, $6/M out, $0.10/M cached), ~350-token decision-projection
+payload (reuses the `explain_prescription` shape), ≤320-char output with a
+deterministic number-set post-check, generation at decision write keyed to
+`engine_decisions.id` (invalidation free), `decision_explanations` storage,
+drop-in seam = the strip's `lines`. Cost ≈ $0.001/generation; measured volume
+(~44 performed rows/wk both users → ~250 decisions/mo) ⇒ ≈ $0.25/mo. Root
+CLAUDE.md doc index updated. N58 `ready`, build on owner go.
+
+**Batch-20 addendum (same session, owner review of the built PR):** (1) the
+strip's `ENGINE AUDIT ›` link removed — drill-in lives in the ⋮ menu only;
+(2) the quick-read's why went **multi-factor**: `composeWhyLines` renders
+feedback-modulation causes (pain-capped load, hot-workload set removal,
+rough-session dampening, set adds/vetoes — engine note strings translated,
+unknown notes surfaced verbatim) alongside the progression state, deduping
+the earn-gate echo of a feedback cause, capped at three lines, with a legacy
+grade fallback for pre-v20 decisions (+6 tests → 26); (3) doc 18 amended —
+§1 requires what+why with multiple contributing factors (binds both
+versions), new §10 v2 coaching layer (user notes + progression-history
+trends in the payload, hard targets first + brief focus direction,
+Mentzer-style scientific-coach register, ≤480 chars, after the v1 MVP).
+09-changelog entry amended in place (same PR).
+
 ## 2026-07-19 — Session 78: N56 intake — W2·D4 deadlift prescription mismatch (code-side, PR #193)
 
 Owner (Batch 19, screenshot attached): "Please look at my next deadlift

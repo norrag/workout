@@ -28,6 +28,47 @@ describe("readTrace", () => {
       { rule: "seed", detail: "" },
     ]);
   });
+
+  // doc 16 §3.6: the progression step's status coding is preserved
+  // structurally — the quick-read narrative and the audit panel's labels read
+  // it without parsing the detail prose
+  it("preserves progression status / governor / predicate fields", () => {
+    const out = {
+      trace: [
+        {
+          rule: "progression",
+          detail: "earned; skipped by rate pacer",
+          status: "paced",
+          governor: "rate_pacer",
+          deltaTarget: 6.8,
+        },
+        {
+          rule: "progression",
+          detail: "not earned: set 2 under",
+          status: "not_earned",
+          predicate: "compliance",
+        },
+      ],
+    };
+    expect(readTrace(out)).toEqual([
+      {
+        rule: "progression",
+        detail: "earned; skipped by rate pacer",
+        status: "paced",
+        governor: "rate_pacer",
+      },
+      {
+        rule: "progression",
+        detail: "not earned: set 2 under",
+        status: "not_earned",
+        predicate: "compliance",
+      },
+    ]);
+    // non-string status-ish values are dropped, not passed through
+    expect(readTrace({ trace: [{ rule: "progression", status: 7 }] })).toEqual([
+      { rule: "progression", detail: "" },
+    ]);
+  });
 });
 
 describe("readOutputNumbers (N33 S4)", () => {

@@ -90,8 +90,14 @@ import {
   unlogSetAction,
   unskipAllAction,
   updateBodyweightAction,
+  getPrescriptionAuditAction,
   type ReplacementCandidate,
 } from "../actions";
+import {
+  prescriptionMatchesDecision,
+  type PrescriptionAudit,
+} from "@/lib/queries/audit";
+import { composePrescriptionNarrative } from "@/lib/prescription-narrative";
 
 /**
  * T-I2: the bodyweight chip in a bodyweight exercise's header. The load is the
@@ -392,6 +398,7 @@ export function DayView({
           e1rmCfg={params.e1rm}
           markerBand={complianceBand(params)}
           microTargetRir={microcycle.target_rir}
+          isDeload={microcycle.is_deload}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
           dropPending={dropPending[we.id] ?? false}
@@ -935,6 +942,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onToggleDrop,
   onLogged,
   commit,
+  isDeload,
 }: {
   we: LoggedExercise;
   index: number;
@@ -943,6 +951,8 @@ const ExerciseBlock = memo(function ExerciseBlock({
   /** shared set-level e1RM band for the ▲/met/▼ markers (doc 16 §5.3) */
   markerBand: number;
   microTargetRir: number;
+  /** deloads suppress delta/progression talk in the quick-read */
+  isDeload: boolean;
   menuOpen: boolean;
   setMenuTarget: number | null;
   dropPending: boolean;
@@ -975,6 +985,55 @@ const ExerciseBlock = memo(function ExerciseBlock({
   const router = useRouter();
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
+  // prescription quick-read (owner 2026-07-19): a notes-style strip toggled
+  // from the header icon row. The ask line renders instantly from the row;
+  // the why lines fill in when the recorded decision arrives (fetched once,
+  // on first open — mirrors the sheets' fetch-on-open pattern, R17 retry).
+  const [rxOpen, setRxOpen] = useState(false);
+  const [rxAudit, setRxAudit] = useState<PrescriptionAudit | null>(null);
+  const [rxState, setRxState] = useState<"idle" | "loading" | "loaded" | "failed">(
+    "idle",
+  );
+  const fetchRxAudit = useCallback(() => {
+    setRxState("loading");
+    getPrescriptionAuditAction(we.id)
+      .then((a) => {
+        setRxAudit(a);
+        setRxState("loaded");
+      })
+      .catch(() => setRxState("failed"));
+  }, [we.id]);
+  const toggleRx = useCallback(() => {
+    setRxOpen((open) => {
+      if (!open && rxState === "idle") fetchRxAudit();
+      return !open;
+    });
+  }, [rxState, fetchRxAudit]);
+  const rxOutOfBand =
+    rxAudit?.output != null &&
+    !prescriptionMatchesDecision(
+      {
+        weight: we.prescribed_weight,
+        reps: we.prescribed_reps,
+        sets: we.prescribed_sets,
+        targetRir: we.target_rir ?? microTargetRir,
+      },
+      rxAudit.output,
+    );
+  const narrative = composePrescriptionNarrative({
+    weight: we.prescribed_weight,
+    reps: we.prescribed_reps,
+    sets: we.prescribed_sets,
+    targetRir: we.target_rir ?? microTargetRir,
+    loadType: coerceLoadType(we.load_type, we.equipment_type),
+    isDeload,
+    kind: rxAudit?.kind ?? null,
+    trace: rxAudit?.trace ?? [],
+    previous: rxAudit?.previous ?? null,
+    outOfBand: rxOutOfBand,
+    decisionOutput: rxAudit?.output ?? null,
+  });
+
   const iconBtn =
     "flex h-7 w-7 items-center justify-center border border-ink/35";
 
@@ -988,6 +1047,26 @@ const ExerciseBlock = memo(function ExerciseBlock({
           {skipped ? " · SKIPPED" : ""}
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            aria-label={`${we.exercise_name} prescription`}
+            aria-expanded={rxOpen}
+            className={`${iconBtn} ${rxOpen ? "border-ink bg-ink text-bg-base" : ""}`}
+            onClick={toggleRx}
+          >
+            {/* target glyph — the ask */}
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <circle
+                cx="7"
+                cy="7"
+                r="5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+              />
+              <circle cx="7" cy="7" r="1.4" fill="currentColor" />
+            </svg>
+          </button>
           <button
             type="button"
             aria-label={`${we.exercise_name} note`}
@@ -1045,6 +1124,33 @@ const ExerciseBlock = memo(function ExerciseBlock({
           )}
         </div>
       </div>
+      {rxOpen && (
+        <div className="mt-[7px] border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium leading-[1.5] text-ink/70">
+          {narrative.ask && (
+            <div className="text-ink/85">{narrative.ask}</div>
+          )}
+          {rxState === "loading" && (
+            <div className="mt-0.5 text-ink/40">Reading the engine&apos;s decision…</div>
+          )}
+          {rxState === "failed" && (
+            <button
+              type="button"
+              onClick={fetchRxAudit}
+              className="mt-0.5 text-left text-ink/50 underline underline-offset-2"
+            >
+              Couldn&apos;t read the engine&apos;s decision — tap to retry.
+            </button>
+          )}
+          {rxState === "loaded" &&
+            narrative.lines.map((line, i) => (
+              <div key={i} className="mt-0.5">
+                {line}
+              </div>
+            ))}
+          {/* drill-in to the Engine audit lives in the ⋮ menu only (owner
+              2026-07-19 follow-up) — the strip stays purely the story */}
+        </div>
+      )}
       {we.pinned_note && (
         <div className="mt-[7px] flex items-start justify-between gap-2 border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
           <span>PINNED — {we.pinned_note.body}</span>
@@ -1140,23 +1246,17 @@ const ExerciseBlock = memo(function ExerciseBlock({
         <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
           EXERCISE — {we.exercise_name.toUpperCase()}
         </div>
-        {we.notes && (
-          <button
-            type="button"
-            role="menuitem"
-            aria-label={`${we.exercise_name} prescription detail`}
-            onClick={() => {
-              onCloseMenu();
-              onAudit(we);
-            }}
-            className="flex w-full items-start justify-between gap-2 border-b border-ink/10 px-4 py-2 text-left text-[11px] leading-[1.45] text-ink/60"
-          >
-            <span>{we.notes}</span>
-            <span aria-hidden className="shrink-0 pt-px text-ink/40">
-              ›
-            </span>
-          </button>
-        )}
+        {/* the raw engine rationale used to live here; the quick-read strip
+            (target button) is the user-facing story now, and the audit panel
+            keeps the technical record — this row is the subtle drill-in */}
+        <MenuRow
+          label="Engine audit"
+          trailing="›"
+          onClick={() => {
+            onCloseMenu();
+            onAudit(we);
+          }}
+        />
         <MenuRow
           label="View exercise"
           trailing="›"

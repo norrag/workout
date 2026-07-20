@@ -58,13 +58,15 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 /**
- * Prescription detail / audit reveal (owner request 2026-06-25) — opened from the
- * exercise dropdown in the day view. Shows the live prescribed weight × reps × sets
- * @ RIR (for verification), the decision kind, the legible version stamps
- * (verified-accurate-as-of vs last-computed-under), and the engine rationale + trace,
- * so the user can confirm a version bump verified the row. Fetches the latest
- * decision on open (mirrors HistorySheet). No mockup figure — light-ledger styling
- * per rule #8; deviation recorded in PROGRESS.md.
+ * Engine audit — the technical/debug reveal behind a prescription (owner
+ * request 2026-06-25; reorganized 2026-07-19 into the debug half of the
+ * prescription-presentation split: the quick-read strip in the day view is the
+ * user-facing story, this panel keeps the full audit record). Grouped ledger:
+ * PRESCRIPTION (tuple + engine rationale + out-of-band tripwire), DECISION
+ * (kind + version stamps), EST. STRENGTH (the e1RM ledger), TRACE
+ * (status-coded steps). Fetches the latest decision on open (mirrors
+ * HistorySheet). No mockup figure — light-ledger styling per rule #8;
+ * deviation recorded in PROGRESS.md.
  */
 export function PrescriptionDetailSheet({
   target,
@@ -131,49 +133,15 @@ export function PrescriptionDetailSheet({
     <BottomSheet
       open
       onClose={onClose}
-      title="Prescription detail"
+      title="Engine audit"
       subtitle={`${target.exerciseName.toUpperCase()} — ${target.equipmentType.toUpperCase()}`}
     >
       {!loaded ? (
         <p className="py-4 text-sm text-ink/45">Loading…</p>
       ) : (
         <div className="pb-2">
-          <FieldRow label="DECISION KIND">
-            {audit ? KIND_LABEL[audit.kind] : "—"}
-          </FieldRow>
-          <FieldRow label="VERIFIED AS OF">
-            <span className="numeral">{versionLabel(target.paramsVersion)}</span>
-          </FieldRow>
-          <FieldRow label="COMPUTED UNDER">
-            <span className="numeral">
-              {versionLabel(audit?.decisionVersion ?? null)}
-            </span>
-            {audit && (
-              <span className="ml-1.5 text-[10px] text-ink/45">
-                · {shortDate(audit.decidedAt)}
-              </span>
-            )}
-          </FieldRow>
-
-          {reverified && (
-            <p className="mt-2 text-[11px] leading-[1.45] text-ink/55">
-              Re-verified under{" "}
-              <span className="numeral">{versionLabel(target.paramsVersion)}</span> —
-              numbers unchanged since{" "}
-              <span className="numeral">{versionLabel(audit!.decisionVersion)}</span>.
-            </p>
-          )}
-
-          {/* ink, not accent — orange is reserved for current position/selection (rule 7) */}
-          {outOfBand && (
-            <p className="mt-2 border-l-2 border-ink/40 pl-2.5 text-[11px] leading-[1.45] text-ink/70">
-              Current numbers don&apos;t match this decision — they were set
-              outside the engine. The rationale below describes the recorded
-              decision, not the numbers shown above.
-            </p>
-          )}
-
-          <div className="mt-4">
+          {/* 1 — the numbers under audit */}
+          <div>
             <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
               PRESCRIPTION
             </div>
@@ -188,6 +156,47 @@ export function PrescriptionDetailSheet({
             {audit?.rationale && (
               <p className="mt-1.5 text-[12px] leading-[1.5] text-ink/70">
                 {audit.rationale}
+              </p>
+            )}
+            {/* ink, not accent — orange is reserved for current position/selection (rule 7) */}
+            {outOfBand && (
+              <p className="mt-2 border-l-2 border-ink/40 pl-2.5 text-[11px] leading-[1.45] text-ink/70">
+                Current numbers don&apos;t match this decision — they were set
+                outside the engine. The record below describes the recorded
+                decision, not the numbers shown above.
+              </p>
+            )}
+          </div>
+
+          {/* 2 — which decision produced them, under which params */}
+          <div className="mt-4">
+            <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+              DECISION
+            </div>
+            <div className="mt-0.5">
+              <FieldRow label="KIND">
+                {audit ? KIND_LABEL[audit.kind] : "—"}
+              </FieldRow>
+              <FieldRow label="COMPUTED UNDER">
+                <span className="numeral">
+                  {versionLabel(audit?.decisionVersion ?? null)}
+                </span>
+                {audit && (
+                  <span className="ml-1.5 text-[10px] text-ink/45">
+                    · {shortDate(audit.decidedAt)}
+                  </span>
+                )}
+              </FieldRow>
+              <FieldRow label="VERIFIED AS OF">
+                <span className="numeral">{versionLabel(target.paramsVersion)}</span>
+              </FieldRow>
+            </div>
+            {reverified && (
+              <p className="mt-2 text-[11px] leading-[1.45] text-ink/55">
+                Re-verified under{" "}
+                <span className="numeral">{versionLabel(target.paramsVersion)}</span> —
+                numbers unchanged since{" "}
+                <span className="numeral">{versionLabel(audit!.decisionVersion)}</span>.
               </p>
             )}
           </div>
@@ -247,6 +256,13 @@ export function PrescriptionDetailSheet({
                   >
                     <span className="font-semibold tracking-[0.08em] text-ink/55">
                       {step.rule.toUpperCase()}
+                      {/* doc 16 §3.6 status coding, structural since the
+                          quick-read split — the governor/predicate names the
+                          why without parsing the prose */}
+                      {step.status ? ` · ${step.status.toUpperCase()}` : ""}
+                      {step.governor || step.predicate
+                        ? ` (${(step.governor ?? step.predicate)!.toUpperCase()})`
+                        : ""}
                     </span>
                     {step.detail ? ` — ${step.detail}` : ""}
                   </li>
