@@ -23,6 +23,7 @@ import {
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
+  REGENERATE_EXPLANATIONS,
 } from "../tools/admin";
 import { captureServer, fakeExtra } from "./harness";
 
@@ -446,6 +447,7 @@ const ALL_ADMIN_TOOLS = [
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
+  REGENERATE_EXPLANATIONS,
 ];
 
 describe("admin-tool registration", () => {

@@ -197,6 +197,17 @@ lines = storedExplanation(latestDecisionId) ?? composePrescriptionNarrative(...)
 6. **Monitor.** A month in, run the token rollup; revisit Batch/caching only
    if the bill says so (it won't — §8).
 
+**Tooling — `regenerate_explanations` (admin MCP, shipped with v1).** Because
+a decision (and thus an explanation) is only written when the engine actually
+*changes* a number, there was no cheap way to iterate on the prompt or to
+populate a specific open row on demand. This admin tool closes that: it
+resolves a scope (whole active meso / one exercise / one `week`+`day`
+coordinate) to the latest decision per open row, regenerates with
+**overwrite** (a prompt tweak takes), and returns each body inline for review.
+Requires the feature generating (key set, mode ≠ off); works in shadow. It is
+also the recovery path for decisions stranded by an outage window (no
+automatic backfill by design — §5).
+
 ## 8. Cost model
 
 **Volume (measured, not guessed).** From the master history exports

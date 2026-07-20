@@ -136,6 +136,22 @@ mode**. Generation fires whenever the engine writes a **new** decision.
      freshness framework records `unchanged`, and **no decision — and so no
      generation — occurs** (it returns HTTP 200 with nothing written, which
      looks like a failure but is the framework working as designed).
+   The cheapest, most reliable trigger — **the `regenerate_explanations`
+   admin MCP tool** (added for exactly this, since decisions only regenerate
+   when the engine actually changes a number). From your Claude connector:
+   - *"regenerate the prescription explanation for \<exercise\>"* →
+     regenerates just that exercise's latest open-row decision (one API
+     call — pennies of a penny).
+   - *"regenerate explanations for week 2 day 3"* → that one coordinate.
+   - *"regenerate all my open prescription explanations"* → the whole active
+     meso.
+
+   It **overwrites** existing rows (so you can iterate on the prompt and
+   re-run), returns each generated sentence inline for you to read on the
+   spot, and works in shadow mode. This is what salvages the 8 rows stranded
+   by the empty-model failure — regenerate them once and they're populated
+   without waiting for the next workout.
+
 2. **Check rows landed** (Supabase SQL editor, or ask Claude — the Supabase
    MCP can run this):
 

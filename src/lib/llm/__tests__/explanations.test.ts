@@ -6,7 +6,12 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { generateDecisionExplanations, recentLines } from "../explanations";
+import {
+  generateDecisionExplanations,
+  recentLines,
+  regenerateExplanations,
+  resolveScopedOpenDecisionIds,
+} from "../explanations";
 import type { LlmCompletion } from "../openai";
 
 // --- fake postgrest client ---------------------------------------------------
@@ -184,6 +189,105 @@ describe("generateDecisionExplanations", () => {
     });
     expect(stored).toBe(0);
     expect(upserts).toHaveLength(0);
+  });
+});
+
+describe("regenerateExplanations (admin overwrite path)", () => {
+  it("overwrites existing rows and returns each body", async () => {
+    const upserts: Upsert[] = [];
+    const results = await regenerateExplanations("u1", ["d1"], {
+      service: fakeService(tables(), upserts),
+      complete: async () => grounded,
+    });
+    expect(results).toEqual([
+      { decision_id: "d1", ok: true, body: grounded.text },
+    ]);
+    // overwrite ⇒ plain upsert, NOT ignoreDuplicates (a prompt tweak must take)
+    expect(upserts[0].options).toEqual({ onConflict: "decision_id" });
+  });
+
+  it("returns a per-decision reason when the post-check discards", async () => {
+    const upserts: Upsert[] = [];
+    const results = await regenerateExplanations("u1", ["d1"], {
+      service: fakeService(tables(), upserts),
+      complete: async () => ({ ...grounded, text: "Estimated max is now 999 lb." }),
+    });
+    expect(results[0].ok).toBe(false);
+    expect(results[0].reason).toContain("999");
+    expect(upserts).toHaveLength(0);
+  });
+});
+
+describe("resolveScopedOpenDecisionIds", () => {
+  it("returns empty when there is no active meso", async () => {
+    const svc = fakeService({ mesocycles: { data: null, error: null } }, []);
+    const r = await resolveScopedOpenDecisionIds("u1", {}, svc);
+    expect(r).toEqual({
+      mesocycleId: null,
+      decisionIds: [],
+      openRowsWithoutDecision: 0,
+    });
+  });
+
+  it("takes the latest decision per open row and counts rows with none", async () => {
+    const svc = fakeService(
+      {
+        mesocycles: { data: { id: "ms1" }, error: null },
+        microcycles: {
+          data: [
+            { id: "mc1", week_number: 1 },
+            { id: "mc2", week_number: 2 },
+          ],
+          error: null,
+        },
+        workouts: {
+          data: [
+            { id: "w1", day_number: 1 },
+            { id: "w2", day_number: 2 },
+          ],
+          error: null,
+        },
+        workout_exercises: {
+          data: [{ id: "we1" }, { id: "we2" }, { id: "we3" }],
+          error: null,
+        },
+        engine_decisions: {
+          data: [
+            { id: "dNew", workout_exercise_id: "we1", created_at: "2026-07-20T00:00:00Z" },
+            { id: "dOld", workout_exercise_id: "we1", created_at: "2026-07-01T00:00:00Z" },
+            { id: "d2", workout_exercise_id: "we2", created_at: "2026-07-10T00:00:00Z" },
+            // we3 has no decision
+          ],
+          error: null,
+        },
+      },
+      [],
+    );
+    const r = await resolveScopedOpenDecisionIds("u1", {}, svc);
+    expect(r.mesocycleId).toBe("ms1");
+    expect(new Set(r.decisionIds)).toEqual(new Set(["dNew", "d2"]));
+    expect(r.decisionIds).not.toContain("dOld");
+    expect(r.openRowsWithoutDecision).toBe(1);
+  });
+
+  it("filters microcycles by week before touching workouts", async () => {
+    const svc = fakeService(
+      {
+        mesocycles: { data: { id: "ms1" }, error: null },
+        microcycles: {
+          data: [
+            { id: "mc1", week_number: 1 },
+            { id: "mc2", week_number: 2 },
+          ],
+          error: null,
+        },
+      },
+      [],
+    );
+    // week 3 matches no microcycle ⇒ short-circuits to an empty scope
+    const r = await resolveScopedOpenDecisionIds("u1", { week: 3 }, svc);
+    expect(r.mesocycleId).toBe("ms1");
+    expect(r.decisionIds).toEqual([]);
   });
 });
 

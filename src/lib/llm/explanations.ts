@@ -279,6 +279,48 @@ export async function generateDecisionExplanations(
   decisionIds: string[],
   deps?: Partial<ExplanationDeps>,
 ): Promise<number> {
+  const results = await runGeneration(userId, decisionIds, deps, {
+    overwrite: false,
+  });
+  return results.filter((r) => r.ok).length;
+}
+
+/** One decision's generation outcome — the detailed shape the admin
+ *  regenerate tool surfaces (the deterministic path only needs the count). */
+export interface GenerationResult {
+  decision_id: string;
+  ok: boolean;
+  /** the stored explanation (present on success) */
+  body?: string;
+  /** why it was skipped (post-check reason, missing context, or error) */
+  reason?: string;
+}
+
+/**
+ * Admin regeneration (doc 18 §7.6 tooling): (re)generate explanations for a
+ * chosen set of decisions and **overwrite** any existing rows, returning each
+ * body so the caller can read the batch inline. This is the cost-controlled
+ * iteration primitive — regenerate one exercise's latest decision after a
+ * prompt tweak instead of repopulating everything. Errors are surfaced
+ * per-decision (never thrown), so one bad row doesn't sink the batch.
+ */
+export async function regenerateExplanations(
+  userId: string,
+  decisionIds: string[],
+  deps?: Partial<ExplanationDeps>,
+): Promise<GenerationResult[]> {
+  return runGeneration(userId, decisionIds, deps, { overwrite: true });
+}
+
+/** Shared core: fetch the decisions, assemble context, generate in bounded
+ *  parallel chunks. `overwrite` chooses insert-if-absent (write path) vs
+ *  replace (regenerate). */
+async function runGeneration(
+  userId: string,
+  decisionIds: string[],
+  deps: Partial<ExplanationDeps> | undefined,
+  opts: { overwrite: boolean },
+): Promise<GenerationResult[]> {
   const service = deps?.service ?? createServiceClient();
   const complete = deps?.complete ?? createCompletion;
 
@@ -291,28 +333,39 @@ export async function generateDecisionExplanations(
     .in("id", decisionIds.slice(0, MAX_BURST));
   if (error) throw error;
   const decisions = (data ?? []) as DecisionRowSlice[];
-  if (decisions.length === 0) return 0;
+  if (decisions.length === 0) return [];
 
   const contexts = await assembleContexts(service, userId, decisions);
 
-  let stored = 0;
+  const out: GenerationResult[] = [];
   for (let i = 0; i < decisions.length; i += CHUNK) {
     const results = await Promise.all(
       decisions.slice(i, i + CHUNK).map(async (decision) => {
         try {
-          return await generateOne(service, userId, decision, contexts, complete);
+          return await generateOne(
+            service,
+            userId,
+            decision,
+            contexts,
+            complete,
+            opts.overwrite,
+          );
         } catch (error) {
           await reportError("llm:explanations", error, {
             userId,
             decisionId: decision.id,
           });
-          return false;
+          return {
+            decision_id: decision.id,
+            ok: false,
+            reason: error instanceof Error ? error.message : "error",
+          };
         }
       }),
     );
-    stored += results.filter(Boolean).length;
+    out.push(...results);
   }
-  return stored;
+  return out;
 }
 
 async function generateOne(
@@ -321,9 +374,10 @@ async function generateOne(
   decision: DecisionRowSlice,
   contexts: Map<string, ExplanationContext>,
   complete: ExplanationDeps["complete"],
-): Promise<boolean> {
+  overwrite: boolean,
+): Promise<GenerationResult> {
   const context = contexts.get(decision.id);
-  if (!context) return false;
+  if (!context) return { decision_id: decision.id, ok: false, reason: "no context" };
   const payload = buildExplanationPayload(
     { kind: decision.kind, inputs: decision.inputs, output: decision.output },
     context,
@@ -353,7 +407,7 @@ async function generateOne(
       new Error(`post-check failed: ${checked.reason}`),
       { userId, decisionId: decision.id, model: completion.model },
     );
-    return false;
+    return { decision_id: decision.id, ok: false, reason: checked.reason };
   }
 
   const { error } = await service.from("decision_explanations").upsert(
@@ -366,8 +420,120 @@ async function generateOne(
       tokens_in: completion.tokensIn,
       tokens_out: completion.tokensOut,
     },
-    { onConflict: "decision_id", ignoreDuplicates: true },
+    // write path: keep the first (decision id is the cache key). Regenerate:
+    // replace, so a prompt tweak actually takes.
+    overwrite
+      ? { onConflict: "decision_id" }
+      : { onConflict: "decision_id", ignoreDuplicates: true },
   );
   if (error) throw error;
-  return true;
+  return { decision_id: decision.id, ok: true, body: checked.body };
+}
+
+// ---------------------------------------------------------------------------
+// scope resolution — the admin regenerate tool's target selector
+// ---------------------------------------------------------------------------
+
+/** Which open prescriptions to regenerate for. All optional: an empty scope =
+ *  every open row of the caller's active meso. */
+export interface RegenScope {
+  /** narrow to one exercise */
+  exerciseId?: string;
+  /** narrow to one day coordinate (both required together) */
+  week?: number;
+  day?: number;
+  /** cap (default MAX_BURST) */
+  limit?: number;
+}
+
+export interface ResolvedScope {
+  mesocycleId: string | null;
+  decisionIds: string[];
+  /** rows in scope that carry no decision yet (nothing to regenerate) */
+  openRowsWithoutDecision: number;
+}
+
+/**
+ * Resolve a scope to the latest decision id per matching OPEN prescription
+ * (planned / in-progress workouts) of the caller's active meso. Service-scoped
+ * to `userId`. Returns [] when there's no active meso or nothing matches.
+ */
+export async function resolveScopedOpenDecisionIds(
+  userId: string,
+  scope: RegenScope = {},
+  client?: Client,
+): Promise<ResolvedScope> {
+  const service = client ?? createServiceClient();
+  const empty: ResolvedScope = {
+    mesocycleId: null,
+    decisionIds: [],
+    openRowsWithoutDecision: 0,
+  };
+
+  const { data: meso, error: mesoError } = await service
+    .from("mesocycles")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (mesoError) throw mesoError;
+  if (!meso) return empty;
+
+  const { data: micros, error: microError } = await service
+    .from("microcycles")
+    .select("id, week_number")
+    .eq("mesocycle_id", meso.id)
+    .eq("user_id", userId);
+  if (microError) throw microError;
+  const microIds = (micros ?? [])
+    .filter((m) => scope.week == null || m.week_number === scope.week)
+    .map((m) => m.id);
+  if (microIds.length === 0) return { ...empty, mesocycleId: meso.id };
+
+  // open = still prescribable (planned / in-progress); completed & skipped are
+  // history. A named day coordinate overrides the status filter.
+  let workoutQuery = service
+    .from("workouts")
+    .select("id, day_number")
+    .eq("user_id", userId)
+    .in("microcycle_id", microIds);
+  if (scope.day != null) workoutQuery = workoutQuery.eq("day_number", scope.day);
+  else workoutQuery = workoutQuery.in("status", ["planned", "in_progress"]);
+  const { data: workouts, error: workoutError } = await workoutQuery;
+  if (workoutError) throw workoutError;
+  const workoutIds = (workouts ?? []).map((w) => w.id);
+  if (workoutIds.length === 0) return { ...empty, mesocycleId: meso.id };
+
+  let weQuery = service
+    .from("workout_exercises")
+    .select("id")
+    .in("workout_id", workoutIds);
+  if (scope.exerciseId) weQuery = weQuery.eq("exercise_id", scope.exerciseId);
+  const { data: wes, error: weError } = await weQuery;
+  if (weError) throw weError;
+  const weIds = (wes ?? []).map((w) => w.id);
+  if (weIds.length === 0) return { ...empty, mesocycleId: meso.id };
+
+  // latest decision per open row (newest first, dedup by workout_exercise_id)
+  const { data: decisions, error: decisionError } = await service
+    .from("engine_decisions")
+    .select("id, workout_exercise_id, created_at")
+    .eq("user_id", userId)
+    .in("workout_exercise_id", weIds)
+    .order("created_at", { ascending: false });
+  if (decisionError) throw decisionError;
+  const latestByWe = new Map<string, string>();
+  for (const d of decisions ?? []) {
+    if (d.workout_exercise_id && !latestByWe.has(d.workout_exercise_id)) {
+      latestByWe.set(d.workout_exercise_id, d.id);
+    }
+  }
+  const decisionIds = [...latestByWe.values()].slice(0, scope.limit ?? MAX_BURST);
+  return {
+    mesocycleId: meso.id,
+    decisionIds,
+    openRowsWithoutDecision: weIds.length - latestByWe.size,
+  };
 }

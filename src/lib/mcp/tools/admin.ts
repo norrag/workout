@@ -30,6 +30,11 @@ import {
 } from "@/lib/queries/e1rm-restamp";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
+import { llmExplanationsGenerate, llmExplanationsMode } from "@/lib/llm/config";
+import {
+  regenerateExplanations,
+  resolveScopedOpenDecisionIds,
+} from "@/lib/llm/explanations";
 import { resolveSession, type McpExtra, type McpClient } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
 import { recordMcpWrite } from "../audit";
@@ -903,6 +908,104 @@ function registerDiscardEngineParams(server: McpServer) {
   );
 }
 
+// --- regenerate_explanations (N58 / doc 18 §7.6 tooling) -------------------
+
+export const REGENERATE_EXPLANATIONS = "regenerate_explanations";
+function registerRegenerateExplanations(server: McpServer) {
+  server.registerTool(
+    REGENERATE_EXPLANATIONS,
+    {
+      title: "Regenerate prescription explanations",
+      description:
+        "Admin only. Force-(re)generate the LLM prescription explanation " +
+        "(doc 18) for the OPEN prescriptions of your active mesocycle, and " +
+        "OVERWRITE any existing ones — the cost-controlled iteration primitive " +
+        "for tuning the prompt without waiting on a workout or repopulating " +
+        "everything. Scope it down to save spend: pass exercise_id for a single " +
+        "movement, or week+day for one coordinate; no args = every open row. " +
+        "Targets the LATEST decision of each matching open row (planned / " +
+        "in-progress). Returns each generated explanation inline for review. " +
+        "Requires OPENAI_API_KEY set and LLM_EXPLANATIONS not 'off' (works in " +
+        "shadow mode). The engine still authors every number.",
+      inputSchema: {
+        exercise_id: z.string().uuid().optional(),
+        week: z.number().int().min(1).max(12).optional(),
+        day: z.number().int().min(1).max(7).optional(),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(40)
+          .optional()
+          .describe("max rows to regenerate (default 40)"),
+      },
+    },
+    async (
+      args: { exercise_id?: string; week?: number; day?: number; limit?: number },
+      extra: McpExtra,
+    ) => {
+      const { userId } = await resolveAdmin(extra);
+      if (!llmExplanationsGenerate()) {
+        return jsonResult({
+          ok: false,
+          error:
+            "LLM explanations are disabled — set OPENAI_API_KEY and leave " +
+            "LLM_EXPLANATIONS unset ('shadow') or 'on'. See docs/deployment/openai-api-setup.md.",
+        });
+      }
+      const scope = {
+        exerciseId: args.exercise_id,
+        week: args.week,
+        day: args.day,
+        limit: args.limit,
+      };
+      const resolved = await resolveScopedOpenDecisionIds(userId, scope);
+      if (!resolved.mesocycleId) {
+        return jsonResult({ ok: false, error: "no active mesocycle to regenerate for." });
+      }
+      if (resolved.decisionIds.length === 0) {
+        return jsonResult({
+          ok: true,
+          mesocycle_id: resolved.mesocycleId,
+          targeted: 0,
+          generated: 0,
+          open_rows_without_decision: resolved.openRowsWithoutDecision,
+          note:
+            "no recorded decisions matched this scope" +
+            (resolved.openRowsWithoutDecision > 0
+              ? " (matching open rows have no decision yet — complete or generate them first)"
+              : ""),
+        });
+      }
+      const results = await regenerateExplanations(userId, resolved.decisionIds);
+      const generated = results.filter((r) => r.ok);
+      const skipped = results.filter((r) => !r.ok);
+      const summary = `regenerated ${generated.length}/${results.length} explanation(s)`;
+      await recordMcpWrite(
+        userId,
+        REGENERATE_EXPLANATIONS,
+        { scope, targeted: resolved.decisionIds.length },
+        summary,
+      );
+      return jsonResult({
+        ok: true,
+        mode: llmExplanationsMode(),
+        mesocycle_id: resolved.mesocycleId,
+        targeted: resolved.decisionIds.length,
+        generated: generated.length,
+        skipped: skipped.map((r) => ({ decision_id: r.decision_id, reason: r.reason })),
+        open_rows_without_decision: resolved.openRowsWithoutDecision,
+        explanations: generated.map((r) => ({ decision_id: r.decision_id, body: r.body })),
+        summary,
+        note:
+          llmExplanationsMode() === "shadow"
+            ? "shadow mode: stored but not yet served on screen — set LLM_EXPLANATIONS=on to display."
+            : undefined,
+      });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 //
 // Note (doc 14 §10): the `regenerate_planned_prescriptions` and
@@ -922,6 +1025,7 @@ export function registerAdminTools(server: McpServer) {
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
+  registerRegenerateExplanations(server);
 }
 
 /** Every role-gated tool this module registers — the roster the tools/list
@@ -935,4 +1039,5 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
+  REGENERATE_EXPLANATIONS,
 ]);
