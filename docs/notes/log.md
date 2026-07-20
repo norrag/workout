@@ -4,6 +4,30 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-20 — Session 82: N58 v2 — the §10 coaching layer (PR #197)
+
+Owner: v1 is implemented and tested; build v2. Shipped doc 18 §10 exactly as
+sequenced — a prompt + payload revision, no seam/lifecycle/gating change:
+
+- **Payload** (+`projectTrend`, pure): pinned + last session note (200-char
+  word-boundary caps; enter the model payload only, never a log or failure
+  row), the §8.3 trend block folded over the pacer's 90-day lookback (status
+  mix, governor firings, asks met/missed, prescribed-vs-measured %/30d;
+  best-effort — no active params or any query failure omits the block, never
+  sinks the burst), last workout fatigue/effort/performance.
+- **Contract:** ≤480 chars / 2–4 sentences, `max_output_tokens` 160; §4
+  post-check unchanged (note numerals join the allowed set). DB backstop
+  320→480 via migration `20260720000003` (constraint swap only; applied to
+  hosted, verified).
+- **Prompt v2:** scientific-coach register — multi-factor why first, then at
+  most a clause or two of focus direction, only when trend/notes/feedback
+  ground it. `EXPLANATION_PROMPT_VERSION` → 2 for row comparability.
+
+Tests +11 (suite 1289); RLS length test now pins 480-accept/481-reject;
+typecheck + lint clean. Testing rides the PR-196 admin loop
+(`generate_explanations` `overwrite:true` regenerates under v2). Residuals:
+owner voice-reads a v2 batch; §7.6 cost rollup a month in.
+
 ## 2026-07-20 — Session 81: N58 live-test diagnosis + admin test loop (PR #196)
 
 Owner report after running the #195 runbook: workout completed → "8 attempted
