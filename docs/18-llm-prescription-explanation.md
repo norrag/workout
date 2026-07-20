@@ -1,5 +1,23 @@
 # 18 — LLM prescription explanation (build spec)
 
+> **v2 BUILT (2026-07-20, N58 v2): the §10 coaching layer.** Prompt + payload
+> revision only, exactly as §10 sequenced — no seam or lifecycle change.
+> `EXPLANATION_PROMPT_VERSION` → 2; payload gains the lifter's notes (pinned +
+> last session note, truncated to 200 chars each, never logged), a `trend`
+> block (the §8.3 progression aggregate over the pacer's 90-day lookback:
+> status mix, governor firings, asks met/missed, prescribed-vs-measured
+> %/30d), and the last workout-level feedback (fatigue/effort/performance);
+> output contract rises to ≤480 chars / 2–4 sentences
+> (`max_output_tokens` 160; DB backstop relaxed by migration
+> `20260720000003`). The system prompt carries the scientific-coach register:
+> the multi-factor why always first, then at most a clause or two of focus
+> direction — and only when the trend/notes/feedback ground it. The §4
+> number post-check applies unchanged (note numerals join the allowed set).
+> Trend assembly is best-effort: any failure omits the block, never the
+> generation. Testing rides the PR-196 admin loop — `generate_explanations`
+> with `overwrite` regenerates stored rows under the v2 prompt;
+> `prompt_version` distinguishes them for comparison.
+>
 > **Status: v1 BUILT (2026-07-20, N58) — activation is owner-gated.** §7
 > phases 1–5 shipped in one PR: `decision_explanations` (+RLS, migration
 > applied to hosted), `src/lib/llm/` (config/kill-switch, Responses-API

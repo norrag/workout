@@ -1669,18 +1669,35 @@ describe("decision_explanations (doc 18)", () => {
     expect(after!.body).not.toBe("tampered");
   });
 
-  it("the 320-char §4 clamp is enforced at the DB as a backstop", async () => {
+  it("the 480-char §10 clamp is enforced at the DB as a backstop", async () => {
     const { data: decision } = await service
       .from("engine_decisions")
       .insert({ user_id: aliceId, inputs: {}, output: {}, params_version: 1 })
       .select("id")
       .single();
-    const { error } = await service.from("decision_explanations").insert({
+    // a v2-length body (321–480 chars, over the old v1 cap) is accepted…
+    const { error: okError } = await service.from("decision_explanations").insert({
       decision_id: decision!.id,
       user_id: aliceId,
-      body: "x".repeat(321),
+      body: "y".repeat(480),
       model: "gpt-5.6-luna",
-      prompt_version: 1,
+      prompt_version: 2,
+      tokens_in: 0,
+      tokens_out: 0,
+    });
+    expect(okError).toBeNull();
+    // …and the new ceiling still backstops the server-side clamp
+    const { data: decision2 } = await service
+      .from("engine_decisions")
+      .insert({ user_id: aliceId, inputs: {}, output: {}, params_version: 1 })
+      .select("id")
+      .single();
+    const { error } = await service.from("decision_explanations").insert({
+      decision_id: decision2!.id,
+      user_id: aliceId,
+      body: "x".repeat(481),
+      model: "gpt-5.6-luna",
+      prompt_version: 2,
       tokens_in: 0,
       tokens_out: 0,
     });

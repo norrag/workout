@@ -88,8 +88,10 @@ function tables(overrides: Partial<TableData> = {}): TableData {
   return {
     engine_decisions: { data: [decisionRow], error: null },
     exercises: { data: [{ id: "ex1", name: "Deadlift" }], error: null },
+    // exercise_id rides along for the §10 session-note resolution (the fake
+    // returns one canned result per table, both consumers pick their fields)
     workout_exercises: {
-      data: [{ id: "we1", muscle_group_id: "mg1" }],
+      data: [{ id: "we1", muscle_group_id: "mg1", exercise_id: "ex1" }],
       error: null,
     },
     muscle_groups: { data: [{ id: "mg1", name: "glutes" }], error: null },
@@ -150,7 +152,7 @@ describe("generateDecisionExplanations", () => {
       user_id: "u1",
       body: grounded.text,
       model: "gpt-5.6-luna",
-      prompt_version: 1,
+      prompt_version: 2,
       tokens_in: 610,
       tokens_out: 34,
     });
@@ -159,6 +161,69 @@ describe("generateDecisionExplanations", () => {
       onConflict: "decision_id",
       ignoreDuplicates: true,
     });
+  });
+
+  it("folds the §10 coaching context into the payload when the tables have it", async () => {
+    const seen: string[] = [];
+    await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(
+        tables({
+          exercise_notes: {
+            data: [{ exercise_id: "ex1", body: "hook grip from set one" }],
+            error: null,
+          },
+          exercise_feedback: {
+            data: [
+              {
+                workout_exercise_id: "we1",
+                notes: "grip started slipping late",
+                created_at: "2026-07-15T11:00:00Z",
+              },
+            ],
+            error: null,
+          },
+          workout_feedback: {
+            data: [
+              {
+                overall_fatigue: 8,
+                effort_rating: 7,
+                performance_rating: null,
+                created_at: "2026-07-15T11:00:00Z",
+              },
+            ],
+            error: null,
+          },
+        }),
+        [],
+      ),
+      complete: async ({ input }) => {
+        seen.push(input);
+        return grounded;
+      },
+    });
+    const payload = JSON.parse(seen[0]);
+    expect(payload.notes).toEqual({
+      pinned: "hook grip from set one",
+      last_session: "grip started slipping late",
+    });
+    expect(payload.workout_feedback).toEqual({ fatigue: 8, effort: 7 });
+    // no active engine_params in the fake ⇒ the trend block is skipped, not fatal
+    expect(payload).not.toHaveProperty("trend");
+  });
+
+  it("omits the §10 blocks entirely when nothing is recorded (v1-shaped payload)", async () => {
+    const seen: string[] = [];
+    await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(tables(), []),
+      complete: async ({ input }) => {
+        seen.push(input);
+        return grounded;
+      },
+    });
+    const payload = JSON.parse(seen[0]);
+    expect(payload).not.toHaveProperty("notes");
+    expect(payload).not.toHaveProperty("workout_feedback");
+    expect(payload).not.toHaveProperty("trend");
   });
 
   it("discards output that fails the §4 post-check (no row stored)", async () => {

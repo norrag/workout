@@ -1,12 +1,15 @@
 /**
- * N58 / doc 18 §§3–4 — payload projection, token budget, and the post-check
+ * N58 / doc 18 §§3–4 + §10 — payload projection (incl. the v2 coaching
+ * blocks: notes, trend, workout feedback), token budget, and the post-check
  * that makes the LLM drop-in safe. The N56 W2·D4 deadlift decision is the
  * canonical fixture, same as the deterministic composer's suite.
  */
 import { describe, expect, it } from "vitest";
 import {
   EXPLANATION_MAX_CHARS,
+  EXPLANATION_PROMPT_VERSION,
   EXPLANATION_SYSTEM_PROMPT,
+  NOTE_MAX_CHARS,
   PAYLOAD_TOKEN_CEILING,
   buildExplanationPayload,
   estimateTokens,
@@ -14,8 +17,11 @@ import {
   payloadNumberSet,
   postCheckExplanation,
   projectTrace,
+  projectTrend,
+  truncateNote,
   type ExplanationContext,
   type ExplanationDecision,
+  type TrendSummaryInput,
 } from "../prescription-explainer";
 
 /** The N56 field decision, in its stored jsonb shape. */
@@ -146,6 +152,47 @@ describe("buildExplanationPayload (§3)", () => {
     expect(bw.equipment).toBe("bodyweight_loadable");
   });
 
+  it("carries the §10 coaching blocks when the context supplies them", () => {
+    const trend = {
+      window_days: 90,
+      statuses: { stepped: 3, paced: 2 },
+      governors: { rate_pacer: 2 },
+      asks_met: 3,
+      prescribed_gain_pct_per_30d: 1.9,
+      measured_gain_pct_per_30d: 1.8,
+    };
+    const v2 = buildExplanationPayload(w2d4Decision, {
+      ...w2d4Context,
+      pinnedNote: "hook grip from set one",
+      lastSessionNote: "grip started slipping on the last set",
+      workoutFeedback: { fatigue: 8, effort: 7, performance: null },
+      trend,
+    });
+    expect(v2.notes).toEqual({
+      pinned: "hook grip from set one",
+      last_session: "grip started slipping on the last set",
+    });
+    // null fields are dropped, not nulled — token budget spends on signal
+    expect(v2.workout_feedback).toEqual({ fatigue: 8, effort: 7 });
+    expect(v2.trend).toEqual(trend);
+    expect(estimateTokens(JSON.stringify(v2))).toBeLessThanOrEqual(
+      PAYLOAD_TOKEN_CEILING,
+    );
+  });
+
+  it("omits the §10 blocks when the context has nothing for them", () => {
+    const v2 = buildExplanationPayload(w2d4Decision, {
+      ...w2d4Context,
+      pinnedNote: null,
+      lastSessionNote: "  ",
+      workoutFeedback: { fatigue: null, effort: null, performance: null },
+      trend: null,
+    });
+    expect(v2).not.toHaveProperty("notes");
+    expect(v2).not.toHaveProperty("workout_feedback");
+    expect(v2).not.toHaveProperty("trend");
+  });
+
   it("caps recent lines at three and trace steps at eight", () => {
     const many = buildExplanationPayload(
       {
@@ -162,6 +209,64 @@ describe("buildExplanationPayload (§3)", () => {
     );
     expect(many.recent).toHaveLength(3);
     expect(many.decision.trace).toHaveLength(8);
+  });
+});
+
+describe("projectTrend (§10)", () => {
+  const summary: TrendSummaryInput = {
+    decisions: 7,
+    statusCounts: { stepped: 3, vanished: 0, paced: 2, not_earned: 2 },
+    governorFirings: { rate_pacer: 2 },
+    earnedThenMet: 3,
+    earnedThenMissed: 0,
+    prescribedGain: { gainPctPer30d: 1.9 },
+    measuredGain: { gainPctPer30d: 1.8 },
+  };
+
+  it("trims the audit aggregate to the payload block, zeros omitted", () => {
+    expect(projectTrend(summary, 90)).toEqual({
+      window_days: 90,
+      statuses: { stepped: 3, paced: 2, not_earned: 2 },
+      governors: { rate_pacer: 2 },
+      asks_met: 3,
+      prescribed_gain_pct_per_30d: 1.9,
+      measured_gain_pct_per_30d: 1.8,
+    });
+  });
+
+  it("is null on an empty window and drops empty maps/gains", () => {
+    expect(
+      projectTrend({ ...summary, decisions: 0 }, 90),
+    ).toBeNull();
+    const sparse = projectTrend(
+      {
+        decisions: 1,
+        statusCounts: { stepped: 1 },
+        governorFirings: {},
+        earnedThenMet: 0,
+        earnedThenMissed: 0,
+        prescribedGain: null,
+        measuredGain: null,
+      },
+      90,
+    );
+    expect(sparse).toEqual({ window_days: 90, statuses: { stepped: 1 } });
+  });
+});
+
+describe("truncateNote (§10)", () => {
+  it("passes short notes through, whitespace-normalized", () => {
+    expect(truncateNote("  hook grip\nfrom set one ")).toBe(
+      "hook grip from set one",
+    );
+  });
+
+  it("truncates long notes on a word boundary under the cap", () => {
+    const long = "word ".repeat(80).trim();
+    const cut = truncateNote(long);
+    expect(cut.length).toBeLessThanOrEqual(NOTE_MAX_CHARS);
+    expect(cut.endsWith("…")).toBe(true);
+    expect(cut).not.toContain("wor…"); // no mid-word cut
   });
 });
 
@@ -223,6 +328,20 @@ describe("postCheckExplanation (§4)", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("allows numerals the lifter's own notes introduced (§10)", () => {
+    const v2 = buildExplanationPayload(w2d4Decision, {
+      ...w2d4Context,
+      lastSessionNote: "belt on the 3rd set helped",
+      workoutFeedback: { fatigue: 8, effort: null, performance: null },
+    });
+    expect(
+      postCheckExplanation(
+        "You noted the belt helped on the 3rd set; with fatigue at 8, keep it.",
+        v2,
+      ).ok,
+    ).toBe(true);
+  });
+
   it("reads numerals inside payload strings (dates, history lines)", () => {
     const result = postCheckExplanation(
       "Priced from an estimated 341.7 lb max set on Jul 12; you have been between 250 and 265 lb recently.",
@@ -244,16 +363,29 @@ describe("payloadNumberSet", () => {
   });
 });
 
-describe("system prompt (§3)", () => {
-  it("stays near its ~250-token cache budget", () => {
-    // few-shots included; the whole prefix must stay cheap enough that a
-    // cache miss is noise (§8). Generous ceiling — the point is drift alarm.
-    expect(estimateTokens(EXPLANATION_SYSTEM_PROMPT)).toBeLessThanOrEqual(700);
+describe("system prompt (§3 + §10)", () => {
+  it("stays within its cached-prefix budget", () => {
+    // few-shots included; the v2 coach prefix is bigger than v1's ~250 tokens
+    // but still prompt-cached across every burst (§5), so the ceiling is a
+    // drift alarm, not a cost gate.
+    expect(estimateTokens(EXPLANATION_SYSTEM_PROMPT)).toBeLessThanOrEqual(1300);
   });
 
   it("binds the §1 multi-cause requirement and the house voice", () => {
     expect(EXPLANATION_SYSTEM_PROMPT).toContain("name both");
     expect(EXPLANATION_SYSTEM_PROMPT).toContain("no exclamation marks");
     expect(EXPLANATION_SYSTEM_PROMPT).toContain("pounds (lb)");
+  });
+
+  it("puts the why first and gates coaching on payload grounding (§10)", () => {
+    expect(EXPLANATION_SYSTEM_PROMPT).toContain("never displaced by coaching");
+    expect(EXPLANATION_SYSTEM_PROMPT).toContain("No grounding, no coaching");
+    expect(EXPLANATION_SYSTEM_PROMPT).toContain("2 to 4 plain sentences");
+    expect(EXPLANATION_SYSTEM_PROMPT).toContain("480 characters");
+  });
+
+  it("is stamped as prompt v2 (§10 — comparability across revisions)", () => {
+    expect(EXPLANATION_PROMPT_VERSION).toBe(2);
+    expect(EXPLANATION_MAX_CHARS).toBe(480);
   });
 });

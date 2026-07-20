@@ -3,6 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { createServiceClient } from "@/lib/supabase/service";
 import { describeError, reportError } from "@/lib/observability/report";
+import { PROGRESSION_RULE, engineParamsSchema } from "@/lib/engine";
+import {
+  PROGRESSION_LOOKBACK_DAYS,
+  aggregateProgressionEvents,
+  toProgressionAuditEvent,
+  type ProgressionAuditEvent,
+} from "@/lib/queries/progression-history";
 import { llmExplanationsGenerate } from "./config";
 import { createCompletion, type LlmCompletion } from "./openai";
 import {
@@ -14,7 +21,9 @@ import {
   estimateTokens,
   monthDay,
   postCheckExplanation,
+  projectTrend,
   type ExplanationContext,
+  type PayloadTrend,
 } from "./prescription-explainer";
 
 type Client = SupabaseClient<Database>;
@@ -196,6 +205,72 @@ interface DecisionRowSlice {
   kind: string;
 }
 
+/**
+ * §10 v2: the trend block per exercise — the progression-history aggregate
+ * (`aggregateProgressionEvents`) over the same lookback the pacer reads,
+ * folded from recorded decisions and priced through the ACTIVE params' e1RM
+ * curve. Best-effort by design: the trend is coaching context, so any failure
+ * here (no active params row yet, a query hiccup) omits the block rather than
+ * sinking the burst — the R20 report still fires for real errors.
+ */
+async function assembleTrends(
+  service: Client,
+  userId: string,
+  exerciseIds: string[],
+): Promise<Map<string, PayloadTrend>> {
+  const trends = new Map<string, PayloadTrend>();
+  if (exerciseIds.length === 0) return trends;
+  try {
+    const sinceIso = new Date(
+      Date.now() - PROGRESSION_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const [paramsResult, decisionsResult] = await Promise.all([
+      service
+        .from("engine_params")
+        .select("params")
+        .eq("is_active", true)
+        .limit(1),
+      service
+        .from("engine_decisions")
+        .select("id, kind, workout_id, exercise_id, microcycle_id, created_at, inputs, output")
+        .eq("user_id", userId)
+        .in("exercise_id", exerciseIds)
+        .contains("output", { trace: [{ rule: PROGRESSION_RULE }] })
+        .gte("created_at", sinceIso)
+        .order("created_at", { ascending: true })
+        .limit(1000),
+    ]);
+    if (paramsResult.error) throw paramsResult.error;
+    if (decisionsResult.error) throw decisionsResult.error;
+    const rawParams = paramsResult.data?.[0]?.params;
+    if (!rawParams) return trends; // no active params ⇒ nothing to price with
+    const params = engineParamsSchema.parse(rawParams);
+
+    const byExercise = new Map<string, ProgressionAuditEvent[]>();
+    for (const row of decisionsResult.data ?? []) {
+      if (!row.exercise_id) continue;
+      const cur = byExercise.get(row.exercise_id) ?? [];
+      cur.push(
+        toProgressionAuditEvent(
+          row as unknown as Parameters<typeof toProgressionAuditEvent>[0],
+          params,
+        ),
+      );
+      byExercise.set(row.exercise_id, cur);
+    }
+    for (const [exerciseId, events] of byExercise) {
+      const trend = projectTrend(
+        aggregateProgressionEvents(events),
+        PROGRESSION_LOOKBACK_DAYS,
+      );
+      if (trend) trends.set(exerciseId, trend);
+    }
+  } catch (error) {
+    await reportError("llm:explanations", error, { userId, stage: "trend" });
+  }
+  return trends;
+}
+
 async function assembleContexts(
   service: Client,
   userId: string,
@@ -214,7 +289,7 @@ async function assembleContexts(
     ...new Set(decisions.map((d) => d.mesocycle_id).filter((v): v is string => !!v)),
   ];
 
-  const [exercises, wes, micros, mesos, sets] = await Promise.all([
+  const [exercises, wes, micros, mesos, sets, pinnedNotes, sessionNotes, workoutFeedback, trends] = await Promise.all([
     exerciseIds.length
       ? service.from("exercises").select("id, name").in("id", exerciseIds)
       : Promise.resolve({ data: [], error: null }),
@@ -242,8 +317,35 @@ async function assembleContexts(
           // 3 sessions × a generous 8 sets, per exercise
           .limit(24 * exerciseIds.length)
       : Promise.resolve({ data: [], error: null }),
+    // §10 v2: the user's own words — pinned note per exercise…
+    exerciseIds.length
+      ? service
+          .from("exercise_notes")
+          .select("exercise_id, body, updated_at")
+          .eq("user_id", userId)
+          .eq("is_pinned", true)
+          .in("exercise_id", exerciseIds)
+          .order("updated_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    // …and the latest session note (`exercise_feedback.notes`, 09 session-5 §8)
+    service
+      .from("exercise_feedback")
+      .select("workout_exercise_id, notes, created_at")
+      .eq("user_id", userId)
+      .not("notes", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    // §10 v2: last workout-level feedback (fatigue/effort/performance)
+    service
+      .from("workout_feedback")
+      .select("overall_fatigue, effort_rating, performance_rating, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    // §10 v2: the progression trend block (best-effort, never throws)
+    assembleTrends(service, userId, exerciseIds),
   ]);
-  for (const result of [exercises, wes, micros, mesos, sets]) {
+  for (const result of [exercises, wes, micros, mesos, sets, pinnedNotes, sessionNotes, workoutFeedback]) {
     if (result.error) throw result.error;
   }
 
@@ -269,6 +371,63 @@ async function assembleContexts(
     ]),
   );
   const mgName = new Map((muscleGroups.data ?? []).map((m) => [m.id, m.name]));
+
+  // resolve the noted feedback rows' workout_exercises to exercise ids (their
+  // sessions are historical — disjoint from this burst's weIds)
+  const notedWeIds = [
+    ...new Set(
+      (sessionNotes.data ?? [])
+        .map((n) => (n as { workout_exercise_id?: string }).workout_exercise_id)
+        .filter((v): v is string => !!v),
+    ),
+  ];
+  const notedWes = notedWeIds.length
+    ? await service
+        .from("workout_exercises")
+        .select("id, exercise_id")
+        .in("id", notedWeIds)
+    : { data: [], error: null };
+  if (notedWes.error) throw notedWes.error;
+  const exerciseByNotedWe = new Map(
+    (notedWes.data ?? []).map((w) => [
+      w.id,
+      (w as { exercise_id?: string | null }).exercise_id ?? null,
+    ]),
+  );
+  // newest-first rows ⇒ first hit per exercise is its latest session note
+  const sessionNoteByExercise = new Map<string, string>();
+  for (const row of sessionNotes.data ?? []) {
+    const r = row as { workout_exercise_id?: string; notes?: string | null };
+    const exerciseId = r.workout_exercise_id
+      ? exerciseByNotedWe.get(r.workout_exercise_id)
+      : null;
+    if (exerciseId && r.notes && !sessionNoteByExercise.has(exerciseId)) {
+      sessionNoteByExercise.set(exerciseId, r.notes);
+    }
+  }
+
+  const pinnedByExercise = new Map<string, string>();
+  for (const row of pinnedNotes.data ?? []) {
+    const r = row as { exercise_id?: string; body?: string };
+    if (r.exercise_id && r.body && !pinnedByExercise.has(r.exercise_id)) {
+      pinnedByExercise.set(r.exercise_id, r.body);
+    }
+  }
+
+  const wfRow = (workoutFeedback.data ?? [])[0] as
+    | {
+        overall_fatigue?: number | null;
+        effort_rating?: number | null;
+        performance_rating?: number | null;
+      }
+    | undefined;
+  const lastWorkoutFeedback = wfRow
+    ? {
+        fatigue: wfRow.overall_fatigue ?? null,
+        effort: wfRow.effort_rating ?? null,
+        performance: wfRow.performance_rating ?? null,
+      }
+    : null;
   const weekByMicro = new Map(
     (micros.data ?? []).map((m) => [m.id, m.week_number]),
   );
@@ -295,6 +454,16 @@ async function assembleContexts(
       recent: decision.exercise_id
         ? (recentByExercise.get(decision.exercise_id) ?? [])
         : [],
+      pinnedNote: decision.exercise_id
+        ? (pinnedByExercise.get(decision.exercise_id) ?? null)
+        : null,
+      lastSessionNote: decision.exercise_id
+        ? (sessionNoteByExercise.get(decision.exercise_id) ?? null)
+        : null,
+      workoutFeedback: lastWorkoutFeedback,
+      trend: decision.exercise_id
+        ? (trends.get(decision.exercise_id) ?? null)
+        : null,
     });
   }
   return contexts;
