@@ -14,6 +14,22 @@
 > [`deployment/openai-api-setup.md`](deployment/openai-api-setup.md). §7.6
 > monitoring and the §10 v2 coaching layer remain.
 >
+> **Testing follow-up (2026-07-20, same day):** the first live run surfaced a
+> testability gap — generation is fire-and-forget (§5), so its failures were
+> visible only in Vercel function logs, and a fresh fingerprint meant no way
+> to re-trigger a generation without re-training. Follow-up PR adds:
+> `llm_explanation_failures` (durable, queryable failure log written beside
+> every R20 report; owner-or-admin SELECT) and four admin MCP tools —
+> `get_llm_explanation_status` (env config as the deployed function resolves
+> it + stored rows + recent failures), `test_llm_explanation` (one live call;
+> returns the exact upstream error; optional per-decision dry-run/store),
+> `generate_explanations` (synchronous scoped (re)generation, `overwrite` for
+> prompt iteration), and `recompute_prescriptions` (forced re-decide of open
+> rows — all / day coordinate / exercise — writing new decisions even when
+> numbers are unchanged, so the explanation pipeline re-keys). None of this
+> changes the §5 production lifecycle; it is the §9 voice-gate loop made
+> operable from a Claude session.
+>
 > Owner-commissioned 2026-07-19 alongside the
 > deterministic quick-read (PR #194, same session). This is the PH30 idea
 > ("LLM narrative layer", parked 2026-07-02) made concrete: model, payload,

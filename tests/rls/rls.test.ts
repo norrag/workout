@@ -1689,6 +1689,93 @@ describe("decision_explanations (doc 18)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// llm_explanation_failures (N58 follow-up): the durable generation-failure
+// log — same posture as decision_explanations (owner-or-admin SELECT,
+// service-role-only writes).
+// ---------------------------------------------------------------------------
+
+describe("llm_explanation_failures (N58 follow-up)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  async function seedFailure(): Promise<string> {
+    const { data, error } = await service
+      .from("llm_explanation_failures")
+      .insert({
+        user_id: aliceId,
+        decision_id: null,
+        stage: "generate",
+        error: "openai responded 404: model not found",
+        context: { model: "gpt-5.6-luna" },
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return data!.id as string;
+  }
+
+  it("owner can read their failure rows; the other user cannot", async () => {
+    const id = await seedFailure();
+
+    const { data: own, error: ownError } = await alice
+      .from("llm_explanation_failures")
+      .select("stage, error")
+      .eq("id", id)
+      .maybeSingle();
+    expect(ownError).toBeNull();
+    expect(own?.stage).toBe("generate");
+
+    const { data: cross } = await bob
+      .from("llm_explanation_failures")
+      .select("error")
+      .eq("id", id)
+      .maybeSingle();
+    expect(cross).toBeNull();
+  });
+
+  it("users cannot write failure rows directly", async () => {
+    const id = await seedFailure();
+
+    const { error: insertError } = await alice
+      .from("llm_explanation_failures")
+      .insert({
+        user_id: aliceId,
+        decision_id: null,
+        stage: "burst",
+        error: "forged",
+        context: null,
+      });
+    expect(insertError).not.toBeNull();
+
+    // update/delete silently match zero rows under RLS — prove the row survived
+    await alice
+      .from("llm_explanation_failures")
+      .update({ error: "tampered" })
+      .eq("id", id);
+    await alice.from("llm_explanation_failures").delete().eq("id", id);
+    const { data: after } = await service
+      .from("llm_explanation_failures")
+      .select("error")
+      .eq("id", id)
+      .single();
+    expect(after!.error).not.toBe("tampered");
+  });
+
+  it("the stage vocabulary is enforced at the DB", async () => {
+    const { error } = await service.from("llm_explanation_failures").insert({
+      user_id: aliceId,
+      decision_id: null,
+      stage: "mystery",
+      error: "x",
+      context: null,
+    });
+    expect(error).not.toBeNull();
+    expect(error!.code).toBe("23514"); // check constraint violation
+  });
+});
+
 describe("single active meso (R15)", () => {
   const service = createClient(URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },

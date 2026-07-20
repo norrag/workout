@@ -14,6 +14,7 @@ import {
   dropForeignDecisions,
   latestDecisionsByRow,
   liveWeekRirUpdates,
+  rowMatchesForce,
   type RecomputeArgs,
 } from "../regeneration";
 import { V15_PARAMS, V20_PARAMS } from "@/lib/engine/__tests__/helpers";
@@ -773,5 +774,27 @@ describe("latestDecisionsByRow (R11)", () => {
     const src = pageSource([row("d2", "other"), row("d1", "we1"), row("d0", null)]);
     const latest = await latestDecisionsByRow(src.fetch, ["we1"], 10);
     expect([...latest.keys()]).toEqual(["we1"]);
+  });
+});
+
+// --- rowMatchesForce (N58 follow-up: forced recompute scoping) ---------------
+
+describe("rowMatchesForce", () => {
+  const row = { exerciseId: "e1", weekNumber: 2, dayNumber: 3 };
+
+  it("an empty scope matches every open row (the all=true case)", () => {
+    expect(rowMatchesForce(row, {})).toBe(true);
+  });
+
+  it("matches on exercise, week, day — individually and combined", () => {
+    expect(rowMatchesForce(row, { exerciseId: "e1" })).toBe(true);
+    expect(rowMatchesForce(row, { exerciseId: "e2" })).toBe(false);
+    expect(rowMatchesForce(row, { weekNumber: 2 })).toBe(true);
+    expect(rowMatchesForce(row, { weekNumber: 3 })).toBe(false);
+    expect(rowMatchesForce(row, { weekNumber: 2, dayNumber: 3 })).toBe(true);
+    expect(rowMatchesForce(row, { weekNumber: 2, dayNumber: 1 })).toBe(false);
+    expect(
+      rowMatchesForce(row, { exerciseId: "e1", weekNumber: 2, dayNumber: 3 }),
+    ).toBe(true);
   });
 });

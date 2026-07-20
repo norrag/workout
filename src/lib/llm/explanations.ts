@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { createServiceClient } from "@/lib/supabase/service";
-import { reportError } from "@/lib/observability/report";
+import { describeError, reportError } from "@/lib/observability/report";
 import { llmExplanationsGenerate } from "./config";
 import { createCompletion, type LlmCompletion } from "./openai";
 import {
@@ -55,6 +55,41 @@ export interface ExplanationDeps {
   }) => Promise<LlmCompletion>;
 }
 
+// ---------------------------------------------------------------------------
+// durable failure log (N58 follow-up)
+// ---------------------------------------------------------------------------
+
+/** Where in the pipeline an attempt died (mirrors the table's check). */
+export type FailureStage = "burst" | "generate" | "post_check";
+
+/**
+ * Best-effort insert into `llm_explanation_failures` so a failed generation is
+ * queryable (SQL editor, `get_llm_explanation_status`) instead of visible only
+ * in Vercel function logs. Runs BESIDE the R20 report, never instead of it,
+ * and never throws — the failure log must not be able to break the failure
+ * path it records.
+ */
+async function recordFailure(
+  service: Client,
+  userId: string,
+  decisionId: string | null,
+  stage: FailureStage,
+  error: unknown,
+  context?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await service.from("llm_explanation_failures").insert({
+      user_id: userId,
+      decision_id: decisionId,
+      stage,
+      error: describeError(error).message.slice(0, 2000) || "unknown error",
+      context: context ?? null,
+    });
+  } catch {
+    // swallowed by design; the R20 report already fired
+  }
+}
+
 /** Schedule generation for specific just-written decision ids (seed + slot +
  *  reconcile sites, which see their ids). Synchronous, never throws. */
 export function scheduleDecisionExplanations(
@@ -62,7 +97,7 @@ export function scheduleDecisionExplanations(
   decisionIds: string[],
 ): void {
   if (!llmExplanationsGenerate() || decisionIds.length === 0) return;
-  fireAndForget(() => generateDecisionExplanations(userId, decisionIds));
+  fireAndForget(userId, () => generateDecisionExplanations(userId, decisionIds));
 }
 
 /** Schedule generation for every decision of one just-generated workout (the
@@ -72,7 +107,7 @@ export function scheduleWorkoutExplanations(
   workoutId: string,
 ): void {
   if (!llmExplanationsGenerate()) return;
-  fireAndForget(async () => {
+  fireAndForget(userId, async () => {
     const service = createServiceClient();
     const { data, error } = await service
       .from("engine_decisions")
@@ -94,11 +129,12 @@ export function scheduleWorkoutExplanations(
  *  the explanation is a display artifact and must not be able to break a
  *  write path. `next/server` is imported lazily so this module's consumers
  *  (query land) stay loadable under plain node/vitest. */
-function fireAndForget(task: () => Promise<unknown>): void {
+function fireAndForget(userId: string, task: () => Promise<unknown>): void {
   const run = () =>
-    task().catch((error) =>
-      reportError("llm:explanations", error, { stage: "burst" }),
-    );
+    task().catch(async (error) => {
+      await reportError("llm:explanations", error, { stage: "burst" });
+      await recordFailure(createServiceClient(), userId, null, "burst", error);
+    });
   void import("next/server")
     .then((mod) => mod.after(run))
     .catch(() => void run());
@@ -268,17 +304,46 @@ async function assembleContexts(
 // generation
 // ---------------------------------------------------------------------------
 
+/** One decision's generation outcome, surfaced by the admin tooling. */
+export interface ExplanationOutcome {
+  decisionId: string;
+  exercise: string | null;
+  ok: boolean;
+  /** on success: the stored body */
+  body?: string;
+  model?: string;
+  tokensIn?: number;
+  tokensOut?: number;
+  /** on failure: which stage died + the exact error */
+  stage?: FailureStage;
+  error?: string;
+}
+
+export interface ExplanationRunResult {
+  /** rows actually written (post-check passed + upsert succeeded) */
+  stored: number;
+  results: ExplanationOutcome[];
+}
+
+export interface GenerateOptions {
+  /** overwrite an existing explanation for the same decision (admin retesting;
+   *  the production hook keeps `ignoreDuplicates` so re-runs are harmless) */
+  overwrite?: boolean;
+}
+
 /**
  * Generate + store explanations for the given decisions. Exported for
- * integration tests (deps injectable); production entry is the `schedule*`
- * pair. Per-decision failures are isolated: one bad row never sinks the
- * burst. Returns the number of explanations stored.
+ * integration tests (deps injectable) and the admin MCP tools (synchronous,
+ * per-decision outcomes); production entry is the `schedule*` pair.
+ * Per-decision failures are isolated: one bad row never sinks the burst —
+ * each is R20-reported AND recorded in `llm_explanation_failures`.
  */
 export async function generateDecisionExplanations(
   userId: string,
   decisionIds: string[],
   deps?: Partial<ExplanationDeps>,
-): Promise<number> {
+  opts?: GenerateOptions,
+): Promise<ExplanationRunResult> {
   const service = deps?.service ?? createServiceClient();
   const complete = deps?.complete ?? createCompletion;
 
@@ -291,28 +356,43 @@ export async function generateDecisionExplanations(
     .in("id", decisionIds.slice(0, MAX_BURST));
   if (error) throw error;
   const decisions = (data ?? []) as DecisionRowSlice[];
-  if (decisions.length === 0) return 0;
+  if (decisions.length === 0) return { stored: 0, results: [] };
 
   const contexts = await assembleContexts(service, userId, decisions);
 
-  let stored = 0;
+  const results: ExplanationOutcome[] = [];
   for (let i = 0; i < decisions.length; i += CHUNK) {
-    const results = await Promise.all(
+    const chunk = await Promise.all(
       decisions.slice(i, i + CHUNK).map(async (decision) => {
+        const exercise = contexts.get(decision.id)?.exerciseName ?? null;
         try {
-          return await generateOne(service, userId, decision, contexts, complete);
+          return await generateOne(
+            service,
+            userId,
+            decision,
+            contexts,
+            complete,
+            opts?.overwrite ?? false,
+          );
         } catch (error) {
           await reportError("llm:explanations", error, {
             userId,
             decisionId: decision.id,
           });
-          return false;
+          await recordFailure(service, userId, decision.id, "generate", error);
+          return {
+            decisionId: decision.id,
+            exercise,
+            ok: false,
+            stage: "generate" as const,
+            error: describeError(error).message,
+          };
         }
       }),
     );
-    stored += results.filter(Boolean).length;
+    results.push(...chunk);
   }
-  return stored;
+  return { stored: results.filter((r) => r.ok).length, results };
 }
 
 async function generateOne(
@@ -321,9 +401,18 @@ async function generateOne(
   decision: DecisionRowSlice,
   contexts: Map<string, ExplanationContext>,
   complete: ExplanationDeps["complete"],
-): Promise<boolean> {
+  overwrite: boolean,
+): Promise<ExplanationOutcome> {
   const context = contexts.get(decision.id);
-  if (!context) return false;
+  if (!context) {
+    return {
+      decisionId: decision.id,
+      exercise: null,
+      ok: false,
+      stage: "generate",
+      error: "no context assembled for decision",
+    };
+  }
   const payload = buildExplanationPayload(
     { kind: decision.kind, inputs: decision.inputs, output: decision.output },
     context,
@@ -353,7 +442,21 @@ async function generateOne(
       new Error(`post-check failed: ${checked.reason}`),
       { userId, decisionId: decision.id, model: completion.model },
     );
-    return false;
+    await recordFailure(
+      service,
+      userId,
+      decision.id,
+      "post_check",
+      new Error(checked.reason),
+      { model: completion.model },
+    );
+    return {
+      decisionId: decision.id,
+      exercise: context.exerciseName,
+      ok: false,
+      stage: "post_check",
+      error: checked.reason,
+    };
   }
 
   const { error } = await service.from("decision_explanations").upsert(
@@ -366,8 +469,150 @@ async function generateOne(
       tokens_in: completion.tokensIn,
       tokens_out: completion.tokensOut,
     },
-    { onConflict: "decision_id", ignoreDuplicates: true },
+    { onConflict: "decision_id", ignoreDuplicates: !overwrite },
   );
   if (error) throw error;
-  return true;
+  return {
+    decisionId: decision.id,
+    exercise: context.exerciseName,
+    ok: true,
+    body: checked.body,
+    model: completion.model,
+    tokensIn: completion.tokensIn,
+    tokensOut: completion.tokensOut,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// diagnostics (N58 follow-up) — the admin MCP tools' service half
+// ---------------------------------------------------------------------------
+
+export interface ProbeResult {
+  ok: boolean;
+  /** the §3 payload sent (present when a decision was probed) */
+  payload?: Record<string, unknown>;
+  /** raw completion on success (NOT stored unless `store` was set) */
+  body?: string;
+  model?: string;
+  tokensIn?: number;
+  tokensOut?: number;
+  /** whether the row was written (only when `store` requested and checks passed) */
+  stored?: boolean;
+  /** §4 post-check verdict for a decision probe */
+  postCheck?: { ok: boolean; reason?: string };
+  /** the exact upstream/pipeline error on failure — the diagnostic this exists for */
+  error?: string;
+}
+
+/**
+ * One live OpenAI call with a trivial prompt — proves key, billing, model id,
+ * and request shape from INSIDE the deployed environment (where the env vars
+ * live), and returns the exact upstream error when any of them is wrong.
+ * Never stores anything; costs ~30 tokens.
+ */
+export async function probeLlmConnectivity(): Promise<ProbeResult> {
+  try {
+    const completion = await createCompletion({
+      instructions: "You are a connectivity check.",
+      input: "Reply with exactly: ok",
+      maxOutputTokens: 16,
+    });
+    return {
+      ok: true,
+      body: completion.text,
+      model: completion.model,
+      tokensIn: completion.tokensIn,
+      tokensOut: completion.tokensOut,
+    };
+  } catch (error) {
+    return { ok: false, error: describeError(error).message };
+  }
+}
+
+/**
+ * Run the FULL generation pipeline for one recorded decision — payload
+ * projection, live completion, §4 post-check — and return every intermediate,
+ * without storing unless `store` is set (then upserted with overwrite, so
+ * iterating on a single decision is cheap). User-scoped via the service
+ * client; the caller (admin MCP tool) supplies the session's own userId.
+ */
+export async function probeDecisionExplanation(
+  userId: string,
+  decisionId: string,
+  opts?: { store?: boolean },
+): Promise<ProbeResult> {
+  const service = createServiceClient();
+  const { data, error } = await service
+    .from("engine_decisions")
+    .select(
+      "id, workout_exercise_id, exercise_id, microcycle_id, mesocycle_id, inputs, output, kind",
+    )
+    .eq("user_id", userId)
+    .eq("id", decisionId)
+    .maybeSingle();
+  if (error) return { ok: false, error: describeError(error).message };
+  if (!data) return { ok: false, error: "decision not found (or not yours)" };
+  const decision = data as DecisionRowSlice;
+
+  const contexts = await assembleContexts(service, userId, [decision]);
+  const context = contexts.get(decision.id);
+  if (!context) return { ok: false, error: "no context assembled for decision" };
+  const payload = buildExplanationPayload(
+    { kind: decision.kind, inputs: decision.inputs, output: decision.output },
+    context,
+  );
+
+  let completion: LlmCompletion;
+  try {
+    completion = await createCompletion({
+      instructions: EXPLANATION_SYSTEM_PROMPT,
+      input: JSON.stringify(payload),
+      maxOutputTokens: EXPLANATION_MAX_OUTPUT_TOKENS,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      payload: payload as unknown as Record<string, unknown>,
+      error: describeError(error).message,
+    };
+  }
+
+  const checked = postCheckExplanation(completion.text, payload);
+  let stored = false;
+  if (checked.ok && opts?.store) {
+    const { error: upsertError } = await service
+      .from("decision_explanations")
+      .upsert(
+        {
+          decision_id: decision.id,
+          user_id: userId,
+          body: checked.body,
+          model: completion.model,
+          prompt_version: EXPLANATION_PROMPT_VERSION,
+          tokens_in: completion.tokensIn,
+          tokens_out: completion.tokensOut,
+        },
+        { onConflict: "decision_id", ignoreDuplicates: false },
+      );
+    if (upsertError)
+      return {
+        ok: false,
+        payload: payload as unknown as Record<string, unknown>,
+        body: completion.text,
+        error: describeError(upsertError).message,
+      };
+    stored = true;
+  }
+
+  return {
+    ok: checked.ok,
+    payload: payload as unknown as Record<string, unknown>,
+    body: completion.text,
+    model: completion.model,
+    tokensIn: completion.tokensIn,
+    tokensOut: completion.tokensOut,
+    stored,
+    postCheck: checked.ok ? { ok: true } : { ok: false, reason: checked.reason },
+    ...(checked.ok ? {} : { error: `post-check failed: ${checked.reason}` }),
+  };
 }
