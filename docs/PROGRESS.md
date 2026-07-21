@@ -2,7 +2,31 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-19 (latest) — N57/N58: prescription presentation split — quick-read strip + Engine audit; LLM explanation spec'd (doc 18)
+## 2026-07-21 (latest) — N59: catch-up restamp of stored per-set e1RM to the v11+ model
+
+Owner (Batch 21): stored `logged_sets.e1rm` was never restamped after v11
+introduced `brzycki_max_eff_reps: 10`. Root cause = the T-N33 restamp hook
+(PR #147) only fires when an activation's `e1rm` block differs from the
+**previous active** version's, not from the stored stamp; the block changed
+exactly once (v10→v11) but v11 shipped inactive before the hook existed, and
+every activation since (v11→v25) left the block byte-identical — so it never
+re-fired and pre-v11 averaged-formula stamps persisted, inflating e1RM on
+sets with effective reps > 10.
+
+- **Migration `20260721000001`** — idempotent one-time catch-up: recompute every
+  `logged_sets.e1rm` under the active v11+ model (Epley-only above 10 effective
+  reps), computed in **double precision** to match the JS engine's float64
+  `Math.round` exactly (exact-decimal rounding diverges on ~10 half-way ties).
+  Verified against the real TS `estimateE1rm` over all 1153 prod (weight,
+  effReps) combos — 0 mismatches. Confidence bands untouched (unchanged by v11).
+- **Applied to hosted prod via MCP (2026-07-21):** 4919 rows across 3 users,
+  rollback snapshot in `ops.e1rm_restamp_backup_20260721`, idempotent (second
+  pass 0 diffs). Effect: 131/220 user-exercise best-e1RM values corrected
+  downward (avg −15.9 lb), concentrated on high-rep/bodyweight lifts; the
+  canonical Deadlift 384.2 → 367.5. Restamp policy left as-is — it now catches
+  every future `e1rm`-block change since the stamps are caught up. (N59)
+
+## 2026-07-19 — N57/N58: prescription presentation split — quick-read strip + Engine audit; LLM explanation spec'd (doc 18)
 
 Owner (Batch 20): the prescription details panel reads as a debugging panel;
 split the presentation into a user-friendly quick-read (deployable now,
