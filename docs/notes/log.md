@@ -4,6 +4,40 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-21 — Session 83: N59 — catch-up restamp of stored e1RM past v11 (PR #198)
+
+Owner (Batch 21): stored `logged_sets.e1rm` never restamped after v11 introduced
+`brzycki_max_eff_reps: 10`; back-fill all users, and a diff of the effect on
+strength metrics if feasible.
+
+- **Root cause confirmed.** T-N33's `e1rmBlockChanged` (queries/e1rm-restamp.ts)
+  compares the incoming activation's `e1rm` block to the **outgoing** one, not to
+  the stored stamp. The block changed once (v10→v11); v11 shipped inactive and
+  the restamp hook didn't exist yet, so by the time it landed the block was
+  byte-identical on every activation v11→v25 (verified in prod) — the hook never
+  re-fired. Pre-v11 averaged-Epley+Brzycki stamps persisted, inflating e1RM on
+  effective-reps > 10 sets.
+- **Faithful recompute.** Reproduced the engine's `estimateE1rm` for the active
+  params (rir_offset 1, brzycki cutoff 10) in SQL. Ran it in **double precision**
+  (float64) with `Math.round` as `floor(x*10+0.5)/10` — numeric/exact rounding
+  disagreed with the engine on 10 half-way ties (e.g. 22.5×13 eff = 32.25 →
+  engine 32.3). Validated the SQL output against the **real TS engine** across all
+  **1153** distinct (weight, effReps) combos: **0 mismatches** (golden 245×15→367.5,
+  245×8@2→326.7 pass).
+- **Applied to prod (MCP).** Rollback snapshot of all 11,149 prior stamps →
+  `ops.e1rm_restamp_backup_20260721` (non-public schema, not API-exposed), then
+  the guarded UPDATE: **4919 rows** rewritten across **3 users**; idempotent second
+  pass = 0 diffs. Deadlift best now 367.5 (was 384.2). Confidence bands unchanged
+  (the v11 delta touches only the value).
+- **Strength-metrics diff.** 131/220 user-exercise best-e1RM values corrected
+  downward (avg −15.9 lb, max −218.1); largest drops on high-rep / bodyweight
+  movements (walking lunges, back raises, weighted sit-ups, seated leg curl)
+  where the averaged formula inflated most.
+- **Durable record.** Idempotent migration `20260721000001` (no-op on the
+  already-backfilled prod; performs the catch-up in every other environment).
+  Policy left unchanged per the owner — it now always catches future `e1rm`-block
+  changes since the stamps are caught up.
+
 ## 2026-07-20 — Session 82: N58 v2 — the §10 coaching layer (PR #197)
 
 Owner: v1 is implemented and tested; build v2. Shipped doc 18 §10 exactly as
