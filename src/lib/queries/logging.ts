@@ -1232,6 +1232,59 @@ export async function saveExerciseFeedback(
 }
 
 /**
+ * Attribute joint pain to a specific exercise in the muscle group without
+ * disturbing its other feedback (pump / workload / soreness / notes). Backs the
+ * fig 1.4 revision's "which exercise caused it?" multi-select: joint pain is
+ * collected once the group closes but the lifter can pin it to the exercise(s)
+ * that actually hurt, so the level lands on each selected exercise's row and
+ * clears (null) on the deselected ones. Only the `joint_pain` (+ group id when
+ * recording pain) columns are touched. Clearing an exercise that has no feedback
+ * row is a no-op — no empty rows are created just to store "no pain".
+ */
+export async function setExerciseJointPain(
+  supabase: Client,
+  userId: string,
+  input: {
+    workout_exercise_id: string;
+    joint_pain: number | null;
+    muscle_group_id: string | null;
+  },
+): Promise<void> {
+  const { data: existing, error: existingError } = await supabase
+    .from("exercise_feedback")
+    .select("id")
+    .eq("workout_exercise_id", input.workout_exercise_id)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing) {
+    // preserve everything else on the row; a clear touches only joint_pain
+    const patch =
+      input.joint_pain != null
+        ? { joint_pain: input.joint_pain, muscle_group_id: input.muscle_group_id }
+        : { joint_pain: null };
+    const { error } = await supabase
+      .from("exercise_feedback")
+      .update(patch)
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else if (input.joint_pain != null) {
+    const { error } = await supabase.from("exercise_feedback").insert({
+      workout_exercise_id: input.workout_exercise_id,
+      user_id: userId,
+      joint_pain: input.joint_pain,
+      muscle_group_id: input.muscle_group_id,
+      pump: null,
+      workload: null,
+      soreness: null,
+      soreness_days: null,
+      notes: null,
+    });
+    if (error) throw error;
+  }
+}
+
+/**
  * Session log note (09 session-5 §8) — a per-(workout_exercise) note saved with
  * that session's exercise log, distinct from the cross-workout pinned note. It
  * reuses `exercise_feedback.notes` (one row per workout_exercise): the

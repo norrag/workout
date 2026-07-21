@@ -29,6 +29,7 @@ import {
   removeWorkoutExercise,
   replaceWorkoutExercise,
   saveExerciseFeedback,
+  setExerciseJointPain,
   savePinnedNote,
   saveSessionNote,
   saveWorkoutFeedback,
@@ -54,6 +55,7 @@ import {
 } from "@/lib/queries/progression";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
+import { resolveJointPainAttribution } from "./feedback-attribution";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -447,6 +449,15 @@ const feedbackSchema = z.object({
   workload: z.coerce.number().int().min(0).max(10).nullable(),
   soreness: z.coerce.number().int().min(0).max(10).nullable(),
   soreness_days: z.coerce.number().int().min(0).max(5).nullable(),
+  // fig 1.4 revision — joint-pain attribution. Joint pain is collected once the
+  // muscle group closes; the lifter may pin it to the exercise(s) that actually
+  // hurt. `pain_exercise_ids` are the selected performed exercises;
+  // `group_exercise_ids` are every performed exercise in the group (so the
+  // deselected ones can be cleared). Both null when the group section wasn't
+  // shown (soreness-only prompt). An empty selection with pain reported defaults
+  // to attributing the pain to every performed exercise in the group.
+  pain_exercise_ids: z.array(z.string().uuid()).max(30).nullable(),
+  group_exercise_ids: z.array(z.string().uuid()).max(30).nullable(),
 });
 
 export async function saveFeedbackAction(input: {
@@ -458,18 +469,42 @@ export async function saveFeedbackAction(input: {
   workload: number | null;
   soreness: number | null;
   soreness_days: number | null;
+  pain_exercise_ids: string[] | null;
+  group_exercise_ids: string[] | null;
 }): Promise<void> {
   const parsed = feedbackSchema.parse(input);
   const { supabase, user } = await requireUser();
+
+  // Resolve the per-exercise write plan: the group-closing row carries the
+  // group-scoped pump / workload / soreness, while joint pain follows the
+  // lifter's attribution across the group's performed exercises (fig 1.4).
+  const { closerPain, others } = resolveJointPainAttribution({
+    closerId: parsed.workout_exercise_id,
+    jointPain: parsed.joint_pain,
+    painExerciseIds: parsed.pain_exercise_ids,
+    groupExerciseIds: parsed.group_exercise_ids,
+  });
+
   await saveExerciseFeedback(supabase, user.id, {
     workout_exercise_id: parsed.workout_exercise_id,
-    joint_pain: parsed.joint_pain,
+    joint_pain: closerPain,
     muscle_group_id: parsed.muscle_group_id,
     pump: parsed.pump,
     workload: parsed.workload,
     soreness: parsed.soreness,
     soreness_days: parsed.soreness_days,
   });
+
+  // Attribute (or clear) joint pain on the remaining performed exercises of the
+  // group, leaving their pump / workload / soreness / notes untouched.
+  for (const other of others) {
+    await setExerciseJointPain(supabase, user.id, {
+      workout_exercise_id: other.id,
+      joint_pain: other.jointPain,
+      muscle_group_id: parsed.muscle_group_id,
+    });
+  }
+
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
 }

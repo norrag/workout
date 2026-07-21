@@ -42,6 +42,44 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-21 — Feedback card: joint-pain exercise attribution (fig 1.4)
+
+Owner-reported: joint pain is collected once a muscle group closes, but it was
+stored on the group-*closing* exercise, so the engine's pain gate and the MCP
+feedback rollup attributed it to whichever exercise was last rather than the one
+that actually hurt (e.g. AC-joint pain on bench press mis-read as pain during the
+incline press that followed). Joint pain is genuinely per-exercise; the card
+must let the lifter say which exercise(s) caused it.
+
+### 1. "Which exercise caused it?" multi-select (fig 1.4)
+
+- **Change:** in the group-close feedback prompt, when real joint pain (Low /
+  Moderate / High — i.e. > None) is reported **and** the muscle group has more
+  than one performed exercise, a new section appears below the Joint pain
+  buttons: a bold label "Which exercise caused it?" with a tracked
+  `— optional; defaults to all` sublabel, then one full-width selectable button
+  per performed exercise in the group (vertical stack, left-aligned names).
+  Multi-select — any number may be on. Selection uses the same light-ledger
+  grammar as the pain / days-sore buttons (`accent` fill + `bg-base` text when
+  on, `ink/40` hairline border when off; square corners). The Joint pain
+  sublabel reads `— today's <group> work` when the group has multiple performed
+  exercises, and `— during <exercise>` for a single-exercise group (unchanged).
+- **Behavior:** the pain **level** lands on each selected exercise's feedback
+  row and clears on the deselected ones; an **empty** selection with pain
+  reported defaults to attributing the pain to **all** performed exercises
+  (conservative — the gate fires on each). None / soreness-only prompts show
+  none of this (card stays clean). Pump / workload / soreness remain
+  group-scoped on the closing exercise. On edit the section reconstructs the
+  prior attribution from whichever rows carry pain.
+- **Rationale:** put the pain gate on the exercise that hurt; keep the common
+  path (no pain, or single-exercise groups) exactly as before.
+- **Affected figures:** `1.4`.
+- **Impact:** `RETROFIT` — fig 1.4 already built. No mockup figure exists for
+  the attribution control (rule-8 deviation, recorded here + in PROGRESS.md);
+  it reuses the existing feedback-button grammar. **No `DATA` change** —
+  `exercise_feedback.joint_pain` is already per-`workout_exercise`; only the
+  write path changed (level fans out across the attributed exercises).
+
 ## 2026-07-19 — Day View: prescription quick-read strip + the detail sheet becomes the Engine audit (N57)
 
 Owner-directed rework of prescription presentation: "what we have now feels
