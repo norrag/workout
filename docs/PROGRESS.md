@@ -2,7 +2,36 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-21 (latest) — N59: catch-up restamp of stored per-set e1RM to the v11+ model
+## 2026-07-21 (latest) — joint-pain exercise attribution (fig 1.4 revision)
+
+Owner: joint pain was collected once a muscle group closed but stored on the
+group-*closing* exercise, so the engine's pain gate (doc 10 §3 step 0) and the
+MCP feedback rollup attributed it to whichever exercise happened to be last —
+not the one that hurt (e.g. AC-joint pain on bench press mis-attributed to the
+incline press that followed it).
+
+- **Feedback card (fig 1.4):** when the group has more than one performed
+  exercise and real pain (> None) is reported, a new optional "Which exercise
+  caused it?" multi-select lists the group's performed exercises. Select any
+  number; an empty selection defaults to attributing the pain to all of them.
+  Hidden entirely for None / soreness-only prompts so the card stays clean.
+- **Storage:** no schema change — `exercise_feedback.joint_pain` is already
+  per-exercise and the engine/rollup already read it per-exercise. The pain
+  level now lands on each attributed exercise's row (and clears on the
+  deselected ones); pump / workload / soreness stay group-scoped on the closer.
+  New `setExerciseJointPain` query touches only `joint_pain` so a sibling's
+  soreness/notes survive; `saveFeedbackAction` writes the closer plus the
+  attributed siblings.
+- **Pure attribution helper:** `src/app/(app)/log/feedback-attribution.ts`
+  (`resolveJointPainAttribution`) resolves the write plan; 7 unit tests cover
+  single-exercise groups, default-all, pin-away-from-closer, None-clears, and
+  the soreness-only path.
+- **Rule-8 deviation (recorded):** the "which exercise caused it?" control has
+  no mockup figure — it reuses the pain-button / days-sore light-ledger grammar
+  (accent = selection, square corners, tracked sublabel). Recorded in the
+  09-changelog 2026-07-21 entry.
+
+## 2026-07-21 — N59: catch-up restamp of stored per-set e1RM to the v11+ model
 
 Owner (Batch 21): stored `logged_sets.e1rm` was never restamped after v11
 introduced `brzycki_max_eff_reps: 10`. Root cause = the T-N33 restamp hook

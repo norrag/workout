@@ -496,6 +496,19 @@ export function DayView({
       <FeedbackSheet
         key={feedbackFor?.id ?? "none"}
         we={feedbackFor}
+        groupExercises={
+          feedbackFor
+            ? [feedbackFor, ...groupSiblings(feedbackFor)]
+                // only exercises actually performed can have caused pain
+                .filter((x) => x.sets.length > 0)
+                .sort((a, b) => a.position - b.position)
+                .map((x) => ({
+                  id: x.id,
+                  exercise_name: x.exercise_name,
+                  joint_pain: x.feedback?.joint_pain ?? null,
+                }))
+            : []
+        }
         workoutId={workout.id}
         weekNumber={microcycle.week_number}
         withSoreness={feedbackFor ? isFirstOfGroup(feedbackFor) : false}
@@ -2578,9 +2591,17 @@ const PAIN_OPTIONS = ["None", "Low", "Moderate", "High"];
  * - When the group is COMPLETE (last exercise) → joint pain + pump + workload.
  * - A single-exercise group is both, so it shows everything at once.
  * Editing via the menu re-opens with whatever the row already holds.
+ *
+ * Joint-pain attribution (2026-07-21): joint pain is collected once the group
+ * closes but stored per exercise, so when the group has more than one performed
+ * exercise and real pain is reported the sheet asks WHICH exercise(s) caused it
+ * (multi-select, optional). An empty selection defaults to attributing the pain
+ * to every performed exercise in the group; the engine's pain gate then applies
+ * to the exercise that actually hurt rather than whichever one closed the group.
  */
 function FeedbackSheet({
   we,
+  groupExercises,
   workoutId,
   weekNumber,
   withSoreness,
@@ -2588,6 +2609,7 @@ function FeedbackSheet({
   onClose,
 }: {
   we: LoggedExercise | null;
+  groupExercises: { id: string; exercise_name: string; joint_pain: number | null }[];
   workoutId: string;
   weekNumber: number;
   withSoreness: boolean;
@@ -2595,9 +2617,30 @@ function FeedbackSheet({
   onClose: () => void;
 }) {
   // prefill from any existing feedback (editing) — the sheet is keyed per
-  // exercise so these initial values are correct on each open
+  // exercise so these initial values are correct on each open. The pain LEVEL
+  // may live on a sibling row (attributed away from the closer), so read it
+  // across the group, not just off this exercise's own row.
   const existing = we?.feedback ?? null;
-  const [pain, setPain] = useState<number | null>(existing?.joint_pain ?? null);
+  const groupPain = groupExercises.reduce<number | null>(
+    (acc, e) =>
+      e.joint_pain == null
+        ? acc
+        : acc == null
+          ? e.joint_pain
+          : Math.max(acc, e.joint_pain),
+    null,
+  );
+  const [pain, setPain] = useState<number | null>(
+    groupPain ?? existing?.joint_pain ?? null,
+  );
+  // which performed exercises the pain is pinned to — prefilled from whichever
+  // rows already carry pain (reconstructs a prior attribution on edit)
+  const [painIds, setPainIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        groupExercises.filter((e) => (e.joint_pain ?? 0) > 0).map((e) => e.id),
+      ),
+  );
   const [pump, setPump] = useState(existing?.pump ?? 5);
   const [workload, setWorkload] = useState(existing?.workload ?? 5);
   const [soreness, setSoreness] = useState(existing?.soreness ?? 3);
@@ -2612,16 +2655,24 @@ function FeedbackSheet({
   if (!we) return null;
   const mg = we.muscle_group || "Session";
 
-  // show a section when its role applies OR the row already carries that data
+  // show a section when its role applies OR the row already carries that data.
+  // The group section (joint pain + pump + workload) belongs to the group-
+  // closing exercise; pump/workload gate its appearance, NOT joint pain, so a
+  // sibling that only carries attributed pain doesn't sprout stray sliders.
   const showSoreness = withSoreness || existing?.soreness != null;
   const showGroup =
-    withGroupScope ||
-    existing?.joint_pain != null ||
-    existing?.pump != null ||
-    existing?.workload != null;
+    withGroupScope || existing?.pump != null || existing?.workload != null;
+  // attribution only matters with real pain (> 0) and a choice to make (more
+  // than one performed exercise in the group)
+  const showAttribution =
+    showGroup && pain != null && pain > 0 && groupExercises.length > 1;
 
   const disabled =
-    (showGroup && pain === null) || (showSoreness && sorenessDays === null);
+    // nothing to give (a middle exercise opened via the menu) — saving would
+    // otherwise clear a row that only carries pain attributed from the group
+    (!showGroup && !showSoreness) ||
+    (showGroup && pain === null) ||
+    (showSoreness && sorenessDays === null);
 
   return (
     <BottomSheet
@@ -2678,7 +2729,10 @@ function FeedbackSheet({
           <div className="text-[13px] font-bold">
             Joint pain{" "}
             <span className="text-xs font-normal text-ink/55">
-              — during {we.exercise_name.toLowerCase()}
+              —{" "}
+              {groupExercises.length > 1
+                ? `today's ${mg.toLowerCase()} work`
+                : `during ${we.exercise_name.toLowerCase()}`}
             </span>
           </div>
           <div className="mt-2 grid grid-cols-4 gap-[7px]">
@@ -2698,6 +2752,46 @@ function FeedbackSheet({
               </button>
             ))}
           </div>
+
+          {/* which exercise(s) caused it — only when there's a choice to make.
+              Optional: an empty selection attributes the pain to all of them. */}
+          {showAttribution && (
+            <div className="mt-3">
+              <div className="text-[13px] font-bold">
+                Which exercise caused it?{" "}
+                <span className="text-xs font-normal text-ink/55">
+                  — optional; defaults to all
+                </span>
+              </div>
+              <div className="mt-2 flex flex-col gap-[6px]">
+                {groupExercises.map((ex) => {
+                  const on = painIds.has(ex.id);
+                  return (
+                    <button
+                      key={ex.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setPainIds((cur) => {
+                          const next = new Set(cur);
+                          if (next.has(ex.id)) next.delete(ex.id);
+                          else next.add(ex.id);
+                          return next;
+                        })
+                      }
+                      className={`h-[44px] px-3 text-left text-[13px] ${
+                        on
+                          ? "bg-accent font-bold text-bg-base"
+                          : "border border-ink/40 font-medium text-ink"
+                      }`}
+                    >
+                      {ex.exercise_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2770,6 +2864,12 @@ function FeedbackSheet({
                   workload: showGroup ? workload : null,
                   soreness: showSoreness ? soreness : null,
                   soreness_days: showSoreness ? sorenessDays : null,
+                  // attribution rides along only for the group section; the
+                  // action clears deselected exercises and defaults empty → all
+                  pain_exercise_ids: showGroup ? [...painIds] : null,
+                  group_exercise_ids: showGroup
+                    ? groupExercises.map((e) => e.id)
+                    : null,
                 });
                 onClose();
               } catch {
