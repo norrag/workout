@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-23 — Session 86: prescription explanation v3, phase 3 built (N60, phase-3 PR)
+## 2026-07-23 — Session 86: prescription explanation v3, phase 3 built (N60, PR #202)
 
 Built doc 19 phase 3 on a fresh branch (PR #201 having merged) — the LLM
 re-enters the pipeline, fenced by the phase-2 facts + triggers. Ships in shadow.
