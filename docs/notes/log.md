@@ -4,6 +4,28 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-23 — Session 86: prescription explanation v3, phase 3 built (N60, PR #202)
+
+Built doc 19 phase 3 on a fresh branch (PR #201 having merged) — the LLM
+re-enters the pipeline, fenced by the phase-2 facts + triggers. Ships in shadow.
+
+- **Storage:** migration `20260723000001` adds `triggers text[]` to
+  `decision_explanations` (nullable/additive); **applied + verified on hosted
+  prod via MCP**. RLS unchanged; round-trip test added. DB types updated.
+- **Generation contract:** new pure `src/lib/llm/coaching.ts` — prompt v3
+  (analyst voice, tone prohibitions verbatim, effort-honesty rule, few-shots on
+  facts payloads incl. abstention + low-confidence), structured JSON output
+  `{coaching_context, note_class, abstain}`, extended post-check (abstention =
+  no row; ≤360; facts number-set; note-only + non-actionable class ⇒ discard).
+- **Generation path:** `generateOne` now skips the API call when no trigger
+  fires (the silent majority), feeds the facts payload, parses, post-checks,
+  stores body + triggers + `prompt_version 3`; outcomes carry a `disposition`.
+  Admin tools surface the disposition breakdown + v3 prompt_version; the probe
+  runs the same v3 path.
+- **Owner next step (gate before phase 4):** voice-read a regenerated v3 batch
+  via `generate_explanations overwrite:true` (shadow) or `test_llm_explanation`
+  on single decisions. Full suite green (1353), typecheck + lint clean.
+
 ## 2026-07-23 — Session 85: prescription explanation v3, phases 1–2 built (N60, PR #201)
 
 Built the first two of doc 19's five phases — the pure, no-model-risk half that

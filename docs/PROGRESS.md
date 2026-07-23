@@ -2,7 +2,53 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-23 (latest) — prescription explanation v3, phases 1–2 (doc 19)
+## 2026-07-23 (latest) — prescription explanation v3, phase 3 (doc 19)
+
+Phase 3 — prompt v3 + structured output + the storage delta — shipped as a
+separate PR on top of phases 1–2. The LLM re-enters the pipeline, now fenced by
+the phase-2 facts + triggers. **Ships in shadow:** generation is gated by
+`LLM_EXPLANATIONS`; serving still needs mode=on AND the phase-4 strip flip, so
+nothing new renders. The owner voice-reads a regenerated batch via the admin
+overwrite loop (`generate_explanations overwrite:true`) before phase 4.
+
+- **Storage (§6.3):** migration `20260723000001_decision_explanations_triggers`
+  adds `triggers text[]` (nullable, additive — v1–v2 rows stay valid; the 480
+  DB check stays the backstop). **Applied + verified on hosted prod via MCP
+  2026-07-23** (column present, ARRAY, nullable). RLS unchanged (per-row, not
+  per-column); a round-trip test pins the posture. DB types + `Defaulted` list
+  updated.
+- **Generation contract (§6.2) — new pure `src/lib/llm/coaching.ts`:** prompt
+  v3 (`COACHING_PROMPT_VERSION = 3`, analyst voice, the review's tone
+  prohibitions verbatim, the effort-status honesty rule, few-shots rebuilt on
+  FACTS payloads incl. an abstention example + the low-confidence "no
+  conclusion yet" example); structured JSON output
+  `{coaching_context, note_class, abstain}` parsed leniently; extended
+  post-check against the facts payload (abstention = success/no row; ≤360;
+  every numeral in the facts number set; note-only + non-actionable class ⇒
+  discard).
+- **Generation path (§7.1):** `generateOne` projects facts + scores triggers,
+  **skips the API call entirely when no trigger fires** (the silent majority),
+  feeds the facts payload + v3 prompt, parses, post-checks, stores body +
+  triggers + `prompt_version 3`. Outcomes gain a `disposition`
+  (stored/skipped/abstained/discarded/error); the stored tally counts real
+  rows. `probeDecisionExplanation` runs the same v3 path and returns facts +
+  triggers + note_class + abstain. Admin tools surface the disposition
+  breakdown + the v3 prompt_version. The v2 payload/prompt/post-check in
+  `prescription-explainer.ts` are retained as the doc-18 record (with their
+  tests) but no longer on the generation path.
+- Tests: new `coaching.test.ts`, reworked `explanations.test.ts` to the
+  trigger-gated path, RLS triggers round-trip. Full suite green (**1353**),
+  typecheck + lint clean.
+
+**Remaining (owner-gated, per doc 19 §11):**
+- Phase 4 — flip the strip's coach line on (with its docs/09-logged design
+  treatment), the MCP `facts` field on `explain_prescription`, note-write
+  regeneration hooks (§7.2); measure a month. **Owner voice-reads a v3 batch
+  first** (admin `generate_explanations overwrite:true` in shadow, or
+  `test_llm_explanation` on single decisions).
+- Phase 5 — the §8 deferred surfaces and §10 spun-off items (T-N60a–f).
+
+## 2026-07-23 — prescription explanation v3, phases 1–2 (doc 19)
 
 Implements the first two of doc 19's five phases — the pure, no-model-risk half
 that improves the product on its own. The LLM re-enters only at phase 3, so
