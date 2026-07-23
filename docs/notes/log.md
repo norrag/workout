@@ -4,6 +4,36 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-23 — Session 84: Batch 22 intake — prescription explanation v3 spec (N60)
+
+Owner handed over a full review document of the live v2 explanation output
+("LLM_Coaching_Assessment_Reviewed.md") plus the directive to assess it,
+connect the dots against the codebase, and write the v3 spec + implementation
+plan — with license to amend nuances the owner doesn't fully endorse.
+
+- **Captured.** Review doc preserved verbatim →
+  [`docs/reviews/2026-07-23-llm-coaching-assessment-owner.md`](../reviews/2026-07-23-llm-coaching-assessment-owner.md)
+  (provenance header added); chat directive in the backlog appendix (Batch 22).
+- **Assessed against the code.** All five diagnosed failure modes traced to
+  real design facts, not prompt bugs: `projectTrace` sends the raw trace
+  verbatim; the payload carries the two-rate prescribed/measured pair the
+  model then mis-reconciles; the RIR premise (assumed = target) is invisible
+  to the model; raw notes + a "coach" instruction manufacture relevance;
+  `substituteExplanation` replaces the deterministic why wholesale and every
+  decision generates.
+- **Spec written** → [`docs/19-prescription-explanation-v3.md`](../19-prescription-explanation-v3.md)
+  (authoritative over doc 18 for content architecture/voice/payload/triggers/
+  seam; doc 18 keeps infra). Five recorded amendments to the owner doc (19 §2):
+  LLM `why` field dropped entirely (deterministic composer is the sole why
+  author); note classification inside the one generation call; decision-id
+  keying kept (+ note-write regeneration hooks instead of a context
+  fingerprint); analyst voice as a refinement of the §10 register; the
+  data-collection phase severed into separate backlog candidates (19 §10 —
+  to be filed as items when the owner prioritizes; note: per-set
+  `rir_reported` already exists, the gap is UX adoption).
+- **New item N60** (F/HIGH/H, ready): build = 19 §11, five sequenced PRs;
+  phases 1–2 are LLM-free and independently valuable.
+
 ## 2026-07-21 — Session 83: N59 — catch-up restamp of stored e1RM past v11 (PR #198)
 
 Owner (Batch 21): stored `logged_sets.e1rm` never restamped after v11 introduced
