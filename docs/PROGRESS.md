@@ -2,7 +2,74 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-21 (latest) — joint-pain exercise attribution (fig 1.4 revision)
+## 2026-07-23 (latest) — prescription explanation v3, phases 1–2 (doc 19)
+
+Implements the first two of doc 19's five phases — the pure, no-model-risk half
+that improves the product on its own. The LLM re-enters only at phase 3, so
+nothing here changes a live model surface.
+
+**Phase 1 — seam inversion + Layer-2 hardening (§3, §4).**
+- The seam inverts: the deterministic ask + why now ALWAYS render, and a stored
+  LLM line is *appended* beneath them (`appendCoaching`) as an additive coach
+  line rather than substituted for the composed body. `substituteExplanation`
+  is retired. The ask/out-of-band guards carry over: an out-of-band (N33 S4)
+  row drops the coach line and keeps its hand-adjusted caveat; an unpriced row
+  never carries coaching. `PrescriptionNarrative` gains a `coach` field.
+- Serving cut (§3): stored rows are served only at `prompt_version >= 3`, in
+  both the day-view audit query (`getPrescriptionAudit`) and MCP
+  `explain_prescription`. Nothing serves today (no v3 rows exist) — the safe
+  deterministic-only floor — and v1–v2 whole-blob rows age out as decisions
+  recompute.
+- Layer-2 copy hardening in `prescription-narrative.ts`: §4.1 difficulty
+  framing (the paced line reads as a load step *held back*, never "no
+  increase"); §4.2 vocabulary pass (program-language throughout; the word
+  "engine" now appears only in the Engine audit sheet); §4.3 effort honesty (a
+  new `effortStatus` input gates the grade line's effort claim — inferred
+  effort is never stated as observed, the safe default); §4.4 suppression tests
+  pin the why at ≤3 lines under any trace stack.
+- **Rule-8 note:** the strip's `COACH`-line *visual treatment* is deferred to
+  phase 4 (it needs a docs/09 design decision, and nothing serves until then).
+  The `coach` field is plumbed through the narrative type; the strip does not
+  yet render it.
+
+**Phase 2 — facts + triggers, pure (§5, §6.1).**
+- `src/lib/llm/explanation-facts.ts` — `(decision, context) → ExplanationFacts`,
+  the model's entire v3 worldview, replacing the raw-trace payload. One verdict
+  per axis (`pace_status`, `trend_status`, `effort_status`,
+  `prescription_change`, `primary_reason`, a single approved `load_reason`, a
+  template `program_context`); never a raw trace string, governor name, or a
+  pair of rates (v2 failure mode 2 becomes unrepresentable). The §5.1 gates are
+  code: a paced step reads ahead-of-pace; a plateau needs ≥4 comparable
+  non-deload sessions at moderate+ e1RM confidence AND a flat measured gain, so
+  the Bench Press low-confidence case projects `insufficient_data`, not
+  `plateau`. The note is the ONE fenced free-text field.
+- `src/lib/llm/coaching-triggers.ts` — pure `(facts, signals) → Trigger[]`; an
+  empty array ⇒ no API call, no row. Routine mid-block progression with no
+  note/pain/modulation produces zero triggers (coaching is a minority of
+  decisions). Gates mirror the §6.1 table.
+- Wiring (§7.3): `toFactsInputs` adapts the assembled context into the facts +
+  trigger inputs (comparability-heavy fields conservative until phase 3/4 wires
+  the real assembly — the dry-run never over-claims). `test_llm_explanation`
+  returns facts + triggers alongside the v2 payload; `generate_explanations`
+  gains `dry_run=true`, reporting the would-trigger rate across a scope with
+  zero API calls — the calibration view before the gate flips on.
+- Golden tests: `explanation-facts.test.ts` (Hack Squat worked example, Bench
+  Press insufficient_data), `coaching-triggers.test.ts` (routine ⇒ no trigger),
+  plus the rewritten `prescription-narrative.test.ts`. Full suite green
+  (1340), typecheck + lint clean.
+
+**Remaining (owner-gated, per doc 19 §11):**
+- Phase 3 — prompt v3 + structured JSON output + the `triggers text[]` storage
+  migration + extended post-check + few-shots on facts payloads; generation
+  becomes trigger-gated; `EXPLANATION_PROMPT_VERSION` → 3. Owner voice-reads a
+  regenerated batch (admin overwrite loop) before phase 4.
+- Phase 4 — flip the strip's coach line on (with its docs/09-logged design
+  treatment), the MCP `facts` field on `explain_prescription`, note-write
+  regeneration hooks (§7.2); measure a month.
+- Phase 5 — the §8 deferred surfaces and §10 spun-off items (filed to the notes
+  backlog in this PR).
+
+## 2026-07-21 — joint-pain exercise attribution (fig 1.4 revision)
 
 Owner: joint pain was collected once a muscle group closed but stored on the
 group-*closing* exercise, so the engine's pain gate (doc 10 §3 step 0) and the
