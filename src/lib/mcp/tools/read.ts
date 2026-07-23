@@ -1189,8 +1189,10 @@ function registerExplainPrescription(server: McpServer) {
       const projected = decision
         ? null
         : await projectNextPrescription(client, userId, exercise_id);
-      // doc 18 §6: attach the stored LLM explanation when the feature serves —
-      // the connector coach reads the same sentence the app shows
+      // doc 19 §3: attach the stored LLM coaching line when the feature serves
+      // — the connector coach reads the same line the app shows. The
+      // `prompt_version >= 3` gate is the seam-inversion serving cut: v1–v2
+      // whole-blob rows are never served (they age out as decisions recompute).
       let explanation: string | null = null;
       if (decision && llmExplanationsServe()) {
         const { data: stored, error: explanationError } = await client
@@ -1198,6 +1200,7 @@ function registerExplainPrescription(server: McpServer) {
           .select("body")
           .eq("decision_id", decision.decision_id)
           .eq("user_id", userId)
+          .gte("prompt_version", 3)
           .maybeSingle();
         if (explanationError) throw explanationError;
         explanation = stored?.body ?? null;

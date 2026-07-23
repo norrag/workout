@@ -98,8 +98,8 @@ import {
   type PrescriptionAudit,
 } from "@/lib/queries/audit";
 import {
+  appendCoaching,
   composePrescriptionNarrative,
-  substituteExplanation,
 } from "@/lib/prescription-narrative";
 
 /**
@@ -1036,9 +1036,10 @@ const ExerciseBlock = memo(function ExerciseBlock({
       },
       rxAudit.output,
     );
-  // doc 18 §6: a stored LLM explanation (served only when the feature is on)
-  // replaces the composed body lines; the ask line stays deterministic
-  const narrative = substituteExplanation(
+  // doc 19 §3: the composed ask + why always render; a stored LLM coaching
+  // line (served only when the feature is on and the row is v3) is APPENDED
+  // beneath them as a distinct COACH line — never a replacement.
+  const narrative = appendCoaching(
     composePrescriptionNarrative({
       weight: we.prescribed_weight,
       reps: we.prescribed_reps,

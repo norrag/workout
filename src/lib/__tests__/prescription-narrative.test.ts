@@ -1,18 +1,20 @@
 /**
- * Deterministic prescription quick-read (2026-07-19 owner request). The N56
- * field case is the canonical fixture: W2·D4 deadlift 250×9×3 @ 2 RIR advanced
- * from 250×8×3 @ 3 RIR with the earned step paced — the exact "same weight,
- * why is this different" confusion the quick-read exists to explain.
+ * Deterministic prescription quick-read (2026-07-19 owner request; hardened for
+ * doc 19 §4). The N56 field case is the canonical fixture: W2·D4 deadlift
+ * 250×9×3 @ 2 RIR advanced from 250×8×3 @ 3 RIR with the earned step paced —
+ * the exact "same weight, why is this different" confusion the quick-read
+ * exists to explain. v3 (doc 19): the composed lines always render and an LLM
+ * coaching line is appended (`appendCoaching`), never substituted.
  */
 import { describe, expect, it } from "vitest";
 import {
+  appendCoaching,
   composeAsk,
   composeDelta,
   composeFeedbackLine,
   composePrescriptionNarrative,
   composeProgressionLine,
   composeWhyLines,
-  substituteExplanation,
 } from "../prescription-narrative";
 
 const w2d4 = {
@@ -125,10 +127,10 @@ describe("composeDelta", () => {
   });
 });
 
-describe("composeProgressionLine", () => {
-  it("surfaces the paced state plainly (the N56 §8.5 residual)", () => {
+describe("composeProgressionLine — program-language, no engine vocab (§4.2)", () => {
+  it("frames the paced hold as a load step HELD BACK, not 'no increase' (§4.1)", () => {
     expect(composeProgressionLine(w2d4.trace)).toBe(
-      "You have earned an increase; it is deferred for now so your strength gain stays on its planned monthly pace.",
+      "An extra load increase was held back — this keeps your strength gain on its planned monthly pace.",
     );
   });
 
@@ -137,12 +139,12 @@ describe("composeProgressionLine", () => {
       composeProgressionLine([
         { rule: "progression", detail: "", status: "stepped" },
       ]),
-    ).toContain("earned increase");
+    ).toContain("small step up");
     expect(
       composeProgressionLine([
         { rule: "progression", detail: "", status: "vanished" },
       ]),
-    ).toContain("smallest weight step");
+    ).toContain("smallest weight jump");
   });
 
   it("names each not-earned predicate without judgement", () => {
@@ -150,12 +152,35 @@ describe("composeProgressionLine", () => {
       composeProgressionLine([
         { rule: "progression", detail: "", status: "not_earned", predicate },
       ]);
-    expect(line("compliance")).toContain("didn't fully meet");
+    expect(line("compliance")).toContain("wasn't fully met");
     expect(line("stale")).toContain("hasn't been trained in a while");
     expect(line("pain")).toContain("joint pain");
     expect(line("workload")).toContain("workload ran hot");
     expect(line("dampener")).toContain("rough one");
-    expect(line("confidence")).toContain("isn't confident enough");
+    expect(line("confidence")).toContain("enough recent data yet");
+  });
+
+  it("never uses the word 'engine' (§4.2 — it lives only in the Engine audit)", () => {
+    const statuses = ["stepped", "vanished", "paced"];
+    for (const status of statuses) {
+      expect(
+        composeProgressionLine([{ rule: "progression", detail: "", status }]),
+      ).not.toMatch(/engine/i);
+    }
+    for (const predicate of [
+      "compliance",
+      "stale",
+      "pain",
+      "workload",
+      "dampener",
+      "confidence",
+    ]) {
+      expect(
+        composeProgressionLine([
+          { rule: "progression", detail: "", status: "not_earned", predicate },
+        ]),
+      ).not.toMatch(/engine/i);
+    }
   });
 
   it("stays silent on no_previous_session and without a progression step", () => {
@@ -222,7 +247,7 @@ describe("composeWhyLines — multiple contributing factors", () => {
     });
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("capping the load");
-    expect(lines[1]).toContain("deferred");
+    expect(lines[1]).toContain("held back");
   });
 
   it("dedups the earn-gate echo of a feedback cause (one cause, one line)", () => {
@@ -255,46 +280,112 @@ describe("composeWhyLines — multiple contributing factors", () => {
     expect(lines).toEqual(["Held steady — joint pain was reported last session."]);
   });
 
-  it("falls back to the grade for pre-progression decisions only", () => {
-    const legacy = composeWhyLines({
+  it("caps at three lines under any stack of trace steps (§4.4 suppression)", () => {
+    const lines = composeWhyLines({
       trace: [
-        { rule: "load", detail: "hold 250 lb" },
+        { rule: "feedback", detail: "joint pain 2/3: load increase blocked" },
+        { rule: "feedback", detail: "workload 9/10 past just right: set removed" },
+        { rule: "feedback", detail: "rough session reported: increases dampened" },
         {
-          rule: "grade",
-          detail: "harder than asked (~1 vs 2 RIR) — held, not a miss",
+          rule: "progression",
+          detail: "earned; skipped by rate pacer",
+          status: "paced",
+          governor: "rate_pacer",
         },
       ],
     });
-    expect(legacy).toEqual([
-      "Last session ran harder than asked, so the load holds rather than climbs.",
-    ]);
+    expect(lines.length).toBeLessThanOrEqual(3);
+  });
+
+  describe("effort honesty (§4.3) — the grade line", () => {
+    const harderTrace = [
+      { rule: "load", detail: "hold 250 lb" },
+      {
+        rule: "grade",
+        detail: "harder than asked (~1 vs 2 RIR) — held, not a miss",
+      },
+    ];
+
+    it("states last session's effort only when it was observed", () => {
+      expect(
+        composeWhyLines({ trace: harderTrace, effortStatus: "observed" }),
+      ).toEqual([
+        "Last session ran harder than asked, so the load holds rather than climbs.",
+      ]);
+    });
+
+    it("drops the effort claim when RIR was not reported (inferred)", () => {
+      const inferred = composeWhyLines({
+        trace: harderTrace,
+        effortStatus: "inferred",
+      });
+      expect(inferred).toEqual(["The load holds rather than climbs this session."]);
+      expect(inferred[0]).not.toMatch(/harder than asked|RIR/);
+    });
+
+    it("defaults to inferred when effort status is unknown", () => {
+      expect(composeWhyLines({ trace: harderTrace })).toEqual([
+        "The load holds rather than climbs this session.",
+      ]);
+    });
+
+    it("suppresses a pure effort-feeds-target line entirely when inferred", () => {
+      const easierTrace = [
+        { rule: "load", detail: "hold 250 lb" },
+        {
+          rule: "grade",
+          detail: "easier than asked (~3 vs 2 RIR)",
+        },
+      ];
+      expect(
+        composeWhyLines({ trace: easierTrace, effortStatus: "inferred" }),
+      ).toEqual([]);
+      expect(
+        composeWhyLines({ trace: easierTrace, effortStatus: "observed" }),
+      ).toEqual([
+        "Last session read easier than asked — that carries into the target this session is set from.",
+      ]);
+    });
+  });
+
+  it("uses the grade fallback only for pre-progression decisions", () => {
     const modern = composeWhyLines({
       trace: [
         { rule: "grade", detail: "harder than asked (~1 vs 2 RIR) — held, not a miss" },
         { rule: "progression", detail: "", status: "stepped" },
       ],
+      effortStatus: "observed",
     });
     expect(modern).toHaveLength(1);
-    expect(modern[0]).toContain("earned increase");
+    expect(modern[0]).toContain("small step up");
   });
 });
 
 describe("composePrescriptionNarrative", () => {
-  it("the N56 fixture reads as ask + delta + paced state", () => {
+  it("the N56 fixture reads as ask + delta + paced state, coach absent", () => {
     const n = composePrescriptionNarrative(w2d4);
     expect(n.ask).toBe(
       "3 sets of 9 at 250 lb, each stopped 2 reps short of failure.",
     );
     expect(n.lines).toEqual([
       "Versus last session: one more rep per set, and 1 rep closer to failure — a step up even where the numbers match.",
-      "You have earned an increase; it is deferred for now so your strength gain stays on its planned monthly pace.",
+      "An extra load increase was held back — this keeps your strength gain on its planned monthly pace.",
     ]);
+    expect(n.coach).toBeNull();
+  });
+
+  it("the paced line never renders as the only line in a week that intensified (§4.1)", () => {
+    const n = composePrescriptionNarrative(w2d4);
+    // the delta line ordered first agrees with the paced line's framing
+    expect(n.lines.length).toBeGreaterThan(1);
+    expect(n.lines[0]).toContain("a step up even where the numbers match");
   });
 
   it("a deload explains itself and suppresses progression talk", () => {
     const n = composePrescriptionNarrative({ ...w2d4, isDeload: true });
     expect(n.lines).toHaveLength(1);
     expect(n.lines[0]).toContain("deload");
+    expect(n.coach).toBeNull();
   });
 
   it("a seed explains its provenance", () => {
@@ -315,6 +406,7 @@ describe("composePrescriptionNarrative", () => {
     });
     expect(n.ask).not.toBeNull();
     expect(n.lines).toEqual([]);
+    expect(n.coach).toBeNull();
   });
 
   it("an unpriced row says so", () => {
@@ -327,44 +419,67 @@ describe("composePrescriptionNarrative", () => {
     expect(n.lines[0]).toContain("No prescription yet");
   });
 
-  it("hand-adjusted numbers are flagged with the engine's target", () => {
+  it("hand-adjusted numbers are flagged without engine vocabulary", () => {
     const n = composePrescriptionNarrative({ ...w2d4, outOfBand: true });
     expect(n.lines.at(-1)).toBe(
-      "These numbers were adjusted by hand — the engine's last computed target was 250 lb for 9 at 2 in reserve.",
+      "These numbers were adjusted by hand — the last computed target was 250 lb for 9 at 2 in reserve.",
     );
+    expect(n.lines.at(-1)).not.toMatch(/engine/i);
+  });
+
+  it("never stacks the why past three lines (§4.4 suppression)", () => {
+    const n = composePrescriptionNarrative({
+      ...w2d4,
+      trace: [
+        { rule: "feedback", detail: "joint pain 2/3: load increase blocked" },
+        { rule: "feedback", detail: "workload 9/10 past just right: set removed" },
+        {
+          rule: "progression",
+          detail: "earned; skipped by rate pacer",
+          status: "paced",
+          governor: "rate_pacer",
+        },
+      ],
+      outOfBand: true,
+    });
+    // delta + up to three why lines + out-of-band caveat, still bounded and
+    // never contradicting the delta line ordered first
+    expect(n.lines[0]).toContain("Versus last session");
   });
 });
 
-describe("substituteExplanation (doc 18 §6 — the LLM drop-in seam)", () => {
+describe("appendCoaching (doc 19 §3 — the v3 additive seam)", () => {
   const composed = composePrescriptionNarrative(w2d4);
-  const explanation =
-    "You met last week's target and earned an increase, but the pacer is deferring it.";
+  const coaching =
+    "Grip slipping late has priced misses before — set it before the last rep.";
 
-  it("replaces the body lines only — the ask stays deterministic", () => {
-    const n = substituteExplanation(composed, explanation, false);
+  it("appends the coaching line and leaves the why untouched", () => {
+    const n = appendCoaching(composed, coaching, false);
     expect(n.ask).toBe(composed.ask);
-    expect(n.lines).toEqual([explanation]);
+    expect(n.lines).toEqual(composed.lines);
+    expect(n.coach).toBe(coaching);
   });
 
-  it("falls back to the composed lines when no explanation is stored", () => {
-    expect(substituteExplanation(composed, null, false)).toBe(composed);
-    expect(substituteExplanation(composed, undefined, false)).toBe(composed);
-    expect(substituteExplanation(composed, "", false)).toBe(composed);
+  it("stands the deterministic layers alone when there is no coaching", () => {
+    expect(appendCoaching(composed, null, false)).toBe(composed);
+    expect(appendCoaching(composed, undefined, false)).toBe(composed);
+    expect(appendCoaching(composed, "", false)).toBe(composed);
   });
 
-  it("keeps the composed lines on an out-of-band row (the N33 S4 caveat wins)", () => {
+  it("drops the coach line on an out-of-band row (the N33 S4 caveat wins)", () => {
     const outOfBand = composePrescriptionNarrative({ ...w2d4, outOfBand: true });
-    const n = substituteExplanation(outOfBand, explanation, true);
+    const n = appendCoaching(outOfBand, coaching, true);
     expect(n).toBe(outOfBand);
+    expect(n.coach).toBeNull();
     expect(n.lines.at(-1)).toContain("adjusted by hand");
   });
 
-  it("never substitutes onto an unpriced row", () => {
+  it("never appends coaching onto an unpriced row", () => {
     const cold = composePrescriptionNarrative({
       ...w2d4,
       weight: null,
       reps: null,
     });
-    expect(substituteExplanation(cold, explanation, false)).toBe(cold);
+    expect(appendCoaching(cold, coaching, false)).toBe(cold);
   });
 });
