@@ -11,6 +11,16 @@
  * changed AND why, naming every contributing cause (§1), then — v2, the §10
  * coaching layer — at most a clause or two of focus direction grounded in
  * the payload's trend, notes, or feedback.
+ *
+ * doc 19 / N60 (v3) SUPERSEDES the payload + prompt + post-check below: the
+ * generation path now feeds the model the semantic FACTS projection
+ * (`explanation-facts.ts`) and the trigger-gated coaching contract
+ * (`coaching.ts`), not this raw-trace payload. What this module STILL provides
+ * on the live path is the trend projection (`projectTrend`/`projectTrace`) and
+ * `monthDay` used by `explanations.ts` context assembly; the v2
+ * `buildExplanationPayload` / `EXPLANATION_SYSTEM_PROMPT` /
+ * `postCheckExplanation` are retained as the doc-18 record (and their tests),
+ * no longer called by generation.
  */
 
 /** Bumped on any change to the system prompt or payload shape, and stored on

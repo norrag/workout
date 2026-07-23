@@ -1704,6 +1704,41 @@ describe("decision_explanations (doc 18)", () => {
     expect(error).not.toBeNull();
     expect(error!.code).toBe("23514"); // check constraint violation
   });
+
+  it("the v3 triggers audit column round-trips under the same posture (doc 19 §6.3)", async () => {
+    const { data: decision } = await service
+      .from("engine_decisions")
+      .insert({ user_id: aliceId, inputs: {}, output: {}, params_version: 1 })
+      .select("id")
+      .single();
+    const { error: insertError } = await service
+      .from("decision_explanations")
+      .insert({
+        decision_id: decision!.id,
+        user_id: aliceId,
+        body: "Peak week — the seat height note from last block still applies.",
+        model: "gpt-5.6-luna",
+        prompt_version: 3,
+        tokens_in: 300,
+        tokens_out: 40,
+        triggers: ["block_intent", "note"],
+      });
+    expect(insertError).toBeNull();
+
+    // owner reads the column; the other user sees nothing (row-level, as before)
+    const { data: own } = await alice
+      .from("decision_explanations")
+      .select("triggers")
+      .eq("decision_id", decision!.id)
+      .maybeSingle();
+    expect(own?.triggers).toEqual(["block_intent", "note"]);
+    const { data: cross } = await bob
+      .from("decision_explanations")
+      .select("triggers")
+      .eq("decision_id", decision!.id)
+      .maybeSingle();
+    expect(cross).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

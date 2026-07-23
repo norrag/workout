@@ -42,7 +42,10 @@ type Defaulted =
   | "profile_applied_at"
   | "profile_dismissed_at"
   // 5c: nullable body-fat provenance — written by the bf% write paths only
-  | "body_fat_source";
+  | "body_fat_source"
+  // N60 / doc 19 §6.3: nullable triggers audit on decision_explanations — set
+  // only by the v3 generation hook, optional on insert (null on pre-v3 rows)
+  | "triggers";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -483,6 +486,9 @@ export type DecisionExplanationRow = {
   tokens_in: number;
   tokens_out: number;
   created_at: string;
+  /** doc 19 §6.1 — the triggers that routed this decision to the LLM call;
+   *  null on pre-v3 rows */
+  triggers: string[] | null;
 }
 
 /** N58 follow-up — durable failure log for the LLM explanation pipeline: one

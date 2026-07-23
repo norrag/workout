@@ -13,14 +13,7 @@ import {
 import { llmExplanationsGenerate } from "./config";
 import { createCompletion, type LlmCompletion } from "./openai";
 import {
-  EXPLANATION_MAX_OUTPUT_TOKENS,
-  EXPLANATION_PROMPT_VERSION,
-  EXPLANATION_SYSTEM_PROMPT,
-  PAYLOAD_TOKEN_CEILING,
-  buildExplanationPayload,
-  estimateTokens,
   monthDay,
-  postCheckExplanation,
   projectTrace,
   projectTrend,
   type ExplanationContext,
@@ -33,6 +26,14 @@ import {
   type FactsDecision,
 } from "./explanation-facts";
 import { scoreTriggers, type Trigger, type TriggerSignals } from "./coaching-triggers";
+import {
+  COACHING_MAX_OUTPUT_TOKENS,
+  COACHING_PROMPT_VERSION,
+  COACHING_SYSTEM_PROMPT,
+  parseCoachingResponse,
+  postCheckCoaching,
+  type NoteClass,
+} from "./coaching";
 
 type Client = SupabaseClient<Database>;
 
@@ -481,23 +482,39 @@ async function assembleContexts(
 // generation
 // ---------------------------------------------------------------------------
 
+/** doc 19 §6/§7 — what became of one decision in the v3 trigger-gated path. */
+export type ExplanationDisposition =
+  | "stored" // a coaching row was written
+  | "skipped" // no trigger fired ⇒ no API call, deterministic layers stand alone
+  | "abstained" // the model was called but had nothing worth saying (success)
+  | "discarded" // post-check/parse rejected the output (no row)
+  | "error"; // an upstream/pipeline error
+
 /** One decision's generation outcome, surfaced by the admin tooling. */
 export interface ExplanationOutcome {
   decisionId: string;
   exercise: string | null;
+  /** the attempt completed without erroring/discarding (skip + abstain are ok) */
   ok: boolean;
-  /** on success: the stored body */
+  /** whether a coaching row was actually written (the `stored` tally counts these) */
+  stored: boolean;
+  disposition: ExplanationDisposition;
+  /** doc 19 §6.1 — the triggers that gated (or would have gated) the call */
+  triggers?: Trigger[];
+  /** on a stored row: the coaching body */
   body?: string;
+  /** the model's note classification when a note was in the payload */
+  noteClass?: NoteClass;
   model?: string;
   tokensIn?: number;
   tokensOut?: number;
-  /** on failure: which stage died + the exact error */
+  /** on failure/discard: which stage died + the exact reason */
   stage?: FailureStage;
   error?: string;
 }
 
 export interface ExplanationRunResult {
-  /** rows actually written (post-check passed + upsert succeeded) */
+  /** rows actually written (triggered + post-check passed + upsert succeeded) */
   stored: number;
   results: ExplanationOutcome[];
 }
@@ -561,6 +578,8 @@ export async function generateDecisionExplanations(
             decisionId: decision.id,
             exercise,
             ok: false,
+            stored: false,
+            disposition: "error" as const,
             stage: "generate" as const,
             error: describeError(error).message,
           };
@@ -569,7 +588,36 @@ export async function generateDecisionExplanations(
     );
     results.push(...chunk);
   }
-  return { stored: results.filter((r) => r.ok).length, results };
+  return { stored: results.filter((r) => r.stored).length, results };
+}
+
+/** §6.2 discard path — R20 report + durable failure row + a `discarded`
+ *  outcome; shared by the parse-failure and post-check-failure branches. */
+async function discardOutcome(
+  service: Client,
+  userId: string,
+  decision: DecisionRowSlice,
+  context: ExplanationContext,
+  model: string,
+  reason: string,
+  triggers: Trigger[],
+): Promise<ExplanationOutcome> {
+  await reportError(
+    "llm:explanations",
+    new Error(`post-check failed: ${reason}`),
+    { userId, decisionId: decision.id, model },
+  );
+  await recordFailure(service, userId, decision.id, "post_check", new Error(reason), { model });
+  return {
+    decisionId: decision.id,
+    exercise: context.exerciseName,
+    ok: false,
+    stored: false,
+    disposition: "discarded",
+    triggers,
+    stage: "post_check",
+    error: reason,
+  };
 }
 
 async function generateOne(
@@ -586,53 +634,60 @@ async function generateOne(
       decisionId: decision.id,
       exercise: null,
       ok: false,
+      stored: false,
+      disposition: "error",
       stage: "generate",
       error: "no context assembled for decision",
     };
   }
-  const payload = buildExplanationPayload(
-    { kind: decision.kind, inputs: decision.inputs, output: decision.output },
-    context,
-  );
-  const input = JSON.stringify(payload);
-  if (estimateTokens(input) > PAYLOAD_TOKEN_CEILING) {
-    // over-budget payloads are a shape bug, not a cost emergency — report
-    // and generate anyway (the ceiling is ~9% of the model's context)
-    await reportError(
-      "llm:explanations",
-      new Error(`payload over token ceiling (${estimateTokens(input)})`),
-      { userId, decisionId: decision.id },
-    );
-  }
 
-  const completion = await complete({
-    instructions: EXPLANATION_SYSTEM_PROMPT,
-    input,
-    maxOutputTokens: EXPLANATION_MAX_OUTPUT_TOKENS,
-  });
-
-  const checked = postCheckExplanation(completion.text, payload);
-  if (!checked.ok) {
-    // §4: discard, report, deterministic fallback (no row)
-    await reportError(
-      "llm:explanations",
-      new Error(`post-check failed: ${checked.reason}`),
-      { userId, decisionId: decision.id, model: completion.model },
-    );
-    await recordFailure(
-      service,
-      userId,
-      decision.id,
-      "post_check",
-      new Error(checked.reason),
-      { model: completion.model },
-    );
+  // doc 19 §5–§6.1: the facts projection + the trigger gate. No trigger ⇒ no
+  // API call and no row — the deterministic ask + why are the complete output.
+  const { factsDecision, factsContext, signals } = toFactsInputs(decision, context);
+  const facts = buildExplanationFacts(factsDecision, factsContext);
+  const triggers = scoreTriggers(facts, signals);
+  if (triggers.length === 0) {
     return {
       decisionId: decision.id,
       exercise: context.exerciseName,
-      ok: false,
-      stage: "post_check",
-      error: checked.reason,
+      ok: true,
+      stored: false,
+      disposition: "skipped",
+      triggers,
+    };
+  }
+
+  const completion = await complete({
+    instructions: COACHING_SYSTEM_PROMPT,
+    input: JSON.stringify(facts),
+    maxOutputTokens: COACHING_MAX_OUTPUT_TOKENS,
+  });
+
+  // §6.2: parse the structured reply, then run the extended post-check against
+  // the FACTS payload. Any parse/check failure ⇒ discard, report, no row (the
+  // deterministic layers render alone — the permanent fallback).
+  const parsed = parseCoachingResponse(completion.text);
+  if (!parsed.ok) {
+    return discardOutcome(service, userId, decision, context, completion.model, parsed.reason, triggers);
+  }
+  const checked = postCheckCoaching(parsed.response, facts, triggers);
+  if (!checked.ok) {
+    return discardOutcome(service, userId, decision, context, completion.model, checked.reason, triggers);
+  }
+  if ("abstain" in checked) {
+    // §6.2: abstention is a success path — the trigger got the model to the
+    // plate; it does not oblige a swing. Nothing stored, no failure recorded.
+    return {
+      decisionId: decision.id,
+      exercise: context.exerciseName,
+      ok: true,
+      stored: false,
+      disposition: "abstained",
+      triggers,
+      noteClass: parsed.response.note_class,
+      model: completion.model,
+      tokensIn: completion.tokensIn,
+      tokensOut: completion.tokensOut,
     };
   }
 
@@ -642,9 +697,10 @@ async function generateOne(
       user_id: userId,
       body: checked.body,
       model: completion.model,
-      prompt_version: EXPLANATION_PROMPT_VERSION,
+      prompt_version: COACHING_PROMPT_VERSION,
       tokens_in: completion.tokensIn,
       tokens_out: completion.tokensOut,
+      triggers,
     },
     { onConflict: "decision_id", ignoreDuplicates: !overwrite },
   );
@@ -653,7 +709,11 @@ async function generateOne(
     decisionId: decision.id,
     exercise: context.exerciseName,
     ok: true,
+    stored: true,
+    disposition: "stored",
+    triggers,
     body: checked.body,
+    noteClass: parsed.response.note_class,
     model: completion.model,
     tokensIn: completion.tokensIn,
     tokensOut: completion.tokensOut,
@@ -815,20 +875,26 @@ export async function dryRunDecisionTriggers(
 
 export interface ProbeResult {
   ok: boolean;
-  /** the §3 payload sent (present when a decision was probed) */
+  /** the facts payload actually sent to the model (§5 — the v3 worldview) */
   payload?: Record<string, unknown>;
   /** doc 19 §5 facts projection for the decision (present on a decision probe) */
   facts?: ExplanationFacts;
-  /** doc 19 §6.1 triggers that would gate the generation call */
+  /** doc 19 §6.1 triggers that gate the generation call */
   triggers?: Trigger[];
-  /** raw completion on success (NOT stored unless `store` was set) */
+  /** whether the triggers would have routed this decision to the call in prod */
+  wouldGenerate?: boolean;
+  /** the model's note classification (§6.2) when a note was in the payload */
+  noteClass?: NoteClass;
+  /** the model chose to abstain — a success path (nothing to store) */
+  abstained?: boolean;
+  /** the coaching body on success (NOT stored unless `store` was set) */
   body?: string;
   model?: string;
   tokensIn?: number;
   tokensOut?: number;
   /** whether the row was written (only when `store` requested and checks passed) */
   stored?: boolean;
-  /** §4 post-check verdict for a decision probe */
+  /** §6.2 post-check verdict for a decision probe */
   postCheck?: { ok: boolean; reason?: string };
   /** the exact upstream/pipeline error on failure — the diagnostic this exists for */
   error?: string;
@@ -887,37 +953,60 @@ export async function probeDecisionExplanation(
   const contexts = await assembleContexts(service, userId, [decision]);
   const context = contexts.get(decision.id);
   if (!context) return { ok: false, error: "no context assembled for decision" };
-  const payload = buildExplanationPayload(
-    { kind: decision.kind, inputs: decision.inputs, output: decision.output },
-    context,
-  );
-  // doc 19 §5–§6.1: the facts projection + trigger verdict, surfaced alongside
-  // the (v2) payload so the admin test loop can compare the two worldviews and
-  // calibrate the trigger gate before it flips on (§7.3).
+
+  // doc 19 §5–§6.1: the facts projection + trigger verdict. Unlike production
+  // generation, the probe ALWAYS makes the call (an explicit single-decision
+  // test) and reports would_generate separately, so the admin can read what the
+  // model would say even for a decision that wouldn't trigger in prod (§7.3).
   const { factsDecision, factsContext, signals } = toFactsInputs(decision, context);
   const facts = buildExplanationFacts(factsDecision, factsContext);
   const triggers = scoreTriggers(facts, signals);
+  const payload = facts as unknown as Record<string, unknown>;
 
   let completion: LlmCompletion;
   try {
     completion = await createCompletion({
-      instructions: EXPLANATION_SYSTEM_PROMPT,
-      input: JSON.stringify(payload),
-      maxOutputTokens: EXPLANATION_MAX_OUTPUT_TOKENS,
+      instructions: COACHING_SYSTEM_PROMPT,
+      input: JSON.stringify(facts),
+      maxOutputTokens: COACHING_MAX_OUTPUT_TOKENS,
     });
   } catch (error) {
     return {
       ok: false,
-      payload: payload as unknown as Record<string, unknown>,
+      payload,
       facts,
       triggers,
+      wouldGenerate: triggers.length > 0,
       error: describeError(error).message,
     };
   }
 
-  const checked = postCheckExplanation(completion.text, payload);
+  const base = {
+    payload,
+    facts,
+    triggers,
+    wouldGenerate: triggers.length > 0,
+    body: completion.text,
+    model: completion.model,
+    tokensIn: completion.tokensIn,
+    tokensOut: completion.tokensOut,
+  };
+
+  const parsed = parseCoachingResponse(completion.text);
+  if (!parsed.ok) {
+    return { ok: false, ...base, postCheck: { ok: false, reason: parsed.reason }, error: parsed.reason };
+  }
+  const checked = postCheckCoaching(parsed.response, facts, triggers);
+  const noteClass = parsed.response.note_class;
+  if (!checked.ok) {
+    return { ok: false, ...base, noteClass, postCheck: { ok: false, reason: checked.reason }, error: checked.reason };
+  }
+  if ("abstain" in checked) {
+    return { ok: true, ...base, noteClass, abstained: true, stored: false, postCheck: { ok: true } };
+  }
+
   let stored = false;
-  if (checked.ok && opts?.store) {
+  if (opts?.store) {
     const { error: upsertError } = await service
       .from("decision_explanations")
       .upsert(
@@ -926,33 +1015,18 @@ export async function probeDecisionExplanation(
           user_id: userId,
           body: checked.body,
           model: completion.model,
-          prompt_version: EXPLANATION_PROMPT_VERSION,
+          prompt_version: COACHING_PROMPT_VERSION,
           tokens_in: completion.tokensIn,
           tokens_out: completion.tokensOut,
+          triggers,
         },
         { onConflict: "decision_id", ignoreDuplicates: false },
       );
-    if (upsertError)
-      return {
-        ok: false,
-        payload: payload as unknown as Record<string, unknown>,
-        body: completion.text,
-        error: describeError(upsertError).message,
-      };
+    if (upsertError) {
+      return { ok: false, ...base, noteClass, error: describeError(upsertError).message };
+    }
     stored = true;
   }
 
-  return {
-    ok: checked.ok,
-    payload: payload as unknown as Record<string, unknown>,
-    facts,
-    triggers,
-    body: completion.text,
-    model: completion.model,
-    tokensIn: completion.tokensIn,
-    tokensOut: completion.tokensOut,
-    stored,
-    postCheck: checked.ok ? { ok: true } : { ok: false, reason: checked.reason },
-    ...(checked.ok ? {} : { error: `post-check failed: ${checked.reason}` }),
-  };
+  return { ok: true, ...base, body: checked.body, noteClass, stored, postCheck: { ok: true } };
 }

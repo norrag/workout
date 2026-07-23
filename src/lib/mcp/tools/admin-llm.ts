@@ -10,7 +10,7 @@ import {
 } from "@/lib/llm/explanations";
 import { llmExplanationsMode } from "@/lib/llm/config";
 import { explanationModel } from "@/lib/llm/openai";
-import { EXPLANATION_PROMPT_VERSION } from "@/lib/llm/prescription-explainer";
+import { COACHING_PROMPT_VERSION } from "@/lib/llm/coaching";
 import { reconcilePrescriptions } from "@/lib/queries/regeneration";
 import { listOpenDecisionTargets } from "@/lib/queries/open-decisions";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -71,9 +71,21 @@ function shapeOutcomes(results: ExplanationOutcome[]) {
     decision_id: r.decisionId,
     exercise: r.exercise,
     ok: r.ok,
-    ...(r.ok
-      ? { body: r.body, model: r.model, tokens_in: r.tokensIn, tokens_out: r.tokensOut }
-      : { stage: r.stage, error: r.error }),
+    disposition: r.disposition, // stored | skipped | abstained | discarded | error
+    ...(r.triggers ? { triggers: r.triggers } : {}),
+    ...(r.disposition === "stored"
+      ? {
+          body: r.body,
+          note_class: r.noteClass ?? null,
+          model: r.model,
+          tokens_in: r.tokensIn,
+          tokens_out: r.tokensOut,
+        }
+      : {}),
+    ...(r.disposition === "abstained"
+      ? { note_class: r.noteClass ?? null, tokens_in: r.tokensIn, tokens_out: r.tokensOut }
+      : {}),
+    ...(r.ok ? {} : { stage: r.stage, error: r.error }),
   }));
 }
 
@@ -189,7 +201,7 @@ function registerGetLlmExplanationStatus(server: McpServer) {
           llm_explanations_env: process.env.LLM_EXPLANATIONS ?? null,
           model: explanationModel(),
           model_env_override: process.env.OPENAI_EXPLANATION_MODEL ?? null,
-          prompt_version: EXPLANATION_PROMPT_VERSION,
+          prompt_version: COACHING_PROMPT_VERSION,
         },
         explanations: {
           stored: explanationCount.count ?? 0,
@@ -260,12 +272,16 @@ function registerTestLlmExplanation(server: McpServer) {
         ok: probe.ok,
         kind: "decision_probe",
         decision_id,
+        // doc 19 §5–§6.2: the facts worldview the model saw + the trigger
+        // verdict + the classification, alongside the coaching body. The probe
+        // always calls (an explicit test); would_generate says whether prod
+        // WOULD have, and abstained whether the model chose silence (§6.2).
         payload: probe.payload ?? null,
-        // doc 19 §5–§6.1: the v3 facts worldview + trigger verdict, alongside
-        // the v2 payload/body — the calibration view before the gate flips
         facts: probe.facts ?? null,
         triggers: probe.triggers ?? null,
-        would_generate: probe.triggers ? probe.triggers.length > 0 : null,
+        would_generate: probe.wouldGenerate ?? null,
+        note_class: probe.noteClass ?? null,
+        abstained: probe.abstained ?? false,
         body: probe.body ?? null,
         model: probe.model ?? null,
         tokens_in: probe.tokensIn ?? null,
@@ -397,12 +413,17 @@ function registerGenerateExplanations(server: McpServer) {
         decisionIds.slice(0, GENERATION_CAP),
         args.overwrite ?? false,
       );
-      const summary = `generated ${run.stored}/${Math.min(decisionIds.length, GENERATION_CAP)} explanations`;
+      // doc 19 §6: most decisions skip (no trigger) or abstain — surface the
+      // full disposition breakdown, not just the stored count
+      const tally = { stored: 0, skipped: 0, abstained: 0, discarded: 0, error: 0 };
+      for (const r of run.results) tally[r.disposition] += 1;
+      const summary = `generated ${run.stored}/${Math.min(decisionIds.length, GENERATION_CAP)} (skipped ${tally.skipped}, abstained ${tally.abstained})`;
       await recordMcpWrite(userId, GENERATE_EXPLANATIONS, { ...scope, overwrite: args.overwrite ?? false }, summary);
       return jsonResult({
         ok: true,
         generated: run.stored,
         attempted: Math.min(decisionIds.length, GENERATION_CAP),
+        breakdown: tally,
         results: shapeOutcomes(run.results),
         ...(truncated
           ? {

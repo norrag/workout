@@ -1,7 +1,9 @@
 /**
- * N58 / doc 18 §5 — the write-site generation hook, run against a faked
- * service client and a stubbed model: context assembly, the §4 post-check
- * discard path, per-decision failure isolation, and the stored row's shape.
+ * N60 / doc 19 §6–§7 — the v3 write-site generation hook, run against a faked
+ * service client and a stubbed model: the trigger gate (no trigger ⇒ no call),
+ * facts-payload generation, structured-output parsing, the §6.2 post-check +
+ * abstention path, per-decision failure isolation, and the stored row's shape
+ * (coaching body + triggers audit + prompt_version 3).
  */
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -108,53 +110,69 @@ function tables(overrides: Partial<TableData> = {}): TableData {
   };
 }
 
-const grounded: LlmCompletion = {
-  text: "You met last week's target and earned an increase, but the pacer is deferring it; one more rep at 250 lb instead.",
+/** A session note on the exercise makes the decision TRIGGER (note gate, §6.1)
+ *  so the model is called at all — the base `tables()` has no signal and skips. */
+function triggeredTables(): TableData {
+  return tables({
+    exercise_feedback: {
+      data: [
+        {
+          workout_exercise_id: "we1",
+          notes: "grip started slipping late",
+          created_at: "2026-07-15T11:00:00Z",
+        },
+      ],
+      error: null,
+    },
+  });
+}
+
+/** The v3 structured reply — a grounded, actionable coaching line. */
+const coaching: LlmCompletion = {
+  text: '{"coaching_context":"Grip slipped late last session — secure it before the last set so it never costs you a rep.","note_class":"technique","abstain":false}',
   model: "gpt-5.6-luna",
-  tokensIn: 610,
-  tokensOut: 34,
+  tokensIn: 260,
+  tokensOut: 40,
 };
 
-describe("generateDecisionExplanations", () => {
-  it("assembles context, generates, post-checks, and stores one row per decision", async () => {
+describe("generateDecisionExplanations (v3)", () => {
+  it("sends the FACTS payload, parses the reply, and stores body + triggers", async () => {
     const upserts: Upsert[] = [];
     const seen: string[] = [];
     const { stored, results } = await generateDecisionExplanations("u1", ["d1"], {
-      service: fakeService(tables(), upserts),
+      service: fakeService(triggeredTables(), upserts),
       complete: async ({ input }) => {
         seen.push(input);
-        return grounded;
+        return coaching;
       },
     });
 
     expect(stored).toBe(1);
-    expect(results).toEqual([
-      {
-        decisionId: "d1",
-        exercise: "Deadlift",
-        ok: true,
-        body: grounded.text,
-        model: "gpt-5.6-luna",
-        tokensIn: 610,
-        tokensOut: 34,
-      },
-    ]);
-    const payload = JSON.parse(seen[0]);
-    expect(payload.exercise).toBe("Deadlift");
-    expect(payload.muscle_group).toBe("glutes");
-    expect(payload.week).toEqual({ n: 2, of: 5, target_rir: 2, deload: false });
-    expect(payload.recent).toEqual(["Jul 15 · 255 × 8, 7"]);
+    expect(results[0]).toMatchObject({
+      decisionId: "d1",
+      exercise: "Deadlift",
+      ok: true,
+      stored: true,
+      disposition: "stored",
+      triggers: ["note"],
+      noteClass: "technique",
+    });
+
+    // the model sees the §5 facts object — one verdict per axis, no raw trace
+    const facts = JSON.parse(seen[0]);
+    expect(facts.exercise).toBe("Deadlift");
+    expect(facts.prescription_change).toBe("reps_increased");
+    expect(facts.pace_status).toBe("ahead");
+    expect(JSON.stringify(facts)).not.toContain("rate_pacer");
 
     expect(upserts).toHaveLength(1);
     expect(upserts[0].table).toBe("decision_explanations");
     expect(upserts[0].row).toMatchObject({
       decision_id: "d1",
       user_id: "u1",
-      body: grounded.text,
-      model: "gpt-5.6-luna",
-      prompt_version: 2,
-      tokens_in: 610,
-      tokens_out: 34,
+      body: "Grip slipped late last session — secure it before the last set so it never costs you a rep.",
+      prompt_version: 3,
+      triggers: ["note"],
     });
     // §5: the decision id is the cache key — re-runs must be harmless
     expect(upserts[0].options).toMatchObject({
@@ -163,90 +181,70 @@ describe("generateDecisionExplanations", () => {
     });
   });
 
-  it("folds the §10 coaching context into the payload when the tables have it", async () => {
-    const seen: string[] = [];
-    await generateDecisionExplanations("u1", ["d1"], {
-      service: fakeService(
-        tables({
-          exercise_notes: {
-            data: [{ exercise_id: "ex1", body: "hook grip from set one" }],
-            error: null,
-          },
-          exercise_feedback: {
-            data: [
-              {
-                workout_exercise_id: "we1",
-                notes: "grip started slipping late",
-                created_at: "2026-07-15T11:00:00Z",
-              },
-            ],
-            error: null,
-          },
-          workout_feedback: {
-            data: [
-              {
-                overall_fatigue: 8,
-                effort_rating: 7,
-                performance_rating: null,
-                created_at: "2026-07-15T11:00:00Z",
-              },
-            ],
-            error: null,
-          },
-        }),
-        [],
-      ),
-      complete: async ({ input }) => {
-        seen.push(input);
-        return grounded;
+  it("skips a decision with NO trigger — no API call, no row (§6.1)", async () => {
+    const upserts: Upsert[] = [];
+    let called = 0;
+    const { stored, results } = await generateDecisionExplanations("u1", ["d1"], {
+      // base tables: a routine mid-block paced advance, no note/pain/modulation
+      service: fakeService(tables(), upserts),
+      complete: async () => {
+        called += 1;
+        return coaching;
       },
     });
-    const payload = JSON.parse(seen[0]);
-    expect(payload.notes).toEqual({
-      pinned: "hook grip from set one",
-      last_session: "grip started slipping late",
-    });
-    expect(payload.workout_feedback).toEqual({ fatigue: 8, effort: 7 });
-    // no active engine_params in the fake ⇒ the trend block is skipped, not fatal
-    expect(payload).not.toHaveProperty("trend");
+    expect(called).toBe(0);
+    expect(stored).toBe(0);
+    expect(upserts).toHaveLength(0);
+    expect(results[0]).toMatchObject({ ok: true, stored: false, disposition: "skipped", triggers: [] });
   });
 
-  it("omits the §10 blocks entirely when nothing is recorded (v1-shaped payload)", async () => {
-    const seen: string[] = [];
-    await generateDecisionExplanations("u1", ["d1"], {
-      service: fakeService(tables(), []),
-      complete: async ({ input }) => {
-        seen.push(input);
-        return grounded;
-      },
-    });
-    const payload = JSON.parse(seen[0]);
-    expect(payload).not.toHaveProperty("notes");
-    expect(payload).not.toHaveProperty("workout_feedback");
-    expect(payload).not.toHaveProperty("trend");
-  });
-
-  it("discards output that fails the §4 post-check (no row stored)", async () => {
+  it("abstention is a success path — a triggered call that stores nothing (§6.2)", async () => {
     const upserts: Upsert[] = [];
     const inserts: Upsert[] = [];
     const { stored, results } = await generateDecisionExplanations("u1", ["d1"], {
-      service: fakeService(tables(), upserts, inserts),
+      service: fakeService(triggeredTables(), upserts, inserts),
       complete: async () => ({
-        ...grounded,
-        text: "Your estimated max moved to 999 lb.", // number not in payload
+        ...coaching,
+        text: '{"coaching_context":null,"note_class":"normal_exertion","abstain":true}',
+      }),
+    });
+    expect(stored).toBe(0);
+    expect(upserts).toHaveLength(0);
+    // abstention is NOT a failure — nothing lands in the failure log
+    expect(inserts.filter((u) => u.table === "llm_explanation_failures")).toHaveLength(0);
+    expect(results[0]).toMatchObject({ ok: true, stored: false, disposition: "abstained" });
+  });
+
+  it("discards output that fails the §6.2 post-check (no row, failure logged)", async () => {
+    const upserts: Upsert[] = [];
+    const inserts: Upsert[] = [];
+    const { stored, results } = await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(triggeredTables(), upserts, inserts),
+      complete: async () => ({
+        ...coaching,
+        // a number not present in the facts payload
+        text: '{"coaching_context":"Push to 999 lb next week.","note_class":"technique","abstain":false}',
       }),
     });
     expect(stored).toBe(0);
     expect(upserts.filter((u) => u.table === "decision_explanations")).toHaveLength(0);
-    expect(results[0]).toMatchObject({ ok: false, stage: "post_check" });
-    // N58 follow-up: the discard is durably recorded, not just console-reported
+    expect(results[0]).toMatchObject({ ok: false, stored: false, disposition: "discarded", stage: "post_check" });
     const failureRows = inserts.filter((u) => u.table === "llm_explanation_failures");
     expect(failureRows).toHaveLength(1);
-    expect(failureRows[0].row).toMatchObject({
-      user_id: "u1",
-      decision_id: "d1",
-      stage: "post_check",
+    expect(failureRows[0].row).toMatchObject({ user_id: "u1", decision_id: "d1", stage: "post_check" });
+  });
+
+  it("discards a note-only trigger when the note is non-actionable (§6.2)", async () => {
+    const upserts: Upsert[] = [];
+    const { stored, results } = await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(triggeredTables(), upserts),
+      complete: async () => ({
+        ...coaching,
+        text: '{"coaching_context":"That burning pump shows patience.","note_class":"normal_exertion","abstain":false}',
+      }),
     });
+    expect(stored).toBe(0);
+    expect(results[0]).toMatchObject({ ok: false, disposition: "discarded" });
   });
 
   it("isolates a per-decision failure from the rest of the burst", async () => {
@@ -256,24 +254,21 @@ describe("generateDecisionExplanations", () => {
     let calls = 0;
     const { stored, results } = await generateDecisionExplanations("u1", ["d1", "d2"], {
       service: fakeService(
-        tables({ engine_decisions: { data: [decisionRow, second], error: null } }),
+        { ...triggeredTables(), engine_decisions: { data: [decisionRow, second], error: null } },
         upserts,
         inserts,
       ),
       complete: async () => {
         calls += 1;
         if (calls === 1) throw new Error("model down");
-        return grounded;
+        return coaching;
       },
     });
     expect(stored).toBe(1);
     expect(upserts).toHaveLength(1);
-    // the failed decision's outcome carries the exact error + a durable row
     const failed = results.find((r) => !r.ok);
-    expect(failed).toMatchObject({ stage: "generate", error: "model down" });
-    expect(
-      inserts.filter((u) => u.table === "llm_explanation_failures"),
-    ).toHaveLength(1);
+    expect(failed).toMatchObject({ stage: "generate", error: "model down", disposition: "error" });
+    expect(inserts.filter((u) => u.table === "llm_explanation_failures")).toHaveLength(1);
   });
 
   it("is a no-op for an empty or foreign decision set", async () => {
@@ -283,7 +278,7 @@ describe("generateDecisionExplanations", () => {
         tables({ engine_decisions: { data: [], error: null } }),
         upserts,
       ),
-      complete: async () => grounded,
+      complete: async () => coaching,
     });
     expect(stored).toBe(0);
     expect(results).toEqual([]);
@@ -295,7 +290,7 @@ describe("generateDecisionExplanations", () => {
     const { stored } = await generateDecisionExplanations(
       "u1",
       ["d1"],
-      { service: fakeService(tables(), upserts), complete: async () => grounded },
+      { service: fakeService(triggeredTables(), upserts), complete: async () => coaching },
       { overwrite: true },
     );
     expect(stored).toBe(1);
