@@ -7,9 +7,13 @@
  * `not_earned` states, the N56 §8.5 residual).
  *
  * Copy voice per doc 06/08: plain sentences, no hype, no exclamation marks.
- * The LLM variant (doc 18) is a drop-in replacement for `lines` — keep this
- * composer's shape (one ask line + up to three short body lines) in sync with
- * that spec's output contract.
+ * The word "engine" lives only in the Engine audit sheet (doc 19 §4.2); every
+ * line here is program-language — what happened, what the program does next.
+ *
+ * v3 (doc 19): the composed lines ALWAYS render. An optional LLM coaching line
+ * is *appended* beneath them (`appendCoaching`), never substituted for them —
+ * one author per layer (§3). The ask and why are the complete output; a coach
+ * line is additive when a stored row exists.
  *
  * Client-safe: zod-free, type-only imports, no I/O (rides the day-view chunk
  * under the WS-J bundle split).
@@ -38,6 +42,14 @@ export interface PrescriptionNarrativeInput {
   outOfBand: boolean;
   /** the decision's own numbers, named when `outOfBand` */
   decisionOutput: DecisionOutputNumbers | null;
+  /**
+   * doc 19 §4.3 — was last session's effort actually reported, or inferred?
+   * "observed" ⇒ some `rir_reported` on the previous session's working sets;
+   * "inferred" (the safe default) ⇒ the engine assumed the prescribed target,
+   * so no line may state last session's effort as observed. Derived where the
+   * audit is assembled; undefined is treated as inferred.
+   */
+  effortStatus?: "observed" | "inferred";
 }
 
 export interface PrescriptionNarrative {
@@ -45,6 +57,13 @@ export interface PrescriptionNarrative {
   ask: string | null;
   /** the why — delta vs last session, progression state, caveats */
   lines: string[];
+  /**
+   * doc 19 §3 — the LLM coaching line, appended beneath the deterministic why
+   * as a visually distinct `COACH` line. Null unless a stored row exists AND
+   * the row is servable (§3: prompt_version ≥ 3, not out-of-band). Additive,
+   * never a replacement for `lines`.
+   */
+  coach: string | null;
 }
 
 /** "2 reps short of failure" / "1 rep short of failure" / "right at failure". */
@@ -175,18 +194,37 @@ export function composeFeedbackLine(detail: string): string {
   return line.endsWith(".") ? line : `${line}.`;
 }
 
-/** The legacy grade-based why (pre-v20 decisions with no progression step). */
-function composeGradeLine(trace: AuditTraceStep[]): string | null {
+/**
+ * The legacy grade-based why (pre-v20 decisions with no progression step).
+ * doc 19 §4.3: the grade's "~N vs M RIR" reading is *inferred* from performance,
+ * never reported — so its effort framing renders only when effort was observed.
+ * When inferred, the material fact (the load held) is stated without an effort
+ * claim, and a pure effort-feeds-the-target line is dropped.
+ */
+function composeGradeLine(
+  trace: AuditTraceStep[],
+  effortStatus: "observed" | "inferred",
+): string | null {
   const grade = trace.find((s) => s.rule === "grade");
   if (!grade) return null;
   if (grade.detail.includes("harder than asked"))
-    return "Last session ran harder than asked, so the load holds rather than climbs.";
+    return effortStatus === "observed"
+      ? "Last session ran harder than asked, so the load holds rather than climbs."
+      : "The load holds rather than climbs this session.";
   if (grade.detail.includes("easier than asked"))
-    return "Last session read easier than asked — that feeds the estimate this ask is priced from.";
+    return effortStatus === "observed"
+      ? "Last session read easier than asked — that carries into the target this session is set from."
+      : null;
   return null;
 }
 
-/** The progression-state sentence (doc 16 §3.6 status vocabulary). */
+/**
+ * The progression-state sentence (doc 16 §3.6 status vocabulary), in
+ * program-language per doc 19 §4.2 (no "engine", no ambiguous "earned an
+ * increase"). The `paced` line uses the §4.1 difficulty framing: a load step
+ * was *held back*, agreeing with the delta line's "a step up even where the
+ * numbers match" — never read as "no increase".
+ */
 export function composeProgressionLine(
   trace: AuditTraceStep[],
 ): string | null {
@@ -194,25 +232,25 @@ export function composeProgressionLine(
   if (!step) return null;
   switch (step.status) {
     case "stepped":
-      return "This includes an earned increase — you completed your last prescription, so the engine is asking for slightly more.";
+      return "This adds a small step up — you completed last session's target, so the program asks for a little more.";
     case "vanished":
-      return "You earned an increase, but it is smaller than this exercise's smallest weight step — the engine retries it next session.";
+      return "A small step up came due, but it is below this exercise's smallest weight jump — the program carries it to next session.";
     case "paced":
-      return "You have earned an increase; it is deferred for now so your strength gain stays on its planned monthly pace.";
+      return "An extra load increase was held back — this keeps your strength gain on its planned monthly pace.";
     case "not_earned":
       switch (step.predicate) {
         case "compliance":
-          return "No increase this time — last session didn't fully meet its prescription.";
+          return "No step up this time — last session's target wasn't fully met.";
         case "stale":
-          return "No increase — this exercise hasn't been trained in a while, so the engine wants the current target reproduced first.";
+          return "No step up — this exercise hasn't been trained in a while, so the program repeats the current target first.";
         case "pain":
           return "Held steady — joint pain was reported last session.";
         case "workload":
-          return "Held steady — last session's workload ran hot, so the engine isn't adding demand.";
+          return "Held steady — last session's workload ran hot, so nothing is added this time.";
         case "dampener":
           return "Held steady — last session was reported as a rough one.";
         case "confidence":
-          return "No increase — the strength estimate behind this exercise isn't confident enough yet.";
+          return "Holding here — there isn't enough recent data yet to price a confident step up.";
         default:
           // no_previous_session and unnamed predicates: nothing worth a line
           return null;
@@ -235,7 +273,7 @@ export function composeProgressionLine(
  * feedback line said it first, so one cause never reads as two.
  */
 export function composeWhyLines(
-  input: Pick<PrescriptionNarrativeInput, "trace">,
+  input: Pick<PrescriptionNarrativeInput, "trace" | "effortStatus">,
 ): string[] {
   const lines: string[] = [];
   const feedbackSteps = input.trace.filter((s) => s.rule === "feedback");
@@ -253,7 +291,7 @@ export function composeWhyLines(
 
   // pre-v20 decisions carry no progression step — the grade colors the why
   if (!progressionStep && feedbackSteps.length === 0) {
-    const grade = composeGradeLine(input.trace);
+    const grade = composeGradeLine(input.trace, input.effortStatus ?? "inferred");
     if (grade) lines.push(grade);
   }
 
@@ -261,21 +299,25 @@ export function composeWhyLines(
 }
 
 /**
- * N58 / doc 18 §6 — the LLM drop-in seam: a stored explanation replaces ONLY
- * the composed body lines; the ask line stays deterministic so the numbers on
- * screen are never model-rendered. No explanation ⇒ the composed lines render
- * (the composer is the permanent fallback). An out-of-band row keeps the
- * composed lines too: the stored explanation narrates the DECISION's numbers,
- * and the hand-adjusted caveat (N33 S4) must win over a story that no longer
- * matches the row.
+ * doc 19 §3 — the v3 seam inversion: the composed why lines ALWAYS render; a
+ * stored LLM coaching line is *appended* beneath them, never substituted for
+ * them. The ask and why stay deterministic (one author per layer); the coach
+ * line is additive context.
+ *
+ * The guards carry over from the retired `substituteExplanation`: no coaching
+ * ⇒ the deterministic layers stand alone (the common path — coaching is a
+ * minority of decisions, §6.1). An out-of-band row drops the coach line: its
+ * story matches the DECISION, not the hand-adjusted numbers now on the row
+ * (N33 S4), and the hand-adjusted caveat is the line that must win. An
+ * unpriced row (null ask) never carries coaching.
  */
-export function substituteExplanation(
+export function appendCoaching(
   narrative: PrescriptionNarrative,
-  explanation: string | null | undefined,
+  coaching: string | null | undefined,
   outOfBand: boolean,
 ): PrescriptionNarrative {
-  if (!explanation || outOfBand || narrative.ask == null) return narrative;
-  return { ask: narrative.ask, lines: [explanation] };
+  if (!coaching || outOfBand || narrative.ask == null) return narrative;
+  return { ...narrative, coach: coaching };
 }
 
 /**
@@ -293,8 +335,9 @@ export function composePrescriptionNarrative(
     return {
       ask: null,
       lines: [
-        "No prescription yet — log this exercise once and the engine prices the next session from it.",
+        "No prescription yet — log this exercise once and the program will set the next session from it.",
       ],
+      coach: null,
     };
   }
 
@@ -303,7 +346,7 @@ export function composePrescriptionNarrative(
     lines.push(
       "A deload — deliberately light to shed the block's fatigue. Extra reps aren't the goal this week.",
     );
-    return { ask, lines };
+    return { ask, lines, coach: null };
   }
 
   if (input.kind === "seed") {
@@ -318,14 +361,14 @@ export function composePrescriptionNarrative(
 
   if (input.outOfBand && input.decisionOutput) {
     const d = input.decisionOutput;
-    const engineAsk =
+    const computedAsk =
       d.weight != null && d.reps != null
         ? `${d.weight} lb for ${d.reps}`
         : "different numbers";
     lines.push(
-      `These numbers were adjusted by hand — the engine's last computed target was ${engineAsk}${d.targetRir != null ? ` at ${d.targetRir} in reserve` : ""}.`,
+      `These numbers were adjusted by hand — the last computed target was ${computedAsk}${d.targetRir != null ? ` at ${d.targetRir} in reserve` : ""}.`,
     );
   }
 
-  return { ask, lines };
+  return { ask, lines, coach: null };
 }

@@ -49,11 +49,12 @@ export interface PrescriptionAudit {
    *  (`inputs.previous`) — feeds the quick-read's plain-language delta; null on
    *  seeds and cold rows */
   previous: DecisionOutputNumbers | null;
-  /** N58 / doc 18 §6 — the stored LLM explanation of THIS decision, fetched
-   *  only when the caller says the feature is serving (`llmExplanationsServe`).
-   *  Replaces the quick-read's body lines only; the ask line and the ENGINE
-   *  AUDIT panel stay deterministic. Null ⇒ the composer renders (permanent
-   *  fallback). */
+  /** doc 19 §3 — the stored LLM coaching line for THIS decision, fetched only
+   *  when the caller says the feature is serving (`llmExplanationsServe`) AND
+   *  the row is a v3 row (`prompt_version >= 3`; v1–v2 whole-blob rows stop
+   *  being served the moment the seam inverts, §3). Appended BENEATH the
+   *  deterministic why (never a replacement); the ask, why, and ENGINE AUDIT
+   *  panel stay deterministic. Null ⇒ the composer stands alone. */
   explanation: string | null;
 }
 
@@ -144,9 +145,11 @@ export async function getPrescriptionAudit(
   if (error) throw error;
   if (!data) return null;
 
-  // doc 18 §6: the explanation is keyed to the decision id, so joining the
+  // doc 19 §3: the coaching line is keyed to the decision id, so joining the
   // row's LATEST decision (above) makes staleness structurally impossible.
   // Fetched only when serving is on — shadow mode stores but never shows.
+  // The `prompt_version >= 3` gate is the seam-inversion serving cut: v1–v2
+  // whole-blob rows are never served, so they age out as decisions recompute.
   let explanation: string | null = null;
   if (includeExplanation) {
     const { data: stored, error: explanationError } = await client
@@ -154,6 +157,7 @@ export async function getPrescriptionAudit(
       .select("body")
       .eq("decision_id", data.id)
       .eq("user_id", userId)
+      .gte("prompt_version", 3)
       .maybeSingle();
     if (explanationError) throw explanationError;
     explanation = stored?.body ?? null;

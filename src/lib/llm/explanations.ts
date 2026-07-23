@@ -21,10 +21,18 @@ import {
   estimateTokens,
   monthDay,
   postCheckExplanation,
+  projectTrace,
   projectTrend,
   type ExplanationContext,
   type PayloadTrend,
 } from "./prescription-explainer";
+import {
+  buildExplanationFacts,
+  type ExplanationFacts,
+  type FactsContext,
+  type FactsDecision,
+} from "./explanation-facts";
+import { scoreTriggers, type Trigger, type TriggerSignals } from "./coaching-triggers";
 
 type Client = SupabaseClient<Database>;
 
@@ -653,6 +661,155 @@ async function generateOne(
 }
 
 // ---------------------------------------------------------------------------
+// doc 19 §5–§6 — facts + triggers projection over the assembled context
+// ---------------------------------------------------------------------------
+
+function fNum(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+function fStr(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+function fRec(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Adapt one recorded decision + its assembled context into the pure §5 facts
+ * inputs and the §6.1 trigger signals. The comparability-heavy fields the facts
+ * layer needs (effort observation, joint-pain recurrence, trend confidence, the
+ * completion/deviation/increment signals) are populated best-effort here and
+ * conservatively where the query doesn't yet supply them — so the dry-run never
+ * over-claims (plateau/pace stay guarded). Phase 3/4 refine the real assembly.
+ */
+export function toFactsInputs(
+  decision: DecisionRowSlice,
+  context: ExplanationContext,
+): { factsDecision: FactsDecision; factsContext: FactsContext; signals: TriggerSignals } {
+  const inputs = decision.inputs;
+  const output = decision.output;
+  const week = fRec(inputs.week);
+  const previous = fRec(inputs.previous);
+  const feedback = fRec(inputs.exerciseFeedback);
+  const exercise = fRec(inputs.exercise);
+  const loadType = (exercise ? fStr(exercise.loadType) : undefined) ?? "external";
+  const isDeload = week?.isDeload === true;
+  const targetRir = fNum(output.targetRir) ?? (week ? fNum(week.targetRir) : null);
+  const jointPain = feedback ? fNum(feedback.jointPain) : null;
+  const trace = projectTrace(output);
+
+  const factsDecision: FactsDecision = {
+    kind: decision.kind,
+    isDeload,
+    loadType,
+    ask: {
+      weight: fNum(output.weight),
+      reps: fNum(output.reps),
+      sets: fNum(output.sets),
+      targetRir,
+    },
+    previous: previous
+      ? {
+          weight: fNum(previous.weight),
+          reps: fNum(previous.reps),
+          sets: fNum(previous.sets),
+          targetRir: fNum(previous.targetRir),
+        }
+      : null,
+    trace,
+  };
+
+  const trend = context.trend;
+  const factsContext: FactsContext = {
+    exerciseName: context.exerciseName,
+    muscleGroup: context.muscleGroup,
+    weekNumber: context.weekNumber,
+    mesoWeeks: context.mesoWeeks,
+    // phase 3: derive from rir_reported on the previous session's working sets
+    effortObserved: null,
+    pain:
+      jointPain != null && jointPain > 0
+        ? { recurring: false, lastReportSessionsAgo: 0 }
+        : null,
+    pinnedNote: context.pinnedNote ?? null,
+    lastSessionNote: context.lastSessionNote ?? null,
+    trend: trend
+      ? {
+          window_days: trend.window_days,
+          measuredGainPctPer30d: trend.measured_gain_pct_per_30d ?? null,
+          prescribedGainPctPer30d: trend.prescribed_gain_pct_per_30d ?? null,
+          comparableSessions: Object.values(trend.statuses).reduce((a, b) => a + b, 0),
+          // conservative until the real §5.1 comparability gates are wired:
+          // never lets the dry-run claim a plateau it can't yet support
+          e1rmConfidence: "low",
+          comparable: false,
+        }
+      : null,
+  };
+
+  const signals: TriggerSignals = { trace };
+  return { factsDecision, factsContext, signals };
+}
+
+/** One decision's dry-run trigger verdict (§7.3) — no API call, no row. */
+export interface TriggerDryRun {
+  decisionId: string;
+  exercise: string | null;
+  triggers: Trigger[];
+  wouldGenerate: boolean;
+  facts: ExplanationFacts;
+}
+
+/**
+ * Compute facts + triggers for the given decisions WITHOUT calling the model
+ * (§7.3 dry-run) — the calibration surface for §6.1 before the trigger gate is
+ * flipped on. Returns per-decision would-trigger status; costs zero tokens.
+ */
+export async function dryRunDecisionTriggers(
+  userId: string,
+  decisionIds: string[],
+  deps?: Pick<ExplanationDeps, "service">,
+): Promise<TriggerDryRun[]> {
+  const service = deps?.service ?? createServiceClient();
+  const { data, error } = await service
+    .from("engine_decisions")
+    .select(
+      "id, workout_exercise_id, exercise_id, microcycle_id, mesocycle_id, inputs, output, kind",
+    )
+    .eq("user_id", userId)
+    .in("id", decisionIds.slice(0, MAX_BURST));
+  if (error) throw error;
+  const decisions = (data ?? []) as DecisionRowSlice[];
+  if (decisions.length === 0) return [];
+
+  const contexts = await assembleContexts(service, userId, decisions);
+  return decisions.map((decision) => {
+    const context = contexts.get(decision.id);
+    const { factsDecision, factsContext, signals } = toFactsInputs(
+      decision,
+      context ?? {
+        exerciseName: "Exercise",
+        muscleGroup: null,
+        weekNumber: null,
+        mesoWeeks: null,
+        recent: [],
+      },
+    );
+    const facts = buildExplanationFacts(factsDecision, factsContext);
+    const triggers = scoreTriggers(facts, signals);
+    return {
+      decisionId: decision.id,
+      exercise: context?.exerciseName ?? null,
+      triggers,
+      wouldGenerate: triggers.length > 0,
+      facts,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // diagnostics (N58 follow-up) — the admin MCP tools' service half
 // ---------------------------------------------------------------------------
 
@@ -660,6 +817,10 @@ export interface ProbeResult {
   ok: boolean;
   /** the §3 payload sent (present when a decision was probed) */
   payload?: Record<string, unknown>;
+  /** doc 19 §5 facts projection for the decision (present on a decision probe) */
+  facts?: ExplanationFacts;
+  /** doc 19 §6.1 triggers that would gate the generation call */
+  triggers?: Trigger[];
   /** raw completion on success (NOT stored unless `store` was set) */
   body?: string;
   model?: string;
@@ -730,6 +891,12 @@ export async function probeDecisionExplanation(
     { kind: decision.kind, inputs: decision.inputs, output: decision.output },
     context,
   );
+  // doc 19 §5–§6.1: the facts projection + trigger verdict, surfaced alongside
+  // the (v2) payload so the admin test loop can compare the two worldviews and
+  // calibrate the trigger gate before it flips on (§7.3).
+  const { factsDecision, factsContext, signals } = toFactsInputs(decision, context);
+  const facts = buildExplanationFacts(factsDecision, factsContext);
+  const triggers = scoreTriggers(facts, signals);
 
   let completion: LlmCompletion;
   try {
@@ -742,6 +909,8 @@ export async function probeDecisionExplanation(
     return {
       ok: false,
       payload: payload as unknown as Record<string, unknown>,
+      facts,
+      triggers,
       error: describeError(error).message,
     };
   }
@@ -776,6 +945,8 @@ export async function probeDecisionExplanation(
   return {
     ok: checked.ok,
     payload: payload as unknown as Record<string, unknown>,
+    facts,
+    triggers,
     body: completion.text,
     model: completion.model,
     tokensIn: completion.tokensIn,

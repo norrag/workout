@@ -4,6 +4,40 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-23 — Session 85: prescription explanation v3, phases 1–2 built (N60, PR #201)
+
+Built the first two of doc 19's five phases — the pure, no-model-risk half that
+improves the product on its own. The LLM re-enters only at phase 3, so nothing
+here changes a live model surface.
+
+- **Phase 1 — seam inversion + Layer-2 hardening.** `substituteExplanation`
+  retired for `appendCoaching`: the deterministic ask + why now ALWAYS render
+  and a stored LLM line is appended beneath as an additive `coach` field
+  (out-of-band + unpriced guards carry over). Serving cut: stored rows served
+  only at `prompt_version ≥ 3` in `getPrescriptionAudit` + MCP
+  `explain_prescription` — nothing serves today (no v3 rows), the safe floor.
+  `prescription-narrative.ts` copy pass per §4: paced=held-back framing,
+  program-language throughout (no "engine" outside the audit), an `effortStatus`
+  input gating the grade line's effort claim (inferred ≠ observed), and ≤3-line
+  suppression tests. **Strip COACH-line visual deferred to phase 4** (needs a
+  09 design decision; nothing serves until then).
+- **Phase 2 — facts + triggers, pure.** New `src/lib/llm/explanation-facts.ts`
+  (the §5 one-verdict-per-axis worldview; §5.1 gates as code — the Bench Press
+  low-confidence case projects `insufficient_data`, never `plateau`) and
+  `src/lib/llm/coaching-triggers.ts` (§6.1 gates; empty ⇒ no API call). Dry-run
+  wired into `test_llm_explanation` (returns facts + triggers) and
+  `generate_explanations` (`dry_run=true` would-trigger report) for calibration
+  before the gate flips on. Golden tests anchor both review scenarios.
+- **§10 spun-off candidates filed** as T-N60a–f (effort-reporting adoption,
+  structured pain follow-up, note classification at entry, equipment/setup
+  identity, deviation reasons, review-synthesis surfaces) for owner
+  prioritization — not phases of this build.
+- **Remaining (owner-gated):** phase 3 (prompt v3 + `triggers` migration +
+  structured output; owner voice-reads a batch first), phase 4 (strip coach
+  line + MCP `facts` + note-write regen), phase 5 (§8 deferred surfaces).
+- Full suite green (1340), typecheck + lint clean. Implementation record in
+  `docs/PROGRESS.md` (2026-07-23 entry).
+
 ## 2026-07-23 — Session 84: Batch 22 intake — prescription explanation v3 spec (N60)
 
 Owner handed over a full review document of the live v2 explanation output

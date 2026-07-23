@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
+  dryRunDecisionTriggers,
   generateDecisionExplanations,
   probeDecisionExplanation,
   probeLlmConnectivity,
@@ -260,6 +261,11 @@ function registerTestLlmExplanation(server: McpServer) {
         kind: "decision_probe",
         decision_id,
         payload: probe.payload ?? null,
+        // doc 19 §5–§6.1: the v3 facts worldview + trigger verdict, alongside
+        // the v2 payload/body — the calibration view before the gate flips
+        facts: probe.facts ?? null,
+        triggers: probe.triggers ?? null,
+        would_generate: probe.triggers ? probe.triggers.length > 0 : null,
         body: probe.body ?? null,
         model: probe.model ?? null,
         tokens_in: probe.tokensIn ?? null,
@@ -288,7 +294,10 @@ function registerGenerateExplanations(server: McpServer) {
         "of the active meso, narrowed by exercise_id and/or week/day. Set " +
         "overwrite=true to replace existing rows (prompt iteration); default " +
         "skips decisions that already have one. Costs ~$0.001 per decision; " +
-        "capped at 40 generations per call.",
+        "capped at 40 generations per call. Pass dry_run=true to report the " +
+        "doc-19 §6.1 would-trigger status across the scope WITHOUT any API " +
+        "call or stored row — the calibration view before the trigger gate " +
+        "flips on (works in any mode, including off).",
       inputSchema: {
         decision_ids: z.array(z.string().uuid()).max(40).optional(),
         exercise_id: z.string().uuid().optional(),
@@ -296,6 +305,7 @@ function registerGenerateExplanations(server: McpServer) {
         day: z.number().int().min(1).optional(),
         mesocycle_id: z.string().uuid().optional(),
         overwrite: z.boolean().optional(),
+        dry_run: z.boolean().optional(),
       },
     },
     async (
@@ -306,11 +316,14 @@ function registerGenerateExplanations(server: McpServer) {
         day?: number;
         mesocycle_id?: string;
         overwrite?: boolean;
+        dry_run?: boolean;
       },
       extra: McpExtra,
     ) => {
       const { client, userId } = await resolveAdmin(extra);
-      if (llmExplanationsMode() === "off") {
+      // dry-run reports trigger status only — no API call, so it is allowed to
+      // run even when generation is off (that is exactly when you calibrate)
+      if (!args.dry_run && llmExplanationsMode() === "off") {
         return jsonResult({
           ok: false,
           error:
@@ -348,6 +361,34 @@ function registerGenerateExplanations(server: McpServer) {
       }
       if (decisionIds.length === 0) {
         return jsonResult({ ok: true, generated: 0, results: [], note: "no matching decisions" });
+      }
+
+      // doc 19 §7.3 dry-run: report the would-trigger status across the scope
+      // with zero API calls / zero rows, then stop. Bounded by MAX_BURST.
+      if (args.dry_run) {
+        const dry = await dryRunDecisionTriggers(userId, decisionIds.slice(0, GENERATION_CAP));
+        const wouldGenerate = dry.filter((d) => d.wouldGenerate).length;
+        return jsonResult({
+          ok: true,
+          dry_run: true,
+          scope,
+          scanned: dry.length,
+          would_generate: wouldGenerate,
+          trigger_rate: dry.length > 0 ? wouldGenerate / dry.length : 0,
+          decisions: dry.map((d) => ({
+            decision_id: d.decisionId,
+            exercise: d.exercise,
+            triggers: d.triggers,
+            would_generate: d.wouldGenerate,
+            prescription_change: d.facts.prescription_change,
+            primary_reason: d.facts.primary_reason,
+            pace_status: d.facts.pace_status,
+            trend_status: d.facts.trend_status,
+          })),
+          note:
+            "Trigger status only — no OpenAI call, nothing stored. Use this to " +
+            "calibrate §6.1 before flipping the gate on.",
+        });
       }
 
       const truncated = decisionIds.length > GENERATION_CAP;
