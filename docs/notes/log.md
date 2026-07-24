@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-24 — Session 87: editable LLM coaching prompt via MCP (N61)
+
+Owner asked whether we could build MCP tools to edit/update the LLM
+decision-explanation system prompt. Built it — the doc-19 coaching prompt is
+now editable, versioned admin config, mirroring the `engine_params` tuning loop.
+
+- **New item N61** filed (Batch 23 verbatim source added). Follow-on to N60.
+- **Storage:** migration `20260724000001` — `coaching_prompts` (append-only
+  versions, single active row, admin-only RLS SELECT + writes, atomic
+  `activate_coaching_prompt` RPC). Ships EMPTY: the code constant
+  `COACHING_SYSTEM_PROMPT` (version 3) stays the permanent fallback. +RLS tests
+  (admin propose/read/activate, non-admin denied read+write+RPC, length
+  backstop). DB types updated. **Migration not yet applied to hosted prod** —
+  owner-gated step, like N58/N60.
+- **Query layer:** `src/lib/queries/coaching-prompts.ts` — get active / list /
+  get version / propose (version floored at 4 so DB prompts always clear the
+  serving cut) / activate / deletion-impact + discard. Unit-tested.
+- **Generation:** `explanations.ts` resolves the ACTIVE DB prompt once per burst
+  (byte-stable, prompt-cache friendly) and falls back to the constant on empty
+  table / read error — the editor can never take the pipeline down. Both the
+  write-site path and the probe stamp `prompt_version` from the resolved prompt.
+- **MCP tools (admin-gated):** `get_coaching_prompt` (browse + effective active,
+  `include_body` to copy for editing), `propose_coaching_prompt`,
+  `activate_coaching_prompt` (confirm-echo; no auto-regenerate — separate step),
+  `discard_coaching_prompt` (guards active + referenced). `get_llm_explanation_status`
+  now reports the effective prompt source (db | code_fallback) + version.
+- **Serving cut** is now the named const `COACHING_SERVED_MIN_PROMPT_VERSION`
+  (was a literal `3` in `read.ts` + `audit.ts`). Deterministic post-check still
+  guards every generation regardless of prompt text.
+- Doc 18 §10 addendum documents the editor. Typecheck + lint clean; full unit
+  suite green (1364).
+
 ## 2026-07-23 — Session 86: prescription explanation v3, phase 3 built (N60, PR #202)
 
 Built doc 19 phase 3 on a fresh branch (PR #201 having merged) — the LLM

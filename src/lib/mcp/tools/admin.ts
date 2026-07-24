@@ -30,6 +30,7 @@ import {
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
 import { registerLlmAdminTools, LLM_ADMIN_TOOL_NAMES } from "./admin-llm";
+import { registerCoachingPromptTools, COACHING_PROMPT_TOOL_NAMES } from "./admin-prompt";
 import { resolveAdmin } from "./admin-gate";
 import type { McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
@@ -918,6 +919,8 @@ export function registerAdminTools(server: McpServer) {
   // N58 follow-up: the LLM-explanation test loop + forced recompute
   // (admin-llm.ts) — registered here so the one entry point stays true.
   registerLlmAdminTools(server);
+  // doc 19 / N60 follow-up: edit the LLM coaching system prompt (admin-prompt.ts).
+  registerCoachingPromptTools(server);
 }
 
 /** Every role-gated tool this module registers — the roster the tools/list
@@ -932,4 +935,5 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
   ...LLM_ADMIN_TOOL_NAMES,
+  ...COACHING_PROMPT_TOOL_NAMES,
 ]);

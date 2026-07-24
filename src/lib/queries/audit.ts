@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, EngineDecisionKind } from "@/lib/types/database";
+import { COACHING_SERVED_MIN_PROMPT_VERSION } from "@/lib/llm/coaching";
 
 type Client = SupabaseClient<Database>;
 
@@ -148,8 +149,9 @@ export async function getPrescriptionAudit(
   // doc 19 §3: the coaching line is keyed to the decision id, so joining the
   // row's LATEST decision (above) makes staleness structurally impossible.
   // Fetched only when serving is on — shadow mode stores but never shows.
-  // The `prompt_version >= 3` gate is the seam-inversion serving cut: v1–v2
-  // whole-blob rows are never served, so they age out as decisions recompute.
+  // The serving cut (prompt_version >= the v3 floor) is the seam-inversion
+  // gate: v1–v2 whole-blob rows are never served, so they age out as decisions
+  // recompute. Editable DB prompts (version ≥ 4) always clear it.
   let explanation: string | null = null;
   if (includeExplanation) {
     const { data: stored, error: explanationError } = await client
@@ -157,7 +159,7 @@ export async function getPrescriptionAudit(
       .select("body")
       .eq("decision_id", data.id)
       .eq("user_id", userId)
-      .gte("prompt_version", 3)
+      .gte("prompt_version", COACHING_SERVED_MIN_PROMPT_VERSION)
       .maybeSingle();
     if (explanationError) throw explanationError;
     explanation = stored?.body ?? null;

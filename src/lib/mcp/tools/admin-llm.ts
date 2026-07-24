@@ -11,6 +11,7 @@ import {
 import { llmExplanationsMode } from "@/lib/llm/config";
 import { explanationModel } from "@/lib/llm/openai";
 import { COACHING_PROMPT_VERSION } from "@/lib/llm/coaching";
+import { getActiveCoachingPrompt } from "@/lib/queries/coaching-prompts";
 import { reconcilePrescriptions } from "@/lib/queries/regeneration";
 import { listOpenDecisionTargets } from "@/lib/queries/open-decisions";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -164,7 +165,7 @@ function registerGetLlmExplanationStatus(server: McpServer) {
       const { client, userId } = await resolveAdmin(extra);
       const limit = failure_limit ?? 10;
 
-      const [explanationCount, latest, failureCount, failures] = await Promise.all([
+      const [explanationCount, latest, failureCount, failures, activePrompt] = await Promise.all([
         client
           .from("decision_explanations")
           .select("decision_id", { count: "exact", head: true })
@@ -186,10 +187,16 @@ function registerGetLlmExplanationStatus(server: McpServer) {
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(limit),
+        getActiveCoachingPrompt(client),
       ]);
       for (const r of [explanationCount, latest, failureCount, failures]) {
         if (r.error) throw r.error;
       }
+
+      // The prompt a generation would actually run: the active DB prompt
+      // (editable via the coaching-prompt tools), else the built-in code fallback.
+      const promptSource = activePrompt ? "db" : "code_fallback";
+      const promptVersion = activePrompt ? activePrompt.version : COACHING_PROMPT_VERSION;
 
       const key = process.env.OPENAI_API_KEY;
       return jsonResult({
@@ -201,7 +208,8 @@ function registerGetLlmExplanationStatus(server: McpServer) {
           llm_explanations_env: process.env.LLM_EXPLANATIONS ?? null,
           model: explanationModel(),
           model_env_override: process.env.OPENAI_EXPLANATION_MODEL ?? null,
-          prompt_version: COACHING_PROMPT_VERSION,
+          prompt_version: promptVersion,
+          prompt_source: promptSource,
         },
         explanations: {
           stored: explanationCount.count ?? 0,

@@ -58,6 +58,7 @@ import type { TemplateRow, EquipmentType } from "@/lib/types/database";
 import { equipmentTypeValues } from "@/lib/types/equipment";
 import { resolveSession, type McpExtra, type McpSession } from "../session";
 import { llmExplanationsServe } from "@/lib/llm/config";
+import { COACHING_SERVED_MIN_PROMPT_VERSION } from "@/lib/llm/coaching";
 import {
   toolResult,
   feedbackCoverage,
@@ -1190,9 +1191,10 @@ function registerExplainPrescription(server: McpServer) {
         ? null
         : await projectNextPrescription(client, userId, exercise_id);
       // doc 19 §3: attach the stored LLM coaching line when the feature serves
-      // — the connector coach reads the same line the app shows. The
-      // `prompt_version >= 3` gate is the seam-inversion serving cut: v1–v2
-      // whole-blob rows are never served (they age out as decisions recompute).
+      // — the connector coach reads the same line the app shows. The serving cut
+      // (prompt_version >= the v3 floor) is the seam-inversion gate: v1–v2
+      // whole-blob rows are never served (they age out as decisions recompute);
+      // editable DB prompts (version ≥ 4) always clear it.
       let explanation: string | null = null;
       if (decision && llmExplanationsServe()) {
         const { data: stored, error: explanationError } = await client
@@ -1200,7 +1202,7 @@ function registerExplainPrescription(server: McpServer) {
           .select("body")
           .eq("decision_id", decision.decision_id)
           .eq("user_id", userId)
-          .gte("prompt_version", 3)
+          .gte("prompt_version", COACHING_SERVED_MIN_PROMPT_VERSION)
           .maybeSingle();
         if (explanationError) throw explanationError;
         explanation = stored?.body ?? null;

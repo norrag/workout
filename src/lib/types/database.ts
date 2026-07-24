@@ -469,6 +469,20 @@ export type EngineParamsRow = {
   updated_at: string;
 }
 
+/** doc 19 / N60 follow-up — an editable, versioned LLM coaching system prompt.
+ *  Mirrors engine_params (append-only versions, one active row, admin-gated
+ *  writes). The code constant COACHING_SYSTEM_PROMPT stays the permanent
+ *  fallback when the table is empty/unreadable. Admin SELECT only. */
+export type CoachingPromptRow = {
+  id: string;
+  version: number;
+  body: string;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** which engine entry produced a decision (doc 14 §6.2): a week N→N+1 advance
  *  (prescribe) or a cold-start seed (seedMeso). */
 export type EngineDecisionKind = "seed" | "advance";
@@ -788,6 +802,7 @@ export type Database = {
       template_exercises: Table<TemplateExerciseRow>;
       shares: Table<ShareRow>;
       engine_params: Table<EngineParamsRow>;
+      coaching_prompts: Table<CoachingPromptRow>;
       engine_decisions: Table<EngineDecisionRow>;
       decision_explanations: Table<DecisionExplanationRow>;
       llm_explanation_failures: Table<LlmExplanationFailureRow>;
@@ -811,6 +826,10 @@ export type Database = {
         Returns: undefined;
       };
       activate_engine_params: {
+        Args: { p_version: number };
+        Returns: undefined;
+      };
+      activate_coaching_prompt: {
         Args: { p_version: number };
         Returns: undefined;
       };

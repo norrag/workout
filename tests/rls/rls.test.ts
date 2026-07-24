@@ -1828,6 +1828,104 @@ describe("llm_explanation_failures (N58 follow-up)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// coaching_prompts (doc 19 / N60 follow-up): the editable LLM coaching system
+// prompt. Admin-only SELECT + writes (tighter than engine_params — no client
+// render path); a single active row; atomic activation via the RPC.
+// ---------------------------------------------------------------------------
+
+describe("coaching_prompts (doc 19)", () => {
+  const service = createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  let admin: SupabaseClient;
+  let adminId: string;
+
+  beforeAll(async () => {
+    // a dedicated admin (promoting alice/bob would break their non-admin tests)
+    admin = await signUpUser(`prompt-admin-${Date.now()}@rls.test`);
+    adminId = (await admin.auth.getUser()).data.user!.id;
+    const { error } = await service
+      .from("profiles")
+      .update({ role: "admin" })
+      .eq("id", adminId);
+    if (error) throw error;
+  });
+
+  it("non-admins can neither read nor write coaching prompts", async () => {
+    // seed one via the service role (bypasses RLS)
+    const { error: seedError } = await service
+      .from("coaching_prompts")
+      .insert({ version: 900, body: "z".repeat(60), is_active: false, notes: "seed" });
+    expect(seedError).toBeNull();
+
+    // a non-admin sees nothing (admin-only SELECT)
+    const { data: read } = await bob
+      .from("coaching_prompts")
+      .select("version")
+      .eq("version", 900);
+    expect(read).toEqual([]);
+
+    // and cannot write
+    const { error: writeError } = await bob
+      .from("coaching_prompts")
+      .insert({ version: 901, body: "q".repeat(60), is_active: false });
+    expect(writeError).not.toBeNull();
+  });
+
+  it("an admin can propose, read, and activate; activation keeps exactly one active row", async () => {
+    // two inactive drafts written by the admin's own token (RLS insert gate)
+    const { error: e1 } = await admin
+      .from("coaching_prompts")
+      .insert({ version: 910, body: "a".repeat(60), is_active: false });
+    const { error: e2 } = await admin
+      .from("coaching_prompts")
+      .insert({ version: 911, body: "b".repeat(60), is_active: false });
+    expect(e1).toBeNull();
+    expect(e2).toBeNull();
+
+    // admin can read them back
+    const { data: seen } = await admin
+      .from("coaching_prompts")
+      .select("version")
+      .in("version", [910, 911]);
+    expect((seen ?? []).map((r) => r.version).sort()).toEqual([910, 911]);
+
+    // atomic activation via the RPC
+    const { error: actError } = await admin.rpc("activate_coaching_prompt", { p_version: 910 });
+    expect(actError).toBeNull();
+    // re-activating a different version flips atomically — still exactly one active
+    const { error: act2Error } = await admin.rpc("activate_coaching_prompt", { p_version: 911 });
+    expect(act2Error).toBeNull();
+
+    const { data: active } = await service
+      .from("coaching_prompts")
+      .select("version")
+      .eq("is_active", true);
+    expect(active).toEqual([{ version: 911 }]);
+  });
+
+  it("a non-admin cannot activate a prompt via the RPC", async () => {
+    const { error } = await bob.rpc("activate_coaching_prompt", { p_version: 910 });
+    expect(error).not.toBeNull();
+    // the active row is unchanged
+    const { data: active } = await service
+      .from("coaching_prompts")
+      .select("version")
+      .eq("is_active", true);
+    expect(active).toEqual([{ version: 911 }]);
+  });
+
+  it("the body length is enforced at the DB as a backstop", async () => {
+    const { error } = await service
+      .from("coaching_prompts")
+      .insert({ version: 920, body: "x".repeat(12001), is_active: false });
+    expect(error).not.toBeNull();
+    expect(error!.code).toBe("23514"); // check constraint violation
+  });
+});
+
 describe("single active meso (R15)", () => {
   const service = createClient(URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
