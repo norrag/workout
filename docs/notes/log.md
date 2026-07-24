@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-24 — Session 89: deterministic explanation language + the three-layer strip (N63, PR #PENDING)
+## 2026-07-24 — Session 89: deterministic explanation language + the three-layer strip (N63, PR #207)
 
 Owner: rework the deterministic explanation language to match the coaching
 layer's character, and make the whole prescription note — statement, why, and
