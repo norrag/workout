@@ -42,6 +42,64 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-07-24 — Day View: the prescription strip becomes a three-layer ledger, + the COACH line (fig 1.1, N63)
+
+Owner-directed: "rework the deterministic prescription explanation language to
+be better, and more consistent with the character/language/tone/terminology
+represented within the coaching layer… consider also the overall formatting of
+the full prescription note (statement, explanation, coaching layer) so we have a
+clear, pleasant and easy presentation." The ask line was called out as already
+good and is unchanged. Amends the 2026-07-19 entry below (§1); the drill-in
+rule, the target-glyph button, and the strip's position above PINNED all stand.
+
+### 1. Quick-read strip — visual hierarchy across the three layers (fig 1.1)
+
+- **Change:** the strip's single flat block of `11px` ink/70 lines becomes three
+  ranked zones inside the same left-border strip:
+  - **the ask** — `11.5px` semibold **full ink** (was ink/85, same weight as the
+    body). It is the prescription; it reads first and reads as primary.
+  - **the why** — `11px` medium ink/70 as before, but each cause on its own line
+    with `4px` of air between them (`space-y-1`) instead of `2px`, so a
+    two- or three-cause week reads as a list, not a paragraph.
+  - **the coach line** — doc 19 §3's additive LLM layer, now rendered: separated
+    by a hairline (`border-t border-ink/20`, `8px` above / `6px` below), a
+    tracked-caps `COACH` label (`9px`, `0.16em`, ink/45 — the ledger
+    section-header idiom already used by the audit sheet and the set-grid
+    header), then the line itself at ink/75.
+- **Rationale:** the three layers have three different authors and three
+  different standings (the ask is the program's instruction, the why is the
+  program's reasoning, the coach line is an observation). Flat styling made them
+  one undifferentiated blob and left the coach line — when it exists at all —
+  indistinguishable from a program fact.
+- **Copy:** the strip's loading and retry lines said "the engine's decision";
+  they now say "the program's decision" (doc 19 §4.2 — "engine" appears only in
+  the Engine audit).
+- **Affected figures:** `1.1`.
+- **Impact:** `RETROFIT`. No mockup figure covers this strip (pre-existing
+  rule-8 deviation from N57, recorded in PROGRESS.md); the treatment is built
+  from the light-ledger primitives already in the day view. Nothing about the
+  coach line's *availability* changes here — it renders only when the LLM
+  feature is serving and a stored v3 row exists for the decision (doc 19 §3),
+  which is still the minority-of-decisions path.
+
+### 2. Deterministic explanation — one voice with the coaching layer
+
+- **Change:** every line the composer can write was rewritten to the copy system
+  now documented at the head of `src/lib/prescription-narrative.ts` and pinned
+  by tests: the program is the actor, second person only for what the lifter did
+  or reported, cause-then-consequence in one sentence, the lifter's own rating
+  vocabulary (workload *past just right*, pump, joint pain, fatigue,
+  performance), one parallel construction for every held-weight cause, and no
+  hype. A **program-intent line** ("this is the block's peak week…") now closes
+  the why on the weeks where intent is the story, using the same templates the
+  coaching facts payload uses, and only when the week has room for it.
+- **Rationale:** the deterministic layer is what the lifter reads every session;
+  it was drifting into colloquialism ("ran hot", "a rough one") and engine-ish
+  shorthand ("step up", "price a confident step") while the coaching layer was
+  held to an analyst register. Two layers, one voice.
+- **Impact:** `RETROFIT` (copy only — no number, gate, or engine behavior
+  changes). Full rationale + the per-line before/after live in doc 19 §13.
+
 ## 2026-07-21 — Feedback card: joint-pain exercise attribution (fig 1.4)
 
 Owner-reported: joint pain is collected once a muscle group closes, but it was

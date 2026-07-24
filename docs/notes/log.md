@@ -4,6 +4,57 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-24 — Session 89: deterministic explanation language + the three-layer strip (N63, PR #207)
+
+Owner: rework the deterministic explanation language to match the coaching
+layer's character, and make the whole prescription note — statement, why, and
+coach line — read as one well-formatted thing. The ask line was called out as
+already good and is untouched. Recorded as doc 19 §13 + the doc 09 2026-07-24
+design entry.
+
+- **New item N63** filed (Batch 25 verbatim source added). Follow-on to N60–N62.
+- **A written copy system, not a wording tweak.** Seven rules at the head of
+  `prescription-narrative.ts`, taken from the same review tone table the
+  coaching prompt is held to: program-as-actor, second person only for what the
+  lifter did or reported, cause-then-consequence in one sentence, the lifter's
+  own rating words (workload *past just right*, pump, joint pain, fatigue,
+  performance), one parallel construction across every held-weight cause, plain
+  "no conclusion warranted" for thin data, no hype. Every composed line was
+  rewritten to it, and a new test block sweeps EVERY line the module can emit
+  for banned engine vocabulary, praise/hype, and sentence shape — so the system
+  is enforced, not just documented.
+- **Two accuracy bugs the copy pass surfaced.** (1) `paced` is four governors
+  (rate_pacer / cadence / miss_throttle / peak_week, doc 16 §3.5) and BOTH
+  layers narrated all four as the rate pacer's — a lifter whose lift was held
+  by the once-per-week cadence was told their gains were ahead of plan. Each
+  governor now has its own sentence and its own facts `load_reason`
+  (`pace_status` was already correct — it always required `rate_pacer`).
+  (2) The ramp clarifier "a step up even where the numbers match" rendered on
+  weeks where the numbers had plainly changed; it is now gated to the case it
+  exists for.
+- **Program intent, the review's second-ranked content.** A closing frame line
+  on peak / first / last weeks, built from the same templates
+  `projectProgramContext` gives the model, rendered last and only when the week
+  has ≤2 things to say already (so the §4.4 line cap holds).
+- **Effort honesty went live.** §4.3's `effortStatus` input existed but nothing
+  supplied it, so the day view always fell through to "inferred".
+  `PrescriptionAudit.effortObserved` now reads the decision's
+  `inputs.actualSets` through a pure, client-safe `readEffortObserved`.
+- **The strip is now a three-layer ledger** (doc 09 entry): ask visually
+  primary, why lines with air between causes, and the doc-19 §3 **COACH line
+  rendered** under a hairline + tracked-caps label — the §8 design decision the
+  spec asked for, closing the strip half of §11 phase 4. Loading/retry copy no
+  longer says "the engine's decision".
+- Full suite green (1406 tests), typecheck + lint clean. No migration,
+  no engine change, no number moved.
+
+### Next session — suggested starting point
+- The rest of doc 19 phase 4: MCP `explain_prescription.facts`, the note-write
+  regeneration hooks, then a month of trigger/abstention/token measurement.
+- Owner residual from N62 still open: the ACTIVE prod prompt is DB v4, authored
+  before the source_session/macro payload — revise it via propose →
+  `generate_explanations preview=true` → activate.
+
 ## 2026-07-24 — Session 88: LLM payload tense + macro goal + prompt preview (N62, PR #206)
 
 Owner handed over three updates to the doc-19 explanation stack and the MCP

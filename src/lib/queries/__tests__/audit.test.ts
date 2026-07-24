@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   prescriptionMatchesDecision,
+  readEffortObserved,
   readOutputNumbers,
   readTrace,
 } from "../audit";
@@ -88,6 +89,46 @@ describe("readOutputNumbers (N33 S4)", () => {
     expect(readOutputNumbers({ rationale: "only prose" })).toBeNull();
     expect(readOutputNumbers(null)).toBeNull();
     expect(readOutputNumbers("junk")).toBeNull();
+  });
+});
+
+describe("readEffortObserved (doc 19 §4.3 — the effort-honesty gate, N63)", () => {
+  it("is observed when any working set carried a reported RIR", () => {
+    expect(
+      readEffortObserved({
+        actualSets: [
+          { reps: 10, rirReported: null },
+          { reps: 9, rirReported: 1 },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("is inferred when the session logged no RIR at all", () => {
+    expect(
+      readEffortObserved({ actualSets: [{ reps: 10 }, { reps: 9, rirReported: null }] }),
+    ).toBe(false);
+  });
+
+  it("ignores warmups — only working sets speak to effort", () => {
+    expect(
+      readEffortObserved({
+        actualSets: [
+          { reps: 5, isWarmup: true, rirReported: 4 },
+          { reps: 10 },
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      readEffortObserved({ actualSets: [{ reps: 5, isWarmup: true, rirReported: 4 }] }),
+    ).toBeNull();
+  });
+
+  it("is unknown (null) without usable actualSets — a seed, or older inputs", () => {
+    expect(readEffortObserved(null)).toBeNull();
+    expect(readEffortObserved({})).toBeNull();
+    expect(readEffortObserved({ actualSets: "nope" })).toBeNull();
+    expect(readEffortObserved({ actualSets: [] })).toBeNull();
   });
 });
 

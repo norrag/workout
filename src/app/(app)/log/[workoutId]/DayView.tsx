@@ -402,6 +402,8 @@ export function DayView({
           markerBand={complianceBand(params)}
           microTargetRir={microcycle.target_rir}
           isDeload={microcycle.is_deload}
+          weekNumber={microcycle.week_number}
+          mesoWeeks={detail.microcycles.length}
           menuOpen={menuFor === we.id}
           setMenuTarget={setMenu?.weId === we.id ? setMenu.setNumber : null}
           dropPending={dropPending[we.id] ?? false}
@@ -959,6 +961,8 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onLogged,
   commit,
   isDeload,
+  weekNumber,
+  mesoWeeks,
 }: {
   we: LoggedExercise;
   index: number;
@@ -969,6 +973,9 @@ const ExerciseBlock = memo(function ExerciseBlock({
   microTargetRir: number;
   /** deloads suppress delta/progression talk in the quick-read */
   isDeload: boolean;
+  /** N63 — where the week sits in the block, for the quick-read's intent line */
+  weekNumber: number;
+  mesoWeeks: number;
   menuOpen: boolean;
   setMenuTarget: number | null;
   dropPending: boolean;
@@ -1052,6 +1059,10 @@ const ExerciseBlock = memo(function ExerciseBlock({
       previous: rxAudit?.previous ?? null,
       outOfBand: rxOutOfBand,
       decisionOutput: rxAudit?.output ?? null,
+      // §4.3 — an assumed RIR is never spoken as an observed one
+      effortStatus: rxAudit?.effortObserved === true ? "observed" : "inferred",
+      weekNumber,
+      mesoWeeks,
     }),
     rxAudit?.explanation,
     rxOutOfBand,
@@ -1148,28 +1159,44 @@ const ExerciseBlock = memo(function ExerciseBlock({
         </div>
       </div>
       {rxOpen && (
-        <div className="mt-[7px] border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium leading-[1.5] text-ink/70">
+        /* N63 — the three layers read as one ledger: the ask is visually
+           primary (near-full ink, semibold), the why sits under it at reading
+           weight with air between causes, and the coaching line — when one
+           exists at all — is ruled off under its own tracked-caps label so it
+           is never mistaken for a program fact. */
+        <div className="mt-[7px] border-l-2 border-ink py-1.5 pl-2.5 text-[11px] font-medium leading-[1.5] text-ink/70">
           {narrative.ask && (
-            <div className="text-ink/85">{narrative.ask}</div>
+            <div className="text-[11.5px] font-semibold leading-[1.45] text-ink">
+              {narrative.ask}
+            </div>
           )}
           {rxState === "loading" && (
-            <div className="mt-0.5 text-ink/40">Reading the engine&apos;s decision…</div>
+            <div className="mt-1 text-ink/40">Reading the program&apos;s decision…</div>
           )}
           {rxState === "failed" && (
             <button
               type="button"
               onClick={fetchRxAudit}
-              className="mt-0.5 text-left text-ink/50 underline underline-offset-2"
+              className="mt-1 text-left text-ink/50 underline underline-offset-2"
             >
-              Couldn&apos;t read the engine&apos;s decision — tap to retry.
+              Couldn&apos;t read the program&apos;s decision — tap to retry.
             </button>
           )}
-          {rxState === "loaded" &&
-            narrative.lines.map((line, i) => (
-              <div key={i} className="mt-0.5">
-                {line}
+          {rxState === "loaded" && narrative.lines.length > 0 && (
+            <div className="mt-1 space-y-1">
+              {narrative.lines.map((line, i) => (
+                <div key={i}>{line}</div>
+              ))}
+            </div>
+          )}
+          {rxState === "loaded" && narrative.coach && (
+            <div className="mt-2 border-t border-ink/20 pt-1.5">
+              <div className="text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+                COACH
               </div>
-            ))}
+              <div className="mt-[3px] text-ink/75">{narrative.coach}</div>
+            </div>
+          )}
           {/* drill-in to the Engine audit lives in the ⋮ menu only (owner
               2026-07-19 follow-up) — the strip stays purely the story */}
         </div>

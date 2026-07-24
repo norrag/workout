@@ -462,3 +462,98 @@ user. Both admin tools now take an explicit prompt:
   text. A DB prompt authored before a payload amendment keeps working; it just
   won't describe the new fields until it is revised — the contract block is how
   a session sees that.
+
+## 13. 2026-07-24 amendment — the deterministic copy system + the strip's three layers (N63)
+
+Owner-requested, after reading the live deterministic output: "rework the
+deterministic prescription explanation language to be better, and more
+consistent with the character/language/tone/terminology represented within the
+coaching layer… consider also the overall formatting of the full prescription
+note (the deterministic prescription statement, the deterministic prescription
+explanation, and the coaching layer if applicable)." The **ask is unchanged** —
+the owner called it good. This amendment supersedes §4.2's one-line "vocabulary
+pass" with a written copy system, and delivers the §11 phase-4 strip flip for
+the coach line (note-write regeneration and the MCP `facts` field remain).
+
+### 13.1 The copy system (Layer 2's half of the §2 A4 voice)
+
+The composer and the coaching prompt are now held to the same seven rules,
+documented at the head of `src/lib/prescription-narrative.ts` and enforced by a
+test block that sweeps every line the module can emit:
+
+1. **The program is the actor.** "The program" writes the prescription; "engine"
+   appears only in the Engine audit (§4.2); "we"/"I" appear nowhere.
+2. **Second person only for what the lifter did or reported** — completed,
+   reported, rated. Never for praise (doing the work is the baseline, per the
+   review's tone prohibitions), never for effort that was assumed (§4.3).
+3. **Cause, then consequence, in one sentence** — the review's model shape
+   ("You completed last session's target, so …"), not a stack of em-dashes.
+4. **The lifter's own vocabulary**, taken from the surfaces they already use:
+   weight (lb), reps, sets, short of failure, effort target, workload (*past
+   just right* is the slider's own anchor label), pump, joint pain, fatigue,
+   performance. Banned: step up, earned, paced, pacer, governor, quantum,
+   anchor, dose, price, e1RM, engine.
+5. **Parallel construction over variety** — every held-weight cause reads "the
+   weight holds because …", so a ledger of causes reads as one system.
+6. **No conclusion is a fine conclusion** — thin data says so plainly
+   ("There is not enough recent data here to justify more weight yet").
+7. **No hype, no exclamation marks** (doc 06/08).
+
+Representative before → after:
+
+| State | v3.0 | v3.1 (N63) |
+|---|---|---|
+| `stepped` | "This adds a small step up — you completed last session's target, so the program asks for a little more." | "The weight goes up because you completed last session's target in full." |
+| `paced` (rate pacer) | "An extra load increase was held back — this keeps your strength gain on its planned monthly pace." | "Your recent gains are already ahead of the planned pace, so the added difficulty comes from reps and effort rather than more weight." |
+| `not_earned/workload` | "Held steady — last session's workload ran hot, so nothing is added this time." | "The weight holds because you rated last session's workload past just right." |
+| `not_earned/dampener` | "Held steady — last session was reported as a rough one." | "The weight holds because you rated last session high on fatigue or low on performance." |
+| `not_earned/confidence` | "Holding here — there isn't enough recent data yet to price a confident step up." | "There is not enough recent data here to justify more weight yet, so the target repeats." |
+| out-of-band | "These numbers were adjusted by hand — the last computed target was 250 lb for 9 at 2 in reserve." | "These numbers were set by hand. The program's own target was 3 sets of 9 at 250 lb, each stopped 2 reps short of failure." (composed through `composeAsk`, so the caveat and the ask can never speak differently) |
+
+### 13.2 Two accuracy fixes the copy pass exposed
+
+- **`paced` is four governors, not one** (doc 16 §3.5: `rate_pacer`, `cadence`,
+  `miss_throttle`, `peak_week`). Both layers narrated all four as the rate
+  pacer's — telling a lifter their gains were "ahead of the planned pace" when
+  the real reason was "the program only steps this lift once a week". Each
+  governor now gets its own true sentence in the composer, and its own
+  `load_reason` in the §5 facts (`already_stepped_this_week`,
+  `recent_increases_not_holding`, `increases_paused_at_peak_week`, and
+  `held_this_session` for an unnamed governor). `pace_status` was already
+  correct — it always required `governor === "rate_pacer"`.
+- **The ramp clarifier was over-claiming.** "a step up even where the numbers
+  match" rendered whenever the RIR stepped down, including weeks that also added
+  weight or reps — where the numbers plainly did not match. It now renders only
+  when the weight *and* reps are unchanged, which is the case it exists for.
+
+### 13.3 The program-intent line
+
+The review's content hierarchy ranks program intent second (right behind
+exercise-specific constraints); the deterministic layer had no way to say it.
+`composeProgramContextLine` adds one sentence for the three weeks where intent
+is the story — the same weeks the `block_intent` trigger fires on (§6.1),
+framed with the same templates `projectProgramContext` gives the model, so a
+week reads the same whichever layer speaks. It renders **last** (body order is
+change → cause → frame), never on a deload (the deload line *is* the intent),
+never as the week-1 line on a seed (which already says it), and only when the
+week has ≤ 2 things to say already — so a busy week keeps the §4.4 line cap and
+a routine week gets the frame instead of silence.
+
+### 13.4 Effort honesty is now live, not just available
+
+§4.3's `effortStatus` input existed but nothing supplied it, so the day view
+always fell through to "inferred". `PrescriptionAudit` gains `effortObserved`,
+read off the recorded decision's `inputs.actualSets` by a pure, client-safe
+`readEffortObserved` (the same rule as the facts layer's
+`projectEffortObserved`, restated because that module is `server-only`). A
+session that reported RIR now gets its effort spoken; one that didn't still
+never has an assumption stated as an observation.
+
+### 13.5 The strip: three layers, three standings
+
+The day-view treatment is specified in `docs/09-design-changelog.md`
+(2026-07-24 entry): the ask goes visually primary, the why lines get air between
+causes, and the coach line renders — ruled off under a tracked-caps `COACH`
+label, the §8 design decision this doc asked for. This closes the strip half of
+§11 phase 4; the MCP `facts` field and the note-write regeneration hooks are
+still open.

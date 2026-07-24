@@ -157,6 +157,27 @@ describe("projectLoadReason", () => {
     expect(projectLoadReason(hackSquatDecision)).toBe("ahead_of_planned_pace");
   });
 
+  it("tells the four paced governors apart — only the rate pacer is 'ahead of plan' (N63)", () => {
+    const paced = (governor?: string) =>
+      projectLoadReason({
+        ...hackSquatDecision,
+        trace: [
+          {
+            rule: "progression",
+            detail: "earned; held",
+            status: "paced",
+            ...(governor ? { governor } : {}),
+          },
+        ],
+      });
+    expect(paced("rate_pacer")).toBe("ahead_of_planned_pace");
+    expect(paced("cadence")).toBe("already_stepped_this_week");
+    expect(paced("miss_throttle")).toBe("recent_increases_not_holding");
+    expect(paced("peak_week")).toBe("increases_paused_at_peak_week");
+    // an unnamed governor states the hold, never a cause it cannot support
+    expect(paced()).toBe("held_this_session");
+  });
+
   it("lets a feedback pain cap outrank the earn-gate echo", () => {
     expect(
       projectLoadReason({

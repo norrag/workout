@@ -66,7 +66,11 @@ export type PrimaryReason =
  *  selected from a fixed set, never free text. Null when the load simply moved
  *  with nothing to explain about it. */
 export type LoadReason =
-  | "ahead_of_planned_pace" // paced: an earned step held to hold the monthly rate
+  | "ahead_of_planned_pace" // paced/rate_pacer: held to hold the monthly rate
+  | "already_stepped_this_week" // paced/cadence: one step per microcycle
+  | "recent_increases_not_holding" // paced/miss_throttle: earned-then-missed cycles
+  | "increases_paused_at_peak_week" // paced/peak_week: the ramp carries the week
+  | "held_this_session" // paced under an unnamed governor
   | "below_smallest_jump" // vanished: earned step under the smallest weight increment
   | "capped_by_joint_pain"
   | "held_by_high_workload"
@@ -351,7 +355,21 @@ export function projectLoadReason(decision: FactsDecision): LoadReason | undefin
   if (!step) return undefined;
   switch (step.status) {
     case "paced":
-      return "ahead_of_planned_pace";
+      // N63 — `paced` is four different governors (doc 16 §3.5); only the rate
+      // pacer means "ahead of plan". Collapsing them all into that verdict fed
+      // the model a reason that wasn't true of a cadence or peak-week hold.
+      switch (step.governor) {
+        case "rate_pacer":
+          return "ahead_of_planned_pace";
+        case "cadence":
+          return "already_stepped_this_week";
+        case "miss_throttle":
+          return "recent_increases_not_holding";
+        case "peak_week":
+          return "increases_paused_at_peak_week";
+        default:
+          return "held_this_session";
+      }
     case "vanished":
       return "below_smallest_jump";
     case "stepped":
