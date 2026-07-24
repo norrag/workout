@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-24 — Session 88: LLM payload tense + macro goal + prompt preview (N62)
+## 2026-07-24 — Session 88: LLM payload tense + macro goal + prompt preview (N62, PR #206)
 
 Owner handed over three updates to the doc-19 explanation stack and the MCP
 layers around it. All three built; recorded as the doc 19 §12 amendment.
