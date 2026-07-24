@@ -8,8 +8,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildExplanationFacts,
+  formatMacroTarget,
   formatWork,
   projectChange,
+  projectMacro,
+  projectNote,
+  projectSourceSession,
   projectLoadReason,
   projectPaceStatus,
   projectPrimaryReason,
@@ -20,13 +24,14 @@ import {
 } from "../explanation-facts";
 
 // --- Hack Squat: the §5 worked example -------------------------------------
-// week 4 of 5, target RIR 0, load holds, reps 10 → 11, earned step paced.
+// week 4 of 5, target RIR 0, load holds, reps 10 → 11, earned step paced. The
+// SOURCE session (§5.2) was week 3 at 1 RIR — the previous tuple carries its ask.
 const hackSquatDecision: FactsDecision = {
   kind: "advance",
   isDeload: false,
   loadType: "external",
   ask: { weight: 112.5, reps: 11, sets: 3, targetRir: 0 },
-  previous: { weight: 112.5, reps: 10, sets: 3, targetRir: 0 },
+  previous: { weight: 112.5, reps: 10, sets: 3, targetRir: 1 },
   trace: [
     { rule: "load", detail: "hold 112.5 lb, reps to 11" },
     {
@@ -44,8 +49,26 @@ const hackSquatContext: FactsContext = {
   mesoWeeks: 5,
   effortObserved: false,
   pain: { recurring: false, lastReportSessionsAgo: null },
+  // §5.2 — the note was written in the SOURCE session (week 3, 1 RIR), not in
+  // the peak week being prescribed
+  sourceSession: { weekNumber: 3, targetRir: 1, deload: false },
+  lastSessionNoteFromSource: true,
   lastSessionNote: "severe burning pump, quads aching",
   lastSessionNoteAgeSessions: 1,
+  macro: {
+    goalType: "hypertrophy",
+    blockPosition: 2,
+    blockCount: 4,
+    phase: "intensification",
+    goalNotes: "add size on the quads before spring",
+    target: {
+      low: 6,
+      high: 9,
+      unit: "%",
+      direction: "gain",
+      durationMonths: 4,
+    },
+  },
   trend: {
     window_days: 90,
     measuredGainPctPer30d: 1.8,
@@ -82,11 +105,11 @@ describe("projectChange", () => {
     expect(projectChange({ ...hackSquatDecision, kind: "seed", previous: null })).toBe("seed");
   });
 
-  it("is a hold when nothing moved", () => {
+  it("is a hold when nothing moved — the RIR target included", () => {
     expect(
       projectChange({
         ...hackSquatDecision,
-        ask: { weight: 112.5, reps: 10, sets: 3, targetRir: 0 },
+        ask: { weight: 112.5, reps: 10, sets: 3, targetRir: 1 },
       }),
     ).toBe("hold");
   });
@@ -278,6 +301,14 @@ describe("buildExplanationFacts — the §5 object", () => {
       exercise: "Hack Squat",
       muscle_group: "quads",
       week: { n: 4, of: 5, target_rir: 0, deload: false },
+      source_session: { week_n: 3, target_rir: 1, deload: false },
+      macro: {
+        goal: "hypertrophy",
+        block: { n: 2, of: 4 },
+        phase: "intensification",
+        target: "gain 6–9% over 4 months (an estimate)",
+        goal_notes: "add size on the quads before spring",
+      },
       prescription_change: "reps_increased",
       previous_work: "112.5 lb × 10 × 3",
       next_work: "112.5 lb × 11 × 3",
@@ -289,9 +320,10 @@ describe("buildExplanationFacts — the §5 object", () => {
       trend_status: "no_actionable_trend",
       pain: { recurring: false, last_report_sessions_ago: null },
       note: {
-        source: "last_session",
+        source: "source_session",
         age_sessions: 1,
         text: "severe burning pump, quads aching",
+        session: { week_n: 3, target_rir: 1, deload: false },
       },
     });
   });
@@ -345,5 +377,146 @@ describe("buildExplanationFacts — the §5 object", () => {
       age_sessions: 0,
       text: "keep the seat one notch higher",
     });
+  });
+});
+
+/**
+ * N62 / §5.2 — `week` is the UPCOMING prescription; the session that produced
+ * `previous_work` gets its own block, and the note names which session wrote it.
+ * Without the split a note left at 1 RIR read as if it happened in the 0 RIR
+ * peak week being prescribed.
+ */
+describe("projectSourceSession (§5.2)", () => {
+  it("reports the source session's own week, RIR, and deload flag", () => {
+    expect(projectSourceSession(hackSquatDecision, hackSquatContext)).toEqual({
+      week_n: 3,
+      target_rir: 1,
+      deload: false,
+    });
+  });
+
+  it("still reports the source session's RIR when its week can't be resolved", () => {
+    expect(
+      projectSourceSession(hackSquatDecision, { ...hackSquatContext, sourceSession: null }),
+    ).toEqual({ target_rir: 1, deload: false });
+  });
+
+  it("prefers the decision's own previous RIR over the coarser microcycle target", () => {
+    expect(
+      projectSourceSession(
+        {
+          ...hackSquatDecision,
+          previous: { weight: 112.5, reps: 10, sets: 3, targetRir: 2 },
+        },
+        hackSquatContext,
+      ),
+    ).toEqual({ week_n: 3, target_rir: 2, deload: false });
+  });
+
+  it("marks a deload source session", () => {
+    expect(
+      projectSourceSession(
+        {
+          ...hackSquatDecision,
+          previous: { weight: 90, reps: 8, sets: 2, targetRir: 6 },
+        },
+        {
+          ...hackSquatContext,
+          sourceSession: { weekNumber: 5, targetRir: 6, deload: true },
+        },
+      ),
+    ).toEqual({ week_n: 5, target_rir: 6, deload: true });
+  });
+
+  it("is absent for a seed — there is no earlier session to disambiguate", () => {
+    expect(
+      projectSourceSession({ ...hackSquatDecision, previous: null }, hackSquatContext),
+    ).toBeUndefined();
+  });
+
+  it("the upcoming week and the source session never collapse into one", () => {
+    const facts = buildExplanationFacts(hackSquatDecision, hackSquatContext);
+    expect(facts.week?.target_rir).toBe(0); // peak week, sets to failure
+    expect(facts.source_session?.target_rir).toBe(1); // the note's session
+    expect(facts.note?.session).toEqual(facts.source_session);
+  });
+});
+
+describe("projectNote provenance (§5.2)", () => {
+  const source = { week_n: 3, target_rir: 1, deload: false };
+
+  it("labels a note from the source session and repeats that session's conditions", () => {
+    expect(projectNote(hackSquatContext, source)).toMatchObject({
+      source: "source_session",
+      age_sessions: 1,
+      session: source,
+    });
+  });
+
+  it("labels a merely recent note as such, with no session block to borrow", () => {
+    const note = projectNote(
+      { ...hackSquatContext, lastSessionNoteFromSource: false, lastSessionNoteAgeSessions: 2 },
+      source,
+    );
+    expect(note).toMatchObject({ source: "recent_session", age_sessions: 2 });
+    expect(note?.session).toBeUndefined();
+  });
+
+  it("a pinned note stays pinned — it belongs to no session", () => {
+    const note = projectNote({ ...hackSquatContext, pinnedNote: "seat one notch higher" }, source);
+    expect(note).toMatchObject({ source: "pinned", age_sessions: 0 });
+    expect(note?.session).toBeUndefined();
+  });
+});
+
+/** N62 / §5.3 — the macro goal layer: context for coaching, never a rate. */
+describe("projectMacro + formatMacroTarget (§5.3)", () => {
+  it("formats a mass target as one estimate sentence", () => {
+    expect(
+      formatMacroTarget({
+        low: 8,
+        high: 12,
+        unit: "lb",
+        direction: "loss",
+        durationMonths: 4,
+      }),
+    ).toBe("lose 8–12 lb over 4 months (an estimate)");
+  });
+
+  it("formats a strength target in percent, and a single-value band without a range", () => {
+    expect(
+      formatMacroTarget({ low: 6, high: 6, unit: "%", direction: "gain", durationMonths: 3 }),
+    ).toBe("gain 6% over 3 months (an estimate)");
+  });
+
+  it("omits a target with no direction or no numbers — absence over an empty claim", () => {
+    expect(
+      formatMacroTarget({ low: 5, high: 8, unit: "lb", direction: "none", durationMonths: 4 }),
+    ).toBeUndefined();
+    expect(
+      formatMacroTarget({ low: null, high: null, unit: "lb", direction: "gain", durationMonths: 4 }),
+    ).toBeUndefined();
+    expect(formatMacroTarget(null)).toBeUndefined();
+  });
+
+  it("omits block placement until the meso is actually placed in the arc", () => {
+    expect(
+      projectMacro({
+        ...hackSquatContext,
+        macro: { goalType: "strength", blockPosition: null, blockCount: null },
+      }),
+    ).toEqual({ goal: "strength" });
+  });
+
+  it("truncates a long goal note — standing intent, not a second story", () => {
+    const macro = projectMacro({
+      ...hackSquatContext,
+      macro: { goalType: "hypertrophy", goalNotes: "a".repeat(300) },
+    });
+    expect(macro?.goal_notes?.length).toBeLessThanOrEqual(140);
+  });
+
+  it("is absent for a standalone meso", () => {
+    expect(projectMacro({ ...hackSquatContext, macro: null })).toBeUndefined();
   });
 });

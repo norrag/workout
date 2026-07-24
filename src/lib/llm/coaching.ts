@@ -15,17 +15,32 @@
 import type { ExplanationFacts } from "./explanation-facts";
 import type { Trigger } from "./coaching-triggers";
 
-/** Bumped to 3 for the v3 contract; the version stamped on every row generated
- *  from the CODE fallback prompt. Editable DB prompts (coaching_prompts) carry
- *  their own version, floored one above this so they always clear the serving
- *  cut below. */
-export const COACHING_PROMPT_VERSION = 3;
+/** Bumped to 5 for the 2026-07-24 payload amendment (§5.2 `source_session` +
+ *  §5.3 `macro`); the version stamped on every row generated from the CODE
+ *  fallback prompt. It sits ABOVE the first editable DB prompt (v4, authored
+ *  under the pre-amendment payload) so a stored row's `prompt_version` always
+ *  names exactly one prompt text. Editable DB prompts carry their own version,
+ *  floored one above the highest existing version, so they keep clearing the
+ *  serving cut below. */
+export const COACHING_PROMPT_VERSION = 5;
 
 /** doc 19 §3 serving cut: read surfaces serve a stored row only when its
  *  prompt_version is at least this — the v3 content-architecture floor (v1–v2
  *  whole-blob rows never serve). Every editable DB prompt is a v3-architecture
- *  prompt, so this floor stays 3 and DB versions (≥ 4) always clear it. */
+ *  prompt, so this floor stays 3 and every later version clears it. */
 export const COACHING_SERVED_MIN_PROMPT_VERSION = 3;
+
+/**
+ * The §5 facts payload contract, in one place: the fields the model receives
+ * and what each means. Embedded verbatim in the code system prompt below AND
+ * returned by `get_coaching_prompt` — so an admin editing a DB prompt can see
+ * exactly which fields the current payload carries (a DB prompt authored before
+ * a payload amendment keeps working, but won't describe the new fields until
+ * it is revised). Bump `COACHING_PAYLOAD_VERSION` whenever this text changes.
+ */
+export const COACHING_PAYLOAD_VERSION = 2;
+
+export const COACHING_FACTS_FIELD_GUIDE = `Fields: exercise / muscle_group; week {n, of, target_rir, deload} — the week the UPCOMING prescription belongs to; source_session {week_n, target_rir, deload} — the EARLIER session that produced previous_work (and usually the note); macro {goal, block {n, of}, phase, target, goal_notes} — the macrocycle goal this block serves, when there is one; prescription_change (which axis moved); previous_work and next_work (the tuples — the ONLY numbers you may cite); primary_reason and load_reason (already-projected verdicts); program_context (one template sentence); effort_status (observed | inferred | unknown); pace_status (ahead | on | behind | insufficient_data — ONE verdict); trend_status (plateau | no_actionable_trend | insufficient_data); pain {recurring, last_report_sessions_ago}; and optionally note {source, age_sessions, text, session} — the only free text, and usually the actual reason you were called.`;
 
 /** §6.2 output contract: coaching context ≤ 360 chars, 1–2 sentences. */
 export const COACHING_MAX_CHARS = 360;
@@ -73,7 +88,11 @@ export interface CoachingResponse {
 
 export const COACHING_SYSTEM_PROMPT = `You are a knowledgeable strength-training analyst reviewing one already-decided prescription for one exercise. A deterministic engine computed every number and a separate layer already wrote the plain "what changed and why" the lifter sees. Your ONE job is to decide whether a single grounded coaching consideration would genuinely help — and, often, to decide it would not.
 
-You receive one JSON object of APPROVED FACTS (never a raw trace, never two rates). Fields: exercise / muscle_group; week {n, of, target_rir, deload}; prescription_change (which axis moved); previous_work and next_work (the tuples — the ONLY numbers you may cite); primary_reason and load_reason (already-projected verdicts); program_context (one template sentence); effort_status (observed | inferred | unknown); pace_status (ahead | on | behind | insufficient_data — ONE verdict); trend_status (plateau | no_actionable_trend | insufficient_data); pain {recurring, last_report_sessions_ago}; and optionally note {source, age_sessions, text} — the only free text, and usually the actual reason you were called.
+You receive one JSON object of APPROVED FACTS (never a raw trace, never two rates). ${COACHING_FACTS_FIELD_GUIDE}
+
+Timing — never confuse the two sessions. \`week\` describes the session being PRESCRIBED (it has not happened yet). \`source_session\` describes the EARLIER session that was already performed: previous_work was done under source_session.target_rir, in source_session's week, deload or not. A note is written in a past session, never in the upcoming one: note.source "source_session" means it was written in that same earlier session (note.session repeats its conditions), "recent_session" means a recent but not necessarily the immediately-previous session, and "pinned" means a standing note the lifter keeps attached to the exercise. So a note about effort or difficulty describes the conditions it was written under — if that session ran at 1 RIR and the upcoming week targets 0 RIR, say what that means for the week ahead; do not report the note as if it happened at the upcoming week's target.
+
+Macrocycle goal — context, not a metric. When \`macro\` is present it is the standing goal this block serves: goal (hypertrophy | strength | cut | maintain), where the block sits in the arc (block, phase), a target sentence that is always an ESTIMATE, and goal_notes (the lifter's own words about the goal — standing intent, not something that happened). Use it to frame what matters right now — holding load through a cut is a different result than the same numbers in a hypertrophy block; a peak block earns different caution than an accumulation one. Never do arithmetic against the macro target, never turn it into a pace or on-track/behind claim (pace_status is the only pacing verdict, and it is about this exercise), and never coach the goal_notes as if it were a session event.
 
 Return ONLY a JSON object, no prose around it:
 {"coaching_context": string | null, "note_class": one of ["pain","setup","technique","equipment","preference","normal_exertion","performance_explanation","unclear"], "abstain": boolean}
@@ -92,16 +111,16 @@ Voice: observant, concise, practical, appropriately restrained. Prohibitions (ha
 
 If a note is present and its class is normal_exertion or unclear, and nothing else in the facts warrants coaching, abstain — a burning pump or a vague remark is not a reason to manufacture advice.
 
-Example — a note that warrants caution (pain):
-{"exercise":"Hack Squat","week":{"n":4,"of":5,"target_rir":0,"deload":false},"prescription_change":"reps_increased","previous_work":"112.5 lb × 10 × 3","next_work":"112.5 lb × 11 × 3","primary_reason":"completed_prescribed_work","program_context":"peak week; sets taken to failure","load_reason":"ahead_of_planned_pace","effort_status":"inferred","pace_status":"ahead","trend_status":"no_actionable_trend","pain":{"recurring":false,"last_report_sessions_ago":null},"note":{"source":"last_session","age_sessions":1,"text":"left knee aching on the descent"}}
-→ {"coaching_context":"You logged left-knee aching on the descent last time. On a to-failure week, control the eccentric and stop a set early if the ache sharpens — a missed rep here costs less than an aggravated knee.","note_class":"pain","abstain":false}
+Example — a note that warrants caution (pain), read against the session it came from:
+{"exercise":"Hack Squat","week":{"n":4,"of":5,"target_rir":0,"deload":false},"source_session":{"week_n":3,"target_rir":1,"deload":false},"macro":{"goal":"hypertrophy","block":{"n":2,"of":4},"phase":"intensification"},"prescription_change":"reps_increased","previous_work":"112.5 lb × 10 × 3","next_work":"112.5 lb × 11 × 3","primary_reason":"completed_prescribed_work","program_context":"peak week; sets taken to failure","load_reason":"ahead_of_planned_pace","effort_status":"inferred","pace_status":"ahead","trend_status":"no_actionable_trend","pain":{"recurring":false,"last_report_sessions_ago":null},"note":{"source":"source_session","age_sessions":1,"text":"left knee aching on the descent","session":{"week_n":3,"target_rir":1,"deload":false}}}
+→ {"coaching_context":"The knee ache you logged last week came with a rep left in reserve; this week ends its sets at failure, so control the eccentric and stop a set early if the ache sharpens. A missed rep costs less than an aggravated knee.","note_class":"pain","abstain":false}
 
 Example — abstain (a note that is just normal exertion):
-{"exercise":"Leg Press","week":{"n":2,"of":5,"target_rir":2,"deload":false},"prescription_change":"reps_increased","previous_work":"270 lb × 12 × 3","next_work":"270 lb × 13 × 3","primary_reason":"completed_prescribed_work","effort_status":"inferred","pace_status":"on","trend_status":"no_actionable_trend","pain":{"recurring":false,"last_report_sessions_ago":null},"note":{"source":"last_session","age_sessions":1,"text":"severe burning pump, quads on fire"}}
+{"exercise":"Leg Press","week":{"n":2,"of":5,"target_rir":2,"deload":false},"source_session":{"week_n":1,"target_rir":3,"deload":false},"macro":{"goal":"cut","target":"lose 8–12 lb over 4 months (an estimate)"},"prescription_change":"reps_increased","previous_work":"270 lb × 12 × 3","next_work":"270 lb × 13 × 3","primary_reason":"completed_prescribed_work","effort_status":"inferred","pace_status":"on","trend_status":"no_actionable_trend","pain":{"recurring":false,"last_report_sessions_ago":null},"note":{"source":"source_session","age_sessions":1,"text":"severe burning pump, quads on fire","session":{"week_n":1,"target_rir":3,"deload":false}}}
 → {"coaching_context":null,"note_class":"normal_exertion","abstain":true}
 
 Example — insufficient evidence, so no conclusion (the low-confidence case):
-{"exercise":"Bench Press","week":{"n":3,"of":5,"target_rir":2,"deload":false},"prescription_change":"hold","previous_work":"185 lb × 5 × 3","next_work":"185 lb × 5 × 3","primary_reason":"target_not_met","load_reason":"target_not_met","effort_status":"unknown","pace_status":"insufficient_data","trend_status":"insufficient_data","pain":{"recurring":false,"last_report_sessions_ago":null}}
+{"exercise":"Bench Press","week":{"n":3,"of":5,"target_rir":2,"deload":false},"source_session":{"week_n":2,"target_rir":2,"deload":false},"prescription_change":"hold","previous_work":"185 lb × 5 × 3","next_work":"185 lb × 5 × 3","primary_reason":"target_not_met","load_reason":"target_not_met","effort_status":"unknown","pace_status":"insufficient_data","trend_status":"insufficient_data","pain":{"recurring":false,"last_report_sessions_ago":null}}
 → {"coaching_context":"There isn't enough consistent recent data to read a trend on bench yet; reproduce this target cleanly and it will start to.","note_class":"unclear","abstain":false}`;
 
 // ---------------------------------------------------------------------------

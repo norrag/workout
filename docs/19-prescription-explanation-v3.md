@@ -146,6 +146,12 @@ All pure-composer work, golden-tested like the rest of the module.
 
 ## 5. The semantic facts projection — what the model is allowed to know
 
+> **Amended 2026-07-24 (N62) — see §12.** The payload gains `source_session`
+> (§12.1) and `macro` (§12.2); `note.source` becomes
+> `pinned | source_session | recent_session`. The principles below are
+> unchanged — both additions are verdict/context fields, not numbers to
+> reconcile.
+
 New pure module `src/lib/llm/explanation-facts.ts`: a deterministic
 projection of (decision, context) → an **approved fact object**. It replaces
 `buildExplanationPayload`'s raw-trace shape as the model's entire worldview.
@@ -252,7 +258,10 @@ The generation call (same client, `openai.ts`) requests a JSON response:
   discarding contexts when the only trigger was `note` and the class is
   non-actionable). Any failure ⇒ discard, R20 + failure-log, no row —
   unchanged machinery.
-- **Prompt v3** (`EXPLANATION_PROMPT_VERSION` = 3): the analyst voice (§2
+- **Prompt v3** (`COACHING_PROMPT_VERSION`; **5** since the §12 payload
+  amendment — the code fallback sits above the first editable DB prompt so a
+  stored row's `prompt_version` always names exactly one prompt text): the
+  analyst voice (§2
   A4), the review's tone prohibitions verbatim (no praise for compliance,
   no simulated intimacy, no form claims, no diagnoses, no engine
   vocabulary, no statistics that don't change the recommendation), the
@@ -288,7 +297,11 @@ burst-bounded — all of doc 18 §5. Three deltas:
    `test_llm_explanation` (now returns facts + triggers + classification
    alongside the body), `get_llm_explanation_status`, and the failure log
    all carry over — plus a dry-run mode that reports *would-trigger* status
-   across a scope, for calibrating §6.1 before flipping.
+   across a scope, for calibrating §6.1 before flipping. **Amended by §12.3:**
+   both tools also take a `prompt_version` / `prompt_body` override so a draft
+   prompt can be read against real decisions **without activating it**, and
+   `generate_explanations preview=true` runs a whole scope under a draft and
+   writes nothing.
 
 ## 8. Surfaces
 
@@ -362,3 +375,90 @@ File as separate notes-area items for owner prioritization:
 Phases 1–2 carry no model-behavior risk and improve the product on their
 own; the LLM re-enters only at phase 3, already fenced by facts, triggers,
 and the extended post-check.
+
+## 12. 2026-07-24 amendment — source session, macro goal, prompt preview (N62)
+
+Owner-requested, three changes to the payload and the admin loop. Nothing here
+changes a number the engine computes, adds a model responsibility, or moves the
+serving cut; §3's three layers and §5's principles stand.
+
+### 12.1 `source_session` — the payload has a tense
+
+`week` described the prescription being generated, but `previous_work` and the
+note came from an EARLIER session, and nothing in the payload said so. A note
+left in week 3 at 1 RIR was therefore readable as if it had happened during the
+0 RIR peak week being prescribed — a temporal ambiguity the model has no way to
+resolve and every incentive to paper over.
+
+The facts object now carries, alongside `week` (unchanged, still the upcoming
+prescription):
+
+```jsonc
+"source_session": { "week_n": 3, "target_rir": 1, "deload": false }
+```
+
+- Resolved from the decision's `source_workout_exercise_id` (workout →
+  microcycle) for the week and deload flag; the target RIR comes off the
+  recorded `previous` tuple, so the block is reportable even when the week
+  lookup finds nothing. Absent on a seed — there is no earlier session.
+- `note.source` becomes `pinned | source_session | recent_session`:
+  `source_session` means the note was written in that very session (matched by
+  `workout_exercise`), and the note then repeats the session block under
+  `note.session` so the two can never drift apart in the model's reading.
+  `recent_session` is the honest label for a note whose session we can't tie to
+  the decision.
+- The prompt gains a timing paragraph making the rule explicit, and the pain
+  few-shot is rebuilt on the 1 RIR-note / 0 RIR-week case.
+- Free rider, same source: `effort_status` is now derived from the recorded
+  decision's `actualSets[].rirReported` (§4.3's "observed vs inferred" gate,
+  previously hardcoded `unknown`) — the source session either reported effort
+  or it didn't, and the payload now says which.
+
+### 12.2 `macro` — the goal the block serves
+
+Coaching had no idea what the training was *for*. The facts object now carries
+the macrocycle goal layer when the meso has one:
+
+```jsonc
+"macro": {
+  "goal": "cut",
+  "block": { "n": 2, "of": 4 },
+  "phase": "intensification",
+  "target": "lose 8–12 lb over 4 months (an estimate)",
+  "goal_notes": "lean out before the summer"
+}
+```
+
+- Qualitative by construction. The target is ONE already-formatted sentence off
+  the macro's cached `target_*` snapshot (doc 17 §2), always flagged an
+  estimate; there is no rate, no measured-vs-planned pair, no macro-level
+  status verdict. `pace_status` remains the only pacing verdict in the payload
+  and stays exercise-scoped. Failure mode 2 stays unrepresentable.
+- `goal_notes` is a deliberate, bounded exception to §5's "the note is the only
+  free text": it is standing intent, not a session event, capped at 140 chars,
+  and the prompt forbids coaching it as if something happened.
+- Best-effort assembly like the trend block: a standalone meso, or any query
+  failure, omits `macro` entirely. Absence is normal, not an error.
+
+### 12.3 Preview a prompt revision without activating it
+
+N61 made the coaching prompt editable but left a gap: the only way to read a
+draft against real decisions was to activate it, which puts it in front of the
+user. Both admin tools now take an explicit prompt:
+
+- `test_llm_explanation` — `prompt_version` (any stored version, active or
+  draft) or `prompt_body` (an unsaved edit) runs the single-decision probe under
+  that prompt; the result reports which prompt ran (`prompt.source`:
+  `active | draft_version | ad_hoc_body | code_fallback`).
+- `generate_explanations` — the same two arguments, plus `preview=true`: real
+  calls across a real scope, per-decision bodies returned, **no rows written**
+  (disposition `previewed`). The live prompt keeps serving throughout. This is
+  the §11 phase-3 "owner voice-reads a regenerated batch" gate, minus the
+  activation.
+- An ad-hoc `prompt_body` names no stored version, so a row generated under it
+  can never be stored (both tools refuse) — stored provenance stays resolvable.
+- `get_coaching_prompt` returns `payload_contract`: the current facts fields,
+  the output schema, and the post-check rules that hold regardless of prompt
+  text. A DB prompt authored before a payload amendment keeps working; it just
+  won't describe the new fields until it is revised — the contract block is how
+  a session sees that.

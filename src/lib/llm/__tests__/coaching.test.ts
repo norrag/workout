@@ -27,7 +27,7 @@ const facts: ExplanationFacts = {
   pace_status: "ahead",
   trend_status: "no_actionable_trend",
   pain: { recurring: false, last_report_sessions_ago: null },
-  note: { source: "last_session", age_sessions: 1, text: "left knee aching on the descent" },
+  note: { source: "source_session", age_sessions: 1, text: "left knee aching on the descent" },
 };
 
 describe("parseCoachingResponse", () => {
@@ -123,7 +123,7 @@ describe("postCheckCoaching (§6.2)", () => {
   it("discards a note-only trigger when the note is non-actionable (no manufactured advice)", () => {
     const pumpFacts: ExplanationFacts = {
       ...facts,
-      note: { source: "last_session", age_sessions: 1, text: "severe burning pump" },
+      note: { source: "source_session", age_sessions: 1, text: "severe burning pump" },
     };
     const r = postCheckCoaching(
       { coaching_context: "That burning pump shows controlled execution — great patience.", note_class: "normal_exertion", abstain: false },

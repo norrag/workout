@@ -74,7 +74,7 @@ describe("scoreTriggers — the §6.1 gates", () => {
     const triggers = scoreTriggers(
       {
         ...routineFacts,
-        note: { source: "last_session", age_sessions: 1, text: "left knee aching on the descent" },
+        note: { source: "source_session", age_sessions: 1, text: "left knee aching on the descent" },
       },
       routineSignals,
     );
@@ -93,7 +93,7 @@ describe("scoreTriggers — the §6.1 gates", () => {
   it("note: a stale session note (older than ~3 exposures) does not fire", () => {
     expect(
       scoreTriggers(
-        { ...routineFacts, note: { source: "last_session", age_sessions: 5, text: "felt strong" } },
+        { ...routineFacts, note: { source: "source_session", age_sessions: 5, text: "felt strong" } },
         routineSignals,
       ),
     ).not.toContain("note");

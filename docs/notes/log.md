@@ -4,7 +4,48 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-24 — Session 87: editable LLM coaching prompt via MCP (N61)
+## 2026-07-24 — Session 88: LLM payload tense + macro goal + prompt preview (N62, PR #206)
+
+Owner handed over three updates to the doc-19 explanation stack and the MCP
+layers around it. All three built; recorded as the doc 19 §12 amendment.
+
+- **New item N62** filed (Batch 24 verbatim source added). Follow-on to N60/N61.
+- **§12.1 the payload has a tense.** `week` stayed (the UPCOMING prescription);
+  the session that produced `previous_work` now has its own
+  `source_session {week_n, target_rir, deload}`, resolved from
+  `source_workout_exercise_id` → workout → microcycle, with the target RIR off
+  the recorded `previous` tuple so a missing hop degrades instead of lying.
+  `note.source` is now `pinned | source_session | recent_session`, and a
+  source-session note repeats the block under `note.session` — a 1 RIR note can
+  no longer be read as if it happened in the 0 RIR peak week. Prompt gained a
+  timing paragraph; the pain few-shot is rebuilt on exactly that case.
+- **Free rider, same source:** `effort_status` now derives from the recorded
+  decision's `actualSets[].rirReported` (doc 19 §4.3's observed/inferred gate,
+  previously hardcoded `unknown`).
+- **§12.2 macro goal.** `macro {goal, block {n,of}, phase, target, goal_notes}`
+  when the meso has a macrocycle — qualitative by construction: the target is
+  ONE formatted estimate sentence off the cached `target_*` snapshot, there is
+  no rate and no macro status verdict, `pace_status` stays the only pacing
+  verdict. `goal_notes` is a bounded (140-char) exception to "the note is the
+  only free text"; the prompt forbids coaching it as an event. Best-effort
+  assembly — a standalone meso or any failure omits the block.
+- **§12.3 preview without activating.** `test_llm_explanation` and
+  `generate_explanations` take `prompt_version` (any stored version, draft
+  included) or `prompt_body` (an unsaved edit); `generate_explanations
+  preview=true` runs real calls across a real scope and writes NOTHING
+  (disposition `previewed`) while the live prompt keeps serving. Ad-hoc bodies
+  name no version, so they can never be stored. `get_coaching_prompt` now
+  returns a `payload_contract` block (facts fields + output schema + the
+  post-check rules that hold regardless of prompt text).
+- **Prompt version:** code fallback bumped to **5** — prod already runs an
+  editable DB prompt at v4, so the constant sits above it and a stored row's
+  `prompt_version` still names exactly one prompt text.
+- **Owner residual:** the ACTIVE prod prompt (DB v4) predates this payload and
+  describes neither new field. It keeps working; revise it through
+  propose → `generate_explanations preview=true` → activate.
+- Full unit suite green (1387), typecheck + lint clean.
+
+## 2026-07-24 — Session 87: editable LLM coaching prompt via MCP (N61, PR #203)
 
 Owner asked whether we could build MCP tools to edit/update the LLM
 decision-explanation system prompt. Built it — the doc-19 coaching prompt is

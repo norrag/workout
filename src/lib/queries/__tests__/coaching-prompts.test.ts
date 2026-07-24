@@ -56,11 +56,12 @@ describe("nextCoachingPromptVersion (serving-cut floor)", () => {
   it("floors the first DB prompt above the code fallback version", () => {
     // an empty table must not produce version 1 — that would never serve
     expect(nextCoachingPromptVersion(null)).toBe(COACHING_PROMPT_VERSION + 1);
-    expect(nextCoachingPromptVersion(null)).toBe(4);
   });
 
   it("increments from the highest existing version when it is above the floor", () => {
-    expect(nextCoachingPromptVersion(4)).toBe(5);
+    expect(nextCoachingPromptVersion(COACHING_PROMPT_VERSION + 3)).toBe(
+      COACHING_PROMPT_VERSION + 4,
+    );
     expect(nextCoachingPromptVersion(12)).toBe(13);
   });
 
@@ -96,8 +97,12 @@ describe("proposeCoachingPrompt", () => {
       return { data: null };
     });
     const version = await proposeCoachingPrompt(client, "a".repeat(60), "first edit");
-    expect(version).toBe(4);
-    expect(captured).toMatchObject({ version: 4, is_active: false, notes: "first edit" });
+    expect(version).toBe(COACHING_PROMPT_VERSION + 1);
+    expect(captured).toMatchObject({
+      version: COACHING_PROMPT_VERSION + 1,
+      is_active: false,
+      notes: "first edit",
+    });
   });
 
   it("increments past the existing top version", async () => {
