@@ -2,7 +2,41 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-24 (latest) — N61: editable LLM coaching prompt via MCP (doc 18 §11)
+## 2026-07-24 (latest) — N63: deterministic explanation copy system + the three-layer prescription strip (doc 19 §13)
+
+Owner-directed copy + presentation rework of the prescription quick-read: the
+deterministic explanation now speaks in the same voice as the coaching layer,
+and the strip's three layers (ask / why / coach) read as one ledger. The ask
+line is unchanged (owner: "the prescription statement itself is ok"). No engine
+change, no migration, no number moved.
+
+- **Copy system (doc 19 §13.1):** seven rules at the head of
+  `src/lib/prescription-narrative.ts` — program-as-actor (never "engine"),
+  second person only for what the lifter did/reported, cause-then-consequence in
+  one sentence, the lifter's own rating vocabulary, one parallel construction
+  for every held-weight cause, plain "no conclusion warranted" on thin data, no
+  hype. Every composed line rewritten; a test block sweeps **every line the
+  module can emit** for banned vocabulary, praise/hype, and sentence shape.
+- **Accuracy fixes the pass exposed (§13.2):** `paced` is four governors (doc 16
+  §3.5) narrated as one — each now gets its own sentence and its own facts
+  `load_reason` (`already_stepped_this_week`, `recent_increases_not_holding`,
+  `increases_paused_at_peak_week`, `held_this_session`); and the ramp clarifier
+  ("the same numbers, asked harder") is gated to weeks where the numbers really
+  do match.
+- **Program-intent line (§13.3):** one closing frame sentence on peak / first /
+  last weeks, from the same templates the facts payload uses, rendered only when
+  the week has room (the §4.4 three-line cap holds).
+- **Effort honesty live (§13.4):** `PrescriptionAudit.effortObserved` (pure,
+  client-safe `readEffortObserved` over the decision's `inputs.actualSets`) now
+  supplies §4.3's gate, which had always fallen through to "inferred".
+- **The strip (§13.5, doc 09 2026-07-24):** ask visually primary, why lines with
+  air between causes, and the doc-19 §3 **COACH line rendered** under a hairline
+  + tracked-caps label — closing the strip half of doc 19 §11 phase 4 (MCP
+  `facts` + note-write regeneration remain). **Rule-8 deviation (recorded):**
+  still no mockup figure for this strip (pre-existing from N57); the treatment
+  is built from the day view's existing light-ledger primitives.
+
+## 2026-07-24 — N61: editable LLM coaching prompt via MCP (doc 18 §11)
 
 The doc-19 coaching **system prompt** becomes editable, versioned admin config —
 a wording change is now an MCP call, not a code PR + deploy. Mirrors the

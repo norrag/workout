@@ -57,6 +57,12 @@ export interface PrescriptionAudit {
    *  deterministic why (never a replacement); the ask, why, and ENGINE AUDIT
    *  panel stay deterministic. Null ⇒ the composer stands alone. */
   explanation: string | null;
+  /** doc 19 §4.3 — did the session this decision advanced from actually REPORT
+   *  its effort (an `rir_reported` on a working set), or did the engine assume
+   *  the prescribed target? Feeds the quick-read's effort-honesty gate, so no
+   *  user-facing line states an assumed RIR as observed. Null ⇒ unknown (a
+   *  seed, or a decision recorded without `actualSets`) — treated as inferred. */
+  effortObserved: boolean | null;
 }
 
 /** The prescription tuple recorded on a decision's output. */
@@ -123,6 +129,26 @@ export function readTrace(output: unknown): AuditTraceStep[] {
 }
 
 /**
+ * doc 19 §4.3 — was the source session's effort OBSERVED (a working set carried
+ * a reported RIR) or merely inferred from the prescribed target? Reads the
+ * recorded decision's `inputs.actualSets`; null when the decision has none (a
+ * seed), which every caller treats as inferred. Pure and client-safe — the same
+ * rule the facts layer applies (`projectEffortObserved`, `llm/explanations.ts`),
+ * restated here because that module is server-only and this one rides the
+ * day-view bundle. Exported for unit testing (the stored jsonb is untyped).
+ */
+export function readEffortObserved(inputs: unknown): boolean | null {
+  const actualSets = (inputs as { actualSets?: unknown } | null)?.actualSets;
+  if (!Array.isArray(actualSets)) return null;
+  const working = actualSets.filter(
+    (s): s is Record<string, unknown> =>
+      !!s && typeof s === "object" && (s as Record<string, unknown>).isWarmup !== true,
+  );
+  if (working.length === 0) return null;
+  return working.some((s) => typeof s.rirReported === "number");
+}
+
+/**
  * The latest engine decision for one workout_exercise, newest first. RLS-scoped:
  * `engine_decisions` has an owner-or-admin SELECT policy, so the user's own client
  * reads only their own rows — no service client needed. Returns null when the row
@@ -177,5 +203,6 @@ export async function getPrescriptionAudit(
       (data.inputs as { previous?: unknown } | null)?.previous ?? null,
     ),
     explanation,
+    effortObserved: readEffortObserved(data.inputs),
   };
 }
