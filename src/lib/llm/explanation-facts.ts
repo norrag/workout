@@ -15,6 +15,17 @@
  * Pure: no I/O, no env, no dates-from-now. Unit-tested exactly like the engine.
  * The engine (never this module, never the model) computes every number; this
  * layer only selects and labels what already exists on the recorded decision.
+ *
+ * 2026-07-24 amendment (owner, doc 19 §5.2–§5.3):
+ * - §5.2 `source_session` — `week` describes the UPCOMING prescription only;
+ *   the session that produced `previous_work` (and usually the note) now
+ *   carries its OWN week / target RIR / deload flag, and the note names which
+ *   session it was written in. Without the split, a note left at 1 RIR read as
+ *   if it had happened during the 0 RIR peak week being prescribed.
+ * - §5.3 `macro` — the macrocycle goal layer (goal, block placement, phase, the
+ *   target as one estimate sentence, the lifter's goal note) so coaching can
+ *   speak to the arc the block serves. Qualitative by construction: no rates,
+ *   no measured-vs-planned pair — the §5 "one verdict per axis" rule stands.
  */
 import type { AuditTraceStep } from "@/lib/queries/audit";
 
@@ -70,10 +81,45 @@ export type PaceStatus = "ahead" | "on" | "behind" | "insufficient_data";
 export type TrendStatus = "plateau" | "no_actionable_trend" | "insufficient_data";
 export type EffortStatus = "observed" | "inferred" | "unknown";
 
+/**
+ * §5.2 (2026-07-24 amendment) — the session that produced `previous_work` and,
+ * usually, the note. Kept STRICTLY separate from `week`, which describes the
+ * UPCOMING prescription: without this split a note left at 1 RIR in week 3 read
+ * as if it had happened during the 0 RIR peak week being prescribed.
+ */
+export interface SourceSession {
+  /** the week number that session was performed in (1-based), when known */
+  week_n?: number;
+  /** the RIR target that session was performed under */
+  target_rir: number | null;
+  /** whether that session fell in a deload week */
+  deload: boolean;
+}
+
+/** The macrocycle goal a mesocycle sits under (§5.3, 2026-07-24 amendment) —
+ *  the standing intent behind this block. Qualitative by design: the model gets
+ *  the goal, where the block sits in the arc, and the stated target as ONE
+ *  already-formatted estimate sentence — never rates to reconcile. */
+export interface MacroFacts {
+  goal: "hypertrophy" | "strength" | "cut" | "maintain";
+  /** which block of the macro this meso is, when it has been placed */
+  block?: { n: number; of: number };
+  phase?: "accumulation" | "intensification" | "peak";
+  /** the macro's stated target as a plain sentence, always flagged an estimate */
+  target?: string;
+  /** the lifter's own words about the goal, when they recorded any */
+  goal_notes?: string;
+}
+
 export interface ExplanationFacts {
   exercise: string;
   muscle_group?: string;
+  /** the week the UPCOMING prescription belongs to (never the source session) */
   week?: { n?: number; of?: number; target_rir: number; deload: boolean };
+  /** §5.2 — the session `previous_work` (and usually the note) came from */
+  source_session?: SourceSession;
+  /** §5.3 — the macrocycle goal this block serves, when the meso has one */
+  macro?: MacroFacts;
   prescription_change: PrescriptionChange;
   previous_work?: string;
   next_work: string;
@@ -84,11 +130,16 @@ export interface ExplanationFacts {
   pace_status: PaceStatus;
   trend_status: TrendStatus;
   pain: { recurring: boolean; last_report_sessions_ago: number | null };
-  /** the ONE unstructured field — the model's actual job (§5). */
+  /** the ONE unstructured field — the model's actual job (§5). Its provenance
+   *  names the SESSION it was written in (§5.2), never the upcoming week. */
   note?: {
-    source: "pinned" | "last_session";
+    /** `source_session` = written in the session that produced `previous_work` */
+    source: "pinned" | "source_session" | "recent_session";
     age_sessions: number;
     text: string;
+    /** the session the note was written in, when known — repeated here so the
+     *  note can never be read against the upcoming week's conditions */
+    session?: SourceSession;
   };
 }
 
@@ -139,11 +190,40 @@ export interface FactsTrend {
   comparable: boolean;
 }
 
+/** §5.3 inputs — the macro row's goal layer, as the caller reads it off
+ *  `macrocycles` + the meso's placement. All optional: a standalone meso has no
+ *  macro, and a macro may have no target snapshot or notes. */
+export interface MacroContext {
+  goalType: "hypertrophy" | "strength" | "cut" | "maintain";
+  /** meso placement within the macro (M1…Mn) and the macro's block count */
+  blockPosition?: number | null;
+  blockCount?: number | null;
+  phase?: string | null;
+  goalNotes?: string | null;
+  /** the cached `planMacrocycle` target snapshot (doc 17 §2) */
+  target?: {
+    low: number | null;
+    high: number | null;
+    unit: string | null;
+    direction: "gain" | "loss" | "none" | null;
+    durationMonths: number | null;
+  } | null;
+}
+
 export interface FactsContext {
   exerciseName: string;
   muscleGroup: string | null;
   weekNumber: number | null;
   mesoWeeks: number | null;
+  /** §5.2 — the week the SOURCE session (the one that produced `previous_work`)
+   *  was performed in. Null/absent ⇒ the source session's week is unknown and
+   *  only its target RIR (carried on the decision) is reported. */
+  sourceSession?: { weekNumber?: number | null; targetRir?: number | null; deload?: boolean | null } | null;
+  /** §5.2 — true when the last session note was written in that SAME source
+   *  session (matched by workout_exercise), false when it is merely recent. */
+  lastSessionNoteFromSource?: boolean | null;
+  /** §5.3 — the macrocycle goal this meso serves, when it has one */
+  macro?: MacroContext | null;
   /** doc 19 §4.3 — did the previous session actually report RIR on a working
    *  set? true ⇒ observed, false ⇒ inferred, null/undefined ⇒ unknown. */
   effortObserved?: boolean | null;
@@ -162,6 +242,9 @@ export interface FactsContext {
 // ---------------------------------------------------------------------------
 
 const NOTE_MAX_CHARS = 200;
+/** The goal note is standing intent, not a session event — a tighter cap than
+ *  the session note keeps it context, never a second story to coach off. */
+const GOAL_NOTE_MAX_CHARS = 140;
 
 function findProgression(trace: AuditTraceStep[]): AuditTraceStep | undefined {
   return trace.find((s) => s.rule === "progression");
@@ -359,26 +442,96 @@ function projectEffort(effortObserved: boolean | null | undefined): EffortStatus
   return "unknown";
 }
 
-function truncateNote(body: string): string {
+function truncateNote(body: string, max = NOTE_MAX_CHARS): string {
   const trimmed = body.replace(/\s+/g, " ").trim();
-  if (trimmed.length <= NOTE_MAX_CHARS) return trimmed;
-  const cut = trimmed.slice(0, NOTE_MAX_CHARS - 1);
+  if (trimmed.length <= max) return trimmed;
+  const cut = trimmed.slice(0, max - 1);
   const lastSpace = cut.lastIndexOf(" ");
-  return `${lastSpace > NOTE_MAX_CHARS / 2 ? cut.slice(0, lastSpace) : cut}…`;
+  return `${lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut}…`;
 }
 
-/** The note — the ONE free-text field, pinned taking provenance precedence. */
-export function projectNote(context: FactsContext): ExplanationFacts["note"] {
+/**
+ * §5.2 — the session that produced `previous_work`. Its target RIR comes off
+ * the recorded decision first (`previous.targetRir` IS the source session's own
+ * ask, per-exercise override included; the microcycle target is the coarser
+ * fallback), so the block is reportable even when the week lookup finds
+ * nothing. Undefined for a seed (no upstream session) — there is then nothing
+ * to disambiguate.
+ */
+export function projectSourceSession(
+  decision: FactsDecision,
+  context: FactsContext,
+): SourceSession | undefined {
+  if (!decision.previous) return undefined;
+  const src = context.sourceSession;
+  const targetRir = decision.previous.targetRir ?? src?.targetRir ?? null;
+  return {
+    ...(src?.weekNumber != null ? { week_n: src.weekNumber } : {}),
+    target_rir: targetRir,
+    deload: src?.deload === true,
+  };
+}
+
+/** §5.3 — the macro goal layer, qualitative plus ONE formatted target sentence. */
+export function projectMacro(context: FactsContext): MacroFacts | undefined {
+  const macro = context.macro;
+  if (!macro) return undefined;
+  const phase =
+    macro.phase === "accumulation" || macro.phase === "intensification" || macro.phase === "peak"
+      ? macro.phase
+      : undefined;
+  const notes = macro.goalNotes?.trim();
+  const target = formatMacroTarget(macro.target);
+  return {
+    goal: macro.goalType,
+    ...(macro.blockPosition != null && macro.blockCount != null && macro.blockCount > 0
+      ? { block: { n: macro.blockPosition, of: macro.blockCount } }
+      : {}),
+    ...(phase ? { phase } : {}),
+    ...(target ? { target } : {}),
+    ...(notes ? { goal_notes: truncateNote(notes, GOAL_NOTE_MAX_CHARS) } : {}),
+  };
+}
+
+/**
+ * The macro's stated target as ONE plain sentence, always flagged an estimate
+ * (doc 10 §9 honesty guardrail). Directionless or unpriced targets return
+ * undefined rather than an empty claim — absence is the strongest gate (§5.1).
+ */
+export function formatMacroTarget(
+  target: MacroContext["target"],
+): string | undefined {
+  if (!target) return undefined;
+  const { low, high, unit, direction, durationMonths } = target;
+  if (direction == null || direction === "none") return undefined;
+  if (low == null && high == null) return undefined;
+  const band = low != null && high != null && low !== high ? `${low}–${high}` : `${high ?? low}`;
+  const measure = unit === "%" ? `${band}%` : `${band}${unit ? ` ${unit}` : ""}`;
+  const verb = direction === "loss" ? "lose" : "gain";
+  const span = durationMonths != null ? ` over ${durationMonths} months` : "";
+  return `${verb} ${measure}${span} (an estimate)`;
+}
+
+/** The note — the ONE free-text field, pinned taking provenance precedence.
+ *  A session note names the SESSION it was written in (§5.2): `source_session`
+ *  when it came from the very session that produced `previous_work`, else
+ *  `recent_session` with its age. */
+export function projectNote(
+  context: FactsContext,
+  sourceSession?: SourceSession,
+): ExplanationFacts["note"] {
   const pinned = context.pinnedNote?.trim();
   if (pinned) {
     return { source: "pinned", age_sessions: 0, text: truncateNote(pinned) };
   }
   const last = context.lastSessionNote?.trim();
   if (last) {
+    const fromSource = context.lastSessionNoteFromSource === true;
     return {
-      source: "last_session",
-      age_sessions: context.lastSessionNoteAgeSessions ?? 1,
+      source: fromSource ? "source_session" : "recent_session",
+      age_sessions: fromSource ? 1 : (context.lastSessionNoteAgeSessions ?? 1),
       text: truncateNote(last),
+      ...(fromSource && sourceSession ? { session: sourceSession } : {}),
     };
   }
   return undefined;
@@ -404,12 +557,16 @@ export function buildExplanationFacts(
     : null;
   const nextWork = formatWork(decision.loadType, decision.ask);
   const loadReason = projectLoadReason(decision);
-  const note = projectNote(context);
+  const sourceSession = projectSourceSession(decision, context);
+  const note = projectNote(context, sourceSession);
+  const macro = projectMacro(context);
 
   return {
     exercise: context.exerciseName,
     ...(context.muscleGroup ? { muscle_group: context.muscleGroup } : {}),
     ...(week ? { week } : {}),
+    ...(sourceSession ? { source_session: sourceSession } : {}),
+    ...(macro ? { macro } : {}),
     prescription_change: projectChange(decision),
     ...(previousWork ? { previous_work: previousWork } : {}),
     next_work: nextWork ?? "unpriced",

@@ -13,6 +13,9 @@ import {
 import {
   COACHING_SYSTEM_PROMPT,
   COACHING_PROMPT_VERSION,
+  COACHING_PAYLOAD_VERSION,
+  COACHING_FACTS_FIELD_GUIDE,
+  COACHING_MAX_CHARS,
 } from "@/lib/llm/coaching";
 import { resolveAdmin } from "./admin-gate";
 import { toolResult, type EnvelopeOpts } from "../envelope";
@@ -41,6 +44,20 @@ function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
   return toolResult(payload, opts);
 }
 
+/** N62 — what the model actually receives and must return, reported alongside
+ *  every prompt read so a revision can be checked against the CURRENT payload
+ *  (a prompt written before a payload amendment keeps working, it just says
+ *  nothing about the new fields). */
+const PAYLOAD_CONTRACT = {
+  payload_version: COACHING_PAYLOAD_VERSION,
+  facts_fields: COACHING_FACTS_FIELD_GUIDE,
+  output:
+    '{"coaching_context": string | null, "note_class": one of ["pain","setup","technique","equipment","preference","normal_exertion","performance_explanation","unclear"], "abstain": boolean}',
+  max_chars: COACHING_MAX_CHARS,
+  enforced_regardless_of_prompt:
+    "post-check: abstention stores nothing; length cap; every numeral must appear in the facts payload; a note-only trigger classified normal_exertion/unclear is discarded",
+} as const;
+
 /** The effective active prompt (DB active row, else the code fallback) — the
  *  prompt a generation would actually run right now. */
 async function effectiveActivePrompt(
@@ -64,10 +81,13 @@ function registerGetCoachingPrompt(server: McpServer) {
         "With no arguments: browse every stored version (which is active, notes, " +
         "size, dates) plus a summary of the EFFECTIVE active prompt — the DB " +
         "active row, or, when none is activated, the built-in code fallback " +
-        "(version 3). With version: return that stored version's full body. Pass " +
-        "include_body=true (no version) to also return the effective active " +
-        "body verbatim — copy it, edit, and feed it to propose_coaching_prompt " +
-        "to start a new version.",
+        "(the code constant). With version: return that stored version's full " +
+        "body. Pass include_body=true (no version) to also return the effective " +
+        "active body verbatim — copy it, edit, and feed it to " +
+        "propose_coaching_prompt to start a new version. Always returns " +
+        "payload_contract: the doc-19 §5 facts fields the model currently " +
+        "receives — check any prompt against it, since a prompt authored before " +
+        "a payload change keeps running but won't describe the newer fields.",
       inputSchema: {
         version: z.number().int().positive().optional(),
         include_body: z.boolean().optional(),
@@ -81,7 +101,7 @@ function registerGetCoachingPrompt(server: McpServer) {
       if (version != null) {
         const detail = await getCoachingPromptVersion(client, version);
         if (!detail) return jsonResult({ found: false, error: `version ${version} not found` });
-        return jsonResult({ found: true, ...detail });
+        return jsonResult({ found: true, ...detail, payload_contract: PAYLOAD_CONTRACT });
       }
       const [versions, active] = await Promise.all([
         listCoachingPrompts(client),
@@ -95,13 +115,18 @@ function registerGetCoachingPrompt(server: McpServer) {
           char_count: active.body.length,
         },
         ...(include_body ? { active_body: active.body } : {}),
+        // N62: the facts payload the model actually receives. A DB prompt
+        // authored before a payload amendment keeps running — it just won't
+        // describe the newer fields until it is revised.
+        payload_contract: PAYLOAD_CONTRACT,
         note:
           active.source === "code_fallback"
-            ? "No DB prompt is active — generation uses the built-in code fallback " +
-              "(version 3). Call again with include_body=true to copy it, edit, then " +
-              "propose_coaching_prompt to create version 4."
+            ? `No DB prompt is active — generation uses the built-in code fallback ` +
+              `(version ${COACHING_PROMPT_VERSION}). Call again with include_body=true to copy it, ` +
+              `edit, then propose_coaching_prompt to create the first DB version.`
             : "The active prompt is a stored DB version. Edit via propose_coaching_prompt " +
-              "→ test_llm_explanation → activate_coaching_prompt.",
+              "→ preview with test_llm_explanation prompt_version=<draft> (no activation " +
+              "needed) → activate_coaching_prompt.",
       });
     },
   );
@@ -118,12 +143,16 @@ function registerProposeCoachingPrompt(server: McpServer) {
       description:
         "Admin only. Write a new INACTIVE coaching-prompt version from the given " +
         "body. It is never active on write and can never be activated by accident. " +
-        "Preview it before activating: test_llm_explanation with a decision_id " +
-        "runs the FULL pipeline (facts → completion → post-check) under the " +
-        "EFFECTIVE active prompt — so activate first on a throwaway, or read the " +
-        "body back and eyeball it. Keep the doc-19 output contract intact (the " +
-        "deterministic post-check still enforces the number-set and length caps " +
-        "regardless of prompt text). Version numbers auto-increment from 4 up.",
+        "Preview it WITHOUT activating: test_llm_explanation with a decision_id " +
+        "+ prompt_version=<this version> runs the full pipeline (facts → " +
+        "completion → post-check) under the draft, and generate_explanations " +
+        "with prompt_version + preview=true reads it across a whole scope — the " +
+        "live prompt keeps serving throughout. (prompt_body on either tool tries " +
+        "an edit before you even propose it.) Keep the doc-19 output contract " +
+        "intact (the deterministic post-check still enforces the number-set and " +
+        "length caps regardless of prompt text), and check get_coaching_prompt's " +
+        "payload_contract for the facts fields the current payload carries. " +
+        "Version numbers auto-increment above the highest existing version.",
       inputSchema: {
         body: z.string().min(50).max(12000),
         notes: z.string().max(500).optional(),

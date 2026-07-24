@@ -34,7 +34,10 @@ import {
   postCheckCoaching,
   type NoteClass,
 } from "./coaching";
-import { getActiveCoachingPrompt } from "@/lib/queries/coaching-prompts";
+import {
+  getActiveCoachingPrompt,
+  getCoachingPromptVersion,
+} from "@/lib/queries/coaching-prompts";
 
 type Client = SupabaseClient<Database>;
 
@@ -104,6 +107,48 @@ export async function resolveCoachingPrompt(service: Client): Promise<ResolvedCo
     await reportError("llm:coaching-prompt", error, {});
   }
   return CODE_COACHING_PROMPT;
+}
+
+/** Which prompt a run actually used — reported back by the admin tools so a
+ *  preview can never be mistaken for a run under the live prompt. */
+export type CoachingPromptSource = "active" | "draft_version" | "ad_hoc_body" | "code_fallback";
+
+export interface CoachingPromptSelection {
+  prompt: ResolvedCoachingPrompt;
+  source: CoachingPromptSource;
+}
+
+/**
+ * N62 — resolve the prompt a TEST/PREVIEW run should use: a stored version
+ * (active or not — this is how a draft is previewed without activating it), an
+ * ad-hoc body (an edit not yet proposed), or, with neither, whatever production
+ * would run right now. An ad-hoc body carries version 0: it names no stored
+ * prompt, so rows generated under it are never storable (the admin tools refuse
+ * the combination) and its provenance can't be forged.
+ */
+export async function resolveCoachingPromptSelection(
+  service: Client,
+  override?: { version?: number; body?: string },
+): Promise<CoachingPromptSelection | { error: string }> {
+  if (override?.body != null && override.version != null) {
+    return { error: "pass prompt_version OR prompt_body, not both" };
+  }
+  if (override?.body != null) {
+    return { prompt: { body: override.body, version: 0 }, source: "ad_hoc_body" };
+  }
+  if (override?.version != null) {
+    const stored = await getCoachingPromptVersion(service, override.version);
+    if (!stored) return { error: `coaching_prompt version ${override.version} not found` };
+    return {
+      prompt: { body: stored.body, version: stored.version },
+      source: stored.is_active ? "active" : "draft_version",
+    };
+  }
+  const prompt = await resolveCoachingPrompt(service);
+  return {
+    prompt,
+    source: prompt === CODE_COACHING_PROMPT ? "code_fallback" : "active",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +284,8 @@ export function recentLines(
 interface DecisionRowSlice {
   id: string;
   workout_exercise_id: string | null;
+  /** the session that produced `previous` — doc 19 §5.2's source session */
+  source_workout_exercise_id?: string | null;
   exercise_id: string | null;
   microcycle_id: string | null;
   mesocycle_id: string | null;
@@ -246,6 +293,10 @@ interface DecisionRowSlice {
   output: Record<string, unknown>;
   kind: string;
 }
+
+/** The columns every generation/probe/dry-run path reads off a decision. */
+const DECISION_COLUMNS =
+  "id, workout_exercise_id, source_workout_exercise_id, exercise_id, microcycle_id, mesocycle_id, inputs, output, kind";
 
 /**
  * §10 v2: the trend block per exercise — the progression-history aggregate
@@ -345,7 +396,10 @@ async function assembleContexts(
       ? service.from("microcycles").select("id, week_number").in("id", microIds)
       : Promise.resolve({ data: [], error: null }),
     mesoIds.length
-      ? service.from("mesocycles").select("id, weeks").in("id", mesoIds)
+      ? service
+          .from("mesocycles")
+          .select("id, weeks, macrocycle_id, position, phase")
+          .in("id", mesoIds)
       : Promise.resolve({ data: [], error: null }),
     exerciseIds.length
       ? service
@@ -415,7 +469,17 @@ async function assembleContexts(
   const mgName = new Map((muscleGroups.data ?? []).map((m) => [m.id, m.name]));
 
   // resolve the noted feedback rows' workout_exercises to exercise ids (their
-  // sessions are historical — disjoint from this burst's weIds)
+  // sessions are historical — disjoint from this burst's weIds), together with
+  // the SOURCE workout_exercises (doc 19 §5.2) the decisions advanced from: one
+  // lookup serves both, and matching the two id sets is what tells a note
+  // written in the source session apart from a merely recent one.
+  const sourceWeIds = [
+    ...new Set(
+      decisions
+        .map((d) => d.source_workout_exercise_id)
+        .filter((v): v is string => !!v),
+    ),
+  ];
   const notedWeIds = [
     ...new Set(
       (sessionNotes.data ?? [])
@@ -423,11 +487,12 @@ async function assembleContexts(
         .filter((v): v is string => !!v),
     ),
   ];
-  const notedWes = notedWeIds.length
+  const lookupWeIds = [...new Set([...notedWeIds, ...sourceWeIds])];
+  const notedWes = lookupWeIds.length
     ? await service
         .from("workout_exercises")
-        .select("id, exercise_id")
-        .in("id", notedWeIds)
+        .select("id, exercise_id, workout_id")
+        .in("id", lookupWeIds)
     : { data: [], error: null };
   if (notedWes.error) throw notedWes.error;
   const exerciseByNotedWe = new Map(
@@ -436,17 +501,40 @@ async function assembleContexts(
       (w as { exercise_id?: string | null }).exercise_id ?? null,
     ]),
   );
-  // newest-first rows ⇒ first hit per exercise is its latest session note
-  const sessionNoteByExercise = new Map<string, string>();
+  const workoutByWe = new Map(
+    (notedWes.data ?? []).map((w) => [
+      w.id,
+      (w as { workout_id?: string | null }).workout_id ?? null,
+    ]),
+  );
+  // newest-first rows ⇒ first hit per exercise is its latest session note. The
+  // note's own workout_exercise is kept so §5.2 can say WHICH session wrote it.
+  const sessionNoteByExercise = new Map<string, { body: string; weId: string }>();
   for (const row of sessionNotes.data ?? []) {
     const r = row as { workout_exercise_id?: string; notes?: string | null };
     const exerciseId = r.workout_exercise_id
       ? exerciseByNotedWe.get(r.workout_exercise_id)
       : null;
     if (exerciseId && r.notes && !sessionNoteByExercise.has(exerciseId)) {
-      sessionNoteByExercise.set(exerciseId, r.notes);
+      sessionNoteByExercise.set(exerciseId, {
+        body: r.notes,
+        weId: r.workout_exercise_id as string,
+      });
     }
   }
+
+  // doc 19 §5.2 — the source sessions' week: workout_exercise → workout →
+  // microcycle. Best-effort: a missing hop just omits the week (the source
+  // session's target RIR still comes off the decision's `previous` tuple).
+  const sourceSessionByWe = await assembleSourceSessions(
+    service,
+    userId,
+    sourceWeIds,
+    workoutByWe,
+  );
+
+  // doc 19 §5.3 — the macro goal layer for the mesos in this burst
+  const macroByMeso = await assembleMacroContexts(service, userId, mesos.data ?? []);
 
   const pinnedByExercise = new Map<string, string>();
   for (const row of pinnedNotes.data ?? []) {
@@ -481,6 +569,9 @@ async function assembleContexts(
     const mgId = decision.workout_exercise_id
       ? mgByWe.get(decision.workout_exercise_id)
       : null;
+    const note = decision.exercise_id
+      ? (sessionNoteByExercise.get(decision.exercise_id) ?? null)
+      : null;
     contexts.set(decision.id, {
       exerciseName:
         (decision.exercise_id
@@ -499,8 +590,19 @@ async function assembleContexts(
       pinnedNote: decision.exercise_id
         ? (pinnedByExercise.get(decision.exercise_id) ?? null)
         : null,
-      lastSessionNote: decision.exercise_id
-        ? (sessionNoteByExercise.get(decision.exercise_id) ?? null)
+      lastSessionNote: note?.body ?? null,
+      // §5.2: the note is the source session's own words only when it was
+      // written in that very session (same workout_exercise) — otherwise it is
+      // merely a recent note and must not borrow the source session's context
+      lastSessionNoteFromSource:
+        note != null &&
+        decision.source_workout_exercise_id != null &&
+        note.weId === decision.source_workout_exercise_id,
+      sourceSession: decision.source_workout_exercise_id
+        ? (sourceSessionByWe.get(decision.source_workout_exercise_id) ?? null)
+        : null,
+      macro: decision.mesocycle_id
+        ? (macroByMeso.get(decision.mesocycle_id) ?? null)
         : null,
       workoutFeedback: lastWorkoutFeedback,
       trend: decision.exercise_id
@@ -511,6 +613,145 @@ async function assembleContexts(
   return contexts;
 }
 
+/**
+ * doc 19 §5.2 — resolve each SOURCE workout_exercise to the week it was
+ * performed in (workout → microcycle). Best-effort by design: a missing hop
+ * omits the week rather than sinking the burst; the source session's target RIR
+ * still comes off the decision's recorded `previous` tuple, so the block is
+ * never wrong, only less complete.
+ */
+async function assembleSourceSessions(
+  service: Client,
+  userId: string,
+  sourceWeIds: string[],
+  workoutByWe: Map<string, string | null>,
+): Promise<Map<string, NonNullable<ExplanationContext["sourceSession"]>>> {
+  const out = new Map<string, NonNullable<ExplanationContext["sourceSession"]>>();
+  if (sourceWeIds.length === 0) return out;
+  try {
+    const workoutIds = [
+      ...new Set(
+        sourceWeIds
+          .map((id) => workoutByWe.get(id) ?? null)
+          .filter((v): v is string => !!v),
+      ),
+    ];
+    if (workoutIds.length === 0) return out;
+    const { data: workouts, error: workoutError } = await service
+      .from("workouts")
+      .select("id, microcycle_id")
+      .eq("user_id", userId)
+      .in("id", workoutIds);
+    if (workoutError) throw workoutError;
+    const microByWorkout = new Map(
+      (workouts ?? []).map((w) => [w.id, w.microcycle_id]),
+    );
+    const microIds = [
+      ...new Set([...microByWorkout.values()].filter((v): v is string => !!v)),
+    ];
+    if (microIds.length === 0) return out;
+    const { data: micros, error: microError } = await service
+      .from("microcycles")
+      .select("id, week_number, target_rir, is_deload")
+      .eq("user_id", userId)
+      .in("id", microIds);
+    if (microError) throw microError;
+    const microById = new Map((micros ?? []).map((m) => [m.id, m]));
+
+    for (const weId of sourceWeIds) {
+      const workoutId = workoutByWe.get(weId);
+      const microId = workoutId ? microByWorkout.get(workoutId) : null;
+      const micro = microId ? microById.get(microId) : null;
+      if (!micro) continue;
+      out.set(weId, {
+        weekNumber: micro.week_number,
+        // the decision's `previous.targetRir` wins in the projection; the
+        // microcycle target is the fallback when the row didn't carry one
+        targetRir: micro.target_rir,
+        deload: micro.is_deload,
+      });
+    }
+  } catch (error) {
+    await reportError("llm:explanations", error, { userId, stage: "source_session" });
+  }
+  return out;
+}
+
+interface MesoSlice {
+  id: string;
+  macrocycle_id?: string | null;
+  position?: number | null;
+  phase?: string | null;
+}
+
+/**
+ * doc 19 §5.3 — the macrocycle goal layer per mesocycle: goal type, the block's
+ * placement in the arc, its phase, the cached target snapshot, and the lifter's
+ * goal note. Best-effort like the trend block: a standalone meso (no macro) or
+ * any failure simply omits the block — coaching without goal context is the
+ * status quo, not an error.
+ */
+async function assembleMacroContexts(
+  service: Client,
+  userId: string,
+  mesos: MesoSlice[],
+): Promise<Map<string, NonNullable<ExplanationContext["macro"]>>> {
+  const out = new Map<string, NonNullable<ExplanationContext["macro"]>>();
+  const macroIds = [
+    ...new Set(mesos.map((m) => m.macrocycle_id ?? null).filter((v): v is string => !!v)),
+  ];
+  if (macroIds.length === 0) return out;
+  try {
+    const [macrosResult, siblingResult] = await Promise.all([
+      service
+        .from("macrocycles")
+        .select(
+          "id, goal_type, goal_notes, duration_months, target_low, target_high, target_unit, target_direction",
+        )
+        .eq("user_id", userId)
+        .in("id", macroIds),
+      // block count = how many mesos the macro plans (placeholders included —
+      // the arc the lifter chose, not just what has been built)
+      service
+        .from("mesocycles")
+        .select("id, macrocycle_id")
+        .eq("user_id", userId)
+        .in("macrocycle_id", macroIds),
+    ]);
+    if (macrosResult.error) throw macrosResult.error;
+    if (siblingResult.error) throw siblingResult.error;
+
+    const macroById = new Map((macrosResult.data ?? []).map((m) => [m.id, m]));
+    const blockCount = new Map<string, number>();
+    for (const row of siblingResult.data ?? []) {
+      const macroId = (row as { macrocycle_id?: string | null }).macrocycle_id;
+      if (macroId) blockCount.set(macroId, (blockCount.get(macroId) ?? 0) + 1);
+    }
+
+    for (const meso of mesos) {
+      const macro = meso.macrocycle_id ? macroById.get(meso.macrocycle_id) : null;
+      if (!macro) continue;
+      out.set(meso.id, {
+        goalType: macro.goal_type,
+        blockPosition: meso.position ?? null,
+        blockCount: meso.macrocycle_id ? (blockCount.get(meso.macrocycle_id) ?? null) : null,
+        phase: meso.phase ?? null,
+        goalNotes: macro.goal_notes ?? null,
+        target: {
+          low: macro.target_low,
+          high: macro.target_high,
+          unit: macro.target_unit,
+          direction: macro.target_direction,
+          durationMonths: macro.duration_months,
+        },
+      });
+    }
+  } catch (error) {
+    await reportError("llm:explanations", error, { userId, stage: "macro" });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // generation
 // ---------------------------------------------------------------------------
@@ -518,6 +759,7 @@ async function assembleContexts(
 /** doc 19 §6/§7 — what became of one decision in the v3 trigger-gated path. */
 export type ExplanationDisposition =
   | "stored" // a coaching row was written
+  | "previewed" // N62: generated + post-checked, deliberately NOT written
   | "skipped" // no trigger fired ⇒ no API call, deterministic layers stand alone
   | "abstained" // the model was called but had nothing worth saying (success)
   | "discarded" // post-check/parse rejected the output (no row)
@@ -556,6 +798,12 @@ export interface GenerateOptions {
   /** overwrite an existing explanation for the same decision (admin retesting;
    *  the production hook keeps `ignoreDuplicates` so re-runs are harmless) */
   overwrite?: boolean;
+  /** N62 — run under a specific prompt instead of the ACTIVE one (previewing a
+   *  draft revision without activating it). Resolved once for the whole burst. */
+  prompt?: ResolvedCoachingPrompt;
+  /** N62 — generate + post-check but write NOTHING: a read-through preview of
+   *  what a prompt revision would say across a scope. */
+  preview?: boolean;
 }
 
 /**
@@ -576,9 +824,7 @@ export async function generateDecisionExplanations(
 
   const { data, error } = await service
     .from("engine_decisions")
-    .select(
-      "id, workout_exercise_id, exercise_id, microcycle_id, mesocycle_id, inputs, output, kind",
-    )
+    .select(DECISION_COLUMNS)
     .eq("user_id", userId)
     .in("id", decisionIds.slice(0, MAX_BURST));
   if (error) throw error;
@@ -589,8 +835,9 @@ export async function generateDecisionExplanations(
 
   // Resolve the active prompt ONCE for the whole burst — byte-stable across the
   // chunked completions (prompt-cache friendly) and one consistent
-  // prompt_version stamped on every row this call writes.
-  const prompt = await resolveCoachingPrompt(service);
+  // prompt_version stamped on every row this call writes. An explicit override
+  // (N62 preview of a draft revision) takes its place, already resolved.
+  const prompt = opts?.prompt ?? (await resolveCoachingPrompt(service));
 
   const results: ExplanationOutcome[] = [];
   for (let i = 0; i < decisions.length; i += CHUNK) {
@@ -606,6 +853,7 @@ export async function generateDecisionExplanations(
             complete,
             opts?.overwrite ?? false,
             prompt,
+            opts?.preview ?? false,
           );
         } catch (error) {
           await reportError("llm:explanations", error, {
@@ -667,6 +915,7 @@ async function generateOne(
   complete: ExplanationDeps["complete"],
   overwrite: boolean,
   prompt: ResolvedCoachingPrompt,
+  preview: boolean,
 ): Promise<ExplanationOutcome> {
   const context = contexts.get(decision.id);
   if (!context) {
@@ -731,26 +980,31 @@ async function generateOne(
     };
   }
 
-  const { error } = await service.from("decision_explanations").upsert(
-    {
-      decision_id: decision.id,
-      user_id: userId,
-      body: checked.body,
-      model: completion.model,
-      prompt_version: prompt.version,
-      tokens_in: completion.tokensIn,
-      tokens_out: completion.tokensOut,
-      triggers,
-    },
-    { onConflict: "decision_id", ignoreDuplicates: !overwrite },
-  );
-  if (error) throw error;
+  // N62 preview: the line was generated and post-checked, but a preview must
+  // never touch stored rows — the point is reading a draft prompt's output
+  // while production keeps serving what the ACTIVE prompt produced.
+  if (!preview) {
+    const { error } = await service.from("decision_explanations").upsert(
+      {
+        decision_id: decision.id,
+        user_id: userId,
+        body: checked.body,
+        model: completion.model,
+        prompt_version: prompt.version,
+        tokens_in: completion.tokensIn,
+        tokens_out: completion.tokensOut,
+        triggers,
+      },
+      { onConflict: "decision_id", ignoreDuplicates: !overwrite },
+    );
+    if (error) throw error;
+  }
   return {
     decisionId: decision.id,
     exercise: context.exerciseName,
     ok: true,
-    stored: true,
-    disposition: "stored",
+    stored: !preview,
+    disposition: preview ? "previewed" : "stored",
     triggers,
     body: checked.body,
     noteClass: parsed.response.note_class,
@@ -774,6 +1028,22 @@ function fRec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
     : null;
+}
+
+/**
+ * doc 19 §4.3 — was the source session's effort OBSERVED (a working set carried
+ * a reported RIR) or merely inferred from the prescribed target? Reads the
+ * recorded decision's `actualSets`; null when the decision has none (a seed),
+ * which the facts layer projects as `unknown`. Exported for unit tests.
+ */
+export function projectEffortObserved(actualSets: unknown): boolean | null {
+  if (!Array.isArray(actualSets)) return null;
+  const working = actualSets.filter((s) => {
+    const row = fRec(s);
+    return row != null && row.isWarmup !== true;
+  });
+  if (working.length === 0) return null;
+  return working.some((s) => fNum(fRec(s)?.rirReported) != null);
 }
 
 /**
@@ -827,8 +1097,14 @@ export function toFactsInputs(
     muscleGroup: context.muscleGroup,
     weekNumber: context.weekNumber,
     mesoWeeks: context.mesoWeeks,
-    // phase 3: derive from rir_reported on the previous session's working sets
-    effortObserved: null,
+    // doc 19 §4.3 — effort honesty, straight off the recorded decision: the
+    // source session's working sets are in `inputs.actualSets` with the RIR the
+    // lifter did (or did not) report. Sets present with no report ⇒ inferred;
+    // no sets at all (a seed) ⇒ unknown.
+    effortObserved: projectEffortObserved(inputs.actualSets),
+    sourceSession: context.sourceSession ?? null,
+    lastSessionNoteFromSource: context.lastSessionNoteFromSource ?? null,
+    macro: context.macro ?? null,
     pain:
       jointPain != null && jointPain > 0
         ? { recurring: false, lastReportSessionsAgo: 0 }
@@ -875,9 +1151,7 @@ export async function dryRunDecisionTriggers(
   const service = deps?.service ?? createServiceClient();
   const { data, error } = await service
     .from("engine_decisions")
-    .select(
-      "id, workout_exercise_id, exercise_id, microcycle_id, mesocycle_id, inputs, output, kind",
-    )
+    .select(DECISION_COLUMNS)
     .eq("user_id", userId)
     .in("id", decisionIds.slice(0, MAX_BURST));
   if (error) throw error;
@@ -934,6 +1208,8 @@ export interface ProbeResult {
   tokensOut?: number;
   /** whether the row was written (only when `store` requested and checks passed) */
   stored?: boolean;
+  /** the prompt version the probe ran under (0 = an ad-hoc, unstored body) */
+  promptVersion?: number;
   /** §6.2 post-check verdict for a decision probe */
   postCheck?: { ok: boolean; reason?: string };
   /** the exact upstream/pipeline error on failure — the diagnostic this exists for */
@@ -975,14 +1251,12 @@ export async function probeLlmConnectivity(): Promise<ProbeResult> {
 export async function probeDecisionExplanation(
   userId: string,
   decisionId: string,
-  opts?: { store?: boolean },
+  opts?: { store?: boolean; prompt?: ResolvedCoachingPrompt },
 ): Promise<ProbeResult> {
   const service = createServiceClient();
   const { data, error } = await service
     .from("engine_decisions")
-    .select(
-      "id, workout_exercise_id, exercise_id, microcycle_id, mesocycle_id, inputs, output, kind",
-    )
+    .select(DECISION_COLUMNS)
     .eq("user_id", userId)
     .eq("id", decisionId)
     .maybeSingle();
@@ -1004,8 +1278,10 @@ export async function probeDecisionExplanation(
   const payload = facts as unknown as Record<string, unknown>;
 
   // Probe the SAME prompt production would run (active DB prompt, else the code
-  // fallback) so a preview reflects what a real generation would say.
-  const prompt = await resolveCoachingPrompt(service);
+  // fallback) so a preview reflects what a real generation would say — unless
+  // the caller passed a specific prompt to try (N62: previewing a draft
+  // revision without activating it).
+  const prompt = opts?.prompt ?? (await resolveCoachingPrompt(service));
 
   let completion: LlmCompletion;
   try {
@@ -1030,6 +1306,7 @@ export async function probeDecisionExplanation(
     facts,
     triggers,
     wouldGenerate: triggers.length > 0,
+    promptVersion: prompt.version,
     body: completion.text,
     model: completion.model,
     tokensIn: completion.tokensIn,
@@ -1050,6 +1327,19 @@ export async function probeDecisionExplanation(
   }
 
   let stored = false;
+  // an ad-hoc prompt body names no stored version (version 0) — a row written
+  // under it would carry unresolvable provenance, so the probe never stores it
+  if (opts?.store && prompt.version === 0) {
+    return {
+      ok: true,
+      ...base,
+      body: checked.body,
+      noteClass,
+      stored: false,
+      postCheck: { ok: true },
+      error: "not stored: an ad-hoc prompt_body has no stored version to record — propose it first, then store under that version",
+    };
+  }
   if (opts?.store) {
     const { error: upsertError } = await service
       .from("decision_explanations")

@@ -8,7 +8,11 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { generateDecisionExplanations, recentLines } from "../explanations";
+import {
+  generateDecisionExplanations,
+  projectEffortObserved,
+  recentLines,
+} from "../explanations";
 import type { LlmCompletion } from "../openai";
 
 // --- fake postgrest client ---------------------------------------------------
@@ -131,6 +135,8 @@ function triggeredTables(): TableData {
 }
 
 /** The v3 structured reply — a grounded, actionable coaching line. */
+const coachingBody =
+  "Grip slipped late last session — secure it before the last set so it never costs you a rep.";
 const coaching: LlmCompletion = {
   text: '{"coaching_context":"Grip slipped late last session — secure it before the last set so it never costs you a rep.","note_class":"technique","abstain":false}',
   model: "gpt-5.6-luna",
@@ -174,7 +180,7 @@ describe("generateDecisionExplanations (v3)", () => {
       decision_id: "d1",
       user_id: "u1",
       body: "Grip slipped late last session — secure it before the last set so it never costs you a rep.",
-      prompt_version: 3,
+      prompt_version: 5,
       triggers: ["note"],
     });
     // §5: the decision id is the cache key — re-runs must be harmless
@@ -301,6 +307,215 @@ describe("generateDecisionExplanations (v3)", () => {
       onConflict: "decision_id",
       ignoreDuplicates: false,
     });
+  });
+});
+
+/**
+ * N62 / doc 19 §5.2–§5.3 — the payload distinguishes the UPCOMING week from the
+ * session that produced `previous_work`, and carries the macrocycle goal.
+ */
+describe("the source session + macro goal in the payload (N62)", () => {
+  const advanceRow = {
+    ...decisionRow,
+    source_workout_exercise_id: "we0",
+    inputs: {
+      ...decisionRow.inputs,
+      // the source session's own ask: week 3, one rep in reserve
+      previous: { weight: 250, reps: 8, sets: 3, targetRir: 1 },
+      // the source session reported no RIR ⇒ effort is inferred, not observed
+      actualSets: [
+        { setNumber: 1, weight: 250, reps: 8, rirReported: null, isWarmup: false },
+      ],
+    },
+    output: { ...decisionRow.output, targetRir: 0 },
+  };
+
+  function amendedTables(): TableData {
+    return tables({
+      engine_decisions: { data: [advanceRow], error: null },
+      workout_exercises: {
+        data: [
+          { id: "we1", muscle_group_id: "mg1", exercise_id: "ex1", workout_id: "w1" },
+          { id: "we0", muscle_group_id: "mg1", exercise_id: "ex1", workout_id: "w0" },
+        ],
+        error: null,
+      },
+      workouts: {
+        data: [
+          { id: "w1", microcycle_id: "mc1" },
+          { id: "w0", microcycle_id: "mc0" },
+        ],
+        error: null,
+      },
+      microcycles: {
+        data: [
+          { id: "mc1", week_number: 4, target_rir: 0, is_deload: false },
+          { id: "mc0", week_number: 3, target_rir: 1, is_deload: false },
+        ],
+        error: null,
+      },
+      // the macro's four blocks (the sibling count is what `of` reports); ms1
+      // is the one this decision belongs to
+      mesocycles: {
+        data: [
+          { id: "ms1", weeks: 5, macrocycle_id: "ma1", position: 2, phase: "intensification" },
+          { id: "ms2", weeks: 5, macrocycle_id: "ma1", position: 1, phase: "accumulation" },
+          { id: "ms3", weeks: 5, macrocycle_id: "ma1", position: 3, phase: "intensification" },
+          { id: "ms4", weeks: 5, macrocycle_id: "ma1", position: 4, phase: "peak" },
+        ],
+        error: null,
+      },
+      macrocycles: {
+        data: [
+          {
+            id: "ma1",
+            goal_type: "cut",
+            goal_notes: "lean out before the summer",
+            duration_months: 4,
+            target_low: 8,
+            target_high: 12,
+            target_unit: "lb",
+            target_direction: "loss",
+          },
+        ],
+        error: null,
+      },
+      // the note was written in the SOURCE session (we0), not a stray recent one
+      exercise_feedback: {
+        data: [
+          {
+            workout_exercise_id: "we0",
+            notes: "burned but had a rep left",
+            created_at: "2026-07-15T11:00:00Z",
+          },
+        ],
+        error: null,
+      },
+    });
+  }
+
+  it("separates the upcoming week from the session the note came from", async () => {
+    const seen: string[] = [];
+    await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(amendedTables(), []),
+      complete: async ({ input }) => {
+        seen.push(input);
+        return coaching;
+      },
+    });
+    const facts = JSON.parse(seen[0]);
+    // the ask being prescribed: peak week, sets to failure
+    expect(facts.week).toMatchObject({ n: 4, target_rir: 0, deload: false });
+    // the session that produced previous_work: an earlier week, a rep in reserve
+    expect(facts.source_session).toEqual({ week_n: 3, target_rir: 1, deload: false });
+    // and the note names that session, so it can never be read at 0 RIR
+    expect(facts.note).toMatchObject({
+      source: "source_session",
+      text: "burned but had a rep left",
+      session: { week_n: 3, target_rir: 1, deload: false },
+    });
+    // §4.3: sets were logged with no reported RIR ⇒ inferred, never "observed"
+    expect(facts.effort_status).toBe("inferred");
+  });
+
+  it("carries the macrocycle goal as context, not as a rate", async () => {
+    const seen: string[] = [];
+    await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(amendedTables(), []),
+      complete: async ({ input }) => {
+        seen.push(input);
+        return coaching;
+      },
+    });
+    const facts = JSON.parse(seen[0]);
+    expect(facts.macro).toEqual({
+      goal: "cut",
+      block: { n: 2, of: 4 },
+      phase: "intensification",
+      target: "lose 8–12 lb over 4 months (an estimate)",
+      goal_notes: "lean out before the summer",
+    });
+  });
+
+  it("omits the macro block for a standalone meso", async () => {
+    const seen: string[] = [];
+    await generateDecisionExplanations("u1", ["d1"], {
+      service: fakeService(
+        {
+          ...amendedTables(),
+          mesocycles: { data: [{ id: "ms1", weeks: 5, macrocycle_id: null }], error: null },
+        },
+        [],
+      ),
+      complete: async ({ input }) => {
+        seen.push(input);
+        return coaching;
+      },
+    });
+    expect(JSON.parse(seen[0]).macro).toBeUndefined();
+  });
+});
+
+/** N62 — the prompt-revision loop: run a draft prompt over real decisions and
+ *  read what it WOULD say, with nothing written and the live prompt untouched. */
+describe("prompt override + preview (N62)", () => {
+  it("runs under the given prompt and writes nothing in preview mode", async () => {
+    const upserts: Upsert[] = [];
+    const instructions: string[] = [];
+    const { stored, results } = await generateDecisionExplanations(
+      "u1",
+      ["d1"],
+      {
+        service: fakeService(triggeredTables(), upserts),
+        complete: async (input) => {
+          instructions.push(input.instructions);
+          return coaching;
+        },
+      },
+      { prompt: { body: "DRAFT PROMPT UNDER TEST", version: 9 }, preview: true },
+    );
+    expect(instructions).toEqual(["DRAFT PROMPT UNDER TEST"]);
+    expect(stored).toBe(0);
+    expect(upserts).toHaveLength(0);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      stored: false,
+      disposition: "previewed",
+      body: coachingBody,
+    });
+  });
+
+  it("stamps the overriding prompt's version when it is NOT a preview", async () => {
+    const upserts: Upsert[] = [];
+    await generateDecisionExplanations(
+      "u1",
+      ["d1"],
+      { service: fakeService(triggeredTables(), upserts), complete: async () => coaching },
+      { prompt: { body: "DRAFT PROMPT UNDER TEST", version: 9 } },
+    );
+    expect(upserts[0].row).toMatchObject({ prompt_version: 9 });
+  });
+});
+
+/** doc 19 §4.3 — effort honesty read straight off the recorded decision. */
+describe("projectEffortObserved", () => {
+  it("is observed when any working set reported an RIR", () => {
+    expect(
+      projectEffortObserved([
+        { reps: 8, rirReported: null, isWarmup: false },
+        { reps: 7, rirReported: 1, isWarmup: false },
+      ]),
+    ).toBe(true);
+  });
+
+  it("is inferred when sets were logged but none reported effort", () => {
+    expect(projectEffortObserved([{ reps: 8, rirReported: null, isWarmup: false }])).toBe(false);
+  });
+
+  it("ignores warmups, and is unknown with no working sets at all (a seed)", () => {
+    expect(projectEffortObserved([{ reps: 5, rirReported: 3, isWarmup: true }])).toBeNull();
+    expect(projectEffortObserved([])).toBeNull();
+    expect(projectEffortObserved(undefined)).toBeNull();
   });
 });
 

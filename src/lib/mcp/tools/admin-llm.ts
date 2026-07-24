@@ -6,7 +6,10 @@ import {
   generateDecisionExplanations,
   probeDecisionExplanation,
   probeLlmConnectivity,
+  resolveCoachingPromptSelection,
+  type CoachingPromptSelection,
   type ExplanationOutcome,
+  type ResolvedCoachingPrompt,
 } from "@/lib/llm/explanations";
 import { llmExplanationsMode } from "@/lib/llm/config";
 import { explanationModel } from "@/lib/llm/openai";
@@ -51,6 +54,7 @@ async function generateInChunks(
   userId: string,
   decisionIds: string[],
   overwrite: boolean,
+  opts?: { prompt?: ResolvedCoachingPrompt; preview?: boolean },
 ): Promise<{ stored: number; results: ExplanationOutcome[] }> {
   const results: ExplanationOutcome[] = [];
   let stored = 0;
@@ -59,12 +63,37 @@ async function generateInChunks(
       userId,
       decisionIds.slice(i, i + GENERATION_CAP),
       undefined,
-      { overwrite },
+      { overwrite, prompt: opts?.prompt, preview: opts?.preview },
     );
     stored += run.stored;
     results.push(...run.results);
   }
   return { stored, results };
+}
+
+/** N62 — resolve the `prompt_version` / `prompt_body` override the LLM admin
+ *  tools accept, so a draft revision can be previewed without activating it.
+ *  Returns the refusal message instead of a selection when the args conflict or
+ *  the named version doesn't exist. */
+async function resolvePromptArgs(
+  client: McpClient,
+  args: { prompt_version?: number; prompt_body?: string },
+): Promise<CoachingPromptSelection | { error: string }> {
+  if (args.prompt_version == null && args.prompt_body == null) {
+    return resolveCoachingPromptSelection(client);
+  }
+  return resolveCoachingPromptSelection(client, {
+    version: args.prompt_version,
+    body: args.prompt_body,
+  });
+}
+
+function promptReport(selection: CoachingPromptSelection) {
+  return {
+    source: selection.source, // active | draft_version | ad_hoc_body | code_fallback
+    version: selection.prompt.version || null,
+    char_count: selection.prompt.body.length,
+  };
 }
 
 function shapeOutcomes(results: ExplanationOutcome[]) {
@@ -74,7 +103,7 @@ function shapeOutcomes(results: ExplanationOutcome[]) {
     ok: r.ok,
     disposition: r.disposition, // stored | skipped | abstained | discarded | error
     ...(r.triggers ? { triggers: r.triggers } : {}),
-    ...(r.disposition === "stored"
+    ...(r.disposition === "stored" || r.disposition === "previewed"
       ? {
           body: r.body,
           note_class: r.noteClass ?? null,
@@ -245,17 +274,35 @@ function registerTestLlmExplanation(server: McpServer) {
         "for that recorded decision (payload projection → completion → §4 " +
         "post-check) and returns every intermediate; nothing is stored unless " +
         "store=true (then upserted with overwrite, so iterating on one " +
-        "decision is cheap). Works regardless of the LLM_EXPLANATIONS mode.",
+        "decision is cheap). Works regardless of the LLM_EXPLANATIONS mode. " +
+        "PREVIEW A PROMPT REVISION WITHOUT ACTIVATING IT: pass prompt_version " +
+        "to run the probe under any stored coaching-prompt version (an inactive " +
+        "draft included), or prompt_body to try an unsaved edit verbatim. " +
+        "Neither changes which prompt production uses; an ad-hoc prompt_body " +
+        "can never be stored (it names no version), so propose it first when " +
+        "you want the resulting row kept.",
       inputSchema: {
         decision_id: z.string().uuid().optional(),
         store: z.boolean().optional(),
+        prompt_version: z.number().int().positive().optional(),
+        prompt_body: z.string().min(50).max(12000).optional(),
       },
     },
     async (
-      { decision_id, store }: { decision_id?: string; store?: boolean },
+      {
+        decision_id,
+        store,
+        prompt_version,
+        prompt_body,
+      }: {
+        decision_id?: string;
+        store?: boolean;
+        prompt_version?: number;
+        prompt_body?: string;
+      },
       extra: McpExtra,
     ) => {
-      const { userId } = await resolveAdmin(extra);
+      const { client, userId } = await resolveAdmin(extra);
       if (!decision_id) {
         const probe = await probeLlmConnectivity();
         return jsonResult({
@@ -267,7 +314,13 @@ function registerTestLlmExplanation(server: McpServer) {
             : { error: probe.error }),
         });
       }
-      const probe = await probeDecisionExplanation(userId, decision_id, { store });
+      const selection = await resolvePromptArgs(client, { prompt_version, prompt_body });
+      if ("error" in selection) return jsonResult({ ok: false, error: selection.error });
+
+      const probe = await probeDecisionExplanation(userId, decision_id, {
+        store,
+        prompt: selection.prompt,
+      });
       if (probe.stored) {
         await recordMcpWrite(
           userId,
@@ -280,6 +333,9 @@ function registerTestLlmExplanation(server: McpServer) {
         ok: probe.ok,
         kind: "decision_probe",
         decision_id,
+        // N62: which prompt this run used — a preview under a draft is never
+        // silently mistaken for a run under the live prompt
+        prompt: promptReport(selection),
         // doc 19 §5–§6.2: the facts worldview the model saw + the trigger
         // verdict + the classification, alongside the coaching body. The probe
         // always calls (an explicit test); would_generate says whether prod
@@ -321,7 +377,13 @@ function registerGenerateExplanations(server: McpServer) {
         "capped at 40 generations per call. Pass dry_run=true to report the " +
         "doc-19 §6.1 would-trigger status across the scope WITHOUT any API " +
         "call or stored row — the calibration view before the trigger gate " +
-        "flips on (works in any mode, including off).",
+        "flips on (works in any mode, including off). PROMPT REVISION LOOP: " +
+        "pass prompt_version (any stored version, active or draft) or " +
+        "prompt_body (an unsaved edit) to run the batch under that prompt " +
+        "instead of the active one, and preview=true to read what it would say " +
+        "WITHOUT writing any row — the voice-read pass over a real scope with " +
+        "the live prompt still serving. preview=true costs tokens (the calls " +
+        "are real); dry_run=true costs none but only reports triggers.",
       inputSchema: {
         decision_ids: z.array(z.string().uuid()).max(40).optional(),
         exercise_id: z.string().uuid().optional(),
@@ -330,6 +392,9 @@ function registerGenerateExplanations(server: McpServer) {
         mesocycle_id: z.string().uuid().optional(),
         overwrite: z.boolean().optional(),
         dry_run: z.boolean().optional(),
+        preview: z.boolean().optional(),
+        prompt_version: z.number().int().positive().optional(),
+        prompt_body: z.string().min(50).max(12000).optional(),
       },
     },
     async (
@@ -341,6 +406,9 @@ function registerGenerateExplanations(server: McpServer) {
         mesocycle_id?: string;
         overwrite?: boolean;
         dry_run?: boolean;
+        preview?: boolean;
+        prompt_version?: number;
+        prompt_body?: string;
       },
       extra: McpExtra,
     ) => {
@@ -415,22 +483,53 @@ function registerGenerateExplanations(server: McpServer) {
         });
       }
 
+      // N62: run under a specific prompt (draft or ad-hoc) when asked, so a
+      // revision can be read across a real scope before it goes live
+      const selection = await resolvePromptArgs(client, args);
+      if ("error" in selection) return jsonResult({ ok: false, error: selection.error });
+      const preview = args.preview ?? false;
+      if (!preview && selection.prompt.version === 0) {
+        return jsonResult({
+          ok: false,
+          error:
+            "an ad-hoc prompt_body can only be run with preview=true (a stored row must name a stored prompt version) — propose it first to generate under it",
+        });
+      }
+
       const truncated = decisionIds.length > GENERATION_CAP;
       const run = await generateInChunks(
         userId,
         decisionIds.slice(0, GENERATION_CAP),
         args.overwrite ?? false,
+        { prompt: selection.prompt, preview },
       );
       // doc 19 §6: most decisions skip (no trigger) or abstain — surface the
       // full disposition breakdown, not just the stored count
-      const tally = { stored: 0, skipped: 0, abstained: 0, discarded: 0, error: 0 };
+      const tally = { stored: 0, previewed: 0, skipped: 0, abstained: 0, discarded: 0, error: 0 };
       for (const r of run.results) tally[r.disposition] += 1;
-      const summary = `generated ${run.stored}/${Math.min(decisionIds.length, GENERATION_CAP)} (skipped ${tally.skipped}, abstained ${tally.abstained})`;
-      await recordMcpWrite(userId, GENERATE_EXPLANATIONS, { ...scope, overwrite: args.overwrite ?? false }, summary);
+      const attempted = Math.min(decisionIds.length, GENERATION_CAP);
+      const summary = preview
+        ? `previewed ${tally.previewed}/${attempted} under prompt ${selection.source} v${selection.prompt.version || "ad-hoc"} (skipped ${tally.skipped}, abstained ${tally.abstained})`
+        : `generated ${run.stored}/${attempted} (skipped ${tally.skipped}, abstained ${tally.abstained})`;
+      await recordMcpWrite(
+        userId,
+        GENERATE_EXPLANATIONS,
+        { ...scope, overwrite: args.overwrite ?? false, preview, prompt_version: selection.prompt.version },
+        summary,
+      );
       return jsonResult({
         ok: true,
         generated: run.stored,
-        attempted: Math.min(decisionIds.length, GENERATION_CAP),
+        attempted,
+        prompt: promptReport(selection),
+        ...(preview
+          ? {
+              preview: true,
+              previewed: tally.previewed,
+              preview_note:
+                "nothing was written — these are the lines this prompt WOULD produce; the active prompt still serves",
+            }
+          : {}),
         breakdown: tally,
         results: shapeOutcomes(run.results),
         ...(truncated

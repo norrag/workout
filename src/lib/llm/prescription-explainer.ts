@@ -134,6 +134,32 @@ export interface ExplanationContext {
   } | null;
   /** §10: the pre-projected trend block, when the history supports one */
   trend?: PayloadTrend | null;
+  /** doc 19 §5.2 — the session that produced the decision's `previous` tuple
+   *  (and usually the note): its week, target RIR, and deload flag. Absent for
+   *  a seed, or when the source session's week can't be resolved. */
+  sourceSession?: {
+    weekNumber?: number | null;
+    targetRir?: number | null;
+    deload?: boolean | null;
+  } | null;
+  /** doc 19 §5.2 — whether `lastSessionNote` was written in that same source
+   *  session (matched by workout_exercise) rather than merely being recent. */
+  lastSessionNoteFromSource?: boolean | null;
+  /** doc 19 §5.3 — the macrocycle goal this meso serves, when it has one */
+  macro?: {
+    goalType: "hypertrophy" | "strength" | "cut" | "maintain";
+    blockPosition?: number | null;
+    blockCount?: number | null;
+    phase?: string | null;
+    goalNotes?: string | null;
+    target?: {
+      low: number | null;
+      high: number | null;
+      unit: string | null;
+      direction: "gain" | "loss" | "none" | null;
+      durationMonths: number | null;
+    } | null;
+  } | null;
 }
 
 /** Structural subset of `ProgressionAuditSummary`
