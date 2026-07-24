@@ -34,6 +34,7 @@ import {
   postCheckCoaching,
   type NoteClass,
 } from "./coaching";
+import { getActiveCoachingPrompt } from "@/lib/queries/coaching-prompts";
 
 type Client = SupabaseClient<Database>;
 
@@ -71,6 +72,38 @@ export interface ExplanationDeps {
     input: string;
     maxOutputTokens: number;
   }) => Promise<LlmCompletion>;
+}
+
+/** The system prompt + version a generation runs with — either the ACTIVE
+ *  editable DB prompt (coaching_prompts) or, when the table is empty/unreadable,
+ *  the code constant. Resolved ONCE per burst and threaded through so a whole
+ *  burst is byte-stable (prompt-cache friendly) and stamps a consistent
+ *  prompt_version on every row it writes. */
+export interface ResolvedCoachingPrompt {
+  body: string;
+  version: number;
+}
+
+/** The code fallback — the permanent floor when no DB prompt is active. */
+export const CODE_COACHING_PROMPT: ResolvedCoachingPrompt = {
+  body: COACHING_SYSTEM_PROMPT,
+  version: COACHING_PROMPT_VERSION,
+};
+
+/**
+ * Resolve the coaching system prompt for a generation burst: the active DB row
+ * if present, else the code constant. Any read failure falls back to the
+ * constant (and is reported) — the prompt editor can never take the pipeline
+ * down; the deterministic layers plus a working code prompt are the floor.
+ */
+export async function resolveCoachingPrompt(service: Client): Promise<ResolvedCoachingPrompt> {
+  try {
+    const active = await getActiveCoachingPrompt(service);
+    if (active) return { body: active.body, version: active.version };
+  } catch (error) {
+    await reportError("llm:coaching-prompt", error, {});
+  }
+  return CODE_COACHING_PROMPT;
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +587,11 @@ export async function generateDecisionExplanations(
 
   const contexts = await assembleContexts(service, userId, decisions);
 
+  // Resolve the active prompt ONCE for the whole burst — byte-stable across the
+  // chunked completions (prompt-cache friendly) and one consistent
+  // prompt_version stamped on every row this call writes.
+  const prompt = await resolveCoachingPrompt(service);
+
   const results: ExplanationOutcome[] = [];
   for (let i = 0; i < decisions.length; i += CHUNK) {
     const chunk = await Promise.all(
@@ -567,6 +605,7 @@ export async function generateDecisionExplanations(
             contexts,
             complete,
             opts?.overwrite ?? false,
+            prompt,
           );
         } catch (error) {
           await reportError("llm:explanations", error, {
@@ -627,6 +666,7 @@ async function generateOne(
   contexts: Map<string, ExplanationContext>,
   complete: ExplanationDeps["complete"],
   overwrite: boolean,
+  prompt: ResolvedCoachingPrompt,
 ): Promise<ExplanationOutcome> {
   const context = contexts.get(decision.id);
   if (!context) {
@@ -658,7 +698,7 @@ async function generateOne(
   }
 
   const completion = await complete({
-    instructions: COACHING_SYSTEM_PROMPT,
+    instructions: prompt.body,
     input: JSON.stringify(facts),
     maxOutputTokens: COACHING_MAX_OUTPUT_TOKENS,
   });
@@ -697,7 +737,7 @@ async function generateOne(
       user_id: userId,
       body: checked.body,
       model: completion.model,
-      prompt_version: COACHING_PROMPT_VERSION,
+      prompt_version: prompt.version,
       tokens_in: completion.tokensIn,
       tokens_out: completion.tokensOut,
       triggers,
@@ -963,10 +1003,14 @@ export async function probeDecisionExplanation(
   const triggers = scoreTriggers(facts, signals);
   const payload = facts as unknown as Record<string, unknown>;
 
+  // Probe the SAME prompt production would run (active DB prompt, else the code
+  // fallback) so a preview reflects what a real generation would say.
+  const prompt = await resolveCoachingPrompt(service);
+
   let completion: LlmCompletion;
   try {
     completion = await createCompletion({
-      instructions: COACHING_SYSTEM_PROMPT,
+      instructions: prompt.body,
       input: JSON.stringify(facts),
       maxOutputTokens: COACHING_MAX_OUTPUT_TOKENS,
     });
@@ -1015,7 +1059,7 @@ export async function probeDecisionExplanation(
           user_id: userId,
           body: checked.body,
           model: completion.model,
-          prompt_version: COACHING_PROMPT_VERSION,
+          prompt_version: prompt.version,
           tokens_in: completion.tokensIn,
           tokens_out: completion.tokensOut,
           triggers,

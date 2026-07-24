@@ -99,6 +99,9 @@ function tables(overrides: Partial<TableData> = {}): TableData {
     muscle_groups: { data: [{ id: "mg1", name: "glutes" }], error: null },
     microcycles: { data: [{ id: "mc1", week_number: 2 }], error: null },
     mesocycles: { data: [{ id: "ms1", weeks: 5 }], error: null },
+    // no active editable prompt (maybeSingle ⇒ null) ⇒ generation falls back to
+    // the code constant (prompt_version 3), the shape these tests assert
+    coaching_prompts: { data: null, error: null },
     logged_sets: {
       data: [
         { exercise_id: "ex1", performed_at: "2026-07-15T10:00:00Z", set_number: 1, weight: 255, reps: 8 },

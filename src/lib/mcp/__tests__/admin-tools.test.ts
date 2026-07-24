@@ -538,3 +538,16 @@ describe("llm admin tools (N58 follow-up)", () => {
     );
   });
 });
+
+// --- N61: editable coaching-prompt tools -------------------------------------
+
+describe("coaching-prompt admin tools (N61)", () => {
+  it("the visibility roster hides them from non-admins (PH33)", async () => {
+    const { ADMIN_TOOL_NAMES } = await import("../tools/admin");
+    const { COACHING_PROMPT_TOOL_NAMES } = await import("../tools/admin-prompt");
+    expect(COACHING_PROMPT_TOOL_NAMES.length).toBe(4);
+    for (const name of COACHING_PROMPT_TOOL_NAMES) {
+      expect(ADMIN_TOOL_NAMES.has(name), name).toBe(true);
+    }
+  });
+});

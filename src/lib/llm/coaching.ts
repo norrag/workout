@@ -15,9 +15,17 @@
 import type { ExplanationFacts } from "./explanation-facts";
 import type { Trigger } from "./coaching-triggers";
 
-/** Bumped to 3 for the v3 contract; stored on every row and, per doc 19 §3,
- *  the serving cut (serve only prompt_version >= 3). */
+/** Bumped to 3 for the v3 contract; the version stamped on every row generated
+ *  from the CODE fallback prompt. Editable DB prompts (coaching_prompts) carry
+ *  their own version, floored one above this so they always clear the serving
+ *  cut below. */
 export const COACHING_PROMPT_VERSION = 3;
+
+/** doc 19 §3 serving cut: read surfaces serve a stored row only when its
+ *  prompt_version is at least this — the v3 content-architecture floor (v1–v2
+ *  whole-blob rows never serve). Every editable DB prompt is a v3-architecture
+ *  prompt, so this floor stays 3 and DB versions (≥ 4) always clear it. */
+export const COACHING_SERVED_MIN_PROMPT_VERSION = 3;
 
 /** §6.2 output contract: coaching context ≤ 360 chars, 1–2 sentences. */
 export const COACHING_MAX_CHARS = 360;

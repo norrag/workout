@@ -314,3 +314,42 @@ post-check — carries over unchanged):
   generations, then flip v2 as a prompt + payload revision — no schema or
   seam change; `decision_explanations.model`/prompt-version columns already
   distinguish generations for comparison.
+
+## 11. Addendum — editable coaching prompt via MCP (N61, 2026-07-24)
+
+The coaching **system prompt** is no longer a code constant only. It is now
+editable, versioned admin config, so a wording change is an MCP call, not a
+code PR + deploy. Mirrors the `engine_params` tuning loop exactly; doc 19 stays
+authoritative for the prompt's *content architecture* — this is the
+*infrastructure* that lets an admin edit it. (Consistent with this doc's remit:
+model/client, storage, decision-id lifecycle, post-check, and admin tooling.)
+
+- **Storage:** `coaching_prompts` (migration `20260724000001`) — append-only
+  versions, a single active row (partial-unique index), admin-only RLS SELECT +
+  writes, atomic `activate_coaching_prompt` RPC. The table ships **empty**.
+- **Permanent fallback:** `COACHING_SYSTEM_PROMPT` (`src/lib/llm/coaching.ts`,
+  version 3) is unchanged and remains the fallback. Generation
+  (`resolveCoachingPrompt`) reads the active DB row and falls back to the
+  constant whenever the table is empty or unreadable — the editor **cannot**
+  take the pipeline down; a working code prompt plus the deterministic layers
+  are the floor.
+- **Serving cut:** DB prompt versions start at 4 (`nextCoachingPromptVersion`
+  floors at `COACHING_PROMPT_VERSION + 1`) so every edit clears the doc-19
+  serving cut, now the named const `COACHING_SERVED_MIN_PROMPT_VERSION`.
+- **Guardrail unchanged:** `postCheckCoaching` runs on every generation
+  regardless of prompt text (number-set, length caps, note-class gate), and the
+  deterministic ask + why always render. A bad edit degrades to
+  abstention/discard, never an ungrounded number.
+- **Tools (admin-gated):** `get_coaching_prompt` (browse versions + the
+  effective active prompt; `include_body` returns the active body verbatim to
+  copy-edit), `propose_coaching_prompt` (inactive draft), `activate_coaching_prompt`
+  (confirm-echo), `discard_coaching_prompt` (guards the active + explanation-
+  referenced versions). Regeneration stays a **separate** step —
+  `generate_explanations overwrite=true` applies a new prompt to existing rows;
+  activation alone only changes what FUTURE generations use.
+  `get_llm_explanation_status` reports the effective prompt source + version.
+- **Loop:** `get_coaching_prompt include_body` → edit →
+  `propose_coaching_prompt` → `test_llm_explanation` (preview) →
+  `activate_coaching_prompt` → `generate_explanations overwrite`.
+- **Owner-gated:** apply migration `20260724000001` to hosted prod (Supabase
+  MCP/CLI), as with the N58/N60 migrations.

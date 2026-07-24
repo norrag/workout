@@ -2,7 +2,41 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-23 (latest) — prescription explanation v3, phase 3 (doc 19)
+## 2026-07-24 (latest) — N61: editable LLM coaching prompt via MCP (doc 18 §11)
+
+The doc-19 coaching **system prompt** becomes editable, versioned admin config —
+a wording change is now an MCP call, not a code PR + deploy. Mirrors the
+`engine_params` propose/activate loop. Doc 18 §11 documents it (infrastructure);
+doc 19 keeps authority over the prompt's content architecture.
+
+- **Storage:** migration `20260724000001_coaching_prompts` — append-only
+  versions, single active row (partial-unique index), **admin-only** RLS SELECT
+  + writes (tighter than `engine_params` — no client render path needs it),
+  atomic `activate_coaching_prompt` RPC. Ships **empty**; the code constant
+  `COACHING_SYSTEM_PROMPT` (version 3) stays the permanent fallback. +RLS tests.
+  **Not yet applied to hosted prod** — owner-gated, like N58/N60.
+- **Resolution + fallback:** `resolveCoachingPrompt` (`explanations.ts`) reads
+  the active DB prompt once per burst (byte-stable ⇒ prompt-cache friendly) and
+  falls back to the constant on empty table / read error, reporting the error.
+  The editor can never take the pipeline down. Both the write-site path and the
+  `test_llm_explanation` probe stamp `prompt_version` from the resolved prompt.
+- **Query layer:** `src/lib/queries/coaching-prompts.ts` — active/list/get/
+  propose/activate/deletion-impact/discard; `nextCoachingPromptVersion` floors
+  the counter at `COACHING_PROMPT_VERSION + 1` (= 4) so every DB prompt clears
+  the serving cut. Unit-tested.
+- **Serving cut:** named const `COACHING_SERVED_MIN_PROMPT_VERSION` replaces the
+  literal `3` in `read.ts` + `audit.ts`.
+- **Tools (admin-gated, `admin-prompt.ts`):** `get_coaching_prompt` (browse +
+  effective active, `include_body` to copy for editing), `propose_coaching_prompt`,
+  `activate_coaching_prompt` (confirm-echo; no auto-regenerate), `discard_coaching_prompt`
+  (guards active + explanation-referenced). `get_llm_explanation_status` reports
+  the effective prompt source (db | code_fallback) + version. Added to the PH33
+  visibility roster.
+- **Guardrail unchanged:** `postCheckCoaching` runs on every generation
+  regardless of prompt text; the deterministic ask + why always render.
+- Typecheck + lint clean; full unit suite green (1364).
+
+## 2026-07-23 — prescription explanation v3, phase 3 (doc 19)
 
 Phase 3 — prompt v3 + structured output + the storage delta — shipped as a
 separate PR on top of phases 1–2. The LLM re-enters the pipeline, now fenced by
