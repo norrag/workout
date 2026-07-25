@@ -272,6 +272,46 @@ describe("shares (R1 lockdown)", () => {
     expect(data).toEqual([{ id: shareId }]);
   });
 
+  // N65: the snapshot column carries the owner's plan contents, so it must be
+  // reachable exactly where the row itself is — the grantee of an ACCEPTED
+  // share, and nobody else. (Redemption itself runs service-role.)
+  it("the grantee reads the snapshot of the share they accepted", async () => {
+    const { error } = await alice
+      .from("shares")
+      .update({ payload: { version: 1, type: "mesocycle", days: [] } })
+      .eq("id", shareId);
+    expect(error).toBeNull();
+    const { data } = await bob
+      .from("shares")
+      .select("payload")
+      .eq("id", shareId)
+      .single();
+    expect(data!.payload).toMatchObject({ version: 1, type: "mesocycle" });
+  });
+
+  it("an un-redeemed share's snapshot is invisible to everyone but the owner", async () => {
+    const { data: open, error } = await alice
+      .from("shares")
+      .insert({
+        owner_id: aliceId,
+        grantee_id: null,
+        object_type: "mesocycle",
+        object_id: crypto.randomUUID(),
+        share_code: crypto.randomUUID().slice(0, 8).toUpperCase(),
+        payload: { version: 1, type: "mesocycle", days: [] },
+      })
+      .select()
+      .single();
+    expect(error).toBeNull();
+    // holding the code is not the same as holding the row: a non-party sees
+    // nothing until redemption (which is service-role) stamps them grantee
+    const { data } = await bob
+      .from("shares")
+      .select("payload")
+      .eq("id", open!.id);
+    expect(data).toEqual([]);
+  });
+
   it("non-parties cannot see the share", async () => {
     // bob is the grantee; a share where he is neither owner nor grantee is
     // invisible to him

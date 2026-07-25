@@ -4,6 +4,46 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-25 — Session 90: mesocycle editing + sharing bugs (N64/N65, PR #208)
+
+Owner handed over two field-reported defects: the day view and cycles view can
+show a day's exercises in different orders, and a shared meso doesn't carry the
+edits made before sharing. Both filed as new items (Batch 26 verbatim source
+added) and fixed in the same PR.
+
+- **New items N64 (order) + N65 (share snapshot)**, both `B`/HIGH. They share a
+  root: the planner board is the meso's structural record and every copy/share
+  reads it, but half the edit surfaces never wrote to it.
+- **N64 — both directions were broken, not one.** Plan → session:
+  `regenerateOpenWorkouts` merges structurally (surviving rows keep their
+  position, new ones append), so a planner-board reorder or an MCP
+  `reorder_day`/`swap_exercise` never reached an already-generated week. Session
+  → plan: the day view's move-up/down wrote the session and its later-week
+  siblings only. New leaf `queries/plan-order.ts` is now the one definition and
+  runs both ways. A day-view replace/add writes to the plan only when *"repeat
+  this change on this day in future weeks"* is ticked — reusing the intent
+  signal the UI already collects rather than inventing a new rule; a removal, or
+  an unticked replace/add, stays session-local by design.
+- **A third order bug fell out of the same read.** `planMesoCopy` renumbered
+  copied fills group-by-group, so duplicating a meso with an interleaved day
+  reset it to group-clustered order. Fills now carry the source's flat
+  `day_position`.
+- **N65 — the share code recorded nothing.** Redemption read the owner's live
+  board, so the grantee got whatever it held when they typed the code. Now
+  `shares.payload` (migration `20260725000001`) snapshots the structure at mint
+  time and refreshes on re-mint, and redemption copies that (live read kept as
+  the fallback for old codes). The copy had also been dropping `rir_schedule`.
+  R1's ownership assertion is deliberately left on the **live** rows, so the
+  snapshot can't widen what a copy may touch.
+- **Verified, not assumed:** day *reordering* (`meso_days.weekday`) was already
+  copied correctly — worth stating because it is what the owner's note named
+  first; the actual losses were the day-view exercise edits and the live-read
+  redemption.
+- Tests +43 (1434 green), lint + typecheck clean. Hosted migration not yet
+  applied (owner-gated, per the usual convention).
+- **Not done this session:** the reconciliation sweep of already-merged `done`
+  rows (N56–N63 etc.) — left for a housekeeping pass so this PR stays a bug fix.
+
 ## 2026-07-24 — Session 89: deterministic explanation language + the three-layer strip (N63, PR #207)
 
 Owner: rework the deterministic explanation language to match the coaching

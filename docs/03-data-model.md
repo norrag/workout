@@ -212,6 +212,12 @@ An exercise instance within a session, carrying the **prescription** the engine 
 
 The complete sheet's progress/denominator counts `prescribed_sets` minus `skipped_set_numbers`; "done" = every planned slot logged or skipped.
 
+**One exercise order, two surfaces (N64).** `workout_exercises.position` (what the day view renders) and `meso_exercises.position` (the flat day-level plan order the cycles view renders, and the one every copy/share carries) must agree for a day, whichever surface the change was made on. `src/lib/queries/plan-order.ts` is the single definition and runs both directions:
+- **plan → session:** after a planner-board save or MCP `edit_mesocycle` merges into an already-generated open workout, `applyPlanOrderToWorkout` renumbers that day to the plan's flat order (rows retained only because they carry logged sets keep their relative order at the end);
+- **session → plan:** a day-view reorder (which always carries forward to later weeks) writes the new order back with `syncPlanOrderFromWorkout`; a replace/add with *"repeat this change on this day in future weeks"* also writes the substitution/addition into the planner board (`syncPlanSubstitution` / `syncPlanAddedExercises`).
+
+A session-only edit (a removal, or a replace/add with the repeat box unticked) stays session-only by design, and the plan of a completed/abandoned meso is never rewritten.
+
 ### `logged_sets`
 The atomic history record. **This is the primary input to the engine and MCP analysis** — each row is fully stamped with cycle context for efficient time-series queries.
 - `workout_exercise_id`
@@ -265,8 +271,11 @@ Unified grant table for custom content:
 - `owner_id`, `grantee_id uuid null` (null + `share_code` set ⇒ link-share)
 - `object_type text` — exercise / template / mesocycle
 - `object_id uuid`, `share_code text unique null`, `expires_at null`
+- `payload jsonb null` — **N65 snapshot** of the shared object's structure, built server-side from the owner's own rows when the code is minted (and refreshed when the owner re-mints a still-open code). Written for `mesocycle` shares today; null for other types and for pre-`20260725000001` codes.
 
 **Accepting a share copies the object** into the grantee's account (with `source_*_id` provenance), and recursively copies any custom exercises referenced by a shared template/meso (deduped by `source_exercise_id`). Copy-on-accept keeps RLS simple and avoids cross-user FK tangles.
+
+**A share code carries what was shared, when it was shared (N65).** Redemption copies a mesocycle from the code's `payload` snapshot — days, muscle-group blocks, slot fills with their **flat day-level order**, and the per-week `rir_schedule` — falling back to the owner's live board only for codes minted before snapshots existed. Edits the owner makes after handing the code over no longer change what the grantee receives. The mesocycle row itself and every referenced exercise are still resolved **live** at redemption, because that is where the R1 ownership assertion lives (`20260701000002`): a snapshot can never widen what a copy may touch.
 
 ### Engine & MCP tables
 - `engine_params`: versioned parameter sets — `version int`, `params jsonb`, `is_active bool`, `notes`. Seeded with defaults; new versions are written via the admin-gated **MCP tuning tools** (no admin UI — see 08 §3).

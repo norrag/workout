@@ -485,6 +485,9 @@ interface CopySourceFill {
   slot_number: number | null;
   exercise_id: string;
   initial_sets: number;
+  /** day-level order across groups (`meso_exercises.position`); optional so a
+   *  caller with only group-local data still copies in group-clustered order */
+  position?: number;
 }
 interface CopySourceGroup {
   muscle_group_id: string;
@@ -503,6 +506,10 @@ export interface CopyFillPlan {
   slot_number: number;
   exercise_id: string;
   initial_sets: number;
+  /** N64: the fill's place in the day's flat order (1..n across groups), so a
+   *  copy reproduces the order the source is trained in — not the group-
+   *  clustered order the rows happen to be read in */
+  day_position: number;
 }
 export interface CopyGroupPlan {
   muscle_group_id: string;
@@ -522,28 +529,55 @@ export interface CopyDayPlan {
  * excluded exercises. A dropped fill leaves its slot open (the group's slot
  * count is preserved) so the picker can replace it. Slot numbers fall back to
  * their position when the source left them unset.
+ *
+ * N64: each surviving fill also gets a `day_position` — its rank in the day's
+ * flat order across groups (the same sort the day view and the seed use), so a
+ * copied/duplicated meso opens in the order the source was trained in. Sources
+ * without stored positions fall back to group order, which is what they meant.
  */
 export function planMesoCopy(
   days: CopySourceDay[],
   excluded: Set<string>,
 ): CopyDayPlan[] {
-  return days.map((day) => ({
-    day_number: day.day_number,
-    label: day.label,
-    weekday: day.weekday,
-    groups: day.groups.map((group) => ({
-      muscle_group_id: group.muscle_group_id,
-      position: group.position,
-      exercise_slots: Math.max(group.exercise_slots, group.fills.length),
-      fills: group.fills
-        .filter((f) => !excluded.has(f.exercise_id))
-        .map((f, i) => ({
+  return days.map((day) => {
+    const kept = day.groups.map((group) => ({
+      group,
+      fills: group.fills.filter((f) => !excluded.has(f.exercise_id)),
+    }));
+    // rank every kept fill of the day in flat order first, so the per-group
+    // mapping below can stamp each one with where it sits in the day
+    const dayPosition = new Map<CopySourceFill, number>();
+    kept
+      .flatMap(({ group, fills }, gi) =>
+        fills.map((fill, si) => ({ fill, gi, si, group })),
+      )
+      .sort(
+        (a, b) =>
+          (a.fill.position ?? Number.MAX_SAFE_INTEGER) -
+            (b.fill.position ?? Number.MAX_SAFE_INTEGER) ||
+          a.group.position - b.group.position ||
+          a.gi - b.gi ||
+          (a.fill.slot_number ?? a.si + 1) - (b.fill.slot_number ?? b.si + 1),
+      )
+      .forEach((x, i) => dayPosition.set(x.fill, i + 1));
+
+    return {
+      day_number: day.day_number,
+      label: day.label,
+      weekday: day.weekday,
+      groups: kept.map(({ group, fills }) => ({
+        muscle_group_id: group.muscle_group_id,
+        position: group.position,
+        exercise_slots: Math.max(group.exercise_slots, group.fills.length),
+        fills: fills.map((f, i) => ({
           slot_number: f.slot_number ?? i + 1,
           exercise_id: f.exercise_id,
           initial_sets: f.initial_sets,
+          day_position: dayPosition.get(f) ?? i + 1,
         })),
-    })),
-  }));
+      })),
+    };
+  });
 }
 
 /**
@@ -583,7 +617,6 @@ export async function copyMesoStructure(
       .single();
     if (dayError) throw dayError;
 
-    let dayPos = 0; // day-wide order across groups (#2)
     for (const group of day.groups) {
       const { data: mesoGroup, error: groupError } = await supabase
         .from("meso_day_groups")
@@ -606,7 +639,9 @@ export async function copyMesoStructure(
               day_of_week: null,
               meso_day_group_id: mesoGroup.id,
               slot_number: f.slot_number,
-              position: ++dayPos,
+              // the source's flat day order (#2), not the group-clustered
+              // read order — N64
+              position: f.day_position,
               exercise_id: f.exercise_id,
               initial_weight: null,
               initial_reps: null,
