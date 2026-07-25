@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-25 — Session 91: MEASURE companion app — direction doc (N66, PR #<n>)
+## 2026-07-25 — Session 91: MEASURE companion app — direction doc (N66, PR #210)
 
 Owner opened a new concept: a companion app, **MEASURE**, for everything
 body-measurement — bodyweight tracking with smoothing/rolling windows and
