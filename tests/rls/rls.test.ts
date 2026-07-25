@@ -1920,7 +1920,9 @@ describe("coaching_prompts (doc 19)", () => {
   it("the body length is enforced at the DB as a backstop", async () => {
     const { error } = await service
       .from("coaching_prompts")
-      .insert({ version: 920, body: "x".repeat(12001), is_active: false });
+      // ceiling raised to 24,000 by 20260725000001 (N62) — the owner's prompt
+      // needed room for the doc-19 §12 payload guidance
+      .insert({ version: 920, body: "x".repeat(24001), is_active: false });
     expect(error).not.toBeNull();
     expect(error!.code).toBe("23514"); // check constraint violation
   });

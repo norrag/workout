@@ -285,7 +285,7 @@ function registerTestLlmExplanation(server: McpServer) {
         decision_id: z.string().uuid().optional(),
         store: z.boolean().optional(),
         prompt_version: z.number().int().positive().optional(),
-        prompt_body: z.string().min(50).max(12000).optional(),
+        prompt_body: z.string().min(50).max(24000).optional(),
       },
     },
     async (
@@ -394,7 +394,7 @@ function registerGenerateExplanations(server: McpServer) {
         dry_run: z.boolean().optional(),
         preview: z.boolean().optional(),
         prompt_version: z.number().int().positive().optional(),
-        prompt_body: z.string().min(50).max(12000).optional(),
+        prompt_body: z.string().min(50).max(24000).optional(),
       },
     },
     async (

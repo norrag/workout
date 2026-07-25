@@ -40,10 +40,29 @@ layers around it. All three built; recorded as the doc 19 §12 amendment.
 - **Prompt version:** code fallback bumped to **5** — prod already runs an
   editable DB prompt at v4, so the constant sits above it and a stored row's
   `prompt_version` still names exactly one prompt text.
-- **Owner residual:** the ACTIVE prod prompt (DB v4) predates this payload and
-  describes neither new field. It keeps working; revise it through
-  propose → `generate_explanations preview=true` → activate.
-- Full unit suite green (1387), typecheck + lint clean.
+- **Live prompt revised + activated (§12.4).** Owner asked for the active prompt
+  to be updated rather than left behind, kept as intact as possible. DB **v6** =
+  the v4 text byte-identical, plus two sections (Session Timing, Macrocycle
+  Goal), the new Input field groups, `source_session`/`macro`/`note.session` in
+  the worked examples, and two corrected example values (`exercise_note` →
+  `pinned`, `next_available_increment_too_large` → `below_smallest_jump` — neither
+  was a real payload value). Built by transforming the v4 row IN the database
+  (nine anchored replaces) rather than retyping 11k chars, then verified by
+  reversing every edit and comparing to v4: byte-identical. Activated via the
+  atomic RPC.
+- **Migration `20260725000001`** raises the `coaching_prompts` body ceiling
+  12,000 → 24,000 chars (v6 is 13,107) — **applied to hosted prod via MCP**;
+  zod bounds and the RLS backstop test moved with it.
+- **Live probe** on the Hack Squat peak-week decision (the owner's review case):
+  payload carries `source_session {week_n 3, target_rir 1}` against
+  `week {n 4, target_rir 0}`, note labelled `source_session` with its conditions,
+  `macro` present; the model read the note against its own session and framed the
+  to-failure week. Triggers pain+note+block_intent, post-check ok, nothing stored.
+- **Watch items for the owner:** the imported macro `goal_notes` is the
+  placeholder "Imported from training history." (harmless, unused by the model,
+  but worth replacing with real intent), and v6's size puts a generation at
+  ≈3.6k input tokens (≈$0.0036/call vs doc 18's ≈$0.001 assumption).
+- Full unit suite green (1388), typecheck + lint clean.
 
 ## 2026-07-24 — Session 87: editable LLM coaching prompt via MCP (N61, PR #203)
 

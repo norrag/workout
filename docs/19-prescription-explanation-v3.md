@@ -462,3 +462,28 @@ user. Both admin tools now take an explicit prompt:
   text. A DB prompt authored before a payload amendment keeps working; it just
   won't describe the new fields until it is revised — the contract block is how
   a session sees that.
+
+### 12.4 The live prompt, revised (v6)
+
+The editable prompt in prod (DB **v4**, owner-authored, 10,968 chars) predated
+this payload. It was revised in place rather than rewritten: the v4 text is
+byte-identical in **v6**, plus two new sections (*Session Timing*, *Macrocycle
+Goal*), the two new field groups in its Input list, `source_session` / `macro` /
+`note.session` in its worked examples, and two corrected example values
+(`exercise_note` → `pinned`; `next_available_increment_too_large` →
+`below_smallest_jump`, neither of which is a real payload value). The revision
+was produced by an exact in-database transformation of the v4 row and verified
+by reversing every edit and comparing to v4 — so "keep the owner's prompt
+intact" is a checked property, not a claim. **v6 is active as of 2026-07-24.**
+
+Version numbers are identities, not a ranking: the code fallback constant is 5
+(unused by any DB prompt) so a stored row's `prompt_version` always names
+exactly one prompt text.
+
+The revision needed room: migration `20260725000001` raises the
+`coaching_prompts` body ceiling from 12,000 to 24,000 chars (v6 is 13,107), with
+the server-side zod bound moved to match. The ceiling is a runaway-input
+backstop, not a cost control — a longer prompt still costs input tokens on every
+generation (v6 measures ≈3.6k input tokens per call, ≈$0.0036 at Luna's $1/M,
+against doc 18's ≈$0.001 assumption; the burst-stable prompt is cache-eligible,
+and the trigger gate keeps call volume a minority of decisions).

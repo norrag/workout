@@ -154,7 +154,7 @@ function registerProposeCoachingPrompt(server: McpServer) {
         "payload_contract for the facts fields the current payload carries. " +
         "Version numbers auto-increment above the highest existing version.",
       inputSchema: {
-        body: z.string().min(50).max(12000),
+        body: z.string().min(50).max(24000),
         notes: z.string().max(500).optional(),
       },
     },

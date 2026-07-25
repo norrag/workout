@@ -17,11 +17,12 @@ import type { Trigger } from "./coaching-triggers";
 
 /** Bumped to 5 for the 2026-07-24 payload amendment (§5.2 `source_session` +
  *  §5.3 `macro`); the version stamped on every row generated from the CODE
- *  fallback prompt. It sits ABOVE the first editable DB prompt (v4, authored
- *  under the pre-amendment payload) so a stored row's `prompt_version` always
- *  names exactly one prompt text. Editable DB prompts carry their own version,
- *  floored one above the highest existing version, so they keep clearing the
- *  serving cut below. */
+ *  fallback prompt. Version numbers are identities, not a ranking: 5 is simply
+ *  unused by the editable DB prompts (prod holds v4, the pre-amendment prompt,
+ *  and v6, the same prompt revised for this payload — active since 2026-07-24),
+ *  so a stored row's `prompt_version` always names exactly one prompt text.
+ *  New DB drafts floor one above the highest existing version, so they keep
+ *  clearing the serving cut below. */
 export const COACHING_PROMPT_VERSION = 5;
 
 /** doc 19 §3 serving cut: read surfaces serve a stored row only when its
