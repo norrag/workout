@@ -39,8 +39,9 @@ added) and fixed in the same PR.
   copied correctly — worth stating because it is what the owner's note named
   first; the actual losses were the day-view exercise edits and the live-read
   redemption.
-- Tests +43 (1434 green), lint + typecheck clean. Hosted migration not yet
-  applied (owner-gated, per the usual convention).
+- Tests +43 (1434 green), lint + typecheck clean. **Hosted migration applied**
+  same session, owner-directed (`share_snapshot`, verified via `list_migrations`
+  + `get_advisors` — additive column, nothing new flagged).
 - **Not done this session:** the reconciliation sweep of already-merged `done`
   rows (N56–N63 etc.) — left for a housekeeping pass so this PR stays a bug fix.
 
