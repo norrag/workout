@@ -43,8 +43,10 @@ no prescribed number moved; one additive migration.
   in `sharing.test.ts` (snapshot capture/refresh, redeem-what-was-shared,
   legacy fallback, R1 still refusing a re-pointed share), on a new shared
   table-backed `fake-client.ts`. Lint + typecheck clean.
-- **Deploy note:** `20260725000001` is additive and not yet applied to hosted —
-  codes minted before it lands simply keep the live-read path.
+- **Deploy note:** `20260725000001` **applied + verified on the live project**
+  `juqvbiymmdcggctdqoiq` via MCP (2026-07-25) — additive column, no RLS change,
+  `get_advisors` shows nothing new. Codes minted before it landed simply used
+  the live-read path in the meantime; no backfill needed.
 
 ## 2026-07-24 — N63: deterministic explanation copy system + the three-layer prescription strip (doc 19 §13)
 
