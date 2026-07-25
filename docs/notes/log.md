@@ -4,6 +4,59 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-25 — Session 91: MEASURE companion app — direction doc (N66, PR #<n>)
+
+Owner opened a new concept: a companion app, **MEASURE**, for everything
+body-measurement — bodyweight tracking with smoothing/rolling windows and
+periodic reports, circumferences, DEXA, import/export, and an integrated
+summary — sharing WORKOUT's DB, design system, and MCP connector, with its own
+front end and a cross-linked seam. Asked for the potential, the opportunities,
+and the best architecture, documented as the concept comes into focus. No code.
+
+- **New item N66** (`F`, `needs-input`) + **new workstream Q**; Batch 27
+  verbatim appended. Direction written to
+  [`docs/20-measure-companion-app.md`](../20-measure-companion-app.md) and
+  indexed in the root `CLAUDE.md`.
+- **Roughly half the substrate already exists** — the read was the useful part:
+  `bodyweight_log` (doc 17 §5 / N41), `body_scans` + `external_connections` +
+  `oauth_transactions` + `v_body_comp_history` (doc 15 / N34), and the pure
+  folds in `queries/bodyweight.ts`. The concept is much less "new app" than it
+  looks; it is mostly a front end and an IA for a lobe that already shipped
+  under `/more`.
+- **The topology call (§3) is the doc's load-bearing decision.** Recommended a
+  `(measure)` route group **inside this deployable** with its own layout, tab
+  bar, and web manifest: two installable home-screen PWAs on one origin, so
+  they share the Supabase session cookie (sign in once) and every cross-link is
+  a plain `<Link>` — and `src/lib` is shared with zero refactor. Cost stated
+  plainly: one deploy, one CI, no independent releases. The monorepo (two Vercel
+  projects) is recorded as the end state with explicit tripwires, and an eslint
+  import boundary between the two route groups keeps the promotion mechanical.
+  A separate repo is rejected outright — it would fork the migrations, types,
+  query layer, and design system against principle 5 and the shared-views rule.
+- **Two principles worth carrying beyond this doc.** (1) *Smoothing is
+  read-time, never stored* — no `smoothed_weight` column, so changing a window
+  is instant and doc 14's invalidation problem is avoided by construction
+  rather than solved. (2) The pure `src/lib/measure/` module emits rate as
+  **%/month**, the pacer's own unit (doc 17 §2.4), so measured bodyweight rate
+  compares to a macro contract band with no conversion and no second definition.
+- **Boundary restated as binding:** doc 15 §3.3 — measurement informs targets
+  and verdicts, never prescriptions. MEASURE must not become a back door into
+  the engine; the consented profile proposal stays the only engine-facing path,
+  and `bodyweight` stays on the doc-14 fingerprint denylist.
+- **Import flagged as the sleeper feature** (§4.6): existing scale history is
+  what makes every trend and verdict useful on day one instead of after six
+  months of empty charts.
+- **Phase 0 is a mockup pass and it gates everything** (hard rule 8) —
+  `measure - App Screens.dc.html` with an M-series figure index, so it can't
+  collide with WORKOUT's 1.x–4.x.
+
+### Next session — suggested starting point
+Get the **§13 answers** from the owner (install model · does BodySpec relocate ·
+Navy-method bf% · progress photos · where a weight goal lives · import formats ·
+smoothing defaults · MCP write posture). Decisions 1 and 5 are the two that
+change the shape of the work; the rest can be settled during Phase 0. Then the
+mockup pass — nothing else is buildable before it.
+
 ## 2026-07-25 — Session 90: mesocycle editing + sharing bugs (N64/N65, PR #208)
 
 Owner handed over two field-reported defects: the day view and cycles view can
