@@ -37,6 +37,11 @@ import {
   skipRemainingSets,
   unlogSet,
 } from "@/lib/queries/logging";
+import {
+  syncPlanAddedExercises,
+  syncPlanOrderFromWorkout,
+  syncPlanSubstitution,
+} from "@/lib/queries/plan-order";
 import { getExerciseHistory, type HistoryPage } from "@/lib/queries/history";
 import {
   getPrescriptionAudit,
@@ -595,6 +600,15 @@ export async function replaceExerciseAction(input: {
       current.exercise_id,
       parsed.exercise_id,
     );
+    // N64: "repeat this change on this day in future weeks" is a plan-level
+    // edit — write it to the planner board too, so the cycles view and any
+    // share/copy of the meso carry the substitution.
+    await syncPlanSubstitution(
+      supabase,
+      parsed.workout_id,
+      current.exercise_id,
+      parsed.exercise_id,
+    );
   }
 
   revalidatePath(`/log/${parsed.workout_id}`);
@@ -644,6 +658,15 @@ export async function addWorkoutExercisesAction(input: {
       siblings,
       parsed.exercise_ids,
     );
+    // N64: same intent as the substitution — the addition belongs to the meso,
+    // not just this session, so it joins the planner board (and then takes its
+    // session position in the plan's flat day order).
+    await syncPlanAddedExercises(
+      supabase,
+      parsed.workout_id,
+      parsed.exercise_ids,
+    );
+    await syncPlanOrderFromWorkout(supabase, parsed.workout_id);
   }
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
@@ -708,6 +731,10 @@ async function moveExercise(
   // carry the new order forward to later weeks' same day (incomplete only)
   const siblings = await getFutureSiblingWorkoutIds(supabase, user.id, workoutId);
   await propagateExerciseOrder(supabase, workoutId, siblings);
+  // N64: and into the planner board, so the cycles view (and every copy/share
+  // of this meso) shows the order the lifter actually trains in. A reorder
+  // always carries forward, so it is always a plan-level change.
+  await syncPlanOrderFromWorkout(supabase, workoutId);
 
   revalidatePath(`/log/${workoutId}`);
   revalidatePath("/workout");

@@ -2,7 +2,51 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-24 (latest) — N63: deterministic explanation copy system + the three-layer prescription strip (doc 19 §13)
+## 2026-07-25 (latest) — N64/N65: one exercise order across both surfaces + share codes that capture what was shared
+
+Two field-reported defects in editing and sharing a mesocycle. No engine change,
+no prescribed number moved; one additive migration.
+
+- **N64 — the day view and the cycles view could disagree on exercise order.**
+  The order lives in two places (`workout_exercises.position` for the session,
+  `meso_exercises.position` for the plan) and each edit path wrote only one of
+  them: `regenerateOpenWorkouts` merged a plan edit *structurally* (surviving
+  rows kept their old position, new ones appended), so a planner-board or MCP
+  `reorder_day` never reached an already-generated week; and the day view's
+  move-up/down wrote the session only, so the cycles view — and every copy or
+  share, which read the plan — never saw it. New leaf module
+  `src/lib/queries/plan-order.ts` is now the single definition and syncs both
+  directions (see doc 03 → `workout_exercises` → "One exercise order, two
+  surfaces"). A day-view replace/add carries into the plan **only** with
+  *"repeat this change on this day in future weeks"* ticked — the same intent
+  that already propagates it to later weeks; a session-only edit stays
+  session-only, and a completed meso's plan is never rewritten.
+- **N64 (second half) — copying a meso flattened its order.** `planMesoCopy`
+  renumbered fills group-by-group, so duplicating a meso whose day interleaves
+  muscle groups reset it to group-clustered order. Fills now carry a
+  `day_position` taken from the source's flat order (falling back to group order
+  when the source stored none).
+- **N65 — a share code now snapshots the mesocycle.** Redemption read the
+  owner's **live** planner board, so what the grantee received was whatever the
+  owner's meso happened to hold when the code was typed — and, combined with
+  N64, day-view-originated edits were never in the plan to be read at all.
+  Migration `20260725000001_share_snapshot` adds `shares.payload jsonb`;
+  `createShareCode` builds it server-side from the owner's own rows (re-minting
+  an open code refreshes it, so "edit, then share again" hands over the current
+  state), and redemption copies from it — with the live read kept as the
+  fallback for pre-snapshot codes. The copy also carries `rir_schedule`, which
+  it had been silently dropping. **R1 unchanged:** the mesocycle row and every
+  referenced exercise are still resolved live and ownership-asserted, so a
+  snapshot can never widen what a copy may touch.
+- **Tests:** +43 (1434 total) — `plan-order.test.ts` (both sync directions, the
+  logged-history and ceiling guards, the completed-meso no-op) and the N65 block
+  in `sharing.test.ts` (snapshot capture/refresh, redeem-what-was-shared,
+  legacy fallback, R1 still refusing a re-pointed share), on a new shared
+  table-backed `fake-client.ts`. Lint + typecheck clean.
+- **Deploy note:** `20260725000001` is additive and not yet applied to hosted —
+  codes minted before it lands simply keep the live-read path.
+
+## 2026-07-24 — N63: deterministic explanation copy system + the three-layer prescription strip (doc 19 §13)
 
 Owner-directed copy + presentation rework of the prescription quick-read: the
 deterministic explanation now speaks in the same voice as the coaching layer,

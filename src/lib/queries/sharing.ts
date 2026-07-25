@@ -1,10 +1,157 @@
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
 
 export type ShareObjectType = "exercise" | "template" | "mesocycle";
+
+// ---------------------------------------------------------------------------
+// N65 — the share snapshot. A code has to hand over the mesocycle as it stood
+// when it was shared: the redemption used to read the owner's LIVE plan, so any
+// edit the owner made afterwards (or a plan the owner had since rebuilt) is
+// what the grantee actually received. `createShareCode` now captures the
+// structure server-side into `shares.payload`, and the redemption copies from
+// that snapshot. Codes minted before this shipped carry no payload and fall
+// back to the live read, so nothing outstanding breaks.
+//
+// Exercise references stay ids: they are resolved (and ownership-asserted, R1)
+// live at redemption, so a snapshot can never widen what a copy may touch.
+// ---------------------------------------------------------------------------
+
+const mesoSnapshotSchema = z.object({
+  version: z.literal(1),
+  type: z.literal("mesocycle"),
+  meso: z.object({
+    name: z.string(),
+    weeks: z.number().int(),
+    days_per_week: z.number().int(),
+    includes_deload: z.boolean(),
+    rir_start: z.number().int(),
+    rir_end: z.number().int(),
+    rir_schedule: z.array(z.number().int()).nullable(),
+  }),
+  days: z.array(
+    z.object({
+      day_number: z.number().int(),
+      label: z.string().nullable(),
+      weekday: z.number().int().nullable(),
+      groups: z.array(
+        z.object({
+          muscle_group_id: z.string().uuid(),
+          position: z.number().int(),
+          exercise_slots: z.number().int(),
+          fills: z.array(
+            z.object({
+              slot_number: z.number().int().nullable(),
+              position: z.number().int(),
+              exercise_id: z.string().uuid(),
+              initial_sets: z.number().int(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  ),
+});
+
+export type MesoShareSnapshot = z.infer<typeof mesoSnapshotSchema>;
+
+/** Parse a stored `shares.payload` as a mesocycle snapshot; null when absent or
+ *  not the shape this version writes (⇒ the live-read fallback). */
+export function parseMesoSnapshot(payload: unknown): MesoShareSnapshot | null {
+  const parsed = mesoSnapshotSchema.safeParse(payload);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Build the snapshot for a mesocycle the caller owns, from the planner board —
+ * the same tables the cycles view renders, so what is captured is exactly what
+ * the owner sees. Reads run on the owner's client (RLS-scoped); returns null
+ * when the meso isn't readable, which leaves the code on the live-read path.
+ */
+export async function buildMesoSnapshot(
+  supabase: Client,
+  mesoId: string,
+): Promise<MesoShareSnapshot | null> {
+  const { data: meso, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select(
+      "id, name, weeks, days_per_week, includes_deload, rir_start, rir_end, rir_schedule",
+    )
+    .eq("id", mesoId)
+    .maybeSingle();
+  if (mesoError) throw mesoError;
+  if (!meso) return null;
+
+  const { data: days, error: dayError } = await supabase
+    .from("meso_days")
+    .select("id, day_number, label, weekday")
+    .eq("mesocycle_id", mesoId)
+    .order("day_number");
+  if (dayError) throw dayError;
+
+  const dayIds = (days ?? []).map((d) => d.id);
+  let groups: {
+    id: string;
+    meso_day_id: string;
+    muscle_group_id: string;
+    position: number;
+    exercise_slots: number;
+  }[] = [];
+  if (dayIds.length > 0) {
+    const { data, error } = await supabase
+      .from("meso_day_groups")
+      .select("id, meso_day_id, muscle_group_id, position, exercise_slots")
+      .in("meso_day_id", dayIds)
+      .order("position");
+    if (error) throw error;
+    groups = data ?? [];
+  }
+
+  const { data: fills, error: fillError } = await supabase
+    .from("meso_exercises")
+    .select("meso_day_group_id, slot_number, position, exercise_id, initial_sets")
+    .eq("mesocycle_id", mesoId)
+    .order("position")
+    .order("slot_number");
+  if (fillError) throw fillError;
+
+  return {
+    version: 1,
+    type: "mesocycle",
+    meso: {
+      name: meso.name,
+      weeks: meso.weeks,
+      days_per_week: meso.days_per_week,
+      includes_deload: meso.includes_deload,
+      rir_start: meso.rir_start,
+      rir_end: meso.rir_end,
+      rir_schedule: meso.rir_schedule,
+    },
+    days: (days ?? []).map((day) => ({
+      day_number: day.day_number,
+      label: day.label,
+      weekday: day.weekday,
+      groups: groups
+        .filter((g) => g.meso_day_id === day.id)
+        .map((g) => ({
+          muscle_group_id: g.muscle_group_id,
+          position: g.position,
+          exercise_slots: g.exercise_slots,
+          fills: (fills ?? [])
+            .filter((f) => f.meso_day_group_id === g.id)
+            .map((f) => ({
+              slot_number: f.slot_number,
+              position: f.position,
+              exercise_id: f.exercise_id,
+              initial_sets: f.initial_sets,
+            })),
+        })),
+    })),
+  };
+}
 
 // no 0/O/1/I — codes get typed from a phone in a gym
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -23,6 +170,12 @@ export function newShareCode(): string {
 /**
  * Mint (or re-surface) a share code for an object the user owns. One open
  * code per object — sharing twice hands out the same code until it's used.
+ *
+ * N65: minting also captures the object's structure into `shares.payload`, so
+ * the grantee receives what was on screen when the code was handed over.
+ * Re-surfacing an open code **refreshes** that snapshot: "edit, then share
+ * again" is the owner saying share *this* — the code stays the same, what it
+ * carries is brought up to date.
  */
 export async function createShareCode(
   supabase: Client,
@@ -45,6 +198,13 @@ export async function createShareCode(
   if (!owned || owned.user_id !== userId)
     return { code: null, error: "Only your own items can be shared." };
 
+  // built from the owner's own rows (never from caller input), so the snapshot
+  // can only ever describe something they already own
+  const payload =
+    objectType === "mesocycle"
+      ? await buildMesoSnapshot(supabase, objectId)
+      : null;
+
   const { data: existing, error: existingError } = await supabase
     .from("shares")
     .select("*")
@@ -56,7 +216,17 @@ export async function createShareCode(
     .limit(1)
     .maybeSingle();
   if (existingError) throw existingError;
-  if (existing?.share_code) return { code: existing.share_code, error: null };
+  if (existing?.share_code) {
+    if (payload) {
+      const { error: refreshError } = await supabase
+        .from("shares")
+        .update({ payload })
+        .eq("id", existing.id)
+        .eq("owner_id", userId);
+      if (refreshError) throw refreshError;
+    }
+    return { code: existing.share_code, error: null };
+  }
 
   const code = newShareCode();
   const { error: insertError } = await supabase.from("shares").insert({
@@ -67,6 +237,7 @@ export async function createShareCode(
     share_code: code,
     expires_at: null,
     accepted_at: null,
+    payload,
   });
   if (insertError) throw insertError;
   return { code, error: null };
@@ -144,6 +315,7 @@ export async function acceptShareCode(
       granteeId,
       share.owner_id,
       share.object_id,
+      parseMesoSnapshot(share.payload),
     );
     if (!copied) return fail("The shared mesocycle no longer exists.");
     objectId = copied.id;
@@ -349,16 +521,13 @@ async function copyTemplate(
 }
 
 /**
- * A shared meso copies as a *planned, standalone* meso: the structure
- * (days, groups, slot fills) carries over; the owner's loads don't — the
- * engine seeds the grantee's numbers at start.
+ * Read the owner's live planner board into snapshot shape — the fallback for a
+ * code minted before `shares.payload` existed (N65).
  */
-async function copyMesocycle(
+async function liveMesoSnapshot(
   service: Client,
-  granteeId: string,
-  ownerId: string,
   mesoId: string,
-): Promise<{ id: string; name: string } | null> {
+): Promise<MesoShareSnapshot | null> {
   const { data: source, error } = await service
     .from("mesocycles")
     .select("*")
@@ -366,8 +535,101 @@ async function copyMesocycle(
     .maybeSingle();
   if (error) throw error;
   if (!source) return null;
+
+  const { data: days, error: dayError } = await service
+    .from("meso_days")
+    .select("*")
+    .eq("mesocycle_id", mesoId)
+    .order("day_number");
+  if (dayError) throw dayError;
+
+  const snapshot: MesoShareSnapshot = {
+    version: 1,
+    type: "mesocycle",
+    meso: {
+      name: source.name,
+      weeks: source.weeks,
+      days_per_week: source.days_per_week,
+      includes_deload: source.includes_deload,
+      rir_start: source.rir_start,
+      rir_end: source.rir_end,
+      rir_schedule: source.rir_schedule,
+    },
+    days: [],
+  };
+
+  for (const day of days ?? []) {
+    const { data: groups, error: groupError } = await service
+      .from("meso_day_groups")
+      .select("*")
+      .eq("meso_day_id", day.id)
+      .order("position");
+    if (groupError) throw groupError;
+
+    const groupSnapshots: MesoShareSnapshot["days"][number]["groups"] = [];
+    for (const group of groups ?? []) {
+      const { data: fills, error: fillError } = await service
+        .from("meso_exercises")
+        .select("*")
+        .eq("meso_day_group_id", group.id)
+        .order("position")
+        .order("slot_number");
+      if (fillError) throw fillError;
+      groupSnapshots.push({
+        muscle_group_id: group.muscle_group_id,
+        position: group.position,
+        exercise_slots: group.exercise_slots,
+        fills: (fills ?? []).map((f) => ({
+          slot_number: f.slot_number,
+          position: f.position,
+          exercise_id: f.exercise_id,
+          initial_sets: f.initial_sets,
+        })),
+      });
+    }
+    snapshot.days.push({
+      day_number: day.day_number,
+      label: day.label,
+      weekday: day.weekday,
+      groups: groupSnapshots,
+    });
+  }
+  return snapshot;
+}
+
+/**
+ * A shared meso copies as a *planned, standalone* meso: the structure
+ * (days, groups, slot fills — including the day-level exercise order and the
+ * per-week RIR schedule) carries over; the owner's loads don't — the engine
+ * seeds the grantee's numbers at start.
+ *
+ * N65: the structure comes from the code's snapshot (what the owner shared),
+ * falling back to the owner's live board for codes minted before snapshots
+ * existed. Either way the mesocycle row itself is still read live, because that
+ * is where the R1 ownership assertion lives: a share whose `object_id` was
+ * re-pointed at a third user's meso copies nothing, snapshot or not. Referenced
+ * exercises are likewise resolved live through `copyExercise`, which re-asserts
+ * ownership per exercise — a snapshot can never widen what a copy may touch.
+ */
+async function copyMesocycle(
+  service: Client,
+  granteeId: string,
+  ownerId: string,
+  mesoId: string,
+  snapshot: MesoShareSnapshot | null,
+): Promise<{ id: string; name: string } | null> {
+  const { data: source, error } = await service
+    .from("mesocycles")
+    .select("id, user_id")
+    .eq("id", mesoId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!source) return null;
   // R1: only the owner's own mesocycle may be copied.
   if (source.user_id !== ownerId) return null;
+
+  const plan = snapshot ?? (await liveMesoSnapshot(service, mesoId));
+  if (!plan) return null;
 
   const { data: copy, error: copyError } = await service
     .from("mesocycles")
@@ -376,12 +638,14 @@ async function copyMesocycle(
       macrocycle_id: null,
       position: null,
       phase: null,
-      name: source.name,
-      weeks: source.weeks,
-      days_per_week: source.days_per_week,
-      includes_deload: source.includes_deload,
-      rir_start: source.rir_start,
-      rir_end: source.rir_end,
+      name: plan.meso.name,
+      weeks: plan.meso.weeks,
+      days_per_week: plan.meso.days_per_week,
+      includes_deload: plan.meso.includes_deload,
+      rir_start: plan.meso.rir_start,
+      rir_end: plan.meso.rir_end,
+      // N18-B: an edited per-week RIR schedule is part of what was shared
+      rir_schedule: plan.meso.rir_schedule,
       status: "planned",
       template_id: null,
       start_date: null,
@@ -390,14 +654,7 @@ async function copyMesocycle(
     .single();
   if (copyError) throw copyError;
 
-  const { data: days, error: dayError } = await service
-    .from("meso_days")
-    .select("*")
-    .eq("mesocycle_id", source.id)
-    .order("day_number");
-  if (dayError) throw dayError;
-
-  for (const day of days ?? []) {
+  for (const day of plan.days) {
     const { data: dayCopy, error: dayCopyError } = await service
       .from("meso_days")
       .insert({
@@ -411,14 +668,7 @@ async function copyMesocycle(
       .single();
     if (dayCopyError) throw dayCopyError;
 
-    const { data: groups, error: groupError } = await service
-      .from("meso_day_groups")
-      .select("*")
-      .eq("meso_day_id", day.id)
-      .order("position");
-    if (groupError) throw groupError;
-
-    for (const group of groups ?? []) {
+    for (const group of day.groups) {
       const { data: groupCopy, error: groupCopyError } = await service
         .from("meso_day_groups")
         .insert({
@@ -431,14 +681,7 @@ async function copyMesocycle(
         .single();
       if (groupCopyError) throw groupCopyError;
 
-      const { data: fills, error: fillError } = await service
-        .from("meso_exercises")
-        .select("*")
-        .eq("meso_day_group_id", group.id)
-        .order("slot_number");
-      if (fillError) throw fillError;
-
-      for (const fill of fills ?? []) {
+      for (const fill of group.fills) {
         const exercise = await copyExercise(
           service,
           granteeId,
@@ -453,6 +696,7 @@ async function copyMesocycle(
             day_of_week: null,
             meso_day_group_id: groupCopy.id,
             slot_number: fill.slot_number,
+            // the day-level order (across groups) the owner shared
             position: fill.position,
             exercise_id: exercise.id,
             initial_weight: null,

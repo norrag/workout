@@ -28,6 +28,7 @@ import {
   paramsTokenFor,
 } from "./fingerprint";
 import { getExerciseParamOverrides } from "./exercise-overrides";
+import { applyPlanOrderToWorkout, planDayExerciseOrder } from "./plan-order";
 import { engineGoal, type EngineGoal } from "./engine-goal";
 import {
   recordSeedDecisions,
@@ -892,6 +893,19 @@ export async function regenerateOpenWorkouts(
         { workoutId: existing.id, microcycleId: micro.id, mesocycleId: mesoId },
         params,
         paramsVersion,
+      );
+
+      // N64: the merge above preserves each surviving row's position and appends
+      // new ones at the end, so a plan-side REORDER (planner board or MCP
+      // `reorder_day`) — and a swap, which lands as a remove + append — would
+      // leave the day view in the old order while the cycles view showed the new
+      // one. Renumber the whole day to the plan's flat order: one order, both
+      // surfaces. Rows kept only because they carry logged sets hold their
+      // relative order at the end.
+      await applyPlanOrderToWorkout(
+        supabase,
+        existing.id,
+        planDayExerciseOrder(day.groups),
       );
     }
   }

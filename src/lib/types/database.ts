@@ -45,7 +45,10 @@ type Defaulted =
   | "body_fat_source"
   // N60 / doc 19 §6.3: nullable triggers audit on decision_explanations — set
   // only by the v3 generation hook, optional on insert (null on pre-v3 rows)
-  | "triggers";
+  | "triggers"
+  // N65: nullable share snapshot — written by the mint path only (null on
+  // pre-20260725 codes, which redeem from the owner's live rows)
+  | "payload";
 type InsertOf<R> = Omit<R, Defaulted> &
   Partial<Pick<R, Extract<Defaulted, keyof R>>>;
 type Table<R> = {
@@ -451,6 +454,9 @@ export type ShareRow = {
   share_code: string | null;
   expires_at: string | null;
   accepted_at: string | null;
+  /** N65: server-built structure snapshot taken when the code was minted; null
+   *  for pre-20260725 codes, which redeem from the owner's live rows */
+  payload: unknown | null;
   created_at: string;
   updated_at: string;
 }

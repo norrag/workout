@@ -16,6 +16,7 @@ import { getActiveEngineParams } from "./generation";
 import { getExerciseE1rmAnchors } from "./anchors";
 import { getMuscleGroupsCached } from "./reference";
 import { computeSlotPrescriptions } from "./slot-prescription";
+import { reorderToMatch } from "./plan-order";
 import { recordSeedDecisions, type SeededDecision } from "./seed-decisions";
 import {
   isTerminalMacroStatus,
@@ -29,6 +30,9 @@ type Client = SupabaseClient<Database>;
 // (so `generation.ts`'s seed can use it without a generation ↔ logging cycle);
 // re-exported here for the existing importers.
 export { getExerciseE1rmAnchors } from "./anchors";
+// `reorderToMatch` moved to the leaf `plan-order.ts` for the same reason (both
+// directions of the plan ⇄ session order sync share it); re-exported here.
+export { reorderToMatch };
 
 // ---------------------------------------------------------------------------
 // day view detail (fig 1.1) — everything the logger needs in one shape
@@ -952,26 +956,6 @@ export async function getFutureSiblingWorkoutIds(
     .in("status", ["planned", "in_progress"]);
   if (wsErr) throw wsErr;
   return (workouts ?? []).map((w) => w.id);
-}
-
-/** Pure: order a target list to match a source exercise order (by exercise_id).
- *  Targets not present in the source keep their relative order at the end. */
-export function reorderToMatch<T extends { exercise_id: string }>(
-  targets: T[],
-  sourceExerciseOrder: string[],
-): T[] {
-  const order = new Map<string, number>();
-  sourceExerciseOrder.forEach((id, i) => {
-    if (!order.has(id)) order.set(id, i);
-  });
-  return targets
-    .map((t, idx) => ({
-      t,
-      key: order.get(t.exercise_id) ?? Number.MAX_SAFE_INTEGER,
-      idx,
-    }))
-    .sort((a, b) => a.key - b.key || a.idx - b.idx)
-    .map((x) => x.t);
 }
 
 /** Reorder each target workout's exercises to match the source order (by
