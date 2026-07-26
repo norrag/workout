@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-26 — Session 92: coach-authored prescription overrides — review (N67, PR #<n>)
+## 2026-07-26 — Session 92: coach-authored prescription overrides — review (N67, PR #211)
 
 Owner proposed an MCP path letting the LLM coach override or author
 prescriptions (exercise / day / week: exercise, weight, reps, sets + reason,
