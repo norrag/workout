@@ -4,6 +4,51 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-26 — Session 92: coach-authored prescription overrides — review (N67, PR #<n>)
+
+Owner proposed an MCP path letting the LLM coach override or author
+prescriptions (exercise / day / week: exercise, weight, reps, sets + reason,
+duration, return criteria), prompted by a live lumbar-nerve episode where a
+coach-agreed rehab plan had nowhere to live. Asked for questions and concerns in
+a review doc before implementing. No code.
+
+- **New item N67** (`F`, HIGH, workstream P, `needs-input`); Batch 28 verbatim
+  appended. Review:
+  [`docs/reviews/2026-07-26-coach-override-prescriptions.md`](../reviews/2026-07-26-coach-override-prescriptions.md).
+- **The load-bearing correction (§2):** the owner's premise that overrides can
+  stay *separate* from the engine isn't available. The engine anchors on what
+  was **performed**, not on what was prescribed, so five couplings carry rehab
+  work into engine state regardless of where an override is stored — the
+  `session_best` anchor argmax (crossover at `30·log₂(1/r)` days: a 1-week −20 %
+  block is *invisible*, a 2-week+ block ratchets the anchor down), `baseWeight =
+  perf.bestWeight` (`engine/index.ts:332`), the pain/dampener clamp pinning next
+  week to the rehab load (`:434/:498/:513` — and rehab weeks are exactly when
+  pain gets reported), `climb_on_performed_reps` restarting the climb off
+  performed reps (`:386`), and the earn gate + miss throttle both tripping while
+  labelling perfect compliance a miss. Recommendation (§13 Q4): override
+  sessions neither earn nor count as missed (the deload treatment), anchor left
+  untouched, and the **coach prescribes the return ramp** — which is the asked-for
+  capability anyway.
+- **Architecture (§3):** a display-only override layer is rejected — every
+  volume view sums `workout_exercises.prescribed_sets` directly, so the plan
+  would desync from what the athlete is told to do (the N33 lesson). Recommended:
+  a **time-boxed constraint override** resolved into config inputs / effective
+  params (doc 14 §7 contract ⇒ fingerprint invalidation for free, engine stays
+  the only author of numbers), plus a labeled absolute pin for substitution.
+  `engine_decisions` already holds the counterfactual, so no "before" column.
+- **Traps found (§4):** `mesoStaleSignature` has **no clock**, so an override
+  that expires by date alone would never bust the reconcile's cheap gate and
+  would apply forever (`queries/regeneration.ts:600-632/:778`); and
+  `LOOKBACK_WEEKS = 2` means a 3-week rehab substitution brings the original
+  exercise back **priced off its pre-injury peak** — the worst direction after an
+  injury.
+- Also flagged: there is no separate coach principal (MCP-only is friction, not
+  security ⇒ an in-app view/clear escape hatch is mandatory), the pain-gate
+  double-cut, the hard-rule-8 design pass (no mockup figure; doc-16 Phase-3
+  marker precedent), and the stats-comparability disclosure. Eight owner
+  decisions in review §13; N39 (per-exercise progression-off override) is a
+  subset of this item.
+
 ## 2026-07-25 — Session 91: MEASURE companion app — direction doc (N66, PR #210)
 
 Owner opened a new concept: a companion app, **MEASURE**, for everything

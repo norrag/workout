@@ -66,6 +66,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N64 | **Day view and cycles view can disagree on exercise order** (owner, 2026-07-25, Batch 26, HIGH). Confirmed both directions: the order lives in `workout_exercises.position` (day view) and `meso_exercises.position` (planner board — what the cycles view, and every copy/share, reads), and each edit path wrote only one. (1) `regenerateOpenWorkouts` merges a plan edit **structurally** — surviving rows keep their old position, new ones append after the max — so a planner-board reorder or MCP `edit_mesocycle` `reorder_day`/`swap_exercise` never reached an already-generated week; (2) the day view's move-up/down (`moveExercise` → `propagateExerciseOrder`) wrote the session and its later-week siblings only, so the plan — and therefore the cycles view and every share/copy — kept the original order forever. Also found: `planMesoCopy` renumbered a copied meso's fills group-by-group (`++dayPos`), flattening any interleaved day order on duplicate/copy-from-meso. **Fixed:** new leaf `src/lib/queries/plan-order.ts` as the single definition, synced both ways — `applyPlanOrderToWorkout` after the plan-edit merge; `syncPlanOrderFromWorkout` after a day-view reorder (which always carries forward, so it is always plan-level); `syncPlanSubstitution`/`syncPlanAddedExercises` when the day-view replace/add has *"repeat this change on this day in future weeks"* ticked. Session-only edits stay session-only; a completed meso's plan is never rewritten. `planMesoCopy` fills now carry a `day_position` from the source's flat order. Doc 03 records the invariant; +43 tests | B | HIGH | — | **done (PR #208)** |
 | N65 | **A shared meso doesn't carry the edits made before sharing** (owner, 2026-07-25, Batch 26, HIGH; relates N64). Root cause is two-part: redemption copied the owner's **live** planner board at the moment the code was typed (so any edit after minting silently changed what the grantee got, and nothing recorded what was actually shared), and — via N64 — day-view-originated edits were never in the plan to be read at all. The copy also silently dropped the meso's per-week `rir_schedule` (N18-B). **Fixed:** migration `20260725000001_share_snapshot` adds `shares.payload jsonb`; `createShareCode` builds the snapshot server-side from the owner's own rows and **refreshes it when the owner re-mints a still-open code** ("edit, then share again" hands over the current state); redemption copies from the snapshot, keeping the live read as the fallback for pre-snapshot codes, and now carries `rir_schedule`. R1 (`20260701000002`) is untouched — the mesocycle row and every referenced exercise are still resolved live and ownership-asserted, so a snapshot can never widen what a copy may touch. Snapshots are written for `mesocycle` shares only; exercise/template shares keep the live-copy path (no reported issue) | B | HIGH | — | **done (PR #208)** — hosted migration applied + verified 2026-07-25 |
 | N66 | **MEASURE — a companion measurement app** (owner, 2026-07-25, Batch 27). Body weight tracking (logging, logbook with rolling averages + change rates, weekly/monthly/yearly reports, smoothing-method and window settings), physical circumferences, DEXA, import/export, and an integrated summary — sharing WORKOUT's DB, design system, and MCP connector, with its own front end, and cross-linking with WORKOUT so each app does what it's best at. **Direction doc landed:** [`docs/20-measure-companion-app.md`](../20-measure-companion-app.md) — division of labour by fact ownership (§1), 6 binding principles (§2, incl. *smoothing is read-time, never stored* and doc 15 §3.3's engine boundary restated), the topology decision (§3: a `(measure)` route group + its own manifest inside this deployable — two home-screen PWAs, one origin, one session cookie, zero `src/lib` refactor; monorepo recorded as the tripwired end state), schema direction (§4: reuse `bodyweight_log`/`body_scans`/`v_body_comp_history`; four `bodyweight_log` amendments + `v_bodyweight_series`; new `measurement_sites`/`_sessions`/`measurements` on the stock-plus-custom `exercises` pattern; import as the sleeper feature), the pure `src/lib/measure/` module emitting %/mo to match the pacer (§5), screens + M-series figure index (§6), the seam (§7), one MCP connector (§8), guardrails (§9), 7 ranked opportunities (§10), out-of-scope (§11), 8 phases with **Phase 0 = mockup pass gating everything** (§12). Builds on N34 (BodySpec), N41 (bodyweight series), N52 (the bf%→pacing chain). **Blocked on the §13 owner decisions** — install model, whether BodySpec relocates, Navy-method bf%, progress photos, where a weight goal lives, import formats, smoothing defaults, MCP write posture | F | — | Q | **needs-input** — direction doc in PR #210; §13 decisions before Phase 0 |
+| N67 | **Coach-authored prescription overrides via MCP** (owner, 2026-07-26, Batch 28). An MCP path letting the LLM coach override/author prescriptions for an exercise, day, or week — full tuple (exercise, weight, reps, sets) + reason, duration, return criteria — clearly labeled coach-authored, fully audited, with a defined engine relationship. Motivating case: lumbar nerve symptoms after hard deadlift work; coach and owner agreed a temporary plan (stop deadlifts, cut related workload, substitute safer movements) and there is no way to write it down. Owner's proposal: overrides stay *separate* from the engine, which keeps evaluating against its own prescription so rehab work reads as a miss and the engine holds a conservative view. **Review shipped:** [`docs/reviews/2026-07-26-coach-override-prescriptions.md`](../reviews/2026-07-26-coach-override-prescriptions.md) — (1) that premise does not hold: five couplings carry override work into engine state regardless of storage (anchor argmax crossover at `30·log₂(1/r)` days ⇒ a 1-week −20 % block is invisible, a 2-week+ block ratchets the anchor down; `baseWeight = perf.bestWeight` `engine/index.ts:332`; the pain/dampener clamp pins next week at the rehab load `:434/:498/:513`; `climb_on_performed_reps` restarts the climb off performed reps `:386`; earn gate + miss throttle both trip and mislabel compliance as a miss) — so the real question is which couplings to neutralize (review §13 Q4, recommends: override sessions neither earn nor count as missed, anchor untouched, coach prescribes the return ramp); (2) a display-only override layer is rejected — every volume view sums `workout_exercises.prescribed_sets` directly, so the plan would desync (the N33 lesson); recommended architecture is a **time-boxed constraint override resolved into config inputs / effective params** (doc 14 §7 contract ⇒ fingerprint invalidation for free, engine stays the only author of numbers) plus a labeled absolute pin for substitution; (3) six mechanical traps incl. `mesoStaleSignature` having **no clock** (a clock-expiring override never busts the reconcile's cheap gate, `queries/regeneration.ts:600-632/:778`) and the `LOOKBACK_WEEKS = 2` cliff (a 3-week rehab substitution brings the original back priced off its **pre-injury peak**); (4) no separate coach principal exists — MCP-only is a friction boundary, not a security one, so an in-app view/clear escape hatch is mandatory; (5) hard-rule-8 design pass needed (no mockup figure; the doc-16 Phase-3 marker precedent applies). Eight owner decisions in the review §13. Relates: **N39** (per-exercise progression-off override — a subset of this), N33 (slot writes through the engine), doc 14 §7, doc 16 §3.4, doc 19 (explanation must state coach authorship) | F | HIGH | P | **needs-input** — review doc shipped (PR #<n>); blocked on the §13 Q1–Q8 decisions, then a spec (doc 21) before any build |
 | N53 | No launch splash any more — long black screens; "invest the time to get this right" (owner, Batch 17, HIGH; addendum-2 correction: the dark splash used to display legibly and no longer does — a regression, not a legibility question). Diagnosis sharpened on the build pass: the remembered "splash" is the in-document `Splash` (logotype+dots); the startup PNGs were **solid** background — in dark appearance perceptually identical to the OS-default black — and the `Splash` window is a single warm auth RTT (a blink), while the LONG window is pre-document: middleware blocked every first byte on a network `auth.getUser()`. The 7/2 forced re-add (PR #109 scope fix) sits on the regression boundary as the likely startup-image reset (iOS re-resolves them at add time — how #90 shipped inert, `b0faa88`). **Shipped:** launch PNGs now carry the full `Splash` composition in both themes (`gen-ios-splash.mjs` renders the app woff2 via wawoff2+opentype.js→sharp) so the earliest paintable frame IS the branded splash; middleware `getUser()`→`getSession()` (cookie-parse, on-demand refresh; presence-only routing — verified auth + RLS unchanged in layouts/pages) takes the Supabase RTT out of every first byte; `getRequestAuth` (React `cache()`) collapses layout+page auth to one RTT behind the splash; `LaunchScreenAudit` reports class-miss devices via the R20 funnel; `launch-screens.test.ts` pins dims + brand-bg + ink-in-center per class×theme (79 tests). **Residual (owner):** remove + re-add the PWA once after deploy (startup images bind at add time; manual-operations.md); if black persists after that on 26.5.1, the audit + short TTFB isolate it to an Apple-side startup-image bug — report back and we escalate to a loud-PNG device test. Relates N1/WS-J (total load time: the page-data phase is untouched) | B | HIGH | J | **done (PR #187)** — resolution in [`scoping.md`](./scoping.md#n53--no-launch-splash-long-black-screens--bux--high--medium) |
 
 > **N36–N39** are the doc-16 §11 deferred spine, filed 2026-07-09 during Phase R
@@ -1299,3 +1300,83 @@ the fold. → N56.)*
 > *[→ N66; direction doc `docs/20-measure-companion-app.md`, new workstream Q.
 > Eight owner decisions collected in its §13 — the item is `needs-input` until
 > those land, and Phase 0 (mockup pass) gates all build work per hard rule 8.]*
+
+### Batch 28 — coach-authored prescription overrides (2026-07-26, session task)
+
+> "Here is a tool idea that needs careful consideration but could provide
+> significant value: an MCP path that allows the coach to manually override or
+> create prescriptions for individual exercises, training days, or weeks. This
+> would include setting exercises, weights, reps, and sets, along with a
+> documented reason, note, and any other relevant context.
+>
+> The use case became clear while I was dealing with pain that may require a
+> temporary rehabilitation period. I am currently experiencing lumbar nerve
+> symptoms, possibly related to recent hard deadlift work. In discussion with my
+> LLM coach through MCP, the recommendation was to modify my workload for the
+> next week or so by temporarily stopping deadlifts, reducing the workload of
+> related exercises, and substituting safer alternatives. After discussing and
+> accepting this plan, it would naturally be useful to allow the coach to make
+> these changes so they could be followed precisely, but no such tools are
+> available
+>
+> Any implementation would need to ensure that coach-created or overridden
+> prescriptions are clearly identified as such. The prescribed values, reasoning,
+> duration, author, and subsequent changes should all be retained for
+> auditability. We would also need a clear definition of how these prescriptions
+> interact with the underlying progression engine.
+>
+> Thinking through the current behavior, the engine already handles misses and
+> underperformance reasonably well. In this situation, I could ignore the normal
+> prescription and perform a lighter weight or lower-rep variation manually. The
+> engine would record the difference as a substantial miss, hold progression, and
+> potentially reduce the weight anchor based on the apparent underperformance.
+> This would move the exercise backward temporarily and require additional time
+> to ramp up again, which is generally appropriate following pain or injury.
+>
+> The missing piece is that I currently have to improvise the temporary weight,
+> rep, set, and exercise changes myself. There is no structured way to prescribe
+> something specific, such as a 20% reduction in load, a targeted reduction in
+> volume, or a temporary substitution for one week. This is an area where current
+> LLM capabilities could be useful. The coach could provide measured, organized
+> rehabilitation-oriented modifications based on a broader base of knowledge than
+> the user may have, rather than leaving the user to adjust the program without
+> much direction.
+>
+> My current thought is that a coach override could:
+>
+> * Temporarily modify an exercise, day, or week without changing the remainder
+> of the cycle.
+> * Replace an exercise for a defined period rather than replacing it for every
+> recurrence in the cycle.
+> * Populate the complete prescription, including exercise, weight, reps, sets,
+> and relevant constraints.
+> * Record the reason, expected duration, and criteria for returning to the
+> normal prescription.
+> * Clearly distinguish coach-created prescriptions from prescriptions generated
+> by the engine.
+> * Preserve a complete audit trail of the original prescription, the override,
+> and the actual performance.
+>
+> The more difficult question is how the engine should interpret the result. One
+> option is for coach overrides to remain separate from the engine's
+> decision-making. The engine would continue evaluating performance against its
+> original prescription, meaning the temporary rehabilitation work would still
+> appear internally as missed or reduced performance. When the override ends, the
+> engine would therefore retain an appropriately conservative view of the user's
+> recent capacity rather than assuming that the coach-prescribed work
+> demonstrated normal readiness.
+>
+> This is preferable to allowing temporary coach prescriptions to overwrite the
+> engine's underlying performance history, which would violate a number of core
+> app principles. The override would guide what the user should do in the short
+> term, while the engine would continue maintaining a cautious progression state
+> based on the fact that the normal work was not completed. Coach override via
+> mcp would remain the only route to such changed.
+>
+> Raise any questions or concerns you have in a review doc to the repo before we
+> implement."
+> *[→ N67; review doc `docs/reviews/2026-07-26-coach-override-prescriptions.md`,
+> workstream P. The "engine stays separate" premise is corrected in §2 (five
+> couplings carry the work in regardless); eight owner decisions collected in
+> §13 — the item is `needs-input` until those land, and a doc-21 spec gates any
+> build.]*
