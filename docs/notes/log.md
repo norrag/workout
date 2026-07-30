@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-30 — Session 92: admin MCP tools for the notes area (N67, PR pending)
+## 2026-07-30 — Session 92: admin MCP tools for the notes area (N67, PR #212)
 
 Owner asked for the notes area itself to be operable from the connector: capture
 and organise notes as they occur, from any model/device, and keep Claude Code for
