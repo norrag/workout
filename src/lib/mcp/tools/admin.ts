@@ -31,6 +31,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
 import { registerLlmAdminTools, LLM_ADMIN_TOOL_NAMES } from "./admin-llm";
 import { registerCoachingPromptTools, COACHING_PROMPT_TOOL_NAMES } from "./admin-prompt";
+import { registerNotesTools, NOTES_TOOL_NAMES } from "./admin-notes";
 import { resolveAdmin } from "./admin-gate";
 import type { McpExtra } from "../session";
 import { toolResult, type EnvelopeOpts } from "../envelope";
@@ -921,6 +922,9 @@ export function registerAdminTools(server: McpServer) {
   registerLlmAdminTools(server);
   // doc 19 / N60 follow-up: edit the LLM coaching system prompt (admin-prompt.ts).
   registerCoachingPromptTools(server);
+  // N67: the field-notes area (docs/notes/) as an admin surface — intake,
+  // assessment and status from any connector client (admin-notes.ts).
+  registerNotesTools(server);
 }
 
 /** Every role-gated tool this module registers — the roster the tools/list
@@ -936,4 +940,5 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   DISCARD_ENGINE_PARAMS,
   ...LLM_ADMIN_TOOL_NAMES,
   ...COACHING_PROMPT_TOOL_NAMES,
+  ...NOTES_TOOL_NAMES,
 ]);

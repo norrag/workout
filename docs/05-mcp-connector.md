@@ -104,6 +104,45 @@ Per [08-design-decisions.md](08-design-decisions.md) §3, **the MCP connector is
 
 The tuning loop: inspect decisions → propose a version → replay real history against it → review diffs in chat → activate. Already-planned future workouts pick up the new version lazily through the read-path freshness reconcile (doc 14) — the former `regenerate_planned_prescriptions` manual step is retired. Same tables and replay functions a future UI would use.
 
+### Notes area — field-note intake & management (role-gated, N67, added 2026-07-30)
+
+The owner's field-notes area (`docs/notes/`, operated per its `CLAUDE.md`) as an
+admin MCP surface, so notes can be captured and organised from any client the
+connector reaches instead of only inside a Claude Code session. The division of
+labour is deliberate: **this surface does intake, assessment and status; Claude
+Code keeps deep scoping, reviews and implementation** (it has the codebase; this
+doesn't).
+
+| Tool | Purpose |
+|---|---|
+| `get_notes_manual` | serves `docs/notes/CLAUDE.md` **verbatim** — the same operating manual a Claude Code session reads — plus the live workstream roster, the enforced status/type/priority vocabulary, the next free ID + batch number, and recent `log.md` entries. Read first |
+| `get_notes_backlog` | the live index parsed (filters: ids/status/type/workstream/priority/free text; compact summaries by default, full row bodies on request). The dedup-and-relate step reads through here |
+| `read_notes_file` | read-only view of any `docs/notes/` file — `archive.md`, `log.md`, `scoping.md`, workstream detail files |
+| `capture_notes` | the manual's **intake protocol as one atomic commit**: verbatim text appended to the append-only appendix under a new dated batch, parsed items added to the index (IDs allocated server-side), duplicates folded into the rows they restate, a new workstream declared in the README roster, and a dated `log.md` entry |
+| `update_note_item` | move one item's status (lifecycle vocabulary only; `status_pr` renders the protocol's `done (PR #N)`), priority, type, workstream, or assessment text — and log it, in one commit. Optionally sweeps a terminal row to `archive.md` with its resolution |
+| `append_notes_log` | a standalone dated `log.md` entry for something that moved the area without changing a row (an owner decision taken in chat, a session summary) |
+
+**The area stays in git; there is no second copy.** The notes area *is* markdown
+in this repo, so these tools read and commit `docs/notes/**` through the GitHub
+API rather than mirroring into Postgres — a note captured on a phone is in
+`backlog.md` immediately, with no reconciliation step and no chance of the DB
+and the file disagreeing (the manual is explicit that `backlog.md` is the single
+source of truth for item state).
+
+Carrying the paradigm, not assuming it: the manual is served verbatim (1), its
+vocabulary is *enforced* in zod + `src/lib/notes/types.ts` so a status outside
+the lifecycle or a workstream outside the roster can't reach a row (2), and each
+write is protocol-complete in one commit so the failure the manual is built to
+prevent — code moves, index goes stale — is structurally unavailable (3).
+
+Safeguards: admin-gated like every tool above; writes path-locked to
+`docs/notes/**.md`; one commit per call with the branch head as its parent, so a
+concurrent Claude Code commit causes a clean rejection rather than a clobber;
+every write also lands in `mcp_write_audit`; and every change is an ordinary git
+commit — reviewable and revertable. Requires `NOTES_REPO_TOKEN`
+([manual-operations.md](deployment/manual-operations.md)); unset, the notes
+tools report the missing config and nothing else on the surface is affected.
+
 ## Notes — two kinds, both exposed
 
 The app keeps two distinct exercise notes (09 session-5 §8), and the connector
@@ -162,6 +201,12 @@ mcp/
 ├── resources.ts
 └── __tests__/       # tool-handler tests with seeded fixture user
 ```
+
+The notes tools (`tools/admin-notes.ts`) sit on `src/lib/notes/`, which is pure
+markdown parsing/mutation (`markdown`, `backlog`, `archive`, `log`, `readme`,
+`ids`, `types` — unit-tested against the **real** `docs/notes/` files) plus two
+I/O modules: `repo.ts` (GitHub transport + the path allowlist) and `area.ts`
+(read snapshot → pure transform → one commit).
 
 ## Safeguards
 
