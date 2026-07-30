@@ -2,7 +2,58 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-25 (latest) — N64/N65: one exercise order across both surfaces + share codes that capture what was shared
+## 2026-07-30 (latest) — N67: the field-notes area as an admin MCP surface
+
+The owner's notes area (`docs/notes/`) is now operable from the connector, so
+notes are captured and organised when they occur rather than waiting for a Claude
+Code session. Six admin-gated tools, no schema change, no engine change.
+
+- **Surface** (`src/lib/mcp/tools/admin-notes.ts`): `get_notes_manual` (serves
+  `docs/notes/CLAUDE.md` verbatim + the live roster, the enforced vocabulary, the
+  next free ID/batch, recent log entries), `get_notes_backlog` (the live index
+  parsed, filterable, compact-by-default), `read_notes_file` (read-only across the
+  area), `capture_notes` (the intake protocol as one atomic commit), 
+  `update_note_item` (status/priority/type/workstream/body + the archive sweep),
+  `append_notes_log`. Registered through `registerAdminTools` and listed in
+  `ADMIN_TOOL_NAMES`, so PH33's `tools/list` filter hides them from non-admins in
+  addition to the call-time `resolveAdmin` denial.
+- **Git, not a database mirror.** The notes files *are* what a session reads. A
+  Postgres copy would stand up a second source of truth against the area's own
+  rule (`backlog.md` is the single source of truth for item state) plus a sync
+  step; committing to `docs/notes/**` through the GitHub API keeps one copy — a
+  note captured on a phone is in `backlog.md` immediately. Cost: one manual op
+  (`NOTES_REPO_TOKEN`, a fine-grained PAT scoped Contents:read+write on this repo
+  alone), documented in `docs/deployment/manual-operations.md`. Unset, every notes
+  tool returns a config error naming the var; nothing else on the surface changes.
+- **Carrying the paradigm rather than assuming it.** The manual is served
+  verbatim; its vocabulary is *enforced* (zod + `src/lib/notes/types.ts` — a
+  status outside the lifecycle, a type outside the set, or a workstream not in the
+  roster cannot reach a row); and every write is protocol-complete in a single
+  commit (verbatim appendix entry + rows + `log.md` together), so the failure the
+  manual exists to prevent — code moves, index goes stale — cannot occur through
+  these tools. `capture_notes` refuses a call that files nothing, and
+  `update_note_item` refuses a no-op, so a "capture" always carries assessment.
+- **Deliberate limit.** No writes to `scoping.md` or the workstream detail files:
+  codebase-grounded scope belongs to a session with the codebase. Remote items
+  arrive assessed but unscoped, which is the honest state.
+- **Layering.** `src/lib/notes/` is pure markdown parse/mutate (`markdown`,
+  `backlog`, `archive`, `log`, `readme`, `ids`, `types`), with I/O confined to
+  `repo.ts` (GitHub transport + the `docs/notes/**.md` path allowlist) and
+  `area.ts` (snapshot → pure transform → one commit). Line-surgical by design:
+  mutations touch only the lines they claim to, so diffs stay reviewable, and a
+  row that doesn't parse cleanly is preserved verbatim rather than rewritten.
+- **Concurrency.** Each commit's parent is the branch head read at snapshot time,
+  pushed non-force: a racing Claude Code commit makes the write fail with a
+  re-read instruction instead of clobbering it.
+- **Tests (+55).** 34 pure tests run against the **real** `docs/notes/` files,
+  including a byte-identical round-trip of every index row — which caught a real
+  parse gap (N62's cell carries `|` inside inline code, so the row was invisible);
+  cells are now split outside code spans. Plus 21 tool tests: admin gating for all
+  six, no `user_id` argument (hard rule #5), the config-missing path, filter and
+  truncation behavior, and the refusal paths. Suite 1489 green; typecheck + lint
+  clean.
+
+## 2026-07-25 — N64/N65: one exercise order across both surfaces + share codes that capture what was shared
 
 Two field-reported defects in editing and sharing a mesocycle. No engine change,
 no prescribed number moved; one additive migration.

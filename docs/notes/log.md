@@ -4,6 +4,60 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-30 — Session 92: admin MCP tools for the notes area (N67, PR #212)
+
+Owner asked for the notes area itself to be operable from the connector: capture
+and organise notes as they occur, from any model/device, and keep Claude Code for
+the reviews, implementation plans and execution that need full codebase access.
+Batch 28 verbatim appended; **new item N67**, **new workstream R** (notes-area
+tooling).
+
+- **Built: six admin-gated tools** — `get_notes_manual`, `get_notes_backlog`,
+  `read_notes_file`, `capture_notes`, `update_note_item`, `append_notes_log`
+  (`src/lib/mcp/tools/admin-notes.ts`, registered through `registerAdminTools`
+  and in `ADMIN_TOOL_NAMES`, so PH33's visibility filter hides them from
+  non-admins as well as denying them).
+- **The load-bearing decision: the area stays in git.** These files *are* what a
+  session reads; mirroring them into Postgres would create a second source of
+  truth against this area's own rule (`backlog.md` is the single source of truth
+  for item state) and a sync problem we don't currently have. The tools read and
+  commit `docs/notes/**` through the GitHub API instead — a note captured on a
+  phone is in `backlog.md` immediately, in git history, no reconciliation step.
+  Cost, stated plainly: one manual op (a fine-grained PAT as `NOTES_REPO_TOKEN`,
+  Contents:read+write, this repo only) before the tools do anything.
+- **"In the exact same way that you do" is carried three ways, not assumed.**
+  (1) `get_notes_manual` serves this manual verbatim; (2) the vocabulary is
+  *enforced* in zod + `src/lib/notes/types.ts` — a status outside the lifecycle,
+  a type outside the set, or a workstream not in the roster cannot reach a row;
+  (3) each write is protocol-complete in one commit — intake writes the verbatim
+  appendix entry, the rows and the `log.md` entry together, so "code moved, index
+  went stale" is structurally unavailable to these tools.
+- **Deliberate limit: no scoping writes.** The tools can file, fold, re-status and
+  sweep; they cannot write `scoping.md` or a workstream detail file. Codebase-
+  grounded scope needs the codebase. Expect remotely-captured items to arrive
+  `inbox`/`triaged` with a real assessment and no scope.
+- **Safety.** Admin gate at call time; path allowlist to `docs/notes/**.md` in the
+  transport; one commit per call whose parent is the branch head, so a racing
+  Claude Code commit is rejected rather than clobbered; `mcp_write_audit` row per
+  write; every change an ordinary revertable commit.
+- **Tests.** 34 pure tests run against the **real** `docs/notes/` files (not
+  fixtures) — including a byte-identical round-trip of every index row, which
+  caught a genuine parse gap: N62's cell carries a `|` inside inline code, so the
+  row was invisible to the parser. Fixed by splitting cells outside code spans.
+  Plus 21 tool tests (gating, no-op refusals, config-missing path). Full suite
+  1489 green.
+- **Manual step outstanding:** `NOTES_REPO_TOKEN` (walkthrough in
+  `docs/deployment/manual-operations.md`). Until it's set, every notes tool
+  returns a config error naming the var and the rest of the connector is
+  unaffected.
+
+### Next session — suggested starting point
+Confirm the owner set `NOTES_REPO_TOKEN` and ran one `get_notes_manual` +
+`capture_notes` round trip from the connector, then re-check this area for
+MCP-written entries. Also outstanding from before: the **N66 §13 decisions**
+(MEASURE), and a reconciliation sweep — several `done (PR #…)` rows (N61–N65,
+N53, N59) are merged and only held live by owner-residual checks.
+
 ## 2026-07-25 — Session 91: MEASURE companion app — direction doc (N66, PR #210)
 
 Owner opened a new concept: a companion app, **MEASURE**, for everything

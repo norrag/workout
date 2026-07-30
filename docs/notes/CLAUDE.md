@@ -56,6 +56,43 @@ Always end an intake by telling the owner, in chat, what you did: what was new,
 what merged into existing items, what relationships/dependencies you found, and
 what you'd suggest tackling next. The chat *is* their interface to this area.
 
+## Two ways in: this session, or the MCP notes tools
+
+Since 2026-07-30 (N67) this area has a second operator. The admin MCP surface
+(`get_notes_manual`, `get_notes_backlog`, `read_notes_file`, `capture_notes`,
+`update_note_item`, `append_notes_log` — doc 05 §"Notes area") lets the owner
+work the area from any connector client, so notes get captured and organised
+when they occur rather than waiting for a Claude Code session.
+
+**It is the same area, not a copy.** Those tools commit directly to these files
+through the GitHub API, so a note captured from a phone is already in
+`backlog.md` when you next read it. There is nothing to import or reconcile.
+Consequences for a session starting here:
+
+- **Assume the area moved since your last session.** Read the files, never a
+  memory of them; `log.md` will carry MCP-written entries alongside session ones
+  (commit messages tag them, and the log entry names the batch).
+- **Your commits and theirs can race.** A tool write takes the branch head as
+  its parent and is rejected outright if the branch moved, so it can never
+  clobber your commit — but if you're mid-edit on `backlog.md` and a capture
+  lands, pull before you push.
+- **The split of labour is deliberate.** The tools do intake, assessment and
+  status: they can file items, fold duplicates, move status, and sweep the
+  archive. They deliberately cannot write `scoping.md` or the workstream detail
+  files — codebase-grounded scoping (file:line, acceptance criteria, root-cause
+  analysis) needs the code in front of you, and that is your job. Expect items
+  captured remotely to arrive at `inbox`/`triaged` with a real assessment but no
+  scope, and expect to scope them here.
+- **The vocabulary in this manual is enforced in code** (`src/lib/notes/types.ts`
+  — statuses, types, priorities, the workstream roster). If you change the
+  lifecycle or the type set in this file, change it there too, or the tools will
+  reject a state you've just documented.
+
+If you're the remote model reading this through `get_notes_manual`: everything
+below applies to you unchanged. Run the intake protocol properly — read the
+backlog before you file, fold restatements into the row they restate rather than
+opening a second one, and say in chat what you did.
+
 ## Lifecycle
 
 ```
@@ -163,6 +200,7 @@ An ongoing system rots if every closed item stays in the live table forever. So:
 | `log.md` | dated activity log, newest first — what each session changed |
 | `scoping.md` | codebase-grounded scope notes for UI/feature/bug items |
 | `A-engine-metrics.md` | workstream A detail (engine & metrics Q&A) |
+| _(code)_ `src/lib/notes/` | the MCP tools' pure parser/mutator for these files + the enforced vocabulary — keep in step with this manual |
 | `I-engine-v9.md` | workstream I detail (engine v9 cleanup) |
 | _new `<X>-*.md`_ | spin up a detail file per workstream as it's picked up |
 
