@@ -4,7 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-26 — Session 92: coach-authored prescription overrides — review (N67, PR #211)
+## 2026-07-31 — Session 92b: exercise-level RIR — assessment; override direction parked (N67 d2, N68, PR #211)
+
+Owner read the override review, judged it "messy and a large paradigm shift",
+and proposed an alternative: **exercise-level RIR assignment** (per exercise and
+per week), managing effort through the RIR framework the app already has. Asked
+for an assessment doc and for the previous review to be marked obsolete. No code.
+
+- **N67 rewritten** around the problem (temporary per-exercise effort/load
+  management) with two directions: direction 1 (overrides) **PARKED**, direction
+  2 (exercise RIR) **LIVE**. Assessment:
+  [`docs/reviews/2026-07-31-exercise-level-rir.md`](../reviews/2026-07-31-exercise-level-rir.md).
+  The override review got a parked banner naming what survives (its §2 engine
+  couplings, §4.4 substitution cliff, §5/§6) rather than being deleted. Both
+  review docs re-dated 2026-07-31 (the first was mis-dated 2026-07-26).
+- **The direction is right and cheaper than direction 1** — and more of it is
+  already built than the owner realised: `workout_exercises.target_rir` is
+  **already a per-slot column** and `queries/anchors.ts` already uses it as each
+  set's assumed RIR; `meso_exercises` is the slot-grain plan row;
+  `mesocycles.rir_schedule` (N18-B) is the per-week authoring precedent;
+  `edit_mesocycle` is the MCP seam; doc 14 §7 makes invalidation mechanical.
+  Crucially the whole clock problem disappears (§4.1 of direction 1) because a
+  per-week RIR value is content, not a window.
+- **New item N68 (`B`, HIGH, workstream A) — the blocking finding.** The app has
+  **two RIR assumptions**: the anchor uses the prescribed `target_rir`, but the
+  stored per-set stamp uses `rir_reported`, which is **never written**
+  (`DayView.tsx:1698`), so every stats surface treats every set as taken to
+  failure. That means exercise-level RIR would fix the engine's view and leave
+  the history chart, PRs and strength trend still reading lighter work as
+  decline — the proposal's headline benefit. It is also the general form of the
+  384-vs-367.5 divergence from the 2026-07-04 review §8.2. Fix is small
+  (`rir_reported ?? target_rir` + the existing restamp hook) but re-levels every
+  historical e1RM upward, so it wants its own PR.
+- **Two honest limits recorded:** RIR is a ~2 %/step lever — RIR 1→5 at 9 reps
+  is only **−9.1 %** load (computed against the live v23 params), so it is an
+  excellent fatigue lever and a weak absolute-load one; the app's own deload
+  pairs RIR 6 with a 50 % set cut, which is why the assessment recommends a
+  per-exercise **set floor** alongside. And RIR cannot say "stop deadlifts", so
+  bounded substitution stays open.
+- Recommended shape: **floor semantics** (`max(weekRir, floor)` — reduce-only,
+  ramp keeps working, deload wins), a `reason` column, an earn-gate predicate,
+  and a build sequence starting with N68. Eight owner decisions in §9.
+
+## 2026-07-31 — Session 92: coach-authored prescription overrides — review (N67, PR #211)
 
 Owner proposed an MCP path letting the LLM coach override or author
 prescriptions (exercise / day / week: exercise, weight, reps, sets + reason,
@@ -14,7 +56,7 @@ a review doc before implementing. No code.
 
 - **New item N67** (`F`, HIGH, workstream P, `needs-input`); Batch 28 verbatim
   appended. Review:
-  [`docs/reviews/2026-07-26-coach-override-prescriptions.md`](../reviews/2026-07-26-coach-override-prescriptions.md).
+  [`docs/reviews/2026-07-31-coach-override-prescriptions.md`](../reviews/2026-07-31-coach-override-prescriptions.md).
 - **The load-bearing correction (§2):** the owner's premise that overrides can
   stay *separate* from the engine isn't available. The engine anchors on what
   was **performed**, not on what was prescribed, so five couplings carry rehab

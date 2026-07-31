@@ -1,9 +1,27 @@
 # Coach-authored prescription overrides — pre-implementation review
 
-**Date:** 2026-07-26 · **Status:** review / questions for the owner — **no code
-written.** Backlog item **N67** (Batch 28). Nothing here is binding; if the idea
-is adopted, the settled parts get written into a numbered spec (doc 21) and the
-implementation follows that.
+**Date:** 2026-07-31 · **Status: PARKED — superseded for now** by
+[`2026-07-31-exercise-level-rir.md`](./2026-07-31-exercise-level-rir.md). Backlog
+item **N67** (Batch 28). No code was written from this doc and none should be.
+
+> **Parked (2026-07-31, same day).** The owner judged this direction "messy and
+> a large paradigm shift" and proposed a far simpler alternative —
+> **exercise-level RIR assignment** — which manages effort per exercise inside
+> the framework the app already has. That is now the live direction; see the
+> assessment doc above.
+>
+> **What survives from this review, and why it is kept rather than deleted:**
+> - **§2 (the five engine couplings)** is a property of the engine, not of this
+>   design. Any "make this exercise easier for a while" feature has to answer
+>   it — the RIR assessment answers most of it structurally (its §6).
+> - **§4.4 (the `LOOKBACK_WEEKS = 2` cliff)** is the only place the
+>   bounded-substitution failure mode is written down, and bounded substitution
+>   is the one clause exercise-level RIR cannot express.
+> - **§6 (safety bounds)** and **§5 (no separate coach principal)** apply to any
+>   MCP write that changes what the athlete is asked to do.
+>
+> Unpark only if exercise-level RIR (plus a set lever plus bounded
+> substitution) proves insufficient in practice.
 
 The owner's request: an MCP path that lets the LLM coach override or author
 prescriptions for an exercise / day / week — full tuple (exercise, weight, reps,
