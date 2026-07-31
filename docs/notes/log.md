@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-31 — Session 92: increment indexing, set-logging queue, slider drag (N67/N68/N69, PR #211)
+## 2026-07-31 — Session 92: increment indexing, set-logging queue, slider drag (N67/N68/N69, PR #215)
 
 Owner handed over three field notes and asked for them built in the same pass.
 All three shipped; the middle one turned out to be structural and cost a hard
@@ -63,7 +63,7 @@ rule.
   track ignores pointers and scrolls.
 
 ### Next session — suggested starting point
-Sweep this PR's rows once #211 merges. Then the **T-N68a** owner call (offline
+Sweep this PR's rows once #215 merges. Then the **T-N68a** owner call (offline
 reads — cache the active day with a staleness marker, or accept the limit), and
 confirm N67 on device against the machine lift that prompted it. N66's doc-20
 §13 decisions are still the biggest unblocked lever.
