@@ -6,6 +6,8 @@ import { roundToStep } from "./rounding";
 export function prescribeDeload(
   inputs: EngineInputs,
   params: EngineParams,
+  /** N67 — the rounding lattice's phase; null ⇒ the absolute grid */
+  origin: number | null = null,
 ): Prescription {
   const peak = inputs.weekPeak ?? inputs.previous;
   const baseWeight = peak?.weight ?? inputs.initial?.weight ?? null;
@@ -19,6 +21,7 @@ export function prescribeDeload(
           baseWeight * params.deload.load_pct,
           inputs.exercise.equipmentType,
           params,
+          origin,
         );
   const sets = Math.max(
     params.min_sets,

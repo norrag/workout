@@ -433,12 +433,15 @@ describe("replayDecisions", () => {
     );
     expect(stock.diffs[0].fields.weight!.to).toBe(185);
 
-    // custom 3 lb loadable step → 184 → 183 (rounds to the custom step, not 5)
+    // custom 3 lb loadable step → 184 stays 184: N67 phases an overridden
+    // exercise's lattice on the weight the lifter entered, so the 3 lb steps
+    // run 181 / 184 / 187 rather than absolute multiples of 3 (183). Still
+    // distinct from the stock 185, which is the point — the override was folded in.
     const overridden = replayDecisions(
       [decision(coldStart, out, "advance", 3)],
       DEFAULT_ENGINE_PARAMS as EngineParams,
     );
-    expect(overridden.diffs[0].fields.weight!.to).toBe(183);
+    expect(overridden.diffs[0].fields.weight!.to).toBe(184);
   });
 });
 

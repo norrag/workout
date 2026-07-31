@@ -87,6 +87,9 @@ function deferred(inputs: EngineInputs, params: EngineParams, why: string): Pres
 export function prescribeBodyweight(
   inputs: EngineInputs,
   params: EngineParams,
+  /** N67 — the rounding lattice's phase for the ENTERED (added/assist) value;
+   *  null ⇒ the absolute grid. Resolved by the caller from the same inputs. */
+  origin: number | null = null,
 ): Prescription {
   const loadType = inputs.exercise.loadType;
   const bw = inputs.bodyweight;
@@ -191,7 +194,7 @@ export function prescribeBodyweight(
       const rawEntered = enteredForEffective(loadType, effTarget, bw) ?? 0;
       const entered = Math.max(
         0,
-        roundToStep(rawEntered, inputs.exercise.equipmentType, params),
+        roundToStep(rawEntered, inputs.exercise.equipmentType, params, origin),
       );
       const eff = effectiveLoad(loadType, entered, bw) ?? effTarget;
       const predicted = predictRepsAtWeight(anchor.value, eff, targetRir, params);
@@ -227,7 +230,7 @@ export function prescribeBodyweight(
   }
   const entered = Math.max(
     0,
-    roundToStep(base.weight, inputs.exercise.equipmentType, params),
+    roundToStep(base.weight, inputs.exercise.equipmentType, params, origin),
   );
   const detail = `starting ${kind} ${entered} lb at ${targetRir} RIR`;
   return {
