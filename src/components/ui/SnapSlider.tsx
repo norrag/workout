@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
 /**
  * Snap-to-stop slider (08, fig 1.4): hairline track with tick stops, ink
  * fill up to the value, rectangular orange thumb (current position).
  * No numbers shown — endpoints carry the meaning.
+ *
+ * N69: the value moves ONLY on a drag that starts on the orange thumb. A tap
+ * or drag anywhere else on the scale does nothing and — because the track no
+ * longer claims the gesture (`touch-none` is on the thumb alone) — scrolls the
+ * page. These sliders sit in a scrolling feedback sheet, where a track-anywhere
+ * jump meant a scroll attempt silently rewrote the answer.
  */
 export function SnapSlider({
   value,
@@ -26,6 +32,7 @@ export function SnapSlider({
   centerLabel?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   const snapFromPointer = useCallback(
     (clientX: number) => {
@@ -53,6 +60,13 @@ export function SnapSlider({
 
   const pct = (value / max) * 100;
 
+  const endDrag = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    setDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId))
+      e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   return (
     <div className="flex flex-col gap-1">
       <div
@@ -64,14 +78,7 @@ export function SnapSlider({
         aria-valuemax={max}
         aria-valuenow={value}
         onKeyDown={onKeyDown}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          snapFromPointer(e.clientX);
-        }}
-        onPointerMove={(e) => {
-          if (e.buttons > 0) snapFromPointer(e.clientX);
-        }}
-        className="relative h-11 cursor-pointer touch-none select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-ink"
+        className="relative h-11 select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-ink"
       >
         {/* track + fill */}
         <div className="absolute inset-x-0 top-[21px] h-0.5 bg-ink/20" />
@@ -85,11 +92,25 @@ export function SnapSlider({
             <div key={i} className="w-px bg-ink/40" />
           ))}
         </div>
-        {/* thumb — current position, the orange concern of this control */}
+        {/* thumb — current position, the orange concern of this control, and the
+            ONLY grab handle. The visual stays the 20×28 accent block; the
+            transparent 44px-wide wrapper is the touch target (R18 sizing) and
+            is what claims the gesture. */}
         <div
-          className="absolute top-[8px] h-7 w-5 -translate-x-1/2 bg-accent"
+          className="absolute top-0 flex h-11 w-11 -translate-x-1/2 cursor-grab touch-none items-center justify-center"
           style={{ left: `${pct}%` }}
-        />
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragging(true);
+          }}
+          onPointerMove={(e) => {
+            if (dragging) snapFromPointer(e.clientX);
+          }}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
+          <div className="h-7 w-5 bg-accent" />
+        </div>
       </div>
       <div className="label-caps flex justify-between text-[9px] font-semibold text-ink/55">
         <span>{leftLabel}</span>

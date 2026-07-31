@@ -2,7 +2,123 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-25 (latest) — N64/N65: one exercise order across both surfaces + share codes that capture what was shared
+## 2026-07-31 (latest) — N67/N68/N69: increment indexing, the set-logging queue, thumb-only sliders
+
+Three field notes, built together. One touches the engine's rounding, one
+reverses a hard rule, one is a five-line gesture fix.
+
+### N67 — the increment now indexes off the last weight the lifter entered
+
+A per-exercise increment set `params.rounding[equipment]`
+(`resolveEffectiveParams`, doc 14 §6.1) and `roundToStep` snapped every prescribed
+load to an **absolute** multiple of it. So a lifter who actually loads a machine
+in 88s, with a 10 lb step, got 90 — a weight they cannot put on the machine —
+rather than 98. The lattice now has a **phase**:
+
+- `roundToStep(weight, equipment, params, origin)` snaps to `origin ± k × step`.
+  No origin ⇒ the absolute grid, byte-identical to before.
+- `latticeOrigin(inputs, params)` resolves the origin from inputs the engine
+  already had, in order of "closest to something the lifter actually typed": the
+  last logged working set → the seed route's earn context (doc 16 §3.7) →
+  `previous.weight` → `weekPeak.weight` → the plan's `initial.weight`. Warmups
+  and zero-load rows are ignored; a genuinely cold slot has no origin and keeps
+  the absolute grid.
+- Threaded through every rounding path — `prescribeCore`, the anchor and
+  cold-start seeds, `boundRepsToWindow`'s ±one-step nudge, `prescribeDeload`,
+  and the bodyweight model's entered-value rounding — so one lift's stops are the
+  same set of numbers wherever they are computed.
+
+**Gating, and why there is no params version bump.** A new **optional**
+`rounding_origin: "absolute" | "last_entered"` on `engineParamsSchema`, which
+`resolveEffectiveParams` sets to `"last_entered"` for an exercise carrying an
+increment override. Optional-with-no-default is load-bearing: stored
+`engine_params` rows that predate it still parse to a *complete* materialization,
+so `is_replayable` and `params_hash` are untouched and an old decision replays on
+the absolute lattice exactly as it was computed. Because the origin rides
+already-denylisted derived inputs (doc 14 §3), the change adds **no freshness
+dependency** — no fingerprint churn, no mass recompute. Scoped to overridden
+exercises deliberately: on the 5 lb equipment defaults an entered load is almost
+always already on the grid, and phasing every lift's lattice would be a silent
+global change. A global switch remains available by activating a version that
+sets the key itself.
+
+Two existing tests changed their expected numbers, which is the clearest evidence
+the behavior moved: a manual 315 seed with a 25 lb step is now **315** (the
+lifter's own number) instead of 325, and a cold start at 184 with a 3 lb custom
+step holds **184** instead of snapping to 183 — still distinct from the stock
+185, which is what those tests were proving. New coverage in
+`engine/__tests__/rounding-origin.test.ts` pins the owner's case directly
+(88 → 98 up, 78 down). The `golden-meso` suite is unchanged, confirming
+non-overridden rows are untouched.
+
+### N68 — set logging goes through a durable background queue
+
+The reported symptom: *"the set gets logged and the checkbox fills, but the
+active set does not move forward… forcing the user to quit and restart the app."*
+
+**The cause is structural, not flakiness.** The checkbox acknowledged on the
+server action's response (N12), but `nextSetNumber` was derived from **server
+rows alone**. So when the RSC revalidation stalled — a flaky connection, the app
+backgrounded mid-flight — the row stayed checked while the next row stayed
+`future`: logged, un-advanceable, and only recoverable by relaunching. The write
+had landed; the UI had no way to learn it.
+
+The fix takes the write off the interaction path entirely, exactly as the owner
+proposed. Surviving a dropped connection is the by-product.
+
+- **`src/lib/logging/queue.ts` — the pure model** (no I/O, no clock; every
+  function takes `now`). FIFO with head-of-line blocking so sets land in the
+  order they were performed; per-cell coalescing so retyping a weight before the
+  write drains produces one write, not two racing ones; capped exponential
+  backoff; and **park, never drop** — an op that spends its 8 attempts becomes
+  `failed` and is surfaced, because losing a set the lifter watched get checked
+  off is the one outcome worse than a slow write.
+- **`src/components/logging/SetLogQueueProvider.tsx` — the runtime.**
+  `localStorage` persistence (validated on read), one serial processor,
+  `router.refresh()` on each settle, and flushes on `online` + `visibilitychange`
+  (a backgrounded tab's timers are throttled). Mounted in the `(app)` layout, so
+  the queue keeps draining as the lifter navigates and resumes after a relaunch.
+- **The day view folds the overlay into its set-state derivation** — the one
+  place that decides which row is active. That single change is what removes the
+  stuck state. `day-rules.ts` grows an optional `pending_set_numbers` so the
+  progress bar, `exerciseDone`, and the feedback prompt all read one definition;
+  it is absent for every caller reading server state alone.
+- **Only idempotent ops are queued**, because retry is blind: `logSet` upserts on
+  `(workout_exercise_id, set_number)` (R3), `amendSet` addresses one immutable set
+  id, the planned-weight write is an overwrite. **Unlog and delete stay
+  foreground** — a delete renumbers the surviving sets, which would land a queued
+  write on the wrong slot, so a queued row's delete menu reads "Still saving…".
+- **Completion still gates on server truth.** Completing locks the session in the
+  DB and would refuse its own outstanding writes, so `COMPLETE WORKOUT` waits for
+  confirmed rows; a fully-logged day mid-drain shows `SAVING THE LAST SETS…`. The
+  queue is cleared for a workout once it completes.
+- **The status strip is quiet by default** — it speaks only when sets are held
+  with no connection or an op has parked (with a TRY AGAIN).
+- **Deliberately zod-free.** The module rides the `(app)` layout's client chunk,
+  and WS-J keeps zod and the engine barrel out of the day view's bundle; the
+  storage boundary uses hand-written guards, and the server actions still
+  re-validate with zod on arrival. With zod the day view's first load went
+  134 → 150 kB; with hand-rolled guards it is 137 kB.
+
+**This reverses hard rule 9 for the write path** ("no offline sync"), recorded in
+`CLAUDE.md`, `01 §F3`, `02 §A5` (rewritten) and `07`. **Reads stay online-only** —
+R7's decision not to runtime-cache documents or RSC payloads is still right (a
+stale prescription with nothing marking it stale is worse than no page). The
+honest limit: this makes the *write* path connection-tolerant, not the app. A
+cold start with no connection still cannot render the day view; logging through a
+dropout works when the session is already open. Filed as **T-N68a** for an owner
+call.
+
+### N69 — sliders drag from the orange thumb only
+
+`SnapSlider` put `onPointerDown`/`onPointerMove` and `touch-none` on the whole
+44px track, so on the scrolling feedback sheets (fig 1.4) a scroll attempt both
+set the value and swallowed the gesture. Pointer capture now lives on a
+transparent 44px wrapper around the 20×28 accent block (the visual is unchanged);
+the track ignores pointers entirely and scrolls the page. Keyboard control on the
+`role="slider"` container is unchanged.
+
+## 2026-07-25 — N64/N65: one exercise order across both surfaces + share codes that capture what was shared
 
 Two field-reported defects in editing and sharing a mesocycle. No engine change,
 no prescribed number moved; one additive migration.

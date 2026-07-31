@@ -56,10 +56,12 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
     expect(out.weight! % 25).toBe(0); // loadable in 25s
   });
 
-  it("rounds a manual meso SEED to the override step", () => {
+  it("seeds a manual weight on the LIFTER'S OWN value under an override (N67)", () => {
     // T-I4: the prior-peak seed is retired; the seed precedence is anchor → the
-    // user's manual `initial_*` → unseeded. A manual seed's weight is rounded to the
-    // exercise's loadable step, which the override sets.
+    // user's manual `initial_*` → unseeded. Pre-N67 an override snapped that
+    // manual seed onto absolute multiples of the step (315 → 325 in 25s); the
+    // lattice now indexes off the entered weight, so the seed IS what the
+    // lifter typed and the 25 lb steps run 290 / 315 / 340 off it.
     const eff = resolveEffectiveParams(P, { weightIncrement: 25 }, "barbell");
     const out = seedMeso(
       null,
@@ -69,16 +71,17 @@ describe("resolveEffectiveParams (doc 14 phase 3)", () => {
       2,
       eff,
     );
-    expect(out.weight! % 25).toBe(0); // 315 → 325
-    // …and it differs from the default 5-lb-rounded seed (the override bit)
-    const def = seedMeso(
+    expect(out.weight).toBe(315);
+
+    // the step really is 25 — pinning the lattice back to absolute proves it
+    const absolute = seedMeso(
       null,
       { weight: 315, reps: 8, sets: 3 },
       { equipmentType: "barbell", loadType: "external" },
       { experienceLevel: "intermediate" },
       2,
-      P,
+      { ...eff, rounding_origin: "absolute" as const },
     );
-    expect(out.weight).not.toBe(def.weight); // 325 vs 315
+    expect(absolute.weight).toBe(325);
   });
 });

@@ -15,7 +15,7 @@ import { assessPerformance, gradeOnRir } from "./rules/performance";
 import { modulateFromFeedback } from "./rules/feedback";
 import { prescribeDeload } from "./rules/deload";
 import { rirRamp, type WeekPlan } from "./rules/rir";
-import { roundToStep } from "./rules/rounding";
+import { roundToStep, latticeOrigin } from "./rules/rounding";
 import {
   weightForRepsAtRir,
   predictRepsAtWeight,
@@ -156,12 +156,17 @@ function prescribeCore(
   inputs: EngineInputs,
   params: EngineParams,
 ): Prescription {
+  // N67: the rounding lattice's phase for this exercise — the last load the
+  // lifter actually entered, when the effective params ask for it. Null (the
+  // default) keeps every rounding call on the absolute grid.
+  const origin = latticeOrigin(inputs, params);
+
   // T-I2: bodyweight load types price on effective load (bodyweight ± entered) and
   // progress on reps at a fixed load (bodyweight_only) or the rep-window in effective
   // space (loadable/assisted). Gated on `bodyweight_model`; the external path below
   // is unchanged. Covers deload + cold start internally.
   if (usesBodyweightModel(inputs, params)) {
-    return prescribeBodyweight(inputs, params);
+    return prescribeBodyweight(inputs, params, origin);
   }
 
   // §6 deload week short-circuits everything else.
@@ -195,6 +200,7 @@ function prescribeCore(
           raw,
           inputs.exercise.equipmentType,
           params,
+          origin,
         );
         // keep reps inside the window if rounding nudged them out (same bound the
         // working path uses; predictRepsAtWeight here reads the deload RIR).
@@ -205,6 +211,7 @@ function prescribeCore(
           deloadRir,
           inputs.exercise.equipmentType,
           params,
+          origin,
         );
         const predicted = predictRepsAtWeight(
           anchor.value,
@@ -236,7 +243,7 @@ function prescribeCore(
         };
       }
     }
-    return prescribeDeload(inputs, params);
+    return prescribeDeload(inputs, params, origin);
   }
 
   const reasons: DecisionTraceStep[] = [];
@@ -269,12 +276,13 @@ function prescribeCore(
         // the seed never prescribes below target_low (e.g. 6 when the window
         // is 8–12) when stepping the weight down one increment fixes it.
         const fw = boundRepsToWindow(
-          roundToStep(raw, inputs.exercise.equipmentType, params),
+          roundToStep(raw, inputs.exercise.equipmentType, params, origin),
           anchorCS.value,
           winCS,
           inputs.week.targetRir,
           inputs.exercise.equipmentType,
           params,
+          origin,
         );
         const predicted = predictRepsAtWeight(
           anchorCS.value,
@@ -315,6 +323,7 @@ function prescribeCore(
               base.weight,
               inputs.exercise.equipmentType,
               params,
+              origin,
             ),
       reps: base.reps,
       sets: clampSets(base.sets, params),
@@ -480,7 +489,7 @@ function prescribeCore(
   // the loadable step would move it (R24); everything else rounds as usual
   let finalWeight = heldNoAnchor
     ? weight
-    : roundToStep(weight, inputs.exercise.equipmentType, params);
+    : roundToStep(weight, inputs.exercise.equipmentType, params, origin);
   // rounding must never lift a gated/held weight above what was handled
   if ((mod.painGated || mod.sessionDampened) && finalWeight > baseWeight) {
     finalWeight = baseWeight;
@@ -508,6 +517,7 @@ function prescribeCore(
         inputs.week.targetRir,
         inputs.exercise.equipmentType,
         params,
+        origin,
       );
       if ((mod.painGated || mod.sessionDampened) && finalWeight > baseWeight) {
         finalWeight = baseWeight;
@@ -772,6 +782,8 @@ function boundRepsToWindow(
   targetRir: number,
   equipmentType: EngineInputs["exercise"]["equipmentType"],
   params: EngineParams,
+  /** N67 — the rounding lattice's phase; null ⇒ the absolute grid */
+  origin: number | null = null,
 ): number {
   const predicted = predictRepsAtWeight(anchorValue, weight, targetRir, params);
   if (predicted == null) return weight;
@@ -787,14 +799,14 @@ function boundRepsToWindow(
   // the buffer would breach a hard bound, step anyway. Symmetric below target_low.
   if (params.bound_to_target_window ?? false) {
     if (predicted > win.target_high) {
-      const up = roundToStep(weight + step, equipmentType, params);
+      const up = roundToStep(weight + step, equipmentType, params, origin);
       const pu = predAt(up);
       if (pu != null && pu >= win.target_low) return up; // lands in the window
       if (predicted > win.max) return up; // buffer breaches the hard max → must step
       return weight;
     }
     if (predicted < win.target_low) {
-      const down = roundToStep(weight - step, equipmentType, params);
+      const down = roundToStep(weight - step, equipmentType, params, origin);
       const pd = predAt(down);
       if (pd != null && pd <= win.target_high) return down;
       if (predicted < win.min) return down; // breaches the hard min → must step
@@ -805,10 +817,10 @@ function boundRepsToWindow(
 
   // legacy: only correct when the prediction breaches the hard [min,max] bounds.
   if (predicted > win.max) {
-    return roundToStep(weight + step, equipmentType, params);
+    return roundToStep(weight + step, equipmentType, params, origin);
   }
   if (predicted < win.min) {
-    return roundToStep(weight - step, equipmentType, params);
+    return roundToStep(weight - step, equipmentType, params, origin);
   }
   return weight;
 }
@@ -882,6 +894,12 @@ export function seedMeso(
   const goalType = opts?.goalType ?? "hypertrophy";
   const anchor = opts?.anchor ?? null;
   const bodyweight = opts?.bodyweight ?? null;
+  // N67: the seed's lattice phase — the prior meso's final working sets when an
+  // earn context came across the boundary, else the peak / plan starting weight.
+  const origin = latticeOrigin(
+    { seedEarn: opts?.earn ?? null, weekPeak: priorPeak, initial },
+    params,
+  );
   const baseline = seedCore(
     priorPeak,
     initial,
@@ -892,6 +910,7 @@ export function seedMeso(
     goalType,
     anchor,
     bodyweight,
+    origin,
   );
 
   // doc 16 §3.7 — the earned-step wrapper on the seed route, mirroring
@@ -940,6 +959,7 @@ export function seedMeso(
     goalType,
     { ...anchor!, value: gate.targetAnchor! },
     bodyweight,
+    origin,
   );
   return applyRealizedAsk({
     baseline,
@@ -965,6 +985,8 @@ function seedCore(
   goalType: EngineInputs["goalType"],
   anchor: E1rmAnchor | null,
   bodyweight: number | null,
+  /** N67 — the rounding lattice's phase; null ⇒ the absolute grid */
+  origin: number | null = null,
 ): Prescription {
   // T-I2: bodyweight load types seed through the bodyweight model (effective load
   // off the anchor; reps-only for bodyweight_only). Gated on `bodyweight_model`.
@@ -980,7 +1002,7 @@ function seedCore(
       initial,
       bodyweight,
     });
-    return prescribeBodyweight(seedInputs, params);
+    return prescribeBodyweight(seedInputs, params, origin);
   }
 
   // §S1 anchor seed — mirrors prescribe()'s seed_anchor branch (index.ts:103-151)
@@ -998,12 +1020,13 @@ function seedCore(
       // rounding lands heavy half the time and the hard [min,max] clamp alone
       // let 6–7 reps through an 8–12 target window.
       const fw = boundRepsToWindow(
-        roundToStep(raw, exercise.equipmentType, params),
+        roundToStep(raw, exercise.equipmentType, params, origin),
         anchor.value,
         win,
         startRir,
         exercise.equipmentType,
         params,
+        origin,
       );
       const predicted = predictRepsAtWeight(anchor.value, fw, startRir, params);
       const reps =
@@ -1044,7 +1067,7 @@ function seedCore(
       };
   return {
     weight: hasInitial
-      ? roundToStep(initial!.weight!, exercise.equipmentType, params)
+      ? roundToStep(initial!.weight!, exercise.equipmentType, params, origin)
       : null,
     reps: initial?.reps ?? null,
     sets: clampSets(initial?.sets ?? params.min_sets, params),

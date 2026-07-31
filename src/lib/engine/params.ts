@@ -149,6 +149,20 @@ export const engineParamsSchema = z.object({
   meso_seed_backoff_pct: z.number().min(0.7).max(1),
   // weights are rounded to this loadable step per equipment, in pounds
   rounding: perEquipmentStep,
+  // N67 — where the rounding lattice is anchored. `absolute` (the historical
+  // behavior, and what an omitted key means) snaps to multiples of the step:
+  // a 10 lb step gives …/80/90/100. `last_entered` phases the lattice on the
+  // last load the lifter actually entered for the exercise, so 88 lb steps to
+  // 98 / 78 instead of 90 / 80.
+  //
+  // OPTIONAL with no default on purpose: stored `engine_params` rows that
+  // predate it keep parsing to a COMPLETE materialization (`is_replayable` and
+  // `params_hash` unchanged), and an old decision replays on the absolute
+  // lattice exactly as it was computed. `resolveEffectiveParams` sets it
+  // per-exercise for a lift carrying an increment override — the case the
+  // owner reported — and it can also be switched on globally by activating a
+  // params version that carries it.
+  rounding_origin: z.enum(["absolute", "last_entered"]).optional(),
 
   // ----- doc 13: rep-window prescription (param-gated, decision 8) -----------
   // Added with `.default()` (legacy = the v8-equivalent increment/reps path) so
