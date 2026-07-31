@@ -4,6 +4,80 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-31 — Session 93: MEASURE review round 1 — capture, the Health bus, three-source synthesis (N66, PR #214)
+
+Owner reviewed doc 20 and returned five items plus one confirmation. Doc 20
+revised in PR #214 (#210 had already merged, so this landed as a fresh change
+on top of `main` rather than stacking on it); still direction, still no code.
+
+- **Topology confirmed.** Shared auth, one deployable, not separate now — but
+  separable later "without an unreasonable amount of work". Turned that from an
+  intention into **§3.4: six checkable rules** (eslint import boundary, no
+  cross-shell React context, `queries/measure/*` as the only DB path, a single
+  `src/lib/seam/` module, token-auth capture endpoints from day one, no
+  internal-path deep links) **plus a costed split**: move three directories,
+  publish the seam as HTTP, set the Supabase cookie domain, pick an MCP host.
+  Days, not weeks — and no data migration, because the DB never forked.
+- **Principle 7, transparency** (owner's words): no composites, every number
+  carries method/window/n and drills to its measurements, assumptions named
+  inline, assumption-backed outputs are ranges not points. This is the
+  constraint that produced the §5 shape.
+- **§4 capture is new and is a real requirement, not polish.** Weighing is the
+  highest-frequency action in the suite, so it gets a latency budget (intent →
+  logged under 5s, no cold launch) and three paths. Needs the first non-MCP API
+  surface: `measure_api_tokens` (hashed, prefix-listed, revocable) behind
+  `POST /api/measure/weight`. **The existing `unique (user_id, measured_on,
+  source)` turns out to make capture idempotent by construction** — a
+  double-run replaces rather than duplicates, and a Health↔MEASURE automation
+  loop *converges instead of compounding*. A constraint written for a different
+  reason is what makes the whole design safe.
+- **§4.5 is the finding of the session: Apple Health is the integration bus.**
+  Happy Scale already reads *and writes* Body Mass to Health, as do Withings
+  and Renpho. So one Shortcut recipe pair gives bidirectional Happy Scale
+  coexistence **and** smart-scale support with no vendor API, no OAuth client,
+  no partner agreement — and it answers owner items 2 and 3 together. Verified
+  the mechanics: *Get Contents of URL* does POST with a JSON body and custom
+  headers, *Log Health Sample* writes Body Mass. Two device-check caveats
+  recorded (no variable in the Type field; automation confirmation prompts vary
+  by iOS version). **Dropbox declined as a sync path** — parsing another app's
+  backup format to produce body-weight numbers fails principle 7 and breaks
+  silently; kept only as a possible future *transport* in §8, never a format.
+  Also recorded flatly: a PWA cannot touch HealthKit on any browser, so
+  Shortcuts is the only bridge and the design should stop looking for a better
+  one.
+- **§5 answers the owner's hard question.** They combine, but **not by
+  averaging**. The instrument table makes the asymmetry explicit — weight is a
+  *precise instrument on a contaminated quantity*, tape an *imprecise
+  instrument on a decent proxy*, DEXA a *good instrument at too slow a
+  cadence* — so any weighted blend would have fictional weights. Instead:
+  **three tiers** (measured → corroborated → projected) with **Tier 3
+  structurally sealed from both the seam and the engine**, and an **8-row
+  corroboration matrix** over mass × waist where "flat" means *inside that
+  instrument's noise band*, with window minimums in code (`confidence.ts`) and
+  DEXA overriding when scans bracket. Also fixed: **waist is a fat proxy, limb
+  girth is a mixed proxy** — never read the same way.
+- **Seam narrowed to four items** through `src/lib/seam/` (§5.6): mass rate in
+  lb/wk **and %/mo** (the pacer's own unit, so no conversion sits between the
+  apps), trend-bracketed Δbw over the macro span, composition delta when
+  same-scanner scans bracket, and the one-sentence corroboration line. Tape,
+  Tier 3, and raw series do **not** cross. **Worth flagging as a concrete
+  improvement:** the retrospective's Δbw today brackets *raw* points and so
+  inherits ±2–4 lb of daily noise at both endpoints — §5.6-2 upgrades it to
+  trend values.
+- **§9 Happy Scale parity table**, verified against their published feature
+  set: take the trend line, tunable smoothing, self-correcting rate,
+  projections (banded), plateau detection, range views, Health import/export;
+  **adapt** milestones (keep the chunking mechanic, drop the celebration —
+  ledger voice); **decline** Dropbox sync and streaks/badges (hard rule 7).
+- Phasing re-cut to 10 phases with capture pulled early (2 → 3 → 4 is the
+  capture spine). §17 now separates three settled decisions from nine open ones.
+
+### Next session — suggested starting point
+Get the §17 answers. Four are quick and unblock Phase 0 design work (waist
+site, tape routine, milestones, Tier 3 default); the rest can ride along. A
+**Happy Scale CSV export sample** is a concrete artifact needed to pin that
+adapter (§8). Then Phase 0's mockup pass — still gates everything.
+
 ## 2026-07-31 — Session 92: increment indexing, set-logging queue, slider drag (N67/N68/N69, PR #215)
 
 Owner handed over three field notes and asked for them built in the same pass.
