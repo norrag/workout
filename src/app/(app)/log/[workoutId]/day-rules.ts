@@ -16,19 +16,38 @@ import {
 } from "@/lib/engine/load";
 import { setComplianceMarker } from "@/lib/engine/rules/progression";
 
-/** The slice of a logged exercise the set-progress math needs. */
+/**
+ * The slice of a logged exercise the set-progress math needs.
+ *
+ * N68: `pending_set_numbers` are sets the write queue is still carrying — the
+ * lifter performed and logged them, the server just hasn't echoed them back
+ * yet. They count as logged for everything the lifter LOOKS at (which row is
+ * active, the progress bar, whether the exercise reads as done), and are
+ * simply absent for callers that don't pass them, which is every caller
+ * reading server state alone.
+ */
 export type SetProgressExercise = {
   status: string;
   prescribed_sets: number | null;
   skipped_set_numbers: number[];
   sets: { set_number: number }[];
+  pending_set_numbers?: number[];
 };
+
+/** Every set number this exercise counts as logged — server rows plus the
+ *  queue's outstanding ones, deduped (a queued set whose echo has landed is in
+ *  both). */
+export function loggedSetNumbers(we: SetProgressExercise): Set<number> {
+  return new Set([
+    ...we.sets.map((s) => s.set_number),
+    ...(we.pending_set_numbers ?? []),
+  ]);
+}
 
 /** Planned slot count, widened to cover any logged/skipped beyond it. */
 export function plannedSetCount(we: SetProgressExercise): number {
-  const maxLogged = we.sets.length
-    ? Math.max(...we.sets.map((s) => s.set_number))
-    : 0;
+  const logged = loggedSetNumbers(we);
+  const maxLogged = logged.size ? Math.max(...logged) : 0;
   const maxSkipped = we.skipped_set_numbers.length
     ? Math.max(...we.skipped_set_numbers)
     : 0;
@@ -39,7 +58,7 @@ export function plannedSetCount(we: SetProgressExercise): number {
 export function exerciseDone(we: SetProgressExercise): boolean {
   if (we.status === "skipped") return true;
   const planned = plannedSetCount(we);
-  const logged = new Set(we.sets.map((s) => s.set_number));
+  const logged = loggedSetNumbers(we);
   const skipped = new Set(we.skipped_set_numbers);
   for (let n = 1; n <= planned; n += 1) {
     if (!logged.has(n) && !skipped.has(n)) return false;
@@ -56,7 +75,10 @@ export function daySetTotals(exercises: SetProgressExercise[]): {
   loggedSets: number;
   totalSets: number;
 } {
-  const loggedSets = exercises.reduce((n, we) => n + we.sets.length, 0);
+  const loggedSets = exercises.reduce(
+    (n, we) => n + loggedSetNumbers(we).size,
+    0,
+  );
   const totalSets = exercises
     .filter((we) => we.status !== "skipped")
     .reduce((n, we) => {

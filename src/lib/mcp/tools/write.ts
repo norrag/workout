@@ -556,7 +556,10 @@ function registerSetExerciseIncrement(server: McpServer) {
         "the equipment default for that lift only (the app's 'Load step'). " +
         "Pass weight_increment null to clear back to the default. Works on any " +
         "exercise (stock or custom); it's a per-user setting, not an edit to " +
-        "the exercise. Prescriptions refresh on next view; logged history is " +
+        "the exercise. Setting one also indexes the load steps off the last " +
+        "weight the user actually entered for the lift rather than absolute " +
+        "multiples of the step — with a 10 lb step, 88 lb steps to 98 or 78. " +
+        "Prescriptions refresh on next view; logged history is " +
         "never touched. Pointless for bodyweight-only lifts (reps progression).",
       inputSchema: {
         exercise_id: z.string().uuid(),

@@ -11,6 +11,27 @@ for the purge policy.
 
 ---
 
+## Swept 2026-07-31 — Batch-28 session start (N53, N58, N61–N65, PH30)
+
+Reconciliation sweep run at the start of the Batch-28 session (the N67/N68/N69
+intake). Every PR named below is confirmed merged in `git log`. Rows with an open
+residual deliberately stay live: **N34** (owner re-runs the BodySpec connect),
+**N43** (awaits the v23/v24 activation runbook), **N47** / **N56** / **N57** /
+**N59** (owner on-device / post-deploy re-checks), **N60** (phases 4–5 are
+owner-gated). Implementation records in `docs/PROGRESS.md`; the raw note text
+stays in the backlog appendix.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N58 | LLM prescription explanation — build to the doc-18 spec | F | H | **done (PR #195, merged 2026-07-19).** v1 built end-to-end (doc 18 §7 phases 1–5): `decision_explanations` + RLS tests, `src/lib/llm/` (off/shadow/on gating, Responses client, §3 payload + §4 number-set post-check), fire-and-forget hook at the doc-16 §10 write sites, §6 read seam. Superseded in content by doc 19 (N60); doc 18 keeps the infrastructure. |
+| N61 | Edit the LLM coaching system prompt via MCP | F | H | **done (PR #203, merged 2026-07-24).** `coaching_prompts` versioned table + propose/get/activate/discard MCP tools; `COACHING_SYSTEM_PROMPT` becomes the seeded default rather than the only source. Record in doc 18 §10 addendum. |
+| N62 | LLM payload + prompt-loop updates: macro goal, source-session tense, no-activation preview | F | H | **done (PR #206, merged 2026-07-24).** Facts payload carries `source_session` and `macro`; admin tooling previews a prompt revision without activating it. Recorded as doc 19 §12. |
+| N63 | Deterministic explanation language + full-note formatting | F | H | **done (PR #207, merged 2026-07-25).** Deterministic ask/why rewritten to the coaching layer's voice and the full note re-formatted (statement → explanation → coaching). Recorded as doc 19 §13. |
+| N64 | Day view and cycles view can disagree on exercise order | B | G | **done (PR #208, merged 2026-07-25).** New leaf `queries/plan-order.ts` is the one definition and runs both ways (plan → session and session → plan); `planMesoCopy` renumbering fixed in the same read. |
+| N65 | A shared meso doesn't carry the edits made before sharing | B | D | **done (PR #208, merged 2026-07-25).** Redemption reads a snapshot taken when the code was minted, not the owner's live board; hosted migration applied + verified 2026-07-25. |
+| N53 | No launch splash any more — long black screens | B/UX | J | **done (PR #187, merged 2026-07-12).** iOS launch screens regenerated for the light system + the in-document `Splash` restored over the pre-paint window. Resolution detail in `scoping.md`. |
+| PH30 | Expanded weekly prescription explanation — LLM narrative layer | D | H | **superseded → N58.** The parked idea became a concrete build spec (`docs/18-llm-prescription-explanation.md`) and shipped in PR #195; the explanation content architecture then moved to doc 19 under N60. |
+
 ## Swept 2026-07-12 — Batch-17 roundup merged (PR #181)
 
 Reconciliation sweep at the N53 session start: PR #181 (Batch-17 roundup)

@@ -46,7 +46,7 @@ The core differentiator: **user feedback after exercises, sets, and cycles is us
 - **Per-exercise feedback** (fig 1.4): joint pain during the exercise, plus muscle-group pump and workload sliders.
 - **Workout complete** (fig 1.5, redesigned): counts (exercises / sets / skipped) + **session feedback sliders (overall fatigue / effort / performance)** + free-text notes + `NEXT WORKOUT →`. Autoregulation recomputes silently — no panel, no stats link (09 2026-06-13 §2); the session sliders return (they were dropped from the mockup in error).
 - Every logged entry is stamped with macro/meso/micro/day context and date.
-- Logging requires connectivity (decision, 08 §3 era): the app is online-only; no offline queue/sync.
+- **Set-logging writes are queued in the background** (2026-07-31, N68 — supersedes the earlier "online-only, no offline queue/sync" decision for writes): a tap advances the UI immediately and a durable client-side queue drains the write, retrying through a dropout and across a relaunch. Reading the app still requires connectivity — there is no offline read cache (02 §A5).
 
 ### F4 — Feedback & progression engine
 - Computes next-week prescriptions (weight, reps, sets) per exercise from the signals listed in [04-feedback-engine.md](04-feedback-engine.md).

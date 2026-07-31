@@ -4,7 +4,7 @@ Rewritten for the June 2026 design pivot ([08-design-decisions.md](08-design-dec
 
 Scope changes folded into this plan:
 
-- **No offline sync.** The app requires connectivity; the service worker only makes the shell installable and fast. The outbox/IndexedDB work is cut.
+- **No offline sync — reads only** (amended 2026-07-31, N68). The app requires connectivity to *read*; the service worker only makes the shell installable and fast. The **set-logging write path is now queued and durable** (02 §A5): the outbox came back, in `localStorage` rather than IndexedDB, because awaiting the write inline could strand a session mid-set. Offline *reads* stay cut.
 - **No admin UI.** Engine inspection, param editing, and replay ship as admin-gated **MCP tools** (Claude is the tuning console). The underlying tables, versioning, and replay functions remain.
 - **Navigation canon:** `WORKOUT · CYCLES · TEMPLATES · EXERCISES · MORE`. Insights is not a tab — meso stats hang off meso detail; exercise history lives in the library/picker.
 - **Groups-first planning** replaces the exercise-first meso builder.
