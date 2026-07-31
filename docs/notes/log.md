@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-31 — Session 92: MEASURE review round 1 — capture, the Health bus, three-source synthesis (N66, PR #210)
+## 2026-07-31 — Session 92: MEASURE review round 1 — capture, the Health bus, three-source synthesis (N66, PR #214)
 
 Owner reviewed doc 20 and returned five items plus one confirmation. Doc 20
 revised in place on the same PR; still direction, still no code.
