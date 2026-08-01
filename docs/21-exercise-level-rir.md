@@ -392,7 +392,7 @@ this spec excludes them from **strength** surfaces but **keeps** them in
 **volume** surfaces (flagged). Rationale: a backed-off set still consumes
 recovery budget, and dropping it makes MEV/MRV read as under-dosed during exactly
 the block where the athlete is complying. *Confirm, or say "exclude from volume
-too".*
+too".* -- CONFIRMED
 
 **9.2 — Capture ergonomics (§2).** Per-set RIR capture is new friction on the
 hottest path in the app. Options: (a) a compact RIR chip on each set row,
@@ -400,13 +400,13 @@ pre-filled with the prescribed value, one tap to change; (b) capture once per
 exercise (last working set) and infer the rest; (c) prompt only when the logged
 weight×reps implies a materially different RIR than prescribed. *(a) is the
 honest default and the simplest to reason about; the design pass will need a
-call.*
+call.* -- SELECT OPT A. WE WILL REVISE LATER IF I CHANGE MY MIND
 
 **9.3 — `max_measuring_rir` default (§6.1).** Proposed **8**, chosen so nothing
 that can exist today becomes non-measuring. A case exists for **6**: `mod_max_rir`
 is 3, and past ~6 the assumed component already dominates the estimate. Starting
 at 8 and tightening later is the safer order (it only ever *adds* exclusions), so
-that is the recommendation. *Confirm 8, or set it lower.*
+that is the recommendation. *Confirm 8, or set it lower.* -- CONFIRM 8
 
 **9.4 — Display past the band (§4.3/§6.1).** A prescription of "170 lb × 9 @ 21
 RIR" is arithmetically fine and humanly strange. Options: show the number as-is;
@@ -414,7 +414,7 @@ show a qualitative band ("light — well short of failure") with the number in t
 detail view; or cap the *displayed* RIR while keeping the real one for pricing.
 *Recommend the qualitative band — it matches the honesty guardrails and avoids
 asking the athlete to estimate something they can't. Settle in the Phase 6 design
-pass.*
+pass.* --  QUALIATITIVE BAND
 
 ## 10. Phases (one per PR, each green on its own)
 
