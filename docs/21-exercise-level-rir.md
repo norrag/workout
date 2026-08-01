@@ -3,7 +3,8 @@
 **Status: authoritative build spec** (2026-07-31). Consolidates the owner's
 Batch-28b proposal and the assessment thread:
 [assessment](./reviews/2026-07-31-exercise-level-rir.md) → owner notes +
-decisions A1–A8 (Batch 28c). Those are the rationale record; **where they
+decisions A1–A8 (Batch 28c) → **owner pushback on §4.2 + the RIR ceiling
+(Batch 28d, revised the same day)**. Those are the rationale record; **where they
 conflict with this doc, this doc wins.** Doc 16 keeps authority over progression
 internals, doc 14 over freshness, doc 10 over metric definitions — this doc
 amends each where noted (§2, §5, §6, §7). Implementation proceeds in new
@@ -36,10 +37,11 @@ block") all become the same one lever.
 | A2 | **Absolute semantics only.** A per-exercise RIR takes control where set; where unset, the configured ramp reasserts. No floor/offset parameters. |
 | A3 | Grain = **day-slot × exercise**, per week (`meso_exercises` + a per-week array). |
 | A4 | **A per-exercise set lever ships too** — but the UI stays simple; MCP is the primary surface. |
-| A5 | **Exclude non-working (high-RIR / low-confidence) sets from stats** — narrowed in §6, needs one confirmation. |
+| A5 | **Exclude non-working (high-RIR / low-confidence) sets from stats** — split in §6 into a hard measuring band (§6.1) and a soft working-set policy (§6.2); one confirmation open. |
 | A6 | **Add the earn-gate predicate** (no progression earned while an assignment is active). |
 | A7 | **Store a `reason`** with the assignment and surface it. |
 | A8 | **Close the override review.** Its one unresolved thread (bounded substitution + the `LOOKBACK_WEEKS = 2` cliff) is preserved as **N69**. |
+| **28d** | **Repricing needs no special case** — thread the resolved RIR through the existing pricing path, symmetric in both directions (§4.2, supersedes the rejected centered-reps rule). **Prescription RIR is unbounded** so one lever spans deload → rehab → extra effort (§4.3); the **measuring band** (§6.1) is what keeps that honest. |
 
 ---
 
@@ -114,12 +116,13 @@ Notes:
 - The resolved value lands in `workout_exercises.target_rir`, which already
   exists per slot and is already read by the anchor and by
   `previous.targetRir` (`queries/progression.ts:160,273`) — no new read wiring.
-- **Ceiling stays 8** (owner's open question, §9.3 of the assessment). The
-  numbers say a higher cap buys almost nothing: even at RIR 8 the load is only
-  −14.6 % vs RIR 1 (§4), and "9 reps with 12 in reserve" is not a meaningful
-  instruction. If more than ~15 % load reduction is needed, the lever is sets or
-  substitution, not RIR. `rir_reported`'s 0–10 range is unchanged (an athlete
-  may honestly report more reserve than was ever prescribed).
+- **Prescription RIR is unbounded upward** (revised 2026-07-31 after the owner's
+  §4.2 pushback — supersedes the earlier "ceiling stays 8"). The DB checks on
+  `microcycles.target_rir` / `workout_exercises.target_rir` widen 0–8 → **0–30**,
+  so one lever spans deload → rehab → deep backoff without a second mechanism.
+  What is bounded is not the *ask* but the *measurement*: see §6.1's measuring
+  band. `rir_reported` stays **0–10** — that is the range a human can actually
+  estimate, and past it the honest report is "no idea", i.e. null.
 
 ---
 
@@ -149,54 +152,103 @@ allowed, but: the MCP tool and the UI must show the week's default beside the
 field, and setting a value **below** the deload RIR emits a warning in the tool
 result. No silent semantics.
 
-### 4.2 Repricing (owner note 3)
+### 4.2 Repricing — no special case (revised 2026-07-31)
 
-**Confirmed: repricing already happens, and it is the source of the numbers
-below.** Under `weight_selection: "rep_window"` the load is
-`weightForRepsAtRir(anchor, targetReps, targetRir)` — raise the RIR and the load
-falls out of the same call. The −9 % figure in the assessment was already the
-repriced load, not the un-repriced one.
+> **Correction.** An earlier draft of this section forced **window-centered reps
+> whenever the resolved RIR differed from the week's**. The owner rejected it on
+> two grounds, both correct, and both are conceded here: (1) it fires on a
+> *decrease* in RIR too, so an exercise deliberately pushed harder would have its
+> rep schedule reset for no reason — a special case masquerading as a rule; and
+> (2) the "flooring reps prices it heavier" warning was answering a question
+> nobody asked. That comparison was *between rep choices at the same RIR*, not a
+> claim that raising RIR raises load. The owner's actual proposal — reprice the
+> weight so the prescription stays inside the rep window at the requested RIR —
+> **is already exactly what the engine does.**
 
-What must be *added* is the owner's second half: when the resolved RIR differs
-from the week's RIR, **reset the rep schedule to a defined point instead of
-carrying whatever the climb left**, exactly as a deload does. Otherwise a slot
-whose climb had walked reps to 12 reprices very differently from one sitting at
-8, for the same assignment.
+**The rule is: thread the resolved RIR into the existing pricing path. Nothing
+else changes.** The rep-window path already:
 
-**The mechanic is the deload's, verbatim** (`engine/index.ts:190-196`):
-window-**centered** reps at the target RIR, load from the anchor, bounded to the
-window, reps re-derived from the rounded weight, **no rep climb** that week.
+1. picks `targetReps` from the Option-A schedule (climb / top-out reset), clamped
+   to the goal window;
+2. prices the load — `weightForRepsAtRir(anchor, targetReps, RIR)`
+   (`engine/index.ts:404`);
+3. rounds, applies `boundRepsToWindow`, then **re-derives** reps from the rounded
+   weight — `predictRepsAtWeight(anchor, finalWeight, RIR)` — clamped to
+   `[win.min, win.max]` (`:492-517`).
 
-One correction worth stating plainly, because the owner's note says "floor
-reps": at a fixed anchor and RIR, **fewer reps means a heavier load** (lower
-effective reps ⇒ lower `k` ⇒ higher weight). Flooring reps would make the
-backed-off prescription *heavier* than centering. Hypertrophy window 8–12, load
-÷ anchor:
+Swap `inputs.week.targetRir` for `resolvedRir` at those three sites and the whole
+thing generalises, in **both** directions, with no branch. The engine never holds
+the load constant and lets reps fall out of the window — it prices the load *from*
+reps and RIR, so the failure the owner wanted to avoid ("265 lb for 1 rep")
+cannot occur by construction.
 
-| target RIR | floor (8 reps) | **centered (10)** | top (12 reps) |
-|---|---|---|---|
-| 1 | 0.774 | **0.732** | 0.698 |
-| 3 | 0.732 | **0.698** | 0.667 |
-| 4 | 0.714 | **0.682** | 0.652 |
-| 5 | 0.698 | **0.667** | 0.638 |
-| 6 | 0.682 | **0.652** | 0.625 |
-| 8 | 0.652 | **0.625** | 0.600 |
+**The owner's worked example, run through the real path.** 265 × 9 @ 0 RIR
+implies an anchor of e1RM 342.6. Ask for 8 RIR:
 
-Centered, relative to a normal RIR-1 week: RIR 3 **−4.7 %**, RIR 4 −6.8 %, RIR 5
-**−8.9 %**, RIR 6 −10.9 %, RIR 8 −14.6 %.
+| reps (anywhere in the 8–12 window) | repriced load | vs the 265 ask |
+|---|---|---|
+| 8 | 223.4 | −15.7 % |
+| **9** | **218.7** | **−17.5 %** |
+| 10 | 214.1 | −19.2 % |
+| 11 | 209.8 | −20.8 % |
+| 12 | 205.6 | −22.4 % |
 
-**Policy (settled):** when `resolvedRir ≠ weekRir`, prescribe with
-window-centered reps at `resolvedRir` — the deload path's own code, generalised
-from "deload week" to "backed-off slot". The climb resumes normally on the first
-week the assignment is absent. This also disposes of the owner's incoherent-triple
-worry ("9 RIR while asking for 8 reps"): the load is *chosen* so the prescribed
-reps land on the prescribed RIR, by construction.
+The owner's estimate was "something like 215 × 8"; the engine gives 219 at the
+held 9 reps. The mechanism and the intuition agree.
 
-**This is a deload at exercise grain, which is exactly the owner's framing** —
-and it is why A4's set lever matters: the app's own deload pairs RIR 6 with
-`set_pct 0.5`. RIR alone moves load ~2 %/step; volume is the other half.
+**This also corrects a number in the assessment.** Its "−14.6 % at RIR 8" was one
+policy point (window-centered reps, measured against an RIR-1 week), not the
+lever's range. Priced against a genuine 0-RIR ask, RIR 8 delivers **−16 % to
+−22 %** depending on where in the window the reps sit. The lever is meaningfully
+stronger than the assessment implied.
 
----
+**Where in the window? Optional, not forced.** Because the load depends on the
+rep position (the table above spans 18 lb), a coach may want to say "reprice at
+the top of the window" for a deeper cut. That becomes an **optional** per-slot
+`rep_position` (`bottom | center | top | <explicit>`); **unset ⇒ the existing
+schedule decides**, which is today's behavior and the default. This is the useful
+part of the rejected centering rule, demoted from a mandate to a knob. Deferred
+to Phase 4 — nothing depends on it.
+
+### 4.3 How deep can this go, and where it stops being a measurement
+
+The owner's follow-on: if −22 % isn't enough for rehab, raise the RIR further —
+"perhaps 20 RIR, which is not something an athlete could realistically estimate,
+but it simply represents a large reduction in effort, with the implied RIR
+derived by reversing the same math."
+
+**The arithmetic is right and is adopted** (hence the unbounded ceiling in §3).
+Against the same 342.6 anchor at 9 reps:
+
+| goal | load | implied RIR |
+|---|---|---|
+| −25 % of the ask | 198.8 | ~13 |
+| 50 % of e1RM | 171.3 | ~21 |
+| −50 % of the ask | 132.5 | ~39 |
+
+So yes — one rule really does span deload, rehab, and extra effort. **The
+constraint is not the pricing, it is the second job that number now does.** A1
+made the prescribed RIR a *measurement input*: `assumedRir = rir_reported ??
+target_rir` feeds the e1RM stamp and the anchor. An unbounded prescribed RIR
+therefore silently asserts a strength measurement nobody observed:
+
+- Under Epley each RIR step is worth **3.3 % of e1RM**. At RIR 21 the estimate is
+  ~70 % assumption and ~30 % observation. At RIR 39 the curve is far outside any
+  band it was fitted on (`brzycki_max_eff_reps: 10`; Brzycki itself is undefined
+  at 37 effective reps — the code caps bisection at 35.9).
+- The confidence ladder bottoms out at `low` (`mod_max_rir: 3`), so a set at RIR
+  4 and a set at RIR 21 currently make the *same* honesty claim. That is a lie by
+  omission at the top end.
+- It contradicts A1's own premise. If the athlete is asked to report honest
+  reserve and the ask says 21, the truthful report is "no idea" — which is
+  exactly why `rir_reported` stays capped at 10 and resolves to null past it.
+
+**The guard (§6.1): a measuring band.** Past it the set is priced normally but is
+**not treated as a measurement** — no e1RM stamp, no anchor contribution. That is
+the one addition needed to make an unbounded lever safe, and it is a direct
+application of doc 16's principle 1 (*never fabricate a measurement*), not a
+restriction on the lever itself. The prescription can go as light as the coach
+wants; the app just stops claiming to have measured strength from it.
 
 ## 5. Engine coupling (amends doc 16 §3.4)
 
@@ -208,11 +260,13 @@ and it is why A4's set lever matters: the app's own deload pairs RIR 6 with
   missed earn (deload parity), so a backed-off block cannot arm the throttle.
 - **Rep climb.** `climb_requires_rir_step` already holds the climb when RIR
   doesn't step down; the §4.2 reset supersedes it for assignment weeks.
-- **Anchor: unchanged, and deliberately not excluded.** With §2's resolution the
-  samples are RIR-adjusted and therefore comparable, so they can stay. Excluding
-  them would freeze the anchor at pre-back-off values and make the return
-  prescription jump straight back to full load — the failure mode the parked
-  review §2.1 documented.
+- **Anchor: backed-off sets still anchor, non-measuring sets do not.** With §2's
+  resolution a set at RIR ≤ `max_measuring_rir` is RIR-adjusted and therefore
+  comparable, so it stays in the anchor — excluding it would freeze the anchor at
+  pre-back-off values and make the return prescription jump straight back to full
+  load (the failure mode the closed review §2.1 documented). Past the §6.1 band
+  the sample is dropped instead, and the freeze is the *intended* outcome: better
+  a stale honest anchor than a fabricated one.
 - **Pain clamp** (`finalWeight ≤ perf.bestWeight` when pain/dampener is set,
   `engine/index.ts:434/:498/:513`): unchanged, and now clamps to a load the
   engine actually asked for.
@@ -221,7 +275,46 @@ and it is why A4's set lever matters: the app's own deload pairs RIR 6 with
 
 ---
 
-## 6. Stats & metrics policy (A5 — narrowed; one confirmation)
+## 6. Stats & metrics policy
+
+### 6.1 The measuring band (new — the guard that makes §4.3 safe)
+
+Two different questions have been conflated by having one confidence ladder:
+*how precise is this estimate* and *is this a measurement at all*. Add the second
+as a hard boundary.
+
+```jsonc
+"e1rm": { "max_measuring_rir": 8 }   // new, .optional() — absent ⇒ today's behavior
+```
+
+**Gate on the assumed-RIR component, not on total effective reps.** The
+unreliability comes from the *assumed* part, not the observed part: a logged
+15-rep set at RIR 1 is 15 reps of observation, while a 9-rep set at RIR 21 is 9
+observed and 21 asserted. Gating on effective reps would punish honest high-rep
+work; gating on RIR targets exactly the fictional component.
+
+When `assumedRir > max_measuring_rir` the set is **non-measuring**:
+
+- `logged_sets.e1rm = null`, `e1rm_confidence = 'none'` (new label below `low`);
+- excluded from the strength anchor (`queries/anchors.ts` drops the sample);
+- excluded from every strength surface (`v_exercise_history.e1rm`,
+  `best_set_e1rm`, `v_exercise_overview.best_e1rm`, `v_meso_summary.best_e1rm`,
+  `v_exercise_prs`);
+- **kept** in volume/adherence surfaces — the work happened;
+- surfaced honestly in the day view and history ("effort: light — not scored").
+
+Default 8 is chosen so **nothing existing changes**: it is today's `target_rir`
+ceiling, so no set that can exist right now becomes non-measuring. It is a
+tunable, and the block is `.optional()` per house discipline (absent ⇒
+byte-identical fingerprints and outputs).
+
+**Consequence worth stating:** during a deep backoff the anchor **freezes** at
+its last measured value rather than drifting on fictional data. That is the
+correct trade — a stale-but-honest anchor beats a fabricated one — and it is why
+the return ramp is the coach's job (§4.2), which was already the plan.
+
+### 6.2 Working-set policy (A5 — narrowed; one confirmation)
+
 
 The owner's decision: only true working sets belong in stats; high-RIR /
 low-confidence sets are done for other reasons and should be excluded. Adopted,
@@ -297,9 +390,9 @@ it.
 **9.1 — Volume counting (§6.2).** A5 said exclude non-working sets from stats;
 this spec excludes them from **strength** surfaces but **keeps** them in
 **volume** surfaces (flagged). Rationale: a backed-off set still consumes
-recovery budget, and dropping it makes MEV/MRV read as under-dosed during
-exactly the block where the athlete is complying. *Confirm, or say "exclude from
-volume too".*
+recovery budget, and dropping it makes MEV/MRV read as under-dosed during exactly
+the block where the athlete is complying. *Confirm, or say "exclude from volume
+too".*
 
 **9.2 — Capture ergonomics (§2).** Per-set RIR capture is new friction on the
 hottest path in the app. Options: (a) a compact RIR chip on each set row,
@@ -309,7 +402,19 @@ weight×reps implies a materially different RIR than prescribed. *(a) is the
 honest default and the simplest to reason about; the design pass will need a
 call.*
 
----
+**9.3 — `max_measuring_rir` default (§6.1).** Proposed **8**, chosen so nothing
+that can exist today becomes non-measuring. A case exists for **6**: `mod_max_rir`
+is 3, and past ~6 the assumed component already dominates the estimate. Starting
+at 8 and tightening later is the safer order (it only ever *adds* exclusions), so
+that is the recommendation. *Confirm 8, or set it lower.*
+
+**9.4 — Display past the band (§4.3/§6.1).** A prescription of "170 lb × 9 @ 21
+RIR" is arithmetically fine and humanly strange. Options: show the number as-is;
+show a qualitative band ("light — well short of failure") with the number in the
+detail view; or cap the *displayed* RIR while keeping the real one for pricing.
+*Recommend the qualitative band — it matches the honesty guardrails and avoids
+asking the athlete to estimate something they can't. Settle in the Phase 6 design
+pass.*
 
 ## 10. Phases (one per PR, each green on its own)
 
@@ -321,21 +426,33 @@ history; RIR copy rewrite; doc 10/11 amendment recording the re-levelling.
 *Tests:* stamp ⇄ anchor parity on one fixture; the N11 exactly-as-prescribed
 case on a deload; restamp idempotence; capture default.
 
-**Phase 2 — assignment: plan + engine.** Migration (§3); pure resolution
-(§4.1) applied after `liveWeekRirUpdates`; `prescribe()` consumes the resolved
-RIR; the §4.2 centered-reps repricing generalised from the deload path; earn-gate
-predicate + miss-throttle parity (§5); doc 14 wiring (§7).
+**Phase 2 — assignment: plan + engine.** Migration (§3, incl. widening the
+`target_rir` checks to 0–30); pure resolution (§4.1) applied after
+`liveWeekRirUpdates`; `prescribe()` consumes the resolved RIR at the three §4.2
+sites — **no new branch**; earn-gate predicate + miss-throttle parity (§5); doc
+14 wiring (§7).
 *Tests:* absolute resolution vs ramp/deload incl. the below-deload warning case;
-centered repricing golden at RIR 3/4/5/6/8 against the §4.2 table; unset ⇒
-byte-identical output and fingerprint; fingerprint scoping (assignment moves
-only its slot's rows); no earn while active.
+**repricing golden against the §4.2 table** (the owner's 342.6-anchor case at RIR
+8 across the window) and symmetrically for a *lowered* RIR — reps stay inside the
+window in both directions; unset ⇒ byte-identical output and fingerprint;
+fingerprint scoping; no earn while active.
+
+**Phase 2b — the measuring band (§6.1).** `max_measuring_rir` param + the
+`'none'` confidence label; stamp writes null past the band; anchor drops those
+samples; strength views exclude them, volume keeps them. Ships with Phase 2 or
+immediately after — **§4.3's unbounded ceiling must not reach production without
+it**.
+*Tests:* band boundary (RIR 8 measures, 9 does not, at the default); anchor
+freeze under a deep-backoff block; absent param ⇒ byte-identical.
 
 **Phase 3 — MCP.** `set_exercise_rir` / `set_exercise_sets` ops + reason,
 read-side disclosure, audit. *Tests:* tool-handler tests on the seeded fixture
 user; refusal on started/completed weeks.
 
-**Phase 4 — set lever (A4).** `set_cap` resolution + engine clamp, same
-fingerprint treatment. Can merge into Phase 2 if it lands naturally.
+**Phase 4 — set lever (A4) + optional `rep_position` (§4.2).** `set_cap`
+resolution + engine clamp, same fingerprint treatment; `rep_position` as an
+optional per-slot knob (unset ⇒ the schedule decides). Can merge into Phase 2 if
+it lands naturally.
 
 **Phase 5 — stats policy (§6).** Intent-keyed exclusion from strength surfaces,
 volume disclosure flag, comparability note on meso/macro rollups.

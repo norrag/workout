@@ -4,6 +4,52 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-31 — Session 92d: repricing policy retracted + measuring band added (N67, doc 21 §4.2/§4.3/§6.1)
+
+Owner pushed back on doc 21 §4.2. **Right on both counts**; the section is
+rewritten, §4.3 and §6.1 are new, and two of my numbers are corrected in their
+favour. Batch 28d verbatim appended. Still no code.
+
+- **Forced centered reps: retracted.** It fired whenever `resolvedRir ≠ weekRir`,
+  including on a *decrease* — so an exercise deliberately pushed harder would have
+  had its rep schedule reset for no reason. A special case wearing a rule's
+  clothes. Gone.
+- **The owner's repricing proposal is already the engine's mechanism.** The
+  rep-window path prices load *from* reps and RIR
+  (`weightForRepsAtRir`, `engine/index.ts:404`) and then re-derives and clamps
+  reps to the window (`:492-517`) — it never holds load constant, so the
+  "265 lb × 1 rep" failure they wanted to avoid cannot occur. Threading
+  `resolvedRir` through those three sites generalises in **both** directions with
+  no branch. My "flooring reps prices it heavier" was a comparison between rep
+  choices at the same RIR, not a claim that raising RIR raises load — it answered
+  a question nobody asked, and it read as nonsense in context. Fairly called.
+- **Two numbers corrected in the owner's favour.** The assessment's "−14.6 % at
+  RIR 8" was one policy point (centered reps, vs an RIR-1 week), not the lever's
+  range: priced against a genuine 0-RIR ask it delivers **−16 % to −22 %**
+  depending on rep position. And their worked example — 265 × 9 @ 0 RIR, ask 8
+  RIR, "maybe 215 × 8" — prices at **219 × 9** on the real path. Their intuition
+  was calibrated; my framing wasn't.
+- **Unbounded RIR adopted** (§4.3, DB check 0–8 → 0–30). The arithmetic is sound:
+  at the same anchor, −25 % of the ask ≈ RIR 13, half the e1RM ≈ RIR 21, −50 % of
+  the ask ≈ RIR 39. One lever really does span deload → rehab → extra effort.
+- **What needed the guard was not the pricing but the second job A1 gave that
+  number.** `assumedRir = rir_reported ?? target_rir` feeds the e1RM stamp and the
+  anchor, so an unbounded prescribed RIR silently asserts an unobserved
+  measurement — 3.3 % of e1RM per RIR step under Epley, and past ~37 effective
+  reps Brzycki is undefined (the code caps bisection at 35.9). Hence the new
+  **measuring band** (§6.1): `max_measuring_rir` (default 8, `.optional()`, so
+  nothing that exists today changes), gating on the **assumed-RIR component**
+  rather than total effective reps — an honest 15-rep set is 15 reps of
+  observation; a 9-rep set at RIR 21 is 9 observed and 21 asserted. Past the band
+  a set is priced normally but stamped `e1rm = null` / confidence `'none'`,
+  dropped from the anchor and strength views, kept in volume. The anchor freezes
+  rather than drifting on fiction — the intended trade, since the coach owns the
+  return ramp.
+- Phase 2 loses the centering work and gains the widened check; **new Phase 2b**
+  ships the measuring band — §4.3's unbounded ceiling must not reach production
+  without it. `rep_position` survives as an *optional* Phase-4 knob. §9 grows to
+  four confirmations (adds the band default and out-of-band display).
+
 ## 2026-07-31 — Session 92c: exercise-level RIR DECIDED → build spec doc 21 (N67, N68, N69, PR #211)
 
 Owner returned notes + decisions A1–A8 on the assessment and asked to finalize
