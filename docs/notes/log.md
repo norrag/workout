@@ -4,6 +4,68 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-31 — Session 92c: exercise-level RIR DECIDED → build spec doc 21 (N67, N68, N69, PR #211)
+
+Owner returned notes + decisions A1–A8 on the assessment and asked to finalize
+before starting phased implementation in a new session. Settled design promoted
+out of `reviews/` into an authoritative numbered spec:
+**[`docs/21-exercise-level-rir.md`](../21-exercise-level-rir.md)** (6 phases,
+§10), indexed in the root `CLAUDE.md`. Both review docs demoted to rationale
+records with "where they conflict, 21 wins" headers. Still no code.
+
+- **A1 widened N68 substantially.** The minimal fix was "fall back to the
+  prescribed RIR in the stamp"; the owner wants logged sets to actually
+  **capture `rir_reported`**, with stats reading RIR and reporting effective
+  reps. That amends the doc-11 premise itself (the prescription becomes a
+  *suggestion*; report honest reserve even when it differs) and **absorbs N38**
+  (honest-RIR capture, deferred since doc 16 §11). One resolution rule —
+  `rir_reported ?? target_rir` — is now shared by the stamp, the anchor and the
+  compliance marker, so the two paths converge by construction. Guard pinned in
+  the spec: the capture default is the prescribed RIR, **never 0** — that is the
+  N11 regression, already covered by `day-rules.test.ts:114`.
+- **A2 rejected my floor recommendation; absolute it is.** Recorded with its one
+  consequence: an assignment on a deload week wins over `deload.target_rir`
+  including downward, so the tool/UI must show the week's default and warn when
+  a value lands below it. No silent semantics.
+- **Owner note 3 needed two corrections, both now in the spec (§4.2).** First,
+  repricing already happens — `weightForRepsAtRir(anchor, reps, rir)` is where
+  the −9 % came from, so the policy adds *determinism*, not magnitude. Second,
+  "floor reps" would price the backed-off load **heavier**, not lighter (fewer
+  effective reps ⇒ lower `k` ⇒ higher weight): at RIR 5 the window floor gives
+  0.698 × anchor vs 0.667 centered. The deload's actual mechanic is
+  window-**centered** reps (`engine/index.ts:190-196`), which is both lighter and
+  parity with the owner's own "this is a deload at exercise level" framing. Table
+  at RIR 1/3/4/5/6/8 × floor/centered/top is in the spec.
+- **RIR ceiling stays 8**, answered with numbers: even RIR 8 is only −14.6 %
+  load vs a normal RIR-1 week, and "9 reps with 12 in reserve" is not a
+  meaningful instruction. Past ~15 % the lever is sets or substitution.
+- **A5 adopted narrowed, flagged for confirmation (doc 21 §9.1).** Excluding by
+  *measured confidence* would silently drop legitimate work (confidence also
+  degrades with effective reps, so an honest 15-rep set at RIR 1 is already
+  `low`, and A1's honest reporting pushes more real sets there). The spec
+  excludes on prescription **intent** (`resolvedRir > weekRir`) — deterministic
+  and plan-level, exactly like the existing `is_deload` filter — and excludes
+  from **strength** surfaces while **keeping** the sets in **volume** surfaces
+  with a disclosure flag, since a backed-off set still consumes recovery budget
+  and dropping it would read as under-MEV during a block the athlete is
+  complying with.
+- **A8 closed the override review.** Its surviving open thread — bounded
+  substitution and the `LOOKBACK_WEEKS = 2` return cliff — spun out as **N69**
+  (`F`, MED) so closing the doc loses nothing; §4.4 there is still its only
+  written record. The doc's other findings are pointed at their new homes in
+  doc 21 §5/§8.
+- **Dedup (protocol step 3).** A1 collides with two live rows, both folded
+  rather than left to duplicate the work: **T-N60a** (effort-reporting adoption
+  — "the schema exists but no UX invites it") is **superseded → doc 21 Phase 1**,
+  which now owns the interaction design; and **N38** is **halved** — its capture
+  affordance + doc-11 premise amendment move to Phase 1, leaving only the
+  periodic honest-RIR engine rule deferred. A side effect worth noting: doc 19
+  §4.3's effort-honesty gate has been suppressing effort claims across the
+  deterministic why and the facts `effort_status` precisely because effort was
+  inferred, never observed — Phase 1 unblocks that too.
+- N67 → `ready`, N68 → `ready` (doc 21 Phase 1), N69 → `triaged`, Batch 28c
+  verbatim appended. Owner starts Phase 1 in a new session.
+
 ## 2026-07-31 — Session 92b: exercise-level RIR — assessment; override direction parked (N67 d2, N68, PR #211)
 
 Owner read the override review, judged it "messy and a large paradigm shift",

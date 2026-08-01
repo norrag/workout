@@ -1,10 +1,21 @@
 # Exercise-level RIR assignment — assessment
 
-**Date:** 2026-07-31 · **Status:** assessment / questions for the owner — **no
-code written.** Backlog **N67** (direction 2) + **N68** (the prerequisite
-defect it exposed). Supersedes, for now,
+**Date:** 2026-07-31 · **Status: rationale record — decided.** The owner answered
+every question in §9 (A1–A8, 2026-07-31) and the settled design now lives in the
+authoritative build spec **[`docs/21-exercise-level-rir.md`](../21-exercise-level-rir.md)**;
+**where this doc conflicts with 21, 21 wins.** Read this one for *why*, doc 21
+for *what to build*. Backlog **N67** (feature) + **N68** (the prerequisite defect
+it exposed, absorbed as doc 21 Phase 1). Replaces
 [`2026-07-31-coach-override-prescriptions.md`](./2026-07-31-coach-override-prescriptions.md)
-(parked, not deleted — its §2 findings still apply and are used below).
+(closed per A8; its one surviving thread is **N69**).
+
+> **Owner corrections folded into doc 21, recorded here so this doc isn't read
+> as still-open:** §5's floor-vs-absolute recommendation was **rejected** —
+> absolute only (A2); §4's "RIR doesn't move load much" is complemented by an
+> explicit **repricing policy** (doc 21 §4.2 — window-centered reps at the target
+> RIR, the deload's own mechanic); §3's minimal N68 fix is **widened** into real
+> per-set `rir_reported` capture (A1), which absorbs N38; and §9's questions are
+> all answered.
 
 The owner's alternative: instead of a coach-authored prescription-override
 paradigm, give coaches (and the user, somewhere unobtrusive in the UI) the
