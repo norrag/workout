@@ -172,6 +172,58 @@ describe("exercise-level RIR (doc 21 §7.1)", () => {
     );
   });
 
+  // doc 21 Phase 4 — the set cap and the rep position are config inputs on the
+  // same terms: in the hash when assigned, absent when not.
+  it("the set cap and the rep position are omitted when unassigned", () => {
+    const omitted = buildConfigInputs(configArgs());
+    expect(Object.keys(omitted)).not.toContain("exerciseSetCap");
+    expect(Object.keys(omitted)).not.toContain("exerciseRepPosition");
+    expect(
+      computeDepFingerprint(
+        buildConfigInputs({
+          ...configArgs(),
+          exerciseSetCap: null,
+          exerciseRepPosition: null,
+        }),
+        token,
+      ),
+    ).toBe(computeDepFingerprint(omitted, token));
+  });
+
+  it("a cap edit and a rep-position edit each move only their own rows", () => {
+    const unassigned = computeDepFingerprint(
+      buildConfigInputs(configArgs()),
+      token,
+    );
+    const capped = computeDepFingerprint(
+      buildConfigInputs({ ...configArgs(), exerciseSetCap: 2 }),
+      token,
+    );
+    const positioned = computeDepFingerprint(
+      buildConfigInputs({ ...configArgs(), exerciseRepPosition: "top" }),
+      token,
+    );
+    expect(capped).not.toBe(unassigned);
+    expect(positioned).not.toBe(unassigned);
+    expect(positioned).not.toBe(capped);
+    // and each lever clears back to the original hash on its own
+    expect(computeDepFingerprint(buildConfigInputs(configArgs()), token)).toBe(
+      unassigned,
+    );
+  });
+
+  it("write/check equivalence holds for all three levers at once", () => {
+    const args = engineArgs();
+    const levers = {
+      exerciseRir: 6,
+      exerciseSetCap: 2,
+      exerciseRepPosition: "top" as const,
+    };
+    expect(
+      configProjection(buildEngineInputs({ ...args, ...levers })),
+    ).toEqual(buildConfigInputs({ ...configArgs(args), ...levers }));
+  });
+
   it("a seed row carries the assignment into its fingerprint too", () => {
     const seedArgs = {
       equipmentType: "barbell",

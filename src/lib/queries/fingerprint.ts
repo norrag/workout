@@ -110,6 +110,12 @@ export interface ConfigInputArgs {
    *  (unassigned) ⇒ the key is omitted and the hash is byte-identical to every
    *  pre-doc-21 fingerprint. */
   exerciseRir?: EngineInputs["exerciseRir"];
+  /** doc 21 A4 — this slot's resolved working-set cap. Config input, same
+   *  treatment as `exerciseRir`: in the fingerprint, omitted when unassigned. */
+  exerciseSetCap?: EngineInputs["exerciseSetCap"];
+  /** doc 21 §4.2 — this slot's optional rep position. Config input, same
+   *  treatment again (omitted when unset ⇒ byte-identical hash). */
+  exerciseRepPosition?: EngineInputs["exerciseRepPosition"];
 }
 
 /**
@@ -136,6 +142,12 @@ export function buildConfigInputs(args: ConfigInputArgs): ConfigInputs {
     // omitted, not null, when unassigned — `canonicalize` drops undefined, so an
     // unassigned row hashes exactly as it did before the feature existed
     ...(args.exerciseRir != null ? { exerciseRir: args.exerciseRir } : {}),
+    ...(args.exerciseSetCap != null
+      ? { exerciseSetCap: args.exerciseSetCap }
+      : {}),
+    ...(args.exerciseRepPosition != null
+      ? { exerciseRepPosition: args.exerciseRepPosition }
+      : {}),
   };
 }
 
@@ -242,6 +254,10 @@ export interface SeedInputArgs {
   /** doc 21 §7.1: this slot's resolved exercise-level RIR (config; omitted when
    *  unassigned so the seed fingerprint stays byte-identical) */
   exerciseRir?: EngineInputs["exerciseRir"];
+  /** doc 21 A4: this slot's resolved working-set cap (config; omitted when unset) */
+  exerciseSetCap?: EngineInputs["exerciseSetCap"];
+  /** doc 21 §4.2: this slot's rep position (config; omitted when unset) */
+  exerciseRepPosition?: EngineInputs["exerciseRepPosition"];
 }
 
 /**
@@ -259,6 +275,8 @@ export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
     previous: null,
     initial: args.initial,
     exerciseRir: args.exerciseRir,
+    exerciseSetCap: args.exerciseSetCap,
+    exerciseRepPosition: args.exerciseRepPosition,
   });
   return seedEngineInputs(
     config,

@@ -497,6 +497,7 @@ describe("planEffortEdits — writes", () => {
           rir_schedule: null,
           set_cap: null,
           set_cap_schedule: null,
+          rep_position: null,
           effort_reason: "elbow",
         },
       ],
@@ -559,8 +560,8 @@ describe("planEffortEdits — no silent semantics (§4.1)", () => {
   });
 });
 
-describe("planEffortEdits — the set cap is honest about Phase 4", () => {
-  it("says the engine does not clamp to the cap yet", () => {
+describe("planEffortEdits — the set cap is a ceiling (Phase 4)", () => {
+  it("says the cap only lowers the engine's set count", () => {
     const r = effortOk(
       planEffortEdits(
         [{ op: "set_exercise_sets", slot_id: "s-bench", edit: { lever: "sets", value: 2, weeks: [4] } }],
@@ -569,12 +570,12 @@ describe("planEffortEdits — the set cap is honest about Phase 4", () => {
         effortCtx(),
       ),
     );
-    expect(r.warnings.join(" ")).toMatch(/does not clamp its set count to it yet/);
+    expect(r.warnings.join(" ")).toMatch(/only lowers the engine's set count/);
   });
 
   it("says nothing of the kind when the cap is cleared", () => {
     const current = new Map([
-      ["s-bench", { target_rir: null, rir_schedule: null, set_cap: 2, set_cap_schedule: null, effort_reason: null }],
+      ["s-bench", { target_rir: null, rir_schedule: null, set_cap: 2, set_cap_schedule: null, rep_position: null, effort_reason: null }],
     ]);
     const r = effortOk(
       planEffortEdits(
@@ -585,6 +586,96 @@ describe("planEffortEdits — the set cap is honest about Phase 4", () => {
       ),
     );
     expect(r.warnings).toEqual([]);
+  });
+});
+
+describe("planEffortEdits — the rep-position lever (doc 21 §4.2)", () => {
+  it("plans a flat position and says what it displaces", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [
+          {
+            op: "set_exercise_rep_position",
+            slot_id: "s-bench",
+            edit: { lever: "rep_position", position: "top", reason: "shoulder" },
+          },
+        ],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.writes[0].patch).toEqual({
+      rep_position: "top",
+      effort_reason: "shoulder",
+    });
+    expect(r.warnings.join(" ")).toMatch(/replaces the climb schedule/);
+    expect(r.disclosures[0]).toMatchObject({
+      lever: "rep_position",
+      rep_position: "top",
+      assigned_weeks: [],
+      covers_deload_week: false,
+    });
+  });
+
+  it("names no week, so an already-trained day is no obstacle", () => {
+    const r = planEffortEdits(
+      [
+        {
+          op: "set_exercise_rep_position",
+          slot_id: "s-bench",
+          edit: { lever: "rep_position", position: 12 },
+        },
+      ],
+      slotRefs(),
+      new Map(),
+      effortCtx({ lockedWeeksByDay: new Map([[1, [1, 2]]]) }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.writes[0].patch.rep_position).toBe("12");
+  });
+
+  it("refuses a per-week rep position rather than ignoring the weeks", () => {
+    const r = planEffortEdits(
+      [
+        {
+          op: "set_exercise_rep_position",
+          slot_id: "s-bench",
+          edit: { lever: "rep_position", position: "top", weeks: [3, 4] },
+        },
+      ],
+      slotRefs(),
+      new Map(),
+      effortCtx(),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/flat for the slot/);
+  });
+});
+
+describe("toEffortOp — the zod op → the pure intent", () => {
+  it("maps the rep-position op onto its lever", () => {
+    expect(
+      toEffortOp({
+        op: "set_exercise_rep_position",
+        slot_id: "s-bench",
+        position: "center",
+      }),
+    ).toEqual({
+      op: "set_exercise_rep_position",
+      slot_id: "s-bench",
+      edit: { lever: "rep_position", position: "center" },
+    });
+  });
+
+  it("carries clear: true without inventing a position", () => {
+    expect(
+      toEffortOp({
+        op: "set_exercise_rep_position",
+        slot_id: "s-bench",
+        clear: true,
+      }).edit,
+    ).toEqual({ lever: "rep_position", clear: true });
   });
 });
 

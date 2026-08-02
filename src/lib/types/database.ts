@@ -296,6 +296,10 @@ export type MesoExerciseRow = {
   set_cap: number | null;
   /** doc 21 A4 — per-WORKING-week set cap, same shape rules as `rir_schedule` */
   set_cap_schedule: (number | null)[] | null;
+  /** doc 21 §4.2 — where in the goal rep window this slot is priced:
+   *  `bottom|center|top` or an explicit rep count as digits. Null = the climb
+   *  schedule decides. Flat per slot — deliberately no per-week schedule. */
+  rep_position: string | null;
   /** doc 21 A7 — why this slot carries an effort assignment */
   effort_reason: string | null;
   created_at: string;
@@ -824,6 +828,7 @@ export type Database = {
         | "rir_schedule"
         | "set_cap"
         | "set_cap_schedule"
+        | "rep_position"
         | "effort_reason"
       >;
       microcycles: Table<MicrocycleRow>;

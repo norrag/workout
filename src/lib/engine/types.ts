@@ -39,6 +39,19 @@ export const workoutFeedbackInputSchema = z.object({
   performanceRating: z.number().int().min(0).max(10).nullable(),
 });
 
+/**
+ * doc 21 §4.2 — the optional per-slot rep position. Three named positions in the
+ * goal's rep window plus an explicit rep count; the explicit form is clamped to
+ * the window's hard bounds by the engine, never applied outside them. Kept as a
+ * plain union (not an object) so a canonicalized config projection carrying one
+ * is a single scalar, exactly like `exerciseRir`.
+ */
+export const repPositionSchema = z.union([
+  z.enum(["bottom", "center", "top"]),
+  z.number().int().min(1).max(50),
+]);
+export type RepPosition = z.infer<typeof repPositionSchema>;
+
 export const prescriptionSchema = z.object({
   weight: z.number().min(0).nullable(),
   reps: z.number().int().min(1).nullable(),
@@ -89,6 +102,28 @@ export const engineInputsSchema = z.object({
   // omits the key entirely and every pre-doc-21 fingerprint, recorded decision,
   // and input literal stays byte-identical.
   exerciseRir: z.number().int().min(0).max(30).nullish(),
+  // doc 21 A4 / Phase 4 — the slot's working-set CAP for this week, resolved by
+  // the query layer (`slot-effort.ts::slotSetCap`). A ceiling, never a floor: it
+  // clamps the engine's own set count DOWN and never raises it (to seed more
+  // sets, the plan's `initial_sets` is the lever). ABSOLUTE like the RIR
+  // assignment (A2) — an authored cap of 1 wins over `params.min_sets`, which is
+  // what makes a rehab/backoff week expressible at all.
+  //
+  // A CONFIG input for the same reason `exerciseRir` is: a plan-level fact the
+  // coach/athlete authored, so it rides the freshness fingerprint and a cap edit
+  // stales exactly the open rows it touches. `.nullish()` with NO default so an
+  // unassigned slot omits the key and every pre-Phase-4 fingerprint, recorded
+  // decision and input literal stays byte-identical.
+  exerciseSetCap: z.number().int().min(1).max(20).nullish(),
+  // doc 21 §4.2 (the demoted centering rule) — WHERE in the goal rep window this
+  // slot is priced. Optional by design: unset ⇒ the Option-A climb schedule
+  // decides, which is today's behavior and the default. Set ⇒ the schedule is
+  // bypassed for this slot and the load is priced at that rep position, which is
+  // what lets a coach take a deeper cut ("reprice at the top of the window")
+  // without touching the RIR. An explicit number is a rep count, clamped to the
+  // window's hard bounds. Config input, `.nullish()` with no default, same
+  // fingerprint treatment as the two above.
+  exerciseRepPosition: repPositionSchema.nullish(),
   // last week's prescription for this exercise (null in week 1)
   previous: prescriptionSchema.nullable(),
   // what was actually performed against `previous`

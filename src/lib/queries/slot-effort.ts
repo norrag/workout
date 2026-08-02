@@ -23,6 +23,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { repPositionSchema, type RepPosition } from "@/lib/engine";
+
+export type { RepPosition };
 
 /** The assignment columns of one `meso_exercises` row (doc 21 §3). */
 export interface SlotEffortAssignment {
@@ -30,6 +33,12 @@ export interface SlotEffortAssignment {
   rir_schedule: (number | null)[] | null;
   set_cap: number | null;
   set_cap_schedule: (number | null)[] | null;
+  /** doc 21 §4.2 (Phase 4) — the optional rep position, stored as text: one of
+   *  `bottom|center|top` or an explicit rep count as digits. Flat per slot, with
+   *  NO per-week schedule: it is a statement about how this exercise is priced,
+   *  not an intensity that ramps, and a second week-indexed array would be a
+   *  knob nobody asked for. */
+  rep_position: string | null;
   effort_reason: string | null;
 }
 
@@ -86,6 +95,33 @@ export function slotSetCap(
   return pickWeek(assignment.set_cap, assignment.set_cap_schedule, weekNumber);
 }
 
+/**
+ * Parse the stored `rep_position` text into the engine's union (doc 21 §4.2).
+ * Unrecognized text resolves to null — the knob is optional everywhere, so a row
+ * the DB check somehow let through degrades to "the schedule decides" rather
+ * than failing a prescription.
+ */
+export function parseRepPosition(
+  stored: string | null | undefined,
+): RepPosition | null {
+  if (stored == null) return null;
+  const raw = /^\d+$/.test(stored) ? Number(stored) : stored;
+  const parsed = repPositionSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+/** The storage form of a rep position — the inverse of `parseRepPosition`. */
+export function repPositionToDb(position: RepPosition): string {
+  return typeof position === "number" ? String(position) : position;
+}
+
+/** The slot's rep position, or null when unassigned. Pure. */
+export function slotRepPosition(
+  assignment: SlotEffortAssignment | null | undefined,
+): RepPosition | null {
+  return parseRepPosition(assignment?.rep_position);
+}
+
 /** The resolved effort for one slot in one week (§4.1). */
 export interface ResolvedSlotEffort {
   /** the RIR the engine prices against: `slotRir ?? weekRir` */
@@ -96,6 +132,8 @@ export interface ResolvedSlotEffort {
   weekRir: number;
   /** the slot's working-set cap for this week, when assigned */
   setCap: number | null;
+  /** §4.2 — where in the rep window this slot is priced; null = the schedule */
+  repPosition: RepPosition | null;
   /** A7 — surfaced next to the assignment wherever it reads */
   reason: string | null;
   /** true while an assignment is EASING this slot relative to the week's ramp.
@@ -121,6 +159,7 @@ export function resolveSlotEffort(
     assignedRir,
     weekRir,
     setCap: slotSetCap(assignment, weekNumber),
+    repPosition: slotRepPosition(assignment),
     reason: assignment?.effort_reason ?? null,
     backedOff: assignedRir != null && assignedRir > weekRir,
   };
@@ -138,6 +177,44 @@ export function exerciseRirInput(
   weekNumber: number,
 ): number | undefined {
   return slotRir(assignment, weekNumber) ?? undefined;
+}
+
+/** The `exerciseSetCap` engine input for a slot (doc 21 A4). Undefined — not
+ *  null — when unassigned, for exactly the reason above. */
+export function exerciseSetCapInput(
+  assignment: SlotEffortAssignment | null | undefined,
+  weekNumber: number,
+): number | undefined {
+  return slotSetCap(assignment, weekNumber) ?? undefined;
+}
+
+/** The `exerciseRepPosition` engine input for a slot (doc 21 §4.2). Undefined
+ *  when unassigned, same fingerprint reasoning. */
+export function exerciseRepPositionInput(
+  assignment: SlotEffortAssignment | null | undefined,
+): RepPosition | undefined {
+  return slotRepPosition(assignment) ?? undefined;
+}
+
+/** All three engine inputs for one slot in one week, spread-ready: every key is
+ *  OMITTED when its lever is unassigned, so an unassigned slot's config
+ *  projection is byte-identical to a pre-doc-21 one. */
+export function slotEffortInputs(
+  assignment: SlotEffortAssignment | null | undefined,
+  weekNumber: number,
+): {
+  exerciseRir?: number;
+  exerciseSetCap?: number;
+  exerciseRepPosition?: RepPosition;
+} {
+  const rir = exerciseRirInput(assignment, weekNumber);
+  const setCap = exerciseSetCapInput(assignment, weekNumber);
+  const repPosition = exerciseRepPositionInput(assignment);
+  return {
+    ...(rir != null ? { exerciseRir: rir } : {}),
+    ...(setCap != null ? { exerciseSetCap: setCap } : {}),
+    ...(repPosition != null ? { exerciseRepPosition: repPosition } : {}),
+  };
 }
 
 /**
@@ -194,6 +271,7 @@ export interface SlotEffortPatch {
   rir_schedule?: (number | null)[] | null;
   set_cap?: number | null;
   set_cap_schedule?: (number | null)[] | null;
+  rep_position?: string | null;
   effort_reason?: string | null;
 }
 
@@ -204,6 +282,7 @@ export function emptySlotEffort(): SlotEffortAssignment {
     rir_schedule: null,
     set_cap: null,
     set_cap_schedule: null,
+    rep_position: null,
     effort_reason: null,
   };
 }
@@ -232,8 +311,12 @@ export function applySlotEffortPatch(
  * — a reason with nothing to explain is noise in every surface that reads it.
  */
 export interface SlotEffortEdit {
-  lever: "rir" | "sets";
+  /** doc 21 Phase 4 adds `rep_position`, which is FLAT per slot: it takes
+   *  `position` and refuses `weeks`/`schedule` (see `planSlotEffortEdit`). */
+  lever: "rir" | "sets" | "rep_position";
   value?: number | null;
+  /** `rep_position` only — `bottom | center | top` or an explicit rep count */
+  position?: RepPosition | null;
   weeks?: number[] | null;
   schedule?: (number | null)[] | null;
   clear?: boolean;
@@ -275,7 +358,9 @@ interface LeverSpec {
   unit: (v: number) => string;
 }
 
-const LEVERS: Record<SlotEffortEdit["lever"], LeverSpec> = {
+/** The two WEEK-SCHEDULED levers. `rep_position` is deliberately absent: it is
+ *  flat per slot and has its own planner (`planRepPositionEdit`). */
+const LEVERS: Record<"rir" | "sets", LeverSpec> = {
   rir: {
     flat: "target_rir",
     sched: "rir_schedule",
@@ -310,6 +395,8 @@ export function planSlotEffortEdit(
   edit: SlotEffortEdit,
   shape: { weeks: number; includesDeload: boolean },
 ): SlotEffortEditResult {
+  if (edit.lever === "rep_position")
+    return planRepPositionEdit(current, edit, shape);
   const spec = LEVERS[edit.lever];
   const workingWeeks = shape.includesDeload ? shape.weeks - 1 : shape.weeks;
   if (workingWeeks < 1)
@@ -444,6 +531,98 @@ export function planSlotEffortEdit(
   };
 }
 
+/**
+ * The rep-position lever (doc 21 §4.2), planned through the same entry point and
+ * the same result shape as the two week-scheduled levers so a caller composing a
+ * batch never has to branch. Flat by design: `weeks` and `schedule` are refused
+ * rather than quietly ignored, because a caller that asked for a per-week rep
+ * position asked for something this column cannot express.
+ *
+ * `byWeek` / `assignedWeeks` / `coversDeload` are deliberately empty-and-false:
+ * they describe a per-week intensity assignment, and a rep position is neither
+ * per-week nor an intensity. That also means the batch planner's already-trained
+ * -week warning and its deload disclosure stay silent for this lever, which is
+ * correct — there is no week it can name.
+ */
+function planRepPositionEdit(
+  current: SlotEffortAssignment,
+  edit: SlotEffortEdit,
+  shape: { weeks: number; includesDeload: boolean },
+): SlotEffortEditResult {
+  const workingWeeks = shape.includesDeload ? shape.weeks - 1 : shape.weeks;
+  if (workingWeeks < 1)
+    return { ok: false, error: "this mesocycle has no working weeks to assign." };
+  if (edit.weeks != null || edit.schedule != null)
+    return {
+      ok: false,
+      error:
+        "rep position is flat for the slot — it takes no weeks or schedule. Use set_exercise_rir for a per-week assignment.",
+    };
+  if (edit.value != null)
+    return {
+      ok: false,
+      error: "rep position takes `position` (bottom | center | top | a rep count), not a value.",
+    };
+
+  const wantsClear = edit.clear === true || edit.position === null;
+  if (!wantsClear && edit.position === undefined)
+    return {
+      ok: false,
+      error:
+        "nothing to set — give a position (bottom | center | top | a rep count) or clear: true.",
+    };
+  if (edit.clear === true && edit.position != null)
+    return { ok: false, error: "give exactly one of a position or clear: true." };
+  if (!wantsClear) {
+    const parsed = repPositionSchema.safeParse(edit.position);
+    if (!parsed.success)
+      return {
+        ok: false,
+        error:
+          "rep position must be bottom, center, top, or a whole rep count 1–50.",
+      };
+  }
+
+  const patch: SlotEffortPatch = {
+    rep_position: wantsClear ? null : repPositionToDb(edit.position!),
+  };
+  if (edit.reason !== undefined) {
+    const trimmed = edit.reason?.trim();
+    if (trimmed != null && trimmed.length > EFFORT_REASON_MAX)
+      return {
+        ok: false,
+        error: `reason is limited to ${EFFORT_REASON_MAX} characters (got ${trimmed.length}).`,
+      };
+    patch.effort_reason = trimmed != null && trimmed.length > 0 ? trimmed : null;
+  }
+
+  let next = applySlotEffortPatch(current, patch);
+  const cleared = !hasAssignment(next);
+  if (cleared && next.effort_reason != null) {
+    patch.effort_reason = null;
+    next = applySlotEffortPatch(next, { effort_reason: null });
+  }
+
+  return {
+    ok: true,
+    plan: {
+      patch,
+      next,
+      byWeek: Array.from({ length: workingWeeks }, () => null),
+      assignedWeeks: [],
+      cleared,
+      coversDeload: false,
+      summary: wantsClear
+        ? "cleared the rep position — the climb schedule decides again"
+        : `priced at ${
+            typeof edit.position === "number"
+              ? `${edit.position} reps`
+              : `the ${edit.position} of the rep window`
+          }`,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // loading (the only I/O in this module — everything above is pure)
 // ---------------------------------------------------------------------------
@@ -459,7 +638,8 @@ export function hasAssignment(a: SlotEffortAssignment): boolean {
     a.target_rir != null ||
     a.rir_schedule != null ||
     a.set_cap != null ||
-    a.set_cap_schedule != null
+    a.set_cap_schedule != null ||
+    a.rep_position != null
   );
 }
 
@@ -508,12 +688,12 @@ export async function getSlotEffortRows(
   let query = client
     .from("meso_exercises")
     .select(
-      "id, exercise_id, day_of_week, meso_day_group_id, target_rir, rir_schedule, set_cap, set_cap_schedule, effort_reason",
+      "id, exercise_id, day_of_week, meso_day_group_id, target_rir, rir_schedule, set_cap, set_cap_schedule, rep_position, effort_reason",
     )
     .eq("mesocycle_id", mesoId);
   if (assignedOnly)
     query = query.or(
-      "target_rir.not.is.null,rir_schedule.not.is.null,set_cap.not.is.null,set_cap_schedule.not.is.null",
+      "target_rir.not.is.null,rir_schedule.not.is.null,set_cap.not.is.null,set_cap_schedule.not.is.null,rep_position.not.is.null",
     );
   const { data: slots, error } = await query;
   if (error) throw error;
@@ -560,6 +740,7 @@ export async function getSlotEffortRows(
         rir_schedule: slot.rir_schedule,
         set_cap: slot.set_cap,
         set_cap_schedule: slot.set_cap_schedule,
+        rep_position: slot.rep_position,
         effort_reason: slot.effort_reason,
       },
     });
@@ -612,6 +793,7 @@ export async function restoreSlotEffortAssignments(
       rir_schedule: saved.rir_schedule,
       set_cap: saved.set_cap,
       set_cap_schedule: saved.set_cap_schedule,
+      rep_position: saved.rep_position,
       effort_reason: saved.effort_reason,
     });
     restored++;
@@ -633,7 +815,7 @@ export function slotEffortSignatureInput(
   return [...assignments.entries()]
     .map(
       ([key, a]) =>
-        `${key}|${a.target_rir ?? ""}|${(a.rir_schedule ?? []).map((v) => v ?? "").join(",")}|${a.set_cap ?? ""}|${(a.set_cap_schedule ?? []).map((v) => v ?? "").join(",")}`,
+        `${key}|${a.target_rir ?? ""}|${(a.rir_schedule ?? []).map((v) => v ?? "").join(",")}|${a.set_cap ?? ""}|${(a.set_cap_schedule ?? []).map((v) => v ?? "").join(",")}|${a.rep_position ?? ""}`,
     )
     .sort();
 }

@@ -26,7 +26,7 @@ import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
 import { scheduleWorkoutExplanations } from "@/lib/llm/explanations";
 import { getBandPosition } from "./envelope";
 import {
-  exerciseRirInput,
+  slotEffortInputs,
   getSlotEffortAssignments,
   slotEffortKey,
   type SlotEffortMap,
@@ -158,6 +158,10 @@ export function buildEngineInputs(args: {
    *  generated (`slot-effort.ts::exerciseRirInput`). A CONFIG input — it rides
    *  `buildConfigInputs` into the fingerprint; omitted when unassigned */
   exerciseRir?: EngineInputs["exerciseRir"];
+  /** doc 21 A4: the slot's resolved working-set cap for that week (config) */
+  exerciseSetCap?: EngineInputs["exerciseSetCap"];
+  /** doc 21 §4.2: the slot's rep position (config) */
+  exerciseRepPosition?: EngineInputs["exerciseRepPosition"];
 }): EngineInputs {
   const { we } = args;
   // config half resolved through the single shared resolver (doc 14 §3) so the
@@ -179,6 +183,8 @@ export function buildEngineInputs(args: {
       previous,
       initial: null,
       exerciseRir: args.exerciseRir,
+      exerciseSetCap: args.exerciseSetCap,
+      exerciseRepPosition: args.exerciseRepPosition,
     }),
     actualSets: args.sets.map((s, index) => ({
       setNumber: s.set_number,
@@ -399,7 +405,7 @@ async function generateDay(
       // doc 21 §4.1: the slot's assignment for the week being generated — the
       // day slot is the plan's, so it is keyed off the SOURCE workout's day
       // number (the counterpart being generated has the same one)
-      exerciseRir: exerciseRirInput(
+      ...slotEffortInputs(
         ctx.slotEffort.get(
           slotEffortKey(weekNWorkout.day_number, we.exercise_id),
         ),
@@ -1357,7 +1363,7 @@ export async function projectNextPrescription(
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,
     bodyweight: profile.bodyweight ?? null,
-    exerciseRir: exerciseRirInput(
+    ...slotEffortInputs(
       projectionEffort.get(slotEffortKey(sourceWorkout.day_number, exerciseId)),
       nextMicro?.week_number ?? micro.week_number,
     ),

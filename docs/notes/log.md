@@ -4,6 +4,51 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-02 — Session 97: doc 21 Phase 4 built — the set lever bites, and the rep-position knob (N70)
+
+The second and third levers on a slot. Phase 3 made the assignment writable;
+Phase 4 makes the set cap *do* something and adds the one knob §4.2 kept when it
+retracted the forced-centering rule.
+
+- **N70 → Phase 4 done (PR #<n>).** Row updated; the item stays live (Phases 5–6
+  remain).
+- **The cap is applied once, at the boundary.** `cappedSets` wraps `prescribe()`
+  and `seedMeso()` rather than editing each branch's `sets` expression (deload,
+  cold start, seed anchor, rep window, bodyweight all land on a set count
+  already). It sits *outside* the doc-16 progression wrapper deliberately: sets
+  play no part in the earn gate or the realized-ask comparison, so a capped
+  week's progression trace is identical to an uncapped one's.
+- **A ceiling, and absolute.** `min(sets, cap)`, applied after
+  `clampSets(…, params)` — so an authored cap of 1 wins over `params.min_sets`,
+  which is the rehab case the lever exists for. It never raises the count;
+  `set_baseline_sets` stays the way to start an exercise on more sets, and the
+  Phase-3 "the engine doesn't clamp to this yet" warning is replaced by the one
+  that now matters.
+- **`rep_position` stays a knob, not a rule.** §4.2's correction is untouched —
+  repricing at a different RIR needs no special case. Unset ⇒ the Option-A climb
+  schedule decides, byte for byte; set ⇒ `repsAtPosition` replaces the schedule's
+  rep choice at the three sites that make one, and the existing pricing path does
+  the rest. Named positions resolve against the target band, an explicit rep count
+  is clamped to the window's hard bounds — a coach can ask for 15s but cannot
+  escape the goal's window.
+- **Flat per slot, on purpose.** One `rep_position text` column, no third
+  week-indexed array: the position is how the exercise is priced, not an intensity
+  that ramps. The MCP op **refuses** `weeks`/`schedule` instead of ignoring them,
+  so a caller who wanted a per-week position is told the column cannot express it.
+- **Freshness is one key per lever.** `exerciseSetCap` and `exerciseRepPosition`
+  join `exerciseRir` in `buildConfigInputs`, each omitted when its own lever is
+  unassigned; the recompute's explicit key-drop (Phase 2's non-obvious guard) now
+  runs per lever, so clearing one assignment can't leave another replaying off a
+  stale copy.
+- **One honesty fix on the read side.** `get_current_state` described a slot
+  carrying only a set cap as "running at an assigned RIR" — quoting the week's own
+  value as if it had been authored. The RIR sentence now covers only RIR-assigned
+  slots; caps and positions get their own clause.
+- *Deliberately not here:* the prescription-strip copy for either lever. The trace
+  and rationale carry both (visible over `explain_prescription`), but the
+  deterministic *why* line and the doc-19 facts payload are Phase 6's subject,
+  with the rest of the explanation layering and its design pass.
+
 ## 2026-08-02 — Session 96: the set-logging queue's echo rule (N73)
 
 Owner reported two regressions from N68's write queue: a ~1s "ping-pong" where a

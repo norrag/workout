@@ -1513,6 +1513,7 @@ describe("write integrity (R3/R4)", () => {
         target_rir: 4,
         rir_schedule: [null, null, 4, 4],
         set_cap: 2,
+        rep_position: "top",
         effort_reason: "left elbow rehab",
       })
       .eq("id", slot!.id);
@@ -1532,6 +1533,19 @@ describe("write integrity (R3/R4)", () => {
       .eq("id", slot!.id);
     expect(tooDeep).not.toBeNull();
 
+    // doc 21 §4.2: the rep position takes a named position or a rep count, and
+    // the CHECK refuses anything else
+    const { error: repCount } = await alice
+      .from("meso_exercises")
+      .update({ rep_position: "15" })
+      .eq("id", slot!.id);
+    expect(repCount).toBeNull();
+    const { error: badPosition } = await alice
+      .from("meso_exercises")
+      .update({ rep_position: "middle" })
+      .eq("id", slot!.id);
+    expect(badPosition).not.toBeNull();
+
     // bob sees nothing and changes nothing
     const { data: bobRead } = await bob
       .from("meso_exercises")
@@ -1545,12 +1559,13 @@ describe("write integrity (R3/R4)", () => {
       .eq("id", slot!.id);
     const { data: after } = await alice
       .from("meso_exercises")
-      .select("target_rir, effort_reason, set_cap")
+      .select("target_rir, effort_reason, set_cap, rep_position")
       .eq("id", slot!.id)
       .single();
     expect(after!.target_rir).toBe(21);
     expect(after!.effort_reason).toBe("left elbow rehab");
     expect(after!.set_cap).toBe(2);
+    expect(after!.rep_position).toBe("15");
   });
 
   it("save_meso_plan refuses another user's meso and leaves the plan intact", async () => {

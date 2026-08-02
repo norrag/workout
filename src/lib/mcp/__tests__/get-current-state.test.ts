@@ -174,6 +174,7 @@ describe("formatCurrentState", () => {
           assignedRir: 4,
           weekRir: 1,
           setCap: null,
+          repPosition: null,
           reason: "right elbow",
           backedOff: true,
         },
@@ -187,6 +188,7 @@ describe("formatCurrentState", () => {
         target_rir: 4,
         week_target_rir: 1,
         set_cap: null,
+        rep_position: null,
         reason: "right elbow",
         backed_off: true,
       },
@@ -194,6 +196,39 @@ describe("formatCurrentState", () => {
     // the authored effort level is stated before anything narrates the engine
     expect(out.summary).toMatch(/Bench Press: RIR 4 — right elbow/);
     expect(out.summary).toMatch(/no progression is earned/);
+  });
+
+  it("discloses a set cap / rep position without claiming an assigned RIR (Phase 4)", () => {
+    const out = formatCurrentState({
+      macrocycle: macro(),
+      mesocycle: meso(),
+      microcycle: micro(),
+      nextWorkout: workout(),
+      slotEffort: [
+        {
+          dayNumber: 2,
+          exerciseId: "e-row",
+          exerciseName: "Barbell Row",
+          // the ramp is still in control of the effort — only the other two
+          // levers are authored here
+          rir: 1,
+          assignedRir: null,
+          weekRir: 1,
+          setCap: 2,
+          repPosition: "top",
+          reason: "volume trim",
+          backedOff: false,
+        },
+      ],
+    });
+    expect(out.effort_assignments?.[0]).toMatchObject({
+      set_cap: 2,
+      rep_position: "top",
+    });
+    expect(out.summary).toMatch(/capped at 2 sets/);
+    expect(out.summary).toMatch(/top of the rep window/);
+    // and it must NOT be described as running at an assigned RIR
+    expect(out.summary).not.toMatch(/at an assigned RIR/);
   });
 
   it("omits the key entirely when nothing is assigned", () => {
