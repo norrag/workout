@@ -14,9 +14,9 @@ import {
   NON_MEASURING_CONFIDENCE,
 } from "../predict";
 import { recencyWeightedE1rm, type E1rmSample } from "../reps";
-import { V20_PARAMS, V24_PARAMS } from "./helpers";
+import { V20_PARAMS, V26_PARAMS } from "./helpers";
 
-const BAND = V24_PARAMS.e1rm; // max_measuring_rir: 8
+const BAND = V26_PARAMS.e1rm; // max_measuring_rir: 8
 const NO_BAND = V20_PARAMS.e1rm; // the key is absent
 
 describe("isMeasuringRir — the boundary (§6.1)", () => {
@@ -101,7 +101,7 @@ describe("anchor freeze under a deep back-off (§6.1)", () => {
   function anchorOf(samples: E1rmSample[], cfg: typeof BAND) {
     return recencyWeightedE1rm(
       samples.filter((s) => isMeasuringRir(s.targetRir, cfg)),
-      { ...V24_PARAMS, e1rm: cfg },
+      { ...V26_PARAMS, e1rm: cfg },
     );
   }
 

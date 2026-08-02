@@ -531,7 +531,12 @@ freeze under a deep-backoff block; absent param ⇒ byte-identical.
   Phase 1 closed everywhere else was still live in that one view). It now reads
   `logged_sets.e1rm`, keeps the in-view expression only as a fallback for
   never-stamped rows, and excludes `'none'` outright.
-- Ships as **engine_params v24, INACTIVE**. `max_measuring_rir` is `.optional()`
+- Ships as **engine_params v26, INACTIVE** — built on the **active v25**, not on
+  the v23 file next door. The hosted chain runs ahead of `supabase/migrations`:
+  v22, v24 and v25 were admin-MCP micro-bumps with no committed migration (the
+  v23 file records the same pattern for v22), and v24/v25 carry
+  `rate_source: "plan"` + the §7 envelope loop. Basing the band row on v23 would
+  have silently reverted both on activation. `max_measuring_rir` is `.optional()`
   and 8 is the pre-doc-21 `target_rir` ceiling, so activation restamps nothing
   and the replay diff is expected empty.
 

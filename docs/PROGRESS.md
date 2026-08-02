@@ -101,7 +101,7 @@ of e1RM, so at RIR 21 the estimate is ~70 % assumption, and the confidence ladde
 bottoms out at `low` — a set at RIR 4 and a set at RIR 21 make the same honesty
 claim.
 
-`e1rm.max_measuring_rir` (**v24**, 8 per §9.3) draws a hard boundary *below* the
+`e1rm.max_measuring_rir` (**v26**, 8 per §9.3) draws a hard boundary *below* the
 ladder — it answers "is this a measurement at all", not "how precise is it". Past
 it a set is priced and performed normally but is not measured: `logged_sets.e1rm`
 null, `e1rm_confidence` `'none'` (a new label), dropped from the anchor, excluded
@@ -136,10 +136,19 @@ is honored end to end (seed, advance, day-view projection, reconcile). There is
 `set_exercise_sets`) and Phase 6 (UI + explanation), so in practice the lever is
 inert until one of those lands.
 
-`max_measuring_rir` ships **inactive** (v24, `.optional()`, absent through the
-active v23), and 8 is the pre-doc-21 `target_rir` ceiling — so no set that can
-exist today becomes non-measuring and the activation replay diff is expected
-empty. Activation is the usual doc-14 v-bump, recorded in
+`max_measuring_rir` ships **inactive** as **v26**, built on the **active v25**.
+Worth recording, because it nearly went wrong: the hosted params chain runs ahead
+of `supabase/migrations` — v22, v24 and v25 were admin-MCP micro-bumps with no
+committed migration (the v23 file already records that pattern for v22), and
+v24/v25 carry `rate_source: "plan"` plus the doc 17 §7 envelope loop. A band row
+built on the v23 file would have collided with the real v24 *and* silently
+reverted the rate source and the envelope loop when activated. The migration is
+now generated from v25's stored materialization and its hash is pinned in
+`params-provenance.test.ts`.
+
+8 is the pre-doc-21 `target_rir` ceiling, so no set that can exist today becomes
+non-measuring and the activation replay diff is expected empty. Activation is the
+usual doc-14 v-bump, recorded in
 [deployment/manual-operations.md](deployment/manual-operations.md).
 
 Full suite green (1568, +76), typecheck + lint clean.

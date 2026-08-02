@@ -494,7 +494,7 @@ the rate-source flip (`band_position` composes identically under `"band"` and
 | **③ Owner reviews + activates** | Sanity-check the position the fold currently derives for the owner's own history (reads from the same `get_progression_history` evidence; short of `min_history_mesos` qualifying mesos it is exactly the default). Activate via `activate_engine_params`; roll back by re-activating the prior row — the loop is OFF again instantly (derived, no stored state to unwind). |
 | **④ Monitor + refit (standing)** | Each decision records the position it consumed in its `inputs` (`get_engine_decisions`), so the position's trajectory is reconstructible per meso boundary. As real mesos complete, check the provisional `raise`/`lower` cutoffs against the observed `get_progression_history` distributions (does a "good" meso clear `earn_rate 0.7` with `miss_ratio ≤ 0.2`? do rate-pacer trips occur at all?) and refit via a further micro-bump if not. Watch for the §7 worst case: a position pinned at 0/1 for consecutive boundaries means the thresholds need a refit (both are defensible programs, but a pin is a signal, not a steady state). The fold + goldens live in `src/lib/engine/rules/envelope.ts` / `__tests__/envelope.test.ts`. |
 
-### Apply the doc 21 Phase 2/2b migrations + activate engine_params **v24** (the measuring band)
+### Apply the doc 21 Phase 2/2b migrations + activate engine_params **v26** (the measuring band)
 
 Three migrations land with doc 21 Phase 2/2b. The first two are **additive and
 inert** (no behavior change on apply); only the v24 activation changes anything,
@@ -504,9 +504,18 @@ and even that is expected to be a no-op.
 |---|---|
 | **① Apply `20260802000001_exercise_level_rir`** | Adds the `meso_exercises` effort-assignment columns and widens the `microcycles` / `workout_exercises` `target_rir` CHECKs 0–8 → 0–30. Pure widening + nullable columns, so every existing row stays valid and no data migration runs. RLS unchanged (`meso_exercises_all_own` covers new columns). Nothing writes an assignment until doc 21 Phase 3 (MCP) or Phase 6 (UI), so the lever is inert on apply. |
 | **② Apply `20260802000002_measuring_band`** | Widens `logged_sets.e1rm_confidence` to admit `'none'` and rebuilds `v_exercise_prs` to read the stored per-set stamp (`logged_sets.e1rm`) instead of re-computing e1RM in SQL off `coalesce(rir_reported, 0)`. **This one is not purely cosmetic:** the old view ignored doc 21 §2's shared RIR resolution, so PRs were still computed on the pre-Phase-1 "every set taken to failure" assumption. After apply, PR e1RMs read whatever the stamps currently say. If `restamp_e1rm` has not been run against production yet (see the Phase-1 entry / doc 10 §9.1), run it **before or right after** this migration so the view and the stamps agree; until then, PRs move only for sets stamped since the Phase-1 deploy. `best_weight` / `best_reps` keep their coherent-set semantics either way. |
-| **③ Apply `20260802000003_engine_params_v24_measuring_band`** | Inserts engine_params v24 with `is_active = false`. v23-or-whatever-is-active stays active; nothing changes for users. |
-| **④ Replay diff for v24** | Admin MCP `replay_decisions` against the candidate. Expected: **empty**. `max_measuring_rir` is 8, which is the pre-doc-21 `target_rir` ceiling, so no set that can exist today is past the band and no prescription, anchor, or stamp moves. A non-empty diff means something already wrote a `target_rir` above 8 — investigate before activating. |
-| **⑤ Activate v24** | `activate_engine_params { version: 24 }` (or the single-active SQL pair). This is what arms the band. Roll back by re-activating the prior version — the band is a pure read-time rule plus a stamp, and `activate_engine_params` restamps when an `e1rm` value moves, so a rollback restamps back. |
+| **③ Apply `20260802000003_engine_params_v26_measuring_band`** | Inserts engine_params **v26** with `is_active = false`. v25 stays active; nothing changes for users. |
+| **④ Replay diff for v26** | Admin MCP `replay_decisions` against the candidate. Expected: **empty**. `max_measuring_rir` is 8, which is the pre-doc-21 `target_rir` ceiling, so no set that can exist today is past the band and no prescription, anchor, or stamp moves. A non-empty diff means something already wrote a `target_rir` above 8 — investigate before activating. |
+| **⑤ Activate v26** | `activate_engine_params { version: 26 }` (or the single-active SQL pair). This is what arms the band. Roll back by re-activating v25 — the band is a pure read-time rule plus a stamp, and `activate_engine_params` restamps when an `e1rm` value moves, so a rollback restamps back. |
+
+> **The hosted params chain runs AHEAD of `supabase/migrations`.** v22, v24 and
+> v25 were applied through admin MCP and carry no committed migration file (the
+> v23 migration records the same for v22). v24 is doc 17 Phase R's `rate_source`
+> flip to "plan"; v25 — the active row — adds the §7 envelope loop. **Any new
+> params row must be built from the ACTIVE row's stored materialization, not
+> from the newest file in this repo**, or activating it silently reverts
+> everything the uncommitted bumps turned on. v26 was generated that way and its
+> hash is pinned in `params-provenance.test.ts`.
 
 > **Ordering matters between ① and ⑤ only in one direction:** the widened
 > `target_rir` CHECK must be applied before anything can write an out-of-band

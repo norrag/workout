@@ -392,12 +392,19 @@ describe("resolveProvenance", () => {
     );
   });
 
-  it("v24 is a complete, replayable snapshot matching the migration hash", () => {
-    // v24 = v23 + `e1rm.max_measuring_rir: 8` (doc 21 §6.1 — the measuring
-    // band, the guard that makes §4.3's unbounded prescription RIR safe). The
-    // key is `.optional()`, so v23/earlier rows are byte-identical and the new
-    // row stays replayable.
-    const v24 = engineParamsSchema.parse({
+  it("v26 is a complete, replayable snapshot matching the migration hash", () => {
+    // v26 = the ACTIVE v25 + `e1rm.max_measuring_rir: 8` (doc 21 §6.1 — the
+    // measuring band, the guard that makes §4.3's unbounded prescription RIR
+    // safe). The key is `.optional()`, so v25/earlier rows are byte-identical
+    // and the new row stays replayable.
+    //
+    // NOTE the base. The hosted chain runs ahead of supabase/migrations: v22,
+    // v24 and v25 were admin-MCP micro-bumps with no committed migration (the
+    // v23 file records the same pattern for v22). v24 flipped
+    // `progression.rate_source` to "plan" (doc 17 Phase R) and v25 — active —
+    // added the §7/N36 envelope block. Both are reconstructed here, because
+    // basing v26 on the v23 literal would silently revert them on activation.
+    const v26 = engineParamsSchema.parse({
       ...V11_PARAMS,
       climb_on_performed_reps: true,
       bound_to_target_window: true,
@@ -418,7 +425,7 @@ describe("resolveProvenance", () => {
         compliance_band: 0.015,
         cadence: "microcycle",
         pacing: "macro_rate",
-        rate_source: "band",
+        rate_source: "plan", // v24
         band_position: 0.5,
         goal_rate_factor: {
           strength: 1.0,
@@ -431,6 +438,27 @@ describe("resolveProvenance", () => {
         max_gap_days: 10,
         peak_week: "skip",
         max_pct_per_step: 0.05,
+        envelope: {
+          // v25
+          enabled: true,
+          lookback_mesos: 3,
+          min_history_mesos: 2,
+          min_decisions: 8,
+          max_age_days: 180,
+          dwell_mesos: 1,
+          step: 0.1,
+          raise: {
+            earn_rate: 0.7,
+            max_miss_ratio: 0.2,
+            over_share: 0.25,
+            pacer_trips: 2,
+          },
+          lower: {
+            miss_ratio: 0.5,
+            throttle_trips: 2,
+            workload_firings: 3,
+          },
+        },
       },
       macro_target: {
         ...V11_PARAMS.macro_target,
@@ -451,11 +479,11 @@ describe("resolveProvenance", () => {
         },
       },
     });
-    const p = resolveProvenance(v24 as unknown as Record<string, unknown>);
+    const p = resolveProvenance(v26 as unknown as Record<string, unknown>);
     expect(p.is_replayable).toBe(true);
     expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION); // optional key: no shape bump
     expect(p.params_hash).toBe(
-      "5f103dc7f59f5b23ce53075df352a2ce1b464878a7c24422bd449a5bb8fb6d6a",
+      "6dd0224425b8c6afaa51f442386cddb7672f31727604ad578120f8c7c5eb96fa",
     );
   });
 
