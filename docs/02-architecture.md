@@ -37,8 +37,48 @@ The feedback/progression engine lives in `src/lib/engine/` as **pure, determinis
 ### A4 — MCP server inside the Next.js app
 The MCP server is a route handler (`/api/mcp`) using `@modelcontextprotocol/sdk` over the streamable HTTP transport, with OAuth-style auth bridged to Supabase Auth. It shares the engine package and typed query layer with the app. See [05-mcp-connector.md](05-mcp-connector.md).
 
-### A5 — PWA, online-only (revised June 2026)
-Service worker (Serwist) precaches the shell for installability and fast loads. **There is no offline logging or outbox** — the app requires connectivity and shows a clean "no connection" state otherwise. Reads use stale-while-revalidate for snappiness only; writes go straight to Supabase with optimistic UI.
+### A5 — PWA: online reads, queued set-logging writes (revised 2026-07-31, N68)
+
+Service worker (Serwist) precaches the shell for installability and fast loads.
+
+**Reads are online-only.** Nothing beyond immutable build assets is runtime-cached
+(R7): a stale prescription served from cache with nothing marking it stale is worse
+than no page at all, so an offline navigation gets the precached `/~offline`
+interstitial. That decision stands.
+
+**Set-logging writes go through a durable client-side queue** (`src/lib/logging/queue.ts`
++ `components/logging/SetLogQueueProvider.tsx`). This reverses the original
+"no outbox" call, for a reason the original decision didn't anticipate: awaiting the
+write *inline* did not just make logging slow on a bad connection, it could strand the
+session — the checkbox filled on the server's ack but the active set only advanced when
+the RSC revalidation committed, so a stalled revalidation left the lifter unable to log
+the next set without relaunching the app. Taking the write off the interaction path is
+what removes that failure mode; surviving a dropped connection is the by-product.
+
+The shape:
+
+- **Enqueue, don't await.** A tap appends an op and returns. The day view derives which
+  set is active from server rows **plus** the queue's outstanding ops, so the UI advances
+  off the tap, never off the network.
+- **One serial processor**, oldest op first, so sets land in the order they were
+  performed. It retries with capped exponential backoff and parks an op as `failed`
+  after 8 attempts — a logged set is never silently discarded.
+- **Idempotent ops only.** `logSet` upserts on `(workout_exercise_id, set_number)` (R3),
+  `amendSet` addresses one immutable set id, the planned-weight write is an overwrite.
+  Blind retry is therefore safe. Deletes and unlogs stay foreground writes for exactly
+  this reason.
+- **Persisted** to `localStorage`, validated on read, so a quit/relaunch — or logging a
+  whole session with no signal — resumes and drains rather than losing sets. The queue
+  lives in the `(app)` layout, so it keeps draining as the lifter navigates.
+- **Completion still waits for the truth.** Completing locks the session in the DB, so
+  `COMPLETE WORKOUT` is gated on server-confirmed sets; a fully-logged day with writes
+  still in flight shows `SAVING THE LAST SETS…` instead.
+- **Quiet by default.** The status strip appears only when sets are held offline or an op
+  has parked.
+
+Known limit: this makes the *write* path offline-tolerant, not the app. A cold start with
+no connection still can't render the day view (the read decision above). Logging through a
+dropout works when the session is already open.
 
 ### A6 — Generated types end-to-end
 `supabase gen types typescript` produces DB types; domain types wrap them in `src/lib/types/`. Zod schemas validate all boundary inputs (forms, route handlers, MCP tool args).

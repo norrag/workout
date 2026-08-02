@@ -46,5 +46,14 @@ export function resolveEffectiveParams(
       ...params.rounding,
       [equipment]: step,
     },
+    // N67: a deliberately-set increment is a statement about how THIS lift's
+    // load moves, so the lattice indexes off what the lifter actually entered
+    // rather than off absolute multiples of the step — 88 lb with a 10 lb step
+    // steps to 98 / 78, not 90 / 80. Scoped to overridden exercises: on the
+    // equipment defaults (5 lb) the entered load is almost always already on
+    // the grid, and phasing every lift's lattice would be a silent global
+    // change. A global switch is still available by activating a params
+    // version that sets `rounding_origin` itself.
+    rounding_origin: params.rounding_origin ?? "last_entered",
   };
 }

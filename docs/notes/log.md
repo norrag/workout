@@ -8,7 +8,7 @@ Append a dated entry whenever a session moves work. Newest first.
 
 Owner pushed back on doc 21 §4.2. **Right on both counts**; the section is
 rewritten, §4.3 and §6.1 are new, and two of my numbers are corrected in their
-favour. Batch 28d verbatim appended. Still no code.
+favour. Batch 30d verbatim appended. Still no code.
 
 - **Forced centered reps: retracted.** It fired whenever `resolvedRir ≠ weekRir`,
   including on a *decrease* — so an exercise deliberately pushed harder would have
@@ -109,7 +109,7 @@ records with "where they conflict, 21 wins" headers. Still no code.
   §4.3's effort-honesty gate has been suppressing effort claims across the
   deterministic why and the facts `effort_status` precisely because effort was
   inferred, never observed — Phase 1 unblocks that too.
-- N70 → `ready`, N71 → `ready` (doc 21 Phase 1), N72 → `triaged`, Batch 28c
+- N70 → `ready`, N71 → `ready` (doc 21 Phase 1), N72 → `triaged`, Batch 30c
   verbatim appended. Owner starts Phase 1 in a new session.
 
 ## 2026-07-31 — Session 92b: exercise-level RIR — assessment; override direction parked (N70 d2, N71, PR #211)
@@ -162,7 +162,7 @@ duration, return criteria), prompted by a live lumbar-nerve episode where a
 coach-agreed rehab plan had nowhere to live. Asked for questions and concerns in
 a review doc before implementing. No code.
 
-- **New item N70** (`F`, HIGH, workstream P, `needs-input`); Batch 28 verbatim
+- **New item N70** (`F`, HIGH, workstream P, `needs-input`); Batch 30 verbatim
   appended. Review:
   [`docs/reviews/2026-07-31-coach-override-prescriptions.md`](../reviews/2026-07-31-coach-override-prescriptions.md).
 - **The load-bearing correction (§2):** the owner's premise that overrides can
@@ -198,6 +198,143 @@ a review doc before implementing. No code.
   marker precedent), and the stats-comparability disclosure. Eight owner
   decisions in review §13; N39 (per-exercise progression-off override) is a
   subset of this item.
+## 2026-07-31 — Session 93: MEASURE review round 1 — capture, the Health bus, three-source synthesis (N66, PR #214)
+
+Owner reviewed doc 20 and returned five items plus one confirmation. Doc 20
+revised in PR #214 (#210 had already merged, so this landed as a fresh change
+on top of `main` rather than stacking on it); still direction, still no code.
+
+- **Topology confirmed.** Shared auth, one deployable, not separate now — but
+  separable later "without an unreasonable amount of work". Turned that from an
+  intention into **§3.4: six checkable rules** (eslint import boundary, no
+  cross-shell React context, `queries/measure/*` as the only DB path, a single
+  `src/lib/seam/` module, token-auth capture endpoints from day one, no
+  internal-path deep links) **plus a costed split**: move three directories,
+  publish the seam as HTTP, set the Supabase cookie domain, pick an MCP host.
+  Days, not weeks — and no data migration, because the DB never forked.
+- **Principle 7, transparency** (owner's words): no composites, every number
+  carries method/window/n and drills to its measurements, assumptions named
+  inline, assumption-backed outputs are ranges not points. This is the
+  constraint that produced the §5 shape.
+- **§4 capture is new and is a real requirement, not polish.** Weighing is the
+  highest-frequency action in the suite, so it gets a latency budget (intent →
+  logged under 5s, no cold launch) and three paths. Needs the first non-MCP API
+  surface: `measure_api_tokens` (hashed, prefix-listed, revocable) behind
+  `POST /api/measure/weight`. **The existing `unique (user_id, measured_on,
+  source)` turns out to make capture idempotent by construction** — a
+  double-run replaces rather than duplicates, and a Health↔MEASURE automation
+  loop *converges instead of compounding*. A constraint written for a different
+  reason is what makes the whole design safe.
+- **§4.5 is the finding of the session: Apple Health is the integration bus.**
+  Happy Scale already reads *and writes* Body Mass to Health, as do Withings
+  and Renpho. So one Shortcut recipe pair gives bidirectional Happy Scale
+  coexistence **and** smart-scale support with no vendor API, no OAuth client,
+  no partner agreement — and it answers owner items 2 and 3 together. Verified
+  the mechanics: *Get Contents of URL* does POST with a JSON body and custom
+  headers, *Log Health Sample* writes Body Mass. Two device-check caveats
+  recorded (no variable in the Type field; automation confirmation prompts vary
+  by iOS version). **Dropbox declined as a sync path** — parsing another app's
+  backup format to produce body-weight numbers fails principle 7 and breaks
+  silently; kept only as a possible future *transport* in §8, never a format.
+  Also recorded flatly: a PWA cannot touch HealthKit on any browser, so
+  Shortcuts is the only bridge and the design should stop looking for a better
+  one.
+- **§5 answers the owner's hard question.** They combine, but **not by
+  averaging**. The instrument table makes the asymmetry explicit — weight is a
+  *precise instrument on a contaminated quantity*, tape an *imprecise
+  instrument on a decent proxy*, DEXA a *good instrument at too slow a
+  cadence* — so any weighted blend would have fictional weights. Instead:
+  **three tiers** (measured → corroborated → projected) with **Tier 3
+  structurally sealed from both the seam and the engine**, and an **8-row
+  corroboration matrix** over mass × waist where "flat" means *inside that
+  instrument's noise band*, with window minimums in code (`confidence.ts`) and
+  DEXA overriding when scans bracket. Also fixed: **waist is a fat proxy, limb
+  girth is a mixed proxy** — never read the same way.
+- **Seam narrowed to four items** through `src/lib/seam/` (§5.6): mass rate in
+  lb/wk **and %/mo** (the pacer's own unit, so no conversion sits between the
+  apps), trend-bracketed Δbw over the macro span, composition delta when
+  same-scanner scans bracket, and the one-sentence corroboration line. Tape,
+  Tier 3, and raw series do **not** cross. **Worth flagging as a concrete
+  improvement:** the retrospective's Δbw today brackets *raw* points and so
+  inherits ±2–4 lb of daily noise at both endpoints — §5.6-2 upgrades it to
+  trend values.
+- **§9 Happy Scale parity table**, verified against their published feature
+  set: take the trend line, tunable smoothing, self-correcting rate,
+  projections (banded), plateau detection, range views, Health import/export;
+  **adapt** milestones (keep the chunking mechanic, drop the celebration —
+  ledger voice); **decline** Dropbox sync and streaks/badges (hard rule 7).
+- Phasing re-cut to 10 phases with capture pulled early (2 → 3 → 4 is the
+  capture spine). §17 now separates three settled decisions from nine open ones.
+
+### Next session — suggested starting point
+Get the §17 answers. Four are quick and unblock Phase 0 design work (waist
+site, tape routine, milestones, Tier 3 default); the rest can ride along. A
+**Happy Scale CSV export sample** is a concrete artifact needed to pin that
+adapter (§8). Then Phase 0's mockup pass — still gates everything.
+
+## 2026-07-31 — Session 92: increment indexing, set-logging queue, slider drag (N67/N68/N69, PR #215)
+
+Owner handed over three field notes and asked for them built in the same pass.
+All three shipped; the middle one turned out to be structural and cost a hard
+rule.
+
+- **Reconciliation sweep first** (resume protocol step 3): PRs #187, #195, #203,
+  #206, #207, #208 all confirmed merged, so **N53, N58, N61–N65 and PH30** moved
+  to `archive.md`. Rows with a real residual stayed live on purpose — N34, N43,
+  N47, N56, N57, N59, N60.
+- **N67 — the increment must index off what the lifter entered.** The override
+  already set `params.rounding[equipment]`, but `roundToStep` snapped to
+  ABSOLUTE multiples of it, so an 88 lb machine load with a 10 lb step became 90,
+  not 98. The fix gives the lattice a **phase**: `roundToStep(w, eq, params,
+  origin)` snaps to `origin ± k × step`, and `latticeOrigin` resolves the origin
+  from inputs the engine already had (last logged working set → seed earn context
+  → `previous` → `weekPeak` → plan `initial`). Two existing tests changed their
+  expected numbers, which is the clearest evidence the behavior moved — a manual
+  325 seed is now the lifter's own 315, and a 3 lb custom step holds 184 instead
+  of snapping to 183.
+- **The design call worth remembering on N67:** it is gated by a new OPTIONAL
+  `rounding_origin` param that `resolveEffectiveParams` sets per-exercise, not by
+  a params version bump. That keeps it live immediately (no activation runbook),
+  keeps every stored `engine_params` row a complete materialization
+  (`is_replayable` / `params_hash` untouched), and — because the origin rides
+  already-denylisted derived inputs — adds no freshness dependency. A global
+  switch is still available by activating a version that sets the key itself.
+- **N68 — the hang-up was not flakiness, it was where the state lived.** The box
+  acknowledged on the server action's response (N12) but `nextSetNumber` was
+  derived from server rows ALONE, so a stalled RSC revalidation left the row
+  checked and the next row `future`: logged, un-advanceable, and only recoverable
+  by relaunching. Taking the write off the interaction path is the fix; surviving
+  a dropped connection is the by-product the owner also asked for. Pure model in
+  `lib/logging/queue.ts`, runtime in `components/logging/SetLogQueueProvider.tsx`,
+  mounted in the `(app)` layout so it drains across navigation and relaunches.
+- **N68 reverses hard rule 9 for writes** ("no offline sync"). Recorded in
+  `CLAUDE.md`, `01 §F3`, `02 §A5` (rewritten), and `07`. Reads stay online-only —
+  R7's decision not to runtime-cache documents/RSC is still right, and the honest
+  limit is stated: a **cold start with no connection still can't render the day
+  view**. Filed as **T-N68a**, needs an owner call.
+- **Two constraints shaped the queue's shape.** (1) Only idempotent ops may be
+  queued, because retry is blind — `logSet` upserts on
+  `(workout_exercise_id, set_number)` (R3), `amendSet` addresses one set id, the
+  planned-weight write overwrites; **unlog and delete stay foreground** and a
+  queued row's delete menu says "Still saving…". (2) `COMPLETE WORKOUT` still
+  gates on SERVER truth, because completion locks the session and would refuse
+  its own outstanding writes — a fully-logged day mid-drain shows
+  `SAVING THE LAST SETS…`.
+- **The queue is deliberately zod-free** (hand-written guards on the storage
+  boundary) — it rides the `(app)` layout's client chunk, and WS-J keeps zod and
+  the engine barrel out of the day view's bundle. With zod the day view went
+  134 → 150 kB first load; without it, 137 kB.
+- **N69 — sliders drag from the thumb only.** `SnapSlider` had the pointer
+  handlers and `touch-none` on the whole 44px track, so on a scrolling feedback
+  sheet a scroll attempt both moved the value and ate the gesture. Pointer
+  capture now lives on a transparent 44px wrapper around the accent block; the
+  track ignores pointers and scrolls.
+
+### Next session — suggested starting point
+Sweep this PR's rows once #215 merges. Then the **T-N68a** owner call (offline
+reads — cache the active day with a staleness marker, or accept the limit), and
+confirm N67 on device against the machine lift that prompted it. N66's doc-20
+§13 decisions are still the biggest unblocked lever.
 
 ## 2026-07-25 — Session 91: MEASURE companion app — direction doc (N66, PR #210)
 

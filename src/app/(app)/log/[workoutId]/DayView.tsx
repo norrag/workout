@@ -54,6 +54,8 @@ import {
 import type { EngineParams } from "@/lib/engine/params";
 import { formatWeight } from "@/lib/units";
 import { localDayIso, shortDateWithWeekday } from "@/lib/dates";
+import { useSetLogQueue } from "@/components/logging/SetLogQueueProvider";
+import type { PendingSet } from "@/lib/logging/queue";
 import {
   adoptServerRowState,
   daySetTotals,
@@ -66,7 +68,6 @@ import {
 import {
   addSetAction,
   addWorkoutExercisesAction,
-  amendSetAction,
   clearPinnedNoteAction,
   completeWorkoutAction,
   deleteSetAction,
@@ -74,8 +75,6 @@ import {
   endWorkoutAction,
   listAddExerciseCandidatesAction,
   listReplacementCandidatesAction,
-  logSetAction,
-  updateSetWeightAction,
   moveExerciseDownAction,
   moveExerciseUpAction,
   removeExerciseAction,
@@ -248,6 +247,7 @@ export function DayView({
   const readOnly = workout.status === "completed" || workout.status === "skipped";
   const [, startTransition] = useTransition();
   const toast = useToast();
+  const queue = useSetLogQueue();
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [setMenu, setSetMenu] = useState<{
     weId: string;
@@ -290,21 +290,40 @@ export function DayView({
     [toast],
   );
 
+  // N68: the same exercises decorated with whatever the write queue is still
+  // carrying. The lifter's view of progress counts a queued set (they did the
+  // work and the box is checked); the COMPLETE gate below does NOT — completion
+  // locks the session in the DB, so a set still in flight would be refused.
+  const optimisticExercises = useMemo(
+    () =>
+      exercises.map((we) => ({
+        ...we,
+        pending_set_numbers: [
+          ...queue
+            .pendingSets(we.id, new Set(we.sets.map((s) => s.set_number)))
+            .keys(),
+        ],
+      })),
+    [exercises, queue],
+  );
+
   // progress bar denominator excludes skipped slots; an exercise is "done"
   // when every planned slot is either logged or skipped (fig 1.1/1.3)
-  const { loggedSets, totalSets, allDone } = useMemo(() => {
+  const { loggedSets, totalSets, allDone, allDoneOptimistic } = useMemo(() => {
     return {
-      ...daySetTotals(exercises),
+      ...daySetTotals(optimisticExercises),
       allDone: exercises.length > 0 && exercises.every(exerciseDone),
+      allDoneOptimistic:
+        optimisticExercises.length > 0 && optimisticExercises.every(exerciseDone),
     };
-  }, [exercises]);
+  }, [exercises, optimisticExercises]);
 
   const groupSiblings = useCallback(
     (we: LoggedExercise) =>
-      exercises.filter(
+      optimisticExercises.filter(
         (x) => x.muscle_group_id === we.muscle_group_id && x.id !== we.id,
       ),
-    [exercises],
+    [optimisticExercises],
   );
   // first to be completed in its group → recovery/soreness prompt
   const isFirstOfGroup = useCallback(
@@ -432,6 +451,14 @@ export function DayView({
         >
           COMPLETE WORKOUT
         </button>
+      )}
+      {/* N68: every set is in, but some are still in the queue. Completing now
+          would lock the session against its own outstanding writes, so say what
+          is happening rather than offering a button that would lose a set. */}
+      {!readOnly && !allDone && allDoneOptimistic && (
+        <div className="mt-6 w-full border-[1.5px] border-dashed border-ink/40 py-4 text-center text-[11px] font-semibold tracking-[0.12em] text-ink/55">
+          SAVING THE LAST SETS…
+        </div>
       )}
 
       <NoteSheet
@@ -993,9 +1020,20 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onLogged: (we: LoggedExercise, wasLastPlannedSet: boolean) => void;
   commit: Commit;
 }) {
+  const queue = useSetLogQueue();
   const skipped = we.status === "skipped";
   const plannedSets = plannedSetCount(we);
-  const loggedNums = new Set(we.sets.map((s) => s.set_number));
+  const serverNums = useMemo(
+    () => new Set(we.sets.map((s) => s.set_number)),
+    [we.sets],
+  );
+  // N68: sets the queue is still carrying count as logged HERE, in the one
+  // place that decides which row is active. That is the whole fix for the
+  // stuck-in-between state — the active set advances off the tap, not off the
+  // revalidation echo, so a slow or absent connection can no longer strand the
+  // session between "box is checked" and "next set can't be logged".
+  const pendingSets = queue.pendingSets(we.id, serverNums);
+  const loggedNums = new Set([...serverNums, ...pendingSets.keys()]);
   const skippedNums = new Set(we.skipped_set_numbers);
   let nextSetNumber = 0;
   for (let n = 1; n <= plannedSets; n += 1) {
@@ -1245,13 +1283,15 @@ const ExerciseBlock = memo(function ExerciseBlock({
           {Array.from({ length: plannedSets }, (_, i) => {
             const setNumber = i + 1;
             const logged = we.sets.find((s) => s.set_number === setNumber);
-            const state: "logged" | "skipped" | "next" | "future" = logged
-              ? "logged"
-              : skippedNums.has(setNumber)
-                ? "skipped"
-                : setNumber === nextSetNumber && !readOnly
-                  ? "next"
-                  : "future";
+            const pending = pendingSets.get(setNumber) ?? null;
+            const state: "logged" | "skipped" | "next" | "future" =
+              logged || pending
+                ? "logged"
+                : skippedNums.has(setNumber)
+                  ? "skipped"
+                  : setNumber === nextSetNumber && !readOnly
+                    ? "next"
+                    : "future";
             return (
               <SetRow
                 // exercise_id keys the row to the exercise occupying the slot:
@@ -1267,6 +1307,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
                 markerBand={markerBand}
                 targetRir={we.target_rir ?? microTargetRir}
                 logged={logged ?? null}
+                pending={pending}
                 isLastRow={setNumber === plannedSets}
                 dropPending={dropPending}
                 menuOpen={setMenuTarget === setNumber}
@@ -1472,6 +1513,7 @@ function SetRow({
   markerBand,
   targetRir,
   logged,
+  pending,
   isLastRow,
   dropPending,
   menuOpen,
@@ -1490,6 +1532,9 @@ function SetRow({
   markerBand: number;
   targetRir: number;
   logged: WorkoutDetail["exercises"][number]["sets"][number] | null;
+  /** N68 — this set is logged and sitting in the write queue: the lifter's
+   *  values, with no server row (and so no set id) behind them yet */
+  pending: PendingSet | null;
   isLastRow: boolean;
   dropPending: boolean;
   menuOpen: boolean;
@@ -1546,6 +1591,9 @@ function SetRow({
 
   const initialWeight =
     logged?.weight ??
+    // N68: a queued set shows exactly what was logged, off the queue entry —
+    // the server row that would normally carry it hasn't landed yet
+    pending?.weight ??
     // bodyweight_only logs the bodyweight as the load (read-only); seed it from
     // the current profile bodyweight when there's nothing logged yet.
     (bwOnly ? (bw ?? prescribedWeight ?? 0) : null) ??
@@ -1557,6 +1605,7 @@ function SetRow({
   // show what was done; fall back to the prescription when there's no anchor
   const initialReps =
     logged?.reps ??
+    pending?.reps ??
     (state !== "logged" ? predictReps(initialWeight) : null) ??
     prescribedReps ??
     lastLogged?.reps ??
@@ -1585,11 +1634,17 @@ function SetRow({
   const [ack, setAck] = useState<"logged" | "unlogged" | null>(null);
   const [logError, setLogError] = useState(false);
   const toast = useToast();
+  const queue = useSetLogQueue();
+
+  // N68: the writes the lifter fires while training — log, amend, planned
+  // weight — go on the queue and this returns instantly. `runLog` below is now
+  // only the UNLOG path: it addresses a set by its server id and a delete is
+  // not safe to retry blind, so it stays a foreground write with a watchdog.
 
   // fire a logging write in the background: the box shows the perimeter spinner
   // while the action runs, acknowledges as soon as the server confirms the write
   // (not when the revalidation commits), or rolls back with a brief shake + a
-  // quiet toast on failure/timeout (online-only, no offline outbox)
+  // quiet toast on failure/timeout
   const runLog = (action: () => Promise<void>, onOk?: () => void) => {
     setLogError(false);
     setSaving(true);
@@ -1663,17 +1718,16 @@ function SetRow({
   // it to just this set or every unlogged set per the auto-match setting
   const persistPlannedWeight = (w: number) => {
     if (w === (plannedWeight ?? prescribedWeight)) return;
-    // Route through runLog (not commit) so a failed write — e.g. the auto-match
-    // fan-out across sets — surfaces a toast and rolls the row back instead of
-    // throwing inside the transition and tripping the app-error page.
-    runLog(() =>
-      updateSetWeightAction({
-        workout_id: we.workout_id,
-        workout_exercise_id: we.id,
-        set_number: setNumber,
-        weight: w,
-      }),
-    );
+    // N68: queued like the log itself — a planned-weight write is a plain
+    // overwrite, so it is safe to retry and must never make the lifter wait
+    // (it fires on every weight-cell blur, mid-set).
+    queue.enqueue({
+      kind: "plan_weight",
+      workout_id: we.workout_id,
+      workout_exercise_id: we.id,
+      set_number: setNumber,
+      weight: w,
+    });
   };
 
   const save = () => {
@@ -1684,55 +1738,51 @@ function SetRow({
     const r = Number(reps);
     if (Number.isNaN(w) || Number.isNaN(r)) return;
     if (state === "next") {
-      // logSetAction carries the weight to the other sets itself when
-      // auto-match is on (server-side, after the insert). Fire-and-forget in the
-      // background; the side effects (drop reset, feedback prompt) run on success
-      runLog(
-        () =>
-          logSetAction({
-            workout_id: we.workout_id,
-            workout_exercise_id: we.id,
-            set_number: setNumber,
-            weight: w,
-            reps: r,
-            rir_reported: null,
-            set_type: dropPending ? "drop" : "straight",
-            // R6: the set's calendar day as this device sees it — evening
-            // sessions must not land on tomorrow's UTC date
-            performed_on: localDayIso(),
-          }),
-        () => {
-          // N12: show the box checked the moment the server confirms the write;
-          // the revalidation echo remounts the row into its real logged state
-          setAck("logged");
-          if (dropPending) onToggleDrop();
-          onLogged();
-        },
-      );
+      // N68: hand the write to the queue and move on. The row is already
+      // "logged" from the queue's overlay by the time this returns, so the box
+      // fills AND the next set becomes active in the same frame — no waiting on
+      // a server response, and nothing to strand if that response never comes.
+      // logSetAction still carries the weight onto the remaining sets when
+      // auto-match is on (server-side, after the insert).
+      queue.enqueue({
+        kind: "log",
+        workout_id: we.workout_id,
+        workout_exercise_id: we.id,
+        set_number: setNumber,
+        weight: w,
+        reps: r,
+        set_type: dropPending ? "drop" : "straight",
+        // R6: the set's calendar day as this device sees it — captured at the
+        // tap, so a set that drains hours later still lands on the day it was
+        // actually performed
+        performed_on: localDayIso(),
+      });
+      if (dropPending) onToggleDrop();
+      onLogged();
     } else if (state === "logged" && logged && edited.current) {
-      // runLog (not commit) so an amend failure rolls back with the box shake +
-      // toast; `edited` stays set on failure so the next blur retries
-      runLog(
-        () =>
-          amendSetAction({
-            workout_id: we.workout_id,
-            set_id: logged.id,
-            weight: w,
-            reps: r,
-            rir_reported: logged.rir_reported,
-          }),
-        () => {
-          edited.current = false;
-        },
-      );
+      // an amend addresses one immutable set id and simply overwrites it, so it
+      // queues like the log; the typed values already show in the cells
+      queue.enqueue({
+        kind: "amend",
+        workout_id: we.workout_id,
+        set_id: logged.id,
+        weight: w,
+        reps: r,
+        rir_reported: logged.rir_reported,
+      });
+      edited.current = false;
       if (w !== logged.weight) persistPlannedWeight(w);
     }
   };
 
   // N50: a completed/skipped session's logged rows must render as static text
   // too — the completion-lock RLS silently no-ops their blur-saves, so live
-  // inputs there are edits that never land
-  const staticCells = readOnly || state === "future" || state === "skipped";
+  // inputs there are edits that never land.
+  // N68: a QUEUED row is static for the same reason in reverse — there is no
+  // set id to amend against until the write lands, so it shows what was logged
+  // and becomes editable when the server echo arrives.
+  const staticCells =
+    readOnly || state === "future" || state === "skipped" || pending != null;
 
   // static (future/skipped) rows show the reps that hit target RIR at the
   // planned weight — memoized so a parent re-render (menu/sheet state) doesn't
@@ -1928,7 +1978,7 @@ function SetRow({
           <LogCheckbox
             checked={ack ? ack === "logged" : state === "logged"}
             loading={saving}
-            error={logError}
+            error={logError || pending?.status === "failed"}
             readOnly={readOnly}
             ariaLabel={
               state === "logged"
@@ -1940,6 +1990,16 @@ function SetRow({
               // remounts the row); ignore taps in that window — acting on the
               // stale `state`/`logged` props would re-send the finished write
               if (ack) return;
+              // N68: a queued set has no server id yet, so there is nothing to
+              // unlog — say so instead of no-opping under the lifter's finger
+              if (pending) {
+                toast(
+                  pending.status === "failed"
+                    ? "That set hasn't saved yet — try again from the banner"
+                    : "That set is still saving — one moment",
+                );
+                return;
+              }
               if (state === "logged") {
                 if (logged)
                   runLog(
@@ -2049,6 +2109,11 @@ function SetRow({
         {state === "logged" &&
           (readOnly ? (
             <MenuRow label="Logged — session locked" disabled />
+          ) : pending ? (
+            // N68: no server id to delete yet, and a delete renumbers the
+            // surviving sets — which would land the queued write on the
+            // wrong slot. Wait for it to drain.
+            <MenuRow label="Still saving…" disabled />
           ) : (
             <MenuRow
               label="Delete set"
@@ -2947,6 +3012,7 @@ function CompleteSheet({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const queue = useSetLogQueue();
   const [notes, setNotes] = useState("");
   // I14: session sliders share the per-exercise 0–10 scale; 5 is the midpoint
   const [fatigue, setFatigue] = useState(5);
@@ -2984,6 +3050,8 @@ function CompleteSheet({
           effort_rating: effort,
           performance_rating: performance,
         });
+        // the session is locked now — nothing queued for it could ever land
+        queue.forget(workout.id);
         router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
       } catch {
         toast("Couldn't complete the workout — check your connection");

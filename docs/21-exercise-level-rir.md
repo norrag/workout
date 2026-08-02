@@ -3,8 +3,8 @@
 **Status: authoritative build spec** (2026-07-31). Consolidates the owner's
 Batch-28b proposal and the assessment thread:
 [assessment](./reviews/2026-07-31-exercise-level-rir.md) → owner notes +
-decisions A1–A8 (Batch 28c) → **owner pushback on §4.2 + the RIR ceiling
-(Batch 28d, revised the same day)**. Those are the rationale record; **where they
+decisions A1–A8 (Batch 30c) → **owner pushback on §4.2 + the RIR ceiling
+(Batch 30d, revised the same day)**. Those are the rationale record; **where they
 conflict with this doc, this doc wins.** Doc 16 keeps authority over progression
 internals, doc 14 over freshness, doc 10 over metric definitions — this doc
 amends each where noted (§2, §5, §6, §7). Implementation proceeds in new

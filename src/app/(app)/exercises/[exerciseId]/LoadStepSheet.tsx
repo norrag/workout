@@ -95,7 +95,9 @@ export function LoadStepSheet({
     >
       <p className="text-[12px] leading-[1.5] text-ink/65">
         The weight the engine adds when you hit a prescription. Overrides the
-        equipment default for this exercise only.
+        equipment default for this exercise only. Steps run from the last weight
+        you entered — enter 88 with a 10 lb step and the next stops are 98 and
+        78.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">

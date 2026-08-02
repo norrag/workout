@@ -26,6 +26,35 @@ function ex(
   };
 }
 
+describe("pending sets count as logged (N68)", () => {
+  it("widens the planned slot count like a server row does", () => {
+    expect(plannedSetCount(ex({ pending_set_numbers: [1, 2, 3, 4, 5] }))).toBe(5);
+  });
+
+  it("completes an exercise whose last sets are still in the write queue", () => {
+    expect(exerciseDone(ex({ logged: [1, 2] }))).toBe(false);
+    expect(exerciseDone(ex({ logged: [1, 2], pending_set_numbers: [3] }))).toBe(
+      true,
+    );
+  });
+
+  it("counts a queued set once, not twice, when its echo lands", () => {
+    // the revalidation has landed for set 1 but the queue entry is a frame from
+    // being retired — the progress bar must not read 4 / 3
+    const totals = daySetTotals([
+      ex({ logged: [1, 2], pending_set_numbers: [1, 3] }),
+    ]);
+    expect(totals).toEqual({ loggedSets: 3, totalSets: 3 });
+  });
+
+  it("is absent for every caller reading server state alone", () => {
+    expect(daySetTotals([ex({ logged: [1] })])).toEqual({
+      loggedSets: 1,
+      totalSets: 3,
+    });
+  });
+});
+
 describe("plannedSetCount", () => {
   it("uses the prescription when nothing is logged or skipped", () => {
     expect(plannedSetCount(ex({}))).toBe(3);
