@@ -42,6 +42,34 @@ function usesBodyweightModel(
 
 export const PROGRESSION_RULE = "progression";
 
+/**
+ * doc 21 §4.1 — the RIR the prescription is actually priced at: the slot's
+ * exercise-level assignment when it has one, else the week's ramp value.
+ * `prescribe()` performs the same substitution once, on the inputs it hands the
+ * pricing path (`pricedAtSlotRir`); this is the zero-dependency reader for the
+ * rules that need the resolved value while still holding the un-substituted
+ * inputs (the earn gate and the quantum).
+ */
+export function resolvedTargetRir(
+  inputs: Pick<EngineInputs, "week" | "exerciseRir">,
+): number {
+  return inputs.exerciseRir ?? inputs.week.targetRir;
+}
+
+/**
+ * doc 21 §5/§6.2 — is this slot running EASIER than the week it sits in? One
+ * predicate, shared by the earn gate (no earn while an assignment is easing the
+ * slot) and by the stats policy (a backed-off session is excluded from strength
+ * surfaces, kept in volume). Keyed on prescription INTENT, not on measured
+ * confidence: a deterministic, visible, plan-level fact, exactly like the
+ * `is_deload` filter the strength series already applies.
+ */
+export function slotBackedOff(
+  inputs: Pick<EngineInputs, "week" | "exerciseRir">,
+): boolean {
+  return inputs.exerciseRir != null && inputs.exerciseRir > inputs.week.targetRir;
+}
+
 /** §3.6 status vocabulary — exactly one status-coded step per working
  *  prescription while the mode is active. */
 export type ProgressionStatus = "stepped" | "vanished" | "paced" | "not_earned";
@@ -203,6 +231,29 @@ export function assessProgression(
   if (inputs.week.isDeload) {
     return notEarned("deload", "deload week");
   }
+  // doc 21 §5 — no earn while an exercise-level assignment is EASING this slot.
+  // Same shape as the deload predicate above, and needed for the same reason:
+  // without it a rehab/back-off week can still mint a step off an anchor held by
+  // an older `moderate` session, so the return prescription jumps to a load the
+  // athlete never re-earned. Confidence degradation alone is not sufficient.
+  // A HARDENED assignment (below the week's RIR) is not gated — that slot is
+  // being pushed, and its compliance is measured the same as any other.
+  //
+  // MISS-THROTTLE PARITY (§5) falls out of this placement, exactly as it does
+  // for the deload predicate above, and is asserted by a test rather than coded
+  // twice: the throttle only pairs a `stepped` ask with the compliance verdict
+  // of the decision that answers it (`deriveProgressionHistory`), and a
+  // backed-off week never records `stepped` — so a backed-off block can neither
+  // earn nor arm the throttle. The predicate sits AFTER `sessionCompliance` on
+  // purpose: compliance is a verdict on the session that was already PERFORMED
+  // (against its own, possibly already-eased, prescription), so a genuine miss
+  // there must still be named a miss no matter what the upcoming week asks.
+  if (slotBackedOff(inputs)) {
+    return notEarned(
+      "exercise_rir",
+      `exercise-level RIR ${inputs.exerciseRir} is above the week's ${inputs.week.targetRir} — effort is deliberately backed off`,
+    );
+  }
   if (
     inputs.daysSincePreviousSession != null &&
     inputs.daysSincePreviousSession > p.max_gap_days
@@ -356,7 +407,10 @@ function quantum(
   const p = params.progression!;
   const cfg = params.e1rm;
   if (baseline.reps == null) return null;
-  const E = baseline.reps + inputs.week.targetRir * cfg.rir_offset;
+  // doc 21 §4.2: the baseline was priced at the RESOLVED RIR, so its effective
+  // point must be measured there too (an assignment that hardens the slot still
+  // earns, and its quantum has to be priced at the effort actually asked for).
+  const E = baseline.reps + resolvedTargetRir(inputs) * cfg.rir_offset;
   const kE = e1rmFactor(E, cfg);
   const kE1 = e1rmFactor(E + 1, cfg);
   const step = params.rounding[inputs.exercise.equipmentType] ?? 5;

@@ -49,11 +49,19 @@ type Defaulted =
   // N65: nullable share snapshot — written by the mint path only (null on
   // pre-20260725 codes, which redeem from the owner's live rows)
   | "payload";
-type InsertOf<R> = Omit<R, Defaulted> &
-  Partial<Pick<R, Extract<Defaulted, keyof R>>>;
-type Table<R> = {
+/** Columns that are optional on insert for ONE table only. `Defaulted` above is
+ *  global (a name listed there is optional everywhere it appears), which is too
+ *  blunt for a column name a strict table also uses — e.g. doc 21 adds a
+ *  nullable `meso_exercises.target_rir` while `microcycles.target_rir` stays
+ *  NOT NULL and must keep being required. */
+type InsertOf<R, Optional extends keyof R = never> = Omit<
+  R,
+  Defaulted | Optional
+> &
+  Partial<Pick<R, Extract<Defaulted, keyof R> | Optional>>;
+type Table<R, Optional extends keyof R = never> = {
   Row: R;
-  Insert: InsertOf<R>;
+  Insert: InsertOf<R, Optional>;
   Update: Partial<R>;
   Relationships: [];
 };
@@ -278,6 +286,18 @@ export type MesoExerciseRow = {
   initial_weight: number | null;
   initial_reps: number | null;
   initial_sets: number;
+  /** doc 21 §4.1 — flat per-slot target RIR (null = the meso RIR ramp applies).
+   *  ABSOLUTE: set wins over `microcycles.target_rir`, deload weeks included. */
+  target_rir: number | null;
+  /** doc 21 §3 — per-WORKING-week target RIR for this slot, indexed exactly like
+   *  `mesocycles.rir_schedule`; a null element = no assignment that week. */
+  rir_schedule: (number | null)[] | null;
+  /** doc 21 A4 — per-slot working-set cap (null = the engine's own count) */
+  set_cap: number | null;
+  /** doc 21 A4 — per-WORKING-week set cap, same shape rules as `rir_schedule` */
+  set_cap_schedule: (number | null)[] | null;
+  /** doc 21 A7 — why this slot carries an effort assignment */
+  effort_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -795,7 +815,17 @@ export type Database = {
       mesocycles: Table<MesocycleRow>;
       meso_days: Table<MesoDayRow>;
       meso_day_groups: Table<MesoDayGroupRow>;
-      meso_exercises: Table<MesoExerciseRow>;
+      // doc 21 §3: the effort-assignment columns are all nullable and written
+      // only by the assignment write paths, so every existing plan-copy /
+      // template / share insert stays valid without naming them.
+      meso_exercises: Table<
+        MesoExerciseRow,
+        | "target_rir"
+        | "rir_schedule"
+        | "set_cap"
+        | "set_cap_schedule"
+        | "effort_reason"
+      >;
       microcycles: Table<MicrocycleRow>;
       workouts: Table<WorkoutRow>;
       workout_exercises: Table<WorkoutExerciseRow>;

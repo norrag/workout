@@ -26,6 +26,12 @@ import {
 } from "./progression";
 import { getMesoPlan } from "./cycles";
 import {
+  exerciseRirInput,
+  getSlotEffortAssignments,
+  slotEffortKey,
+  slotEffortSignatureInput,
+} from "./slot-effort";
+import {
   chooseAdvanceSource,
   LOOKBACK_WEEKS as SLOT_LOOKBACK_WEEKS,
 } from "./slot-prescription";
@@ -214,12 +220,18 @@ function recomputeAdvance(
   args: RecomputeArgs,
   params: EngineParams,
 ): RecomputeResult {
-  const rebuilt = {
+  const rebuilt: Record<string, unknown> = {
     ...args.storedInputs,
     ...args.liveConfig,
     strengthAnchor: args.anchor,
     bodyweight: args.bodyweight,
   };
+  // doc 21 §4.1 — "the ramp reasserts itself the moment the assignment is
+  // removed". `liveConfig` OMITS `exerciseRir` for an unassigned slot, and a
+  // spread cannot delete a key the stored decision still carries, so the
+  // removal has to be explicit. Without it a cleared assignment would replay
+  // forever off its own stale copy.
+  if (!("exerciseRir" in args.liveConfig)) delete rebuilt.exerciseRir;
   const parsed = engineInputsSchema.safeParse(rebuilt);
   if (!parsed.success) return { status: "invalid_source" };
 
@@ -305,6 +317,10 @@ function recomputeSeed(
         anchor: args.anchor,
         bodyweight: args.bodyweight,
         isDeload: cfg.week.isDeload,
+        // doc 21 §4.1: the slot's assignment is a LIVE config input (it rides
+        // `liveConfig`), so a replayed seed reprices at whatever the plan now
+        // says — that is exactly how an assignment edit reaches an open row.
+        ...(cfg.exerciseRir != null ? { exerciseRir: cfg.exerciseRir } : {}),
         ...(stored.seedEarn != null
           ? {
               earn: stored.seedEarn,
@@ -421,6 +437,9 @@ interface OpenRow {
   dayNumber: number;
   targetRir: number;
   isDeload: boolean;
+  /** doc 21 §4.1 — this slot's exercise-level RIR assignment for this week;
+   *  undefined when unassigned (⇒ omitted from the config projection). */
+  exerciseRir?: number;
   currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
   depFingerprint: string | null;
   /** the version this row currently advertises as verified-accurate (doc 14 stamp) */
@@ -604,6 +623,13 @@ interface MesoStaleInputs {
   /** N18-B per-week override (null = interpolated ramp) — a schedule-only edit
    *  must fire the gate so unstarted weeks re-derive their RIR */
   rirSchedule: number[] | null;
+  /** doc 21 §7.2 — the meso's per-slot effort assignments, canonically
+   *  serialized. An assignment-only edit changes no other input here, so
+   *  without this the cheap gate would short-circuit before the fingerprint
+   *  pass ever saw it. OMITTED (undefined) when the meso has no assignment, so
+   *  every existing meso's signature is byte-identical and nobody pays a
+   *  spurious full reconcile on deploy. */
+  slotEffort?: string[];
   weeks: number;
   includesDeload: boolean;
   /** macro `goal_type` (fingerprint goal); null for a standalone meso */
@@ -641,7 +667,7 @@ async function loadMesoStaleInputs(
   mesoId: string,
   paramsVersion: number,
 ): Promise<MesoStaleInputs> {
-  const [mesoRes, profileRes, overrideRes, exerciseRes, microRes] =
+  const [mesoRes, profileRes, overrideRes, exerciseRes, microRes, slotEffort] =
     await Promise.all([
       service
         .from("mesocycles")
@@ -666,6 +692,9 @@ async function loadMesoStaleInputs(
         .select("id")
         .eq("mesocycle_id", mesoId)
         .eq("user_id", userId),
+      // doc 21 §7.2: one indexed read, filtered to rows that actually carry an
+      // assignment — empty for every meso that has none.
+      getSlotEffortAssignments(service, mesoId),
     ]);
   if (mesoRes.error) throw mesoRes.error;
   if (profileRes.error) throw profileRes.error;
@@ -706,11 +735,13 @@ async function loadMesoStaleInputs(
   if (workoutCountRes.error) throw workoutCountRes.error;
   if (closedRes.error) throw closedRes.error;
 
+  const slotEffortSig = slotEffortSignatureInput(slotEffort);
   return {
     paramsVersion,
     rirStart: mesoRes.data.rir_start,
     rirEnd: mesoRes.data.rir_end,
     rirSchedule: mesoRes.data.rir_schedule ?? null,
+    ...(slotEffortSig ? { slotEffort: slotEffortSig } : {}),
     weeks: mesoRes.data.weeks,
     includesDeload: mesoRes.data.includes_deload,
     goalType: macroRes.data?.goal_type ?? null,
@@ -841,6 +872,13 @@ export async function reconcilePrescriptions(
     if (m) m.target_rir = u.target_rir; // downstream reads the corrected value
   }
 
+  // 3c. doc 21 §4.1 — the plan's per-slot effort assignments, resolved STRICTLY
+  //     AFTER 3b. The order is load-bearing: 3b re-derives an unstarted week's
+  //     RIR from the meso ramp, so resolving the assignment first would let the
+  //     reconcile stomp it on the very next read. Empty for a meso with no
+  //     assignment, and then every row below builds byte-identically.
+  const slotEffort = await getSlotEffortAssignments(service, mesoId);
+
   // 4. ALL the meso's workout_exercises (need completed sources for `previous`)
   const { data: wes, error: wesError } = await service
     .from("workout_exercises")
@@ -950,6 +988,10 @@ export async function reconcilePrescriptions(
         dayNumber: workout.day_number,
         targetRir: micro.target_rir,
         isDeload: micro.is_deload,
+        exerciseRir: exerciseRirInput(
+          slotEffort.get(slotEffortKey(workout.day_number, we.exercise_id)),
+          micro.week_number,
+        ),
         currentOutput: {
           weight: we.prescribed_weight,
           reps: we.prescribed_reps,
@@ -1192,6 +1234,7 @@ export async function reconcilePrescriptions(
           workoutFeedback: wfByWorkout.get(src.workout_id) ?? null,
           microTargetRir: srcMicro.target_rir,
           nextWeek: { targetRir: row.targetRir, isDeload: row.isDeload },
+          exerciseRir: row.exerciseRir,
           goal,
           equipmentType,
           profile,
@@ -1283,6 +1326,7 @@ export async function reconcilePrescriptions(
           week: { targetRir: row.targetRir, isDeload: row.isDeload },
           previous,
           initial,
+          exerciseRir: row.exerciseRir,
         }),
         priorPeak,
       ) as unknown as Record<string, unknown>;
@@ -1295,6 +1339,10 @@ export async function reconcilePrescriptions(
       week: { targetRir: row.targetRir, isDeload: row.isDeload },
       previous,
       initial,
+      // doc 21 §7.1: the resolved assignment is a config input, so it lands in
+      // the fingerprint — an assignment edit stales exactly this slot's open
+      // rows and nothing else, with no bespoke invalidation.
+      exerciseRir: row.exerciseRir,
     });
     // the params token folds in this exercise's increment override (doc 14 §3), so
     // an override change moves the expected fingerprint for ONLY that exercise's

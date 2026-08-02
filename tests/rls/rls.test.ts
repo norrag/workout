@@ -1488,6 +1488,71 @@ describe("write integrity (R3/R4)", () => {
     expect(meso!.days_per_week).toBe(1);
   });
 
+  // doc 21 §3 — the exercise-level effort assignment columns. New columns on an
+  // RLS-guarded table are covered by `meso_exercises_all_own` (which scopes
+  // through `mesocycles.user_id = auth.uid()` for ALL commands with the same
+  // WITH CHECK), so the proof is: the owner can write them and a non-owner
+  // cannot see or change them.
+  it("effort assignment columns are owner-writable and cross-user invisible", async () => {
+    const { mesoId, mgId, exId } = await buildPlannedMeso();
+    const { error: planError } = await alice.rpc("save_meso_plan", {
+      p_mesocycle_id: mesoId,
+      p_days: planDays(mgId, exId),
+    });
+    expect(planError).toBeNull();
+
+    const { data: slot } = await alice
+      .from("meso_exercises")
+      .select("id")
+      .eq("mesocycle_id", mesoId)
+      .single();
+
+    const { error: assignError } = await alice
+      .from("meso_exercises")
+      .update({
+        target_rir: 4,
+        rir_schedule: [null, null, 4, 4],
+        set_cap: 2,
+        effort_reason: "left elbow rehab",
+      })
+      .eq("id", slot!.id);
+    expect(assignError).toBeNull();
+
+    // the unbounded ask (§4.3) persists — the measuring band, not a CHECK, is
+    // what keeps it honest
+    const { error: deepError } = await alice
+      .from("meso_exercises")
+      .update({ target_rir: 21 })
+      .eq("id", slot!.id);
+    expect(deepError).toBeNull();
+    // …but the column is still bounded at 30
+    const { error: tooDeep } = await alice
+      .from("meso_exercises")
+      .update({ target_rir: 31 })
+      .eq("id", slot!.id);
+    expect(tooDeep).not.toBeNull();
+
+    // bob sees nothing and changes nothing
+    const { data: bobRead } = await bob
+      .from("meso_exercises")
+      .select("id, target_rir")
+      .eq("id", slot!.id);
+    expect(bobRead ?? []).toHaveLength(0);
+
+    await bob
+      .from("meso_exercises")
+      .update({ target_rir: 0, effort_reason: "hijacked" })
+      .eq("id", slot!.id);
+    const { data: after } = await alice
+      .from("meso_exercises")
+      .select("target_rir, effort_reason, set_cap")
+      .eq("id", slot!.id)
+      .single();
+    expect(after!.target_rir).toBe(21);
+    expect(after!.effort_reason).toBe("left elbow rehab");
+    expect(after!.set_cap).toBe(2);
+  });
+
   it("save_meso_plan refuses another user's meso and leaves the plan intact", async () => {
     const { mesoId, mgId, exId } = await buildPlannedMeso();
     const { error: ownError } = await alice.rpc("save_meso_plan", {

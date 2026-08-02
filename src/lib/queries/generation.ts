@@ -42,6 +42,7 @@ import {
 import { getSeedEarnContexts, type SeedEarnBundle } from "./seed-progression";
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
 import { getBandPosition } from "./envelope";
+import { exerciseRirInput } from "./slot-effort";
 
 type Client = SupabaseClient<Database>;
 
@@ -53,6 +54,10 @@ interface SeedCtx {
   bodyweight: number | null;
   targetRir: number;
   isDeload: boolean;
+  /** doc 21 §4.1: the week being seeded — the index into a slot's per-week
+   *  `rir_schedule` / `set_cap_schedule`. The assignment itself rides on the
+   *  plan fill, so no extra read is needed on this path. */
+  weekNumber: number;
   goal: EngineGoal;
   params: EngineParams;
   paramsVersion: number;
@@ -110,7 +115,16 @@ function seedExerciseRow(
   workoutId: string,
   fill: Pick<
     SlotFill,
-    "exercise_id" | "initial_weight" | "initial_reps" | "initial_sets"
+    | "exercise_id"
+    | "initial_weight"
+    | "initial_reps"
+    | "initial_sets"
+    // doc 21 §4.1 — the slot's own effort assignment, read straight off the plan
+    | "target_rir"
+    | "rir_schedule"
+    | "set_cap"
+    | "set_cap_schedule"
+    | "effort_reason"
   >,
   muscleGroupId: string | null,
   position: number,
@@ -146,6 +160,10 @@ function seedExerciseRow(
   // the mode is inactive so recorded inputs stay byte-identical.
   const earnBundle = ctx.earnByExerciseId?.get(fill.exercise_id) ?? null;
   const history = ctx.progressionByExerciseId?.get(fill.exercise_id) ?? null;
+  // doc 21 §4.1: this slot's exercise-level RIR for the week being seeded.
+  // Undefined when unassigned — the key is then omitted from both the engine
+  // call and the recorded inputs, so the seed stays byte-identical to today.
+  const exerciseRir = exerciseRirInput(fill, ctx.weekNumber);
   const output = seedMeso(
     priorPeak,
     initial,
@@ -158,6 +176,7 @@ function seedExerciseRow(
       anchor,
       bodyweight: ctx.bodyweight,
       isDeload: ctx.isDeload,
+      ...(exerciseRir != null ? { exerciseRir } : {}),
       ...(earnBundle
         ? {
             earn: earnBundle.earn,
@@ -183,6 +202,7 @@ function seedExerciseRow(
     priorPeak,
     strengthAnchor: anchor,
     bodyweight: ctx.bodyweight,
+    exerciseRir,
     ...(ctx.progressionByExerciseId
       ? {
           progression: {
@@ -566,6 +586,7 @@ export async function startMeso(
     // from rir_start), so the seed fingerprint matches the microcycle row
     targetRir: ramp[0].targetRir,
     isDeload: week1.is_deload,
+    weekNumber: week1.week_number,
     goal,
     params,
     paramsVersion,
@@ -750,6 +771,7 @@ export async function regenerateOpenWorkouts(
       bodyweight: profile.bodyweight ?? null,
       targetRir: micro.target_rir,
       isDeload: micro.is_deload,
+      weekNumber: micro.week_number,
       goal,
       params,
       paramsVersion,
