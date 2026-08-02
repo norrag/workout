@@ -4,6 +4,29 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-02 — Session 93b: post-merge sweep (N71 archived; a reverted sweep re-applied)
+
+PR #216 merged, so the archival step that a build PR structurally cannot do for
+itself (CLAUDE.md rule 2) runs here.
+
+- **N71 → archive.** Terminal: doc 21 Phase 1 shipped and merged. **N38** and
+  **N70** deliberately stay live — N38 only lost its capture half (the periodic
+  honest-RIR engine check is still deferred), and N70 is one phase into six.
+- **A previous sweep had been silently reverted, and is re-applied.** Six rows
+  archived on 2026-07-31 (N53, N61, N62, N63, N64, N65) were live in the index
+  again. Cause, from `git log`: the sweep deleted them in `ac21ebe`; the merge
+  `73e7c2b` ("Merge branch 'main' into claude/coach-override-prescriptions-…")
+  restored the deleted lines, because that branch was cut before the sweep and
+  the conflict resolution took the pre-sweep side. All five PRs (#187, #203,
+  #206, #207, #208) re-confirmed merged; the archived resolutions were unchanged
+  and stand, so the rows were simply removed again rather than re-adjudicated.
+  N58 and PH30 were never resurrected.
+- **Worth carrying forward:** a sweep is only durable once every in-flight branch
+  has rebased past it. A sweep landing while long-lived branches are open needs
+  re-verifying at the next session start — noted in `archive.md` on the affected
+  entry. This is exactly the rot rule 3's reconciliation sweep exists to catch;
+  it caught it.
+
 ## 2026-08-02 — Session 93: doc 21 Phase 1 built — one RIR premise (N71, N38, N70)
 
 First code on doc 21. Phase 1 of six, and the one that had to go first: it fixes
