@@ -13,7 +13,11 @@ import {
   planSlotEffortEdit,
   restoreSlotEffortAssignments,
   exerciseRirInput,
+  exerciseSetCapInput,
   hasAssignment,
+  parseRepPosition,
+  repPositionToDb,
+  slotEffortInputs,
   orphanedSlotSchedules,
   resolveSlotEffort,
   slotEffortKey,
@@ -32,6 +36,7 @@ function assignment(
     rir_schedule: null,
     set_cap: null,
     set_cap_schedule: null,
+    rep_position: null,
     effort_reason: null,
     ...o,
   };
@@ -433,6 +438,7 @@ describe("planSlotEffortEdit — composition", () => {
       rir_schedule: [null, null, 4, 4],
       set_cap: null,
       set_cap_schedule: [null, null, 2, 2],
+      rep_position: null,
       effort_reason: "elbow",
     });
     // and clearing both levers takes the reason with the last of them
@@ -440,6 +446,126 @@ describe("planSlotEffortEdit — composition", () => {
     a = applySlotEffortPatch(a, planned(a, { lever: "sets", clear: true }).patch);
     expect(hasAssignment(a)).toBe(false);
     expect(a.effort_reason).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 Phase 4 — the set-cap engine input + the rep-position lever
+// ---------------------------------------------------------------------------
+
+describe("exerciseSetCapInput / slotEffortInputs (Phase 4 byte-identity)", () => {
+  it("omits every unassigned lever, so the projection is pre-doc-21 shaped", () => {
+    expect(slotEffortInputs(assignment(), 2)).toEqual({});
+    expect(slotEffortInputs(null, 2)).toEqual({});
+    expect(exerciseSetCapInput(assignment(), 2)).toBeUndefined();
+  });
+
+  it("carries exactly the levers that are assigned", () => {
+    expect(
+      slotEffortInputs(
+        assignment({ set_cap_schedule: [null, 2, 2, null], rep_position: "top" }),
+        2,
+      ),
+    ).toEqual({ exerciseSetCap: 2, exerciseRepPosition: "top" });
+    // week 4 falls outside the cap schedule ⇒ only the flat rep position rides
+    expect(
+      slotEffortInputs(
+        assignment({ set_cap_schedule: [null, 2, 2, null], rep_position: "top" }),
+        4,
+      ),
+    ).toEqual({ exerciseRepPosition: "top" });
+  });
+
+  it("a set cap of 1 is a real assignment, not an absence", () => {
+    expect(slotEffortInputs(assignment({ set_cap: 1 }), 1)).toEqual({
+      exerciseSetCap: 1,
+    });
+  });
+});
+
+describe("parseRepPosition (§4.2)", () => {
+  it("round-trips the named positions and explicit counts", () => {
+    for (const p of ["bottom", "center", "top"] as const) {
+      expect(parseRepPosition(p)).toBe(p);
+      expect(repPositionToDb(p)).toBe(p);
+    }
+    expect(parseRepPosition("12")).toBe(12);
+    expect(repPositionToDb(12)).toBe("12");
+  });
+
+  it("degrades unparseable text to null rather than failing a prescription", () => {
+    expect(parseRepPosition(null)).toBeNull();
+    expect(parseRepPosition("middle")).toBeNull();
+    expect(parseRepPosition("0")).toBeNull();
+    expect(parseRepPosition("99")).toBeNull();
+  });
+
+  it("is part of hasAssignment and of the stale signature", () => {
+    expect(hasAssignment(assignment({ rep_position: "top" }))).toBe(true);
+    const withPosition = new Map([["1::a", assignment({ rep_position: "top" })]]);
+    const without = new Map([["1::a", assignment({ rep_position: null })]]);
+    expect(slotEffortSignatureInput(withPosition)).not.toEqual(
+      slotEffortSignatureInput(without),
+    );
+  });
+});
+
+describe("planSlotEffortEdit — the rep-position lever (§4.2)", () => {
+  it("assigns a named position flat for the slot", () => {
+    const plan = planned(assignment(), { lever: "rep_position", position: "top" });
+    expect(plan.patch).toEqual({ rep_position: "top" });
+    expect(plan.summary).toMatch(/top of the rep window/);
+    // flat means no week is named: nothing for the batch planner to warn about
+    expect(plan.assignedWeeks).toEqual([]);
+    expect(plan.coversDeload).toBe(false);
+  });
+
+  it("stores an explicit rep count as its canonical text", () => {
+    expect(
+      planned(assignment(), { lever: "rep_position", position: 15 }).patch,
+    ).toEqual({ rep_position: "15" });
+  });
+
+  it("clears back to the climb schedule, taking a lone reason with it", () => {
+    const current = assignment({ rep_position: "top", effort_reason: "tendon" });
+    const plan = planned(current, { lever: "rep_position", clear: true });
+    expect(plan.patch).toEqual({ rep_position: null, effort_reason: null });
+    expect(plan.cleared).toBe(true);
+    expect(plan.summary).toMatch(/climb schedule decides again/);
+  });
+
+  it("refuses weeks, a schedule, or an out-of-range position", () => {
+    expect(
+      refused(assignment(), { lever: "rep_position", position: "top", weeks: [3] }),
+    ).toMatch(/flat for the slot/);
+    expect(
+      refused(assignment(), { lever: "rep_position", schedule: [null, 1] }),
+    ).toMatch(/flat for the slot/);
+    expect(refused(assignment(), { lever: "rep_position" })).toMatch(
+      /nothing to set/,
+    );
+    expect(
+      refused(assignment(), { lever: "rep_position", position: 99 }),
+    ).toMatch(/bottom, center, top, or a whole rep count/);
+  });
+
+  it("composes with the two week-scheduled levers on one slot", () => {
+    let a = emptySlotEffort();
+    a = applySlotEffortPatch(
+      a,
+      planned(a, { lever: "rir", value: 4, weeks: [3, 4] }).patch,
+    );
+    a = applySlotEffortPatch(
+      a,
+      planned(a, { lever: "rep_position", position: "top", reason: "elbow" }).patch,
+    );
+    expect(a.rir_schedule).toEqual([null, null, 4, 4]);
+    expect(a.rep_position).toBe("top");
+    expect(a.effort_reason).toBe("elbow");
+    // clearing the RIR leaves the position — and the reason — standing
+    a = applySlotEffortPatch(a, planned(a, { lever: "rir", clear: true }).patch);
+    expect(hasAssignment(a)).toBe(true);
+    expect(a.effort_reason).toBe("elbow");
   });
 });
 

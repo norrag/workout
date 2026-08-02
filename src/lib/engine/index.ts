@@ -10,6 +10,7 @@ import {
   type Prescription,
   type DecisionTraceStep,
   type SeedEarnContext,
+  type RepPosition,
 } from "./types";
 import { assessPerformance, gradeOnRir } from "./rules/performance";
 import { modulateFromFeedback } from "./rules/feedback";
@@ -52,7 +53,7 @@ export {
 } from "./rules/envelope";
 export { rirRamp, type WeekPlan };
 export { engineParamsSchema, DEFAULT_ENGINE_PARAMS, toEngineEquipment } from "./params";
-export { engineInputsSchema } from "./types";
+export { engineInputsSchema, repPositionSchema, type RepPosition } from "./types";
 export {
   planMacrocycle,
   spreadPhases,
@@ -158,6 +159,43 @@ function pricedAtSlotRir(inputs: EngineInputs): EngineInputs {
   };
 }
 
+/**
+ * doc 21 A4 / Phase 4 — the set lever, applied ONCE at the outermost boundary of
+ * both prescription routes rather than at each of the branch-specific `sets`
+ * expressions (deload, cold start, seed anchor, rep window, bodyweight). Every
+ * one of those already lands on a set count; a cap is a statement about the
+ * result, so capping the result is both the smallest change and the only way the
+ * lever cannot be forgotten on a branch added later.
+ *
+ * A CEILING, never a floor: `min(sets, cap)`. Raising the prescribed sets is the
+ * plan's job (`initial_sets` seeds week 1 and set autoregulation carries it), and
+ * a lever that could do both would silently overwrite the volume autoregulation
+ * every week it was set.
+ *
+ * ABSOLUTE, like the RIR assignment (A2): the cap is applied AFTER
+ * `clampSets(..., params)`, so an authored cap below `params.min_sets` wins. That
+ * is deliberate — a rehab or deep-backoff slot at 1 set is exactly the case this
+ * lever exists for, and `min_sets` is a default for the engine's own reasoning,
+ * not a bound on what a coach may ask for.
+ *
+ * Unassigned, or a cap the prescription already respects ⇒ the SAME object, so
+ * nothing downstream (output, trace, rationale, stored decision) can observe the
+ * feature at all.
+ */
+function cappedSets(
+  out: Prescription,
+  cap: number | null | undefined,
+): Prescription {
+  if (cap == null || out.sets <= cap) return out;
+  const detail = `working-set cap: ${out.sets} → ${cap} set${cap === 1 ? "" : "s"} (exercise-level assignment)`;
+  return {
+    ...out,
+    sets: cap,
+    rationale: `${out.rationale} ${capitalize(detail)}.`,
+    trace: [...out.trace, { rule: "set_cap", detail }],
+  };
+}
+
 export function prescribe(
   rawInputs: EngineInputs,
   rawParams: EngineParams,
@@ -171,9 +209,19 @@ export function prescribe(
   // working prescription — it neither earns nor takes steps (§3.4), so it
   // bypasses the progression wrapper entirely.
   if (!progressionActive(inputs, params) || inputs.week.isDeload) {
-    return prescribeCore(pricedAtSlotRir(inputs), params);
+    return cappedSets(
+      prescribeCore(pricedAtSlotRir(inputs), params),
+      inputs.exerciseSetCap,
+    );
   }
-  return prescribeWithProgression(inputs, params);
+  // the cap is applied to the SHIPPED prescription, after the earned-step
+  // wrapper: sets play no part in the earn gate or the realized-ask comparison
+  // (both are load/rep arithmetic), so capping outside the wrapper keeps the
+  // progression trace identical to an uncapped run of the same week.
+  return cappedSets(
+    prescribeWithProgression(inputs, params),
+    inputs.exerciseSetCap,
+  );
 }
 
 /**
@@ -295,9 +343,13 @@ function prescribeCore(
       winCS != null &&
       confidenceAtLeast(anchorCS.confidence, params.reps_predict.min_confidence)
     ) {
+      // doc 21 §4.2: an assigned rep position prices the seed where the coach
+      // asked for it; unset ⇒ `target_low`, the pre-Phase-4 behavior.
+      const seedReps =
+        repsAtPosition(inputs.exerciseRepPosition, winCS) ?? winCS.target_low;
       const raw = weightForRepsAtRir(
         anchorCS.value,
-        winCS.target_low,
+        seedReps,
         inputs.week.targetRir,
         params,
       );
@@ -323,7 +375,7 @@ function prescribeCore(
         );
         const reps =
           predicted == null
-            ? winCS.target_low
+            ? seedReps
             : Math.min(winCS.max, Math.max(winCS.min, predicted));
         const detail = `seeded from strength anchor (e1RM ${anchorCS.value} lb): ${fw} lb for ${reps} reps at ${inputs.week.targetRir} RIR`;
         return {
@@ -435,12 +487,25 @@ function prescribeCore(
     // (double progression earns the load step on performance, not the ramp).
     const toppedOut = prevReps >= goalWindow!.target_high;
     const climbs = rirStepped || !(params.climb_requires_rir_step ?? false);
-    const targetReps = toppedOut
-      ? goalWindow!.target_low
-      : Math.min(
-          goalWindow!.target_high,
-          Math.max(goalWindow!.target_low, climbs ? prevReps + 1 : prevReps),
-        );
+    // doc 21 §4.2 — an assigned rep position REPLACES the Option-A schedule for
+    // this slot (that is what "reprice at the top of the window" means: the
+    // load follows the position, not the climb). Unset ⇒ null ⇒ the schedule
+    // below is untouched, byte for byte.
+    const positioned = repsAtPosition(inputs.exerciseRepPosition, goalWindow!);
+    const targetReps =
+      positioned ??
+      (toppedOut
+        ? goalWindow!.target_low
+        : Math.min(
+            goalWindow!.target_high,
+            Math.max(goalWindow!.target_low, climbs ? prevReps + 1 : prevReps),
+          ));
+    if (positioned != null) {
+      reasons.push({
+        rule: "rep_position",
+        detail: `rep position ${typeof inputs.exerciseRepPosition === "number" ? `${inputs.exerciseRepPosition} reps` : inputs.exerciseRepPosition} — priced for ${positioned} reps instead of the climb schedule`,
+      });
+    }
     let repriced =
       weightForRepsAtRir(anchor!.value, targetReps, inputs.week.targetRir, params) ??
       baseWeight;
@@ -806,6 +871,38 @@ function confidenceAtLeast(
 }
 
 /**
+ * doc 21 §4.2 — resolve an optional rep position into the reps the load is
+ * priced for. Unset ⇒ null, and every caller then keeps its existing rule (the
+ * Option-A climb schedule on the working path, `target_low` on the seed paths):
+ * this is a knob, not a mandate, which is the whole point of the correction that
+ * retracted the forced-centering rule.
+ *
+ * Positions read against the TARGET band (`target_low`/`target_high` — the band
+ * the prescription aims to sit in), while an explicit rep count is clamped to
+ * the window's HARD bounds `[min, max]`: a coach asking for 15s in an 8–12
+ * target window with a 6–15 hard window gets 15, but cannot escape the window
+ * the goal defines. The engine still re-derives the shipped reps from the
+ * rounded load (prescribed = predicted, doc 13 decision 3), so this positions
+ * the *pricing*, not the displayed number.
+ */
+function repsAtPosition(
+  position: RepPosition | null | undefined,
+  win: RepWindow,
+): number | null {
+  if (position == null) return null;
+  if (typeof position === "number")
+    return Math.min(win.max, Math.max(win.min, position));
+  switch (position) {
+    case "bottom":
+      return win.target_low;
+    case "top":
+      return win.target_high;
+    case "center":
+      return Math.round((win.target_low + win.target_high) / 2);
+  }
+}
+
+/**
  * Keep the prescribed reps inside the window's hard bounds: if rounding the
  * anchor-chosen load left predicted reps above `max` (load too light) add one
  * loadable step; below `min` (too heavy) drop one. A single step is enough.
@@ -929,6 +1026,13 @@ export function seedMeso(
      *  makes) while the earn gate keeps comparing against `startRir`, the
      *  week's own ramp value. Null/omitted ⇒ today's behavior exactly. */
     exerciseRir?: EngineInputs["exerciseRir"];
+    /** doc 21 A4: the slot's working-set cap for the seeded week — a ceiling on
+     *  the seeded set count, applied at this function's boundary exactly as
+     *  `prescribe()` applies it. Null/omitted ⇒ today's behavior exactly. */
+    exerciseSetCap?: EngineInputs["exerciseSetCap"];
+    /** doc 21 §4.2: the slot's optional rep position — where in the goal window
+     *  the anchor seed is priced. Null/omitted ⇒ `target_low`, as before. */
+    exerciseRepPosition?: EngineInputs["exerciseRepPosition"];
   },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
@@ -944,6 +1048,11 @@ export function seedMeso(
   // doc 21 §4.2 — the seed route's half of the one substitution: the assignment
   // replaces the week's ramp RIR for pricing only.
   const pricedRir = opts?.exerciseRir ?? startRir;
+  const repPosition = opts?.exerciseRepPosition ?? null;
+  // doc 21 A4 — the seed route's set cap, applied at this boundary (see
+  // `cappedSets`); the earn gate below never reads `sets`, so capping the
+  // shipped prescription leaves the progression comparison untouched.
+  const cap = (out: Prescription) => cappedSets(out, opts?.exerciseSetCap);
   const baseline = seedCore(
     priorPeak,
     initial,
@@ -955,6 +1064,7 @@ export function seedMeso(
     anchor,
     bodyweight,
     origin,
+    repPosition,
   );
 
   // doc 16 §3.7 — the earned-step wrapper on the seed route, mirroring
@@ -962,7 +1072,7 @@ export function seedMeso(
   // deload target week ⇒ the baseline ships untouched: byte-identical output,
   // trace, and recorded inputs (§2.7).
   if (!progressionActive({ goalType }, params) || (opts?.isDeload ?? false)) {
-    return baseline;
+    return cap(baseline);
   }
 
   // the earn is evaluated through the SAME gate + governors as the advance
@@ -994,7 +1104,7 @@ export function seedMeso(
   };
   const gate = assessProgression(gateInputs, params, baseline);
   if (!gate.offered) {
-    return withProgressionStep(baseline, holdStep(gate));
+    return cap(withProgressionStep(baseline, holdStep(gate)));
   }
   const led = seedCore(
     priorPeak,
@@ -1007,16 +1117,19 @@ export function seedMeso(
     { ...anchor!, value: gate.targetAnchor! },
     bodyweight,
     origin,
+    repPosition,
   );
-  return applyRealizedAsk({
-    baseline,
-    led,
-    ledTrace: led.trace,
-    gate,
-    anchorValue: anchor!.value,
-    inputs: gateInputs,
-    params,
-  });
+  return cap(
+    applyRealizedAsk({
+      baseline,
+      led,
+      ledTrace: led.trace,
+      gate,
+      anchorValue: anchor!.value,
+      inputs: gateInputs,
+      params,
+    }),
+  );
 }
 
 /** The pre-doc-16 seed path, unchanged — parameterized on the anchor input,
@@ -1034,6 +1147,8 @@ function seedCore(
   bodyweight: number | null,
   /** N67 — the rounding lattice's phase; null ⇒ the absolute grid */
   origin: number | null = null,
+  /** doc 21 §4.2 — the slot's optional rep position; null ⇒ `target_low` */
+  repPosition: RepPosition | null = null,
 ): Prescription {
   // T-I2: bodyweight load types seed through the bodyweight model (effective load
   // off the anchor; reps-only for bodyweight_only). Gated on `bodyweight_model`.
@@ -1061,7 +1176,10 @@ function seedCore(
     win != null &&
     confidenceAtLeast(anchor.confidence, params.reps_predict.min_confidence)
   ) {
-    const raw = weightForRepsAtRir(anchor.value, win.target_low, startRir, params);
+    // doc 21 §4.2: the seed route's half of the rep-position knob — unset ⇒
+    // `target_low`, exactly as before.
+    const seedReps = repsAtPosition(repPosition, win) ?? win.target_low;
+    const raw = weightForRepsAtRir(anchor.value, seedReps, startRir, params);
     if (raw != null) {
       // N51: same window bound as the working prescribe path — nearest-step
       // rounding lands heavy half the time and the hard [min,max] clamp alone
@@ -1078,7 +1196,7 @@ function seedCore(
       const predicted = predictRepsAtWeight(anchor.value, fw, startRir, params);
       const reps =
         predicted == null
-          ? win.target_low
+          ? seedReps
           : Math.min(win.max, Math.max(win.min, predicted));
       const detail = `seeded from strength anchor (e1RM ${anchor.value} lb): ${fw} lb for ${reps} reps at ${startRir} RIR`;
       return {

@@ -2,7 +2,64 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-02 (latest) — N73: the set-logging queue's echo rule
+## 2026-08-02 (latest) — doc 21 Phase 4: the set lever bites + the rep-position knob (N70)
+
+The second and third levers on a day-slot. Phase 3 made an assignment writable
+over MCP; Phase 4 makes the working-set cap actually change a prescription, and
+adds the one knob §4.2 kept when it retracted the forced-centering rule.
+
+**The cap is applied ONCE, at the boundary of both prescription routes.**
+`engine/index.ts::cappedSets` wraps `prescribe()` and `seedMeso()` rather than
+editing each branch's `sets` expression — deload, cold start, seed anchor, rep
+window and bodyweight all land on a set count already, and a cap is a statement
+about the *result*. That is both the smallest change and the only shape a branch
+added later cannot forget. It sits deliberately **outside** the doc-16
+progression wrapper: sets play no part in the earn gate or the realized-ask
+comparison, so a capped week's progression trace is identical to an uncapped
+one's.
+
+**A ceiling, never a floor — and absolute (A2).** `min(sets, cap)`, applied
+*after* `clampSets(…, params)`, so an authored cap of 1 wins over
+`params.min_sets`: a rehab slot at one set is exactly what the lever is for.
+Raising sets stays the plan's job (`set_baseline_sets`), because a lever that
+could do both would silently overwrite the volume autoregulation every week it
+was set.
+
+**`rep_position` stays a knob, not a rule.** §4.2's correction is untouched:
+repricing at a different RIR needs no special case. Unset ⇒ the Option-A climb
+schedule decides, byte for byte. Set ⇒ `repsAtPosition` replaces the schedule's
+rep choice at the three sites that make one (the working rep-window path and the
+two anchor-seed paths), and the existing pricing machinery does the rest — so
+"reprice at the top of the window" is a deeper cut *at the same RIR*. Named
+positions resolve against the target band; an explicit rep count is clamped to
+the window's hard bounds, so a coach can ask for 15s but cannot escape the goal's
+window.
+
+**Flat per slot, on purpose.** One `rep_position text` column
+(`20260802000004`), not a third week-indexed array: the position is how the
+exercise is priced, not an intensity that ramps. The new MCP op
+`set_exercise_rep_position` **refuses** `weeks`/`schedule` rather than ignoring
+them, so a caller who wanted a per-week position is told the column cannot
+express it.
+
+**Freshness is mechanical, one key per lever.** `exerciseSetCap` and
+`exerciseRepPosition` join `exerciseRir` in `buildConfigInputs`, each omitted
+when its own lever is unassigned — a slot carrying neither hashes exactly as it
+did before doc 21 existed. Phase 2's non-obvious recompute guard (a spread cannot
+delete a key) now runs per lever, so clearing one assignment can never leave
+another replaying off a stale copy.
+
+**One honesty fix on the read side.** `get_current_state` described a slot
+carrying only a set cap as "running at an assigned RIR" — quoting the week's own
+value as though it had been authored. The RIR sentence now covers only
+RIR-assigned slots; caps and positions get their own clause.
+
+*Deliberately not here:* the prescription-strip copy for either lever. The trace
+and rationale carry both (and `explain_prescription` surfaces them), but the
+deterministic *why* line and the doc-19 facts payload are Phase 6's subject,
+along with the rest of the explanation layering and its design pass.
+
+## 2026-08-02 — N73: the set-logging queue's echo rule
 
 Two regressions the N68 queue introduced, reported by the owner. (1) A logged set
 fills and advances to the next one, then **reverses for about a second** — set 1

@@ -17,6 +17,7 @@ import {
   orphanedSlotSchedules,
   resolveSlotEffort,
   restoreSlotEffortAssignments,
+  type RepPosition,
 } from "./slot-effort";
 
 type Client = SupabaseClient<Database>;
@@ -1168,6 +1169,8 @@ export interface ActiveSlotEffort {
   assignedRir: number | null;
   weekRir: number;
   setCap: number | null;
+  /** doc 21 §4.2 — where in the rep window this slot is priced (null = schedule) */
+  repPosition: RepPosition | null;
   reason: string | null;
   /** running EASIER than the week it sits in — the earn gate keys on this */
   backedOff: boolean;
@@ -1286,7 +1289,12 @@ export async function getActiveSlotEffort(
     // a slot whose assignment doesn't reach THIS week (a schedule with a null
     // element here) isn't active — the ramp is in control and there is nothing
     // to disclose.
-    if (resolved.assignedRir == null && resolved.setCap == null) continue;
+    if (
+      resolved.assignedRir == null &&
+      resolved.setCap == null &&
+      resolved.repPosition == null
+    )
+      continue;
     out.push({
       dayNumber: row.dayNumber,
       exerciseId: row.exerciseId,
@@ -1295,6 +1303,7 @@ export async function getActiveSlotEffort(
       assignedRir: resolved.assignedRir,
       weekRir: resolved.weekRir,
       setCap: resolved.setCap,
+      repPosition: resolved.repPosition,
       reason: resolved.reason,
       backedOff: resolved.backedOff,
     });

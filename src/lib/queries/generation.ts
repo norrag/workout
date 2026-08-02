@@ -42,7 +42,7 @@ import {
 import { getSeedEarnContexts, type SeedEarnBundle } from "./seed-progression";
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
 import { getBandPosition } from "./envelope";
-import { exerciseRirInput } from "./slot-effort";
+import { slotEffortInputs } from "./slot-effort";
 
 type Client = SupabaseClient<Database>;
 
@@ -124,6 +124,7 @@ function seedExerciseRow(
     | "rir_schedule"
     | "set_cap"
     | "set_cap_schedule"
+    | "rep_position"
     | "effort_reason"
   >,
   muscleGroupId: string | null,
@@ -160,10 +161,11 @@ function seedExerciseRow(
   // the mode is inactive so recorded inputs stay byte-identical.
   const earnBundle = ctx.earnByExerciseId?.get(fill.exercise_id) ?? null;
   const history = ctx.progressionByExerciseId?.get(fill.exercise_id) ?? null;
-  // doc 21 §4.1: this slot's exercise-level RIR for the week being seeded.
-  // Undefined when unassigned — the key is then omitted from both the engine
-  // call and the recorded inputs, so the seed stays byte-identical to today.
-  const exerciseRir = exerciseRirInput(fill, ctx.weekNumber);
+  // doc 21 §4.1 + Phase 4: the RIR assignment, the set cap and the rep position all
+  // ride the same rule — one key per lever, OMITTED when that lever is
+  // unassigned, so an unassigned slot's engine call and recorded inputs stay
+  // byte-identical to a pre-doc-21 seed.
+  const slotEffort = slotEffortInputs(fill, ctx.weekNumber);
   const output = seedMeso(
     priorPeak,
     initial,
@@ -176,7 +178,7 @@ function seedExerciseRow(
       anchor,
       bodyweight: ctx.bodyweight,
       isDeload: ctx.isDeload,
-      ...(exerciseRir != null ? { exerciseRir } : {}),
+      ...slotEffort,
       ...(earnBundle
         ? {
             earn: earnBundle.earn,
@@ -202,7 +204,7 @@ function seedExerciseRow(
     priorPeak,
     strengthAnchor: anchor,
     bodyweight: ctx.bodyweight,
-    exerciseRir,
+    ...slotEffort,
     ...(ctx.progressionByExerciseId
       ? {
           progression: {

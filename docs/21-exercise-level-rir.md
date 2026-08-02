@@ -102,6 +102,7 @@ alter table public.meso_exercises
   add column rir_schedule int[],                                      -- per working week; null = use target_rir
   add column set_cap int check (set_cap between 1 and 20),            -- A4; null = engine's own
   add column set_cap_schedule int[],
+  add column rep_position text,                                       -- §4.2; Phase 4, flat (no schedule)
   add column effort_reason text;                                      -- A7
 ```
 
@@ -207,8 +208,8 @@ rep position (the table above spans 18 lb), a coach may want to say "reprice at
 the top of the window" for a deeper cut. That becomes an **optional** per-slot
 `rep_position` (`bottom | center | top | <explicit>`); **unset ⇒ the existing
 schedule decides**, which is today's behavior and the default. This is the useful
-part of the rejected centering rule, demoted from a mandate to a knob. Deferred
-to Phase 4 — nothing depends on it.
+part of the rejected centering rule, demoted from a mandate to a knob. *(Shipped
+in Phase 4, 2026-08-02: flat per slot, no per-week schedule — see §10.)*
 
 ### 4.3 How deep can this go, and where it stops being a measurement
 
@@ -609,10 +610,76 @@ weeks.
 - *Still inert in the app itself:* the UI surface and the doc-19 explanation
   layering are Phase 6.
 
-**Phase 4 — set lever (A4) + optional `rep_position` (§4.2).** `set_cap`
-resolution + engine clamp, same fingerprint treatment; `rep_position` as an
-optional per-slot knob (unset ⇒ the schedule decides). Can merge into Phase 2 if
-it lands naturally.
+**Phase 4 — set lever (A4) + optional `rep_position` (§4.2). ✅ SHIPPED
+2026-08-02.** `set_cap` resolution + engine clamp, same fingerprint treatment;
+`rep_position` as an optional per-slot knob (unset ⇒ the schedule decides).
+*Tests:* the cap clamps down on every prescription route and never up; an
+authored cap below `min_sets` wins; a rep position prices top-of-window lighter
+than bottom at the same RIR, with the explicit form clamped to the window's hard
+bounds; unset ⇒ byte-identical output, trace and fingerprint on both levers.
+
+*As built:*
+- **The cap is applied ONCE, at the boundary of both prescription routes**
+  (`engine/index.ts::cappedSets`, wrapping `prescribe()` and `seedMeso()`),
+  not at each branch's `sets` expression. Every branch — deload, cold start,
+  seed anchor, rep window, bodyweight — already lands on a set count, and a cap
+  is a statement about the result; capping the result is both the smallest
+  change and the only shape a branch added later cannot forget. It sits
+  **outside** the doc-16 progression wrapper on purpose: sets play no part in
+  the earn gate or the realized-ask comparison, so a capped week's progression
+  trace is identical to an uncapped one's.
+- **A ceiling, never a floor**, and **absolute** like the RIR assignment (A2):
+  `min(sets, cap)`, applied *after* `clampSets(…, params)`, so an authored cap
+  of 1 wins over `params.min_sets` — a rehab slot at one set is exactly what
+  this lever is for. Raising sets stays the plan's job (`set_baseline_sets`),
+  because a lever that could do both would silently overwrite the volume
+  autoregulation every week it was set. The Phase-3 tool warning that the engine
+  "does not clamp to the cap yet" is replaced by the one that now matters: the
+  cap only ever lowers the count.
+- **`rep_position` is the useful half of the retracted centering rule, and
+  nothing more.** §4.2's correction stands — repricing at a different RIR needs
+  no special case — so this is a *knob*: unset ⇒ the Option-A climb schedule
+  decides, byte for byte. Set ⇒ `repsAtPosition` replaces the schedule's
+  `targetReps` at the three sites that choose a rep position (the working
+  rep-window path, `prescribe`'s cold-start anchor seed, and `seedCore`'s),
+  and the existing pricing path does the rest. Named positions resolve against
+  the TARGET band; an explicit rep count is clamped to the window's HARD bounds,
+  so a coach can ask for 15s but cannot escape the goal's window.
+- **Flat per slot, with no per-week schedule** — one column (`rep_position
+  text`), not a third week-indexed array. The position is a statement about how
+  the exercise is priced, not an intensity that ramps; the MCP op *refuses*
+  `weeks`/`schedule` rather than ignoring them, so a caller who wanted a per-week
+  position is told this column cannot express it.
+- One text column holds both value forms (`bottom|center|top` or digits) rather
+  than a keyword column plus an int column: they are one knob with one
+  resolution, and splitting them would turn "exactly one of these is set" from a
+  shape into an invariant to enforce. `parseRepPosition` degrades unrecognized
+  text to null — the knob is optional everywhere, so a bad row loses the
+  position instead of failing a prescription.
+- **Freshness is mechanical (§7.1), one key per lever.** `exerciseSetCap` and
+  `exerciseRepPosition` join `exerciseRir` in `buildConfigInputs`, each OMITTED
+  when its own lever is unassigned — so a slot carrying only a cap hashes
+  differently from one carrying only a position, and a slot carrying neither
+  hashes exactly as it did before doc 21 existed. The recompute's explicit
+  key-drop (Phase 2's non-obvious guard) now runs per lever for the same reason:
+  clearing one assignment must not leave another replaying off a stale copy.
+- **MCP: a third op, `set_exercise_rep_position`**, on `edit_mesocycle` beside
+  the other two, planned through the same entry point (`planSlotEffortEdit`
+  dispatches to `planRepPositionEdit`) and returning the same result shape, so a
+  batch never has to branch. Its plan reports no assigned weeks and no deload
+  coverage — deliberately, since it can name neither — which keeps the
+  already-trained-week refusal and the deload disclosure silent for a lever that
+  has nothing to say about weeks.
+- Read-side disclosure carries both: `get_mesocycle`'s slot `effort` block gains
+  `rep_position` and one line on what each lever does, and `get_current_state`
+  now separates "runs at an assigned RIR" from "carries an authored limit" — a
+  slot with only a cap or a position was previously described as running at an
+  assigned RIR (it was the week's own value), which was a claim nobody made.
+- *Deliberately not here:* the prescription-strip copy. The cap and the position
+  both change what the athlete sees, and the trace + rationale say so (visible
+  over `explain_prescription`), but the deterministic *why* line and the doc-19
+  facts payload are **Phase 6**'s subject along with the rest of the explanation
+  layering and its design pass.
 
 **Phase 5 — stats policy (§6).** Intent-keyed exclusion from strength surfaces,
 volume disclosure flag, comparability note on meso/macro rollups.

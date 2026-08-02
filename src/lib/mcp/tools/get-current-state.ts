@@ -57,6 +57,9 @@ export interface CurrentStatePayload {
     target_rir: number;
     week_target_rir: number;
     set_cap: number | null;
+    /** doc 21 §4.2 — `bottom|center|top` or an explicit rep count; null = the
+     *  climb schedule decides (the default) */
+    rep_position: string | number | null;
     reason: string | null;
     backed_off: boolean;
   }[];
@@ -84,11 +87,17 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
     const deload = microcycle?.is_deload ? " (deload week)" : "";
     summary = `Active mesocycle "${mesocycle.name}" — next workout is ${coord}${rir}${deload}.`;
   }
-  if (effort.length > 0) {
-    // doc 21 §8: state the authored effort level before anything narrates the
-    // engine's reasoning — the numbers on those slots are a coach's ask, not a
-    // progression decision.
-    summary += ` ${effort.length} exercise${effort.length === 1 ? " runs" : "s run"} at an assigned RIR this week (${effort
+  // doc 21 §8: state the authored effort level before anything narrates the
+  // engine's reasoning — the numbers on those slots are a coach's ask, not a
+  // progression decision. The RIR sentence covers only the slots that actually
+  // carry a RIR assignment; a slot carrying just a set cap or a rep position is
+  // not "running at an assigned RIR" and gets its own clause (doc 21 Phase 4).
+  const rirAssigned = effort.filter((e) => e.assignedRir != null);
+  const otherLevers = effort.filter(
+    (e) => e.setCap != null || e.repPosition != null,
+  );
+  if (rirAssigned.length > 0) {
+    summary += ` ${rirAssigned.length} exercise${rirAssigned.length === 1 ? " runs" : "s run"} at an assigned RIR this week (${rirAssigned
       .map(
         (e) =>
           `day ${e.dayNumber} ${e.exerciseName ?? e.exerciseId}: RIR ${e.rir}${
@@ -96,6 +105,19 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
           }`,
       )
       .join("; ")}), overriding the week's ramp; no progression is earned on a slot running easier than its week.`;
+  }
+  if (otherLevers.length > 0) {
+    summary += ` ${otherLevers.length} exercise${otherLevers.length === 1 ? " carries" : "s carry"} an authored ${otherLevers.length === 1 ? "limit" : "limits"} this week (${otherLevers
+      .map((e) => {
+        const parts = [
+          e.setCap != null
+            ? `capped at ${e.setCap} set${e.setCap === 1 ? "" : "s"}`
+            : null,
+          e.repPosition != null ? `priced at ${repPositionWords(e.repPosition)}` : null,
+        ].filter(Boolean);
+        return `day ${e.dayNumber} ${e.exerciseName ?? e.exerciseId}: ${parts.join(", ")}`;
+      })
+      .join("; ")}).`;
   }
 
   return {
@@ -149,6 +171,7 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
             target_rir: e.rir,
             week_target_rir: e.weekRir,
             set_cap: e.setCap,
+            rep_position: e.repPosition,
             reason: e.reason,
             backed_off: e.backedOff,
           })),
@@ -156,6 +179,16 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
       : {}),
     summary,
   };
+}
+
+/** doc 21 §4.2 — the rep position in words, for the prose summary. */
+function repPositionWords(position: string | number): string {
+  if (typeof position === "number") return `${position} reps`;
+  return position === "bottom"
+    ? "the bottom of the rep window"
+    : position === "top"
+      ? "the top of the rep window"
+      : "the middle of the rep window";
 }
 
 export const GET_CURRENT_STATE = "get_current_state";
@@ -170,7 +203,8 @@ export function registerGetCurrentState(server: McpServer) {
         "mesocycle → microcycle (week) → next workout, including this week's " +
         "target RIR, plus any exercise-level RIR assignment running this week " +
         "(an authored effort level that overrides the week's ramp for one " +
-        "exercise, with its reason). Call this first to ground any coaching or " +
+        "exercise, with its reason), plus any working-set cap or rep position " +
+        "assigned to a slot. Call this first to ground any coaching or " +
         "planning. Takes no arguments — it always reports the authenticated " +
         "user's own state.",
       inputSchema: {},

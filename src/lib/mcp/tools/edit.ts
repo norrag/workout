@@ -14,7 +14,7 @@ import {
   getActiveEngineParams,
   regenerateOpenWorkouts,
 } from "@/lib/queries/generation";
-import { rirRamp } from "@/lib/engine";
+import { rirRamp, repPositionSchema } from "@/lib/engine";
 import {
   applySlotEffortPatch,
   emptySlotEffort,
@@ -420,7 +420,7 @@ export interface EffortContext {
 }
 
 export interface EffortOp {
-  op: "set_exercise_rir" | "set_exercise_sets";
+  op: "set_exercise_rir" | "set_exercise_sets" | "set_exercise_rep_position";
   slot_id: string;
   edit: SlotEffortEdit;
 }
@@ -438,11 +438,13 @@ export interface EffortDisclosure {
   day_number: number;
   exercise_id: string;
   exercise_name?: string | null;
-  lever: "target_rir" | "set_cap";
+  lever: "target_rir" | "set_cap" | "rep_position";
   by_week: (number | null)[];
   week_defaults: (number | null)[];
   assigned_weeks: number[];
   covers_deload_week: boolean;
+  /** `rep_position` only — the flat value after the write (null = cleared) */
+  rep_position?: string | null;
   reason: string | null;
 }
 
@@ -517,12 +519,25 @@ export function planEffortEdits(
         `day ${slot.day_number}: ${weekWord(lockedCovered)} already trained — the assignment applies to the weeks still ahead.`,
       );
 
-    const lever = op.edit.lever === "rir" ? "target_rir" : "set_cap";
+    const lever =
+      op.edit.lever === "rir"
+        ? "target_rir"
+        : op.edit.lever === "sets"
+          ? "set_cap"
+          : "rep_position";
 
     // §4.1 "the week's default beside the field": an assignment BELOW the
     // week's ramp RIR makes that week harder than programmed. Legitimate
     // (ramping back into a block), never silent.
-    if (op.edit.lever === "rir") {
+    if (op.edit.lever === "rep_position") {
+      // flat by construction: no week can be named, so there is no
+      // already-trained-week clash and no deload disclosure to make. The one
+      // thing worth saying is what it displaces.
+      if (!plan.cleared)
+        warnings.push(
+          `day ${slot.day_number}: the rep position replaces the climb schedule for this exercise — the load is priced at that point in the rep window every week until it is cleared.`,
+        );
+    } else if (op.edit.lever === "rir") {
       for (const w of plan.assignedWeeks) {
         const value = plan.byWeek[w - 1]!;
         const def = ctx.weekRir.get(w);
@@ -545,12 +560,13 @@ export function planEffortEdits(
         warnings.push(
           `a flat set cap also governs the deload week (week ${ctx.deloadWeek}).`,
         );
-      // honesty: the cap is stored, resolved and disclosed, but the engine's
-      // set count doesn't read it yet (doc 21 Phase 4). Never let the tool
-      // imply an effect the prescription won't show.
+      // the cap is a CEILING (doc 21 Phase 4): the engine clamps its own set
+      // count down to it and never up, so a caller asking for MORE sets than
+      // the engine prescribes has to seed them instead. Say so rather than let
+      // the number read as a set count.
       if (!plan.cleared && plan.assignedWeeks.length > 0)
         warnings.push(
-          `day ${slot.day_number}: the working-set cap is recorded on the plan and reads back everywhere, but the engine does not clamp its set count to it yet — that lands in a later phase. To change the sets the athlete actually sees, use set_baseline_sets (week-1 seed).`,
+          `day ${slot.day_number}: the working-set cap only lowers the engine's set count — it never raises it. To start this exercise on more sets, use set_baseline_sets (the week-1 seed).`,
         );
     }
 
@@ -576,6 +592,9 @@ export function planEffortEdits(
       week_defaults: Array.from({ length: workingWeeks }, (_, i) =>
         op.edit.lever === "rir" ? (ctx.weekRir.get(i + 1) ?? null) : null,
       ),
+      ...(op.edit.lever === "rep_position"
+        ? { rep_position: plan.next.rep_position }
+        : {}),
       assigned_weeks: plan.assignedWeeks,
       covers_deload_week: plan.coversDeload,
       reason: plan.next.effort_reason,
@@ -765,6 +784,15 @@ const setExerciseSetsOp = z.object({
   clear: z.boolean().optional(),
   reason: z.string().max(EFFORT_REASON_MAX).nullable().optional(),
 });
+// doc 21 §4.2 — the rep-position lever. Flat per slot (no weeks/schedule), so
+// the shape is deliberately narrower than the other two.
+const setExerciseRepPositionOp = z.object({
+  op: z.literal("set_exercise_rep_position"),
+  slot_id: z.string().uuid(),
+  position: repPositionSchema.nullable().optional(),
+  clear: z.boolean().optional(),
+  reason: z.string().max(EFFORT_REASON_MAX).nullable().optional(),
+});
 const operationSchema = z.discriminatedUnion("op", [
   addOp,
   removeOp,
@@ -775,19 +803,38 @@ const operationSchema = z.discriminatedUnion("op", [
   removeDayOp,
   setExerciseRirOp,
   setExerciseSetsOp,
+  setExerciseRepPositionOp,
 ]);
 type Operation = z.infer<typeof operationSchema>;
 
 type EffortOperation =
   | z.infer<typeof setExerciseRirOp>
-  | z.infer<typeof setExerciseSetsOp>;
+  | z.infer<typeof setExerciseSetsOp>
+  | z.infer<typeof setExerciseRepPositionOp>;
+
+const EFFORT_OPS = new Set([
+  "set_exercise_rir",
+  "set_exercise_sets",
+  "set_exercise_rep_position",
+]);
 
 function isEffortOp(o: Operation): o is EffortOperation {
-  return o.op === "set_exercise_rir" || o.op === "set_exercise_sets";
+  return EFFORT_OPS.has(o.op);
 }
 
 /** The zod op → the lever-neutral intent the pure planner takes. */
 export function toEffortOp(o: EffortOperation): EffortOp {
+  if (o.op === "set_exercise_rep_position")
+    return {
+      op: o.op,
+      slot_id: o.slot_id,
+      edit: {
+        lever: "rep_position",
+        ...(o.position !== undefined ? { position: o.position } : {}),
+        ...(o.clear !== undefined ? { clear: o.clear } : {}),
+        ...(o.reason !== undefined ? { reason: o.reason } : {}),
+      },
+    };
   const lever = o.op === "set_exercise_rir" ? "rir" : "sets";
   const value = o.op === "set_exercise_rir" ? o.rir : o.sets;
   return {
@@ -837,12 +884,16 @@ export function registerEditMesocycle(server: McpServer) {
         "value overrides the deload week too), and removing it hands the week " +
         "straight back to the meso's ramp. No progression is earned while a slot " +
         "runs easier than its week. set_exercise_sets is the same shape for a " +
-        "working-set cap (sets/weeks/schedule/clear) — distinct from " +
+        "working-set CAP (sets/weeks/schedule/clear) — distinct from " +
         "set_baseline_sets, which seeds week 1 and then lets set progression run. " +
-        "NOTE: the cap is recorded and read back everywhere, but the engine does " +
-        "not clamp its set count to it yet — use set_baseline_sets to change the " +
-        "sets the athlete actually sees. " +
-        "Both take an optional reason, surfaced wherever the assignment reads. A " +
+        "The cap is a ceiling: the engine clamps its own set count down to it and " +
+        "never up, so use set_baseline_sets to start an exercise on MORE sets. " +
+        "set_exercise_rep_position (slot_id + position: bottom | center | top | a " +
+        "rep count, or clear: true) prices this slot at that point in the goal rep " +
+        "window instead of following the climb schedule — a deeper cut at the same " +
+        "RIR (top = lighter, bottom = heavier). It is flat for the slot: no weeks, " +
+        "no schedule. " +
+        "All three take an optional reason, surfaced wherever the assignment reads. A " +
         "week that has already been trained can't be reassigned by name.",
       inputSchema: {
         mesocycle_id: z.string().uuid(),

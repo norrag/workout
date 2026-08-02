@@ -26,7 +26,7 @@ import {
 } from "./progression";
 import { getMesoPlan } from "./cycles";
 import {
-  exerciseRirInput,
+  slotEffortInputs,
   getSlotEffortAssignments,
   slotEffortKey,
   slotEffortSignatureInput,
@@ -231,7 +231,15 @@ function recomputeAdvance(
   // spread cannot delete a key the stored decision still carries, so the
   // removal has to be explicit. Without it a cleared assignment would replay
   // forever off its own stale copy.
-  if (!("exerciseRir" in args.liveConfig)) delete rebuilt.exerciseRir;
+  // Phase 4 adds two more levers under the same rule; each is dropped on its own
+  // so clearing one assignment can never leave another replaying off a stale copy.
+  for (const key of [
+    "exerciseRir",
+    "exerciseSetCap",
+    "exerciseRepPosition",
+  ] as const) {
+    if (!(key in args.liveConfig)) delete rebuilt[key];
+  }
   const parsed = engineInputsSchema.safeParse(rebuilt);
   if (!parsed.success) return { status: "invalid_source" };
 
@@ -321,6 +329,12 @@ function recomputeSeed(
         // `liveConfig`), so a replayed seed reprices at whatever the plan now
         // says — that is exactly how an assignment edit reaches an open row.
         ...(cfg.exerciseRir != null ? { exerciseRir: cfg.exerciseRir } : {}),
+        ...(cfg.exerciseSetCap != null
+          ? { exerciseSetCap: cfg.exerciseSetCap }
+          : {}),
+        ...(cfg.exerciseRepPosition != null
+          ? { exerciseRepPosition: cfg.exerciseRepPosition }
+          : {}),
         ...(stored.seedEarn != null
           ? {
               earn: stored.seedEarn,
@@ -437,9 +451,12 @@ interface OpenRow {
   dayNumber: number;
   targetRir: number;
   isDeload: boolean;
-  /** doc 21 §4.1 — this slot's exercise-level RIR assignment for this week;
-   *  undefined when unassigned (⇒ omitted from the config projection). */
+  /** doc 21 §4.1 + Phase 4 — this slot's effort assignment for this week, one
+   *  key per lever; undefined when that lever is unassigned (⇒ omitted from the
+   *  config projection, so the hash stays byte-identical). */
   exerciseRir?: number;
+  exerciseSetCap?: number;
+  exerciseRepPosition?: EngineInputs["exerciseRepPosition"];
   currentOutput: Pick<Prescription, "weight" | "reps" | "sets" | "targetRir">;
   depFingerprint: string | null;
   /** the version this row currently advertises as verified-accurate (doc 14 stamp) */
@@ -988,7 +1005,7 @@ export async function reconcilePrescriptions(
         dayNumber: workout.day_number,
         targetRir: micro.target_rir,
         isDeload: micro.is_deload,
-        exerciseRir: exerciseRirInput(
+        ...slotEffortInputs(
           slotEffort.get(slotEffortKey(workout.day_number, we.exercise_id)),
           micro.week_number,
         ),
@@ -1235,6 +1252,8 @@ export async function reconcilePrescriptions(
           microTargetRir: srcMicro.target_rir,
           nextWeek: { targetRir: row.targetRir, isDeload: row.isDeload },
           exerciseRir: row.exerciseRir,
+          exerciseSetCap: row.exerciseSetCap,
+          exerciseRepPosition: row.exerciseRepPosition,
           goal,
           equipmentType,
           profile,
@@ -1327,6 +1346,8 @@ export async function reconcilePrescriptions(
           previous,
           initial,
           exerciseRir: row.exerciseRir,
+          exerciseSetCap: row.exerciseSetCap,
+          exerciseRepPosition: row.exerciseRepPosition,
         }),
         priorPeak,
       ) as unknown as Record<string, unknown>;

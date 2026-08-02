@@ -251,13 +251,18 @@ export function formatSlotEffort(
     ...(a.set_cap_schedule != null
       ? { set_cap_by_working_week: a.set_cap_schedule }
       : {}),
+    ...(a.rep_position != null ? { rep_position: a.rep_position } : {}),
     reason: a.effort_reason,
     note:
       "an exercise-level assignment is ABSOLUTE — where set it replaces this " +
       "week's target RIR for this slot only (a flat value covers the deload " +
       "week too), and the engine reprices the load to meet it. Clearing it " +
       "hands the slot straight back to the mesocycle's RIR ramp. No " +
-      "progression is earned while a slot runs easier than its week.",
+      "progression is earned while a slot runs easier than its week. " +
+      "set_cap is a CEILING on this slot's working sets — it only ever lowers " +
+      "the engine's own count. rep_position (bottom|center|top or an explicit " +
+      "rep count) prices the load at that point in the goal rep window instead " +
+      "of following the climb schedule.",
   };
 }
 
