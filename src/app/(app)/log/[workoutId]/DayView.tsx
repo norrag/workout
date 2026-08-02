@@ -292,6 +292,19 @@ export function DayView({
     [toast],
   );
 
+  // N73 (the echo rule): hand the freshly rendered server rows back to the
+  // queue so an acked op the render CONTAINS can finally retire. This is the
+  // only thing that clears a queued set's overlay on the happy path — the write
+  // resolving no longer does, precisely so the row can't un-log itself in the
+  // gap before the render arrives. `reconcile` returns the same state when
+  // nothing retires, so running it on every render costs nothing.
+  const reconcile = queue.reconcile;
+  useEffect(() => {
+    reconcile(
+      exercises.map((we) => ({ workoutExerciseId: we.id, sets: we.sets })),
+    );
+  }, [exercises, reconcile]);
+
   // N68: the same exercises decorated with whatever the write queue is still
   // carrying. The lifter's view of progress counts a queued set (they did the
   // work and the box is checked); the COMPLETE gate below does NOT — completion
@@ -1686,10 +1699,19 @@ function SetRow({
     });
   };
 
+  // N73: this row has a write of its own that the server hasn't echoed back
+  // yet, so any render arriving now may predate it. The resync effects below
+  // key off SERVER-value dependencies, so the render that carries the echo is
+  // also the render whose closure they run with — reading this directly is
+  // therefore already the queue as of that render.
+  const writeOutstanding = logged ? queue.isAmending(logged.id) : false;
+
   // re-sync when this row's own logged set changes (a log/unlog/amend
-  // confirmation echoing back) — always adopt the server state
+  // confirmation echoing back) — adopt the server state, unless this row's own
+  // amend is still outstanding and the render may therefore be pre-amend (N73)
   useEffect(() => {
-    if (!adoptServerRowState("own-logged-set", edited.current)) return;
+    if (!adoptServerRowState("own-logged-set", edited.current, writeOutstanding))
+      return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     setRir(String(initialRir));
@@ -1714,7 +1736,7 @@ function SetRow({
     const cleared = prevPlannedWeight.current != null && plannedWeight == null;
     prevPlannedWeight.current = plannedWeight;
     const change = cleared ? ("prescription-reset" as const) : ("planned-input" as const);
-    if (!adoptServerRowState(change, edited.current)) return;
+    if (!adoptServerRowState(change, edited.current, writeOutstanding)) return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     repsManual.current = false;

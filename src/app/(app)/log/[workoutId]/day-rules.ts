@@ -93,7 +93,8 @@ export function daySetTotals(exercises: SetProgressExercise[]): {
  * R13: may a set row adopt a server-driven change over its current cell values?
  *
  * - `own-logged-set` — this row's logged set changed (a log/unlog/amend
- *   confirmation echoing back): always adopt; it IS the row's own state.
+ *   confirmation echoing back): adopt; it IS the row's own state. Except when
+ *   the row has a write of its own still outstanding — see below.
  * - `planned-input` — a background write changed the row's planned inputs
  *   (an auto-match fan-out or a persisted weight edit landing via
  *   `set_weights`, or a bodyweight edit): adopt only while the row has no
@@ -106,11 +107,22 @@ export function daySetTotals(exercises: SetProgressExercise[]): {
  *   made the reset option appear — the typed-in-row guard that protects
  *   against background fan-outs was silently swallowing the reset on set 1
  *   (sets 2+ are prop-derived and always reset).
+ *
+ * N73 — `writeOutstanding` vetoes all three. A render that arrives while this
+ * row's own amend is still queued (or is saved but not yet echoed) may have
+ * been fetched BEFORE that write landed, so its values are the pre-amend ones.
+ * Adopting them is what discarded an edited RIR: the cell snapped back to the
+ * old number, and because adopting also clears the row's dirty flag, the next
+ * blur had nothing left to re-send. The queue is the authority on whether a
+ * write is still outstanding; while one is, what's on screen is the truth and
+ * the echo waits.
  */
 export function adoptServerRowState(
   change: "own-logged-set" | "planned-input" | "prescription-reset",
   hasUncommittedEdits: boolean,
+  writeOutstanding = false,
 ): boolean {
+  if (writeOutstanding) return false;
   if (change === "own-logged-set") return true;
   if (change === "prescription-reset") return true;
   return !hasUncommittedEdits;

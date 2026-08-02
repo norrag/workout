@@ -2022,10 +2022,19 @@ describe("coaching_prompts (doc 19)", () => {
     expect(active).toEqual([{ version: 911 }]);
   });
 
+  // The bound is 24 000 (migration 20260725000002). This asserted 12 001 —
+  // the ORIGINAL bound — and passed only while `supabase/migrations` still
+  // disagreed with hosted; reconstructing that migration made a local stack
+  // match prod and left the assertion inserting a body the DB now accepts.
   it("the body length is enforced at the DB as a backstop", async () => {
+    const withinBound = await service
+      .from("coaching_prompts")
+      .insert({ version: 920, body: "x".repeat(24000), is_active: false });
+    expect(withinBound.error).toBeNull();
+
     const { error } = await service
       .from("coaching_prompts")
-      .insert({ version: 920, body: "x".repeat(12001), is_active: false });
+      .insert({ version: 921, body: "x".repeat(24001), is_active: false });
     expect(error).not.toBeNull();
     expect(error!.code).toBe("23514"); // check constraint violation
   });

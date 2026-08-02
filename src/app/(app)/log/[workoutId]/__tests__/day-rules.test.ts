@@ -265,6 +265,22 @@ describe("adoptServerRowState (R13)", () => {
     expect(adoptServerRowState("prescription-reset", true)).toBe(true);
     expect(adoptServerRowState("prescription-reset", false)).toBe(true);
   });
+
+  // N73: a render arriving while this row's own amend is still outstanding may
+  // have been fetched BEFORE that write landed, so its values are the pre-amend
+  // ones. Adopting them is what discarded an edited RIR — and because adopting
+  // also clears the row's dirty flag, the next blur had nothing left to re-send.
+  it("refuses every change while the row's own write is still outstanding", () => {
+    expect(adoptServerRowState("own-logged-set", false, true)).toBe(false);
+    expect(adoptServerRowState("own-logged-set", true, true)).toBe(false);
+    expect(adoptServerRowState("planned-input", false, true)).toBe(false);
+    expect(adoptServerRowState("prescription-reset", true, true)).toBe(false);
+  });
+
+  it("resumes adopting once that write is echoed back", () => {
+    expect(adoptServerRowState("own-logged-set", false, false)).toBe(true);
+    expect(adoptServerRowState("prescription-reset", true, false)).toBe(true);
+  });
 });
 
 // --- prescriptionBasisE1rm (N56) -------------------------------------------

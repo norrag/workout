@@ -37,7 +37,7 @@ The feedback/progression engine lives in `src/lib/engine/` as **pure, determinis
 ### A4 — MCP server inside the Next.js app
 The MCP server is a route handler (`/api/mcp`) using `@modelcontextprotocol/sdk` over the streamable HTTP transport, with OAuth-style auth bridged to Supabase Auth. It shares the engine package and typed query layer with the app. See [05-mcp-connector.md](05-mcp-connector.md).
 
-### A5 — PWA: online reads, queued set-logging writes (revised 2026-07-31, N68)
+### A5 — PWA: online reads, queued set-logging writes (revised 2026-07-31, N68; echo rule added 2026-08-02, N73)
 
 Service worker (Serwist) precaches the shell for installability and fast loads.
 
@@ -63,6 +63,26 @@ The shape:
 - **One serial processor**, oldest op first, so sets land in the order they were
   performed. It retries with capped exponential backoff and parks an op as `failed`
   after 8 attempts — a logged set is never silently discarded.
+- **The echo rule (N73): an op is retired by the render that CONTAINS its write, never
+  by the dispatch resolving.** A landed write moves to `acked` and keeps its overlay
+  until rendered server rows confirm it (`reconcile`). Settling on the ack instead left
+  a window one revalidation round-trip wide — overlay gone, render not yet committed —
+  in which the row fell back to server state that didn't have the set yet: the box
+  un-ticked and the active set walked backwards for about a second before snapping
+  forward again, and an edit made in that window was destroyed by the arriving render.
+  The two op kinds are deliberately asymmetric: a log is echoed by its **set number
+  existing**, an amend only by the row carrying the **amended values**, so a stale
+  pre-amend render is held rather than adopted. The same holds on the row: while a
+  row's own write is outstanding, what is on screen wins over any arriving render
+  (`adoptServerRowState`'s `writeOutstanding` veto). Revalidation is one coalesced,
+  debounced `router.refresh()` per burst rather than one per op.
+- **An echo watchdog backstops it.** An acked op waits on a *render*, not on the
+  queue, so the processor can never free it — if the refresh that was meant to
+  fetch that render never lands (connection dropped right after the write), the row
+  would sit correct-but-uneditable indefinitely, the same shape of wedge the queue
+  exists to prevent. So while anything is acked the runtime keeps re-asking (and on
+  every `online`/`visibilitychange` wake). Silent in the healthy case; it stops when
+  the last acked op retires.
 - **Idempotent ops only.** `logSet` upserts on `(workout_exercise_id, set_number)` (R3),
   `amendSet` addresses one immutable set id, the planned-weight write is an overwrite.
   Blind retry is therefore safe. Deletes and unlogs stay foreground writes for exactly
