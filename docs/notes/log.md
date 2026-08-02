@@ -10,7 +10,7 @@ The second and third levers on a slot. Phase 3 made the assignment writable;
 Phase 4 makes the set cap *do* something and adds the one knob §4.2 kept when it
 retracted the forced-centering rule.
 
-- **N70 → Phase 4 done (PR #<n>).** Row updated; the item stays live (Phases 5–6
+- **N70 → Phase 4 done (PR #221).** Row updated; the item stays live (Phases 5–6
   remain).
 - **The cap is applied once, at the boundary.** `cappedSets` wraps `prescribe()`
   and `seedMeso()` rather than editing each branch's `sets` expression (deload,
