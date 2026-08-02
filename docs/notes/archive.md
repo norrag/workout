@@ -11,7 +11,32 @@ for the purge policy.
 
 ---
 
+## Swept 2026-08-02 — doc 21 Phase 1 merged (N71)
+
+PR #216 merged (`a84c090`), which closes **N71** by construction — the row is
+terminal and moves here. Two related rows deliberately **stay live**: **N38**
+(only its capture half shipped; the periodic honest-RIR engine check is still
+deferred pending field data) and **N70** (Phase 1 of six — Phase 2 and the
+Phase 2b measuring band are next). Implementation record in `docs/PROGRESS.md`
+(2026-08-02); the raw note text stays in the backlog appendix.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N71 | The app has two different RIR assumptions — stats stamp vs strength anchor | B | A | **done (PR #216, merged 2026-08-02).** `assumedRir(reported, prescribed)` in `engine/predict.ts` is now the one resolution rule at the per-set e1RM stamp site (log + amend), the strength anchor, `setComplianceMarker`, the restamp planner and exercise history — the two paths can no longer diverge. Per-set capture shipped with it (set-grid RIR column pre-filled with the prescribed RIR, doc 21 §9.2 option (a); design pass in `09-design-changelog.md` 2026-08-02). Backfill runs from the new admin-gated `restamp_e1rm` MCP tool — **an operator step, not yet run against production**; the one-time upward re-levelling is written up in doc 10 §9.1 and doc 11 carries the premise amendment banner. Spec: [doc 21 §2 / Phase 1](../21-exercise-level-rir.md). |
+
 ## Swept 2026-07-31 — Batch-28 session start (N53, N58, N61–N65, PH30)
+
+> **Re-applied 2026-08-02.** Six of these rows (N53, N61–N65) came back to the
+> live index: the sweep deleted them in `ac21ebe`, then the merge `73e7c2b`
+> ("Merge branch 'main' into claude/coach-override-prescriptions-6uylt7")
+> restored the deleted lines — that branch was cut before the sweep, and the
+> conflict resolution took the pre-sweep side. Their PRs (#187, #203, #206,
+> #207, #208) are all confirmed merged in `git log`, and the resolutions below
+> stand unchanged, so the rows were removed from the index again rather than
+> re-adjudicated. **This is the failure mode `CLAUDE.md` rule 2 predicts** — a
+> sweep is only durable once every in-flight branch has rebased past it, so a
+> sweep landing while long-lived branches are open should be re-verified at the
+> next session start.
 
 Reconciliation sweep run at the start of the Batch-28 session (the N67/N68/N69
 intake). Every PR named below is confirmed merged in `git log`. Rows with an open
