@@ -25,13 +25,17 @@ export interface GlossaryEntry {
 }
 
 export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
+  // doc 21 §8 (A1): the premise changed, not just the wording. The target is a
+  // SUGGESTION and the reported value is the athlete's honest estimate of what
+  // actually happened — including when the two differ. Every strength number in
+  // the app is priced off this, so the copy has to ask for honesty plainly.
   rir: {
     label: "REPS IN RESERVE (RIR)",
-    body: "How many reps a set stops short of failure — 2 RIR means two more were possible. Each week has a target, and it steps down as the block intensifies, so the same weight is meant to feel harder to a plan.",
+    body: "How many reps a set stops short of failure — 2 RIR means two more were possible. Each week carries a target that steps down as the block intensifies. But the target is what to aim for, not what to report: log the RIR you actually had, even when it misses the ask.",
   },
   rir_ramp: {
     label: "RIR RAMP",
-    body: "The block's week-by-week effort plan, written start → end RIR: begin a few reps shy of failure, step closer each week, then back off for the deload. Every set that week shares the week's target.",
+    body: "The block's week-by-week effort plan, written start → end RIR: begin a few reps shy of failure, step closer each week, then back off for the deload. Every set that week shares the week's target unless one is set for a specific exercise.",
   },
   deload: {
     label: "DELOAD",

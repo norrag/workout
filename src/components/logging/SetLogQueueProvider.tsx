@@ -99,7 +99,7 @@ async function dispatch(op: SetLogOp): Promise<void> {
         set_number: op.set_number,
         weight: op.weight,
         reps: op.reps,
-        rir_reported: null,
+        rir_reported: op.rir_reported ?? null,
         set_type: op.set_type,
         performed_on: op.performed_on,
       });

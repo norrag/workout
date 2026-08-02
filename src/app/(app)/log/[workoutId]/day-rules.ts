@@ -117,6 +117,50 @@ export function adoptServerRowState(
 }
 
 /**
+ * doc 21 §2 (N71/N38) — what the per-set RIR capture control shows before the
+ * athlete touches it.
+ *
+ * A logged row shows what it recorded; a queued row shows what it reported at
+ * the tap; an unlogged row is **pre-filled with the prescribed target RIR**.
+ *
+ * Never 0. That is the N11 regression in its original form: an unreported RIR
+ * defaulting to 0 while the prescription baked in the week's target made an
+ * exactly-as-prescribed set read as a big miss — worst on deloads, where the
+ * target is the largest in the ramp. Pre-filling the prescription also makes
+ * the default a no-op: leaving it alone reports precisely what the server's
+ * `assumedRir` fallback would have resolved to, so only a CHANGED value carries
+ * information the app didn't already have.
+ */
+export function captureRirDefault(args: {
+  /** the server row's reported RIR, when this set is logged */
+  loggedRir: number | null | undefined;
+  /** the queue's reported RIR, when this set is logged but not yet echoed */
+  pendingRir: number | null | undefined;
+  /** the slot's prescribed target RIR for this week */
+  targetRir: number;
+}): number {
+  return args.loggedRir ?? args.pendingRir ?? args.targetRir;
+}
+
+/**
+ * doc 21 §2 — what the capture cell's raw text reports.
+ *
+ * `rir_reported` is capped at **0–10**: that is the range a human can actually
+ * estimate, and past it the honest report is "no idea" (doc 21 §3). Anything
+ * empty, non-integer, or out of range therefore reports **null** — which the
+ * server resolves through `assumedRir` back to the slot's prescribed target,
+ * i.e. exactly what the untouched pre-fill would have said. Reporting nothing
+ * is always safer than reporting a wrong number.
+ */
+export function reportedRirFromInput(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n < 0 || n > 10) return null;
+  return n;
+}
+
+/**
  * P19 → doc 16 §5.3: whether a logged set landed over / met / under its
  * prescription, compared by e1RM so it accounts for both the reps hit and the
  * RIR left in reserve (more reps OR closer to failure ⇒ over). Loads arrive as

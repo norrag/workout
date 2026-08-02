@@ -148,8 +148,21 @@ export function ExerciseHistoryList({
                         {flipValue(row) != null ? formatWeight(flipValue(row)!) : "—"} lb{" "}
                         <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/45">
                           {flipLabel}
+                          {/* doc 21 §2/§6.2: the RIR the estimate was priced
+                              at, marked `~` when it was ASSUMED from the
+                              prescription rather than reported — an assumption
+                              is never shown as an observation. Effective reps
+                              (reps + RIR·offset) is the quantity e1RM is
+                              actually computed over. */}
                           {row.avg_rir != null && (
-                            <> · ~{row.avg_rir} RIR</>
+                            <>
+                              {" "}
+                              · {row.rir_source === "reported" ? "" : "~"}
+                              {row.avg_rir} RIR
+                            </>
+                          )}
+                          {row.effective_reps != null && (
+                            <> · {row.effective_reps} EFF REPS</>
                           )}
                         </span>
                       </>

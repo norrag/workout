@@ -633,6 +633,8 @@ describe("formatExerciseHistory", () => {
         e1rm: 281.3,
         effective_load: null,
         avg_rir: 2,
+      rir_source: null,
+      effective_reps: null,
         is_deload: false,
         session_note: "elbow cranky",
       },
@@ -645,6 +647,8 @@ describe("formatExerciseHistory", () => {
       reps_at_top: "8, 8",
       e1rm: 281.3,
       avg_rir: 2,
+      rir_source: null,
+      effective_reps: null,
       session_note: "elbow cranky",
     });
   });
@@ -667,6 +671,8 @@ describe("formatExerciseHistory", () => {
         e1rm: 281.3,
         effective_load: null,
         avg_rir: null,
+      rir_source: null,
+      effective_reps: null,
         is_deload: false,
         session_note: null,
       },

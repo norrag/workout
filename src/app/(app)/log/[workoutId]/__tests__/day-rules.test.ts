@@ -4,12 +4,14 @@ import { complianceBand } from "@/lib/engine/rules/progression";
 import { predictRepsAtWeight } from "@/lib/engine/predict";
 import {
   adoptServerRowState,
+  captureRirDefault,
   daySetTotals,
   exerciseDone,
   impliedPrescriptionE1rm,
   loggedSetMarker,
   plannedSetCount,
   prescriptionBasisE1rm,
+  reportedRirFromInput,
   type SetProgressExercise,
 } from "../day-rules";
 
@@ -370,5 +372,81 @@ describe("prescriptionBasisE1rm (N56)", () => {
     // fallback showed 8 — the un-earnable ask of the N56 report
     expect(predictRepsAtWeight(basis, 250, 2, e1rmCfg)).toBe(9);
     expect(predictRepsAtWeight(holdRow.measuredAnchor, 250, 2, e1rmCfg)).toBe(8);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// doc 21 §2 (N71/N38) — per-set RIR capture
+// ---------------------------------------------------------------------------
+
+describe("captureRirDefault", () => {
+  // the guard doc 21 §2 pins explicitly: the capture control's initial value is
+  // the PRESCRIBED target RIR, never 0. Defaulting to 0 is the N11 regression —
+  // an exactly-as-prescribed set would read as a big miss, worst on deloads.
+  it("pre-fills an unlogged row with the prescribed target RIR", () => {
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 2 }),
+    ).toBe(2);
+  });
+
+  it("never defaults to 0 on a deload, where the target is largest (N11)", () => {
+    expect(
+      captureRirDefault({
+        loggedRir: undefined,
+        pendingRir: undefined,
+        targetRir: 6,
+      }),
+    ).toBe(6);
+  });
+
+  it("a target of 0 pre-fills 0 — that is the ask, not a default", () => {
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 0 }),
+    ).toBe(0);
+  });
+
+  it("a logged row shows what it recorded, including a reported 0", () => {
+    expect(
+      captureRirDefault({ loggedRir: 0, pendingRir: null, targetRir: 3 }),
+    ).toBe(0);
+  });
+
+  it("a queued row shows what it reported at the tap", () => {
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: 4, targetRir: 1 }),
+    ).toBe(4);
+  });
+});
+
+describe("reportedRirFromInput", () => {
+  it("reports an in-range integer", () => {
+    expect(reportedRirFromInput("3")).toBe(3);
+    expect(reportedRirFromInput(" 0 ")).toBe(0);
+    expect(reportedRirFromInput("10")).toBe(10);
+  });
+
+  // past 10 the honest report is "no idea" (doc 21 §3) — null, which the server
+  // resolves back to the prescribed target rather than storing a wrong number
+  it("reports nothing for empty, non-integer, or out-of-range text", () => {
+    expect(reportedRirFromInput("")).toBeNull();
+    expect(reportedRirFromInput("   ")).toBeNull();
+    expect(reportedRirFromInput("2.5")).toBeNull();
+    expect(reportedRirFromInput("abc")).toBeNull();
+    expect(reportedRirFromInput("-1")).toBeNull();
+    expect(reportedRirFromInput("11")).toBeNull();
+    expect(reportedRirFromInput("21")).toBeNull();
+  });
+
+  // the round trip that makes the pre-fill a no-op: untouched cell in ⇒ the
+  // prescribed target out, which is what `assumedRir` would have resolved to
+  it("round-trips the pre-filled default", () => {
+    const targetRir = 3;
+    const prefill = captureRirDefault({
+      loggedRir: null,
+      pendingRir: null,
+      targetRir,
+    });
+    expect(reportedRirFromInput(String(prefill))).toBe(targetRir);
   });
 });

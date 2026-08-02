@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   recencyWeightedE1rm,
+  assumedRir,
   coerceLoadType,
   effectiveLoad,
   type EngineParams,
@@ -26,8 +27,9 @@ const DAY_MS = 1000 * 60 * 60 * 24;
  * Recency-weighted strength anchor (e1RM) per exercise (doc 11), powering the
  * live reps predictor — and, with `seed_from_anchor` (§S1, standalone-prescription
  * investigation 2026-06-23), the meso-start seed. Reads the user's recent working
- * sets, assumes each was performed at its prescribed target RIR (the app's RIR
- * premise — no separate per-set RIR capture), and folds them through the pure
+ * sets, resolves each set's RIR through the shared `assumedRir` rule (doc 21 §2:
+ * the athlete's reported RIR, else the slot's prescribed target — the doc-11
+ * premise demoted to a fallback), and folds them through the pure
  * `recencyWeightedE1rm`. `ageDays` is computed here (query land); the engine stays
  * clock-free.
  *
@@ -110,8 +112,8 @@ export async function getExerciseE1rmAnchors(
   const completedSets = sets.filter((s) => completedIds.has(s.workout_id));
   if (completedSets.length === 0) return out;
 
-  // assumed RIR = the parent prescription's target RIR (RIR premise, doc 11),
-  // unless the set carried an explicit reported RIR
+  // the fallback half of `assumedRir` (doc 21 §2): the parent prescription's
+  // target RIR, used where the set carried no reported RIR of its own
   const targetRirByWe = new Map((wes ?? []).map((w) => [w.id, w.target_rir]));
 
   // T-I2: resolve each exercise's load type so a bodyweight set's effective load
@@ -146,7 +148,12 @@ export async function getExerciseE1rmAnchors(
     const sample: E1rmSample = {
       weight: load,
       reps: s.reps,
-      targetRir: s.rir_reported ?? targetRirByWe.get(s.workout_exercise_id) ?? null,
+      // doc 21 §2: the ONE resolution rule, shared with the stamp site and the
+      // compliance marker (`rir_reported ?? the slot's prescribed target_rir`)
+      targetRir: assumedRir(
+        s.rir_reported,
+        targetRirByWe.get(s.workout_exercise_id),
+      ),
       ageDays,
       // session = one exercise on one day (doc 13 §9.3 session_best anchor)
       sessionKey: s.workout_exercise_id,

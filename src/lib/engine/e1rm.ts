@@ -21,6 +21,7 @@ export {
   brzycki,
   e1rmFactor,
   e1rmFromEffectiveReps,
+  assumedRir,
   type E1rmConfidence,
   type E1rmEstimate,
 } from "./predict";

@@ -25,7 +25,12 @@ const WE_A = "22222222-2222-4222-8222-222222222222";
 const WE_B = "33333333-3333-4333-8333-333333333333";
 const SET_ID = "44444444-4444-4444-8444-444444444444";
 
-function log(setNumber: number, weight = 100, we = WE_A): SetLogOp {
+function log(
+  setNumber: number,
+  weight = 100,
+  we = WE_A,
+  rir: number | null = 2,
+): SetLogOp {
   return {
     kind: "log",
     workout_id: WORKOUT,
@@ -33,6 +38,7 @@ function log(setNumber: number, weight = 100, we = WE_A): SetLogOp {
     set_number: setNumber,
     weight,
     reps: 8,
+    rir_reported: rir,
     set_type: "straight",
     performed_on: "2026-07-31",
   };
@@ -137,7 +143,12 @@ describe("pendingSetsFor (the optimistic overlay)", () => {
 
     const a = pendingSetsFor(q, WE_A);
     expect([...a.keys()]).toEqual([1, 2]);
-    expect(a.get(1)).toMatchObject({ weight: 135, reps: 8, status: "pending" });
+    expect(a.get(1)).toMatchObject({
+      weight: 135,
+      reps: 8,
+      rirReported: 2,
+      status: "pending",
+    });
     expect([...pendingSetsFor(q, WE_B).keys()]).toEqual([1]);
   });
 
@@ -203,6 +214,45 @@ describe("storage codec", () => {
       rir_reported: null,
     }, 1);
     expect(decodeQueue(encodeQueue(q))).toEqual(q);
+  });
+
+  // doc 21 §2: an op enqueued by the PREVIOUS build has no `rir_reported`.
+  // It must still decode — dropping it would strand a real logged set — and
+  // dispatches as null, which the server resolves to the slot's target RIR.
+  it("accepts a pre-capture log op with no rir_reported", () => {
+    const legacy = {
+      v: 1,
+      ops: [
+        {
+          id: "a",
+          op: {
+            kind: "log",
+            workout_id: WORKOUT,
+            workout_exercise_id: WE_A,
+            set_number: 1,
+            weight: 135,
+            reps: 8,
+            set_type: "straight",
+            performed_on: "2026-07-31",
+          },
+          attempts: 0,
+          nextAttemptAt: 0,
+          enqueuedAt: 0,
+          status: "pending",
+          error: null,
+        },
+      ],
+    };
+    const decoded = decodeQueue(JSON.stringify(legacy));
+    expect(decoded.ops).toHaveLength(1);
+    expect(pendingSetsFor(decoded, WE_A).get(1)?.rirReported).toBeNull();
+  });
+
+  it("rejects an out-of-range reported RIR (0–10 is what a human can estimate)", () => {
+    const q = add(EMPTY_QUEUE, "a", log(1), 0);
+    const raw = JSON.parse(encodeQueue(q));
+    raw.ops[0].op.rir_reported = 21;
+    expect(decodeQueue(JSON.stringify(raw))).toEqual(EMPTY_QUEUE);
   });
 
   it("treats anything unparseable as an empty queue rather than poisoning the processor", () => {

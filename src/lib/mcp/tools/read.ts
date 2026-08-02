@@ -722,8 +722,14 @@ export function formatExerciseHistory(
       // accounts for how far from failure the sets were. Null on bodyweight
       // sessions. The engine's value, distinct from the raw-Epley v_exercise_*.
       e1rm: s.e1rm,
-      // the session's average reported RIR — the effort context behind e1rm
+      // doc 21 §2: the session's average ASSUMED RIR — the effort context
+      // behind e1rm, resolved as `rir_reported ?? the slot's prescribed
+      // target_rir`. `rir_source` says whether that was observed or assumed;
+      // never report an assumed value as the athlete's own.
       avg_rir: s.avg_rir,
+      rir_source: s.rir_source,
+      // the effective reps the estimate is computed over (reps + RIR·offset)
+      effective_reps: s.effective_reps,
       session_note: s.session_note,
     })),
     note: truncated
@@ -772,7 +778,7 @@ function registerGetExerciseHistory(server: McpServer) {
               lifetime_sessions: overview.data?.times_trained ?? null,
             },
             estimates:
-              "top_weight × reps are logged actuals; e1rm is the engine's per-set estimate (averaged Epley/Brzycki over effective reps = reps + RIR·offset), averaged across the session's working sets (N2) — an estimate/trend, not a tested 1RM. avg_rir is the session's average reported RIR (the effort context folded into e1rm). Null e1rm on bodyweight sessions.",
+              "top_weight × reps are logged actuals; e1rm is the engine's per-set estimate (averaged Epley/Brzycki over effective reps = reps + RIR·offset), averaged across the session's working sets (N2) — an estimate/trend, not a tested 1RM. avg_rir is the session's average ASSUMED RIR — the effort folded into e1rm, resolved as the athlete's reported RIR where they gave one and the slot's prescribed target RIR otherwise (doc 21 §2); rir_source says which (reported / assumed / mixed), so never present an assumed value as something the athlete told you. effective_reps is reps + RIR·offset, the quantity e1rm is computed over. Null e1rm on bodyweight sessions.",
           },
         },
       );

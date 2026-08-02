@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { pageSetsByDay, HISTORY_PAGE_SETS } from "../history";
+import {
+  pageSetsByDay,
+  sessionAvgEffectiveReps,
+  sessionRirSource,
+  HISTORY_PAGE_SETS,
+} from "../history";
 
 // N30 — exercise history pages on whole calendar days so the raw set limit
 // never splits a session across pages (sets of one workout can even share
@@ -86,5 +91,82 @@ describe("pageSetsByDay (N30)", () => {
 
   it("exports a sane default page size", () => {
     expect(HISTORY_PAGE_SETS).toBe(120);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §6.2 (A1) — exercise history reports the RIR the estimate was priced
+// at, where that RIR came from, and the effective reps behind it.
+// ---------------------------------------------------------------------------
+
+describe("sessionRirSource (doc 21 §6.2)", () => {
+  it("reads reported only when every resolvable set carried a report", () => {
+    expect(
+      sessionRirSource([
+        { rir_reported: 2, assumed: 2 },
+        { rir_reported: 1, assumed: 1 },
+      ]),
+    ).toBe("reported");
+  });
+
+  // a historical session — nothing reported, everything resolved from the
+  // slot's prescription. Honest label, not a claim the athlete told us.
+  it("reads assumed when every set fell back to the prescription", () => {
+    expect(
+      sessionRirSource([
+        { rir_reported: null, assumed: 2 },
+        { rir_reported: null, assumed: 2 },
+      ]),
+    ).toBe("assumed");
+  });
+
+  it("reads mixed when only some sets reported", () => {
+    expect(
+      sessionRirSource([
+        { rir_reported: 2, assumed: 2 },
+        { rir_reported: null, assumed: 3 },
+      ]),
+    ).toBe("mixed");
+  });
+
+  it("is null when nothing resolves (no report and no prescription)", () => {
+    expect(sessionRirSource([{ rir_reported: null, assumed: null }])).toBeNull();
+    expect(sessionRirSource([])).toBeNull();
+  });
+
+  it("a reported 0 counts as a report, not an absence", () => {
+    expect(sessionRirSource([{ rir_reported: 0, assumed: 0 }])).toBe("reported");
+  });
+});
+
+describe("sessionAvgEffectiveReps (doc 21 §6.2)", () => {
+  it("averages reps + assumedRIR × offset across the session", () => {
+    expect(
+      sessionAvgEffectiveReps(
+        [
+          { reps: 8, assumed: 2 },
+          { reps: 10, assumed: 1 },
+        ],
+        1,
+      ),
+    ).toBe(10.5); // (10 + 11) / 2
+  });
+
+  it("honors a non-unit rir_offset", () => {
+    expect(sessionAvgEffectiveReps([{ reps: 8, assumed: 2 }], 0.5)).toBe(9);
+  });
+
+  // skipped, never counted as reps + 0 — that silent zero is the N71 defect
+  it("skips sets with no resolvable RIR rather than treating them as failure", () => {
+    expect(
+      sessionAvgEffectiveReps(
+        [
+          { reps: 8, assumed: 2 },
+          { reps: 20, assumed: null },
+        ],
+        1,
+      ),
+    ).toBe(10);
+    expect(sessionAvgEffectiveReps([{ reps: 8, assumed: null }], 1)).toBeNull();
   });
 });

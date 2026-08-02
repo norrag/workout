@@ -677,6 +677,44 @@ export async function clearSkippedSets(
   if (error) throw error;
 }
 
+/**
+ * doc 21 §2 — the FALLBACK half of `assumedRir` at the per-set e1RM stamp site:
+ * the target RIR the slot's prescription asked for. Null when the slot carries
+ * none (a cold/unprescribed row), in which case an unreported set stays
+ * unreported and stamps at `low` confidence exactly as before.
+ */
+export async function getSlotTargetRir(
+  supabase: Client,
+  workoutExerciseId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("workout_exercises")
+    .select("target_rir")
+    .eq("id", workoutExerciseId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.target_rir ?? null;
+}
+
+/** Same fallback, reached from a logged set id (the amend path). */
+export async function getSetSlotTargetRir(
+  supabase: Client,
+  userId: string,
+  setId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("logged_sets")
+    .select("workout_exercise:workout_exercises(target_rir)")
+    .eq("id", setId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  const row = data as unknown as {
+    workout_exercise: { target_rir: number | null } | null;
+  } | null;
+  return row?.workout_exercise?.target_rir ?? null;
+}
+
 /** Amend a logged set (history is append-only; corrections are updates). */
 export async function amendSet(
   supabase: Client,

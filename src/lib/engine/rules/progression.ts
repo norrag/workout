@@ -19,6 +19,7 @@
 import type { EngineParams } from "../params";
 import type { DecisionTraceStep, EngineInputs } from "../types";
 import {
+  assumedRir,
   e1rmFactor,
   estimateE1rm,
   type E1rmConfig,
@@ -119,7 +120,9 @@ export function setComplianceMarker(args: {
       ? (estimateE1rm(
           args.loggedEffectiveWeight,
           args.loggedReps,
-          args.loggedRir ?? args.targetRir,
+          // doc 21 §2: the shared resolution — reported wins, else the
+          // prescription's target (never 0; that is the N11 regression)
+          assumedRir(args.loggedRir, args.targetRir),
           args.e1rmCfg,
         )?.value ?? null)
       : null;

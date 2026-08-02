@@ -58,12 +58,14 @@ import { useSetLogQueue } from "@/components/logging/SetLogQueueProvider";
 import type { PendingSet } from "@/lib/logging/queue";
 import {
   adoptServerRowState,
+  captureRirDefault,
   daySetTotals,
   exerciseDone,
   impliedPrescriptionE1rm,
   loggedSetMarker,
   plannedSetCount,
   prescriptionBasisE1rm,
+  reportedRirFromInput,
 } from "./day-rules";
 import {
   addSetAction,
@@ -1274,10 +1276,12 @@ const ExerciseBlock = memo(function ExerciseBlock({
       {!skipped && (
         <>
           {/* grid header (denser rows, 09 §5) */}
-          <div className="mt-2.5 grid grid-cols-[20px_1fr_1fr_44px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink/50">
+          <div className="mt-2.5 grid grid-cols-[20px_1fr_1fr_44px_44px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink/50">
             <div />
             <div className="text-center">LB</div>
             <div className="text-center">REPS</div>
+            {/* doc 21 §2 — per-set effort capture (09-changelog 2026-08-02) */}
+            <div className="text-center">RIR</div>
             <div className="text-center">LOG</div>
           </div>
           {Array.from({ length: plannedSets }, (_, i) => {
@@ -1614,9 +1618,24 @@ function SetRow({
   // the lifter's bodyweight as the (read-only) load.
   const futureWeight = plannedWeight ?? prescribedWeight;
   const staticWeight = bwOnly ? bw : futureWeight;
+  // doc 21 §2 (N71/N38): the athlete's honest reps-in-reserve for THIS set. The
+  // control is pre-filled with the prescribed target RIR — never 0, which is
+  // the N11 regression (an unreported set defaulting to 0 while the
+  // prescription baked in the week's target made an exactly-as-prescribed set
+  // read as a big miss, worst on deloads). Leaving it untouched therefore
+  // reports the prescription, which is the same value the server's
+  // `assumedRir` fallback would have resolved to — so the default is a no-op
+  // and only a CHANGED value carries new information.
+  const reportedRirOnRow = logged?.rir_reported ?? pending?.rirReported ?? null;
+  const initialRir = captureRirDefault({
+    loggedRir: logged?.rir_reported,
+    pendingRir: pending?.rirReported,
+    targetRir,
+  });
   // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
   const [weight, setWeight] = useState(formatWeight(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
+  const [rir, setRir] = useState(String(initialRir));
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
   const repsManual = useRef(false);
@@ -1673,10 +1692,11 @@ function SetRow({
     if (!adoptServerRowState("own-logged-set", edited.current)) return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
+    setRir(String(initialRir));
     edited.current = false;
     repsManual.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logged?.id, logged?.weight, logged?.reps]);
+  }, [logged?.id, logged?.weight, logged?.reps, logged?.rir_reported]);
 
   // re-sync when a background write changes the row's planned inputs (an
   // auto-match fan-out or a persisted weight edit landing via set_weights, or
@@ -1737,6 +1757,12 @@ function SetRow({
     const w = Number(weight);
     const r = Number(reps);
     if (Number.isNaN(w) || Number.isNaN(r)) return;
+    // doc 21 §2: an empty or out-of-range cell reports NOTHING rather than a
+    // wrong number — the server then falls back to the slot's prescribed
+    // target RIR, which is exactly what the pre-filled default would have said.
+    // `rir_reported` is capped at 10 (the range a human can actually estimate);
+    // past that the honest report is "no idea", i.e. null.
+    const reportedRir = reportedRirFromInput(rir);
     if (state === "next") {
       // N68: hand the write to the queue and move on. The row is already
       // "logged" from the queue's overlay by the time this returns, so the box
@@ -1751,6 +1777,7 @@ function SetRow({
         set_number: setNumber,
         weight: w,
         reps: r,
+        rir_reported: reportedRir,
         set_type: dropPending ? "drop" : "straight",
         // R6: the set's calendar day as this device sees it — captured at the
         // tap, so a set that drains hours later still lands on the day it was
@@ -1768,7 +1795,7 @@ function SetRow({
         set_id: logged.id,
         weight: w,
         reps: r,
-        rir_reported: logged.rir_reported,
+        rir_reported: reportedRir,
       });
       edited.current = false;
       if (w !== logged.weight) persistPlannedWeight(w);
@@ -1864,7 +1891,7 @@ function SetRow({
 
   return (
     <div
-      className={`relative grid grid-cols-[20px_1fr_1fr_44px] items-center gap-2.5 py-[5px] ${
+      className={`relative grid grid-cols-[20px_1fr_1fr_44px_44px] items-center gap-2.5 py-[5px] ${
         isLastRow ? "" : "border-b border-ink/15"
       }`}
     >
@@ -1900,6 +1927,19 @@ function SetRow({
                 weight, falling back to the prescription without an anchor */}
             {state === "logged" ? reps : (staticPredictedReps ?? prescribedReps ?? "—")}
             {markerGlyph}
+          </div>
+          {/* doc 21 §2/§6.2: a locked/queued logged row shows the effort it
+              reported; an unlogged row shows the week's ask. Muted whenever the
+              number is the PRESCRIPTION rather than something the athlete
+              reported — an assumption is never shown as an observation. */}
+          <div
+            className={
+              cell.replace("w-full", "") +
+              " flex items-center justify-center" +
+              (reportedRirOnRow != null ? "" : " text-ink/45")
+            }
+          >
+            {state === "logged" ? rir : targetRir}
           </div>
         </>
       ) : (
@@ -1969,6 +2009,23 @@ function SetRow({
                 and under's bottom. */}
             {markerGlyph}
           </div>
+          {/* doc 21 §2 — per-set effort capture (N71/N38). Same cell
+              primitive as LB/REPS (09-changelog 2026-08-02), pre-filled with
+              the prescribed target RIR so leaving it alone reports the
+              prescription and only a CHANGED value carries new information.
+              The prescription is a suggestion: report what actually happened. */}
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label={`set ${setNumber} RIR`}
+            value={rir}
+            onChange={(e) => {
+              setRir(e.target.value);
+              edited.current = true;
+            }}
+            onBlur={() => state === "logged" && save()}
+            className={cell}
+          />
         </>
       )}
       {/* LOG column — the checkbox button itself fills the 44×35 cell (R18);

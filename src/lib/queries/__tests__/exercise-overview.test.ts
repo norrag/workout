@@ -82,6 +82,8 @@ describe("groupHistoryByMeso", () => {
     e1rm: 266.7,
     effective_load: null,
     avg_rir: null,
+      rir_source: null,
+      effective_reps: null,
     is_deload: false,
     session_note: null,
   });

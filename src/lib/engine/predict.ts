@@ -92,6 +92,32 @@ function confidenceFor(
 }
 
 /**
+ * The RIR a logged set is ASSUMED to have been performed at — doc 21 §2, the
+ * one resolution rule shared by every consumer:
+ *
+ *   assumedRir(set) = set.rir_reported ?? set.workout_exercise.target_rir
+ *
+ * The athlete's honest report wins; where they did not report, the set falls
+ * back to what the prescription asked for (the doc-11 RIR premise, now a
+ * FALLBACK rather than an assumption). Used identically at the per-set e1RM
+ * stamp site, in the strength anchor, in the compliance marker, and in the
+ * restamp backfill — before doc 21 the stamp path had no fallback at all, so a
+ * never-written `rir_reported` made every stats surface read every set as taken
+ * to failure (N71).
+ *
+ * **Never default a captured value to 0** (the N11 regression, pinned by
+ * `day-rules.test.ts`): an absent report resolves to the prescribed target, not
+ * to zero, or an exactly-as-prescribed set reads as a big miss — worst on
+ * deloads, where the target RIR is the largest in the ramp.
+ */
+export function assumedRir(
+  reported: number | null | undefined,
+  prescribed: number | null | undefined,
+): number | null {
+  return reported ?? prescribed ?? null;
+}
+
+/**
  * From a logged working set of `weight × reps` at reported `rir`:
  *   effectiveReps = reps + rir × rir_offset
  *   e1RM = average( Epley, Brzycki ) over effectiveReps (§S3 switch)

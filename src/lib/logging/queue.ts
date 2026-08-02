@@ -49,6 +49,12 @@ export type SetLogOp =
       set_number: number;
       weight: number;
       reps: number;
+      /** doc 21 §2 — the athlete's reported reps-in-reserve for this set, as
+       *  captured on the row (pre-filled with the prescribed target, so a
+       *  straight-through tap reports the prescription). Null only when the row
+       *  had no prescription to pre-fill from, or when an older queued op
+       *  (enqueued before capture shipped) drains after an upgrade. */
+      rir_reported: number | null;
       set_type: "straight" | "drop";
       /** the set's calendar day as the DEVICE saw it when the tap happened
        *  (R6) — captured at enqueue, so a queued set that drains tomorrow still
@@ -269,6 +275,9 @@ export interface PendingSet {
   setNumber: number;
   weight: number;
   reps: number;
+  /** doc 21 §2 — the reported RIR the row carried at the tap, so the queued row
+   *  renders exactly what was logged (null for an op enqueued pre-capture) */
+  rirReported: number | null;
   status: "pending" | "failed";
 }
 
@@ -296,6 +305,7 @@ export function pendingSetsFor(
       setNumber: op.set_number,
       weight: op.weight,
       reps: op.reps,
+      rirReported: op.rir_reported ?? null,
       status: q.status,
     });
   }
@@ -353,6 +363,11 @@ function isOp(v: unknown): v is SetLogOp {
         isInt(v.set_number, 1, 30) &&
         isNum(v.weight, 0, 2000) &&
         isInt(v.reps, 0, 100) &&
+        // doc 21 §2: `undefined` is accepted so an op enqueued by the previous
+        // build (before per-set capture) still drains after an upgrade instead
+        // of poisoning the whole stored queue — it dispatches as null and the
+        // server falls back to the slot's prescribed target RIR.
+        (v.rir_reported == null || isInt(v.rir_reported, 0, 10)) &&
         (v.set_type === "straight" || v.set_type === "drop") &&
         typeof v.performed_on === "string" &&
         /^\d{4}-\d{2}-\d{2}$/.test(v.performed_on)
