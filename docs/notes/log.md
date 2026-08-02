@@ -33,6 +33,13 @@ an edited RIR repeatedly discarded on the last set of an exercise. New item
   veto (the queue is the authority on whether this row still owes a write); one
   coalesced, debounced `router.refresh()` replaces one-per-op; and the provider's
   `apply` stopped mutating a ref inside a `setState` updater.
+- **An echo watchdog backstops the rule.** An acked op waits on a *render*, not
+  on the queue, so the processor can never free it — if the refresh meant to
+  fetch that render never lands (the connection drops in the moment between the
+  write landing and the refetch), the row would sit correct-but-uneditable
+  indefinitely. That is the same shape of wedge the queue exists to prevent, so
+  while anything is acked the runtime keeps re-asking (every 5s, plus each
+  `online`/`visibilitychange` wake). Silent on a healthy round-trip.
 - **The safety valve is kind-aware, and that asymmetry is the point.** An acked
   *amend* expires after 30s (dropping it just lets the row adopt server truth).
   An acked *log* never expires on a timer — dropping it would retract a true

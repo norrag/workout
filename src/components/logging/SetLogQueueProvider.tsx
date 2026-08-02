@@ -12,7 +12,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ACK_ECHO_TIMEOUT_MS,
   DEFAULT_RETRY,
   EMPTY_QUEUE,
   QUEUE_STORAGE_KEY,
@@ -113,6 +112,9 @@ export function useSetLogQueue(): SetLogQueueApi {
 const REFRESH_DEBOUNCE_MS = 250;
 /** …but never defer the render past this, however busy the queue stays. */
 const REFRESH_MAX_DEFER_MS = 2_000;
+/** How often the watchdog re-asks for a render while an op is still unechoed.
+ *  Never reached on a healthy round-trip — this is the stuck case only. */
+const ECHO_RETRY_MS = 5_000;
 
 function newId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -294,7 +296,16 @@ export function SetLogQueueProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const wake = () => {
-      if (document.visibilityState === "visible") pump();
+      if (document.visibilityState !== "visible") return;
+      pump();
+      // An acked op is waiting on a render, not on the queue — so `pump` alone
+      // would never free it. If the refresh that was meant to fetch that render
+      // failed (the connection dropped right after the write landed) and no ops
+      // are left to trigger another, nothing else would ask again: the row would
+      // sit correct-but-uneditable until a reload. Same shape as the wedge N68
+      // set out to kill, so ask again on every wake.
+      if (stateRef.current.ops.some((q) => q.status === "acked"))
+        scheduleRefresh();
     };
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", wake);
@@ -302,35 +313,32 @@ export function SetLogQueueProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("online", wake);
       document.removeEventListener("visibilitychange", wake);
     };
-  }, [pump]);
+  }, [pump, scheduleRefresh]);
 
-  // The safety valve behind the echo rule (acked AMENDS only — see
-  // `expireAcked`): if a row's amend never gets echoed back, drop it so the row
-  // adopts server state instead of staying pinned on local values. The timeout
-  // is long enough that a healthy round-trip never reaches it.
-  const oldestAckedAt = useMemo(
-    () =>
-      state.ops.reduce<number | null>(
-        (acc, q) =>
-          q.status === "acked" && q.op.kind === "amend" && q.ackedAt != null
-            ? Math.min(acc ?? q.ackedAt, q.ackedAt)
-            : acc,
-        null,
-      ),
+  // ---- the echo watchdog -------------------------------------------------
+  // An acked op waits on a RENDER, not on the queue, so the processor can never
+  // free it: if the refresh meant to fetch that render never lands — the
+  // connection dropped just after the write, or `router.refresh()` failed and
+  // told nobody — the row would sit correct-but-uneditable indefinitely. So
+  // while anything is acked, keep asking. This is silent in the healthy case
+  // (an echo arrives in well under one interval) and self-limiting: it stops
+  // the moment the last acked op retires.
+  //
+  // The same tick runs the amend-only safety valve (see `expireAcked`) — an
+  // amend the server normalized can never be matched by `reconcile`, so past
+  // its deadline the row is released to adopt server state.
+  const ackedCount = useMemo(
+    () => state.ops.filter((q) => q.status === "acked").length,
     [state],
   );
   useEffect(() => {
-    if (oldestAckedAt == null) return;
-    const due = oldestAckedAt + ACK_ECHO_TIMEOUT_MS - Date.now();
-    const t = setTimeout(
-      () => {
-        apply((cur) => expireAcked(cur, Date.now()));
-        router.refresh();
-      },
-      Math.max(50, due),
-    );
-    return () => clearTimeout(t);
-  }, [oldestAckedAt, apply, router]);
+    if (ackedCount === 0) return;
+    const t = setInterval(() => {
+      apply((cur) => expireAcked(cur, Date.now()));
+      scheduleRefresh();
+    }, ECHO_RETRY_MS);
+    return () => clearInterval(t);
+  }, [ackedCount, apply, scheduleRefresh]);
 
   useEffect(
     () => () => {

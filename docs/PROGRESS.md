@@ -57,6 +57,15 @@ Supporting changes:
   render-phase side effect React may re-run); the ref is now the synchronously
   updated source of truth the processor already assumed it was.
 
+**An echo watchdog backstops the rule.** An acked op waits on a *render*, not on
+the queue, so the processor can never free it. If the refresh meant to fetch that
+render never lands — the connection dropped in the moment between the write
+landing and the refetch — the row would sit correct-but-uneditable indefinitely,
+which is the same shape of wedge the queue exists to prevent. So while anything
+is acked the runtime keeps re-asking (every 5s, and on each
+`online`/`visibilitychange` wake). It never fires on a healthy round-trip and
+stops the moment the last acked op retires.
+
 **The safety valve is kind-aware.** An acked *amend* expires after 30s — dropping
 it just lets the row adopt server truth, where it was headed anyway. An acked
 *log* **never** expires on a timer: dropping it would retract a statement that is

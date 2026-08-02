@@ -76,6 +76,13 @@ The shape:
   row's own write is outstanding, what is on screen wins over any arriving render
   (`adoptServerRowState`'s `writeOutstanding` veto). Revalidation is one coalesced,
   debounced `router.refresh()` per burst rather than one per op.
+- **An echo watchdog backstops it.** An acked op waits on a *render*, not on the
+  queue, so the processor can never free it — if the refresh that was meant to
+  fetch that render never lands (connection dropped right after the write), the row
+  would sit correct-but-uneditable indefinitely, the same shape of wedge the queue
+  exists to prevent. So while anything is acked the runtime keeps re-asking (and on
+  every `online`/`visibilitychange` wake). Silent in the healthy case; it stops when
+  the last acked op retires.
 - **Idempotent ops only.** `logSet` upserts on `(workout_exercise_id, set_number)` (R3),
   `amendSet` addresses one immutable set id, the planned-weight write is an overwrite.
   Blind retry is therefore safe. Deletes and unlogs stay foreground writes for exactly
