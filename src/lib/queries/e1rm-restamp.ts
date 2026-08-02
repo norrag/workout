@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   assumedRir,
-  estimateE1rm as estimateE1rmCore,
+  stampE1rm,
   type E1rmConfig,
 } from "@/lib/engine/predict";
 import type { EngineParams } from "@/lib/engine";
@@ -76,6 +76,10 @@ export type RestampSetRow = Pick<
  * `targetRirByWe` (the pager resolves it per page). An absent map — or a slot
  * with no prescription — leaves the row on its reported RIR alone, i.e. the
  * pre-doc-21 behavior.
+ *
+ * doc 21 §6.1 (Phase 2b): the same `stampE1rm` the log/amend site uses, so the
+ * measuring band applies identically to a backfill — a set past the band
+ * restamps to `null` / `none` rather than to a fabricated estimate.
  */
 export function planRestamps<T extends RestampSetRow>(
   rows: T[],
@@ -92,9 +96,7 @@ export function planRestamps<T extends RestampSetRow>(
       r.rir_reported,
       targetRirByWe?.get(r.workout_exercise_id),
     );
-    const est = estimateE1rmCore(r.weight, r.reps, rir, cfg);
-    const e1rm = est?.value ?? null;
-    const e1rm_confidence = est?.confidence ?? null;
+    const { e1rm, e1rm_confidence } = stampE1rm(r.weight, r.reps, rir, cfg);
     if (e1rm !== r.e1rm || e1rm_confidence !== r.e1rm_confidence)
       out.push({ row: r, e1rm, e1rm_confidence });
   }

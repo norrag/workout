@@ -144,6 +144,74 @@ export function estimateE1rm(
 }
 
 /**
+ * doc 21 §6.1 — the label stored on a set that is priced but NOT measured.
+ * Deliberately NOT a member of `E1rmConfidence`: the ladder answers "how precise
+ * is this estimate", and `none` answers a different question — "is this a
+ * measurement at all". Keeping them separate also keeps every
+ * `Record<E1rmConfidence, …>` weight table total.
+ */
+export const NON_MEASURING_CONFIDENCE = "none";
+
+/** The confidence label as STORED on `logged_sets.e1rm_confidence`. */
+export type StampedConfidence =
+  | E1rmConfidence
+  | typeof NON_MEASURING_CONFIDENCE;
+
+/**
+ * doc 21 §6.1 — the measuring band. Is a set performed at this ASSUMED RIR a
+ * strength measurement at all?
+ *
+ * Gated on the assumed-RIR component, not on total effective reps, because the
+ * unreliability comes from the *assumed* part: a logged 15-rep set at RIR 1 is
+ * 15 reps of observation, while a 9-rep set at RIR 21 is 9 observed and 21
+ * asserted. Gating on effective reps would punish honest high-rep work; gating
+ * on RIR targets exactly the fictional component.
+ *
+ * This is the guard that makes §4.3's unbounded prescription RIR safe. Under
+ * Epley each RIR step is worth ~3.3% of e1RM, so at RIR 21 the estimate is ~70%
+ * assumption; the confidence ladder bottoms out at `low` and so makes the same
+ * honesty claim for a set at RIR 4 as for one at RIR 21. Past the band the set
+ * is priced normally, performed, and counted as volume — the app simply stops
+ * claiming to have measured strength from it (doc 16 principle 1: never
+ * fabricate a measurement).
+ *
+ * `max_measuring_rir` is `.optional()`: ABSENT ⇒ today's behavior exactly, and
+ * the default 8 is chosen so nothing that could exist before doc 21 (the old
+ * `target_rir` ceiling) becomes non-measuring. An unknown RIR (null) stays
+ * measuring — it is already `low` confidence and predates this rule.
+ */
+export function isMeasuringRir(
+  rir: number | null | undefined,
+  cfg: Pick<E1rmConfig, "max_measuring_rir">,
+): boolean {
+  const max = cfg.max_measuring_rir;
+  if (max == null || rir == null) return true;
+  return rir <= max;
+}
+
+/**
+ * The stored per-set stamp: `estimateE1rm` plus the §6.1 band. Past the band the
+ * value is null and the label is `none`, so every strength surface that
+ * aggregates `logged_sets.e1rm` (history, `best_set_e1rm`, `best_e1rm`, PRs, the
+ * anchor) drops the set by construction, while volume/adherence surfaces — which
+ * count sets, not loads — keep it. One rule, shared by the log/amend stamp site
+ * and the restamp backfill, so the two can never diverge.
+ */
+export function stampE1rm(
+  weight: number,
+  reps: number,
+  assumed: number | null,
+  cfg: E1rmConfig,
+): { e1rm: number | null; e1rm_confidence: StampedConfidence | null } {
+  const est = estimateE1rm(weight, reps, assumed, cfg);
+  if (est == null) return { e1rm: null, e1rm_confidence: null };
+  if (!isMeasuringRir(assumed, cfg)) {
+    return { e1rm: null, e1rm_confidence: NON_MEASURING_CONFIDENCE };
+  }
+  return { e1rm: est.value, e1rm_confidence: est.confidence };
+}
+
+/**
  * Invert the averaged e1RM curve: the effective reps at which `weight` yields
  * `e1rm`. Monotonic increasing in reps, so bisection is exact-to-tolerance and
  * deterministic. Returns 0 when the weight is already at/above the e1RM (you

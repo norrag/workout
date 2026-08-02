@@ -111,6 +111,16 @@ export const V20_PARAMS: EngineParams = {
   },
 };
 
+/** v24 = v20/v23 plus the doc 21 §6.1 measuring band: past `max_measuring_rir`
+ *  a set is priced but not measured (no stamp, no anchor contribution, no
+ *  strength surface). Mirrors `20260802000003_engine_params_v24_measuring_band`.
+ *  8 is the pre-doc-21 `target_rir` ceiling, so nothing that could exist before
+ *  the exercise-level lever becomes non-measuring. */
+export const V24_PARAMS: EngineParams = {
+  ...V20_PARAMS,
+  e1rm: { ...V20_PARAMS.e1rm, max_measuring_rir: 8 },
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

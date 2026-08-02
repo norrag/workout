@@ -47,7 +47,7 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   },
   e1rm_confidence: {
     label: "ESTIMATE CONFIDENCE",
-    body: "Not every estimated 1RM is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number.",
+    body: "Not every estimated 1RM is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number. A set run far enough from failure isn't rated at all: it still counts as work and as volume, but it says nothing about your strength, so nothing is estimated from it.",
   },
   est_strength: {
     label: "EST. STRENGTH",

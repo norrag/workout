@@ -392,6 +392,82 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v24 is a complete, replayable snapshot matching the migration hash", () => {
+    // v24 = v23 + `e1rm.max_measuring_rir: 8` (doc 21 §6.1 — the measuring
+    // band, the guard that makes §4.3's unbounded prescription RIR safe). The
+    // key is `.optional()`, so v23/earlier rows are byte-identical and the new
+    // row stays replayable.
+    const v24 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+      session_fatigue_dampen_threshold: 8,
+      session_performance_dampen_threshold: 3,
+      climb_requires_rir_step: true,
+      hold_week_anchor_deadband: true,
+      e1rm: { ...V11_PARAMS.e1rm, max_measuring_rir: 8 },
+      progression: {
+        mode: "earned_step",
+        step: "min",
+        min_confidence: "moderate",
+        compliance_band: 0.015,
+        cadence: "microcycle",
+        pacing: "macro_rate",
+        rate_source: "band",
+        band_position: 0.5,
+        goal_rate_factor: {
+          strength: 1.0,
+          hypertrophy: 0.75,
+          gain: 0.75,
+          cut: 0.0,
+          maintain: 0.0,
+        },
+        miss_rearm_sessions: 2,
+        max_gap_days: 10,
+        peak_week: "skip",
+        max_pct_per_step: 0.05,
+      },
+      macro_target: {
+        ...V11_PARAMS.macro_target,
+        strength_sex_factor: { male: 1.0, female: 1.0 },
+        age_taper_floor_strength: 0.7,
+        bf_proxy_pct: {
+          male: { lean: 10, average: 16, high_bf: 25 },
+          female: { lean: 18, average: 26, high_bf: 35 },
+        },
+        strength_model: {
+          enabled: true,
+          neural_n0: { low: 3, high: 5 },
+          neural_floor: { low: 0.1, high: 0.4 },
+          neural_tau_years: 0.5,
+          ffm_coupling_k: 1,
+          undermuscled_unbank: 0.5,
+          rate_ceiling_pct_month: 8,
+        },
+      },
+    });
+    const p = resolveProvenance(v24 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION); // optional key: no shape bump
+    expect(p.params_hash).toBe(
+      "5f103dc7f59f5b23ce53075df352a2ce1b464878a7c24422bd449a5bb8fb6d6a",
+    );
+  });
+
+  it("max_measuring_rir is absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain(
+      "max_measuring_rir",
+    );
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("strength_model is absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("strength_model");
     expect(

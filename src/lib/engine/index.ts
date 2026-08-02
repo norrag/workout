@@ -72,6 +72,12 @@ export {
   type E1rmConfidence,
 } from "./e1rm";
 export {
+  isMeasuringRir,
+  stampE1rm,
+  NON_MEASURING_CONFIDENCE,
+  type StampedConfidence,
+} from "./predict";
+export {
   strengthTrend,
   volumeWeightedMean,
   DEFAULT_STRENGTH,
