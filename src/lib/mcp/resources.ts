@@ -76,7 +76,7 @@ export function registerResources(server: McpServer) {
     },
     guardResource("current-cycle", async (uri: URL, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const state = await getCurrentState(client, userId);
+      const state = await getCurrentState(client, userId, { includeSlotEffort: true });
       const payload = formatCurrentState(state);
       return {
         contents: [

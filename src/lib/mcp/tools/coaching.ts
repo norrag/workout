@@ -188,7 +188,7 @@ function registerGetTrainingOverview(server: McpServer) {
       const { client, userId } = resolveSession(extra);
       const [profile, currentState] = await Promise.all([
         getProfile(client, userId),
-        getCurrentState(client, userId),
+        getCurrentState(client, userId, { includeSlotEffort: true }),
       ]);
 
       let activeSummary: VMesoSummaryRow | null = null;

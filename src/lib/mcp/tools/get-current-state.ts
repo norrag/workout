@@ -45,6 +45,21 @@ export interface CurrentStatePayload {
     status: string;
     scheduled_date: string | null;
   } | null;
+  /**
+   * doc 21 §8 — exercise-level RIR assignments live this week. Present only
+   * when something is assigned, so a plan without one reads exactly as it did
+   * before the lever existed.
+   */
+  effort_assignments?: {
+    day_number: number;
+    exercise_id: string;
+    exercise_name: string | null;
+    target_rir: number;
+    week_target_rir: number;
+    set_cap: number | null;
+    reason: string | null;
+    backed_off: boolean;
+  }[];
   /** one-line orientation for the model */
   summary: string;
 }
@@ -52,6 +67,7 @@ export interface CurrentStatePayload {
 /** Pure shaping of the query result — unit-testable without I/O. */
 export function formatCurrentState(state: CurrentState): CurrentStatePayload {
   const { macrocycle, mesocycle, microcycle, nextWorkout } = state;
+  const effort = state.slotEffort ?? [];
 
   let summary: string;
   if (!mesocycle) {
@@ -67,6 +83,19 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
       microcycle != null ? `, target RIR ${microcycle.target_rir}` : "";
     const deload = microcycle?.is_deload ? " (deload week)" : "";
     summary = `Active mesocycle "${mesocycle.name}" — next workout is ${coord}${rir}${deload}.`;
+  }
+  if (effort.length > 0) {
+    // doc 21 §8: state the authored effort level before anything narrates the
+    // engine's reasoning — the numbers on those slots are a coach's ask, not a
+    // progression decision.
+    summary += ` ${effort.length} exercise${effort.length === 1 ? " runs" : "s run"} at an assigned RIR this week (${effort
+      .map(
+        (e) =>
+          `day ${e.dayNumber} ${e.exerciseName ?? e.exerciseId}: RIR ${e.rir}${
+            e.reason ? ` — ${e.reason}` : ""
+          }`,
+      )
+      .join("; ")}), overriding the week's ramp; no progression is earned on a slot running easier than its week.`;
   }
 
   return {
@@ -111,6 +140,20 @@ export function formatCurrentState(state: CurrentState): CurrentStatePayload {
           scheduled_date: nextWorkout.scheduled_date,
         }
       : null,
+    ...(effort.length > 0
+      ? {
+          effort_assignments: effort.map((e) => ({
+            day_number: e.dayNumber,
+            exercise_id: e.exerciseId,
+            exercise_name: e.exerciseName,
+            target_rir: e.rir,
+            week_target_rir: e.weekRir,
+            set_cap: e.setCap,
+            reason: e.reason,
+            backed_off: e.backedOff,
+          })),
+        }
+      : {}),
     summary,
   };
 }
@@ -125,13 +168,16 @@ export function registerGetCurrentState(server: McpServer) {
       description:
         "The user's current position in their training: active macrocycle → " +
         "mesocycle → microcycle (week) → next workout, including this week's " +
-        "target RIR. Call this first to ground any coaching or planning. " +
-        "Takes no arguments — it always reports the authenticated user's own state.",
+        "target RIR, plus any exercise-level RIR assignment running this week " +
+        "(an authored effort level that overrides the week's ramp for one " +
+        "exercise, with its reason). Call this first to ground any coaching or " +
+        "planning. Takes no arguments — it always reports the authenticated " +
+        "user's own state.",
       inputSchema: {},
     },
     async (_args: Record<string, never>, extra: McpExtra) => {
       const { client, userId } = resolveSession(extra);
-      const state = await getCurrentState(client, userId);
+      const state = await getCurrentState(client, userId, { includeSlotEffort: true });
       const payload = formatCurrentState(state);
       return toolResult(payload as unknown as Record<string, unknown>);
     },

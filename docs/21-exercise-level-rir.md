@@ -540,9 +540,74 @@ freeze under a deep-backoff block; absent param ⇒ byte-identical.
   and 8 is the pre-doc-21 `target_rir` ceiling, so activation restamps nothing
   and the replay diff is expected empty.
 
-**Phase 3 — MCP.** `set_exercise_rir` / `set_exercise_sets` ops + reason,
-read-side disclosure, audit. *Tests:* tool-handler tests on the seeded fixture
-user; refusal on started/completed weeks.
+**Phase 3 — MCP. ✅ SHIPPED 2026-08-02.** `set_exercise_rir` /
+`set_exercise_sets` ops + reason, read-side disclosure, audit. *Tests:*
+tool-handler tests on the seeded fixture user; refusal on started/completed
+weeks.
+
+*As built:*
+- **Both ops live on `edit_mesocycle`** (§8 — no new tool, no new paradigm), so
+  they inherit its ownership check, its planned/active gate, its zod validation
+  and its `mcp_write_audit` row. They are **not** board structure, though, so
+  they stay out of `applyMesoEdits` — that transform rebuilds the planner board
+  wholesale, while an assignment is a column on a row that already exists. The
+  handler splits the two op families and runs the structural save first.
+- **The authoring core is pure**: `queries/slot-effort.ts::planSlotEffortEdit`
+  takes the slot's current assignment, one intent, and the meso's shape, and
+  returns the exact column patch or a sentence. Four value forms per lever —
+  flat, flat + `weeks`, explicit `schedule`, `clear` — with every DB bound
+  mirrored so a caller gets a refusal instead of a constraint violation.
+  `tools/edit.ts::planEffortEdits` is the second pure layer: it composes a batch
+  against the week defaults and the already-trained weeks, and every refusal
+  fires **before any write**, so a mixed structural + effort call can't
+  half-apply.
+- **`save_meso_plan` was quietly fatal to this feature.** The planner-board save
+  is a wholesale replace — it deletes the meso's days and re-inserts every slot
+  from a structure-only payload — so a plain reorder, in the app or over MCP,
+  would have wiped every assignment in the meso. `saveMesoPlan` now snapshots the
+  assignments, and re-keys them onto the re-minted rows by day-slot × exercise
+  (`restoreSlotEffortAssignments`) — the same identity `slotEffortKey` already
+  resolves against, so a surviving slot keeps its assignment and a removed one
+  loses it. No migration: the RPC's payload stays structure-only. It is also why
+  the effort writes in a mixed call run **after** the structural save, addressing
+  the new row ids through that key rather than the ids the caller passed in.
+- **Refusal on started weeks is week-precise, not day-precise.** The structural
+  day lock ("this day is completed/in progress this week") is the wrong shape for
+  an assignment: assigning week 4 is perfectly legitimate on a day whose week-1
+  session is in the books. So effort ops take their own guard — an op that
+  **names** a week (`weeks`, or a non-null `schedule` element) whose workout for
+  that day is completed / in progress / skipped is refused, while a **flat**
+  value is allowed and comes back with a warning listing the weeks it can no
+  longer change. A performed session is the intensity that was actually trained
+  (hard rule #5) either way.
+- **No silent semantics (§4.1), as warnings rather than refusals**: an assignment
+  *below* the week's ramp RIR is reported as "week N runs HARDER than
+  programmed"; a flat value is reported as also governing the deload week (with
+  the deload's own default beside it). The week defaults come from the **live**
+  ramp (`rirRamp` on the active params, exactly as `liveWeekRirUpdates` derives
+  it), so a planned meso with no microcycles yet discloses the same numbers an
+  active one does.
+- **Read-side disclosure is present-only.** `get_mesocycle` adds an `effort`
+  block **on the slot that carries one**, and `get_current_state` adds
+  `effort_assignments` (resolved for the live week, with the week's own RIR
+  beside it, the reason, and `backed_off`) plus a sentence in its `summary` —
+  both omitted entirely when nothing is assigned, so an unassigned plan reads
+  byte-identical to before the lever existed. `getCurrentState` takes the
+  disclosure as an **opt-in** (`includeSlotEffort`) because the app's workout
+  page calls it up to three times a render and has no use for it.
+- **`set_exercise_sets` ships inert and says so.** The cap is stored, resolved
+  and disclosed, but nothing in the engine clamps a set count to it until Phase
+  4 — so both the tool description and every write that assigns one carry a
+  warning pointing at `set_baseline_sets` for the sets the athlete actually
+  sees. An MCP surface that implies an effect the prescription won't show is
+  worse than no surface.
+- Clearing the last assignment on a slot clears its `reason` too (A7 — a reason
+  with nothing to explain is noise in every surface that reads it), and
+  `set_exercise_sets` is deliberately named apart from `set_baseline_sets`: the
+  cap governs every assigned week, the baseline seeds week 1 and then hands over
+  to set progression.
+- *Still inert in the app itself:* the UI surface and the doc-19 explanation
+  layering are Phase 6.
 
 **Phase 4 — set lever (A4) + optional `rep_position` (§4.2).** `set_cap`
 resolution + engine clamp, same fingerprint treatment; `rep_position` as an

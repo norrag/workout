@@ -74,6 +74,19 @@ export function fakeClient(tables: FakeTables): SupabaseClient<Database> {
         filters.push((r) => (r[col] ?? null) !== value);
         return builder;
       },
+      // only the one form the call sites use: comma-separated
+      // "<col>.not.is.null" terms, OR-ed (slot-effort's assigned-only read).
+      or: (expr: string) => {
+        const cols = expr
+          .split(",")
+          .map((term) => term.trim())
+          .filter((term) => term.endsWith(".not.is.null"))
+          .map((term) => term.slice(0, -".not.is.null".length));
+        if (cols.length !== expr.split(",").length)
+          throw new Error(`fakeClient.or() only understands "<col>.not.is.null": ${expr}`);
+        filters.push((r) => cols.some((c) => (r[c] ?? null) !== null));
+        return builder;
+      },
       order: (col: string, opts?: { ascending?: boolean }) => {
         orders.push({ col, asc: opts?.ascending !== false });
         return builder;

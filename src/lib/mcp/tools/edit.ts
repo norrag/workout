@@ -10,7 +10,27 @@ import {
   type MesoPlan,
   type PlanDayInput,
 } from "@/lib/queries/cycles";
-import { regenerateOpenWorkouts } from "@/lib/queries/generation";
+import {
+  getActiveEngineParams,
+  regenerateOpenWorkouts,
+} from "@/lib/queries/generation";
+import { rirRamp } from "@/lib/engine";
+import {
+  applySlotEffortPatch,
+  emptySlotEffort,
+  getSlotEffortRows,
+  planSlotEffortEdit,
+  slotEffortKey,
+  writeSlotEffort,
+  EFFORT_REASON_MAX,
+  SLOT_RIR_MAX,
+  SLOT_RIR_MIN,
+  SLOT_SET_CAP_MAX,
+  SLOT_SET_CAP_MIN,
+  type SlotEffortAssignment,
+  type SlotEffortEdit,
+  type SlotEffortPatch,
+} from "@/lib/queries/slot-effort";
 import {
   findUnknownExerciseIds,
   getMusclesForExercises,
@@ -373,6 +393,264 @@ export function applyMesoEdits(input: EditDay[], ops: ResolvedEdit[]): ApplyResu
   return { ok: true, days: out, touched: [...touched].sort((a, b) => a - b), summaries };
 }
 
+// --- effort assignments (doc 21 Phase 3) -----------------------------------
+// `set_exercise_rir` / `set_exercise_sets` are NOT board structure: they write
+// columns on an existing `meso_exercises` row rather than reshaping the plan, so
+// they stay out of `applyMesoEdits` (which rebuilds the board wholesale) and get
+// their own pure planner. Everything a refusal or a warning depends on — the
+// meso's shape, the week's ramp default, which weeks are already trained — is an
+// input, so the whole policy is unit-testable without a database.
+
+/** One slot addressed by an effort op, with the identity the write re-keys on. */
+export interface EffortSlotRef {
+  slot_id: string;
+  day_number: number;
+  exercise_id: string;
+  exercise_name?: string | null;
+}
+
+export interface EffortContext {
+  shape: { weeks: number; includesDeload: boolean };
+  /** week_number → that week's target RIR (the ramp / deload default, §4.1) */
+  weekRir: Map<number, number>;
+  /** the trailing deload week's number, when the meso has one */
+  deloadWeek: number | null;
+  /** day_number → week numbers already trained (completed / in progress / skipped) */
+  lockedWeeksByDay: Map<number, number[]>;
+}
+
+export interface EffortOp {
+  op: "set_exercise_rir" | "set_exercise_sets";
+  slot_id: string;
+  edit: SlotEffortEdit;
+}
+
+export interface EffortWrite {
+  slot_id: string;
+  day_number: number;
+  exercise_id: string;
+  patch: SlotEffortPatch;
+  next: SlotEffortAssignment;
+}
+
+export interface EffortDisclosure {
+  slot_id: string;
+  day_number: number;
+  exercise_id: string;
+  exercise_name?: string | null;
+  lever: "target_rir" | "set_cap";
+  by_week: (number | null)[];
+  week_defaults: (number | null)[];
+  assigned_weeks: number[];
+  covers_deload_week: boolean;
+  reason: string | null;
+}
+
+export type EffortPlanResult =
+  | {
+      ok: true;
+      writes: EffortWrite[];
+      summaries: string[];
+      warnings: string[];
+      disclosures: EffortDisclosure[];
+    }
+  | { ok: false; error: string };
+
+/**
+ * Plan a batch of effort ops against the slots' current assignments.
+ *
+ * Refusals (both are §4.1's "no silent semantics", applied to time rather than
+ * to intensity):
+ * - an op naming a slot this meso doesn't have;
+ * - an op that explicitly names a week (via `weeks`, or a non-null element of
+ *   `schedule`) whose workout for that day is already completed / in progress /
+ *   skipped. A performed session is the intensity that was actually trained
+ *   (hard rule #5) and no assignment can rewrite it, so a caller that was
+ *   specific about that week is told, not quietly ignored.
+ *
+ * A FLAT value is allowed alongside trained weeks — "run this exercise at RIR 4
+ * for the block" is a statement about the block, not about a week — but the
+ * already-trained weeks come back as a warning so the caller knows the
+ * assignment only bites from here on.
+ */
+export function planEffortEdits(
+  ops: EffortOp[],
+  slots: Map<string, EffortSlotRef>,
+  current: Map<string, SlotEffortAssignment>,
+  ctx: EffortContext,
+): EffortPlanResult {
+  const writes = new Map<string, EffortWrite>();
+  const state = new Map<string, SlotEffortAssignment>();
+  const summaries: string[] = [];
+  const warnings: string[] = [];
+  const disclosures: EffortDisclosure[] = [];
+  const workingWeeks = ctx.shape.includesDeload
+    ? ctx.shape.weeks - 1
+    : ctx.shape.weeks;
+
+  for (const op of ops) {
+    const slot = slots.get(op.slot_id);
+    if (!slot)
+      return { ok: false, error: `slot ${op.slot_id} not found in this mesocycle.` };
+    const before =
+      state.get(op.slot_id) ?? current.get(op.slot_id) ?? emptySlotEffort();
+
+    const planned = planSlotEffortEdit(before, op.edit, ctx.shape);
+    if (!planned.ok)
+      return { ok: false, error: `${op.op} (day ${slot.day_number}): ${planned.error}` };
+    const { plan } = planned;
+
+    // explicit week targeting can't reach a trained week
+    const locked = ctx.lockedWeeksByDay.get(slot.day_number) ?? [];
+    const namesWeeks = op.edit.weeks != null || op.edit.schedule != null;
+    if (namesWeeks && locked.length > 0) {
+      const clash = plan.assignedWeeks.filter((w) => locked.includes(w));
+      if (clash.length > 0)
+        return {
+          ok: false,
+          error: `${op.op}: week(s) ${clash.join(", ")} of day ${slot.day_number} are already trained (completed, in progress, or skipped) — that session is the intensity it was performed at and can't be reassigned. Target a later week.`,
+        };
+    }
+    const lockedCovered = plan.assignedWeeks.filter((w) => locked.includes(w));
+    if (!namesWeeks && lockedCovered.length > 0)
+      warnings.push(
+        `day ${slot.day_number}: ${weekWord(lockedCovered)} already trained — the assignment applies to the weeks still ahead.`,
+      );
+
+    const lever = op.edit.lever === "rir" ? "target_rir" : "set_cap";
+
+    // §4.1 "the week's default beside the field": an assignment BELOW the
+    // week's ramp RIR makes that week harder than programmed. Legitimate
+    // (ramping back into a block), never silent.
+    if (op.edit.lever === "rir") {
+      for (const w of plan.assignedWeeks) {
+        const value = plan.byWeek[w - 1]!;
+        const def = ctx.weekRir.get(w);
+        if (def != null && value < def)
+          warnings.push(
+            `day ${slot.day_number} week ${w}: RIR ${value} is BELOW the week's ${def} — that week runs HARDER than programmed.`,
+          );
+      }
+      if (plan.coversDeload && ctx.deloadWeek != null) {
+        const value = plan.next.target_rir!;
+        const def = ctx.weekRir.get(ctx.deloadWeek);
+        warnings.push(
+          def != null && value < def
+            ? `a flat assignment also governs the deload week (week ${ctx.deloadWeek}) — RIR ${value} against the deload's ${def}, so the deload gets harder. Use weeks/schedule to leave it alone.`
+            : `a flat assignment also governs the deload week (week ${ctx.deloadWeek}). Use weeks/schedule to leave it on the deload default.`,
+        );
+      }
+    } else {
+      if (plan.coversDeload && ctx.deloadWeek != null)
+        warnings.push(
+          `a flat set cap also governs the deload week (week ${ctx.deloadWeek}).`,
+        );
+      // honesty: the cap is stored, resolved and disclosed, but the engine's
+      // set count doesn't read it yet (doc 21 Phase 4). Never let the tool
+      // imply an effect the prescription won't show.
+      if (!plan.cleared && plan.assignedWeeks.length > 0)
+        warnings.push(
+          `day ${slot.day_number}: the working-set cap is recorded on the plan and reads back everywhere, but the engine does not clamp its set count to it yet — that lands in a later phase. To change the sets the athlete actually sees, use set_baseline_sets (week-1 seed).`,
+        );
+    }
+
+    const merged = writes.get(op.slot_id);
+    writes.set(op.slot_id, {
+      slot_id: op.slot_id,
+      day_number: slot.day_number,
+      exercise_id: slot.exercise_id,
+      patch: { ...(merged?.patch ?? {}), ...plan.patch },
+      next: plan.next,
+    });
+    state.set(op.slot_id, applySlotEffortPatch(before, plan.patch));
+    summaries.push(
+      `day ${slot.day_number}${slot.exercise_name ? ` ${slot.exercise_name}` : ""}: ${plan.summary}`,
+    );
+    disclosures.push({
+      slot_id: op.slot_id,
+      day_number: slot.day_number,
+      exercise_id: slot.exercise_id,
+      exercise_name: slot.exercise_name,
+      lever,
+      by_week: plan.byWeek,
+      week_defaults: Array.from({ length: workingWeeks }, (_, i) =>
+        op.edit.lever === "rir" ? (ctx.weekRir.get(i + 1) ?? null) : null,
+      ),
+      assigned_weeks: plan.assignedWeeks,
+      covers_deload_week: plan.coversDeload,
+      reason: plan.next.effort_reason,
+    });
+  }
+
+  return { ok: true, writes: [...writes.values()], summaries, warnings, disclosures };
+}
+
+function weekWord(weeks: number[]): string {
+  return weeks.length === 1 ? `week ${weeks[0]} is` : `weeks ${weeks.join(", ")} are`;
+}
+
+/** The week defaults + already-trained weeks the planner reasons against. */
+async function loadEffortContext(
+  client: Client,
+  meso: {
+    id: string;
+    weeks: number;
+    includes_deload: boolean;
+    rir_start: number;
+    rir_end: number;
+    rir_schedule: number[] | null;
+  },
+): Promise<EffortContext> {
+  const shape = { weeks: meso.weeks, includesDeload: meso.includes_deload };
+  const weekRir = new Map<number, number>();
+  let deloadWeek: number | null = null;
+  try {
+    const { params } = await getActiveEngineParams(client);
+    // the LIVE ramp, exactly as `liveWeekRirUpdates` re-derives it — so a planned
+    // meso (no microcycles yet) and an active one disclose the same defaults.
+    for (const w of rirRamp(
+      meso.weeks,
+      meso.includes_deload,
+      meso.rir_start,
+      meso.rir_end,
+      params,
+      meso.rir_schedule,
+    )) {
+      weekRir.set(w.weekNumber, w.targetRir);
+      if (w.isDeload) deloadWeek = w.weekNumber;
+    }
+  } catch {
+    // a meso whose shape the ramp rejects shouldn't exist; never fail an edit
+    // over a disclosure — the assignment itself doesn't depend on it.
+  }
+
+  const lockedWeeksByDay = new Map<number, number[]>();
+  const { data: micros, error: microErr } = await client
+    .from("microcycles")
+    .select("id, week_number")
+    .eq("mesocycle_id", meso.id);
+  if (microErr) throw microErr;
+  if (micros && micros.length > 0) {
+    const weekByMicroId = new Map(micros.map((m) => [m.id, m.week_number]));
+    const { data: workouts, error: woErr } = await client
+      .from("workouts")
+      .select("microcycle_id, day_number, status")
+      .in("microcycle_id", [...weekByMicroId.keys()]);
+    if (woErr) throw woErr;
+    for (const w of workouts ?? []) {
+      if (w.status === "planned") continue;
+      const week = weekByMicroId.get(w.microcycle_id);
+      if (week == null) continue;
+      const list = lockedWeeksByDay.get(w.day_number) ?? [];
+      if (!list.includes(week)) list.push(week);
+      lockedWeeksByDay.set(w.day_number, list);
+    }
+    for (const list of lockedWeeksByDay.values()) list.sort((a, b) => a - b);
+  }
+
+  return { shape, weekRir, deloadWeek, lockedWeeksByDay };
+}
+
 // --- active-week target guard (decision #1) --------------------------------
 
 /** The current (active) week's workout status per day_number, for the lock check. */
@@ -453,6 +731,40 @@ const removeDayOp = z.object({
   op: z.literal("remove_day"),
   day_number: z.number().int().min(1).max(7),
 });
+// doc 21 §8 — the effort levers. Same slot addressing as every other op; the
+// value forms are "flat", "flat + weeks", "explicit schedule", or "clear".
+const setExerciseRirOp = z.object({
+  op: z.literal("set_exercise_rir"),
+  slot_id: z.string().uuid(),
+  rir: z.number().int().min(SLOT_RIR_MIN).max(SLOT_RIR_MAX).nullable().optional(),
+  weeks: z.array(z.number().int().min(1).max(8)).min(1).max(8).optional(),
+  schedule: z
+    .array(z.number().int().min(SLOT_RIR_MIN).max(SLOT_RIR_MAX).nullable())
+    .min(1)
+    .max(8)
+    .optional(),
+  clear: z.boolean().optional(),
+  reason: z.string().max(EFFORT_REASON_MAX).nullable().optional(),
+});
+const setExerciseSetsOp = z.object({
+  op: z.literal("set_exercise_sets"),
+  slot_id: z.string().uuid(),
+  sets: z
+    .number()
+    .int()
+    .min(SLOT_SET_CAP_MIN)
+    .max(SLOT_SET_CAP_MAX)
+    .nullable()
+    .optional(),
+  weeks: z.array(z.number().int().min(1).max(8)).min(1).max(8).optional(),
+  schedule: z
+    .array(z.number().int().min(SLOT_SET_CAP_MIN).max(SLOT_SET_CAP_MAX).nullable())
+    .min(1)
+    .max(8)
+    .optional(),
+  clear: z.boolean().optional(),
+  reason: z.string().max(EFFORT_REASON_MAX).nullable().optional(),
+});
 const operationSchema = z.discriminatedUnion("op", [
   addOp,
   removeOp,
@@ -461,8 +773,36 @@ const operationSchema = z.discriminatedUnion("op", [
   setSetsOp,
   addDayOp,
   removeDayOp,
+  setExerciseRirOp,
+  setExerciseSetsOp,
 ]);
 type Operation = z.infer<typeof operationSchema>;
+
+type EffortOperation =
+  | z.infer<typeof setExerciseRirOp>
+  | z.infer<typeof setExerciseSetsOp>;
+
+function isEffortOp(o: Operation): o is EffortOperation {
+  return o.op === "set_exercise_rir" || o.op === "set_exercise_sets";
+}
+
+/** The zod op → the lever-neutral intent the pure planner takes. */
+export function toEffortOp(o: EffortOperation): EffortOp {
+  const lever = o.op === "set_exercise_rir" ? "rir" : "sets";
+  const value = o.op === "set_exercise_rir" ? o.rir : o.sets;
+  return {
+    op: o.op,
+    slot_id: o.slot_id,
+    edit: {
+      lever,
+      ...(value !== undefined ? { value } : {}),
+      ...(o.weeks !== undefined ? { weeks: o.weeks } : {}),
+      ...(o.schedule !== undefined ? { schedule: o.schedule } : {}),
+      ...(o.clear !== undefined ? { clear: o.clear } : {}),
+      ...(o.reason !== undefined ? { reason: o.reason } : {}),
+    },
+  };
+}
 
 export const EDIT_MESOCYCLE = "edit_mesocycle";
 
@@ -487,7 +827,23 @@ export function registerEditMesocycle(server: McpServer) {
         "set count and ramps the edited structure forward. For an active meso, only " +
         "days that are neither completed nor in progress this week can be edited; " +
         "completed/in-progress workouts and all logged sets are never touched " +
-        "(hard rules #3/#5).",
+        "(hard rules #3/#5). " +
+        "EFFORT ops (per exercise, per week): set_exercise_rir (slot_id + one of " +
+        "rir for the whole meso, rir + weeks for those working weeks, schedule " +
+        "with one value or null per working week, or clear: true) assigns a target " +
+        "RIR to ONE exercise on ONE day, and the engine reprices the load to meet " +
+        "it — higher RIR = lighter (back-off, rehab, fatigue management), lower = " +
+        "harder. It is ABSOLUTE: where set it overrides the week's RIR (a flat " +
+        "value overrides the deload week too), and removing it hands the week " +
+        "straight back to the meso's ramp. No progression is earned while a slot " +
+        "runs easier than its week. set_exercise_sets is the same shape for a " +
+        "working-set cap (sets/weeks/schedule/clear) — distinct from " +
+        "set_baseline_sets, which seeds week 1 and then lets set progression run. " +
+        "NOTE: the cap is recorded and read back everywhere, but the engine does " +
+        "not clamp its set count to it yet — use set_baseline_sets to change the " +
+        "sets the athlete actually sees. " +
+        "Both take an optional reason, surfaced wherever the assignment reads. A " +
+        "week that has already been trained can't be reassigned by name.",
       inputSchema: {
         mesocycle_id: z.string().uuid(),
         operations: z.array(operationSchema).min(1).max(20),
@@ -501,7 +857,9 @@ export function registerEditMesocycle(server: McpServer) {
 
       const { data: meso, error: mesoError } = await client
         .from("mesocycles")
-        .select("id, name, status")
+        .select(
+          "id, name, status, weeks, includes_deload, rir_start, rir_end, rir_schedule",
+        )
         .eq("id", args.mesocycle_id)
         .eq("user_id", userId)
         .maybeSingle();
@@ -568,16 +926,34 @@ export function registerEditMesocycle(server: McpServer) {
 
       // slot_id → day_number, for the target-day guard and op resolution
       const slotDay = new Map<string, number>();
+      const slotRefs = new Map<string, EffortSlotRef>();
       for (const d of plan.days)
         for (const g of d.groups)
-          for (const f of g.fills) slotDay.set(f.id, d.day_number);
+          for (const f of g.fills) {
+            slotDay.set(f.id, d.day_number);
+            slotRefs.set(f.id, {
+              slot_id: f.id,
+              day_number: d.day_number,
+              exercise_id: f.exercise_id,
+              exercise_name: f.exercise_name,
+            });
+          }
+
+      // doc 21 §8: effort ops write columns on an existing slot rather than
+      // reshaping the board, so they take the week-precise guard below instead
+      // of the structural day lock (assigning week 4 is legitimate on a day
+      // whose week-1 session is already in the books).
+      const structuralOps = args.operations.filter(
+        (o): o is Exclude<Operation, EffortOperation> => !isEffortOp(o),
+      );
+      const effortOps = args.operations.filter(isEffortOp);
 
       // decision #1: a day whose current-week workout is completed/in-progress
       // is locked. Future weeks and untouched current-week days stay editable.
-      if (meso.status === "active") {
+      if (meso.status === "active" && structuralOps.length > 0) {
         const statusByDay = await activeWeekStatusByDay(client, args.mesocycle_id);
         const targetDays = new Set<number>();
-        for (const o of args.operations) {
+        for (const o of structuralOps) {
           if (o.op === "add_exercise" || o.op === "reorder_day" || o.op === "remove_day")
             targetDays.add(o.day_number);
           else if (o.op === "add_day") {
@@ -600,8 +976,27 @@ export function registerEditMesocycle(server: McpServer) {
           });
       }
 
+      // doc 21 §8: plan every effort op BEFORE any write, so a refusal (an
+      // unknown slot, an already-trained week, an out-of-range value) leaves the
+      // plan exactly as it was even when the same call also carries structure.
+      let effort: Extract<EffortPlanResult, { ok: true }> | null = null;
+      if (effortOps.length > 0) {
+        const ctx = await loadEffortContext(client, meso);
+        const currentBySlot = new Map<string, SlotEffortAssignment>();
+        for (const row of await getSlotEffortRows(client, args.mesocycle_id, true))
+          currentBySlot.set(row.id, row.assignment);
+        const planned = planEffortEdits(
+          effortOps.map(toEffortOp),
+          slotRefs,
+          currentBySlot,
+          ctx,
+        );
+        if (!planned.ok) return jsonResult({ ok: false, error: planned.error });
+        effort = planned;
+      }
+
       // resolve muscle_group → id and run the pure transform
-      const resolved: ResolvedEdit[] = args.operations.map((o) => {
+      const resolved: ResolvedEdit[] = structuralOps.map((o) => {
         if (o.op === "add_exercise")
           return {
             op: "add_exercise" as const,
@@ -623,16 +1018,55 @@ export function registerEditMesocycle(server: McpServer) {
           };
         return o;
       });
-      const result = applyMesoEdits(toEditDays(plan), resolved);
-      if (!result.ok) return jsonResult({ ok: false, error: result.error });
-      if (result.touched.length === 0)
-        return jsonResult({ ok: false, error: "no operations changed the plan." });
+      let structuralSummaries: string[] = [];
+      let touchedDays: number[] = [];
+      if (structuralOps.length > 0) {
+        const result = applyMesoEdits(toEditDays(plan), resolved);
+        if (!result.ok) return jsonResult({ ok: false, error: result.error });
+        if (result.touched.length === 0)
+          return jsonResult({ ok: false, error: "no operations changed the plan." });
+        // assignments survive the wholesale replace (saveMesoPlan re-keys them
+        // by day-slot × exercise) — a reorder must not silently wipe them.
+        await saveMesoPlan(client, userId, args.mesocycle_id, result.days);
+        structuralSummaries = result.summaries;
+        touchedDays = result.touched;
+      }
 
-      await saveMesoPlan(client, userId, args.mesocycle_id, result.days);
+      // effort writes go in after the structural save, because that save
+      // re-mints every slot id — the day-slot × exercise key is what survives it
+      // (and is the identity the resolution itself uses).
+      const effortWarnings = [...(effort?.warnings ?? [])];
+      if (effort) {
+        let idByKey: Map<string, string> | null = null;
+        if (structuralOps.length > 0) {
+          idByKey = new Map(
+            (await getSlotEffortRows(client, args.mesocycle_id, false)).map((r) => [
+              r.key,
+              r.id,
+            ]),
+          );
+        }
+        for (const w of effort.writes) {
+          const targetId =
+            idByKey?.get(slotEffortKey(w.day_number, w.exercise_id)) ??
+            (idByKey ? null : w.slot_id);
+          if (targetId == null) {
+            effortWarnings.push(
+              `day ${w.day_number}: the slot was removed by a structural operation in this same call — its effort assignment was not written.`,
+            );
+            continue;
+          }
+          await writeSlotEffort(client, targetId, w.patch);
+          if (!touchedDays.includes(w.day_number)) touchedDays.push(w.day_number);
+        }
+        touchedDays.sort((a, b) => a - b);
+      }
 
       // active meso: bring open (not-started) workouts in line; the engine ramps
-      // the new structure forward. Completed/in-progress workouts & logged sets
-      // are never touched (regenerateOpenWorkouts skips them).
+      // the new structure forward and reprices any repointed effort assignment
+      // (doc 21 §4.2 — one substitution on the existing pricing path).
+      // Completed/in-progress workouts & logged sets are never touched
+      // (regenerateOpenWorkouts skips them).
       let regenerated = false;
       if (meso.status === "active") {
         const profile = await getProfile(client, userId);
@@ -652,16 +1086,23 @@ export function registerEditMesocycle(server: McpServer) {
           )
         : new Map();
 
-      const summary = `edited mesocycle "${meso.name}" — ${result.summaries.length} change(s) on day(s) ${
-        result.touched.join(", ") || "—"
+      const changes = [...structuralSummaries, ...(effort?.summaries ?? [])];
+      const summary = `edited mesocycle "${meso.name}" — ${changes.length} change(s) on day(s) ${
+        touchedDays.join(", ") || "—"
       }`;
       await recordMcpWrite(userId, EDIT_MESOCYCLE, args, summary);
       return jsonResult({
         ok: true,
         mesocycle_id: args.mesocycle_id,
-        touched_days: result.touched,
-        changes: result.summaries,
+        touched_days: touchedDays,
+        changes,
         regenerated_open_workouts: regenerated,
+        ...(effort
+          ? {
+              effort_assignments: effort.disclosures,
+              ...(effortWarnings.length > 0 ? { warnings: effortWarnings } : {}),
+            }
+          : {}),
         plan: formatMesoPlan(fresh, freshRoles),
         summary:
           meso.status === "active"

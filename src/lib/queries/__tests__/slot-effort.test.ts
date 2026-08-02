@@ -6,7 +6,12 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  applySlotEffortPatch,
   assignmentHardensWeek,
+  emptySlotEffort,
+  getSlotEffortAssignments,
+  planSlotEffortEdit,
+  restoreSlotEffortAssignments,
   exerciseRirInput,
   hasAssignment,
   orphanedSlotSchedules,
@@ -17,6 +22,7 @@ import {
   slotSetCap,
   type SlotEffortAssignment,
 } from "../slot-effort";
+import { fakeClient } from "./fake-client";
 
 function assignment(
   o: Partial<SlotEffortAssignment> = {},
@@ -219,5 +225,305 @@ describe("orphanedSlotSchedules (§3 — the N18-B clearing rule per slot)", () 
     expect(
       orphanedSlotSchedules([{ ...slots[0] }], 4),
     ).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// authoring (doc 21 Phase 3 — the write side)
+// ---------------------------------------------------------------------------
+
+const FIVE_WITH_DELOAD = { weeks: 5, includesDeload: true }; // 4 working weeks
+const FOUR_NO_DELOAD = { weeks: 4, includesDeload: false };
+
+function planned(
+  current: SlotEffortAssignment,
+  edit: Parameters<typeof planSlotEffortEdit>[1],
+  shape = FIVE_WITH_DELOAD,
+) {
+  const r = planSlotEffortEdit(current, edit, shape);
+  if (!r.ok) throw new Error(`expected ok, got: ${r.error}`);
+  return r.plan;
+}
+
+function refused(
+  current: SlotEffortAssignment,
+  edit: Parameters<typeof planSlotEffortEdit>[1],
+  shape = FIVE_WITH_DELOAD,
+) {
+  const r = planSlotEffortEdit(current, edit, shape);
+  if (r.ok) throw new Error(`expected a refusal, got: ${r.plan.summary}`);
+  return r.error;
+}
+
+describe("planSlotEffortEdit — the value forms", () => {
+  it("a flat value assigns every week, deload included (§4.1 absolute)", () => {
+    const plan = planned(assignment(), { lever: "rir", value: 4 });
+    expect(plan.patch).toEqual({ target_rir: 4, rir_schedule: null });
+    expect(plan.byWeek).toEqual([4, 4, 4, 4]);
+    expect(plan.assignedWeeks).toEqual([1, 2, 3, 4]);
+    // the flat value is what a week off the end of the schedule falls back to,
+    // so it governs the deload week too — the thing that must never be silent
+    expect(plan.coversDeload).toBe(true);
+    expect(plan.summary).toBe("RIR 4 for the whole mesocycle");
+  });
+
+  it("value + weeks writes the headline case: RIR 4 on weeks 3–4 only", () => {
+    const plan = planned(assignment(), { lever: "rir", value: 4, weeks: [3, 4] });
+    expect(plan.patch).toEqual({ target_rir: null, rir_schedule: [null, null, 4, 4] });
+    expect(plan.byWeek).toEqual([null, null, 4, 4]);
+    expect(plan.assignedWeeks).toEqual([3, 4]);
+    // week-targeted ⇒ the deload week keeps its own default
+    expect(plan.coversDeload).toBe(false);
+    expect(plan.summary).toBe("RIR 4 on weeks 3, 4");
+  });
+
+  it("an explicit schedule is taken as given, nulls and all", () => {
+    const plan = planned(assignment(), {
+      lever: "rir",
+      schedule: [null, 5, 4, null],
+    });
+    expect(plan.patch.rir_schedule).toEqual([null, 5, 4, null]);
+    expect(plan.assignedWeeks).toEqual([2, 3]);
+    expect(plan.summary).toMatch(/w2:5 w3:4/);
+  });
+
+  it("clear removes the lever and, with nothing left, the reason too (A7)", () => {
+    const plan = planned(
+      assignment({ target_rir: 4, effort_reason: "elbow" }),
+      { lever: "rir", clear: true },
+    );
+    expect(plan.patch).toEqual({
+      target_rir: null,
+      rir_schedule: null,
+      effort_reason: null,
+    });
+    expect(plan.cleared).toBe(true);
+    expect(plan.assignedWeeks).toEqual([]);
+  });
+
+  it("an explicit null value is the same as clear", () => {
+    expect(planned(assignment({ target_rir: 4 }), { lever: "rir", value: null }).patch)
+      .toMatchObject({ target_rir: null, rir_schedule: null });
+  });
+
+  it("clearing one lever keeps the reason while the other stays assigned", () => {
+    const plan = planned(
+      assignment({ target_rir: 4, set_cap: 2, effort_reason: "elbow" }),
+      { lever: "rir", clear: true },
+    );
+    expect(plan.cleared).toBe(false);
+    expect(plan.patch.effort_reason).toBeUndefined();
+    expect(plan.next.effort_reason).toBe("elbow");
+  });
+
+  it("the set lever writes its own columns with the same shape (A4)", () => {
+    const plan = planned(assignment(), { lever: "sets", value: 2, weeks: [4] });
+    expect(plan.patch).toEqual({ set_cap: null, set_cap_schedule: [null, null, null, 2] });
+    expect(plan.summary).toBe("2 sets on week 4");
+  });
+
+  it("switching from a schedule to a flat value clears the schedule", () => {
+    const plan = planned(assignment({ rir_schedule: [null, null, 4, 4] }), {
+      lever: "rir",
+      value: 3,
+    });
+    expect(plan.patch).toEqual({ target_rir: 3, rir_schedule: null });
+    expect(plan.byWeek).toEqual([3, 3, 3, 3]);
+  });
+
+  it("a meso without a deload never reports deload coverage", () => {
+    const plan = planned(assignment(), { lever: "rir", value: 4 }, FOUR_NO_DELOAD);
+    expect(plan.byWeek).toEqual([4, 4, 4, 4]);
+    expect(plan.coversDeload).toBe(false);
+  });
+});
+
+describe("planSlotEffortEdit — reason (A7)", () => {
+  it("sets, trims, and clears independently of the lever", () => {
+    expect(
+      planned(assignment(), { lever: "rir", value: 4, reason: "  right elbow  " })
+        .patch.effort_reason,
+    ).toBe("right elbow");
+    expect(
+      planned(assignment({ target_rir: 4, effort_reason: "old" }), {
+        lever: "rir",
+        value: 5,
+        reason: null,
+      }).patch.effort_reason,
+    ).toBeNull();
+    // absent ⇒ untouched
+    expect(
+      planned(assignment({ target_rir: 4, effort_reason: "keep" }), {
+        lever: "rir",
+        value: 5,
+      }).patch.effort_reason,
+    ).toBeUndefined();
+  });
+
+  it("an empty reason stores null rather than an empty string", () => {
+    expect(
+      planned(assignment(), { lever: "rir", value: 4, reason: "   " }).patch
+        .effort_reason,
+    ).toBeNull();
+  });
+});
+
+describe("planSlotEffortEdit — refusals", () => {
+  it("needs exactly one value form", () => {
+    expect(refused(assignment(), { lever: "rir" })).toMatch(/nothing to set/);
+    expect(
+      refused(assignment(), { lever: "rir", value: 4, clear: true }),
+    ).toMatch(/exactly one/);
+    expect(
+      refused(assignment(), { lever: "rir", value: 4, schedule: [1, 1, 1, 1] }),
+    ).toMatch(/exactly one/);
+  });
+
+  it("refuses weeks without a value", () => {
+    expect(refused(assignment(), { lever: "rir", weeks: [3] })).toMatch(/supply the value/);
+  });
+
+  it("refuses a week outside the working weeks (the deload can't be named)", () => {
+    expect(refused(assignment(), { lever: "rir", value: 4, weeks: [5] })).toMatch(
+      /outside this mesocycle's 4 working week/,
+    );
+  });
+
+  it("refuses a schedule that doesn't cover the working weeks", () => {
+    expect(refused(assignment(), { lever: "rir", schedule: [4, 4] })).toMatch(
+      /must cover the 4 working week/,
+    );
+  });
+
+  it("refuses an all-null schedule — that is a clear, and should say so", () => {
+    expect(
+      refused(assignment(), { lever: "rir", schedule: [null, null, null, null] }),
+    ).toMatch(/clear: true/);
+  });
+
+  it("refuses values the database would reject, per lever", () => {
+    // §4.3: the ask is unbounded in principle, 30 is what the column persists
+    expect(planSlotEffortEdit(assignment(), { lever: "rir", value: 30 }, FIVE_WITH_DELOAD).ok).toBe(true);
+    expect(refused(assignment(), { lever: "rir", value: 31 })).toMatch(/0–30/);
+    expect(refused(assignment(), { lever: "rir", value: -1 })).toMatch(/0–30/);
+    expect(refused(assignment(), { lever: "sets", value: 0 })).toMatch(/1–20/);
+    expect(refused(assignment(), { lever: "sets", value: 21 })).toMatch(/1–20/);
+    expect(
+      refused(assignment(), { lever: "rir", schedule: [null, 44, null, null] }),
+    ).toMatch(/0–30/);
+  });
+
+  it("refuses an over-long reason", () => {
+    expect(
+      refused(assignment(), { lever: "rir", value: 4, reason: "x".repeat(501) }),
+    ).toMatch(/500 characters/);
+  });
+});
+
+describe("planSlotEffortEdit — composition", () => {
+  it("two edits compose through applySlotEffortPatch", () => {
+    let a = emptySlotEffort();
+    a = applySlotEffortPatch(
+      a,
+      planned(a, { lever: "rir", value: 4, weeks: [3, 4], reason: "elbow" }).patch,
+    );
+    a = applySlotEffortPatch(a, planned(a, { lever: "sets", value: 2, weeks: [3, 4] }).patch);
+    expect(a).toEqual({
+      target_rir: null,
+      rir_schedule: [null, null, 4, 4],
+      set_cap: null,
+      set_cap_schedule: [null, null, 2, 2],
+      effort_reason: "elbow",
+    });
+    // and clearing both levers takes the reason with the last of them
+    a = applySlotEffortPatch(a, planned(a, { lever: "rir", clear: true }).patch);
+    a = applySlotEffortPatch(a, planned(a, { lever: "sets", clear: true }).patch);
+    expect(hasAssignment(a)).toBe(false);
+    expect(a.effort_reason).toBeNull();
+  });
+});
+
+describe("restoreSlotEffortAssignments (the save_meso_plan replace)", () => {
+  // `save_meso_plan` deletes the meso's days and re-inserts every slot from a
+  // structure-only payload, so without the re-key a plain reorder would wipe
+  // every assignment in the meso.
+  function tables(slotRows: Record<string, unknown>[]) {
+    return {
+      meso_exercises: slotRows,
+      meso_days: [{ id: "d1", mesocycle_id: "m1", day_number: 1 }],
+      meso_day_groups: [{ id: "g1", meso_day_id: "d1" }],
+    };
+  }
+
+  it("carries an assignment onto the re-minted row for the same day × exercise", async () => {
+    const before = tables([
+      {
+        id: "old-slot",
+        mesocycle_id: "m1",
+        meso_day_group_id: "g1",
+        day_of_week: null,
+        exercise_id: "e-bench",
+        target_rir: null,
+        rir_schedule: [null, null, 4, 4],
+        set_cap: null,
+        set_cap_schedule: null,
+        effort_reason: "elbow",
+      },
+    ]);
+    const snapshot = await getSlotEffortAssignments(fakeClient(before), "m1");
+    expect(snapshot.size).toBe(1);
+
+    // the replace: same day, same exercise, brand-new row id, no assignment
+    const after = tables([
+      {
+        id: "new-slot",
+        mesocycle_id: "m1",
+        meso_day_group_id: "g1",
+        day_of_week: null,
+        exercise_id: "e-bench",
+        target_rir: null,
+        rir_schedule: null,
+        set_cap: null,
+        set_cap_schedule: null,
+        effort_reason: null,
+      },
+    ]);
+    const client = fakeClient(after);
+    expect(await restoreSlotEffortAssignments(client, "m1", snapshot)).toBe(1);
+    expect(after.meso_exercises[0]).toMatchObject({
+      id: "new-slot",
+      rir_schedule: [null, null, 4, 4],
+      effort_reason: "elbow",
+    });
+  });
+
+  it("drops the assignment of a slot the edit removed, and leaves others alone", async () => {
+    const snapshot = new Map([
+      [
+        slotEffortKey(1, "e-gone"),
+        assignment({ target_rir: 4, effort_reason: "elbow" }),
+      ],
+    ]);
+    const after = tables([
+      {
+        id: "kept",
+        mesocycle_id: "m1",
+        meso_day_group_id: "g1",
+        day_of_week: null,
+        exercise_id: "e-bench",
+        target_rir: null,
+        rir_schedule: null,
+        set_cap: null,
+        set_cap_schedule: null,
+        effort_reason: null,
+      },
+    ]);
+    expect(await restoreSlotEffortAssignments(fakeClient(after), "m1", snapshot)).toBe(0);
+    expect(after.meso_exercises[0].target_rir).toBeNull();
+  });
+
+  it("writes nothing at all when the meso has no assignments", async () => {
+    const after = tables([]);
+    expect(await restoreSlotEffortAssignments(fakeClient(after), "m1", new Map())).toBe(0);
   });
 });

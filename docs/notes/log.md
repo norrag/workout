@@ -4,6 +4,45 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-02 — Session 95: doc 21 Phase 3 built — the MCP write surface (N70)
+
+The lever becomes usable. Phases 2/2b resolved and priced an assignment end to
+end, but nothing could write one; Phase 3 is the surface, and per A4 it is the
+primary one — the app UI is still Phase 6.
+
+- **N70 → Phase 3 done (PR #219).** Row updated; the item stays live (Phases 4–6
+  remain).
+- **One defect found and fixed on the way in, worth naming.** `save_meso_plan`
+  is a wholesale replace that re-inserts every slot from a **structure-only**
+  payload — so a plain day reorder, in the app or over MCP, would have wiped
+  every assignment in the meso. Phase 2 shipped the columns without touching
+  that path, and nothing caught it because nothing could write an assignment
+  yet. `saveMesoPlan` now snapshots and re-keys by day-slot × exercise, the
+  identity `slotEffortKey` already resolves against. No migration — the RPC
+  payload stays structure-only.
+- **Two policy calls the spec left to the build:**
+  1. *Refusal on started weeks is week-precise, not day-precise.* The structural
+     day lock ("this day already trained this week") is the wrong shape for an
+     assignment — assigning week 4 is legitimate on a day whose week-1 session is
+     in the books. So a **named** week that is completed / in progress / skipped
+     is refused, while a **flat** value is allowed and warns which weeks it can
+     no longer change.
+  2. *Intent gets warnings, not refusals.* An assignment below the week's ramp
+     (harder than programmed) and a flat value reaching the deload week are both
+     legitimate uses; they are stated, with the week's own default beside them,
+     rather than blocked or applied silently (§4.1).
+- **Disclosure is present-only** on both read surfaces, so an unassigned plan —
+  every plan today — reads byte-identical to before the lever existed.
+  `getCurrentState` takes it as an opt-in because the workout page calls it up to
+  three times a render.
+- No migration this phase. Suite 1608 green, typecheck + lint clean.
+
+### Next session — suggested starting point
+- **doc 21 Phase 4**: the set lever's engine clamp (`set_cap` resolves and is
+  written today, but nothing consumes it yet) + the optional `rep_position` knob
+  (§4.2). Then Phase 5 (stats policy) and Phase 6 (UI + explanation, which needs
+  a hard-rule-8 design pass recorded in `docs/09-design-changelog.md`).
+
 ## 2026-08-02 — Session 94: doc 21 Phases 2 + 2b built — exercise-level RIR (N70)
 
 The feature itself, on the premise Phase 1 fixed. Shipped as one PR because

@@ -11,7 +11,13 @@ import type {
 } from "@/lib/types/database";
 import { planGroupExercises } from "@/lib/planner/groups";
 import { getMuscleGroupsCached } from "./reference";
-import { orphanedSlotSchedules } from "./slot-effort";
+import {
+  getSlotEffortAssignments,
+  getSlotEffortRows,
+  orphanedSlotSchedules,
+  resolveSlotEffort,
+  restoreSlotEffortAssignments,
+} from "./slot-effort";
 
 type Client = SupabaseClient<Database>;
 
@@ -959,11 +965,18 @@ export async function saveMesoPlan(
   // (SECURITY INVOKER + explicit meso-ownership guard); `userId` stays in the
   // signature for call-site clarity only.
   void userId;
+  // doc 21 §3: the replace re-mints every `meso_exercises` row, and the payload
+  // carries structure only — so the per-slot effort assignments have to be
+  // snapshotted and re-keyed by day-slot × exercise afterwards, or a plain
+  // reorder would wipe every assignment in the meso. Empty for a meso without
+  // assignments (every meso today) ⇒ one filtered query and no writes.
+  const assignments = await getSlotEffortAssignments(supabase, mesoId);
   const { error } = await supabase.rpc("save_meso_plan", {
     p_mesocycle_id: mesoId,
     p_days: days,
   });
   if (error) throw error;
+  await restoreSlotEffortAssignments(supabase, mesoId, assignments);
 }
 
 export async function updateDayGroup(
@@ -1142,16 +1155,43 @@ export async function deleteMesocycle(
 // (no macro) are first-class (08 §3).
 // ---------------------------------------------------------------------------
 
+/** doc 21 §8: one exercise-level effort assignment, resolved for the current
+ *  week — the read-side disclosure that keeps an authored effort level from
+ *  reading as an engine decision. */
+export interface ActiveSlotEffort {
+  dayNumber: number;
+  exerciseId: string;
+  exerciseName: string | null;
+  /** the RIR this slot runs at this week (the week's own value when unassigned) */
+  rir: number;
+  /** the slot's assignment for this week; null = the ramp is in control */
+  assignedRir: number | null;
+  weekRir: number;
+  setCap: number | null;
+  reason: string | null;
+  /** running EASIER than the week it sits in — the earn gate keys on this */
+  backedOff: boolean;
+}
+
 export interface CurrentState {
   macrocycle: MacrocycleRow | null;
   mesocycle: MesocycleRow | null;
   microcycle: MicrocycleRow | null;
   nextWorkout: WorkoutRow | null;
+  /** assignments active in the current week (empty for every meso without one) */
+  slotEffort: ActiveSlotEffort[];
 }
 
+/**
+ * `includeSlotEffort` is opt-in because the app's workout page calls this up to
+ * three times per render and has no use for the disclosure (the day view reads
+ * the resolved prescription itself); the MCP read surfaces, which DO have to
+ * disclose an authored effort level, ask for it.
+ */
 export async function getCurrentState(
   supabase: Client,
   userId: string,
+  opts: { includeSlotEffort?: boolean } = {},
 ): Promise<CurrentState> {
   const { data: mesocycle, error: mesoError } = await supabase
     .from("mesocycles")
@@ -1163,7 +1203,13 @@ export async function getCurrentState(
     .maybeSingle();
   if (mesoError) throw mesoError;
   if (!mesocycle)
-    return { macrocycle: null, mesocycle: null, microcycle: null, nextWorkout: null };
+    return {
+      macrocycle: null,
+      mesocycle: null,
+      microcycle: null,
+      nextWorkout: null,
+      slotEffort: [],
+    };
 
   let macrocycle: MacrocycleRow | null = null;
   if (mesocycle.macrocycle_id) {
@@ -1185,7 +1231,7 @@ export async function getCurrentState(
     .maybeSingle();
   if (microError) throw microError;
   if (!microcycle)
-    return { macrocycle, mesocycle, microcycle: null, nextWorkout: null };
+    return { macrocycle, mesocycle, microcycle: null, nextWorkout: null, slotEffort: [] };
 
   const { data: nextWorkout, error: workoutError } = await supabase
     .from("workouts")
@@ -1197,5 +1243,61 @@ export async function getCurrentState(
     .maybeSingle();
   if (workoutError) throw workoutError;
 
-  return { macrocycle, mesocycle, microcycle, nextWorkout: nextWorkout ?? null };
+  return {
+    macrocycle,
+    mesocycle,
+    microcycle,
+    nextWorkout: nextWorkout ?? null,
+    slotEffort: opts.includeSlotEffort
+      ? await getActiveSlotEffort(
+          supabase,
+          mesocycle.id,
+          microcycle.week_number,
+          microcycle.target_rir,
+        )
+      : [],
+  };
+}
+
+/**
+ * The effort assignments live in one week, resolved (doc 21 §4.1) and named.
+ * One filtered read for the assignments (empty for every meso without one, at
+ * which point this costs a single indexed query and returns []) and one name
+ * lookup only when something is assigned.
+ */
+export async function getActiveSlotEffort(
+  supabase: Client,
+  mesoId: string,
+  weekNumber: number,
+  weekRir: number,
+): Promise<ActiveSlotEffort[]> {
+  const rows = await getSlotEffortRows(supabase, mesoId, true);
+  if (rows.length === 0) return [];
+  const { data: exercises, error } = await supabase
+    .from("exercises")
+    .select("id, name")
+    .in("id", [...new Set(rows.map((r) => r.exerciseId))]);
+  if (error) throw error;
+  const nameById = new Map((exercises ?? []).map((e) => [e.id, e.name]));
+
+  const out: ActiveSlotEffort[] = [];
+  for (const row of rows) {
+    const resolved = resolveSlotEffort(row.assignment, weekNumber, weekRir);
+    // a slot whose assignment doesn't reach THIS week (a schedule with a null
+    // element here) isn't active — the ramp is in control and there is nothing
+    // to disclose.
+    if (resolved.assignedRir == null && resolved.setCap == null) continue;
+    out.push({
+      dayNumber: row.dayNumber,
+      exerciseId: row.exerciseId,
+      exerciseName: nameById.get(row.exerciseId) ?? null,
+      rir: resolved.rir,
+      assignedRir: resolved.assignedRir,
+      weekRir: resolved.weekRir,
+      setCap: resolved.setCap,
+      reason: resolved.reason,
+      backedOff: resolved.backedOff,
+    });
+  }
+  return out.sort((a, b) => a.dayNumber - b.dayNumber);
 }
