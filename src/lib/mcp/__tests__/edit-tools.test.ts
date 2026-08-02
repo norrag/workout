@@ -2,8 +2,13 @@ import { describe, it, expect, beforeAll } from "vitest";
 import {
   applyMesoEdits,
   registerEditMesocycle,
+  planEffortEdits,
+  toEffortOp,
   EDIT_MESOCYCLE,
   type EditDay,
+  type EffortContext,
+  type EffortPlanResult,
+  type EffortSlotRef,
   type ResolvedEdit,
 } from "../tools/edit";
 import { captureServer, fakeExtra } from "./harness";
@@ -243,6 +248,33 @@ describe("edit_mesocycle tool", () => {
     expect(Object.keys(schema)).toEqual(expect.arrayContaining(["mesocycle_id", "operations"]));
   });
 
+  it("accepts the doc-21 effort ops in its operations schema", () => {
+    const { server, tools } = captureServer();
+    registerEditMesocycle(server);
+    const schema = tools.get(EDIT_MESOCYCLE)!.config.inputSchema as {
+      operations: { parse: (v: unknown) => unknown };
+    };
+    const slot = "22222222-2222-2222-2222-222222222222";
+    expect(() =>
+      schema.operations.parse([
+        { op: "set_exercise_rir", slot_id: slot, rir: 4, weeks: [3, 4], reason: "elbow" },
+        { op: "set_exercise_rir", slot_id: slot, schedule: [null, null, 4, 4] },
+        { op: "set_exercise_sets", slot_id: slot, sets: 2 },
+        { op: "set_exercise_rir", slot_id: slot, clear: true },
+      ]),
+    ).not.toThrow();
+    // §4.3: the ask reaches 30 (deload → rehab → deep back-off on one lever)
+    expect(() =>
+      schema.operations.parse([{ op: "set_exercise_rir", slot_id: slot, rir: 21 }]),
+    ).not.toThrow();
+    expect(() =>
+      schema.operations.parse([{ op: "set_exercise_rir", slot_id: slot, rir: 31 }]),
+    ).toThrow();
+    expect(() =>
+      schema.operations.parse([{ op: "set_exercise_sets", slot_id: slot, sets: 0 }]),
+    ).toThrow();
+  });
+
   it("rejects an unauthenticated call before any write", async () => {
     const { server, tools } = captureServer();
     registerEditMesocycle(server);
@@ -366,5 +398,258 @@ describe("applyMesoEdits — remove_day", () => {
     const r = applyMesoEdits(plan(), [{ op: "remove_day", day_number: 6 }]);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/no day 6/);
+  });
+});
+
+// --- effort assignments (doc 21 Phase 3) -----------------------------------
+
+function slotRefs(): Map<string, EffortSlotRef> {
+  return new Map([
+    ["s-bench", { slot_id: "s-bench", day_number: 1, exercise_id: "e-bench", exercise_name: "Bench Press" }],
+    ["s-squat", { slot_id: "s-squat", day_number: 2, exercise_id: "e-squat", exercise_name: "Back Squat" }],
+  ]);
+}
+
+/** a 5-week meso with a deload: working weeks 1–4 ramp 3→0, week 5 deloads at 4 */
+function effortCtx(over: Partial<EffortContext> = {}): EffortContext {
+  return {
+    shape: { weeks: 5, includesDeload: true },
+    weekRir: new Map([
+      [1, 3],
+      [2, 2],
+      [3, 1],
+      [4, 0],
+      [5, 4],
+    ]),
+    deloadWeek: 5,
+    lockedWeeksByDay: new Map(),
+    ...over,
+  };
+}
+
+function effortOk(r: EffortPlanResult) {
+  if (!r.ok) throw new Error(`expected ok, got: ${r.error}`);
+  return r;
+}
+
+describe("planEffortEdits — writes", () => {
+  it("assigns RIR 4 to weeks 3–4 of one slot and discloses the week defaults", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [
+          {
+            op: "set_exercise_rir",
+            slot_id: "s-bench",
+            edit: { lever: "rir", value: 4, weeks: [3, 4], reason: "right elbow" },
+          },
+        ],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.writes).toHaveLength(1);
+    expect(r.writes[0]).toMatchObject({
+      slot_id: "s-bench",
+      day_number: 1,
+      exercise_id: "e-bench",
+      patch: { target_rir: null, rir_schedule: [null, null, 4, 4], effort_reason: "right elbow" },
+    });
+    expect(r.disclosures[0]).toMatchObject({
+      lever: "target_rir",
+      by_week: [null, null, 4, 4],
+      week_defaults: [3, 2, 1, 0],
+      assigned_weeks: [3, 4],
+      covers_deload_week: false,
+      reason: "right elbow",
+    });
+    expect(r.summaries[0]).toBe("day 1 Bench Press: RIR 4 on weeks 3, 4");
+    // easing an exercise never warns — that is the whole point of the lever
+    expect(r.warnings).toEqual([]);
+  });
+
+  it("merges two ops on one slot into a single write", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [
+          { op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 4, weeks: [4] } },
+          { op: "set_exercise_sets", slot_id: "s-bench", edit: { lever: "sets", value: 2, weeks: [4] } },
+        ],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.writes).toHaveLength(1);
+    expect(r.writes[0].patch).toMatchObject({
+      rir_schedule: [null, null, null, 4],
+      set_cap_schedule: [null, null, null, 2],
+    });
+    expect(r.summaries).toHaveLength(2);
+  });
+
+  it("clears an assignment back to the ramp, reason included", () => {
+    const current = new Map([
+      [
+        "s-bench",
+        {
+          target_rir: 4,
+          rir_schedule: null,
+          set_cap: null,
+          set_cap_schedule: null,
+          effort_reason: "elbow",
+        },
+      ],
+    ]);
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", clear: true } }],
+        slotRefs(),
+        current,
+        effortCtx(),
+      ),
+    );
+    expect(r.writes[0].patch).toEqual({
+      target_rir: null,
+      rir_schedule: null,
+      effort_reason: null,
+    });
+    expect(r.disclosures[0].assigned_weeks).toEqual([]);
+  });
+});
+
+describe("planEffortEdits — no silent semantics (§4.1)", () => {
+  it("warns that a flat assignment also governs the deload week", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 4 } }],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.disclosures[0].covers_deload_week).toBe(true);
+    expect(r.warnings.join(" ")).toMatch(/deload week \(week 5\)/);
+  });
+
+  it("warns when the assignment runs a week HARDER than programmed", () => {
+    // week 1 ramps at RIR 3; asking for RIR 1 there is legitimate (ramping back
+    // into a block) but must be stated
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 1, weeks: [1] } }],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.warnings.join(" ")).toMatch(/week 1: RIR 1 is BELOW the week's 3/);
+  });
+
+  it("warns that a flat assignment below the deload RIR hardens the deload", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 2 } }],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.warnings.join(" ")).toMatch(/deload gets harder/);
+  });
+});
+
+describe("planEffortEdits — already-trained weeks", () => {
+  const trained = () =>
+    effortCtx({ lockedWeeksByDay: new Map([[1, [1, 2]]]) });
+
+  it("refuses an explicitly named week that has already been trained", () => {
+    const r = planEffortEdits(
+      [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 4, weeks: [2, 3] } }],
+      slotRefs(),
+      new Map(),
+      trained(),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/week\(s\) 2 of day 1 are already trained/);
+  });
+
+  it("refuses a schedule whose non-null element lands on a trained week", () => {
+    const r = planEffortEdits(
+      [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", schedule: [4, null, null, null] } }],
+      slotRefs(),
+      new Map(),
+      trained(),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/already trained/);
+  });
+
+  it("allows a flat assignment over trained weeks, and says which won't change", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 4 } }],
+        slotRefs(),
+        new Map(),
+        trained(),
+      ),
+    );
+    expect(r.warnings.join(" ")).toMatch(/weeks 1, 2 are already trained/);
+  });
+
+  it("doesn't apply one day's trained weeks to another day", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_rir", slot_id: "s-squat", edit: { lever: "rir", value: 4, weeks: [2] } }],
+        slotRefs(),
+        new Map(),
+        trained(),
+      ),
+    );
+    expect(r.writes).toHaveLength(1);
+  });
+});
+
+describe("planEffortEdits — refusals", () => {
+  it("refuses an unknown slot before anything is written", () => {
+    const r = planEffortEdits(
+      [{ op: "set_exercise_rir", slot_id: "s-nope", edit: { lever: "rir", value: 4 } }],
+      slotRefs(),
+      new Map(),
+      effortCtx(),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/not found in this mesocycle/);
+  });
+
+  it("surfaces the pure planner's refusal with the day for context", () => {
+    const r = planEffortEdits(
+      [{ op: "set_exercise_rir", slot_id: "s-bench", edit: { lever: "rir", value: 4, weeks: [5] } }],
+      slotRefs(),
+      new Map(),
+      effortCtx(),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/day 1.*outside this mesocycle's 4 working week/);
+  });
+});
+
+describe("toEffortOp", () => {
+  it("maps each tool op onto the lever-neutral intent", () => {
+    expect(toEffortOp({ op: "set_exercise_rir", slot_id: "s", rir: 4, weeks: [3] })).toEqual({
+      op: "set_exercise_rir",
+      slot_id: "s",
+      edit: { lever: "rir", value: 4, weeks: [3] },
+    });
+    expect(toEffortOp({ op: "set_exercise_sets", slot_id: "s", clear: true })).toEqual({
+      op: "set_exercise_sets",
+      slot_id: "s",
+      edit: { lever: "sets", clear: true },
+    });
+    // an omitted field must stay omitted — `reason: undefined` would read as
+    // "clear the reason" in the pure planner
+    expect(
+      toEffortOp({ op: "set_exercise_rir", slot_id: "s", rir: 4 }).edit,
+    ).not.toHaveProperty("reason");
   });
 });

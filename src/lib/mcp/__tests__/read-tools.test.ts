@@ -218,6 +218,75 @@ describe("formatMesoPlan", () => {
     expect((days[0].emphasis as Record<string, unknown>).classification).toBe("unclassified");
   });
 
+  it("discloses an effort assignment on the slot that carries it (doc 21 §8)", () => {
+    const plan = {
+      meso: {
+        id: "m1",
+        name: "Block 1",
+        position: 1,
+        phase: "accumulation",
+        weeks: 5,
+        days_per_week: 1,
+        includes_deload: true,
+        rir_start: 3,
+        rir_end: 0,
+        status: "active",
+        start_date: "2026-06-01",
+      },
+      days: [
+        {
+          id: "day-1",
+          day_number: 1,
+          label: "Push",
+          weekday: 1,
+          groups: [
+            {
+              id: "grp-1",
+              muscle_group_id: "mg-chest",
+              muscle_group: "Chest",
+              exercise_slots: 2,
+              fills: [
+                {
+                  id: "slot-1",
+                  exercise_id: "ex-bench",
+                  slot_number: 1,
+                  exercise_name: "Bench Press",
+                  initial_sets: 3,
+                  target_rir: null,
+                  rir_schedule: [null, null, 4, 4],
+                  set_cap: null,
+                  set_cap_schedule: null,
+                  effort_reason: "right elbow",
+                },
+                {
+                  id: "slot-2",
+                  exercise_id: "ex-fly",
+                  slot_number: 2,
+                  exercise_name: "Fly",
+                  initial_sets: 2,
+                  target_rir: null,
+                  rir_schedule: null,
+                  set_cap: null,
+                  set_cap_schedule: null,
+                  effort_reason: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as MesoPlan;
+    const exercises = ((formatMesoPlan(plan).days as Record<string, unknown>[])[0]
+      .groups as Record<string, unknown>[])[0].exercises as Record<string, unknown>[];
+    expect(exercises[0].effort).toMatchObject({
+      rir_by_working_week: [null, null, 4, 4],
+      reason: "right elbow",
+    });
+    expect(exercises[0].effort).not.toHaveProperty("target_rir");
+    // an unassigned slot reads exactly as it did before the lever existed
+    expect(exercises[1]).not.toHaveProperty("effort");
+  });
+
   it("derives a per-day emphasis from the exercises' muscle roles (12 §2)", () => {
     const plan = {
       meso: {

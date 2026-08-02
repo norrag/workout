@@ -87,7 +87,7 @@ describe("formatTrainingOverview", () => {
         experience_level: "advanced",
         bodyweight: 198,
       } as never,
-      currentState: { macrocycle: null, mesocycle: null, microcycle: null, nextWorkout: null },
+      currentState: { macrocycle: null, mesocycle: null, microcycle: null, nextWorkout: null, slotEffort: [] },
       activeSummary: {
         name: "Block 1",
         workouts_completed: 8,
@@ -109,7 +109,7 @@ describe("formatTrainingOverview", () => {
   it("handles no active meso", () => {
     const out = formatTrainingOverview({
       profile: null,
-      currentState: { macrocycle: null, mesocycle: null, microcycle: null, nextWorkout: null },
+      currentState: { macrocycle: null, mesocycle: null, microcycle: null, nextWorkout: null, slotEffort: [] },
       activeSummary: null,
       topLifts: [],
     });

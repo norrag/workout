@@ -112,6 +112,7 @@ describe("formatCurrentState", () => {
       mesocycle: null,
       microcycle: null,
       nextWorkout: null,
+      slotEffort: [],
     };
     const out = formatCurrentState(state);
     expect(out.has_active_mesocycle).toBe(false);
@@ -126,6 +127,7 @@ describe("formatCurrentState", () => {
       mesocycle: meso(),
       microcycle: micro(),
       nextWorkout: workout(),
+      slotEffort: [],
     });
     expect(out.has_active_mesocycle).toBe(true);
     expect(out.macrocycle).toEqual({
@@ -151,9 +153,58 @@ describe("formatCurrentState", () => {
       mesocycle: meso(),
       microcycle: micro({ is_deload: true, target_rir: 4 }),
       nextWorkout: workout(),
+      slotEffort: [],
     });
     expect(out.microcycle?.is_deload).toBe(true);
     expect(out.summary).toMatch(/deload week/i);
+  });
+
+  it("discloses this week's exercise-level RIR assignments (doc 21 §8)", () => {
+    const out = formatCurrentState({
+      macrocycle: macro(),
+      mesocycle: meso(),
+      microcycle: micro(),
+      nextWorkout: workout(),
+      slotEffort: [
+        {
+          dayNumber: 1,
+          exerciseId: "e-bench",
+          exerciseName: "Bench Press",
+          rir: 4,
+          assignedRir: 4,
+          weekRir: 1,
+          setCap: null,
+          reason: "right elbow",
+          backedOff: true,
+        },
+      ],
+    });
+    expect(out.effort_assignments).toEqual([
+      {
+        day_number: 1,
+        exercise_id: "e-bench",
+        exercise_name: "Bench Press",
+        target_rir: 4,
+        week_target_rir: 1,
+        set_cap: null,
+        reason: "right elbow",
+        backed_off: true,
+      },
+    ]);
+    // the authored effort level is stated before anything narrates the engine
+    expect(out.summary).toMatch(/Bench Press: RIR 4 — right elbow/);
+    expect(out.summary).toMatch(/no progression is earned/);
+  });
+
+  it("omits the key entirely when nothing is assigned", () => {
+    const out = formatCurrentState({
+      macrocycle: macro(),
+      mesocycle: meso(),
+      microcycle: micro(),
+      nextWorkout: workout(),
+      slotEffort: [],
+    });
+    expect(out).not.toHaveProperty("effort_assignments");
   });
 
   it("handles an active meso with no open workout", () => {
@@ -162,6 +213,7 @@ describe("formatCurrentState", () => {
       mesocycle: meso({ macrocycle_id: null, position: null }),
       microcycle: null,
       nextWorkout: null,
+      slotEffort: [],
     });
     expect(out.has_active_mesocycle).toBe(true);
     expect(out.macrocycle).toBeNull();

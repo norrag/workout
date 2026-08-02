@@ -2,7 +2,82 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-02 (latest) — doc 21 Phase 2 + 2b: exercise-level RIR (plan + engine, and the measuring band)
+## 2026-08-02 (latest) — doc 21 Phase 3: the MCP write surface for exercise-level RIR
+
+[doc 21](21-exercise-level-rir.md) §8 (MCP), on the resolution Phase 2 built.
+Phases 2/2b honored an assignment end to end but **nothing could write one** —
+this is the surface that makes the lever usable, and per A4 it is the primary
+one (the UI stays Phase 6).
+
+### The two ops
+
+`edit_mesocycle` gains `set_exercise_rir` and `set_exercise_sets` — no new tool,
+so both inherit its ownership check, planned/active gate, zod validation and
+`mcp_write_audit` row. Four value forms per lever, per §8:
+
+| form | writes |
+|---|---|
+| `rir: 4` | `target_rir = 4` — the whole meso, deload week included |
+| `rir: 4, weeks: [3, 4]` | `rir_schedule = [null, null, 4, 4]` |
+| `schedule: [null, 5, 4, null]` | that array verbatim |
+| `clear: true` | both columns back to null (and the reason with them, if nothing else is assigned) |
+
+`reason` (A7) is orthogonal to all four. `set_exercise_sets` is the same shape
+for the working-set cap — deliberately named apart from `set_baseline_sets`,
+which seeds week 1 and then hands over to set progression.
+
+### Two pure layers, so nothing half-applies
+
+`queries/slot-effort.ts::planSlotEffortEdit` takes one intent + the slot's
+current assignment + the meso's shape and returns the exact column patch or a
+sentence; every DB bound is mirrored there, so a caller gets a refusal rather
+than a constraint violation. `tools/edit.ts::planEffortEdits` composes a batch
+against the week defaults and the already-trained weeks. Both run **before any
+write**, so a call mixing structure and assignments cannot land half of it.
+
+### The bug this phase had to fix first
+
+`save_meso_plan` is a wholesale replace — it deletes the meso's days and
+re-inserts every slot from a **structure-only** payload. So a plain reorder, in
+the app or over MCP, would have wiped every assignment in the meso. `saveMesoPlan`
+now snapshots the assignments and re-keys them onto the re-minted rows by
+day-slot × exercise (`restoreSlotEffortAssignments`) — the identity
+`slotEffortKey` already resolves against, so a surviving slot keeps its
+assignment and a removed one loses it. No migration; the RPC payload stays
+structure-only. It is also why effort writes in a mixed call run *after* the
+structural save, addressing the new ids through that key.
+
+### Guards (§4.1 "no silent semantics")
+
+- **Refusal is week-precise, not day-precise.** The structural day lock is the
+  wrong shape here: assigning week 4 is fine on a day whose week-1 session is in
+  the books. An op that *names* a week already completed / in progress / skipped
+  is refused; a *flat* value is allowed and returns a warning naming the weeks it
+  can no longer change.
+- **Warnings, not refusals, for intent.** An assignment below the week's ramp is
+  reported as "week N runs HARDER than programmed"; a flat value is reported as
+  also governing the deload week, with the deload's own default beside it. Week
+  defaults come from the **live** ramp (`rirRamp` on the active params), so a
+  planned meso with no microcycles yet discloses the same numbers an active one
+  does.
+
+### Read-side disclosure — present-only
+
+`get_mesocycle` adds an `effort` block on the slot that carries one;
+`get_current_state` adds `effort_assignments` for the live week (resolved value,
+the week's own RIR beside it, reason, `backed_off`) plus a sentence in its
+summary, so an authored effort level is never narrated as an engine decision.
+Both are **omitted entirely** when nothing is assigned — an unassigned plan reads
+exactly as it did before the lever existed. `getCurrentState` takes the
+disclosure as an opt-in, because the workout page calls it up to three times per
+render and has no use for it.
+
+Tests: 39 new (the value forms, every refusal, reason lifecycle, composition,
+the trained-week guard both ways, the deload/hardening warnings, the re-key
+across a plan replace, and the two disclosures). Suite green (1608), typecheck
+and lint clean. No migration in this phase.
+
+## 2026-08-02 — doc 21 Phase 2 + 2b: exercise-level RIR (plan + engine, and the measuring band)
 
 [doc 21](21-exercise-level-rir.md) §3–§7 (Phase 2) and §6.1 (Phase 2b), built
 together because §10 requires it: "§4.3's unbounded ceiling must not reach

@@ -30,6 +30,10 @@ import { getMacroOverview, type MacroOverview } from "@/lib/queries/macro";
 import type { MacroRetrospective } from "@/lib/queries/macro-retrospective";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
+  hasAssignment,
+  type SlotEffortAssignment,
+} from "@/lib/queries/slot-effort";
+import {
   loadMesoSetProjection,
   type ProjectedCell,
   type WeightedWeekSets,
@@ -232,6 +236,31 @@ export function buildDayEmphasisList(plan: MesoPlan, rolesByExercise: RolesByExe
   }));
 }
 
+/**
+ * doc 21 §8 — the plan-level shape of one slot's effort assignment. Only the
+ * assigned lever(s) appear, plus the reason (A7) and one line of semantics, so
+ * the model can never read a null as "assigned to nothing".
+ */
+export function formatSlotEffort(
+  a: SlotEffortAssignment,
+): Record<string, unknown> {
+  return {
+    ...(a.target_rir != null ? { target_rir: a.target_rir } : {}),
+    ...(a.rir_schedule != null ? { rir_by_working_week: a.rir_schedule } : {}),
+    ...(a.set_cap != null ? { set_cap: a.set_cap } : {}),
+    ...(a.set_cap_schedule != null
+      ? { set_cap_by_working_week: a.set_cap_schedule }
+      : {}),
+    reason: a.effort_reason,
+    note:
+      "an exercise-level assignment is ABSOLUTE — where set it replaces this " +
+      "week's target RIR for this slot only (a flat value covers the deload " +
+      "week too), and the engine reprices the load to meet it. Clearing it " +
+      "hands the slot straight back to the mesocycle's RIR ramp. No " +
+      "progression is earned while a slot runs easier than its week.",
+  };
+}
+
 export function formatMesoPlan(
   plan: MesoPlan | null,
   rolesByExercise: RolesByExercise = new Map(),
@@ -258,6 +287,10 @@ export function formatMesoPlan(
           exercise_id: f.exercise_id,
           exercise_name: f.exercise_name,
           planned_sets: f.initial_sets,
+          // doc 21 §8: an effort assignment is disclosed on the slot that
+          // carries it — and ONLY there, so an unassigned plan (every plan
+          // without one) reads exactly as it did before the lever existed.
+          ...(hasAssignment(f) ? { effort: formatSlotEffort(f) } : {}),
         };
       });
       dayPlannedSets += groupPlannedSets;

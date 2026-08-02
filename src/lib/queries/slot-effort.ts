@@ -176,6 +176,275 @@ export function orphanedSlotSchedules(
 }
 
 // ---------------------------------------------------------------------------
+// authoring (doc 21 Phase 3 — the write side, still pure)
+// ---------------------------------------------------------------------------
+
+/** DB bounds (migration 20260802000001), mirrored so the pure core can refuse
+ *  a value the database would reject rather than surfacing a constraint error. */
+export const SLOT_RIR_MIN = 0;
+/** §4.3: the ask is unbounded in principle; 30 is what the app persists. */
+export const SLOT_RIR_MAX = 30;
+export const SLOT_SET_CAP_MIN = 1;
+export const SLOT_SET_CAP_MAX = 20;
+export const EFFORT_REASON_MAX = 500;
+
+/** The columns one assignment write touches. Absent key = leave as-is. */
+export interface SlotEffortPatch {
+  target_rir?: number | null;
+  rir_schedule?: (number | null)[] | null;
+  set_cap?: number | null;
+  set_cap_schedule?: (number | null)[] | null;
+  effort_reason?: string | null;
+}
+
+/** An empty (never-assigned) slot — the starting point for a fresh write. */
+export function emptySlotEffort(): SlotEffortAssignment {
+  return {
+    target_rir: null,
+    rir_schedule: null,
+    set_cap: null,
+    set_cap_schedule: null,
+    effort_reason: null,
+  };
+}
+
+/** Apply a patch to an assignment, so a sequence of edits composes purely. */
+export function applySlotEffortPatch(
+  current: SlotEffortAssignment,
+  patch: SlotEffortPatch,
+): SlotEffortAssignment {
+  return { ...current, ...patch };
+}
+
+/**
+ * One authoring intent, for either lever. Exactly one of `value` / `schedule` /
+ * `clear` carries the assignment:
+ *
+ * - `value` alone      — a flat assignment for the whole meso (the deload week
+ *                        included: a flat value is what a week off the end of
+ *                        the schedule falls back to).
+ * - `value` + `weeks`  — that value on those WORKING weeks, ramp elsewhere.
+ * - `schedule`         — the explicit per-working-week array (null = ramp).
+ * - `clear`            — remove this lever's assignment entirely.
+ *
+ * `reason` (A7) is orthogonal: absent leaves it untouched, a string sets it,
+ * null clears it. Clearing the last assignment on a slot clears the reason too
+ * — a reason with nothing to explain is noise in every surface that reads it.
+ */
+export interface SlotEffortEdit {
+  lever: "rir" | "sets";
+  value?: number | null;
+  weeks?: number[] | null;
+  schedule?: (number | null)[] | null;
+  clear?: boolean;
+  reason?: string | null;
+}
+
+export interface SlotEffortEditPlan {
+  /** the columns to write */
+  patch: SlotEffortPatch;
+  /** the assignment as it reads after the write */
+  next: SlotEffortAssignment;
+  /** this lever's value per working week after the write (null = ramp) */
+  byWeek: (number | null)[];
+  /** the working weeks that carry a value after the write */
+  assignedWeeks: number[];
+  /** true when the slot carries no assignment on EITHER lever afterwards */
+  cleared: boolean;
+  /**
+   * true when a trailing deload week also inherits this assignment. A flat
+   * value governs every week the schedule doesn't cover — including the deload
+   * — which is exactly §4.1's "absolute, deload included", and exactly the
+   * thing that must never apply silently.
+   */
+  coversDeload: boolean;
+  /** one line for the tool result / audit summary */
+  summary: string;
+}
+
+export type SlotEffortEditResult =
+  | { ok: true; plan: SlotEffortEditPlan }
+  | { ok: false; error: string };
+
+interface LeverSpec {
+  flat: "target_rir" | "set_cap";
+  sched: "rir_schedule" | "set_cap_schedule";
+  min: number;
+  max: number;
+  label: string;
+  unit: (v: number) => string;
+}
+
+const LEVERS: Record<SlotEffortEdit["lever"], LeverSpec> = {
+  rir: {
+    flat: "target_rir",
+    sched: "rir_schedule",
+    min: SLOT_RIR_MIN,
+    max: SLOT_RIR_MAX,
+    label: "target RIR",
+    unit: (v) => `RIR ${v}`,
+  },
+  sets: {
+    flat: "set_cap",
+    sched: "set_cap_schedule",
+    min: SLOT_SET_CAP_MIN,
+    max: SLOT_SET_CAP_MAX,
+    label: "working-set cap",
+    unit: (v) => `${v} set${v === 1 ? "" : "s"}`,
+  },
+};
+
+function weekList(weeks: number[]): string {
+  return weeks.length === 1 ? `week ${weeks[0]}` : `weeks ${weeks.join(", ")}`;
+}
+
+/**
+ * Plan one assignment write. Pure: takes the slot's current assignment, the
+ * intent, and the meso's shape; returns the exact column patch or a refusal.
+ * Every bound the database enforces is checked here first so the caller can
+ * report a sentence instead of a constraint violation, and so the whole
+ * authoring surface is unit-testable without a database.
+ */
+export function planSlotEffortEdit(
+  current: SlotEffortAssignment,
+  edit: SlotEffortEdit,
+  shape: { weeks: number; includesDeload: boolean },
+): SlotEffortEditResult {
+  const spec = LEVERS[edit.lever];
+  const workingWeeks = shape.includesDeload ? shape.weeks - 1 : shape.weeks;
+  if (workingWeeks < 1)
+    return { ok: false, error: "this mesocycle has no working weeks to assign." };
+
+  const wantsClear = edit.clear === true || edit.value === null;
+  if (edit.weeks != null && wantsClear)
+    return {
+      ok: false,
+      error:
+        "clearing removes the whole assignment — it can't be limited to weeks. To drop just some weeks, send a schedule with nulls in those positions.",
+    };
+  if (edit.weeks != null && edit.value == null)
+    return {
+      ok: false,
+      error: "`weeks` selects the weeks a flat value applies to — supply the value too.",
+    };
+  const modes = [
+    wantsClear,
+    edit.value != null,
+    edit.schedule != null,
+  ].filter(Boolean).length;
+  if (modes === 0)
+    return {
+      ok: false,
+      error: `nothing to set — give a ${edit.lever === "rir" ? "rir" : "sets"} value (optionally with weeks), a schedule, or clear: true.`,
+    };
+  if (modes > 1)
+    return {
+      ok: false,
+      error: "give exactly one of a flat value, a schedule, or clear: true.",
+    };
+
+  const patch: SlotEffortPatch = {};
+
+  if (wantsClear) {
+    patch[spec.flat] = null;
+    patch[spec.sched] = null;
+  } else if (edit.schedule != null) {
+    const schedule = edit.schedule;
+    if (schedule.length !== workingWeeks)
+      return {
+        ok: false,
+        error: `schedule must cover the ${workingWeeks} working week(s) (got ${schedule.length}). Use null for a week that should follow the ramp.`,
+      };
+    for (const v of schedule) {
+      if (v == null) continue;
+      if (!Number.isInteger(v) || v < spec.min || v > spec.max)
+        return {
+          ok: false,
+          error: `${spec.label} values must be whole numbers ${spec.min}–${spec.max} (got ${v}).`,
+        };
+    }
+    if (schedule.every((v) => v == null))
+      return {
+        ok: false,
+        error: "that schedule assigns nothing — use clear: true to remove the assignment.",
+      };
+    patch[spec.flat] = null;
+    patch[spec.sched] = [...schedule];
+  } else {
+    const value = edit.value!;
+    if (!Number.isInteger(value) || value < spec.min || value > spec.max)
+      return {
+        ok: false,
+        error: `${spec.label} must be a whole number ${spec.min}–${spec.max} (got ${value}).`,
+      };
+    if (edit.weeks != null) {
+      const weeks = [...new Set(edit.weeks)].sort((a, b) => a - b);
+      if (weeks.length === 0)
+        return { ok: false, error: "`weeks` was empty — omit it to assign every week." };
+      const outOfRange = weeks.filter((w) => w < 1 || w > workingWeeks);
+      if (outOfRange.length > 0)
+        return {
+          ok: false,
+          error: `week(s) ${outOfRange.join(", ")} are outside this mesocycle's ${workingWeeks} working week(s)${
+            shape.includesDeload ? " (the deload week can't be targeted by week — a flat value covers it)" : ""
+          }.`,
+        };
+      const schedule: (number | null)[] = Array.from({ length: workingWeeks }, () => null);
+      for (const w of weeks) schedule[w - 1] = value;
+      patch[spec.flat] = null;
+      patch[spec.sched] = schedule;
+    } else {
+      patch[spec.flat] = value;
+      patch[spec.sched] = null;
+    }
+  }
+
+  if (edit.reason !== undefined) {
+    const trimmed = edit.reason?.trim();
+    if (trimmed != null && trimmed.length > EFFORT_REASON_MAX)
+      return {
+        ok: false,
+        error: `reason is limited to ${EFFORT_REASON_MAX} characters (got ${trimmed.length}).`,
+      };
+    patch.effort_reason = trimmed != null && trimmed.length > 0 ? trimmed : null;
+  }
+
+  let next = applySlotEffortPatch(current, patch);
+  const cleared = !hasAssignment(next);
+  if (cleared && next.effort_reason != null) {
+    patch.effort_reason = null;
+    next = applySlotEffortPatch(next, { effort_reason: null });
+  }
+
+  const byWeek: (number | null)[] = [];
+  for (let w = 1; w <= workingWeeks; w++) {
+    byWeek.push(pickWeek(next[spec.flat], next[spec.sched], w));
+  }
+  const assignedWeeks = byWeek
+    .map((v, i) => (v == null ? null : i + 1))
+    .filter((w): w is number => w != null);
+  const coversDeload = shape.includesDeload && next[spec.flat] != null;
+
+  let summary: string;
+  if (wantsClear) {
+    summary = `cleared the ${spec.label} assignment`;
+  } else if (patch[spec.flat] != null) {
+    summary = `${spec.unit(patch[spec.flat]!)} for the whole mesocycle`;
+  } else {
+    const values = [...new Set(assignedWeeks.map((w) => byWeek[w - 1]!))];
+    summary =
+      values.length === 1
+        ? `${spec.unit(values[0])} on ${weekList(assignedWeeks)}`
+        : `${spec.label} ${assignedWeeks.map((w) => `w${w}:${byWeek[w - 1]}`).join(" ")}`;
+  }
+
+  return {
+    ok: true,
+    plan: { patch, next, byWeek, assignedWeeks, cleared, coversDeload, summary },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // loading (the only I/O in this module — everything above is pure)
 // ---------------------------------------------------------------------------
 
@@ -209,16 +478,46 @@ export async function getSlotEffortAssignments(
   mesoId: string,
 ): Promise<SlotEffortMap> {
   const out: SlotEffortMap = new Map();
-  const { data: slots, error } = await client
+  for (const row of await getSlotEffortRows(client, mesoId, true)) {
+    out.set(row.key, row.assignment);
+  }
+  return out;
+}
+
+/** One `meso_exercises` row with its day-slot identity resolved. */
+export interface SlotEffortRow {
+  id: string;
+  key: string;
+  dayNumber: number;
+  exerciseId: string;
+  assignment: SlotEffortAssignment;
+}
+
+/**
+ * The row-level load behind both the read map and the write paths. With
+ * `assignedOnly` it is the cheap hot-path read described above; without it, it
+ * is how a writer addresses a slot after `save_meso_plan` has re-minted every
+ * row id (the day-slot × exercise key is stable across that replace, the id is
+ * not).
+ */
+export async function getSlotEffortRows(
+  client: Client,
+  mesoId: string,
+  assignedOnly: boolean,
+): Promise<SlotEffortRow[]> {
+  let query = client
     .from("meso_exercises")
     .select(
-      "exercise_id, day_of_week, meso_day_group_id, target_rir, rir_schedule, set_cap, set_cap_schedule, effort_reason",
+      "id, exercise_id, day_of_week, meso_day_group_id, target_rir, rir_schedule, set_cap, set_cap_schedule, effort_reason",
     )
-    .eq("mesocycle_id", mesoId)
-    .or(
+    .eq("mesocycle_id", mesoId);
+  if (assignedOnly)
+    query = query.or(
       "target_rir.not.is.null,rir_schedule.not.is.null,set_cap.not.is.null,set_cap_schedule.not.is.null",
     );
+  const { data: slots, error } = await query;
   if (error) throw error;
+  const out: SlotEffortRow[] = [];
   if (!slots || slots.length === 0) return out;
 
   // day_number lives on `meso_days`, two hops up from the slot; resolved only
@@ -251,15 +550,73 @@ export async function getSlotEffortAssignments(
       slot.day_of_week ??
       null;
     if (dayNumber == null) continue;
-    out.set(slotEffortKey(dayNumber, slot.exercise_id), {
-      target_rir: slot.target_rir,
-      rir_schedule: slot.rir_schedule,
-      set_cap: slot.set_cap,
-      set_cap_schedule: slot.set_cap_schedule,
-      effort_reason: slot.effort_reason,
+    out.push({
+      id: slot.id,
+      key: slotEffortKey(dayNumber, slot.exercise_id),
+      dayNumber,
+      exerciseId: slot.exercise_id,
+      assignment: {
+        target_rir: slot.target_rir,
+        rir_schedule: slot.rir_schedule,
+        set_cap: slot.set_cap,
+        set_cap_schedule: slot.set_cap_schedule,
+        effort_reason: slot.effort_reason,
+      },
     });
   }
   return out;
+}
+
+/** Write one slot's assignment columns. RLS scopes the row (`meso_exercises`
+ *  is guarded through `mesocycles.user_id`), so no user filter is needed. */
+export async function writeSlotEffort(
+  client: Client,
+  slotId: string,
+  patch: SlotEffortPatch,
+): Promise<void> {
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await client
+    .from("meso_exercises")
+    .update(patch)
+    .eq("id", slotId);
+  if (error) throw error;
+}
+
+/**
+ * Carry assignments across `save_meso_plan`'s wholesale replace.
+ *
+ * The planner-board save deletes the meso's days and re-inserts every slot from
+ * the payload, and that payload has never carried the assignment columns — so
+ * without this, reordering a day (in the app or over MCP) would silently drop
+ * every effort assignment in the meso. Re-keying by day-slot × exercise is
+ * exactly the identity the resolution itself uses (`slotEffortKey`), so a slot
+ * that survived the edit keeps its assignment and one that was removed loses it,
+ * which is the right outcome in both cases.
+ *
+ * Returns the number of slots restored. A meso with no assignments — every meso
+ * today — costs one filtered, indexed query and writes nothing.
+ */
+export async function restoreSlotEffortAssignments(
+  client: Client,
+  mesoId: string,
+  snapshot: SlotEffortMap,
+): Promise<number> {
+  if (snapshot.size === 0) return 0;
+  const rows = await getSlotEffortRows(client, mesoId, false);
+  let restored = 0;
+  for (const row of rows) {
+    const saved = snapshot.get(row.key);
+    if (!saved) continue;
+    await writeSlotEffort(client, row.id, {
+      target_rir: saved.target_rir,
+      rir_schedule: saved.rir_schedule,
+      set_cap: saved.set_cap,
+      set_cap_schedule: saved.set_cap_schedule,
+      effort_reason: saved.effort_reason,
+    });
+    restored++;
+  }
+  return restored;
 }
 
 /**
