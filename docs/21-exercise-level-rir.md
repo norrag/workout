@@ -460,24 +460,80 @@ case on a deload; restamp idempotence; capture default.
 becomes load-bearing once §4.3's unbounded prescription RIR exists, and nothing
 that can be logged today (`target_rir ≤ 8`, `rir_reported ≤ 10`) reaches it.
 
-**Phase 2 — assignment: plan + engine.** Migration (§3, incl. widening the
-`target_rir` checks to 0–30); pure resolution (§4.1) applied after
-`liveWeekRirUpdates`; `prescribe()` consumes the resolved RIR at the three §4.2
-sites — **no new branch**; earn-gate predicate + miss-throttle parity (§5); doc
-14 wiring (§7).
+**Phase 2 — assignment: plan + engine. ✅ SHIPPED 2026-08-02.** Migration (§3,
+incl. widening the `target_rir` checks to 0–30); pure resolution (§4.1) applied
+after `liveWeekRirUpdates`; `prescribe()` consumes the resolved RIR at the three
+§4.2 sites — **no new branch**; earn-gate predicate + miss-throttle parity (§5);
+doc 14 wiring (§7).
 *Tests:* absolute resolution vs ramp/deload incl. the below-deload warning case;
 **repricing golden against the §4.2 table** (the owner's 342.6-anchor case at RIR
 8 across the window) and symmetrically for a *lowered* RIR — reps stay inside the
 window in both directions; unset ⇒ byte-identical output and fingerprint;
 fingerprint scoping; no earn while active.
 
-**Phase 2b — the measuring band (§6.1).** `max_measuring_rir` param + the
-`'none'` confidence label; stamp writes null past the band; anchor drops those
-samples; strength views exclude them, volume keeps them. Ships with Phase 2 or
-immediately after — **§4.3's unbounded ceiling must not reach production without
-it**.
+*As built:*
+- `queries/slot-effort.ts` owns the resolution, pure and unit-tested:
+  `slotRir(assignment, week)` = `rir_schedule[week] ?? target_rir`, and
+  `resolveSlotEffort` folds in the week's ramp value. The schedule is indexed by
+  **working week**, so a deload week falls off the end of the array and resolves
+  to the flat `target_rir` — which is what lets one column pair express both
+  "the whole meso" and "weeks 3–4 only". A **null element** means "no assignment
+  that week"; the DB check bounds `array_remove(x, null::int)` because CHECK
+  constraints cannot contain subqueries.
+- **Repricing is one substitution at one site.** `pricedAtSlotRir` swaps the
+  resolved RIR onto the inputs the pricing path reads; the deload, cold-start,
+  bodyweight, rep-window and seed branches all generalize with no edit. The
+  earn gate deliberately keeps the **un-substituted** inputs, which is what lets
+  it compare the slot against the week it sits in.
+- **Miss-throttle parity was not code.** The throttle only pairs a `stepped` ask
+  with the next decision's compliance verdict, and a backed-off week can only
+  record `not_earned` — so it can neither earn nor arm the throttle, exactly as
+  a deload week already behaves. Asserted by test rather than implemented twice.
+  The predicate sits **after** `sessionCompliance`: compliance judges the session
+  already performed, so a genuine miss stays a miss whatever the next week asks.
+- **Freshness needed one non-obvious guard.** The resolved value is omitted (not
+  null) from the config projection when unassigned, so every pre-doc-21
+  fingerprint, recorded decision and stale signature is byte-identical and
+  nothing recomputes on deploy. But a spread cannot *delete* a key, so a
+  replayed advance whose assignment was cleared would carry the stale one
+  forever — the recompute drops it explicitly when the live config omits it.
+  That is what makes "the ramp reasserts itself the moment the assignment is
+  removed" actually true.
+- The per-slot schedules inherit N18-B's orphan-clearing on a meso shape edit
+  (`updateMesocycleAttrs` → `orphanedSlotSchedules`).
+- `MesoExerciseRow`'s nullable assignment columns needed a per-table
+  insert-optional list in `types/database.ts`: the global `Defaulted` set is
+  keyed by column NAME, and `microcycles.target_rir` is NOT NULL and must stay
+  required.
+- **No write surface yet** — the resolution is honored end to end (seed,
+  advance, day-view projection, reconcile), but nothing writes an assignment
+  until Phase 3 (MCP) or Phase 6 (UI), so the lever is inert in practice.
+
+**Phase 2b — the measuring band (§6.1). ✅ SHIPPED 2026-08-02** (same PR as
+Phase 2 — **§4.3's unbounded ceiling must not reach production without it**).
+`max_measuring_rir` param + the `'none'` confidence label; stamp writes null past
+the band; anchor drops those samples; strength views exclude them, volume keeps
+them.
 *Tests:* band boundary (RIR 8 measures, 9 does not, at the default); anchor
 freeze under a deep-backoff block; absent param ⇒ byte-identical.
+
+*As built:*
+- `engine/predict.ts::isMeasuringRir` + `stampE1rm` are the one rule, shared by
+  the log/amend stamp site and the restamp planner. `'none'` is deliberately NOT
+  a member of `E1rmConfidence`: the ladder answers "how precise", `none` answers
+  "is this a measurement at all" — and keeping them apart keeps every
+  `Record<E1rmConfidence, …>` weight table total.
+- The strength surfaces inherit the exclusion **by construction** — they
+  aggregate `logged_sets.e1rm` and max/avg ignore nulls — with one exception
+  that had to be fixed: **`v_exercise_prs` re-computed e1RM in SQL** off
+  `coalesce(rir_reported, 0)` rather than reading the stamp, so *both* doc-21
+  rules passed it by, **including §2's shared resolution** (i.e. the N71 defect
+  Phase 1 closed everywhere else was still live in that one view). It now reads
+  `logged_sets.e1rm`, keeps the in-view expression only as a fallback for
+  never-stamped rows, and excludes `'none'` outright.
+- Ships as **engine_params v24, INACTIVE**. `max_measuring_rir` is `.optional()`
+  and 8 is the pre-doc-21 `target_rir` ceiling, so activation restamps nothing
+  and the replay diff is expected empty.
 
 **Phase 3 — MCP.** `set_exercise_rir` / `set_exercise_sets` ops + reason,
 read-side disclosure, audit. *Tests:* tool-handler tests on the seeded fixture

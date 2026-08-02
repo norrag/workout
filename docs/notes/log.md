@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-02 — Session 94: doc 21 Phases 2 + 2b built — exercise-level RIR (N70)
+
+The feature itself, on the premise Phase 1 fixed. Shipped as one PR because
+doc 21 §10 requires it: "§4.3's unbounded ceiling must not reach production
+without" the measuring band.
+
+- **N70 → `in progress`, Phases 2 + 2b done (PR #218).** Row updated with what
+  landed and what is next (Phase 3, MCP). It stays live — four of six phases
+  remain.
+- **Deliberately still inert.** The plan columns, the resolution, and the engine
+  coupling are all active, but **nothing writes an assignment yet** — that is
+  Phase 3 (MCP) / Phase 6 (UI). Worth stating plainly so the next session
+  doesn't go looking for a surface that was never in scope.
+- **Two things the spec didn't anticipate, both recorded in doc 21 §10 as-built:**
+  1. *A spread cannot delete a key.* `liveConfig` omits `exerciseRir` when a slot
+     is unassigned, so a replayed advance whose assignment had been **cleared**
+     would have carried its own stale copy forever — the ramp would never
+     reassert. The recompute now drops the key explicitly. This is the kind of
+     defect the byte-identity discipline creates: omitting rather than nulling is
+     right for the fingerprint and wrong for the spread, and only one of those is
+     obvious at the call site.
+  2. *`v_exercise_prs` had never been fixed.* It re-computes e1RM in SQL off
+     `coalesce(rir_reported, 0)` instead of reading the stamp, so **§2's shared
+     resolution — the whole of Phase 1 — had not reached it**, and §6.1's band
+     wouldn't have either. Found while wiring 2b, fixed in the same PR. Phase 1's
+     write-up lists the view among the consumers of the stamp; it isn't one.
+- **Miss-throttle parity turned out to be a test, not a feature.** §5 asks that a
+  backed-off session neither earn nor count as a missed earn. It already can't:
+  the throttle pairs a `stepped` ask with the next verdict, and a backed-off week
+  only ever records `not_earned` — the same reason a deload can't arm it. Pinned
+  rather than re-implemented.
+
 ## 2026-08-02 — Session 93b: post-merge sweep (N71 archived; a reverted sweep re-applied)
 
 PR #216 merged, so the archival step that a build PR structurally cannot do for
