@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types/database";
 import { planGroupExercises } from "@/lib/planner/groups";
 import { getMuscleGroupsCached } from "./reference";
+import { orphanedSlotSchedules } from "./slot-effort";
 
 type Client = SupabaseClient<Database>;
 
@@ -345,7 +346,42 @@ export async function updateMesocycleAttrs(
     .eq("id", mesoId)
     .eq("user_id", userId);
   if (updErr) throw updErr;
+
+  // doc 21 §3 — the same orphan-clearing rule, applied to the PER-SLOT
+  // schedules. A shape edit that changes weeks/includes_deload leaves any
+  // per-exercise schedule whose length no longer covers the working weeks
+  // pointing at the wrong weeks; clear exactly those back to null so the slot
+  // falls back to its flat `target_rir` (then the ramp) rather than silently
+  // applying week 4's assignment to week 3.
+  if (touchesShape) {
+    await clearOrphanedSlotSchedules(supabase, mesoId, workingWeeks);
+  }
   return { ok: true };
+}
+
+/** Clear per-slot schedules orphaned by a meso shape edit (doc 21 §3). */
+async function clearOrphanedSlotSchedules(
+  supabase: Client,
+  mesoId: string,
+  workingWeeks: number,
+): Promise<void> {
+  const { data: slots, error } = await supabase
+    .from("meso_exercises")
+    .select("id, rir_schedule, set_cap_schedule")
+    .eq("mesocycle_id", mesoId)
+    .or("rir_schedule.not.is.null,set_cap_schedule.not.is.null");
+  if (error) throw error;
+  if (!slots || slots.length === 0) return;
+  for (const orphan of orphanedSlotSchedules(slots, workingWeeks)) {
+    const { error: clearErr } = await supabase
+      .from("meso_exercises")
+      .update({
+        ...(orphan.rir ? { rir_schedule: null } : {}),
+        ...(orphan.setCap ? { set_cap_schedule: null } : {}),
+      })
+      .eq("id", orphan.id);
+    if (clearErr) throw clearErr;
+  }
 }
 
 export interface SlotFill extends MesoExerciseRow {

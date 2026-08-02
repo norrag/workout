@@ -10,20 +10,35 @@
 import { describe, expect, it } from "vitest";
 import { mesoStaleSignature } from "../regeneration";
 
-const base = {
+const base: {
+  paramsVersion: number;
+  rirStart: number;
+  rirEnd: number;
+  rirSchedule: number[] | null;
+  slotEffort?: string[];
+  weeks: number;
+  includesDeload: boolean;
+  goalType: string | null;
+  experienceLevel: string | null;
+  overrideCount: number;
+  overrideLatest: string | null;
+  exerciseLatest: string | null;
+  workoutCount: number;
+  closedWorkoutLatest: string | null;
+} = {
   paramsVersion: 16,
   rirStart: 3,
   rirEnd: 0,
-  rirSchedule: null as number[] | null,
+  rirSchedule: null,
   weeks: 5,
   includesDeload: true,
   goalType: "gain" as string | null,
   experienceLevel: "intermediate" as string | null,
   overrideCount: 2,
-  overrideLatest: "2026-06-20T00:00:00Z" as string | null,
-  exerciseLatest: "2026-06-01T00:00:00Z" as string | null,
+  overrideLatest: "2026-06-20T00:00:00Z",
+  exerciseLatest: "2026-06-01T00:00:00Z",
   workoutCount: 12,
-  closedWorkoutLatest: "2026-06-25T00:00:00Z" as string | null,
+  closedWorkoutLatest: "2026-06-25T00:00:00Z",
 };
 
 describe("mesoStaleSignature (reconcile gate #1)", () => {
@@ -50,6 +65,12 @@ describe("mesoStaleSignature (reconcile gate #1)", () => {
       { exerciseLatest: "2026-06-02T00:00:00Z" }, // a library equipment/load_type edit
       { workoutCount: 13 }, // a workout was generated (week advance)
       { closedWorkoutLatest: "2026-06-26T00:00:00Z" }, // a workout completed/skipped
+      // doc 21 §7.2: a per-slot effort assignment SET, EDITED, or CLEARED. An
+      // assignment-only edit touches nothing else in this signature, so without
+      // it the cheap gate would short-circuit before the fingerprint pass ran.
+      { slotEffort: ["1::a|4||||"] },
+      { slotEffort: ["1::a|5||||"] },
+      { slotEffort: ["1::a|4||||", "2::b||,,4,4|||"] },
     ];
     for (const m of mutations) {
       expect(
@@ -65,6 +86,13 @@ describe("mesoStaleSignature (reconcile gate #1)", () => {
     // pay the full reconcile. (Loader-side: `closedWorkoutLatest` reads only
     // status in (completed, skipped); an in_progress bump is invisible to it.)
     expect(mesoStaleSignature({ ...base })).toBe(mesoStaleSignature({ ...base }));
+  });
+
+  it("a meso with no assignment hashes exactly as it did pre-doc-21 (§7.2)", () => {
+    // the key is OMITTED, not null, when there is no assignment — so nobody pays
+    // a spurious full reconcile the first time this ships
+    const withUndefined = mesoStaleSignature({ ...base, slotEffort: undefined });
+    expect(withUndefined).toBe(mesoStaleSignature({ ...base }));
   });
 
   it("does not collide across the watermark count/timestamp pair", () => {

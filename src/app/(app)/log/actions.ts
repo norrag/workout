@@ -54,7 +54,7 @@ import { llmExplanationsServe } from "@/lib/llm/config";
 import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 import { localDayIso } from "@/lib/dates";
 import { getActiveEngineParams } from "@/lib/queries/generation";
-import { assumedRir, estimateE1rm } from "@/lib/engine";
+import { assumedRir, stampE1rm } from "@/lib/engine";
 import type { EngineParams } from "@/lib/engine/params";
 import {
   advanceWeekAfterWorkout,
@@ -85,6 +85,11 @@ async function requireUser() {
  * never-written `rir_reported` made `effectiveReps = reps + 0` and every stats
  * surface read every set as taken to failure. `slotTargetRir` is the
  * prescription the set was logged against.
+ *
+ * doc 21 §6.1 (Phase 2b): past the measuring band the stamp is `null` with
+ * confidence `none` — the set was priced and performed (and still counts as
+ * volume), but the app does not claim to have measured strength from it. Every
+ * strength surface aggregates this column, so the exclusion is by construction.
  */
 function computeSetE1rm(
   params: EngineParams,
@@ -93,13 +98,7 @@ function computeSetE1rm(
   rir: number | null,
   slotTargetRir: number | null,
 ): { e1rm: number | null; e1rm_confidence: string | null } {
-  const est = estimateE1rm(
-    weight,
-    reps,
-    assumedRir(rir, slotTargetRir),
-    params,
-  );
-  return { e1rm: est?.value ?? null, e1rm_confidence: est?.confidence ?? null };
+  return stampE1rm(weight, reps, assumedRir(rir, slotTargetRir), params.e1rm);
 }
 
 const logSetSchema = z.object({

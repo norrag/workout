@@ -107,6 +107,92 @@ describe("write/check equivalence (doc 14 §3 golden)", () => {
   });
 });
 
+describe("exercise-level RIR (doc 21 §7.1)", () => {
+  const token = { version: 9 };
+
+  it("an unassigned slot hashes byte-identically to a pre-doc-21 row", () => {
+    // undefined ⇒ the key is omitted from the config projection entirely, which
+    // is what keeps every existing prescription fresh across the deploy
+    const omitted = buildConfigInputs(configArgs());
+    const explicitUndefined = buildConfigInputs({
+      ...configArgs(),
+      exerciseRir: undefined,
+    });
+    const explicitNull = buildConfigInputs({
+      ...configArgs(),
+      exerciseRir: null,
+    });
+    expect(Object.keys(omitted)).not.toContain("exerciseRir");
+    expect(computeDepFingerprint(explicitUndefined, token)).toBe(
+      computeDepFingerprint(omitted, token),
+    );
+    expect(computeDepFingerprint(explicitNull, token)).toBe(
+      computeDepFingerprint(omitted, token),
+    );
+  });
+
+  it("scope falls out of the hash: only the assigned slot's rows move", () => {
+    const unassigned = computeDepFingerprint(
+      buildConfigInputs(configArgs()),
+      token,
+    );
+    const assigned = computeDepFingerprint(
+      buildConfigInputs({ ...configArgs(), exerciseRir: 6 }),
+      token,
+    );
+    const different = computeDepFingerprint(
+      buildConfigInputs({ ...configArgs(), exerciseRir: 4 }),
+      token,
+    );
+    expect(assigned).not.toBe(unassigned);
+    expect(different).not.toBe(assigned);
+    // clearing the assignment returns the row to its original fingerprint —
+    // "the ramp reasserts itself the moment the assignment is removed"
+    expect(computeDepFingerprint(buildConfigInputs(configArgs()), token)).toBe(
+      unassigned,
+    );
+  });
+
+  it("0 is a real assignment, not an absence", () => {
+    expect(
+      computeDepFingerprint(
+        buildConfigInputs({ ...configArgs(), exerciseRir: 0 }),
+        token,
+      ),
+    ).not.toBe(computeDepFingerprint(buildConfigInputs(configArgs()), token));
+  });
+
+  it("write/check equivalence holds with an assignment present", () => {
+    const args = engineArgs();
+    const projected = configProjection(
+      buildEngineInputs({ ...args, exerciseRir: 6 }),
+    );
+    expect(projected).toEqual(
+      buildConfigInputs({ ...configArgs(args), exerciseRir: 6 }),
+    );
+  });
+
+  it("a seed row carries the assignment into its fingerprint too", () => {
+    const seedArgs = {
+      equipmentType: "barbell",
+      profile: { experience_level: "intermediate" as const },
+      goal: "hypertrophy" as const,
+      startRir: 3,
+      isDeload: false,
+      initial: null,
+      priorPeak: null,
+    };
+    const plain = configProjection(buildSeedInputs(seedArgs));
+    const assigned = configProjection(
+      buildSeedInputs({ ...seedArgs, exerciseRir: 8 }),
+    );
+    expect(computeDepFingerprint(assigned, token)).not.toBe(
+      computeDepFingerprint(plain, token),
+    );
+    expect(Object.keys(plain)).not.toContain("exerciseRir");
+  });
+});
+
 describe("computeDepFingerprint", () => {
   const token = { version: 9 };
 
@@ -128,6 +214,9 @@ describe("computeDepFingerprint", () => {
     ["previous", { previous: { weight: 999, reps: 8, sets: 3, targetRir: 2 } }],
     ["equipment", { equipmentType: "dumbbell", loadType: "external" }],
     ["initial", { initial: { weight: 45, reps: 10, sets: 3 } }],
+    // doc 21 §7.1: the resolved exercise-level RIR is a CONFIG input, so an
+    // assignment edit stales exactly this slot's open rows
+    ["exerciseRir", { exerciseRir: 6 }],
   ])("changes when the %s config dimension changes", (_label, over) => {
     const base = computeDepFingerprint(buildConfigInputs(configArgs()), token);
     const changed = computeDepFingerprint(

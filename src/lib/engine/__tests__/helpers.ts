@@ -111,6 +111,19 @@ export const V20_PARAMS: EngineParams = {
   },
 };
 
+/** v26 = the active v25 plus the doc 21 §6.1 measuring band: past
+ *  `max_measuring_rir` a set is priced but not measured (no stamp, no anchor
+ *  contribution, no strength surface). Mirrors
+ *  `20260802000003_engine_params_v26_measuring_band`. 8 is the pre-doc-21
+ *  `target_rir` ceiling, so nothing that could exist before the exercise-level
+ *  lever becomes non-measuring. Built on V20 here because the band is
+ *  orthogonal to the v21–v25 macro-target / rate-source / envelope deltas —
+ *  what these tests exercise is the `e1rm` block alone. */
+export const V26_PARAMS: EngineParams = {
+  ...V20_PARAMS,
+  e1rm: { ...V20_PARAMS.e1rm, max_measuring_rir: 8 },
+};
+
 export function baseInputs(
   overrides: Partial<EngineInputs> = {},
 ): EngineInputs {

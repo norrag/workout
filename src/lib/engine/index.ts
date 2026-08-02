@@ -36,6 +36,8 @@ export {
   progressionActive,
   complianceBand,
   setComplianceMarker,
+  resolvedTargetRir,
+  slotBackedOff,
   DEFAULT_COMPLIANCE_BAND,
   type ProgressionStatus,
   type ProgressionTraceStep,
@@ -69,6 +71,12 @@ export {
   type E1rmEstimate,
   type E1rmConfidence,
 } from "./e1rm";
+export {
+  isMeasuringRir,
+  stampE1rm,
+  NON_MEASURING_CONFIDENCE,
+  type StampedConfidence,
+} from "./predict";
 export {
   strengthTrend,
   volumeWeightedMean,
@@ -128,6 +136,28 @@ export {
 export type { EquipmentType } from "./params";
 export type { EngineInputs, Prescription, EngineParams, SeedEarnContext };
 
+/**
+ * doc 21 §4.2 — the ONE place the exercise-level RIR assignment enters, and the
+ * whole of the repricing policy: substitute the resolved RIR for the week's on
+ * the inputs the PRICING path reads, and every existing mechanism generalizes
+ * unchanged. `weightForRepsAtRir` → rounding → `boundRepsToWindow` →
+ * `predictRepsAtWeight` already price the load *from* reps and RIR, so the
+ * prescription stays inside the rep window at the requested effort in BOTH
+ * directions — backing off and pushing harder — with no branch, no special
+ * case, and no rep-schedule reset (the rejected centered-reps rule).
+ *
+ * The un-substituted inputs are what the earn gate sees, so it can still tell
+ * an eased slot from the week it sits in (§5). Unassigned ⇒ returns the same
+ * object, so nothing downstream can observe the feature at all.
+ */
+function pricedAtSlotRir(inputs: EngineInputs): EngineInputs {
+  if (inputs.exerciseRir == null) return inputs;
+  return {
+    ...inputs,
+    week: { ...inputs.week, targetRir: inputs.exerciseRir },
+  };
+}
+
 export function prescribe(
   rawInputs: EngineInputs,
   rawParams: EngineParams,
@@ -141,7 +171,7 @@ export function prescribe(
   // working prescription — it neither earns nor takes steps (§3.4), so it
   // bypasses the progression wrapper entirely.
   if (!progressionActive(inputs, params) || inputs.week.isDeload) {
-    return prescribeCore(inputs, params);
+    return prescribeCore(pricedAtSlotRir(inputs), params);
   }
   return prescribeWithProgression(inputs, params);
 }
@@ -587,7 +617,11 @@ function prescribeWithProgression(
   inputs: EngineInputs,
   params: EngineParams,
 ): Prescription {
-  const baseline = prescribeCore(inputs, params);
+  // doc 21 §4.2/§5: pricing runs at the resolved slot RIR, the gate reads the
+  // un-substituted inputs (it must still see the week's ramp value to refuse an
+  // earn on an eased slot).
+  const priced = pricedAtSlotRir(inputs);
+  const baseline = prescribeCore(priced, params);
   const gate = assessProgression(inputs, params, baseline);
 
   if (!gate.offered) {
@@ -599,7 +633,7 @@ function prescribeWithProgression(
   const anchor = inputs.strengthAnchor!;
   const led = prescribeCore(
     {
-      ...inputs,
+      ...priced,
       strengthAnchor: { ...anchor, value: gate.targetAnchor! },
     },
     { ...params, hold_week_anchor_deadband: false },
@@ -889,6 +923,12 @@ export function seedMeso(
      *  caller-derived like the advance path's. Null/omitted ⇒ the pacer reads
      *  the fixed params `band_position` (loop off). */
     bandPosition?: EngineInputs["bandPosition"];
+    /** doc 21 §4.1: this slot's exercise-level RIR assignment for the seeded
+     *  week, already resolved by the query layer. ABSOLUTE — it replaces
+     *  `startRir` for pricing (the same one-line substitution `prescribe()`
+     *  makes) while the earn gate keeps comparing against `startRir`, the
+     *  week's own ramp value. Null/omitted ⇒ today's behavior exactly. */
+    exerciseRir?: EngineInputs["exerciseRir"];
   },
 ): Prescription {
   const params = engineParamsSchema.parse(rawParams);
@@ -901,12 +941,15 @@ export function seedMeso(
     { seedEarn: opts?.earn ?? null, weekPeak: priorPeak, initial },
     params,
   );
+  // doc 21 §4.2 — the seed route's half of the one substitution: the assignment
+  // replaces the week's ramp RIR for pricing only.
+  const pricedRir = opts?.exerciseRir ?? startRir;
   const baseline = seedCore(
     priorPeak,
     initial,
     exercise,
     user,
-    startRir,
+    pricedRir,
     params,
     goalType,
     anchor,
@@ -932,6 +975,9 @@ export function seedMeso(
     user,
     goalType,
     week: { targetRir: startRir, isDeload: false },
+    // §5: the gate sees the assignment beside the week's own value, so an eased
+    // slot cannot mint a step off an older anchor
+    ...(opts?.exerciseRir != null ? { exerciseRir: opts.exerciseRir } : {}),
     previous: earn?.previous ?? null,
     actualSets: earn?.actualSets ?? [],
     exerciseFeedback: earn?.exerciseFeedback ?? null,
@@ -955,7 +1001,7 @@ export function seedMeso(
     initial,
     exercise,
     user,
-    startRir,
+    pricedRir,
     params,
     goalType,
     { ...anchor!, value: gate.targetAnchor! },

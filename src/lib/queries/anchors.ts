@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   recencyWeightedE1rm,
   assumedRir,
+  isMeasuringRir,
   coerceLoadType,
   effectiveLoad,
   type EngineParams,
@@ -145,15 +146,25 @@ export async function getExerciseE1rmAnchors(
       0,
       (now - new Date(s.performed_at).getTime()) / DAY_MS,
     );
+    // doc 21 §2: the ONE resolution rule, shared with the stamp site and the
+    // compliance marker (`rir_reported ?? the slot's prescribed target_rir`)
+    const rir = assumedRir(
+      s.rir_reported,
+      targetRirByWe.get(s.workout_exercise_id),
+    );
+    // doc 21 §6.1: past the measuring band the set is not a measurement, so it
+    // is dropped from the anchor rather than fed in at a fabricated e1RM. The
+    // consequence is deliberate: during a deep back-off the anchor FREEZES at
+    // its last measured value instead of drifting on fictional data — a stale
+    // honest anchor beats a fabricated one, and the return ramp is the coach's
+    // job (§4.2). A backed-off set INSIDE the band still anchors: it is
+    // RIR-adjusted and therefore comparable, and excluding it would make the
+    // return prescription jump straight back to full load.
+    if (!isMeasuringRir(rir, params.e1rm)) continue;
     const sample: E1rmSample = {
       weight: load,
       reps: s.reps,
-      // doc 21 §2: the ONE resolution rule, shared with the stamp site and the
-      // compliance marker (`rir_reported ?? the slot's prescribed target_rir`)
-      targetRir: assumedRir(
-        s.rir_reported,
-        targetRirByWe.get(s.workout_exercise_id),
-      ),
+      targetRir: rir,
       ageDays,
       // session = one exercise on one day (doc 13 §9.3 session_best anchor)
       sessionKey: s.workout_exercise_id,

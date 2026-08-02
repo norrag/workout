@@ -2,7 +2,192 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-02 (latest) — doc 21 Phase 1: one RIR premise (N71 + N38)
+## 2026-08-02 (latest) — doc 21 Phase 2 + 2b: exercise-level RIR (plan + engine, and the measuring band)
+
+[doc 21](21-exercise-level-rir.md) §3–§7 (Phase 2) and §6.1 (Phase 2b), built
+together because §10 requires it: "§4.3's unbounded ceiling must not reach
+production without" the band. Phase 1 (below) fixed the premise underneath both.
+
+### What it does
+
+Assign a target RIR **per exercise, per week**, inside a program. The coach or
+the athlete says "this slot runs at RIR 4 for weeks 3 and 4"; the engine
+reprices the load to meet that effort; the ramp reasserts itself the moment the
+assignment is removed. It replaces the parked coach-override paradigm as the one
+mechanism for temporary per-exercise effort management — fatigue management,
+rehab, and ordinary programming intent all become the same lever.
+
+### Data model (§3)
+
+`meso_exercises` gains `target_rir`, `rir_schedule`, `set_cap`,
+`set_cap_schedule`, `effort_reason`. Grain is day-slot × exercise (A3), modelled
+directly on `mesocycles.rir_schedule` (N18-B) including its orphan-clearing rule,
+now extended to the per-slot schedules in `updateMesocycleAttrs`. NULL schedule
+**elements** are meaningful — `[null, null, 4, 4]` is the headline "weeks 3 and 4
+only" case — so the element bound is expressed as containment of the
+null-stripped array (CHECK constraints cannot hold subqueries).
+
+`microcycles.target_rir` and `workout_exercises.target_rir` widen **0–8 → 0–30**
+(§4.3). What is bounded is not the *ask* but the *measurement* — that is Phase 2b.
+
+RLS is untouched: `meso_exercises_all_own` scopes through `mesocycles.user_id`
+for ALL commands with the same WITH CHECK, so new columns are covered by
+construction. Proven in `tests/rls` (owner writes them; a non-owner can neither
+see nor change them).
+
+### Resolution (§4.1) — absolute
+
+`queries/slot-effort.ts`, pure: `slotRir = rir_schedule[week] ?? target_rir`,
+`resolvedRir = slotRir ?? weekRir`. Set wins, unset yields — in **both**
+directions, deload weeks included (an assignment below the deload RIR hardens
+that week, which is legitimate; the week's own default always travels beside the
+resolved value so no surface has to state it silently).
+
+Order is load-bearing: it runs **after** `liveWeekRirUpdates` in the reconcile,
+which re-derives an unstarted week's RIR from the ramp. Resolving first would let
+the reconcile stomp the assignment on the next read.
+
+### Repricing (§4.2) — one substitution, no new branch
+
+`pricedAtSlotRir` swaps the resolved RIR onto the inputs the pricing path reads,
+once, at the entry point. Everything downstream — `weightForRepsAtRir` →
+rounding → `boundRepsToWindow` → `predictRepsAtWeight`, plus the deload,
+cold-start, bodyweight and seed branches — generalizes untouched. The engine
+prices the load *from* reps and RIR, so "265 lb for 1 rep" cannot occur by
+construction, and the rule is symmetric: a *lowered* assignment prices up with no
+rep-schedule reset (the rejected centered-reps rule would have fired there).
+
+Golden-tested against the owner's §4.2 table at the 342.6 anchor — 223.4 /
+218.7 / 214.1 / 209.8 / 205.6 across the 8–12 window at RIR 8, reproduced to the
+decimal, with the held 9-rep position landing 219 against the owner's ~215
+estimate.
+
+The un-substituted inputs are what the earn gate sees, which is what lets it tell
+an eased slot from the week it sits in.
+
+### Engine coupling (§5)
+
+A new `exercise_rir` gate predicate refuses an earn while an assignment **eases**
+the slot — without it a rehab week can still mint a step off an anchor held by an
+older `moderate` session. A **hardened** slot still earns; that work is measured
+like any other. Miss-throttle parity falls out of the placement rather than being
+coded twice: the throttle only pairs a `stepped` ask with the next decision's
+compliance verdict, and a backed-off week never records `stepped` — exactly how a
+deload week already behaves. The predicate sits *after* `sessionCompliance` on
+purpose: compliance judges the session already performed, so a genuine miss must
+still be named a miss no matter what the upcoming week asks.
+
+### Freshness (§7) — mechanical, and byte-identical when unused
+
+The resolved value enters `buildConfigInputs`, so it is in the config projection,
+the fingerprint sees it, and the scope falls out of the hash — an assignment edit
+stales exactly that slot's open rows. The assignments join `mesoStaleSignature`
+so an assignment-only edit busts the cheap reconcile gate.
+
+Both are **omitted, not null**, when unassigned. `canonicalize` drops undefined,
+so every existing fingerprint, recorded decision, and stale signature is
+byte-identical and **nothing recomputes on deploy**. One non-obvious consequence
+had to be handled explicitly: a spread cannot delete a key, so a replayed advance
+whose assignment was *cleared* would carry the stale one forever — the recompute
+drops it when the live config omits it. That is what makes "the ramp reasserts
+itself the moment the assignment is removed" true.
+
+### Phase 2b — the measuring band (§6.1)
+
+A1 made the prescribed RIR a *measurement* input (`assumedRir = rir_reported ??
+target_rir` feeds the stamp and the anchor), so an unbounded ask silently asserts
+a strength measurement nobody observed: under Epley each RIR step is worth ~3.3 %
+of e1RM, so at RIR 21 the estimate is ~70 % assumption, and the confidence ladder
+bottoms out at `low` — a set at RIR 4 and a set at RIR 21 make the same honesty
+claim.
+
+`e1rm.max_measuring_rir` (**v26**, 8 per §9.3) draws a hard boundary *below* the
+ladder — it answers "is this a measurement at all", not "how precise is it". Past
+it a set is priced and performed normally but is not measured: `logged_sets.e1rm`
+null, `e1rm_confidence` `'none'` (a new label), dropped from the anchor, excluded
+from every strength surface — and **kept** in volume/adherence, because the work
+happened (§9.1, confirmed). The exclusion is by construction rather than a filter
+each view must remember: the strength views aggregate `logged_sets.e1rm`, and
+max/avg ignore nulls.
+
+Gated on the **assumed-RIR component**, not on effective reps: a logged 15-rep
+set at RIR 1 is 15 reps of observation, while a 9-rep set at RIR 21 is 9 observed
+and 21 asserted. Gating on effective reps would punish honest high-rep work.
+
+The consequence is intended: during a deep back-off the anchor **freezes** at its
+last measured value instead of drifting on fiction (both directions are pinned by
+tests). A backed-off set *inside* the band still anchors — it is RIR-adjusted and
+therefore comparable, and excluding it would make the return prescription jump
+straight back to full load.
+
+**One surface needed fixing to make this real.** `v_exercise_prs` was the only
+strength view that re-computed e1RM in SQL off `coalesce(rir_reported, 0)`
+instead of reading the stamp, so *both* doc-21 rules passed it by — including
+§2's shared resolution, i.e. the N71 defect Phase 1 closed everywhere else. It
+now reads `logged_sets.e1rm`, keeping the in-view expression only as a fallback
+for never-stamped rows (there are none — both backfill migrations covered them),
+and excludes `'none'` outright.
+
+### What is live, and what is not
+
+The plan columns and the resolution ship **active**: an assignment written today
+is honored end to end (seed, advance, day-view projection, reconcile). There is
+**no write surface yet** — that is Phase 3 (MCP `set_exercise_rir` /
+`set_exercise_sets`) and Phase 6 (UI + explanation), so in practice the lever is
+inert until one of those lands.
+
+`max_measuring_rir` ships **inactive** as **v26**, built on the **active v25**.
+Worth recording, because it nearly went wrong: the hosted params chain runs ahead
+of `supabase/migrations` — v22, v24 and v25 were admin-MCP micro-bumps with no
+committed migration (the v23 file already records that pattern for v22), and
+v24/v25 carry `rate_source: "plan"` plus the doc 17 §7 envelope loop. A band row
+built on the v23 file would have collided with the real v24 *and* silently
+reverted the rate source and the envelope loop when activated. The migration is
+now generated from v25's stored materialization and its hash is pinned in
+`params-provenance.test.ts`.
+
+8 is the pre-doc-21 `target_rir` ceiling, so no set that can exist today becomes
+non-measuring and the activation replay diff is expected empty. Activation is the
+usual doc-14 v-bump, recorded in
+[deployment/manual-operations.md](deployment/manual-operations.md).
+
+### Applied to production 2026-08-02
+
+All three migrations are live, and **the doc 21 §2 / N71 re-levelling restamp
+has now run**: 9 087 e1RM stamps and 5 891 confidence labels moved, average
+**+4.80 lb (+4.85 %)**, max +42.5, min 0 — strictly upward, exactly as doc 10
+§9.1 predicted. Rollback snapshot in `ops.e1rm_restamp_backup_20260802`. v26 is
+present and INACTIVE; the band is not armed yet.
+
+Three things the deploy surfaced, all fixed here:
+
+1. **`restamp_e1rm` had never worked at scale.** It pages 1 000 sets, then
+   resolves their slots with one `.in("id", …)`. PostgREST puts that in the
+   query string — ~1 000 UUIDs is a ~37 KB URL — so the request 414s and the
+   restamp dies. Phase 1 shipped it untested against real volume. The lookup is
+   now chunked (200/request, pinned by a test) and the admin tools stringify
+   errors through a real `errorMessage` helper instead of `String(e)`, which had
+   reported the PostgrestError as the useless `"[object Object]"`. The
+   production restamp was therefore run as SQL — verified byte-for-byte against
+   `stampE1rm` over all 2 618 distinct `(weight, reps, assumedRir)` combos in
+   prod, 0 mismatches.
+2. **A repo migration had never been recorded.**
+   `20260721000001_restamp_logged_set_e1rm_v11_catchup` was applied to prod as
+   raw SQL on 2026-07-21 and never entered the ledger. Harmless as data, but a
+   live trap: a later `db push` would have run it *after* the Phase-1 restamp
+   and reverted the §2 resolution on every row. Now recorded.
+3. **`coaching_prompts.body` disagreed between repo and prod** (12 000 vs
+   24 000 chars) — another hosted-only migration that was never committed. A
+   fresh environment would have rejected prompts prod accepts. Reconstructed as
+   `20260725000002_coaching_prompts_length.sql`, idempotent.
+
+The through-line: **hosted state and `supabase/migrations` had drifted in both
+directions**, and every one of these was a silent divergence waiting to bite a
+fresh environment or a future push. Worth a standing check at session start.
+
+Full suite green (1569, +77), typecheck + lint clean.
+
+## 2026-08-02 — doc 21 Phase 1: one RIR premise (N71 + N38)
 
 [doc 21](21-exercise-level-rir.md) §2, Phase 1 of six. The feature it unblocks
 (exercise-level RIR) is Phase 2; this phase fixes the premise underneath it.

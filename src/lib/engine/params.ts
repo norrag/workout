@@ -538,6 +538,25 @@ export const engineParamsSchema = z.object({
           low: z.number().min(0),
         })
         .optional(),
+      // doc 21 §6.1 — the MEASURING BAND. Past this assumed RIR a set is priced
+      // and performed but is not treated as a strength measurement: no stored
+      // e1RM (confidence `none`), no anchor contribution, excluded from every
+      // strength surface — and KEPT in volume/adherence, because the work
+      // happened. It answers a different question from the confidence ladder
+      // (`is this a measurement at all`, not `how precise is it`), which is why
+      // it is a hard boundary rather than another rung.
+      //
+      // This is the guard that makes doc 21 §4.3's unbounded prescription RIR
+      // safe: without it, an unbounded ask silently asserts a strength
+      // measurement nobody observed (~70% assumption at RIR 21, and outside the
+      // band the curves were fitted on past ~35 effective reps).
+      //
+      // `.optional()` per house discipline — ABSENT ⇒ byte-identical parse,
+      // hash, and behavior on every pre-v24 row. v24 sets it to 8 (§9.3,
+      // confirmed): today's `target_rir` ceiling, so nothing that could exist
+      // before doc 21 becomes non-measuring. Tightening later only ever ADDS
+      // exclusions, which is the safer direction to move in.
+      max_measuring_rir: z.number().int().min(0).optional(),
     })
     .default({
       rir_offset: 1.0,

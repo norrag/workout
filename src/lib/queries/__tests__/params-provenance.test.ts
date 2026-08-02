@@ -392,6 +392,110 @@ describe("resolveProvenance", () => {
     );
   });
 
+  it("v26 is a complete, replayable snapshot matching the migration hash", () => {
+    // v26 = the ACTIVE v25 + `e1rm.max_measuring_rir: 8` (doc 21 §6.1 — the
+    // measuring band, the guard that makes §4.3's unbounded prescription RIR
+    // safe). The key is `.optional()`, so v25/earlier rows are byte-identical
+    // and the new row stays replayable.
+    //
+    // NOTE the base. The hosted chain runs ahead of supabase/migrations: v22,
+    // v24 and v25 were admin-MCP micro-bumps with no committed migration (the
+    // v23 file records the same pattern for v22). v24 flipped
+    // `progression.rate_source` to "plan" (doc 17 Phase R) and v25 — active —
+    // added the §7/N36 envelope block. Both are reconstructed here, because
+    // basing v26 on the v23 literal would silently revert them on activation.
+    const v26 = engineParamsSchema.parse({
+      ...V11_PARAMS,
+      climb_on_performed_reps: true,
+      bound_to_target_window: true,
+      retire_prior_peak_seed: true,
+      deload_anchor_rir: true,
+      deload: { ...V11_PARAMS.deload, target_rir: 6 },
+      bodyweight_model: true,
+      pain_cut_gate: 3,
+      session_fatigue_dampen_threshold: 8,
+      session_performance_dampen_threshold: 3,
+      climb_requires_rir_step: true,
+      hold_week_anchor_deadband: true,
+      e1rm: { ...V11_PARAMS.e1rm, max_measuring_rir: 8 },
+      progression: {
+        mode: "earned_step",
+        step: "min",
+        min_confidence: "moderate",
+        compliance_band: 0.015,
+        cadence: "microcycle",
+        pacing: "macro_rate",
+        rate_source: "plan", // v24
+        band_position: 0.5,
+        goal_rate_factor: {
+          strength: 1.0,
+          hypertrophy: 0.75,
+          gain: 0.75,
+          cut: 0.0,
+          maintain: 0.0,
+        },
+        miss_rearm_sessions: 2,
+        max_gap_days: 10,
+        peak_week: "skip",
+        max_pct_per_step: 0.05,
+        envelope: {
+          // v25
+          enabled: true,
+          lookback_mesos: 3,
+          min_history_mesos: 2,
+          min_decisions: 8,
+          max_age_days: 180,
+          dwell_mesos: 1,
+          step: 0.1,
+          raise: {
+            earn_rate: 0.7,
+            max_miss_ratio: 0.2,
+            over_share: 0.25,
+            pacer_trips: 2,
+          },
+          lower: {
+            miss_ratio: 0.5,
+            throttle_trips: 2,
+            workload_firings: 3,
+          },
+        },
+      },
+      macro_target: {
+        ...V11_PARAMS.macro_target,
+        strength_sex_factor: { male: 1.0, female: 1.0 },
+        age_taper_floor_strength: 0.7,
+        bf_proxy_pct: {
+          male: { lean: 10, average: 16, high_bf: 25 },
+          female: { lean: 18, average: 26, high_bf: 35 },
+        },
+        strength_model: {
+          enabled: true,
+          neural_n0: { low: 3, high: 5 },
+          neural_floor: { low: 0.1, high: 0.4 },
+          neural_tau_years: 0.5,
+          ffm_coupling_k: 1,
+          undermuscled_unbank: 0.5,
+          rate_ceiling_pct_month: 8,
+        },
+      },
+    });
+    const p = resolveProvenance(v26 as unknown as Record<string, unknown>);
+    expect(p.is_replayable).toBe(true);
+    expect(p.schema_version).toBe(CURRENT_PARAMS_SCHEMA_VERSION); // optional key: no shape bump
+    expect(p.params_hash).toBe(
+      "6dd0224425b8c6afaa51f442386cddb7672f31727604ad578120f8c7c5eb96fa",
+    );
+  });
+
+  it("max_measuring_rir is absent from DEFAULT (v10), preserving its hash", () => {
+    expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain(
+      "max_measuring_rir",
+    );
+    expect(
+      hashParams(DEFAULT_ENGINE_PARAMS as unknown as Record<string, unknown>),
+    ).toBe("399102c44ecade41439b96d4f496a807b2737248cf5aca2e6d79d7c1a3bf09c4");
+  });
+
   it("strength_model is absent from DEFAULT (v10), preserving its hash", () => {
     expect(canonicalize(DEFAULT_ENGINE_PARAMS)).not.toContain("strength_model");
     expect(

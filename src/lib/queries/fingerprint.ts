@@ -103,6 +103,13 @@ export interface ConfigInputArgs {
   week: EngineInputs["week"];
   previous: EngineInputs["previous"];
   initial: EngineInputs["initial"];
+  /** doc 21 §7.1 — this slot's resolved exercise-level RIR assignment. A CONFIG
+   *  input (a plan-level fact the coach/athlete authored), so it rides the
+   *  fingerprint and an assignment edit stales exactly the open rows it touches:
+   *  the scope falls out of the hash, with no bespoke invalidation. Undefined
+   *  (unassigned) ⇒ the key is omitted and the hash is byte-identical to every
+   *  pre-doc-21 fingerprint. */
+  exerciseRir?: EngineInputs["exerciseRir"];
 }
 
 /**
@@ -126,6 +133,9 @@ export function buildConfigInputs(args: ConfigInputArgs): ConfigInputs {
     week: args.week,
     previous: args.previous,
     initial: args.initial,
+    // omitted, not null, when unassigned — `canonicalize` drops undefined, so an
+    // unassigned row hashes exactly as it did before the feature existed
+    ...(args.exerciseRir != null ? { exerciseRir: args.exerciseRir } : {}),
   };
 }
 
@@ -229,6 +239,9 @@ export interface SeedInputArgs {
   bodyweight?: EngineInputs["bodyweight"];
   /** doc 16 §3.7: the seed's derived progression inputs (mode-active only) */
   progression?: SeedProgressionInputs;
+  /** doc 21 §7.1: this slot's resolved exercise-level RIR (config; omitted when
+   *  unassigned so the seed fingerprint stays byte-identical) */
+  exerciseRir?: EngineInputs["exerciseRir"];
 }
 
 /**
@@ -245,6 +258,7 @@ export function buildSeedInputs(args: SeedInputArgs): EngineInputs {
     week: { targetRir: args.startRir, isDeload: args.isDeload },
     previous: null,
     initial: args.initial,
+    exerciseRir: args.exerciseRir,
   });
   return seedEngineInputs(
     config,

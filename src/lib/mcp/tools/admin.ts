@@ -48,6 +48,30 @@ function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
   return toolResult(payload, opts);
 }
 
+/**
+ * Human-readable text for a thrown value. `String(e)` alone yields the useless
+ * `"[object Object]"` for a PostgrestError — which is exactly what a failing
+ * admin tool reported, hiding the real cause (a 414 from an oversized `.in()`
+ * filter) behind a shrug. Postgrest errors carry `message`/`details`/`hint`/
+ * `code` as plain properties and are NOT `Error` instances, so pull them out.
+ */
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null) {
+    const o = e as Record<string, unknown>;
+    const parts = [o.message, o.details, o.hint]
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+    const code = typeof o.code === "string" ? ` [${o.code}]` : "";
+    if (parts.length > 0) return `${parts.join(" — ")}${code}`;
+    try {
+      return JSON.stringify(e);
+    } catch {
+      /* fall through to String() */
+    }
+  }
+  return String(e);
+}
+
 // call-time admin gate: shared with admin-llm.ts via ./admin-gate
 
 // --- pure helpers ----------------------------------------------------------
@@ -393,7 +417,7 @@ function registerProposeEngineParams(server: McpServer) {
       } catch (e) {
         return jsonResult({
           ok: false,
-          error: `params failed validation: ${e instanceof Error ? e.message : String(e)}`,
+          error: `params failed validation: ${errorMessage(e)}`,
         });
       }
       const summary = `proposed engine_params v${newVersion} (inactive)`;
@@ -451,7 +475,7 @@ function registerActivateEngineParams(server: McpServer) {
       try {
         await activateEngineParams(client, version);
       } catch (e) {
-        return jsonResult({ ok: false, error: e instanceof Error ? e.message : String(e) });
+        return jsonResult({ ok: false, error: errorMessage(e) });
       }
 
       // T-N33 (owner decision 2026-07-04): stored per-set e1RM stamps are
@@ -472,7 +496,7 @@ function registerActivateEngineParams(server: McpServer) {
             detail.resolved,
           );
         } catch (e) {
-          restampError = e instanceof Error ? e.message : String(e);
+          restampError = errorMessage(e);
           await reportError("mcp:activate-params-restamp", e, { version });
         }
       }
@@ -832,7 +856,7 @@ function registerSimulatePrescriptions(server: McpServer) {
           return {
             case_index: index,
             ok: false,
-            error: e instanceof Error ? e.message : String(e),
+            error: errorMessage(e),
           };
         }
       });
@@ -935,7 +959,7 @@ function registerRestampE1rm(server: McpServer) {
         await reportError("mcp:restamp-e1rm", e, { version });
         return jsonResult({
           ok: false,
-          error: e instanceof Error ? e.message : String(e),
+          error: errorMessage(e),
         });
       }
       const summary = `restamped ${result.updated} of ${result.scanned} logged sets under engine_params v${version}`;

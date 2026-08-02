@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   assumedRir,
-  estimateE1rm as estimateE1rmCore,
+  stampE1rm,
   type E1rmConfig,
 } from "@/lib/engine/predict";
 import type { EngineParams } from "@/lib/engine";
@@ -76,6 +76,10 @@ export type RestampSetRow = Pick<
  * `targetRirByWe` (the pager resolves it per page). An absent map — or a slot
  * with no prescription — leaves the row on its reported RIR alone, i.e. the
  * pre-doc-21 behavior.
+ *
+ * doc 21 §6.1 (Phase 2b): the same `stampE1rm` the log/amend site uses, so the
+ * measuring band applies identically to a backfill — a set past the band
+ * restamps to `null` / `none` rather than to a fabricated estimate.
  */
 export function planRestamps<T extends RestampSetRow>(
   rows: T[],
@@ -92,9 +96,7 @@ export function planRestamps<T extends RestampSetRow>(
       r.rir_reported,
       targetRirByWe?.get(r.workout_exercise_id),
     );
-    const est = estimateE1rmCore(r.weight, r.reps, rir, cfg);
-    const e1rm = est?.value ?? null;
-    const e1rm_confidence = est?.confidence ?? null;
+    const { e1rm, e1rm_confidence } = stampE1rm(r.weight, r.reps, rir, cfg);
     if (e1rm !== r.e1rm || e1rm_confidence !== r.e1rm_confidence)
       out.push({ row: r, e1rm, e1rm_confidence });
   }
@@ -105,6 +107,11 @@ export interface RestampResult {
   scanned: number;
   updated: number;
 }
+
+/** Max ids per `.in()` lookup. PostgREST encodes filters in the query string,
+ *  so this bounds URL length; 200 UUIDs ≈ 7.5 KB, comfortably inside every
+ *  proxy/gateway limit while keeping the round-trip count low. */
+const LOOKUP_CHUNK = 200;
 
 /**
  * Restamp every stored per-set e1RM under `params` (all users — engine params
@@ -142,15 +149,22 @@ export async function restampLoggedSetE1rms(
     // doc 21 §2: resolve the page's slots' prescribed target RIRs — the
     // fallback half of `assumedRir`, so a restamp reproduces exactly what log
     // time would have written for the same row.
+    //
+    // CHUNKED (R-restamp): a 1000-row page can carry ~1000 distinct slot ids,
+    // and PostgREST puts `.in()` in the QUERY STRING — ~37 KB of UUIDs, past
+    // every practical URL limit, so the request 414s and the whole restamp dies
+    // with an opaque error. The first at-scale run hit exactly that. Chunk the
+    // lookup so the URL stays bounded regardless of page size.
     const weIds = [...new Set(rows.map((r) => r.workout_exercise_id))];
-    const { data: wes, error: weError } = await service
-      .from("workout_exercises")
-      .select("id, target_rir")
-      .in("id", weIds);
-    if (weError) throw weError;
-    const targetRirByWe = new Map(
-      (wes ?? []).map((w) => [w.id, w.target_rir] as const),
-    );
+    const targetRirByWe = new Map<string, number | null>();
+    for (let i = 0; i < weIds.length; i += LOOKUP_CHUNK) {
+      const { data: wes, error: weError } = await service
+        .from("workout_exercises")
+        .select("id, target_rir")
+        .in("id", weIds.slice(i, i + LOOKUP_CHUNK));
+      if (weError) throw weError;
+      for (const w of wes ?? []) targetRirByWe.set(w.id, w.target_rir);
+    }
 
     const changed = planRestamps(rows, cfg, targetRirByWe);
     for (let i = 0; i < changed.length; i += writeChunk) {

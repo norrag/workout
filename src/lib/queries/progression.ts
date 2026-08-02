@@ -25,6 +25,12 @@ import {
 import { derivePlanStrengthRate, type PlanStrengthRate } from "./plan-rate";
 import { scheduleWorkoutExplanations } from "@/lib/llm/explanations";
 import { getBandPosition } from "./envelope";
+import {
+  exerciseRirInput,
+  getSlotEffortAssignments,
+  slotEffortKey,
+  type SlotEffortMap,
+} from "./slot-effort";
 import { maybeCompleteMacroAfterMeso } from "./macro-close";
 import { getMuscleRoleIdsForExercises } from "./exercises";
 import {
@@ -148,6 +154,10 @@ export function buildEngineInputs(args: {
   /** doc 17 §7 envelope band position; omit while the loop is off so recorded
    *  decision inputs stay byte-identical without it */
   bandPosition?: EngineInputs["bandPosition"];
+  /** doc 21 §4.1: the slot's resolved exercise-level RIR for the week being
+   *  generated (`slot-effort.ts::exerciseRirInput`). A CONFIG input — it rides
+   *  `buildConfigInputs` into the fingerprint; omitted when unassigned */
+  exerciseRir?: EngineInputs["exerciseRir"];
 }): EngineInputs {
   const { we } = args;
   // config half resolved through the single shared resolver (doc 14 §3) so the
@@ -168,6 +178,7 @@ export function buildEngineInputs(args: {
       week: args.nextWeek,
       previous,
       initial: null,
+      exerciseRir: args.exerciseRir,
     }),
     actualSets: args.sets.map((s, index) => ({
       setNumber: s.set_number,
@@ -305,6 +316,10 @@ interface WeekContext {
    *  per advance run (constant within a meso: only completed mesos feed the
    *  fold); null while the loop is off, and then never recorded */
   bandPosition: number | null;
+  /** doc 21 §4.1: the meso's exercise-level RIR / set-cap assignments, keyed by
+   *  day-slot × exercise. Empty for every meso without one — and then nothing
+   *  downstream can observe the feature. */
+  slotEffort: SlotEffortMap;
 }
 
 /**
@@ -381,6 +396,15 @@ async function generateDay(
       weekPeak: ctx.peaks.get(we.exercise_id) ?? null,
       strengthAnchor: ctx.anchorsByExercise.get(we.exercise_id) ?? null,
       bodyweight: ctx.profile.bodyweight ?? null,
+      // doc 21 §4.1: the slot's assignment for the week being generated — the
+      // day slot is the plan's, so it is keyed off the SOURCE workout's day
+      // number (the counterpart being generated has the same one)
+      exerciseRir: exerciseRirInput(
+        ctx.slotEffort.get(
+          slotEffortKey(weekNWorkout.day_number, we.exercise_id),
+        ),
+        ctx.nextMicro.week_number,
+      ),
       ...(progressionByExercise
         ? {
             progressionHistory:
@@ -895,6 +919,9 @@ export async function advanceWeekAfterWorkout(
     // doc 17 §7: the envelope loop's per-user band position; null (and never
     // recorded) while the loop is off.
     bandPosition: await getBandPosition(service, userId, params),
+    // doc 21 §4.1: the plan's per-slot effort assignments; empty for a meso
+    // without any, and then the resolution is a no-op everywhere downstream.
+    slotEffort: await getSlotEffortAssignments(service, meso.id),
   };
 
   // -------------------------------------------------------------------------
@@ -1302,6 +1329,9 @@ export async function projectNextPrescription(
   // doc 17 §7: the envelope position the live advance would consume (self-
   // gating — null, and omitted below, while the loop is off)
   const projectionBandPosition = await getBandPosition(supabase, userId, params);
+  // doc 21 §4.1: the projection prices at the same resolved RIR the live advance
+  // will, so the predictor never shows a number the assignment would override
+  const projectionEffort = await getSlotEffortAssignments(supabase, meso.id);
   const projectionGoal = engineGoal(macroGoal);
   const inputs = buildEngineInputs({
     we: sourceWe,
@@ -1327,6 +1357,10 @@ export async function projectNextPrescription(
     weekPeak: peakByExercise(mesoWes ?? [], micro.target_rir).get(exerciseId) ?? null,
     strengthAnchor: anchors.get(exerciseId) ?? null,
     bodyweight: profile.bodyweight ?? null,
+    exerciseRir: exerciseRirInput(
+      projectionEffort.get(slotEffortKey(sourceWorkout.day_number, exerciseId)),
+      nextMicro?.week_number ?? micro.week_number,
+    ),
     ...(projectionProgression
       ? {
           progressionHistory: projectionProgression.get(exerciseId) ?? null,

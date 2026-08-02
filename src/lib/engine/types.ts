@@ -43,9 +43,12 @@ export const prescriptionSchema = z.object({
   weight: z.number().min(0).nullable(),
   reps: z.number().int().min(1).nullable(),
   sets: z.number().int().min(1),
-  // 0–8: working weeks ramp 0–3, but a deload prescribes a higher recovery RIR
-  // (≈6, anchor-based deload selection) — see engine_params.deload.target_rir.
-  targetRir: z.number().int().min(0).max(8),
+  // 0–30 (doc 21 §3/§4.3, widened from 0–8): working weeks ramp 0–3 and a deload
+  // prescribes a higher recovery RIR (≈6, engine_params.deload.target_rir), but
+  // an exercise-level assignment is UNBOUNDED upward so one lever spans deload →
+  // rehab → deep back-off. What bounds the *measurement* is the §6.1 measuring
+  // band, not this ceiling.
+  targetRir: z.number().int().min(0).max(30),
 });
 
 /**
@@ -66,10 +69,26 @@ export const engineInputsSchema = z.object({
   goalType: z.enum(goalTypes),
   // the week being generated
   week: z.object({
-    // 0–8: a deload week carries the higher recovery RIR (≈6) into prescribe()
-    targetRir: z.number().int().min(0).max(8),
+    // 0–30 (doc 21 §3): a deload week carries the higher recovery RIR (≈6) into
+    // prescribe(); the ceiling widened with the exercise-level lever so a whole
+    // week can also be assigned past the old 8.
+    targetRir: z.number().int().min(0).max(30),
     isDeload: z.boolean(),
   }),
+  // doc 21 §4.1 — the exercise-level RIR assignment for THIS slot in THIS week,
+  // already resolved by the query layer (`queries/slot-effort.ts`: the slot's
+  // `rir_schedule[week] ?? target_rir`). ABSOLUTE (A2): when present it replaces
+  // `week.targetRir` everywhere the prescription is priced and reported — in
+  // BOTH directions, with no special case (§4.2); when absent the week's ramp
+  // value is used, exactly as before.
+  //
+  // A CONFIG input, deliberately: it is a plan-level fact the athlete/coach
+  // authored, so it belongs in the freshness fingerprint (doc 14 §3 — it is not
+  // on the derived denylist) and an assignment edit correctly stales exactly the
+  // open rows it touches. `.nullish()` with NO default so an unassigned slot
+  // omits the key entirely and every pre-doc-21 fingerprint, recorded decision,
+  // and input literal stays byte-identical.
+  exerciseRir: z.number().int().min(0).max(30).nullish(),
   // last week's prescription for this exercise (null in week 1)
   previous: prescriptionSchema.nullable(),
   // what was actually performed against `previous`

@@ -11,6 +11,7 @@ import { V11_PARAMS, V18_PARAMS } from "@/lib/engine/__tests__/helpers";
 import {
   e1rmBlockChanged,
   planRestamps,
+  restampLoggedSetE1rms,
   type RestampSetRow,
 } from "../e1rm-restamp";
 
@@ -166,5 +167,67 @@ describe("planRestamps", () => {
       );
       expect(second).toEqual([]);
     });
+  });
+});
+
+describe("slot lookup chunking (R-restamp)", () => {
+  it("never puts more than LOOKUP_CHUNK ids in one `.in()` filter", async () => {
+    // PostgREST encodes `.in()` in the QUERY STRING, so a 1000-row page's worth
+    // of slot UUIDs (~37 KB) 414s and kills the whole restamp — the failure the
+    // first at-scale run actually hit. Pin the chunking.
+    const setCount = 950;
+    const rows = Array.from({ length: setCount }, (_, i) => ({
+      id: `set-${String(i).padStart(4, "0")}`,
+      workout_exercise_id: `we-${String(i).padStart(4, "0")}`,
+      weight: 100,
+      reps: 8,
+      rir_reported: null,
+      is_warmup: false,
+      e1rm: null,
+      e1rm_confidence: null,
+    }));
+
+    const inSizes: number[] = [];
+    let servedSets = false;
+    const service = {
+      from(table: string) {
+        if (table === "logged_sets") {
+          const builder = {
+            select: () => builder,
+            order: () => builder,
+            limit: () => builder,
+            gt: () => builder,
+            then: undefined,
+            upsert: async () => ({ error: null }),
+          } as unknown as Record<string, unknown>;
+          // the pager awaits the query builder itself
+          (builder as { then?: unknown }).then = (
+            resolve: (v: { data: unknown[]; error: null }) => void,
+          ) => {
+            const data = servedSets ? [] : rows;
+            servedSets = true;
+            resolve({ data, error: null });
+          };
+          return builder;
+        }
+        return {
+          select: () => ({
+            in: async (_col: string, ids: string[]) => {
+              inSizes.push(ids.length);
+              return {
+                data: ids.map((id) => ({ id, target_rir: 2 })),
+                error: null,
+              };
+            },
+          }),
+        };
+      },
+    } as unknown as Parameters<typeof restampLoggedSetE1rms>[0];
+
+    await restampLoggedSetE1rms(service, V11_PARAMS);
+
+    expect(inSizes.length).toBeGreaterThan(1); // it actually chunked
+    expect(Math.max(...inSizes)).toBeLessThanOrEqual(200);
+    expect(inSizes.reduce((a, b) => a + b, 0)).toBe(setCount);
   });
 });
