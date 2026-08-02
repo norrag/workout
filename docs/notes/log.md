@@ -4,6 +4,61 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-02 — Session 93: doc 21 Phase 1 built — one RIR premise (N71, N38, N70)
+
+First code on doc 21. Phase 1 of six, and the one that had to go first: it fixes
+the premise the whole feature stands on.
+
+- **The defect, restated as built.** Two paths, two assumptions. The anchor
+  honored each set's prescribed `target_rir`; the per-set e1RM stamp keyed on
+  `logged_sets.rir_reported`, which nothing ever wrote — so `effectiveReps =
+  reps + 0` and **every stats surface read every set as taken to failure** while
+  the engine's own anchor did not. `assumedRir(reported, prescribed)` in
+  `engine/predict.ts` is now the single rule at the stamp site (log *and*
+  amend), the anchor, `setComplianceMarker`, the restamp planner, and exercise
+  history. N71 closes by construction — there is no longer a second place for
+  the two to disagree.
+- **Capture shipped, so N38's other half is done.** §9.2 option (a): a third
+  set-grid column (`LB · REPS · RIR · LOG`), the same input primitive as the
+  other two, pre-filled with the prescribed target RIR. The pre-fill being a
+  *no-op* is the design's whole trick — an untouched cell reports exactly what
+  the server's fallback would have resolved to, so a new column on the hottest
+  path in the app costs nothing and only a *changed* value carries information.
+  Pre-filling 0 stayed rejected; that is N11.
+- **Two guards pinned, not assumed.** Absence resolves to the ask, never 0; and
+  `rir_reported` stays capped 0–10, past which the honest report is "no idea".
+  Both have tests, including the deload case where the miss would be worst.
+- **The backfill is an operator step, on purpose.** `activate_engine_params`
+  only restamps when an `e1rm` *param value* moves — here the **resolution**
+  changed while every param held, so a new admin-gated `restamp_e1rm` tool
+  drives it. It is **not run against production in the PR**: the pass moves
+  every historical e1RM upward once (PRs, `best_e1rm`, key lifts, the strength
+  trend), and that should land when the owner chooses, not as a side effect of a
+  deploy. Doc 10 gains **§9.1** describing the re-levelling; doc 11's premise
+  carries an amendment banner pointing at doc 21 §2.
+- **Honesty carried through to the surfaces.** An assumed RIR is a plan fact,
+  not an observation, and nothing displays it as one: history reports
+  `rir_source` (`reported`/`assumed`/`mixed`) with a `~` on the assumed case
+  plus the effective reps behind the estimate, the MCP payload says the same,
+  and the day view mutes a set-row RIR that is the prescription rather than a
+  report. The `rir` glossary copy changed *meaning*, not wording.
+- **Rule 8 honored.** No mockup figure exists for per-set capture — re-verified
+  against `App Screens v2` (its set grid is `LB · REPS · LOG` throughout; RIR
+  appears only as the week's target in header/prescription copy). House-style
+  transcription recorded in the 09 changelog, precedent being the P19/N35 marker
+  glyphs.
+- **Deferred deliberately:** the measuring band (§6.1) stays Phase 2b. It only
+  becomes load-bearing once §4.3's unbounded prescription RIR exists, and
+  nothing loggable today reaches it.
+
+Rows moved: **N71 → done (PR #216)**; **N38 → reduced**, capture half done, the
+periodic-check half still deferred but now with real reported-RIR data to design
+against; **N70 → in progress**, Phase 2 (+ 2b, which must ship with or
+immediately after it) next.
+
+Suite green at 1500 (+34); typecheck + lint clean. No migration — every column
+this phase writes already existed.
+
 ## 2026-07-31 — Session 92d: repricing policy retracted + measuring band added (N70, doc 21 §4.2/§4.3/§6.1)
 
 Owner pushed back on doc 21 §4.2. **Right on both counts**; the section is
