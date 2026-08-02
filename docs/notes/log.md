@@ -4,6 +4,200 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-07-31 — Session 92d: repricing policy retracted + measuring band added (N70, doc 21 §4.2/§4.3/§6.1)
+
+Owner pushed back on doc 21 §4.2. **Right on both counts**; the section is
+rewritten, §4.3 and §6.1 are new, and two of my numbers are corrected in their
+favour. Batch 30d verbatim appended. Still no code.
+
+- **Forced centered reps: retracted.** It fired whenever `resolvedRir ≠ weekRir`,
+  including on a *decrease* — so an exercise deliberately pushed harder would have
+  had its rep schedule reset for no reason. A special case wearing a rule's
+  clothes. Gone.
+- **The owner's repricing proposal is already the engine's mechanism.** The
+  rep-window path prices load *from* reps and RIR
+  (`weightForRepsAtRir`, `engine/index.ts:404`) and then re-derives and clamps
+  reps to the window (`:492-517`) — it never holds load constant, so the
+  "265 lb × 1 rep" failure they wanted to avoid cannot occur. Threading
+  `resolvedRir` through those three sites generalises in **both** directions with
+  no branch. My "flooring reps prices it heavier" was a comparison between rep
+  choices at the same RIR, not a claim that raising RIR raises load — it answered
+  a question nobody asked, and it read as nonsense in context. Fairly called.
+- **Two numbers corrected in the owner's favour.** The assessment's "−14.6 % at
+  RIR 8" was one policy point (centered reps, vs an RIR-1 week), not the lever's
+  range: priced against a genuine 0-RIR ask it delivers **−16 % to −22 %**
+  depending on rep position. And their worked example — 265 × 9 @ 0 RIR, ask 8
+  RIR, "maybe 215 × 8" — prices at **219 × 9** on the real path. Their intuition
+  was calibrated; my framing wasn't.
+- **Unbounded RIR adopted** (§4.3, DB check 0–8 → 0–30). The arithmetic is sound:
+  at the same anchor, −25 % of the ask ≈ RIR 13, half the e1RM ≈ RIR 21, −50 % of
+  the ask ≈ RIR 39. One lever really does span deload → rehab → extra effort.
+- **What needed the guard was not the pricing but the second job A1 gave that
+  number.** `assumedRir = rir_reported ?? target_rir` feeds the e1RM stamp and the
+  anchor, so an unbounded prescribed RIR silently asserts an unobserved
+  measurement — 3.3 % of e1RM per RIR step under Epley, and past ~37 effective
+  reps Brzycki is undefined (the code caps bisection at 35.9). Hence the new
+  **measuring band** (§6.1): `max_measuring_rir` (default 8, `.optional()`, so
+  nothing that exists today changes), gating on the **assumed-RIR component**
+  rather than total effective reps — an honest 15-rep set is 15 reps of
+  observation; a 9-rep set at RIR 21 is 9 observed and 21 asserted. Past the band
+  a set is priced normally but stamped `e1rm = null` / confidence `'none'`,
+  dropped from the anchor and strength views, kept in volume. The anchor freezes
+  rather than drifting on fiction — the intended trade, since the coach owns the
+  return ramp.
+- Phase 2 loses the centering work and gains the widened check; **new Phase 2b**
+  ships the measuring band — §4.3's unbounded ceiling must not reach production
+  without it. `rep_position` survives as an *optional* Phase-4 knob. §9 grows to
+  four confirmations (adds the band default and out-of-band display).
+
+## 2026-07-31 — Session 92c: exercise-level RIR DECIDED → build spec doc 21 (N70, N71, N72, PR #211)
+
+Owner returned notes + decisions A1–A8 on the assessment and asked to finalize
+before starting phased implementation in a new session. Settled design promoted
+out of `reviews/` into an authoritative numbered spec:
+**[`docs/21-exercise-level-rir.md`](../21-exercise-level-rir.md)** (6 phases,
+§10), indexed in the root `CLAUDE.md`. Both review docs demoted to rationale
+records with "where they conflict, 21 wins" headers. Still no code.
+
+- **A1 widened N71 substantially.** The minimal fix was "fall back to the
+  prescribed RIR in the stamp"; the owner wants logged sets to actually
+  **capture `rir_reported`**, with stats reading RIR and reporting effective
+  reps. That amends the doc-11 premise itself (the prescription becomes a
+  *suggestion*; report honest reserve even when it differs) and **absorbs N38**
+  (honest-RIR capture, deferred since doc 16 §11). One resolution rule —
+  `rir_reported ?? target_rir` — is now shared by the stamp, the anchor and the
+  compliance marker, so the two paths converge by construction. Guard pinned in
+  the spec: the capture default is the prescribed RIR, **never 0** — that is the
+  N11 regression, already covered by `day-rules.test.ts:114`.
+- **A2 rejected my floor recommendation; absolute it is.** Recorded with its one
+  consequence: an assignment on a deload week wins over `deload.target_rir`
+  including downward, so the tool/UI must show the week's default and warn when
+  a value lands below it. No silent semantics.
+- **Owner note 3 needed two corrections, both now in the spec (§4.2).** First,
+  repricing already happens — `weightForRepsAtRir(anchor, reps, rir)` is where
+  the −9 % came from, so the policy adds *determinism*, not magnitude. Second,
+  "floor reps" would price the backed-off load **heavier**, not lighter (fewer
+  effective reps ⇒ lower `k` ⇒ higher weight): at RIR 5 the window floor gives
+  0.698 × anchor vs 0.667 centered. The deload's actual mechanic is
+  window-**centered** reps (`engine/index.ts:190-196`), which is both lighter and
+  parity with the owner's own "this is a deload at exercise level" framing. Table
+  at RIR 1/3/4/5/6/8 × floor/centered/top is in the spec.
+- **RIR ceiling stays 8**, answered with numbers: even RIR 8 is only −14.6 %
+  load vs a normal RIR-1 week, and "9 reps with 12 in reserve" is not a
+  meaningful instruction. Past ~15 % the lever is sets or substitution.
+- **A5 adopted narrowed, flagged for confirmation (doc 21 §9.1).** Excluding by
+  *measured confidence* would silently drop legitimate work (confidence also
+  degrades with effective reps, so an honest 15-rep set at RIR 1 is already
+  `low`, and A1's honest reporting pushes more real sets there). The spec
+  excludes on prescription **intent** (`resolvedRir > weekRir`) — deterministic
+  and plan-level, exactly like the existing `is_deload` filter — and excludes
+  from **strength** surfaces while **keeping** the sets in **volume** surfaces
+  with a disclosure flag, since a backed-off set still consumes recovery budget
+  and dropping it would read as under-MEV during a block the athlete is
+  complying with.
+- **A8 closed the override review.** Its surviving open thread — bounded
+  substitution and the `LOOKBACK_WEEKS = 2` return cliff — spun out as **N72**
+  (`F`, MED) so closing the doc loses nothing; §4.4 there is still its only
+  written record. The doc's other findings are pointed at their new homes in
+  doc 21 §5/§8.
+- **Dedup (protocol step 3).** A1 collides with two live rows, both folded
+  rather than left to duplicate the work: **T-N60a** (effort-reporting adoption
+  — "the schema exists but no UX invites it") is **superseded → doc 21 Phase 1**,
+  which now owns the interaction design; and **N38** is **halved** — its capture
+  affordance + doc-11 premise amendment move to Phase 1, leaving only the
+  periodic honest-RIR engine rule deferred. A side effect worth noting: doc 19
+  §4.3's effort-honesty gate has been suppressing effort claims across the
+  deterministic why and the facts `effort_status` precisely because effort was
+  inferred, never observed — Phase 1 unblocks that too.
+- N70 → `ready`, N71 → `ready` (doc 21 Phase 1), N72 → `triaged`, Batch 30c
+  verbatim appended. Owner starts Phase 1 in a new session.
+
+## 2026-07-31 — Session 92b: exercise-level RIR — assessment; override direction parked (N70 d2, N71, PR #211)
+
+Owner read the override review, judged it "messy and a large paradigm shift",
+and proposed an alternative: **exercise-level RIR assignment** (per exercise and
+per week), managing effort through the RIR framework the app already has. Asked
+for an assessment doc and for the previous review to be marked obsolete. No code.
+
+- **N70 rewritten** around the problem (temporary per-exercise effort/load
+  management) with two directions: direction 1 (overrides) **PARKED**, direction
+  2 (exercise RIR) **LIVE**. Assessment:
+  [`docs/reviews/2026-07-31-exercise-level-rir.md`](../reviews/2026-07-31-exercise-level-rir.md).
+  The override review got a parked banner naming what survives (its §2 engine
+  couplings, §4.4 substitution cliff, §5/§6) rather than being deleted. Both
+  review docs re-dated 2026-07-31 (the first was mis-dated 2026-07-26).
+- **The direction is right and cheaper than direction 1** — and more of it is
+  already built than the owner realised: `workout_exercises.target_rir` is
+  **already a per-slot column** and `queries/anchors.ts` already uses it as each
+  set's assumed RIR; `meso_exercises` is the slot-grain plan row;
+  `mesocycles.rir_schedule` (N18-B) is the per-week authoring precedent;
+  `edit_mesocycle` is the MCP seam; doc 14 §7 makes invalidation mechanical.
+  Crucially the whole clock problem disappears (§4.1 of direction 1) because a
+  per-week RIR value is content, not a window.
+- **New item N71 (`B`, HIGH, workstream A) — the blocking finding.** The app has
+  **two RIR assumptions**: the anchor uses the prescribed `target_rir`, but the
+  stored per-set stamp uses `rir_reported`, which is **never written**
+  (`DayView.tsx:1698`), so every stats surface treats every set as taken to
+  failure. That means exercise-level RIR would fix the engine's view and leave
+  the history chart, PRs and strength trend still reading lighter work as
+  decline — the proposal's headline benefit. It is also the general form of the
+  384-vs-367.5 divergence from the 2026-07-04 review §8.2. Fix is small
+  (`rir_reported ?? target_rir` + the existing restamp hook) but re-levels every
+  historical e1RM upward, so it wants its own PR.
+- **Two honest limits recorded:** RIR is a ~2 %/step lever — RIR 1→5 at 9 reps
+  is only **−9.1 %** load (computed against the live v23 params), so it is an
+  excellent fatigue lever and a weak absolute-load one; the app's own deload
+  pairs RIR 6 with a 50 % set cut, which is why the assessment recommends a
+  per-exercise **set floor** alongside. And RIR cannot say "stop deadlifts", so
+  bounded substitution stays open.
+- Recommended shape: **floor semantics** (`max(weekRir, floor)` — reduce-only,
+  ramp keeps working, deload wins), a `reason` column, an earn-gate predicate,
+  and a build sequence starting with N71. Eight owner decisions in §9.
+
+## 2026-07-31 — Session 92: coach-authored prescription overrides — review (N70, PR #211)
+
+Owner proposed an MCP path letting the LLM coach override or author
+prescriptions (exercise / day / week: exercise, weight, reps, sets + reason,
+duration, return criteria), prompted by a live lumbar-nerve episode where a
+coach-agreed rehab plan had nowhere to live. Asked for questions and concerns in
+a review doc before implementing. No code.
+
+- **New item N70** (`F`, HIGH, workstream P, `needs-input`); Batch 30 verbatim
+  appended. Review:
+  [`docs/reviews/2026-07-31-coach-override-prescriptions.md`](../reviews/2026-07-31-coach-override-prescriptions.md).
+- **The load-bearing correction (§2):** the owner's premise that overrides can
+  stay *separate* from the engine isn't available. The engine anchors on what
+  was **performed**, not on what was prescribed, so five couplings carry rehab
+  work into engine state regardless of where an override is stored — the
+  `session_best` anchor argmax (crossover at `30·log₂(1/r)` days: a 1-week −20 %
+  block is *invisible*, a 2-week+ block ratchets the anchor down), `baseWeight =
+  perf.bestWeight` (`engine/index.ts:332`), the pain/dampener clamp pinning next
+  week to the rehab load (`:434/:498/:513` — and rehab weeks are exactly when
+  pain gets reported), `climb_on_performed_reps` restarting the climb off
+  performed reps (`:386`), and the earn gate + miss throttle both tripping while
+  labelling perfect compliance a miss. Recommendation (§13 Q4): override
+  sessions neither earn nor count as missed (the deload treatment), anchor left
+  untouched, and the **coach prescribes the return ramp** — which is the asked-for
+  capability anyway.
+- **Architecture (§3):** a display-only override layer is rejected — every
+  volume view sums `workout_exercises.prescribed_sets` directly, so the plan
+  would desync from what the athlete is told to do (the N33 lesson). Recommended:
+  a **time-boxed constraint override** resolved into config inputs / effective
+  params (doc 14 §7 contract ⇒ fingerprint invalidation for free, engine stays
+  the only author of numbers), plus a labeled absolute pin for substitution.
+  `engine_decisions` already holds the counterfactual, so no "before" column.
+- **Traps found (§4):** `mesoStaleSignature` has **no clock**, so an override
+  that expires by date alone would never bust the reconcile's cheap gate and
+  would apply forever (`queries/regeneration.ts:600-632/:778`); and
+  `LOOKBACK_WEEKS = 2` means a 3-week rehab substitution brings the original
+  exercise back **priced off its pre-injury peak** — the worst direction after an
+  injury.
+- Also flagged: there is no separate coach principal (MCP-only is friction, not
+  security ⇒ an in-app view/clear escape hatch is mandatory), the pain-gate
+  double-cut, the hard-rule-8 design pass (no mockup figure; doc-16 Phase-3
+  marker precedent), and the stats-comparability disclosure. Eight owner
+  decisions in review §13; N39 (per-exercise progression-off override) is a
+  subset of this item.
 ## 2026-07-31 — Session 93: MEASURE review round 1 — capture, the Health bus, three-source synthesis (N66, PR #214)
 
 Owner reviewed doc 20 and returned five items plus one confirmation. Doc 20
