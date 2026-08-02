@@ -30,6 +30,28 @@ without" the measuring band.
      resolution — the whole of Phase 1 — had not reached it**, and §6.1's band
      wouldn't have either. Found while wiring 2b, fixed in the same PR. Phase 1's
      write-up lists the view among the consumers of the stamp; it isn't one.
+- **Deployed the same session, and the deploy found three drifts.** The owner
+  asked for the restamp + migrations to be applied, so they were (run record in
+  `docs/deployment/manual-operations.md`). The N71 re-levelling moved 9 087
+  stamps, avg +4.80 lb (+4.85 %), strictly upward.
+  1. `restamp_e1rm` **has never worked at scale** — a 1 000-id `.in()` filter
+     goes in the query string and 414s. Phase 1 shipped it untested against real
+     volume; it was also reporting the failure as `"[object Object]"`. Both
+     fixed. The prod restamp ran as verified SQL instead (0 mismatches against
+     the TS engine over all 2 618 distinct combos).
+  2. `20260721000001` had been applied to prod as raw SQL and **never entered
+     the migration ledger** — a `db push` would later have re-run it and
+     reverted the §2 resolution. Recorded.
+  3. `coaching_prompts.body` was **12 000 in the repo and 24 000 in prod** —
+     another uncommitted hosted-only migration. Reconstructed.
+  The pattern is the point: hosted and `supabase/migrations` drift in BOTH
+  directions, and nothing checks. Worth a standing session-start reconcile.
+- **The params row nearly shipped on the wrong base.** The band was first
+  written as v24 over the v23 file; hosted v24 already exists (`rate_source`
+  → "plan") and v25 (active) adds the envelope loop, so activating it would have
+  reverted both. Rebuilt as v26 from v25's stored materialization. Standing rule
+  now in the runbook: **build a params row from the ACTIVE row, never from the
+  newest file in the repo.**
 - **Miss-throttle parity turned out to be a test, not a feature.** §5 asks that a
   backed-off session neither earn nor count as a missed earn. It already can't:
   the throttle pairs a `stepped` ask with the next verdict, and a backed-off week

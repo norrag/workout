@@ -40,6 +40,8 @@ import type { McpExtra, McpClient } from "../session";
  * naturally as decisions recompute).
  */
 
+import { errorMessage } from "./admin";
+
 function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
   return toolResult(payload, opts);
 }
@@ -164,7 +166,7 @@ function registerProposeCoachingPrompt(server: McpServer) {
       try {
         newVersion = await proposeCoachingPrompt(client, body, notes ?? null);
       } catch (e) {
-        return jsonResult({ ok: false, error: e instanceof Error ? e.message : String(e) });
+        return jsonResult({ ok: false, error: errorMessage(e) });
       }
       const summary = `proposed coaching_prompt v${newVersion} (inactive)`;
       await recordMcpWrite(userId, PROPOSE_COACHING_PROMPT, { version: newVersion, notes }, summary);
@@ -212,7 +214,7 @@ function registerActivateCoachingPrompt(server: McpServer) {
       try {
         await activateCoachingPrompt(client, version);
       } catch (e) {
-        return jsonResult({ ok: false, error: e instanceof Error ? e.message : String(e) });
+        return jsonResult({ ok: false, error: errorMessage(e) });
       }
       const summary = `activated coaching_prompt v${version}`;
       await recordMcpWrite(userId, ACTIVATE_COACHING_PROMPT, { version }, summary);

@@ -494,17 +494,50 @@ the rate-source flip (`band_position` composes identically under `"band"` and
 | **③ Owner reviews + activates** | Sanity-check the position the fold currently derives for the owner's own history (reads from the same `get_progression_history` evidence; short of `min_history_mesos` qualifying mesos it is exactly the default). Activate via `activate_engine_params`; roll back by re-activating the prior row — the loop is OFF again instantly (derived, no stored state to unwind). |
 | **④ Monitor + refit (standing)** | Each decision records the position it consumed in its `inputs` (`get_engine_decisions`), so the position's trajectory is reconstructible per meso boundary. As real mesos complete, check the provisional `raise`/`lower` cutoffs against the observed `get_progression_history` distributions (does a "good" meso clear `earn_rate 0.7` with `miss_ratio ≤ 0.2`? do rate-pacer trips occur at all?) and refit via a further micro-bump if not. Watch for the §7 worst case: a position pinned at 0/1 for consecutive boundaries means the thresholds need a refit (both are defensible programs, but a pin is a signal, not a steady state). The fold + goldens live in `src/lib/engine/rules/envelope.ts` / `__tests__/envelope.test.ts`. |
 
-### Apply the doc 21 Phase 2/2b migrations + activate engine_params **v26** (the measuring band)
+### ~~Apply the doc 21 Phase 2/2b migrations~~ (DONE 2026-08-02) + activate engine_params **v26** (the measuring band)
 
-Three migrations land with doc 21 Phase 2/2b. The first two are **additive and
-inert** (no behavior change on apply); only the v24 activation changes anything,
-and even that is expected to be a no-op.
+Three migrations land with doc 21 Phase 2/2b. **Steps ①–③ were applied to hosted
+on 2026-08-02** (see the run record below); only **step ⑤, activating v26,
+remains** — and it is expected to be a no-op.
+
+**Run record (2026-08-02).** In order:
+1. Rollback snapshot `ops.e1rm_restamp_backup_20260802` (11 499 rows: id, e1rm,
+   e1rm_confidence).
+2. `20260721000001_restamp_logged_set_e1rm_v11_catchup` **recorded** in the
+   ledger. It had been applied to prod out-of-band as raw SQL on 2026-07-21 and
+   never registered — so it was a data no-op, but an un-ledgered file is a trap:
+   a later `db push` would have run it *after* the Phase-1 restamp and reverted
+   the doc 21 §2 resolution on every row it touched.
+3. `20260802000001_exercise_level_rir` applied.
+4. **The doc 21 §2 / N71 re-levelling restamp ran.** 9 087 e1RM stamps and
+   5 891 confidence labels moved; average **+4.80 lb (+4.85 %)**, max +42.5,
+   min 0 — strictly upward, as doc 10 §9.1 predicted. Re-running the same
+   computation now selects 0 rows (idempotent).
+   *It was run as SQL, not via the `restamp_e1rm` tool, because the tool is
+   broken in the deployed build* — see the note below — *and the SQL was
+   verified byte-for-byte against the TS engine (`stampE1rm`) across all 2 618
+   distinct `(weight, reps, assumedRir)` combinations in prod: 0 mismatches.*
+5. `20260802000002_measuring_band` applied (the `none` label + `v_exercise_prs`
+   reading the stamp).
+6. `20260802000003_engine_params_v26_measuring_band` applied — v26 present,
+   `is_active = false`, `is_replayable = true`, hash
+   `6dd0224425b8…`, carrying v25's `rate_source: "plan"` and envelope block
+   forward unchanged.
+
+> **`restamp_e1rm` is broken in the currently deployed build** (fixed on the
+> doc 21 Phase 2 branch, not yet merged). It pages 1 000 sets at a time and then
+> looks their slots up with a single `.in("id", …)` — PostgREST puts that in the
+> query string, so ~1 000 UUIDs is a ~37 KB URL and the request 414s. The tool
+> reported it as `"[object Object]"` because the handler stringified a
+> PostgrestError with `String(e)`. Both are fixed on the branch (chunked lookup
+> + a real `errorMessage` helper). **Once that merges and deploys, the tool is
+> the supported way to restamp**; until then, use the verified SQL above.
 
 | Step | What / why |
 |---|---|
-| **① Apply `20260802000001_exercise_level_rir`** | Adds the `meso_exercises` effort-assignment columns and widens the `microcycles` / `workout_exercises` `target_rir` CHECKs 0–8 → 0–30. Pure widening + nullable columns, so every existing row stays valid and no data migration runs. RLS unchanged (`meso_exercises_all_own` covers new columns). Nothing writes an assignment until doc 21 Phase 3 (MCP) or Phase 6 (UI), so the lever is inert on apply. |
-| **② Apply `20260802000002_measuring_band`** | Widens `logged_sets.e1rm_confidence` to admit `'none'` and rebuilds `v_exercise_prs` to read the stored per-set stamp (`logged_sets.e1rm`) instead of re-computing e1RM in SQL off `coalesce(rir_reported, 0)`. **This one is not purely cosmetic:** the old view ignored doc 21 §2's shared RIR resolution, so PRs were still computed on the pre-Phase-1 "every set taken to failure" assumption. After apply, PR e1RMs read whatever the stamps currently say. If `restamp_e1rm` has not been run against production yet (see the Phase-1 entry / doc 10 §9.1), run it **before or right after** this migration so the view and the stamps agree; until then, PRs move only for sets stamped since the Phase-1 deploy. `best_weight` / `best_reps` keep their coherent-set semantics either way. |
-| **③ Apply `20260802000003_engine_params_v26_measuring_band`** | Inserts engine_params **v26** with `is_active = false`. v25 stays active; nothing changes for users. |
+| ~~**① Apply `20260802000001_exercise_level_rir`**~~ **(done)** | Adds the `meso_exercises` effort-assignment columns and widens the `microcycles` / `workout_exercises` `target_rir` CHECKs 0–8 → 0–30. Pure widening + nullable columns, so every existing row stays valid and no data migration runs. RLS unchanged (`meso_exercises_all_own` covers new columns). Nothing writes an assignment until doc 21 Phase 3 (MCP) or Phase 6 (UI), so the lever is inert on apply. |
+| ~~**② Apply `20260802000002_measuring_band`**~~ **(done)** | Widens `logged_sets.e1rm_confidence` to admit `'none'` and rebuilds `v_exercise_prs` to read the stored per-set stamp (`logged_sets.e1rm`) instead of re-computing e1RM in SQL off `coalesce(rir_reported, 0)`. **This one is not purely cosmetic:** the old view ignored doc 21 §2's shared RIR resolution, so PRs were still computed on the pre-Phase-1 "every set taken to failure" assumption. After apply, PR e1RMs read whatever the stamps currently say. If `restamp_e1rm` has not been run against production yet (see the Phase-1 entry / doc 10 §9.1), run it **before or right after** this migration so the view and the stamps agree; until then, PRs move only for sets stamped since the Phase-1 deploy. `best_weight` / `best_reps` keep their coherent-set semantics either way. |
+| ~~**③ Apply `20260802000003_engine_params_v26_measuring_band`**~~ **(done)** | Inserts engine_params **v26** with `is_active = false`. v25 stays active; nothing changes for users. |
 | **④ Replay diff for v26** | Admin MCP `replay_decisions` against the candidate. Expected: **empty**. `max_measuring_rir` is 8, which is the pre-doc-21 `target_rir` ceiling, so no set that can exist today is past the band and no prescription, anchor, or stamp moves. A non-empty diff means something already wrote a `target_rir` above 8 — investigate before activating. |
 | **⑤ Activate v26** | `activate_engine_params { version: 26 }` (or the single-active SQL pair). This is what arms the band. Roll back by re-activating v25 — the band is a pure read-time rule plus a stamp, and `activate_engine_params` restamps when an `e1rm` value moves, so a rollback restamps back. |
 

@@ -108,6 +108,11 @@ export interface RestampResult {
   updated: number;
 }
 
+/** Max ids per `.in()` lookup. PostgREST encodes filters in the query string,
+ *  so this bounds URL length; 200 UUIDs ≈ 7.5 KB, comfortably inside every
+ *  proxy/gateway limit while keeping the round-trip count low. */
+const LOOKUP_CHUNK = 200;
+
 /**
  * Restamp every stored per-set e1RM under `params` (all users — engine params
  * are global, so the caller passes the SERVICE client). Keyset-paged full-row
@@ -144,15 +149,22 @@ export async function restampLoggedSetE1rms(
     // doc 21 §2: resolve the page's slots' prescribed target RIRs — the
     // fallback half of `assumedRir`, so a restamp reproduces exactly what log
     // time would have written for the same row.
+    //
+    // CHUNKED (R-restamp): a 1000-row page can carry ~1000 distinct slot ids,
+    // and PostgREST puts `.in()` in the QUERY STRING — ~37 KB of UUIDs, past
+    // every practical URL limit, so the request 414s and the whole restamp dies
+    // with an opaque error. The first at-scale run hit exactly that. Chunk the
+    // lookup so the URL stays bounded regardless of page size.
     const weIds = [...new Set(rows.map((r) => r.workout_exercise_id))];
-    const { data: wes, error: weError } = await service
-      .from("workout_exercises")
-      .select("id, target_rir")
-      .in("id", weIds);
-    if (weError) throw weError;
-    const targetRirByWe = new Map(
-      (wes ?? []).map((w) => [w.id, w.target_rir] as const),
-    );
+    const targetRirByWe = new Map<string, number | null>();
+    for (let i = 0; i < weIds.length; i += LOOKUP_CHUNK) {
+      const { data: wes, error: weError } = await service
+        .from("workout_exercises")
+        .select("id, target_rir")
+        .in("id", weIds.slice(i, i + LOOKUP_CHUNK));
+      if (weError) throw weError;
+      for (const w of wes ?? []) targetRirByWe.set(w.id, w.target_rir);
+    }
 
     const changed = planRestamps(rows, cfg, targetRirByWe);
     for (let i = 0; i < changed.length; i += writeChunk) {

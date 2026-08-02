@@ -151,7 +151,41 @@ non-measuring and the activation replay diff is expected empty. Activation is th
 usual doc-14 v-bump, recorded in
 [deployment/manual-operations.md](deployment/manual-operations.md).
 
-Full suite green (1568, +76), typecheck + lint clean.
+### Applied to production 2026-08-02
+
+All three migrations are live, and **the doc 21 §2 / N71 re-levelling restamp
+has now run**: 9 087 e1RM stamps and 5 891 confidence labels moved, average
+**+4.80 lb (+4.85 %)**, max +42.5, min 0 — strictly upward, exactly as doc 10
+§9.1 predicted. Rollback snapshot in `ops.e1rm_restamp_backup_20260802`. v26 is
+present and INACTIVE; the band is not armed yet.
+
+Three things the deploy surfaced, all fixed here:
+
+1. **`restamp_e1rm` had never worked at scale.** It pages 1 000 sets, then
+   resolves their slots with one `.in("id", …)`. PostgREST puts that in the
+   query string — ~1 000 UUIDs is a ~37 KB URL — so the request 414s and the
+   restamp dies. Phase 1 shipped it untested against real volume. The lookup is
+   now chunked (200/request, pinned by a test) and the admin tools stringify
+   errors through a real `errorMessage` helper instead of `String(e)`, which had
+   reported the PostgrestError as the useless `"[object Object]"`. The
+   production restamp was therefore run as SQL — verified byte-for-byte against
+   `stampE1rm` over all 2 618 distinct `(weight, reps, assumedRir)` combos in
+   prod, 0 mismatches.
+2. **A repo migration had never been recorded.**
+   `20260721000001_restamp_logged_set_e1rm_v11_catchup` was applied to prod as
+   raw SQL on 2026-07-21 and never entered the ledger. Harmless as data, but a
+   live trap: a later `db push` would have run it *after* the Phase-1 restamp
+   and reverted the §2 resolution on every row. Now recorded.
+3. **`coaching_prompts.body` disagreed between repo and prod** (12 000 vs
+   24 000 chars) — another hosted-only migration that was never committed. A
+   fresh environment would have rejected prompts prod accepts. Reconstructed as
+   `20260725000002_coaching_prompts_length.sql`, idempotent.
+
+The through-line: **hosted state and `supabase/migrations` had drifted in both
+directions**, and every one of these was a silent divergence waiting to bite a
+fresh environment or a future push. Worth a standing check at session start.
+
+Full suite green (1569, +77), typecheck + lint clean.
 
 ## 2026-08-02 — doc 21 Phase 1: one RIR premise (N71 + N38)
 
