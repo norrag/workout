@@ -20,12 +20,39 @@ The §6 proposals were reviewed and accepted with these choices, and are now
 1. **Anchor = recency-weighted e1RM**, not all-time best — so the predictor
    tracks current form and legitimately drops when performance dips (e.g. a cut
    deficit). Half-life `e1rm.recency_halflife_days` (default 30 d), tunable.
-2. **The RIR premise (the user's framing).** The app *prescribes* a target RIR
-   and trusts the user to hit it honestly. A logged `weight × reps` against a
-   target RIR therefore **is** an RIR data point — there is **no separate
-   per-set RIR capture**. The sliders (effort / performance / fatigue, workload
-   / pump) are the cross-check on how it actually went and feed the next target.
-   So all e1RM math uses the set's prescribed target RIR as the assumed RIR.
+2. **The RIR premise (the user's framing).** ⚠️ **AMENDED 2026-08-02 by
+   [doc 21 §2](./21-exercise-level-rir.md) Phase 1 (N71/N38) — read that first;
+   where the two conflict, doc 21 wins.** The original premise, kept here as the
+   record: the app *prescribes* a target RIR and trusts the user to hit it
+   honestly; a logged `weight × reps` against a target RIR therefore **is** an
+   RIR data point — there is **no separate per-set RIR capture**; the sliders
+   (effort / performance / fatigue, workload / pump) are the cross-check on how
+   it actually went and feed the next target; all e1RM math uses the set's
+   prescribed target RIR as the assumed RIR.
+
+   **The amendment.** The prescription is now a *suggestion*, and the athlete
+   reports RIR **per set** — their honest estimate of actual reps in reserve,
+   **even when it differs from what was prescribed**. The prescribed target RIR
+   becomes the **fallback**, not the assumption, through one resolution rule
+   used everywhere:
+
+   ```
+   assumedRir(set) = set.rir_reported ?? set.workout_exercise.target_rir
+   ```
+
+   Why it had to change: the premise was implemented in *two different ways*.
+   The strength anchor honored each set's prescribed `target_rir`, while the
+   stored per-set e1RM stamp keyed on `logged_sets.rir_reported` — which the app
+   never wrote. So `effectiveReps = reps + 0`, and every stats surface read
+   every set as taken to failure while the engine's own anchor did not (N71).
+   The shared rule closes that by construction: stamp, anchor, compliance
+   marker, and the restamp backfill now resolve identically.
+
+   Two guards travel with it. **An absent report never resolves to 0** — that is
+   the N11 regression (pinned by `day-rules.test.ts`), where an
+   exactly-as-prescribed set read as a big miss, worst on deloads. And
+   `rir_reported` stays capped at **0–10**: past that the honest report is "no
+   idea", i.e. null.
 3. **Predicted reps = a single integer** (rounded), clamped ≥ 1.
 
 ---

@@ -418,13 +418,47 @@ pass.* --  QUALIATITIVE BAND
 
 ## 10. Phases (one per PR, each green on its own)
 
-**Phase 1 — one RIR premise (N71 + N38).** `assumedRir = rir_reported ??
-target_rir` at the stamp site, the anchor, and the marker; per-set RIR capture
-in the day view (pre-filled with the prescription, never 0 — pin the N11 case);
-restamp backfill via `e1rm-restamp`; `rir_reported` + effective reps in exercise
-history; RIR copy rewrite; doc 10/11 amendment recording the re-levelling.
+**Phase 1 — one RIR premise (N71 + N38). ✅ SHIPPED 2026-08-02.** `assumedRir =
+rir_reported ?? target_rir` at the stamp site, the anchor, and the marker;
+per-set RIR capture in the day view (pre-filled with the prescription, never 0 —
+pin the N11 case); restamp backfill via `e1rm-restamp`; `rir_reported` +
+effective reps in exercise history; RIR copy rewrite; doc 10/11 amendment
+recording the re-levelling.
 *Tests:* stamp ⇄ anchor parity on one fixture; the N11 exactly-as-prescribed
 case on a deload; restamp idempotence; capture default.
+
+*As built:*
+- `engine/predict.ts::assumedRir(reported, prescribed)` is the one rule,
+  re-exported through the engine barrel. Consumers: the stamp site
+  (`log/actions.ts::computeSetE1rm`, log **and** amend), the anchor
+  (`queries/anchors.ts`), the compliance marker
+  (`engine/rules/progression.ts::setComplianceMarker`, which the day-view
+  markers and the earn gate both read), the restamp planner, and exercise
+  history. The anchor already had the fallback; the other paths did not — that
+  asymmetry *was* N71.
+- The stamp's fallback needs the slot's prescribed RIR, fetched by
+  `getSlotTargetRir` / `getSetSlotTargetRir` and folded into the existing
+  `Promise.all` on the log path, so the hot write path gains no serial latency.
+- Capture is a **third value column on the set grid** (`LB · REPS · RIR · LOG`),
+  the same input primitive as the other two, pre-filled from
+  `day-rules.ts::captureRirDefault` and parsed by `reportedRirFromInput`
+  (out-of-range or empty ⇒ report nothing, never a wrong number). Both are pure
+  and unit-tested. Design pass recorded in `docs/09-design-changelog.md`
+  (2026-08-02) per hard rule 8 — §9.2's **option (a)**.
+- The write queue's `log` op carries `rir_reported`; ops enqueued by the
+  previous build (no such field) still decode and drain, dispatching null.
+- The backfill runs through the new admin-gated MCP tool **`restamp_e1rm`** —
+  `activate_engine_params` only restamps when an `e1rm` param *value* moves, and
+  here the **resolution** changed while every param held. Idempotent.
+- Exercise history reports `avg_rir` (assumed), `rir_source`
+  (`reported`/`assumed`/`mixed`) and `effective_reps`, on the flip line and in
+  the MCP payload, so an assumption is never shown as an observation (§6.2).
+- The one-time upward re-levelling is written up in **doc 10 §9.1**; the doc-11
+  premise carries the amendment banner.
+
+*Not in Phase 1, by design:* the measuring band (§6.1) is Phase 2b — it only
+becomes load-bearing once §4.3's unbounded prescription RIR exists, and nothing
+that can be logged today (`target_rir ≤ 8`, `rir_reported ≤ 10`) reaches it.
 
 **Phase 2 — assignment: plan + engine.** Migration (§3, incl. widening the
 `target_rir` checks to 0–30); pure resolution (§4.1) applied after

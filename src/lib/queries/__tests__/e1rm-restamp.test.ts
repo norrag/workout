@@ -19,6 +19,7 @@ const PRE_V11 = DEFAULT_ENGINE_PARAMS as EngineParams;
 function row(over: Partial<RestampSetRow>): RestampSetRow {
   return {
     id: "s1",
+    workout_exercise_id: "we1",
     weight: 245,
     reps: 15,
     rir_reported: null,
@@ -80,5 +81,90 @@ describe("planRestamps", () => {
       V18_PARAMS.e1rm,
     );
     expect(plan[0].e1rm).toBeCloseTo(326.7, 1);
+  });
+
+  // doc 21 §2 (N71): the RESOLUTION changed, not a param value — an unreported
+  // set now restamps at its slot's prescribed target RIR instead of being
+  // treated as taken to failure. This is the one-time upward re-levelling.
+  describe("doc 21 §2 — assumedRir fallback to the slot's prescribed target", () => {
+    const slots = new Map<string, number | null>([["we1", 2]]);
+
+    it("an unreported set restamps at the slot's prescribed RIR, not at 0", () => {
+      // 245×8, unreported, slot prescribed 2 RIR ⇒ identical to a REPORTED 2
+      const viaFallback = planRestamps(
+        [row({ weight: 245, reps: 8, rir_reported: null, e1rm: 1 })],
+        V18_PARAMS.e1rm,
+        slots,
+      );
+      const viaReport = planRestamps(
+        [row({ weight: 245, reps: 8, rir_reported: 2, e1rm: 1 })],
+        V18_PARAMS.e1rm,
+      );
+      expect(viaFallback[0].e1rm).toBe(viaReport[0].e1rm);
+      expect(viaFallback[0].e1rm).toBeCloseTo(326.7, 1);
+    });
+
+    it("re-levels an existing stamp UPWARD (the N71 correction)", () => {
+      // the stored stamp was computed as if the set went to failure (rir 0)
+      const asFailure =
+        planRestamps(
+          [row({ weight: 245, reps: 8, rir_reported: null, e1rm: 1 })],
+          V18_PARAMS.e1rm,
+        )[0].e1rm ?? 0;
+      const resolved =
+        planRestamps(
+          [row({ weight: 245, reps: 8, rir_reported: null, e1rm: 1 })],
+          V18_PARAMS.e1rm,
+          slots,
+        )[0].e1rm ?? 0;
+      expect(resolved).toBeGreaterThan(asFailure);
+    });
+
+    it("a reported RIR still wins over the slot's prescription", () => {
+      const plan = planRestamps(
+        [row({ weight: 245, reps: 8, rir_reported: 0, e1rm: 1 })],
+        V18_PARAMS.e1rm,
+        new Map([["we1", 5]]),
+      );
+      // eff reps 8, not 13
+      expect(plan[0].e1rm).toBeCloseTo(
+        planRestamps(
+          [row({ weight: 245, reps: 8, rir_reported: 0, e1rm: 1 })],
+          V18_PARAMS.e1rm,
+        )[0].e1rm ?? 0,
+        6,
+      );
+    });
+
+    it("a slot with no prescription leaves the row on its reported RIR alone", () => {
+      const plan = planRestamps(
+        [row({ weight: 245, reps: 8, rir_reported: null, e1rm: 1 })],
+        V18_PARAMS.e1rm,
+        new Map([["we1", null]]),
+      );
+      expect(plan[0].e1rm_confidence).toBe("low"); // unresolved ⇒ null RIR
+    });
+
+    it("is idempotent — a second pass under the same map writes nothing", () => {
+      const first = planRestamps(
+        [row({ weight: 245, reps: 8, rir_reported: null, e1rm: 1 })],
+        V18_PARAMS.e1rm,
+        slots,
+      )[0];
+      const second = planRestamps(
+        [
+          row({
+            weight: 245,
+            reps: 8,
+            rir_reported: null,
+            e1rm: first.e1rm,
+            e1rm_confidence: first.e1rm_confidence,
+          }),
+        ],
+        V18_PARAMS.e1rm,
+        slots,
+      );
+      expect(second).toEqual([]);
+    });
   });
 });

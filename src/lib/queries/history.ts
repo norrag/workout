@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { coerceLoadType, effectiveLoad, isBodyweightLoad } from "@/lib/engine";
+import {
+  assumedRir,
+  coerceLoadType,
+  effectiveLoad,
+  isBodyweightLoad,
+} from "@/lib/engine";
+import { getActiveEngineParams } from "./generation";
 import type { Database } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
@@ -18,10 +24,22 @@ export interface HistoryEntry {
    * exercise — the flip-view metric in place of e1RM there (owner #3). Null for
    * external exercises (the flip shows e1RM) or when no bodyweight was captured. */
   effective_load: number | null;
-  /** session-average reported RIR across the working sets, denoted next to the
-   * e1RM in the flip view so it's clear the estimate is RIR-aware (owner note:
-   * "denote RIR with the sets/e1rm"). Null when no set reported an RIR. */
+  /** session-average ASSUMED RIR across the working sets — doc 21 §2/§6.2, the
+   * same resolution the e1RM was stamped at (`rir_reported ?? the slot's
+   * prescribed target_rir`), denoted next to the e1RM in the flip view so it's
+   * clear the estimate is RIR-aware (owner note: "denote RIR with the
+   * sets/e1rm"). Null only when the session has neither report nor
+   * prescription. */
   avg_rir: number | null;
+  /** doc 21 §6.2 — where that RIR came from, so the surface never passes an
+   * assumption off as an observation: `reported` (the athlete told us on every
+   * set), `assumed` (all fallen back to the prescription), `mixed`, or null
+   * (nothing resolvable). */
+  rir_source: "reported" | "assumed" | "mixed" | null;
+  /** doc 21 §6.2 (A1) — session-average EFFECTIVE reps (`reps + RIR·offset`),
+   * the quantity the e1RM is actually computed over. Reported alongside the
+   * RIR so the estimate's basis is legible rather than implied. */
+  effective_reps: number | null;
   is_deload: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
   session_note: string | null;
@@ -59,13 +77,43 @@ export function sessionAvgE1rm(e1rms: (number | null)[]): number | null {
   return Math.round((present.reduce((a, b) => a + b, 0) / present.length) * 10) / 10;
 }
 
-/** The session's average reported RIR across its working sets (null-skipped),
- *  rounded to 1 dp — denoted with the e1RM so the estimate's effort context is
- *  visible. Null when no working set reported an RIR. */
+/** The session's average RIR across its working sets (null-skipped), rounded to
+ *  1 dp — denoted with the e1RM so the estimate's effort context is visible.
+ *  Null when nothing resolves. Callers pass the ASSUMED RIRs (doc 21 §2), so
+ *  this is the effort the estimate was actually priced at. */
 export function sessionAvgRir(rirs: (number | null)[]): number | null {
   const present = rirs.filter((v): v is number => v != null);
   if (present.length === 0) return null;
   return Math.round((present.reduce((a, b) => a + b, 0) / present.length) * 10) / 10;
+}
+
+/**
+ * doc 21 §6.2 — provenance of a session's RIR, so an assumption is never shown
+ * as an observation. `reported` only when EVERY resolvable working set carried
+ * the athlete's own report; `assumed` when none did; `mixed` in between.
+ */
+export function sessionRirSource(
+  sets: { rir_reported: number | null; assumed: number | null }[],
+): "reported" | "assumed" | "mixed" | null {
+  const resolvable = sets.filter((s) => s.assumed != null);
+  if (resolvable.length === 0) return null;
+  const reported = resolvable.filter((s) => s.rir_reported != null).length;
+  if (reported === resolvable.length) return "reported";
+  if (reported === 0) return "assumed";
+  return "mixed";
+}
+
+/** The session's average EFFECTIVE reps (`reps + assumedRir × rir_offset`) —
+ *  the quantity every per-set e1RM is computed over (doc 10 §1). Rounded to
+ *  1 dp; sets with no resolvable RIR are skipped, never counted as reps + 0. */
+export function sessionAvgEffectiveReps(
+  sets: { reps: number; assumed: number | null }[],
+  rirOffset: number,
+): number | null {
+  const present = sets.filter((s) => s.assumed != null);
+  if (present.length === 0) return null;
+  const total = present.reduce((a, s) => a + s.reps + s.assumed! * rirOffset, 0);
+  return Math.round((total / present.length) * 10) / 10;
 }
 
 /**
@@ -162,6 +210,8 @@ export async function getExerciseHistory(
     { data: workouts, error: workoutError },
     { data: feedback, error: feedbackError },
     { data: exercise, error: exError },
+    { data: wes, error: weError },
+    { params },
   ] = await Promise.all([
     supabase.from("mesocycles").select("id, name").in("id", mesoIds),
     supabase
@@ -178,12 +228,21 @@ export async function getExerciseHistory(
       .select("equipment_type, load_type")
       .eq("id", exerciseId)
       .maybeSingle(),
+    // doc 21 §2: the fallback half of `assumedRir` — what each set's slot
+    // prescribed, so history reports the RIR the e1RM was actually stamped at
+    // rather than silently implying every set went to failure (N71)
+    supabase.from("workout_exercises").select("id, target_rir").in("id", weIds),
+    getActiveEngineParams(supabase),
   ]);
   if (mesoError) throw mesoError;
   if (microError) throw microError;
   if (workoutError) throw workoutError;
   if (feedbackError) throw feedbackError;
   if (exError) throw exError;
+  if (weError) throw weError;
+  const targetRirByWe = new Map(
+    (wes ?? []).map((w) => [w.id, w.target_rir] as const),
+  );
   // T-I2: for a bodyweight exercise the flip view shows the session-average
   // EFFECTIVE load (bodyweight ± entered) using each set's captured bodyweight.
   const loadType = exercise
@@ -230,7 +289,26 @@ export async function getExerciseHistory(
       reps,
       e1rm,
       effective_load,
-      avg_rir: sessionAvgRir(group.map((s) => s.rir_reported)),
+      // doc 21 §2/§6.2: resolve once, then report the RIR, where it came from,
+      // and the effective reps the estimate is computed over
+      ...(() => {
+        const resolved = group.map((s) => ({
+          reps: s.reps,
+          rir_reported: s.rir_reported,
+          assumed: assumedRir(
+            s.rir_reported,
+            targetRirByWe.get(s.workout_exercise_id),
+          ),
+        }));
+        return {
+          avg_rir: sessionAvgRir(resolved.map((r) => r.assumed)),
+          rir_source: sessionRirSource(resolved),
+          effective_reps: sessionAvgEffectiveReps(
+            resolved,
+            params.e1rm.rir_offset,
+          ),
+        };
+      })(),
       is_deload: micro?.is_deload ?? false,
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };

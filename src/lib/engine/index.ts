@@ -65,6 +65,7 @@ export {
 } from "./macro";
 export {
   estimateE1rm,
+  assumedRir,
   type E1rmEstimate,
   type E1rmConfidence,
 } from "./e1rm";

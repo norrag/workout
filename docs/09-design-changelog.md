@@ -42,6 +42,68 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-02 — Day View: per-set RIR capture joins the set grid (fig 1.1, doc 21 §2/§8, N71/N38)
+
+- **Change:** the logging set grid gains a **third value column, `RIR`**, between
+  `REPS` and `LOG`. The header row becomes `LB · REPS · RIR · LOG` and the grid
+  goes `[20px 1fr 1fr 44px 44px]` — `LB`/`REPS` keep the flexible columns, `RIR`
+  takes a fixed 44px (one or two digits is the whole range), and `LOG` is
+  unchanged at 44px. The cell is the **same input primitive** as `LB`/`REPS`:
+  same 35px box, 15px numeral, same four state treatments (logged / next /
+  skipped / future). No new control type is introduced.
+  - **Pre-filled with the prescribed target RIR** — never 0, never empty. On a
+    logged row it shows what that set reported; on a queued row what it
+    reported at the tap; on an unlogged row the week's ask.
+  - **Static rows** (future / skipped / completed-session / queued) render the
+    number as text like the other two cells. It is **muted to `ink/45` whenever
+    the number is the prescription rather than something the athlete reported** —
+    a logged set that carried no report reads muted, exactly like an unlogged
+    row's ask. Same honesty rule as history's `~` marker (§6.2): an assumption
+    is never rendered as an observation.
+  - Editing a logged row's RIR saves through the same blur → amend path as
+    weight and reps; a value outside 0–10 (or an emptied cell) reports
+    **nothing** rather than a wrong number, and the server falls back to the
+    prescription.
+- **Rationale:** doc 21 §2 (A1) amends the RIR premise — the prescription is a
+  *suggestion* and the athlete reports honest reps-in-reserve *even when it
+  differs*. Without a write surface, `logged_sets.rir_reported` was dormant and
+  every stats surface read every set as taken to failure (N71). Doc 21 §9.2
+  settled the ergonomics as **option (a)**, a per-set control pre-filled with
+  the prescribed value: the honest default and the simplest to reason about.
+  Pre-filling the prescription makes the default a **no-op** — an untouched cell
+  reports exactly what the server's `assumedRir` fallback would have resolved to
+  — so the new column costs nothing on the hot path and only a *changed* value
+  carries information. Pre-filling **0** was rejected outright: that is the N11
+  regression, where an exactly-as-prescribed set read as a big miss, worst on
+  deloads.
+- **Affected figures:** 1.1 (set grid), and the shared set-row component
+  wherever it appears (1.2, 1.3).
+- **Rule-8 pass:** **no mockup figure exists for per-set RIR capture** —
+  verified against `workout - App Screens v2.dc.html` (the set grid there is
+  `LB / REPS / LOG` throughout; RIR appears only as the week's target in header
+  and prescription copy, never as a set-row cell). Doc 21 §8 anticipates this
+  and requires the house-style transcription to be recorded here before
+  building. Same precedent as the P19/N35 marker glyphs (2026-07-09). House
+  style honored: existing cell primitive reused rather than invented; ink only,
+  no accent (orange stays reserved for position/selection); square corners;
+  tracked all-caps column label.
+- **Touch targets:** the 44px column keeps the input's hit area at 44×35 with
+  the row's 10px gaps around it, matching the `LOG` column's treatment (R18).
+  `LB`/`REPS` narrow from ~118px to ~100px on a 375px viewport — still well
+  clear of a three-digit weight at 15px.
+- **Copy (doc 21 §8):** the `rir` glossary entry changes **meaning**, not just
+  wording — it now states that the target is what to aim for, not what to
+  report, and asks for the RIR the athlete actually had. The `rir_ramp` entry
+  gains "unless one is set for a specific exercise" ahead of doc 21 Phase 2.
+- **Also in this pass (exercise history, fig 3.1b/3.2):** the e1RM flip line
+  reports the RIR the estimate was **priced at** and the **effective reps**
+  behind it — `367.5 lb EST 1RM · ~2 RIR · 10 EFF REPS`. A leading `~` marks an
+  RIR that was *assumed* from the prescription rather than reported, so an
+  assumption is never displayed as an observation (doc 21 §6.2).
+- **Impact:** `NET-NEW` + `DATA` — `logged_sets.rir_reported` (existing column,
+  previously never written) becomes live; the write queue's `log` op carries it;
+  exercise history gains `rir_source` + `effective_reps`.
+
 ## 2026-07-24 — Day View: the prescription strip becomes a three-layer ledger, + the COACH line (fig 1.1, N63)
 
 Owner-directed: "rework the deterministic prescription explanation language to

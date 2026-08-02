@@ -2,7 +2,96 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-07-31 (latest) — N67/N68/N69: increment indexing, the set-logging queue, thumb-only sliders
+## 2026-08-02 (latest) — doc 21 Phase 1: one RIR premise (N71 + N38)
+
+[doc 21](21-exercise-level-rir.md) §2, Phase 1 of six. The feature it unblocks
+(exercise-level RIR) is Phase 2; this phase fixes the premise underneath it.
+
+### The defect
+
+The app had **two different RIR assumptions**, and only one of them was right.
+
+| Path | Assumed RIR | Consumers |
+|---|---|---|
+| Strength anchor (`queries/anchors.ts`) | the set's prescribed `workout_exercises.target_rir` | prescription pricing, day-view predictor, earn gate |
+| Stored per-set stamp (`log/actions.ts::computeSetE1rm`) | `logged_sets.rir_reported` — **never written** ⇒ `effectiveReps = reps + 0` | `v_exercise_history.e1rm`/`.best_set_e1rm`, `v_exercise_overview.best_e1rm`, `v_meso_summary.best_e1rm`, `v_exercise_prs`, strength trend, MCP history |
+
+So **every stats surface treated every set as taken to failure** while the
+engine's own anchor did not. That is the general form of the 384-vs-367.5
+divergence the owner hit in July (2026-07-04 review §8.2).
+
+### The rule
+
+`engine/predict.ts::assumedRir(reported, prescribed)` — `rir_reported ??
+target_rir`, one definition, re-exported through the engine barrel and used at
+the stamp site (log **and** amend), in the anchor, in
+`setComplianceMarker` (which the day-view ▲/■/▼ markers and the earn gate both
+read), in the restamp planner, and in exercise history. N71 closes by
+construction: the two paths can no longer disagree.
+
+Two guards ride with it, both pinned by tests. **Absence never resolves to 0** —
+that is the N11 regression, where an exactly-as-prescribed set read as a big
+miss, worst on deloads. And `rir_reported` stays capped **0–10**: past that the
+honest report is "no idea", i.e. null.
+
+### Capture (doc 21 §9.2 option (a), N38's other half)
+
+The set grid gains a third value column — `LB · REPS · RIR · LOG` — using the
+same input primitive as the other two, **pre-filled with the prescribed target
+RIR**. That pre-fill is deliberately a *no-op*: an untouched cell reports
+exactly what the server's fallback would have resolved to, so the new column
+costs nothing on the hot path and only a *changed* value carries information the
+app didn't already have. The two rules are pure and live in `day-rules.ts`
+(`captureRirDefault`, `reportedRirFromInput`). No mockup figure exists, so the
+hard-rule-8 transcription is recorded in
+[09-design-changelog.md](09-design-changelog.md) (2026-08-02), same precedent as
+the P19/N35 marker glyphs.
+
+The write queue's `log` op carries `rir_reported`; an op enqueued by the previous
+build still decodes and drains (dispatching null) rather than poisoning the
+stored queue.
+
+### The backfill, and what it moves
+
+`queries/e1rm-restamp.ts` now resolves each row through `assumedRir`, joining
+the page's slots for the fallback. It runs from a new admin-gated MCP tool,
+**`restamp_e1rm`** — `activate_engine_params` only restamps when an `e1rm`
+*param value* moves, and here the **resolution** changed while every param held.
+Idempotent; a second pass writes nothing.
+
+**Every historical e1RM moves up, once** (a set prescribed at RIR 2 gains 2
+effective reps, ≈ +6.7 % under Epley at `rir_offset: 1.0`), taking PRs,
+`best_e1rm`, key lifts and the strength trend with it. It is a correction, not
+progress — the numbers had been under-reporting. Written up in **doc 10 §9.1**;
+the doc-11 premise carries an amendment banner.
+
+**The tool has not been run against production** — that is a deliberate
+one-command operator step (`restamp_e1rm { confirm: "restamp" }`), so the
+re-levelling lands when the owner chooses rather than as a silent side effect of
+a deploy. Until it runs, new sets stamp under the new rule and old ones keep
+their old stamps.
+
+### Honesty on the surfaces (doc 21 §6.2)
+
+An assumed RIR is a *plan fact*, not an observation, so it is never displayed as
+one. Exercise history reports `avg_rir` (assumed), `rir_source`
+(`reported` / `assumed` / `mixed`) and `effective_reps` — on the flip line as
+`· ~2 RIR · 10 EFF REPS`, with the leading `~` marking the assumed case — and
+the MCP history payload says the same in its note.
+
+The `rir` glossary copy changes **meaning**, not just wording: the target is what
+to aim for, not what to report.
+
+### Deferred, deliberately
+
+The measuring band (§6.1, `max_measuring_rir`) is Phase 2b. It only becomes
+load-bearing once §4.3's unbounded prescription RIR exists, and nothing that can
+be logged today (`target_rir ≤ 8`, `rir_reported ≤ 10`) would reach it.
+
+Full suite green (1492, +26), typecheck + lint clean. No migration: every column
+this phase writes already existed.
+
+## 2026-07-31 — N67/N68/N69: increment indexing, the set-logging queue, thumb-only sliders
 
 Three field notes, built together. One touches the engine's rounding, one
 reverses a hard rule, one is a five-line gesture fix.

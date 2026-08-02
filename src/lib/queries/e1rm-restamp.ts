@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { estimateE1rm as estimateE1rmCore, type E1rmConfig } from "@/lib/engine/predict";
+import {
+  assumedRir,
+  estimateE1rm as estimateE1rmCore,
+  type E1rmConfig,
+} from "@/lib/engine/predict";
 import type { EngineParams } from "@/lib/engine";
 import type { Database, LoggedSetRow } from "@/lib/types/database";
 import { hashParams } from "./params-provenance";
@@ -20,10 +24,16 @@ type Client = SupabaseClient<Database>;
  * On activation, when (and only when) the new version's `e1rm` block differs
  * from the previously active one, every stored stamp is recomputed under the
  * new params and the changed rows rewritten — same recompute rule as log time:
- * `estimateE1rm(weight, reps, rir_reported, params)`, raw entered weight,
- * reported RIR (null stays null-confidence). Hard rule #5 is not implicated:
- * the amend path (`amendSet`) already treats `e1rm` as an updatable derived
- * column.
+ * `estimateE1rm(weight, reps, assumedRir(rir_reported, slot target_rir),
+ * params)`, raw entered weight. Hard rule #5 is not implicated: the amend path
+ * (`amendSet`) already treats `e1rm` as an updatable derived column.
+ *
+ * doc 21 §2 / N71 also makes this the vehicle for a ONE-TIME backfill: the
+ * resolution rule itself changed (an unreported set now resolves to its slot's
+ * prescribed target RIR instead of stamping as taken to failure), so every
+ * historical stamp moves UP once. That pass is driven by the admin-gated
+ * `restamp_e1rm` MCP tool rather than by a params activation, since no `e1rm`
+ * block value moved.
  *
  * Caveat (documented in the review doc): a version activated BY MIGRATION
  * (e.g. v18) bypasses this hook — prefer the MCP `activate_engine_params`
@@ -45,7 +55,13 @@ export function e1rmBlockChanged(
 
 export type RestampSetRow = Pick<
   LoggedSetRow,
-  "id" | "weight" | "reps" | "rir_reported" | "e1rm" | "e1rm_confidence"
+  | "id"
+  | "workout_exercise_id"
+  | "weight"
+  | "reps"
+  | "rir_reported"
+  | "e1rm"
+  | "e1rm_confidence"
 >;
 
 /**
@@ -54,10 +70,17 @@ export type RestampSetRow = Pick<
  * null, matching log time). The confidence bands live in the same `e1rm` block,
  * so a change to that block can move the confidence even when the value holds —
  * both must restamp together. Exported for unit tests; the I/O pager stays thin.
+ *
+ * doc 21 §2: the RIR each row re-prices at is the shared resolution
+ * `rir_reported ?? the slot's prescribed target_rir`, supplied by
+ * `targetRirByWe` (the pager resolves it per page). An absent map — or a slot
+ * with no prescription — leaves the row on its reported RIR alone, i.e. the
+ * pre-doc-21 behavior.
  */
 export function planRestamps<T extends RestampSetRow>(
   rows: T[],
   cfg: E1rmConfig,
+  targetRirByWe?: Map<string, number | null>,
 ): { row: T; e1rm: number | null; e1rm_confidence: string | null }[] {
   const out: {
     row: T;
@@ -65,7 +88,11 @@ export function planRestamps<T extends RestampSetRow>(
     e1rm_confidence: string | null;
   }[] = [];
   for (const r of rows) {
-    const est = estimateE1rmCore(r.weight, r.reps, r.rir_reported, cfg);
+    const rir = assumedRir(
+      r.rir_reported,
+      targetRirByWe?.get(r.workout_exercise_id),
+    );
+    const est = estimateE1rmCore(r.weight, r.reps, rir, cfg);
     const e1rm = est?.value ?? null;
     const e1rm_confidence = est?.confidence ?? null;
     if (e1rm !== r.e1rm || e1rm_confidence !== r.e1rm_confidence)
@@ -112,7 +139,20 @@ export async function restampLoggedSetE1rms(
     scanned += rows.length;
     lastId = rows[rows.length - 1].id;
 
-    const changed = planRestamps(rows, cfg);
+    // doc 21 §2: resolve the page's slots' prescribed target RIRs — the
+    // fallback half of `assumedRir`, so a restamp reproduces exactly what log
+    // time would have written for the same row.
+    const weIds = [...new Set(rows.map((r) => r.workout_exercise_id))];
+    const { data: wes, error: weError } = await service
+      .from("workout_exercises")
+      .select("id, target_rir")
+      .in("id", weIds);
+    if (weError) throw weError;
+    const targetRirByWe = new Map(
+      (wes ?? []).map((w) => [w.id, w.target_rir] as const),
+    );
+
+    const changed = planRestamps(rows, cfg, targetRirByWe);
     for (let i = 0; i < changed.length; i += writeChunk) {
       const chunk = changed
         .slice(i, i + writeChunk)

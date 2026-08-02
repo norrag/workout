@@ -897,6 +897,54 @@ function registerDiscardEngineParams(server: McpServer) {
   );
 }
 
+// --- restamp_e1rm ----------------------------------------------------------
+
+export const RESTAMP_E1RM = "restamp_e1rm";
+function registerRestampE1rm(server: McpServer) {
+  server.registerTool(
+    RESTAMP_E1RM,
+    {
+      title: "Restamp per-set e1RM",
+      description:
+        "Admin only. Recompute every stored per-set e1RM stamp (and its " +
+        "confidence band) under the currently active engine params, using the " +
+        "shared RIR resolution `rir_reported ?? the slot's prescribed " +
+        "target_rir` (doc 21 §2). Idempotent — only rows whose value or " +
+        "confidence actually moves are rewritten, and a re-run writes nothing. " +
+        "activate_engine_params already runs this automatically when a version " +
+        "changes the e1rm block; this tool exists for the case where the " +
+        "RESOLUTION changed but no param value did (the one-time N71 " +
+        "re-levelling, which moves every historical stamp upward). Requires " +
+        "confirm to be the literal string 'restamp'.",
+      inputSchema: {
+        confirm: z.string(),
+      },
+    },
+    async ({ confirm }: { confirm: string }, extra: McpExtra) => {
+      const { client, userId } = await resolveAdmin(extra);
+      if (confirm !== "restamp")
+        return jsonResult({
+          ok: false,
+          error: "confirm must be the literal string 'restamp'.",
+        });
+      const { params, version } = await getActiveEngineParams(client);
+      let result: { scanned: number; updated: number };
+      try {
+        result = await restampLoggedSetE1rms(createServiceClient(), params);
+      } catch (e) {
+        await reportError("mcp:restamp-e1rm", e, { version });
+        return jsonResult({
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+      const summary = `restamped ${result.updated} of ${result.scanned} logged sets under engine_params v${version}`;
+      await recordMcpWrite(userId, RESTAMP_E1RM, { version }, summary);
+      return jsonResult({ ok: true, version, ...result, summary });
+    },
+  );
+}
+
 // --- registry --------------------------------------------------------------
 //
 // Note (doc 14 §10): the `regenerate_planned_prescriptions` and
@@ -916,6 +964,7 @@ export function registerAdminTools(server: McpServer) {
   registerReplayDecisions(server);
   registerSimulatePrescriptions(server);
   registerDiscardEngineParams(server);
+  registerRestampE1rm(server);
   // N58 follow-up: the LLM-explanation test loop + forced recompute
   // (admin-llm.ts) — registered here so the one entry point stays true.
   registerLlmAdminTools(server);
@@ -934,6 +983,7 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   REPLAY_DECISIONS,
   SIMULATE_PRESCRIPTIONS,
   DISCARD_ENGINE_PARAMS,
+  RESTAMP_E1RM,
   ...LLM_ADMIN_TOOL_NAMES,
   ...COACHING_PROMPT_TOOL_NAMES,
 ]);

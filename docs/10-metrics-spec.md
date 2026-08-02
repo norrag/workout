@@ -400,6 +400,32 @@ Params: `macro_target.<goal>` rate tables, `macro_target.sex_factor`, `macro_tar
   the evidence doesn't support the 1:1 ratio for those outcomes.
 - **MEV/MAV/MRV exact numbers** and **rate-of-gain tables** are heuristics with large individual
   variance — tunable starting points, not guarantees.
+- **Reported vs assumed RIR** (doc 21 §2, 2026-08-02). Every strength estimate is priced at an
+  *assumed* RIR resolved as `rir_reported ?? the slot's prescribed target_rir`. Surfaces must not
+  present the fallback as something the athlete told us: exercise history carries `rir_source`
+  (`reported` / `assumed` / `mixed`) and marks an assumed value `~`, and the MCP history payload
+  says the same. An assumed RIR is a *plan fact*, not an observation.
+
+### 9.1 The 2026-08-02 e1RM re-levelling (one-time, N71)
+
+Until doc 21 Phase 1, `logged_sets.rir_reported` had **no write surface**: the day view always sent
+`null`, and the per-set e1RM stamp had no fallback, so `effectiveReps = reps + 0` — **every stored
+stamp was computed as if the set had been taken to failure**. The strength anchor, meanwhile,
+already assumed each set's prescribed `target_rir`. The two disagreed; that divergence is what
+showed 384 in exercise history while the anchor said 367.5 (2026-07-04 review §8.2).
+
+Phase 1 makes both paths share `assumedRir`, and the stored stamps are re-derived under it via the
+admin-gated `restamp_e1rm` MCP tool. **Every historical e1RM moves up, once** — a set prescribed at
+RIR 2 gains 2 effective reps (≈ +6.7 % under Epley at the default `rir_offset: 1.0`). Everything
+derived from the per-set stamp re-levels with it: `v_exercise_history.e1rm` / `.best_set_e1rm`,
+`v_exercise_overview.best_e1rm`, `v_meso_summary.best_e1rm`, `v_exercise_prs`, key lifts, and the
+strength trend.
+
+Read it as a correction, not progress: **no set got stronger on 2026-08-02**, the numbers stopped
+under-reporting. Cross-date comparisons that straddle the restamp are not like-for-like; the
+*relative* shape of a trend is preserved wherever a block's sets shared one prescribed RIR, and
+distorted where the prescribed RIR moved (a deload's sets gain the most, since their target RIR is
+the largest in the ramp). Sets that already carried a reported RIR are untouched.
 
 ## References (primary anchors)
 

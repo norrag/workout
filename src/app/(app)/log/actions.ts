@@ -20,6 +20,8 @@ import {
   endMesocycle,
   endWorkout,
   getFutureSiblingWorkoutIds,
+  getSetSlotTargetRir,
+  getSlotTargetRir,
   logSet,
   propagateAddedExercises,
   propagateExerciseOrder,
@@ -52,7 +54,7 @@ import { llmExplanationsServe } from "@/lib/llm/config";
 import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 import { localDayIso } from "@/lib/dates";
 import { getActiveEngineParams } from "@/lib/queries/generation";
-import { estimateE1rm } from "@/lib/engine";
+import { assumedRir, estimateE1rm } from "@/lib/engine";
 import type { EngineParams } from "@/lib/engine/params";
 import {
   advanceWeekAfterWorkout,
@@ -76,14 +78,27 @@ async function requireUser() {
  * stored with the set so both are auditable and surfaceable (history flip, MCP)
  * without recomputing. Both null for bodyweight (weight 0) / non-working input —
  * `estimateE1rm` returns null there.
+ *
+ * doc 21 §2 (N71): the RIR the stamp prices at is the SHARED resolution
+ * `rir_reported ?? the slot's prescribed target_rir`, not the raw reported
+ * value. Before this the stamp had no fallback while the anchor did, so a
+ * never-written `rir_reported` made `effectiveReps = reps + 0` and every stats
+ * surface read every set as taken to failure. `slotTargetRir` is the
+ * prescription the set was logged against.
  */
 function computeSetE1rm(
   params: EngineParams,
   weight: number,
   reps: number,
   rir: number | null,
+  slotTargetRir: number | null,
 ): { e1rm: number | null; e1rm_confidence: string | null } {
-  const est = estimateE1rm(weight, reps, rir, params);
+  const est = estimateE1rm(
+    weight,
+    reps,
+    assumedRir(rir, slotTargetRir),
+    params,
+  );
   return { e1rm: est?.value ?? null, e1rm_confidence: est?.confidence ?? null };
 }
 
@@ -115,9 +130,13 @@ export async function logSetAction(input: {
 }): Promise<void> {
   const parsed = logSetSchema.parse(input);
   const { supabase, user } = await requireUser();
-  const [profile, { params }] = await Promise.all([
+  // doc 21 §2: the slot's prescribed target RIR is the stamp's fallback, so it
+  // is fetched alongside the profile/params rather than serially — the write
+  // path's latency is unchanged.
+  const [profile, { params }, slotTargetRir] = await Promise.all([
     getProfile(supabase, user.id),
     getActiveEngineParams(supabase),
+    getSlotTargetRir(supabase, parsed.workout_exercise_id),
   ]);
   await logSet(supabase, user.id, {
     workout_exercise_id: parsed.workout_exercise_id,
@@ -126,7 +145,13 @@ export async function logSetAction(input: {
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
     set_type: parsed.set_type,
-    ...computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
+    ...computeSetE1rm(
+      params,
+      parsed.weight,
+      parsed.reps,
+      parsed.rir_reported,
+      slotTargetRir,
+    ),
     // T-I2/#4: capture the lifter's bodyweight at log time (effective-load base for
     // bodyweight movements); locked once the workout completes.
     bodyweight: profile?.bodyweight ?? null,
@@ -164,13 +189,22 @@ export async function amendSetAction(input: {
 }): Promise<void> {
   const parsed = amendSchema.parse(input);
   const { supabase, user } = await requireUser();
-  const { params } = await getActiveEngineParams(supabase);
+  const [{ params }, slotTargetRir] = await Promise.all([
+    getActiveEngineParams(supabase),
+    getSetSlotTargetRir(supabase, user.id, parsed.set_id),
+  ]);
   await amendSet(supabase, user.id, parsed.set_id, {
     weight: parsed.weight,
     reps: parsed.reps,
     rir_reported: parsed.rir_reported,
     // recompute the stored e1RM + confidence since weight/reps/RIR all changed
-    ...computeSetE1rm(params, parsed.weight, parsed.reps, parsed.rir_reported),
+    ...computeSetE1rm(
+      params,
+      parsed.weight,
+      parsed.reps,
+      parsed.rir_reported,
+      slotTargetRir,
+    ),
   });
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath("/workout");
