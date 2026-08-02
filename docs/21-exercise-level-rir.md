@@ -595,6 +595,12 @@ weeks.
   byte-identical to before the lever existed. `getCurrentState` takes the
   disclosure as an **opt-in** (`includeSlotEffort`) because the app's workout
   page calls it up to three times a render and has no use for it.
+- **`set_exercise_sets` ships inert and says so.** The cap is stored, resolved
+  and disclosed, but nothing in the engine clamps a set count to it until Phase
+  4 — so both the tool description and every write that assigns one carry a
+  warning pointing at `set_baseline_sets` for the sets the athlete actually
+  sees. An MCP surface that implies an effect the prescription won't show is
+  worse than no surface.
 - Clearing the last assignment on a slot clears its `reason` too (A7 — a reason
   with nothing to explain is noise in every surface that reads it), and
   `set_exercise_sets` is deliberately named apart from `set_baseline_sets`: the

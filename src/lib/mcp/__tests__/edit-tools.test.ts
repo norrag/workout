@@ -559,6 +559,35 @@ describe("planEffortEdits — no silent semantics (§4.1)", () => {
   });
 });
 
+describe("planEffortEdits — the set cap is honest about Phase 4", () => {
+  it("says the engine does not clamp to the cap yet", () => {
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_sets", slot_id: "s-bench", edit: { lever: "sets", value: 2, weeks: [4] } }],
+        slotRefs(),
+        new Map(),
+        effortCtx(),
+      ),
+    );
+    expect(r.warnings.join(" ")).toMatch(/does not clamp its set count to it yet/);
+  });
+
+  it("says nothing of the kind when the cap is cleared", () => {
+    const current = new Map([
+      ["s-bench", { target_rir: null, rir_schedule: null, set_cap: 2, set_cap_schedule: null, effort_reason: null }],
+    ]);
+    const r = effortOk(
+      planEffortEdits(
+        [{ op: "set_exercise_sets", slot_id: "s-bench", edit: { lever: "sets", clear: true } }],
+        slotRefs(),
+        current,
+        effortCtx(),
+      ),
+    );
+    expect(r.warnings).toEqual([]);
+  });
+});
+
 describe("planEffortEdits — already-trained weeks", () => {
   const trained = () =>
     effortCtx({ lockedWeeksByDay: new Map([[1, [1, 2]]]) });

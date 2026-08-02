@@ -540,10 +540,18 @@ export function planEffortEdits(
             : `a flat assignment also governs the deload week (week ${ctx.deloadWeek}). Use weeks/schedule to leave it on the deload default.`,
         );
       }
-    } else if (plan.coversDeload && ctx.deloadWeek != null) {
-      warnings.push(
-        `a flat set cap also governs the deload week (week ${ctx.deloadWeek}).`,
-      );
+    } else {
+      if (plan.coversDeload && ctx.deloadWeek != null)
+        warnings.push(
+          `a flat set cap also governs the deload week (week ${ctx.deloadWeek}).`,
+        );
+      // honesty: the cap is stored, resolved and disclosed, but the engine's
+      // set count doesn't read it yet (doc 21 Phase 4). Never let the tool
+      // imply an effect the prescription won't show.
+      if (!plan.cleared && plan.assignedWeeks.length > 0)
+        warnings.push(
+          `day ${slot.day_number}: the working-set cap is recorded on the plan and reads back everywhere, but the engine does not clamp its set count to it yet — that lands in a later phase. To change the sets the athlete actually sees, use set_baseline_sets (week-1 seed).`,
+        );
     }
 
     const merged = writes.get(op.slot_id);
@@ -831,6 +839,9 @@ export function registerEditMesocycle(server: McpServer) {
         "runs easier than its week. set_exercise_sets is the same shape for a " +
         "working-set cap (sets/weeks/schedule/clear) — distinct from " +
         "set_baseline_sets, which seeds week 1 and then lets set progression run. " +
+        "NOTE: the cap is recorded and read back everywhere, but the engine does " +
+        "not clamp its set count to it yet — use set_baseline_sets to change the " +
+        "sets the athlete actually sees. " +
         "Both take an optional reason, surfaced wherever the assignment reads. A " +
         "week that has already been trained can't be reassigned by name.",
       inputSchema: {

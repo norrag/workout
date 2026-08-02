@@ -72,10 +72,15 @@ exactly as it did before the lever existed. `getCurrentState` takes the
 disclosure as an opt-in, because the workout page calls it up to three times per
 render and has no use for it.
 
-Tests: 39 new (the value forms, every refusal, reason lifecycle, composition,
+`set_exercise_sets` **ships inert and says so**: the cap is stored, resolved and
+disclosed, but no engine path clamps a set count to it until Phase 4, so the
+tool description and every assigning write carry a warning pointing at
+`set_baseline_sets` for the sets the athlete actually sees.
+
+Tests: 41 new (the value forms, every refusal, reason lifecycle, composition,
 the trained-week guard both ways, the deload/hardening warnings, the re-key
-across a plan replace, and the two disclosures). Suite green (1608), typecheck
-and lint clean. No migration in this phase.
+across a plan replace, the inert-cap disclosure, and the two read surfaces).
+Suite green (1610), typecheck and lint clean. No migration in this phase.
 
 ## 2026-08-02 — doc 21 Phase 2 + 2b: exercise-level RIR (plan + engine, and the measuring band)
 
