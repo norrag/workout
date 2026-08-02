@@ -1,22 +1,28 @@
 import { describe, it, expect } from "vitest";
 import {
+  ACK_ECHO_TIMEOUT_MS,
   DEFAULT_RETRY,
   EMPTY_QUEUE,
+  ack,
   backoffMs,
   clearWorkout,
   decodeQueue,
   encodeQueue,
   enqueue,
+  expireAcked,
   fail,
+  hasPendingAmend,
   hasPendingLog,
   nextReady,
   nextWakeAt,
   opKey,
   pendingSetsFor,
   queueSummary,
+  reconcile,
   retryAll,
   settle,
   type QueueState,
+  type ServerSetRow,
   type SetLogOp,
 } from "../queue";
 
@@ -44,9 +50,44 @@ function log(
   };
 }
 
+function amend(
+  weight = 140,
+  reps = 7,
+  rir: number | null = 1,
+  setId = SET_ID,
+): SetLogOp {
+  return {
+    kind: "amend",
+    workout_id: WORKOUT,
+    set_id: setId,
+    weight,
+    reps,
+    rir_reported: rir,
+  };
+}
+
 function add(state: QueueState, id: string, op: SetLogOp, now: number) {
   return enqueue(state, { id, op, now });
 }
+
+/** a rendered server row for the exercise + set the helpers above address */
+function row(
+  setNumber: number,
+  over: Partial<ServerSetRow> = {},
+): ServerSetRow {
+  return {
+    id: SET_ID,
+    set_number: setNumber,
+    weight: 100,
+    reps: 8,
+    rir_reported: 2,
+    ...over,
+  };
+}
+
+const renderedA = (sets: ServerSetRow[]) => [
+  { workoutExerciseId: WE_A, sets },
+];
 
 describe("opKey", () => {
   it("identifies the cell an op competes for", () => {
@@ -181,6 +222,157 @@ describe("pendingSetsFor (the optimistic overlay)", () => {
     );
     expect(pendingSetsFor(q, WE_A).size).toBe(0);
     expect(hasPendingLog(q, WE_A, 1)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// N73 — the echo rule
+// ---------------------------------------------------------------------------
+
+describe("ack + reconcile (the echo rule)", () => {
+  it("keeps a landed set logged in the gap before its render arrives", () => {
+    // THE REGRESSION. The write resolves, but the revalidated render is still
+    // in flight: for that ~1s the row must stay logged and set 2 must stay the
+    // active one. Settling on dispatch success is what made the box un-tick,
+    // walked the active set backwards, then snapped forward again.
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    q = ack(q, "a", 1100);
+
+    expect(pendingSetsFor(q, WE_A).get(1)).toMatchObject({
+      weight: 100,
+      reps: 8,
+      status: "pending",
+    });
+    // and nothing re-sends it while it waits
+    expect(nextReady(q, 9999)).toBeNull();
+  });
+
+  it("retires a log op only once the render carries its set", () => {
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    q = add(q, "b", log(2), 1010);
+    q = ack(q, "a", 1100);
+
+    // a render that predates the write leaves it alone
+    expect(reconcile(q, renderedA([])).ops).toHaveLength(2);
+    // the render that contains it retires it
+    q = reconcile(q, renderedA([row(1)]));
+    expect(q.ops.map((o) => o.id)).toEqual(["b"]);
+  });
+
+  it("leaves an op alone when its exercise isn't in the render at all", () => {
+    // absence of evidence is not evidence the write is missing
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    q = ack(q, "a", 1100);
+    expect(
+      reconcile(q, [{ workoutExerciseId: WE_B, sets: [row(1)] }]).ops,
+    ).toHaveLength(1);
+  });
+
+  it("never touches a pending or failed op — those still owe a write", () => {
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    for (let i = 0; i < DEFAULT_RETRY.maxAttempts; i += 1) q = fail(q, "a", 0, "offline");
+    q = add(q, "b", log(2), 1010);
+    expect(reconcile(q, renderedA([row(1), row(2)])).ops).toHaveLength(2);
+  });
+
+  it("returns the same state object when nothing retires", () => {
+    const q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    // the day view runs this on every render; it must be free when idle
+    expect(reconcile(q, renderedA([row(1)]))).toBe(q);
+    expect(reconcile(EMPTY_QUEUE, renderedA([]))).toBe(EMPTY_QUEUE);
+  });
+
+  it("holds an amend through a STALE render and retires it on the real echo", () => {
+    // THE DISCARDED-RIR REGRESSION. The row showed 1 RIR, the render still
+    // carried the pre-amend 2. Retiring on the render's arrival (rather than
+    // its content) let the row adopt the old value and dropped the edit.
+    let q = add(EMPTY_QUEUE, "a", amend(140, 7, 1), 1000);
+    q = ack(q, "a", 1100);
+
+    const stale = renderedA([row(1, { weight: 140, reps: 7, rir_reported: 2 })]);
+    expect(reconcile(q, stale).ops).toHaveLength(1);
+    expect(hasPendingAmend(reconcile(q, stale), SET_ID)).toBe(true);
+
+    const echoed = renderedA([row(1, { weight: 140, reps: 7, rir_reported: 1 })]);
+    expect(reconcile(q, echoed).ops).toHaveLength(0);
+  });
+
+  it("holds an amend whose set is missing from the render", () => {
+    let q = add(EMPTY_QUEUE, "a", amend(), 1000);
+    q = ack(q, "a", 1100);
+    expect(reconcile(q, renderedA([row(1, { id: "other" })])).ops).toHaveLength(1);
+  });
+
+  it("matches a null reported RIR exactly, not loosely", () => {
+    let q = add(EMPTY_QUEUE, "a", amend(140, 7, null), 1000);
+    q = ack(q, "a", 1100);
+    const zero = renderedA([row(1, { weight: 140, reps: 7, rir_reported: 0 })]);
+    expect(reconcile(q, zero).ops).toHaveLength(1);
+    const nulled = renderedA([row(1, { weight: 140, reps: 7, rir_reported: null })]);
+    expect(reconcile(q, nulled).ops).toHaveLength(0);
+  });
+});
+
+describe("acked ops are past re-sending", () => {
+  it("is not re-dispatched, re-armed, or superseded", () => {
+    let q = add(EMPTY_QUEUE, "a", log(1, 100), 1000);
+    q = ack(q, "a", 1100);
+
+    expect(nextReady(q, 1e9)).toBeNull();
+    expect(nextWakeAt(q)).toBeNull();
+    // "try again" must not re-send a write that already landed
+    expect(retryAll(q, 2000).ops[0].status).toBe("acked");
+    // a later op for the same cell queues BEHIND it and wins by landing last
+    const q2 = add(q, "b", log(1, 135), 1200);
+    expect(q2.ops.map((o) => o.id)).toEqual(["a", "b"]);
+  });
+
+  it("is counted as neither outstanding nor parked", () => {
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    q = ack(q, "a", 1100);
+    // the status strip must stay silent — there is nothing to report
+    expect(queueSummary(q)).toEqual({ pending: 0, failed: 0 });
+  });
+
+  it("is dropped on reload — a fresh page IS the echo", () => {
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    q = add(q, "b", log(2), 1010);
+    q = ack(q, "a", 1100);
+    expect(decodeQueue(encodeQueue(q)).ops.map((o) => o.id)).toEqual(["b"]);
+  });
+});
+
+describe("expireAcked (the safety valve)", () => {
+  it("drops an amend whose echo never comes", () => {
+    let q = add(EMPTY_QUEUE, "a", amend(), 1000);
+    q = ack(q, "a", 1000);
+    expect(expireAcked(q, 1000 + ACK_ECHO_TIMEOUT_MS - 1).ops).toHaveLength(1);
+    // letting it go just means the row adopts server state — where it was headed
+    expect(expireAcked(q, 1000 + ACK_ECHO_TIMEOUT_MS).ops).toHaveLength(0);
+  });
+
+  it("NEVER drops a log — that would retract a set that really saved", () => {
+    let q = add(EMPTY_QUEUE, "a", log(1), 1000);
+    q = ack(q, "a", 1000);
+    expect(expireAcked(q, 1e12).ops).toHaveLength(1);
+  });
+
+  it("leaves pending and failed ops alone", () => {
+    let q = add(EMPTY_QUEUE, "a", amend(), 1000);
+    for (let i = 0; i < DEFAULT_RETRY.maxAttempts; i += 1) q = fail(q, "a", 0, "offline");
+    expect(expireAcked(q, 1e12).ops).toHaveLength(1);
+    expect(expireAcked(q, 1e12)).toBe(q);
+  });
+});
+
+describe("hasPendingAmend", () => {
+  it("is true from the tap until the echo, whatever the op's status", () => {
+    let q = add(EMPTY_QUEUE, "a", amend(), 1000);
+    expect(hasPendingAmend(q, SET_ID)).toBe(true);
+    q = ack(q, "a", 1100);
+    expect(hasPendingAmend(q, SET_ID)).toBe(true);
+    expect(hasPendingAmend(q, "someone-else")).toBe(false);
+    expect(hasPendingAmend(settle(q, "a"), SET_ID)).toBe(false);
   });
 });
 

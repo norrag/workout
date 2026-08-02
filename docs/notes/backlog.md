@@ -64,6 +64,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N69 | **Sliders should only move when dragged from the orange tab** (owner, 2026-07-31, Batch 28). "Clicking elsewhere on the scale should not move them, as this leads to unintentional slider movement when attempting to scroll." Confirmed: `SnapSlider` put `onPointerDown`/`onPointerMove` + `touch-none` on the whole 44px track, so any touch on the scale both set the value and swallowed the scroll gesture — and the feedback sheets (fig 1.4) are scrolling surfaces. Now only the thumb starts a drag (pointer capture on a transparent 44px wrapper around the 20×28 accent block, `touch-none` on it alone); the track ignores pointers and scrolls the page. Keyboard control unchanged. | B/UX | MED | E | **done (PR #215)** |
 | N70 | **Exercise-level RIR — temporary per-exercise effort/load management** (owner, 2026-07-31, Batches 30/30b/30c). Origin: a live lumbar-nerve episode — a coach-agreed rehab plan had nowhere to live. *Direction 1 (coach-authored prescription overrides) **CLOSED** per A8* — [`reviews/2026-07-31-coach-override-prescriptions.md`](../reviews/2026-07-31-coach-override-prescriptions.md), kept as history; its findings went to doc 21 §5/§8 except the substitution cliff → **N72**. *Direction 2 (**LIVE**): per day-slot × exercise target RIR, per week.* Assessment [`reviews/2026-07-31-exercise-level-rir.md`](../reviews/2026-07-31-exercise-level-rir.md) → **owner decided A1–A8 (2026-07-31)** → authoritative build spec **[`docs/21-exercise-level-rir.md`](../21-exercise-level-rir.md)** (6 phases, §10). Settled: **absolute** semantics (set wins, unset yields to the ramp — floor semantics rejected as extra parameters); **repricing needs no special case** (Batch 28d — thread the resolved RIR through the existing rep-window path; it already prices load *from* reps+RIR and re-clamps to the window, so "265 for 1 rep" cannot occur, and it generalises symmetrically to *lowering* RIR for more effort — the earlier forced-centering rule was rejected and is retracted); **prescription RIR unbounded** (DB check widened 0–8 → 0–30) so one lever spans deload → rehab → extra effort, guarded by a new **measuring band** (`max_measuring_rir`, default 8: past it a set is priced normally but is not a measurement — e1rm null, dropped from the anchor and strength views, kept in volume; the anchor freezes rather than drifting on fiction); grain = `meso_exercises` + per-week array (mirroring `mesocycles.rir_schedule` incl. orphan-clearing); a **per-exercise set cap** ships too (MCP-first, minimal UI); earn-gate predicate + miss-throttle parity; `reason` column; RIR ceiling **unbounded** (the earlier "stays 8" is retracted). Two numbers corrected in the owner's favour: the assessment's "−14.6 % at RIR 8" was one policy point, not the lever's range — priced against a genuine 0-RIR ask, RIR 8 delivers **−16 % to −22 %** depending on rep position; and the owner's own worked example (265×9 @ 0 RIR → 8 RIR) prices at **219 lb × 9** against their estimate of ~215, so the intuition matched the engine. Four confirmations open in doc 21 §9 (volume counting; capture ergonomics; the `max_measuring_rir` default; how to display an out-of-band RIR). Relates: **N71** (Phase 1), **N38** (absorbed by Phase 1), **N72** (out of scope), N39 (redundant under an assignment), N18-B, N25 (RIR copy), doc 14 §7, doc 16 §3.4, doc 19 | F | HIGH | P | **in progress** — spec'd (PR #211); **Phase 1 done (PR #216)** (the RIR premise, N71/N38 — see those rows); **Phases 2 + 2b done (PR #218)** — the plan columns + absolute resolution (`queries/slot-effort.ts`, run after `liveWeekRirUpdates`), repricing as ONE substitution at the pricing entry point with no new branch (§4.2 golden reproduced to the decimal), the `exercise_rir` earn-gate predicate (miss-throttle parity falls out of its placement, asserted not re-coded), doc-14 wiring that is byte-identical when unassigned, plus the measuring band (`max_measuring_rir`, v24 INACTIVE) and a fix to `v_exercise_prs`, the one strength view that still re-computed e1RM off `coalesce(rir_reported, 0)` and so had kept the N71 defect Phase 1 closed everywhere else. **Phase 3 done (PR #219)** — the MCP write surface: `set_exercise_rir` / `set_exercise_sets` on `edit_mesocycle` (four value forms per lever — flat, flat + weeks, explicit schedule, clear — plus `reason`), two pure planning layers so a mixed structural + effort call can never half-apply, week-precise refusal on already-trained weeks (a *named* week is refused, a flat value warns which weeks it can no longer change), §4.1 warnings for an assignment below the week's ramp or reaching the deload week, and present-only read disclosure on `get_mesocycle` + `get_current_state`. It also fixed a defect Phase 2 left live: **`save_meso_plan`'s wholesale replace would have wiped every assignment in the meso on a plain reorder** — `saveMesoPlan` now snapshots and re-keys them by day-slot × exercise. **The lever is now writable over MCP; the app UI is still Phase 6.** Next: 4 (set-cap engine clamp + `rep_position`), 5 (stats policy), 6 (UI + explanation) |
 | N72 | **Bounded exercise substitution + the `LOOKBACK_WEEKS = 2` return cliff** (spun out 2026-07-31 when N70 direction 1 closed; `F`, MED). The one clause exercise-level RIR cannot express: "stop deadlifts for two weeks, do RDLs instead, then come back". Today a **single-session** swap exists (`replaceWorkoutExercise` → `queries/slot-prescription.ts`) and a **plan-wide, all-future-weeks** swap exists (`edit_mesocycle { op: "swap_exercise" }`) — but nothing bounded to a window. Worse, the return is mis-priced past two weeks: `LOOKBACK_WEEKS = 2` (`queries/slot-prescription.ts:70`) means a 3-week substitution brings the original back as a **cold seed off the prior peak** (`v_exercise_prs`) — the worst direction after an injury. Only written record of the failure mode: [`reviews/2026-07-31-coach-override-prescriptions.md`](../reviews/2026-07-31-coach-override-prescriptions.md) §4.4 (closed doc, kept for this). Options framed there: extend the lookback while a substitution is active, or (recommended) require the return to be prescribed rather than inferred. Any MCP surface inherits that doc's §5/§6 constraints (no separate coach principal; reduce-only bounds). Relates: N33 (the lookback's origin), N70 | F | MED | P | **triaged** — deferred until doc 21 lands; revisit if a real substitution runs past 2 weeks |
+| N73 | **Set-logging queue ping-pong + discarded RIR edits** (owner, 2026-08-02, Batch 31, HIGH — regressions introduced by N68's queue). Two symptoms, one root cause. (1) *"More often than not"*: a logged set fills, advances to set 2, then **reverses for about a second** — set 1 unlogged and active again — before snapping forward once more. (2) On the last set of an exercise, the set flickered back to unlogged and a **modified RIR was repeatedly discarded**, reset to the prescribed value; it took several attempts to get the edit to stick. Root cause: the queue retired an op's optimistic overlay on **dispatch success** and *then* called `router.refresh()`, so every set had a window — one revalidation round-trip — with the overlay already gone and the server render not yet committed. The row fell back to server state that did not yet contain the set: box un-ticks, active set walks backwards. The RIR loss is the same window with an edit in it — the row went editable mid-flight, and the arriving render remounted it (key carries `logged.id`) or resynced it via `adoptServerRowState("own-logged-set", …)`, which adopted unconditionally *and* cleared the dirty flag, so the next blur had nothing left to re-send. Racing revalidations made it intermittent (a refresh fetched before a later write landed could commit after it settled). Fix = **the echo rule**: a landed write moves to `acked` and keeps its overlay until a rendered server row *contains* it (`reconcile`, fed the day view's rows on every render); amends match on **content**, so a stale pre-amend render is held rather than adopted; `adoptServerRowState` gains a `writeOutstanding` veto; one coalesced debounced `router.refresh()` replaces one-per-op. Relates: N68 (the queue this refines), N12 (the original hang), R13/N13 (the resync rule amended) | B | HIGH | J | **done (PR #220)** |
 
 > **N36–N39** are the doc-16 §11 deferred spine, filed 2026-07-09 during Phase R
 > so nothing is lost after the N35 build-out. Each points back to
@@ -1599,3 +1600,57 @@ the fold. → N56.)*
 > assumed-RIR component rather than effective reps so honest high-rep work isn't
 > punished): past it a set is priced but never scored. Yes — one rule does span
 > deload → rehab → extra effort.]*
+
+### Batch 31 — set-logging queue ping-pong + discarded RIR (2026-08-02, session task)
+
+> "There is a bug fix/refinement needed in the set logging functionality.
+>
+> We recently introduced a background queue, primarily to alleviate issues with
+> hangs while logging sets. These issues could result in either an indefinite
+> loading state or a stale state where the set appeared to be logged, but the UI
+> controls never advanced to the next active set.
+>
+> The intention was that moving set logging to a background task would keep the
+> UI responsive and allow logs to be resolved in the background or while offline
+> so that work could continue. However, this change has introduced new issues and
+> is not functioning entirely correctly.
+>
+> Issues observed:
+>
+> Frequently, when a set—call it Set 1—is logged, the UI immediately shows Set 1
+> as logged and briefly advances to Set 2 as intended. However, the action is
+> then briefly reversed: Set 1 appears unlogged again and becomes the active set
+> for about a second before it is shown as logged once more and the UI advances
+> back to Set 2. This creates a brief ping-pong effect where the UI advances,
+> moves back, and then advances again. This does not happen every time, and I am
+> not sure why, but it occurs more often than not.
+>
+> On at least one occasion, when logging the final set of an exercise, the set
+> briefly appeared as logged before being reset to unlogged. I had also modified
+> the prescribed RIR value, but the updated value was repeatedly discarded and
+> reset to the original value. After multiple attempts, the set was saved
+> successfully once, but the modified RIR value was still discarded. Eventually,
+> after several more attempts, I was able to get the set to save correctly with
+> the updated value.
+>
+> It's imperative that we have a smooth flow for logging sets, as it is the most
+> frequently performed action in the app. The structure needs to be architected
+> correctly so that sets are logged without friction, not band aided. Set logging
+> needs to just work, every time. Function is the imperative, low latency is
+> desired. Two second latency is the max, 1 second or less latency is desired, no
+> latency is preferred. Architect these solutions robustly."
+> *[→ N73, built in PR #220. Both symptoms are ONE root cause, and it is
+> structural rather than flaky: the queue retired an op's optimistic overlay when
+> the server action RESOLVED, then called `router.refresh()` — leaving a
+> revalidation-round-trip window with the overlay gone and the render not yet
+> committed, during which the row fell back to server state that did not contain
+> the set. Hence the reversal, and hence its intermittency (whether a racing
+> refresh committed inside or outside the window). The discarded RIR is the same
+> window with an edit in it: the row went editable mid-flight, and the arriving
+> render both remounted it and resynced it through a rule that adopted server
+> values unconditionally while clearing the row's dirty flag, so the edit was
+> neither kept nor re-sent. Fixed by the **echo rule** — an op stays until a
+> rendered row CONTAINS its write — which makes the queue's overlay and the
+> server render hand off atomically instead of overlapping. Perceived latency is
+> unchanged (the tap still advances the row in the same frame); the owner's
+> ≤1s target now applies only to how long a row stays uneditable.]*

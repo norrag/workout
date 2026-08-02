@@ -4,6 +4,45 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-02 — Session 96: the set-logging queue's echo rule (N73)
+
+Owner reported two regressions from N68's write queue: a ~1s "ping-pong" where a
+logged set un-logs and re-logs (and the active set walks backwards with it), and
+an edited RIR repeatedly discarded on the last set of an exercise. New item
+**N73**, built in PR #220.
+
+- **One root cause, not two.** The queue retired an op's optimistic overlay on
+  **dispatch success** and only then called `router.refresh()`. That leaves a
+  window one revalidation round-trip wide with the overlay already gone and the
+  server render not yet committed — and in that window the row falls back to
+  server state that does not contain the set. Box un-ticks, next set un-advances.
+  Its intermittency was never mysterious: it depended on whether a racing refresh
+  committed inside or outside that window. The discarded RIR is the same window
+  with an edit in it — the row became editable mid-flight, then the arriving
+  render remounted it (the row key carries `logged.id`) or resynced it through
+  `adoptServerRowState("own-logged-set", …)`, which adopted unconditionally
+  **and** cleared the row's dirty flag, so the next blur had nothing left to send.
+- **The fix is a rule, not a patch: retire on the ECHO, never on the ack.** A
+  landed write moves to a new `acked` status and keeps its overlay until a
+  rendered server row *contains* it. `reconcile` (fed the day view's rows on
+  every render, and free when idle — it returns the same state object) is the
+  only thing that drops it. The two kinds are deliberately asymmetric: a log is
+  echoed by its **set number existing**, an amend only by the row carrying the
+  **amended values**, so a stale pre-amend render is held rather than adopted.
+- **Three supporting changes.** `adoptServerRowState` gains a `writeOutstanding`
+  veto (the queue is the authority on whether this row still owes a write); one
+  coalesced, debounced `router.refresh()` replaces one-per-op; and the provider's
+  `apply` stopped mutating a ref inside a `setState` updater.
+- **The safety valve is kind-aware, and that asymmetry is the point.** An acked
+  *amend* expires after 30s (dropping it just lets the row adopt server truth).
+  An acked *log* never expires on a timer — dropping it would retract a true
+  statement and un-tick a box the lifter watched fill, which is the regression
+  itself. It needs no timer anyway: it is invisible the moment any render carries
+  the set number, and `reconcile`/`clearWorkout`/`decodeQueue` all collect it.
+- Perceived latency is unchanged (the tap still advances the row in the same
+  frame). What the ~250 ms debounce bounds is how long a just-logged row stays
+  uneditable — comfortably inside the owner's ≤1s target.
+
 ## 2026-08-02 — Session 95: doc 21 Phase 3 built — the MCP write surface (N70)
 
 The lever becomes usable. Phases 2/2b resolved and priced an assignment end to

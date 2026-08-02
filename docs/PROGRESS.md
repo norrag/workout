@@ -2,7 +2,77 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-02 (latest) — doc 21 Phase 3: the MCP write surface for exercise-level RIR
+## 2026-08-02 (latest) — N73: the set-logging queue's echo rule
+
+Two regressions the N68 queue introduced, reported by the owner. (1) A logged set
+fills and advances to the next one, then **reverses for about a second** — set 1
+unlogged and active again — before snapping forward once more; *"more often than
+not"*. (2) On the last set of an exercise, the set flickered back to unlogged and
+a **modified RIR was repeatedly discarded**, reset to the prescribed value.
+
+**Both are one root cause, and it is structural.** The queue retired an op's
+optimistic overlay when the server action **resolved**, and only then called
+`router.refresh()`. That leaves a window one revalidation round-trip wide with
+the overlay already gone and the server render not yet committed — and in that
+window the row falls back to server state that does not contain the set. The box
+un-ticks, the active set walks backwards, then both snap forward when the render
+lands. Nothing about it was mysterious or intermittent underneath: whether a
+racing refresh committed inside or outside that window is what varied.
+
+The discarded RIR is the *same window with an edit in it*. The row went editable
+mid-flight (it was no longer "pending"), so the lifter could type in it — and the
+arriving render then either remounted the row (its key carries `logged.id`) or
+resynced it through `adoptServerRowState("own-logged-set", …)`, which adopted
+server values unconditionally **and** cleared the row's dirty flag. So the edit
+was neither kept nor re-sent: it took several attempts to land because it needed
+a gap where no render arrived between typing and blurring.
+
+### The rule: retire on the echo, never on the ack
+
+A landed write now moves to a new **`acked`** status and **keeps its overlay
+until a rendered server row contains it**. `reconcile` — fed the day view's rows
+from an effect on every render — is the only thing that drops it, and it returns
+the same state object when nothing retires, so running it per render is free.
+The handoff is atomic because `pendingSetsFor` already suppresses an overlay for
+any set number the server render carries: overlay and render swap in one commit
+instead of overlapping.
+
+The two op kinds are **deliberately asymmetric**, and that asymmetry is the fix
+for the second symptom:
+
+- a **log** is echoed by its set number *existing*;
+- an **amend** only by the row carrying the *amended values*. A row still showing
+  the old ones is a stale render — fetched before the amend landed — so the op,
+  and the local values it protects, must survive it.
+
+Supporting changes:
+
+- **`adoptServerRowState` gains a `writeOutstanding` veto** (R13/N13's rule,
+  amended). While a row's own write is outstanding, what is on screen wins over
+  any arriving render. The queue is the authority on that, via `hasPendingAmend`.
+- **One coalesced, debounced `router.refresh()` per burst** rather than one per
+  op. Four sets logged in a row used to queue four full RSC fetches of the day
+  view that could commit out of order.
+- The provider's `apply` stopped assigning a ref inside a `setState` updater (a
+  render-phase side effect React may re-run); the ref is now the synchronously
+  updated source of truth the processor already assumed it was.
+
+**The safety valve is kind-aware.** An acked *amend* expires after 30s — dropping
+it just lets the row adopt server truth, where it was headed anyway. An acked
+*log* **never** expires on a timer: dropping it would retract a statement that is
+true and un-tick a box the lifter watched fill, which is precisely the regression
+this rule exists to kill. It needs no timer either — it is invisible the moment
+any render carries the set number, and `reconcile`, `clearWorkout` (on
+completion) and `decodeQueue` (on reload) all collect it.
+
+**Latency is unchanged where it matters:** the tap still advances the row in the
+same frame, so perceived latency stays zero. What the ~250 ms debounce bounds is
+how long a just-logged row stays uneditable — well inside the owner's ≤1s target.
+
+Recorded in `02 §A5`. Tests: the ping-pong and the discarded-RIR sequences are
+both pinned as golden cases in `src/lib/logging/__tests__/queue.test.ts`.
+
+## 2026-08-02 — doc 21 Phase 3: the MCP write surface for exercise-level RIR
 
 [doc 21](21-exercise-level-rir.md) §8 (MCP), on the resolution Phase 2 built.
 Phases 2/2b honored an assignment end to end but **nothing could write one** —
