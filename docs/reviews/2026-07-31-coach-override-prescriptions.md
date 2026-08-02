@@ -22,7 +22,7 @@ written from this doc and none should be.
 >   layering over it.
 > - **§4.4 (the `LOOKBACK_WEEKS = 2` return cliff)** — **the one thread that
 >   stays open**, because bounded substitution is the single clause exercise-level
->   RIR cannot express. Tracked as backlog **N69**; this section is still its only
+>   RIR cannot express. Tracked as backlog **N72**; this section is still its only
 >   written record.
 > - **§5 (no separate coach principal)** and **§6 (reduce-only safety bounds)** —
 >   apply to any MCP write that changes what the athlete is asked to do,

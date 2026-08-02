@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-07-31 — Session 92d: repricing policy retracted + measuring band added (N67, doc 21 §4.2/§4.3/§6.1)
+## 2026-07-31 — Session 92d: repricing policy retracted + measuring band added (N70, doc 21 §4.2/§4.3/§6.1)
 
 Owner pushed back on doc 21 §4.2. **Right on both counts**; the section is
 rewritten, §4.3 and §6.1 are new, and two of my numbers are corrected in their
@@ -50,7 +50,7 @@ favour. Batch 28d verbatim appended. Still no code.
   without it. `rep_position` survives as an *optional* Phase-4 knob. §9 grows to
   four confirmations (adds the band default and out-of-band display).
 
-## 2026-07-31 — Session 92c: exercise-level RIR DECIDED → build spec doc 21 (N67, N68, N69, PR #211)
+## 2026-07-31 — Session 92c: exercise-level RIR DECIDED → build spec doc 21 (N70, N71, N72, PR #211)
 
 Owner returned notes + decisions A1–A8 on the assessment and asked to finalize
 before starting phased implementation in a new session. Settled design promoted
@@ -59,7 +59,7 @@ out of `reviews/` into an authoritative numbered spec:
 §10), indexed in the root `CLAUDE.md`. Both review docs demoted to rationale
 records with "where they conflict, 21 wins" headers. Still no code.
 
-- **A1 widened N68 substantially.** The minimal fix was "fall back to the
+- **A1 widened N71 substantially.** The minimal fix was "fall back to the
   prescribed RIR in the stamp"; the owner wants logged sets to actually
   **capture `rir_reported`**, with stats reading RIR and reporting effective
   reps. That amends the doc-11 premise itself (the prescription becomes a
@@ -96,7 +96,7 @@ records with "where they conflict, 21 wins" headers. Still no code.
   and dropping it would read as under-MEV during a block the athlete is
   complying with.
 - **A8 closed the override review.** Its surviving open thread — bounded
-  substitution and the `LOOKBACK_WEEKS = 2` return cliff — spun out as **N69**
+  substitution and the `LOOKBACK_WEEKS = 2` return cliff — spun out as **N72**
   (`F`, MED) so closing the doc loses nothing; §4.4 there is still its only
   written record. The doc's other findings are pointed at their new homes in
   doc 21 §5/§8.
@@ -109,17 +109,17 @@ records with "where they conflict, 21 wins" headers. Still no code.
   §4.3's effort-honesty gate has been suppressing effort claims across the
   deterministic why and the facts `effort_status` precisely because effort was
   inferred, never observed — Phase 1 unblocks that too.
-- N67 → `ready`, N68 → `ready` (doc 21 Phase 1), N69 → `triaged`, Batch 28c
+- N70 → `ready`, N71 → `ready` (doc 21 Phase 1), N72 → `triaged`, Batch 28c
   verbatim appended. Owner starts Phase 1 in a new session.
 
-## 2026-07-31 — Session 92b: exercise-level RIR — assessment; override direction parked (N67 d2, N68, PR #211)
+## 2026-07-31 — Session 92b: exercise-level RIR — assessment; override direction parked (N70 d2, N71, PR #211)
 
 Owner read the override review, judged it "messy and a large paradigm shift",
 and proposed an alternative: **exercise-level RIR assignment** (per exercise and
 per week), managing effort through the RIR framework the app already has. Asked
 for an assessment doc and for the previous review to be marked obsolete. No code.
 
-- **N67 rewritten** around the problem (temporary per-exercise effort/load
+- **N70 rewritten** around the problem (temporary per-exercise effort/load
   management) with two directions: direction 1 (overrides) **PARKED**, direction
   2 (exercise RIR) **LIVE**. Assessment:
   [`docs/reviews/2026-07-31-exercise-level-rir.md`](../reviews/2026-07-31-exercise-level-rir.md).
@@ -134,7 +134,7 @@ for an assessment doc and for the previous review to be marked obsolete. No code
   `edit_mesocycle` is the MCP seam; doc 14 §7 makes invalidation mechanical.
   Crucially the whole clock problem disappears (§4.1 of direction 1) because a
   per-week RIR value is content, not a window.
-- **New item N68 (`B`, HIGH, workstream A) — the blocking finding.** The app has
+- **New item N71 (`B`, HIGH, workstream A) — the blocking finding.** The app has
   **two RIR assumptions**: the anchor uses the prescribed `target_rir`, but the
   stored per-set stamp uses `rir_reported`, which is **never written**
   (`DayView.tsx:1698`), so every stats surface treats every set as taken to
@@ -152,9 +152,9 @@ for an assessment doc and for the previous review to be marked obsolete. No code
   bounded substitution stays open.
 - Recommended shape: **floor semantics** (`max(weekRir, floor)` — reduce-only,
   ramp keeps working, deload wins), a `reason` column, an earn-gate predicate,
-  and a build sequence starting with N68. Eight owner decisions in §9.
+  and a build sequence starting with N71. Eight owner decisions in §9.
 
-## 2026-07-31 — Session 92: coach-authored prescription overrides — review (N67, PR #211)
+## 2026-07-31 — Session 92: coach-authored prescription overrides — review (N70, PR #211)
 
 Owner proposed an MCP path letting the LLM coach override or author
 prescriptions (exercise / day / week: exercise, weight, reps, sets + reason,
@@ -162,7 +162,7 @@ duration, return criteria), prompted by a live lumbar-nerve episode where a
 coach-agreed rehab plan had nowhere to live. Asked for questions and concerns in
 a review doc before implementing. No code.
 
-- **New item N67** (`F`, HIGH, workstream P, `needs-input`); Batch 28 verbatim
+- **New item N70** (`F`, HIGH, workstream P, `needs-input`); Batch 28 verbatim
   appended. Review:
   [`docs/reviews/2026-07-31-coach-override-prescriptions.md`](../reviews/2026-07-31-coach-override-prescriptions.md).
 - **The load-bearing correction (§2):** the owner's premise that overrides can

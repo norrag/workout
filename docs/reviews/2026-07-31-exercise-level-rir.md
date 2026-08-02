@@ -4,16 +4,16 @@
 every question in §9 (A1–A8, 2026-07-31) and the settled design now lives in the
 authoritative build spec **[`docs/21-exercise-level-rir.md`](../21-exercise-level-rir.md)**;
 **where this doc conflicts with 21, 21 wins.** Read this one for *why*, doc 21
-for *what to build*. Backlog **N67** (feature) + **N68** (the prerequisite defect
+for *what to build*. Backlog **N70** (feature) + **N71** (the prerequisite defect
 it exposed, absorbed as doc 21 Phase 1). Replaces
 [`2026-07-31-coach-override-prescriptions.md`](./2026-07-31-coach-override-prescriptions.md)
-(closed per A8; its one surviving thread is **N69**).
+(closed per A8; its one surviving thread is **N72**).
 
 > **Owner corrections folded into doc 21, recorded here so this doc isn't read
 > as still-open:** §5's floor-vs-absolute recommendation was **rejected** —
 > absolute only (A2); §4's "RIR doesn't move load much" is complemented by an
 > explicit **repricing policy** (doc 21 §4.2 — window-centered reps at the target
-> RIR, the deload's own mechanic); §3's minimal N68 fix is **widened** into real
+> RIR, the deload's own mechanic); §3's minimal N71 fix is **widened** into real
 > per-set `rir_reported` capture (A1), which absorbs N38; and §9's questions are
 > all answered.
 
@@ -46,7 +46,7 @@ Three things need to be said plainly before it gets built:
    PRs, `best_e1rm`, and the strength trend reading the lighter work as a
    straight decline — exactly the problem the proposal exists to solve. This is
    a real standing defect (§3), independent of this feature; it is filed as
-   **N68** and it is a **P0 prerequisite**.
+   **N71** and it is a **P0 prerequisite**.
 2. **RIR is a ~2 %-per-step load lever, not a 20 % one.** At 9 prescribed reps,
    moving RIR 1 → 5 (the working-week ceiling) reduces load by **9.1 %** (§4).
    That is an excellent *fatigue* lever and a weak *absolute-load* lever. For
@@ -93,7 +93,7 @@ week's value. It has to become a resolved input the engine consumes.
 
 ---
 
-## 3. P0 — the app has two different RIR assumptions (filed as N68)
+## 3. P0 — the app has two different RIR assumptions (filed as N71)
 
 The doc 11 premise is: *the app prescribes a target RIR and trusts the user to
 hit it, so a logged `weight × reps` against a target RIR is itself an RIR data
@@ -262,7 +262,7 @@ bounded substitution is a smaller, separable feature.
 
 ## 8. Metrics — what improves and what needs disclosure
 
-Assuming N68 lands first:
+Assuming N71 lands first:
 
 - **Strength trend / e1RM series: fixed as claimed.** High-RIR sets stop
   reading as decline.
@@ -286,7 +286,7 @@ Assuming N68 lands first:
 
 ## 9. Owner decisions
 
-**Q1 — N68 first?** The metric benefit doesn't exist until the stamp uses the
+**Q1 — N71 first?** The metric benefit doesn't exist until the stamp uses the
 prescribed RIR, and that re-levels historical e1RMs upward. *Recommend: yes,
 its own PR, before the RIR feature — it's a standing defect either way.*
 
@@ -307,7 +307,7 @@ floor in the same workstream (not necessarily the same PR).*
 
 **Q5 — Stats treatment.** Exclude elevated-RIR exercise-weeks from the strength
 trend (deload precedent), flag them, or leave them in? *Recommend flag, don't
-exclude — with N68 fixed they are honest data points, just lower confidence.*
+exclude — with N71 fixed they are honest data points, just lower confidence.*
 
 **Q6 — Earn-gate predicate.** Add "no earn while the slot's RIR is above the
 week's RIR"? *Recommend yes — cheap, and it closes the case where an old
@@ -325,7 +325,7 @@ place that failure mode is written down.*
 
 ## 10. Phasing
 
-1. **N68 — one RIR premise.** Stamp `rir_reported ?? target_rir`; restamp
+1. **N71 — one RIR premise.** Stamp `rir_reported ?? target_rir`; restamp
    history via the existing hook; doc 10/11 amendment; call out the level shift.
 2. **Exercise RIR — plan + engine.** Column(s) on `meso_exercises`, pure
    resolution (`max(weekRir, floor)`), engine consumes it, `target_rir` written

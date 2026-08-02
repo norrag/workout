@@ -10,8 +10,8 @@ internals, doc 14 over freshness, doc 10 over metric definitions — this doc
 amends each where noted (§2, §5, §6, §7). Implementation proceeds in new
 sessions, one phase per PR (§10).
 
-Backlog: **N67** (the feature), **N68** (the RIR-premise defect, absorbed as
-Phase 1), **N38** (honest-RIR capture — absorbed as Phase 1), **N69** (bounded
+Backlog: **N70** (the feature), **N71** (the RIR-premise defect, absorbed as
+Phase 1), **N38** (honest-RIR capture — absorbed as Phase 1), **N72** (bounded
 substitution — explicitly out of scope, tracked separately).
 
 ---
@@ -40,7 +40,7 @@ block") all become the same one lever.
 | A5 | **Exclude non-working (high-RIR / low-confidence) sets from stats** — split in §6 into a hard measuring band (§6.1) and a soft working-set policy (§6.2); one confirmation open. |
 | A6 | **Add the earn-gate predicate** (no progression earned while an assignment is active). |
 | A7 | **Store a `reason`** with the assignment and surface it. |
-| A8 | **Close the override review.** Its one unresolved thread (bounded substitution + the `LOOKBACK_WEEKS = 2` cliff) is preserved as **N69**. |
+| A8 | **Close the override review.** Its one unresolved thread (bounded substitution + the `LOOKBACK_WEEKS = 2` cliff) is preserved as **N72**. |
 | **28d** | **Repricing needs no special case** — thread the resolved RIR through the existing pricing path, symmetric in both directions (§4.2, supersedes the rejected centered-reps rule). **Prescription RIR is unbounded** so one lever spans deload → rehab → extra effort (§4.3); the **measuring band** (§6.1) is what keeps that honest. |
 
 ---
@@ -51,7 +51,7 @@ block") all become the same one lever.
 hit it, so no per-set RIR is captured; a logged `weight × reps` against a
 *prescribed* target RIR is itself an RIR data point.
 
-**Two paths implement it inconsistently, and that is a live defect (N68):**
+**Two paths implement it inconsistently, and that is a live defect (N71):**
 
 | Path | Assumed RIR | Consumers |
 |---|---|---|
@@ -71,7 +71,7 @@ assumedRir(set) = set.rir_reported ?? set.workout_exercise.target_rir
 
 - Applies identically at the stamp site (`computeSetE1rm`), in the anchor
   (`queries/anchors.ts`), in the marker/compliance comparison, and in the
-  restamp backfill. The two paths converge; N68 closes by construction.
+  restamp backfill. The two paths converge; N71 closes by construction.
 - **Never default a captured value to 0.** This is the N11 regression, already
   pinned by a test (`day-rules.test.ts:114`): `rir_reported` defaulting to 0
   while the prescription baked in the week's target RIR made an
@@ -418,7 +418,7 @@ pass.* --  QUALIATITIVE BAND
 
 ## 10. Phases (one per PR, each green on its own)
 
-**Phase 1 — one RIR premise (N68 + N38).** `assumedRir = rir_reported ??
+**Phase 1 — one RIR premise (N71 + N38).** `assumedRir = rir_reported ??
 target_rir` at the stamp site, the anchor, and the marker; per-set RIR capture
 in the day view (pre-filled with the prescription, never 0 — pin the N11 case);
 restamp backfill via `e1rm-restamp`; `rir_reported` + effective reps in exercise
@@ -460,5 +460,5 @@ volume disclosure flag, comparability note on meso/macro rollups.
 **Phase 6 — UI + explanation.** 09-changelog design pass, planner/day-view
 disclosure, editor sheet, doc 19 layering.
 
-**Out of scope, tracked as N69:** bounded exercise substitution and the
+**Out of scope, tracked as N72:** bounded exercise substitution and the
 `LOOKBACK_WEEKS = 2` return cliff — the one clause this lever cannot express.
