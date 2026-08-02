@@ -1699,26 +1699,18 @@ function SetRow({
     });
   };
 
-  // N73: this row has a write of its own the server hasn't echoed back yet, so
-  // any render that arrives may predate it. Read once per render and held in a
-  // ref, because the resync effects below run off SERVER-value dependencies —
-  // they must consult the queue as it is when the echo lands, not as it was
-  // when they were last declared.
+  // N73: this row has a write of its own that the server hasn't echoed back
+  // yet, so any render arriving now may predate it. The resync effects below
+  // key off SERVER-value dependencies, so the render that carries the echo is
+  // also the render whose closure they run with — reading this directly is
+  // therefore already the queue as of that render.
   const writeOutstanding = logged ? queue.isAmending(logged.id) : false;
-  const writeOutstandingRef = useRef(writeOutstanding);
-  writeOutstandingRef.current = writeOutstanding;
 
   // re-sync when this row's own logged set changes (a log/unlog/amend
   // confirmation echoing back) — adopt the server state, unless this row's own
   // amend is still outstanding and the render may therefore be pre-amend (N73)
   useEffect(() => {
-    if (
-      !adoptServerRowState(
-        "own-logged-set",
-        edited.current,
-        writeOutstandingRef.current,
-      )
-    )
+    if (!adoptServerRowState("own-logged-set", edited.current, writeOutstanding))
       return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
@@ -1744,8 +1736,7 @@ function SetRow({
     const cleared = prevPlannedWeight.current != null && plannedWeight == null;
     prevPlannedWeight.current = plannedWeight;
     const change = cleared ? ("prescription-reset" as const) : ("planned-input" as const);
-    if (!adoptServerRowState(change, edited.current, writeOutstandingRef.current))
-      return;
+    if (!adoptServerRowState(change, edited.current, writeOutstanding)) return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
     repsManual.current = false;
