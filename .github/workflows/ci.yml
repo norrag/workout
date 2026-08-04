@@ -27,6 +27,28 @@ jobs:
       - name: Build
         run: npm run build
 
+  # Hosted schema drift (N74). Every other job applies migrations to a fresh
+  # local stack, so they can only ever prove the repo is self-consistent — they
+  # cannot see that production is missing one. This job compares
+  # supabase/migrations/ against the hosted schema_migrations table.
+  #
+  # No-ops with a warning until SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF are
+  # set (docs/deployment/manual-operations.md), so it never blocks fork PRs.
+  migration-drift:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Hosted migration drift
+        run: npm run db:check
+
   rls-tests:
     runs-on: ubuntu-latest
     steps:

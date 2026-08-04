@@ -56,6 +56,8 @@ import { formatWeight } from "@/lib/units";
 import { localDayIso, shortDateWithWeekday } from "@/lib/dates";
 import { useSetLogQueue } from "@/components/logging/SetLogQueueProvider";
 import type { PendingSet } from "@/lib/logging/queue";
+import { dayCloseOption, isWeekLocked } from "@/lib/logging/end";
+import type { WorkoutRow } from "@/lib/types/database";
 import {
   adoptServerRowState,
   captureRirDefault,
@@ -75,6 +77,7 @@ import {
   deleteSetAction,
   endMesocycleAction,
   endWorkoutAction,
+  skipWorkoutAction,
   listAddExerciseCandidatesAction,
   listReplacementCandidatesAction,
   moveExerciseDownAction,
@@ -246,7 +249,18 @@ export function DayView({
   params: EngineParams;
 }) {
   const { workout, microcycle, mesocycle, exercises } = detail;
-  const readOnly = workout.status === "completed" || workout.status === "skipped";
+  // N74: completing a day of week N generates its week-N+1 counterpart straight
+  // away, so that day is reachable from the cycles grid while week N is still
+  // open. It stays fully VIEWABLE — the whole plan is always inspectable — but
+  // it is not loggable: the engine's autoregulation reads whole-week feedback,
+  // so training into a week whose predecessor is unfinished would progress off
+  // a partial week. Backed by the same check server-side in `logSet` (the UI
+  // gate alone is not a guarantee).
+  const weekLocked = isWeekLocked(microcycle.status);
+  const readOnly =
+    workout.status === "completed" ||
+    workout.status === "skipped" ||
+    weekLocked;
   const [, startTransition] = useTransition();
   const toast = useToast();
   const queue = useSetLogQueue();
@@ -411,9 +425,10 @@ export function DayView({
         mesoId={mesocycle.id}
         mesoName={mesocycle.name}
         workoutId={workout.id}
-        workoutActive={
-          workout.status === "planned" || workout.status === "in_progress"
-        }
+        // N74: `readOnly` already folds in the week lock, so a future week's
+        // day offers neither "Add exercise" nor a close action
+        workoutActive={!readOnly}
+        workoutStatus={workout.status}
         mesoActive={mesocycle.status === "active"}
         weekNumber={microcycle.week_number}
         dayNumber={workout.day_number}
@@ -424,6 +439,28 @@ export function DayView({
         totalSets={totalSets}
         navWeeks={detail.navWeeks}
       />
+
+      {/* N74: say WHY this plan is read-only, and where the user should be
+          instead. Without this the day just silently refuses to log. */}
+      {weekLocked && (
+        <div className="mt-5 border-[1.5px] border-dashed border-ink/40 p-4">
+          <div className="text-[10px] font-bold tracking-[0.14em] text-ink/55">
+            WEEK {microcycle.week_number} NOT STARTED
+          </div>
+          <p className="mt-2.5 text-sm leading-relaxed text-ink/70">
+            These targets are planned in full, but week{" "}
+            {microcycle.week_number} opens once every day of week{" "}
+            {microcycle.week_number - 1} is logged or skipped — each week&apos;s
+            loads are set from the whole week before it.
+          </p>
+          <Link
+            href="/workout"
+            className="mt-4 block w-full bg-ink py-4 text-center text-[13px] font-bold tracking-[0.12em] text-bg-base"
+          >
+            GO TO CURRENT WORKOUT
+          </Link>
+        </div>
+      )}
 
       {/* exercise blocks */}
       {exercises.map((we, i) => (
@@ -578,6 +615,7 @@ function DayHeader({
   mesoName,
   workoutId,
   workoutActive,
+  workoutStatus,
   mesoActive,
   weekNumber,
   dayNumber,
@@ -592,6 +630,7 @@ function DayHeader({
   mesoName: string;
   workoutId: string;
   workoutActive: boolean;
+  workoutStatus: WorkoutRow["status"];
   mesoActive: boolean;
   weekNumber: number;
   dayNumber: number;
@@ -770,7 +809,9 @@ function DayHeader({
               mesoId={mesoId}
               workoutId={workoutId}
               workoutActive={workoutActive}
+              workoutStatus={workoutStatus}
               mesoActive={mesoActive}
+              hasLoggedSets={loggedSets > 0}
             />
           </div>
         </div>
@@ -793,20 +834,33 @@ function WorkoutOptionsMenu({
   mesoId,
   workoutId,
   workoutActive,
+  workoutStatus,
   mesoActive,
+  hasLoggedSets,
 }: {
   mesoId: string;
   workoutId: string;
   workoutActive: boolean;
+  workoutStatus: WorkoutRow["status"];
   mesoActive: boolean;
+  /** N74: an untrained day is SKIPPED, a day with work on it is ENDED — the
+   *  two are different terminal states and only one is offered at a time */
+  hasLoggedSets: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState<null | "workout" | "meso">(null);
+  const [confirm, setConfirm] = useState<null | "workout" | "meso" | "skip">(
+    null,
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [ending, startEnding] = useTransition();
+  // N74: which terminal state this day is eligible for — the same rule the
+  // server enforces, so the menu can never offer the action it will refuse
+  const closeOption = workoutActive
+    ? dayCloseOption(workoutStatus, hasLoggedSets)
+    : null;
 
   const go = (href: string) => {
     setOpen(false);
@@ -834,6 +888,25 @@ function WorkoutOptionsMenu({
         router.push(`/cycles/meso/${mesoId}`);
       } catch {
         toast("Couldn't end the mesocycle — check your connection");
+      }
+    });
+
+  // N74: close an untrained day so the week can close and the next one can be
+  // generated. The server refuses a day with logged sets; surface that rather
+  // than swallowing it, since the user's next move is "End workout" instead.
+  const skipDay = () =>
+    startEnding(async () => {
+      try {
+        const res = await skipWorkoutAction({ workout_id: workoutId });
+        if (res.error) {
+          setConfirm(null);
+          toast(res.error);
+          return;
+        }
+        setConfirm(null);
+        router.push(res.nextWorkoutId ? `/log/${res.nextWorkoutId}` : "/workout");
+      } catch {
+        toast("Couldn't skip the day — check your connection");
       }
     });
 
@@ -894,7 +967,20 @@ function WorkoutOptionsMenu({
             }}
           />
         )}
-        {workoutActive && (
+        {/* N74 — an untrained day skips (keeping it out of every rollup); a day
+            with logged work ends (keeping the work). Never both at once, and
+            the choice is the shared `dayCloseOption` rule the server enforces. */}
+        {closeOption === "skip" && (
+          <MenuRow
+            label="Skip day"
+            destructive
+            onClick={() => {
+              setOpen(false);
+              setConfirm("skip");
+            }}
+          />
+        )}
+        {closeOption === "end" && (
           <MenuRow
             label="End workout"
             destructive
@@ -938,6 +1024,36 @@ function WorkoutOptionsMenu({
             className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-50"
           >
             {ending ? "ENDING…" : "END WORKOUT"}
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={confirm === "skip"}
+        onClose={() => setConfirm(null)}
+        title="Skip day"
+        subtitle="CLOSE UNTRAINED · ADVANCE WEEK"
+      >
+        <p className="text-[13px] leading-relaxed text-ink">
+          This marks the day skipped without logging anything, so the week can
+          close and next week&apos;s targets can be built. It counts as a
+          missed session in your stats. This can&apos;t be undone.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirm(null)}
+            className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={skipDay}
+            disabled={ending}
+            className="bg-accent px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base disabled:opacity-50"
+          >
+            {ending ? "SKIPPING…" : "SKIP DAY"}
           </button>
         </div>
       </BottomSheet>
