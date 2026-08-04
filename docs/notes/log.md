@@ -11,7 +11,7 @@ honest in the stats; this one makes it visible and editable where the athlete
 actually is, and stops the coaching layer from claiming credit for a decision a
 person made.
 
-- **N70 → Phase 6 done. The item CLOSES** — all six phases shipped.
+- **N70 → Phase 6 done (PR #224). The item CLOSES** — all six phases shipped.
 - **One display module for one state.** `src/lib/slot-effort-display.ts` (pure,
   client-safe) owns every word: the eyebrow suffix, the §9.4 band phrase, the
   disclosure sentences. Three surfaces compose from it, so they cannot drift into
