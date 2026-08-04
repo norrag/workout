@@ -35,6 +35,11 @@ const PrescriptionDetailSheet = dynamic(() =>
     (m) => m.PrescriptionDetailSheet,
   ),
 );
+// doc 21 §8 — the effort-target editor. Same treatment: a lever most sessions
+// never touch has no business in the day view's first-load JS.
+const EffortSheet = dynamic(() =>
+  import("./EffortSheet").then((m) => m.EffortSheet),
+);
 import type {
   LoggedExercise,
   NavWeek,
@@ -59,6 +64,7 @@ import type { PendingSet } from "@/lib/logging/queue";
 import {
   adoptServerRowState,
   captureRirDefault,
+  isReportableRir,
   daySetTotals,
   exerciseDone,
   impliedPrescriptionE1rm,
@@ -102,6 +108,7 @@ import {
   appendCoaching,
   composePrescriptionNarrative,
 } from "@/lib/prescription-narrative";
+import { effortEyebrowSuffix } from "@/lib/slot-effort-display";
 
 /**
  * T-I2: the bodyweight chip in a bodyweight exercise's header. The load is the
@@ -258,6 +265,8 @@ export function DayView({
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
   const [auditFor, setAuditFor] = useState<LoggedExercise | null>(null);
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
+  /** doc 21 §8 — the effort-target sheet (the assignment editor) */
+  const [effortFor, setEffortFor] = useState<LoggedExercise | null>(null);
   const [noteSheet, setNoteSheet] = useState<{
     we: LoggedExercise;
     origin: NoteOrigin;
@@ -379,6 +388,7 @@ export function DayView({
     (we: LoggedExercise) => setReplaceFor(we),
     [],
   );
+  const openEffort = useCallback((we: LoggedExercise) => setEffortFor(we), []);
   const openNote = useCallback(
     (we: LoggedExercise, origin: NoteOrigin) => setNoteSheet({ we, origin }),
     [],
@@ -449,6 +459,7 @@ export function DayView({
           onHistory={openHistory}
           onAudit={openAudit}
           onReplace={openReplace}
+          onEffort={openEffort}
           onNote={openNote}
           onFeedback={openFeedback}
           onToggleDrop={toggleDrop}
@@ -486,6 +497,16 @@ export function DayView({
         we={replaceFor}
         onClose={() => setReplaceFor(null)}
         commit={commit}
+      />
+      <EffortSheet
+        we={effortFor}
+        mesocycleId={mesocycle.id}
+        dayNumber={workout.day_number}
+        weekNumber={microcycle.week_number}
+        weekRir={microcycle.target_rir}
+        isDeload={microcycle.is_deload}
+        readOnly={readOnly}
+        onClose={() => setEffortFor(null)}
       />
       <HistorySheet
         target={
@@ -997,6 +1018,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onHistory,
   onAudit,
   onReplace,
+  onEffort,
   onNote,
   onFeedback,
   onToggleDrop,
@@ -1029,6 +1051,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onHistory: (we: LoggedExercise) => void;
   onAudit: (we: LoggedExercise) => void;
   onReplace: (we: LoggedExercise) => void;
+  onEffort: (we: LoggedExercise) => void;
   onNote: (we: LoggedExercise, origin: NoteOrigin) => void;
   onFeedback: (we: LoggedExercise) => void;
   onToggleDrop: (weId: string) => void;
@@ -1112,6 +1135,9 @@ const ExerciseBlock = memo(function ExerciseBlock({
       previous: rxAudit?.previous ?? null,
       outOfBand: rxOutOfBand,
       decisionOutput: rxAudit?.output ?? null,
+      // doc 21 §8 — the authored effort level leads the why and prices the
+      // ask's effort clause through the §9.4 band; null when unassigned
+      effort: we.slot_effort,
       // §4.3 — an assumed RIR is never spoken as an observed one
       effortStatus: rxAudit?.effortObserved === true ? "observed" : "inferred",
       weekNumber,
@@ -1132,6 +1158,10 @@ const ExerciseBlock = memo(function ExerciseBlock({
           {" — "}
           {we.muscle_group.toUpperCase() || "OTHER"}
           {skipped ? " · SKIPPED" : ""}
+          {/* doc 21 §8 — an authored effort level reads on the row itself, in
+              the same ` · SUFFIX` idiom as SKIPPED (09-changelog 2026-08-04
+              session 2). The strip carries the numbers and the reason. */}
+          {effortEyebrowSuffix(we.slot_effort)}
         </div>
         <div className="flex gap-2">
           <button
@@ -1375,6 +1405,21 @@ const ExerciseBlock = memo(function ExerciseBlock({
             router.push(
               `/exercises/${we.exercise_id}?from=/log/${we.workout_id}`,
             );
+          }}
+        />
+        {/* doc 21 §8 — the effort assignment for THIS slot, this week. The
+            sheet reads even when the day is read-only (a completed session's
+            assignment is part of its record); it only refuses to write. */}
+        <MenuRow
+          label="Effort target"
+          trailing={
+            we.slot_effort?.assignedRir != null
+              ? `RIR ${we.slot_effort.assignedRir}`
+              : "›"
+          }
+          onClick={() => {
+            onCloseMenu();
+            onEffort(we);
           }}
         />
         <MenuRow
@@ -1648,7 +1693,7 @@ function SetRow({
   // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
   const [weight, setWeight] = useState(formatWeight(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
-  const [rir, setRir] = useState(String(initialRir));
+  const [rir, setRir] = useState(initialRir == null ? "" : String(initialRir));
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
   const repsManual = useRef(false);
@@ -1714,7 +1759,7 @@ function SetRow({
       return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
-    setRir(String(initialRir));
+    setRir(initialRir == null ? "" : String(initialRir));
     edited.current = false;
     repsManual.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1961,7 +2006,13 @@ function SetRow({
               (reportedRirOnRow != null ? "" : " text-ink/45")
             }
           >
-            {state === "logged" ? rir : targetRir}
+            {state === "logged"
+              ? rir
+              : /* doc 21 §9.4 — a prescription past the reportable range is
+                   not a number to confirm; the strip states the band instead */
+                isReportableRir(targetRir)
+                ? targetRir
+                : "—"}
           </div>
         </>
       ) : (
@@ -2041,6 +2092,9 @@ function SetRow({
             inputMode="numeric"
             aria-label={`set ${setNumber} RIR`}
             value={rir}
+            /* empty only when the prescription is past the reportable range
+               (doc 21 §9.4) — the athlete may still report if they can */
+            placeholder="—"
             onChange={(e) => {
               setRir(e.target.value);
               edited.current = true;

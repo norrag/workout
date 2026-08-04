@@ -11,6 +11,7 @@ import {
   formatMacroTarget,
   formatWork,
   projectChange,
+  projectEffortAssignment,
   projectMacro,
   projectNote,
   projectSourceSession,
@@ -539,5 +540,72 @@ describe("projectMacro + formatMacroTarget (§5.3)", () => {
 
   it("is absent for a standalone meso", () => {
     expect(projectMacro({ ...hackSquatContext, macro: null })).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §8 — the authored effort assignment
+// ---------------------------------------------------------------------------
+
+describe("projectEffortAssignment", () => {
+  it("is ABSENT for an unassigned slot, and leaves the facts byte-identical", () => {
+    expect(projectEffortAssignment(hackSquatContext)).toBeUndefined();
+    const facts = buildExplanationFacts(hackSquatDecision, hackSquatContext);
+    expect("effort_assignment" in facts).toBe(false);
+    expect(
+      buildExplanationFacts(hackSquatDecision, { ...hackSquatContext, effort: null }),
+    ).toEqual(facts);
+  });
+
+  it("carries the departure — the assignment AND the week it left", () => {
+    const facts = buildExplanationFacts(hackSquatDecision, {
+      ...hackSquatContext,
+      effort: {
+        assignedRir: 4,
+        weekRir: 0,
+        backedOff: true,
+        measuring: true,
+        reason: "  nerve flare  ",
+      },
+    });
+    expect(facts.effort_assignment).toEqual({
+      target_rir: 4,
+      week_target_rir: 0,
+      backed_off: true,
+      measured: true,
+      reason: "nerve flare",
+    });
+  });
+
+  it("derives backed_off when the caller didn't, and flags the measuring band", () => {
+    expect(
+      projectEffortAssignment({
+        ...hackSquatContext,
+        effort: { assignedRir: 21, weekRir: 1, measuring: false },
+      }),
+    ).toEqual({
+      target_rir: 21,
+      week_target_rir: 1,
+      backed_off: true,
+      measured: false,
+    });
+  });
+
+  it("omits itself when the week's own value is unknown — a departure needs both", () => {
+    expect(
+      projectEffortAssignment({
+        ...hackSquatContext,
+        effort: { assignedRir: 4, weekRir: null },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("carries the two shape levers as the strings the model can name", () => {
+    const facts = projectEffortAssignment({
+      ...hackSquatContext,
+      effort: { assignedRir: 4, weekRir: 1, setCap: 2, repPosition: "top" },
+    });
+    expect(facts?.set_cap).toBe(2);
+    expect(facts?.rep_position).toBe("top");
   });
 });

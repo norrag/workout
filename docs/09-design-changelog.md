@@ -42,6 +42,109 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-04 (session 2) — An effort assignment reads on the plan and prices in words, not a number nobody can estimate (figs 1.1 / 1.2 / 2.5b, doc 21 §8/§9.4, N70)
+
+The Phase-6 pass for exercise-level RIR. Four elements, none of which exists in
+the mockup; every one built from a primitive the app already ships.
+
+- **Change (fig 1.1, Day View exercise eyebrow).** The `NN — MUSCLE` eyebrow
+  gains a suffix when the slot carries an assignment for this week, using the
+  **exact idiom already there for `· SKIPPED`** (same 10px semibold,
+  `0.16em` tracking, `ink/55`, ` · ` separator — no tag box, no new primitive,
+  no accent):
+  - assigned **above** the week's RIR → `· BACKED OFF`
+  - assigned **below** the week's RIR → `· PUSHED HARDER`
+  - a working-set cap → `· CAPPED 2` · a rep position → `· TOP OF WINDOW`
+  At most **two** suffixes render (RIR state first); the strip carries the rest.
+  `BACKED OFF` is deliberately the **same word** the history row and the
+  comparability line already use (2026-08-04 session 1) — one state, one name,
+  wherever it appears.
+- **Change (fig 1.1, prescription quick-read strip).** The assignment is the
+  **first thing the why says**, above every engine-authored line: *"This exercise
+  is set to 4 reps short of failure this week, easier than the week's 1."*
+  followed, when one was stored, by the reason on its own line: *"Noted: nerve
+  flare — easing the lumbar load for two weeks."* Then at most one further
+  effort line (cap → rep position → the measuring-band note). Same 11px body
+  treatment as the existing why lines; **no new label, no rule, no color** — the
+  ordering *is* the emphasis (doc 21 §8: the authored effort level must be read
+  before the engine's own reasoning, so a coaching line can never narrate an
+  engine rationale for a decision a human made).
+- **Change (fig 1.1, the ask line — doc 21 §9.4 settled as the qualitative
+  band).** Past the measuring band (`e1rm.max_measuring_rir`, default 8) the ask
+  **stops printing the RIR number** and states the band instead: `3 sets of 9 at
+  171 lb, each kept well short of failure.` The real number is unchanged
+  everywhere it is a *number* — the Engine audit sheet's `PRESCRIPTION` tuple
+  (fig 1.2) still reads `171 × 9 @ 21 RIR`, and the trace is untouched. A
+  strip-only band line says why: *"Well short of failure by design — this one is
+  priced light, so it is not read as a strength measurement."*
+- **Change (fig 1.1, the `RIR` capture cell — amends the 2026-08-02 pre-fill
+  rule).** When the prescribed target RIR is **above 10** (the range
+  `logged_sets.rir_reported` accepts, and the range a human can estimate at all),
+  the cell pre-fills **empty** with a `—` placeholder instead of the prescribed
+  number, and stays editable 0–10. An untouched cell still reports nothing and
+  still resolves to the prescription server-side, so the default stays a no-op;
+  what changes is that the app stops printing "21" in a box labelled RIR and
+  asking the athlete to confirm it. A real report *is* still accepted there, and
+  a set reported at 8 becomes a measurement again — the band and the capture
+  control compose rather than fight.
+- **Change (net-new sheet, fig 1.2 family — `Effort target`).** A bottom sheet off
+  the Day View exercise `⋯` menu, built to the **Load-step sheet** precedent
+  (doc 14 phase 3, `LoadStepSheet.tsx`): title + tracked-caps subtitle, a chip
+  row, an optional free entry, a clear affordance, `Cancel` / `SAVE`. Contents,
+  top to bottom:
+  1. the week's own value stated first — `WEEK 3 RAMP · 1 RIR` (§4.1's "show the
+     default beside the field"), `DELOAD · 6 RIR` on a deload week;
+  2. RIR chips `+1 +2 +4 +8` **relative to the week**, resolved on selection and
+     shown as the absolute value (`RIR 5`), plus `CUSTOM` for the 0–30 range —
+     the Load-step chip treatment exactly (`border-accent bg-accent` selected,
+     `border-dashed` for `CUSTOM`);
+  3. scope: `THIS WEEK` / `REST OF BLOCK` / `WHOLE BLOCK` — one selected, the
+     same chip treatment. A week whose session is already completed or in
+     progress renders **disabled**, not hidden;
+  4. `REASON` — a one-line text field, 500 chars, stored with the assignment (A7)
+     and surfaced in the strip;
+  5. `USE THE WEEK'S RAMP` — the clear affordance, in the Load-step
+     `USE DEFAULT` position and treatment;
+  6. warnings inline above the buttons, in **ink** (never accent): harder-than-
+     programmed, and a whole-block value covering the deload.
+  A cap or rep position set over the connector reads here as a **disclosure
+  line** (`WORKING-SET CAP · 2`), not an editable control — A4 keeps MCP the
+  primary surface for those two, and a lever the sheet cannot change must still
+  be visible where the athlete looks for it.
+- **Change (fig 2.5b, the planned-day page).** The per-slot right-hand meta
+  (`N SETS · M RIR`) resolves the assignment for that week, so a planned week
+  shows the intensity it will actually be priced at, and appends ` · BACKED OFF`
+  / ` · PUSHED HARDER` in the same eyebrow idiom. A slot priced past the
+  measuring band shows `LIGHT` in place of the RIR number, matching the strip.
+- **Rationale.** doc 21 §8 requires the assignment to read on the planner slot
+  and the day-view strip and gives the sheet the Load-step precedent, but no
+  figure exists for any of it. The two judgement calls: (1) the **eyebrow suffix
+  over a tag box** — the exercise header already has four icon controls and a
+  boxed tag would compete with them, while `· SKIPPED` proves the suffix is the
+  house idiom for "this row is in a non-default state"; (2) the **qualitative
+  band** — doc 21 §9.4, settled by the owner. A prescription of `@ 21 RIR` is
+  arithmetically fine and humanly strange, and printing it in the athlete's
+  quick-read asks them to internalize a number the app itself refuses to treat as
+  a measurement. The band phrase says the true thing; the audit sheet keeps the
+  arithmetic.
+- **Affected figures.** 1.1 (eyebrow, strip, set grid), 1.2 (menu + the new
+  sheet; the audit sheet is unchanged and that is the point), 2.5b (planned day).
+- **Rule-8 pass.** **No mockup figure exists** for any element here — verified
+  against `workout - App Screens v2.dc.html`, where the exercise eyebrow carries
+  only `NN — MUSCLE`, the strip carries only ask + why, and the exercise menu has
+  no effort row. Recorded here before building per doc 21 §8; same precedent as
+  the 2026-08-02 RIR column and the P19/N35 marker glyphs. House style honored:
+  every primitive reused (the `· SKIPPED` suffix, the strip body line, the
+  Load-step sheet), **ink only — no accent except the Load-step chip selection
+  the sheet inherits**, square corners, lowercase/tracked-caps discipline, no
+  hype and no exclamation marks.
+- **Impact.** `RETROFIT` — `DayView.tsx` (eyebrow, strip, menu row, capture
+  pre-fill), the planned-day page; `NET-NEW` — `EffortSheet.tsx`; `DATA` — the
+  day view and the planned-day page must read the slot's assignment columns
+  (`meso_exercises.target_rir` / `rir_schedule` / `set_cap` / `set_cap_schedule` /
+  `rep_position` / `effort_reason`) resolved for the week, plus whether the
+  resolved RIR is inside the measuring band.
+
 ## 2026-08-04 — Backed-off sessions read as set-aside, not as decline (figs 3.2 / 4.3, doc 21 §6.2, N70)
 
 - **Change (fig 3.2, exercise History):** a session whose slot ran at an

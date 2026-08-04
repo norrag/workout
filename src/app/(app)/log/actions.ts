@@ -53,7 +53,22 @@ import { getProfile, updateProfile } from "@/lib/queries/profiles";
 import { llmExplanationsServe } from "@/lib/llm/config";
 import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 import { localDayIso } from "@/lib/dates";
-import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  getActiveEngineParams,
+  regenerateOpenWorkouts,
+} from "@/lib/queries/generation";
+import {
+  EFFORT_REASON_MAX,
+  SLOT_RIR_MAX,
+  SLOT_RIR_MIN,
+  getSlotEffortRows,
+  loadEffortContext,
+  overlaySlotRirSchedule,
+  planEffortEdits,
+  slotEffortKey,
+  writeSlotEffort,
+  type SlotEffortEdit,
+} from "@/lib/queries/slot-effort";
 import { assumedRir, stampE1rm } from "@/lib/engine";
 import type { EngineParams } from "@/lib/engine/params";
 import {
@@ -910,4 +925,154 @@ export async function endMesocycleAction(input: {
   revalidatePath(`/log/${parsed.workout_id}`);
   revalidatePath(`/cycles/meso/${parsed.meso_id}`);
   revalidatePath("/cycles");
+}
+
+// ---------------------------------------------------------------------------
+// doc 21 §8 (Phase 6) — the effort-target assignment, from the app
+// ---------------------------------------------------------------------------
+
+const slotEffortSchema = z.object({
+  workout_id: z.string().uuid(),
+  mesocycle_id: z.string().uuid(),
+  day_number: z.number().int().min(1),
+  exercise_id: z.string().uuid(),
+  week_number: z.number().int().min(1),
+  scope: z.enum(["this_week", "rest_of_block", "whole_block"]),
+  /** the absolute RIR to assign; null with `clear` */
+  target_rir: z.number().int().min(SLOT_RIR_MIN).max(SLOT_RIR_MAX).nullable(),
+  clear: z.boolean().default(false),
+  reason: z.string().max(EFFORT_REASON_MAX).nullable().default(null),
+});
+
+export interface SlotEffortActionResult {
+  ok: boolean;
+  /** what was written, in the same words the MCP tool reports */
+  summary?: string;
+  /** §4.1 "no silent semantics" — harder-than-programmed, deload coverage, … */
+  warnings?: string[];
+  error?: string;
+}
+
+/**
+ * Assign (or clear) this slot's target RIR for a scope of weeks.
+ *
+ * The app is the SECOND write surface for the lever — MCP was the first (Phase
+ * 3) — and there is exactly one authoring policy: this action loads the same
+ * context and runs the same pure planner (`loadEffortContext` +
+ * `planEffortEdits`, both in `queries/slot-effort.ts`), so every refusal and
+ * every §4.1 warning is identical whichever surface wrote. What differs is only
+ * the input shape: the sheet offers three scopes instead of week arrays (§8 —
+ * the UI stays deliberately minimal), and a scoped write OVERLAYS the slot's
+ * existing per-week map rather than replacing it, so nudging one week can never
+ * silently drop an assignment sitting on another.
+ *
+ * The set cap and the rep position are deliberately NOT writable here (A4):
+ * they read in the sheet and are authored over the connector.
+ */
+export async function setSlotEffortAction(input: {
+  workout_id: string;
+  mesocycle_id: string;
+  day_number: number;
+  exercise_id: string;
+  week_number: number;
+  scope: "this_week" | "rest_of_block" | "whole_block";
+  target_rir: number | null;
+  clear?: boolean;
+  reason?: string | null;
+}): Promise<SlotEffortActionResult> {
+  const parsed = slotEffortSchema.parse(input);
+  const { supabase, user } = await requireUser();
+
+  const { data: meso, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select(
+      "id, status, weeks, includes_deload, rir_start, rir_end, rir_schedule",
+    )
+    .eq("id", parsed.mesocycle_id)
+    .maybeSingle();
+  if (mesoError) throw mesoError;
+  // RLS scopes the read, so a miss is "not yours or not there" either way
+  if (!meso) return { ok: false, error: "That mesocycle isn't available." };
+  if (meso.status !== "planned" && meso.status !== "active")
+    return {
+      ok: false,
+      error: "This mesocycle is finished — its sessions are a record now.",
+    };
+
+  const rows = await getSlotEffortRows(supabase, parsed.mesocycle_id, false);
+  const key = slotEffortKey(parsed.day_number, parsed.exercise_id);
+  const row = rows.find((r) => r.key === key);
+  if (!row)
+    return {
+      ok: false,
+      error:
+        "This exercise isn't on the plan for this day, so there's nothing to assign to. Replacing an exercise for one session doesn't move the plan.",
+    };
+
+  const workingWeeks = meso.includes_deload ? meso.weeks - 1 : meso.weeks;
+  const clearing = parsed.clear || parsed.target_rir == null;
+  let edit: SlotEffortEdit;
+  if (clearing && parsed.scope === "whole_block") {
+    edit = { lever: "rir", clear: true, reason: parsed.reason };
+  } else if (parsed.scope === "whole_block") {
+    edit = { lever: "rir", value: parsed.target_rir, reason: parsed.reason };
+  } else {
+    const schedule = overlaySlotRirSchedule(
+      row.assignment,
+      parsed.week_number,
+      clearing ? null : parsed.target_rir,
+      parsed.scope,
+      workingWeeks,
+    );
+    // an overlay that empties the last assigned week IS a clear — say so to the
+    // planner rather than handing it an all-null schedule it would refuse
+    edit = schedule.every((v) => v == null)
+      ? { lever: "rir", clear: true, reason: parsed.reason }
+      : { lever: "rir", schedule, reason: parsed.reason };
+  }
+
+  const { params } = await getActiveEngineParams(supabase);
+  const ctx = await loadEffortContext(supabase, meso, params);
+  const planned = planEffortEdits(
+    [{ op: "set_exercise_rir", slot_id: row.id, edit }],
+    new Map([
+      [
+        row.id,
+        {
+          slot_id: row.id,
+          day_number: row.dayNumber,
+          exercise_id: row.exerciseId,
+        },
+      ],
+    ]),
+    new Map(rows.map((r) => [r.id, r.assignment])),
+    ctx,
+  );
+  if (!planned.ok) return { ok: false, error: planned.error };
+
+  for (const w of planned.writes) await writeSlotEffort(supabase, w.slot_id, w.patch);
+
+  // an active meso reprices its OPEN workouts through the engine immediately —
+  // the whole point of the lever is that this week's prescription changes. The
+  // freshness fingerprint would catch it on the next read anyway (doc 21 §7),
+  // but the athlete is looking at the day view right now.
+  if (meso.status === "active") {
+    const profile = await getProfile(supabase, user.id);
+    if (profile)
+      await regenerateOpenWorkouts(
+        supabase,
+        user.id,
+        parsed.mesocycle_id,
+        profile,
+      );
+  }
+
+  revalidatePath(`/log/${parsed.workout_id}`);
+  revalidatePath("/workout");
+  revalidatePath(`/cycles/meso/${parsed.mesocycle_id}`);
+  return {
+    ok: true,
+    summary: planned.summaries[0] ?? "",
+    warnings: planned.warnings,
+  };
 }

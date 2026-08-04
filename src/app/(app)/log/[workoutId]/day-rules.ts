@@ -142,6 +142,16 @@ export function adoptServerRowState(
  * the default a no-op: leaving it alone reports precisely what the server's
  * `assumedRir` fallback would have resolved to, so only a CHANGED value carries
  * information the app didn't already have.
+ *
+ * **Amended by doc 21 Phase 6 (09-changelog 2026-08-04 session 2).** §4.3 made
+ * the *prescribed* RIR unbounded (0–30) while `rir_reported` stayed 0–10 — the
+ * range a human can actually estimate. Past that range the pre-fill returns
+ * **null** (an empty cell), because pre-filling "21" into a box labelled RIR
+ * asks the athlete to confirm a number they cannot mean and the app itself
+ * refuses to treat as a measurement (§6.1). The default stays a no-op either
+ * way: an empty cell reports nothing and the server's `assumedRir` fallback
+ * resolves to the same prescription. A real report is still accepted there —
+ * a deep back-off reported at 8 becomes a measurement again.
  */
 export function captureRirDefault(args: {
   /** the server row's reported RIR, when this set is logged */
@@ -150,8 +160,16 @@ export function captureRirDefault(args: {
   pendingRir: number | null | undefined;
   /** the slot's prescribed target RIR for this week */
   targetRir: number;
-}): number {
-  return args.loggedRir ?? args.pendingRir ?? args.targetRir;
+}): number | null {
+  const reported = args.loggedRir ?? args.pendingRir;
+  if (reported != null) return reported;
+  return isReportableRir(args.targetRir) ? args.targetRir : null;
+}
+
+/** The range `logged_sets.rir_reported` accepts, and the range an athlete can
+ *  honestly estimate (doc 21 §3). Past it the honest report is "no idea". */
+export function isReportableRir(rir: number | null | undefined): boolean {
+  return rir != null && Number.isInteger(rir) && rir >= 0 && rir <= 10;
 }
 
 /**

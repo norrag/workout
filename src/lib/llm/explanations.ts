@@ -10,6 +10,7 @@ import {
   toProgressionAuditEvent,
   type ProgressionAuditEvent,
 } from "@/lib/queries/progression-history";
+import { getActiveEngineParams } from "@/lib/queries/generation";
 import { llmExplanationsGenerate } from "./config";
 import { createCompletion, type LlmCompletion } from "./openai";
 import {
@@ -536,6 +537,15 @@ async function assembleContexts(
   // doc 19 §5.3 — the macro goal layer for the mesos in this burst
   const macroByMeso = await assembleMacroContexts(service, userId, mesos.data ?? []);
 
+  // doc 21 §8 — the human's own words for an effort assignment, plus the
+  // measuring band. Best-effort like every other context block: a failure omits
+  // the reason rather than sinking the burst, and the assignment's numbers come
+  // off the recorded decision either way.
+  const { effortReasons, maxMeasuringRir } = await assembleEffortContext(
+    service,
+    mesoIds,
+  );
+
   const pinnedByExercise = new Map<string, string>();
   for (const row of pinnedNotes.data ?? []) {
     const r = row as { exercise_id?: string; body?: string };
@@ -604,6 +614,13 @@ async function assembleContexts(
       macro: decision.mesocycle_id
         ? (macroByMeso.get(decision.mesocycle_id) ?? null)
         : null,
+      effortReason:
+        decision.mesocycle_id && decision.exercise_id
+          ? (effortReasons.get(
+              `${decision.mesocycle_id}::${decision.exercise_id}`,
+            ) ?? null)
+          : null,
+      maxMeasuringRir,
       workoutFeedback: lastWorkoutFeedback,
       trend: decision.exercise_id
         ? (trends.get(decision.exercise_id) ?? null)
@@ -611,6 +628,58 @@ async function assembleContexts(
     });
   }
   return contexts;
+}
+
+/**
+ * doc 21 §8 — the effort assignments' free text, plus the active measuring band.
+ *
+ * Everything numeric about an assignment is already on the recorded decision
+ * (`exerciseRir` and its two siblings are engine inputs), so this exists for the
+ * ONE thing that isn't: the reason a person typed. It is keyed by
+ * `meso::exercise` rather than by day-slot, and a reason is **dropped when the
+ * same exercise carries two different reasons in one meso** — the day-slot hop
+ * would cost two more queries for a case that barely exists, and attaching the
+ * wrong person's wrong reason to a coaching line is far worse than attaching
+ * none (§5.1: absence is the strongest gate).
+ *
+ * Best-effort throughout: a failure returns no reasons and no band rather than
+ * sinking the burst.
+ */
+async function assembleEffortContext(
+  service: Client,
+  mesoIds: string[],
+): Promise<{ effortReasons: Map<string, string>; maxMeasuringRir: number | null }> {
+  const effortReasons = new Map<string, string>();
+  let maxMeasuringRir: number | null = null;
+  if (mesoIds.length === 0) return { effortReasons, maxMeasuringRir };
+  try {
+    const [{ params }, { data, error }] = await Promise.all([
+      getActiveEngineParams(service),
+      service
+        .from("meso_exercises")
+        .select("mesocycle_id, exercise_id, effort_reason")
+        .in("mesocycle_id", mesoIds)
+        .not("effort_reason", "is", null),
+    ]);
+    maxMeasuringRir = params.e1rm.max_measuring_rir ?? null;
+    if (error) throw error;
+    const ambiguous = new Set<string>();
+    for (const row of data ?? []) {
+      const reason = row.effort_reason?.trim();
+      if (!reason) continue;
+      const key = `${row.mesocycle_id}::${row.exercise_id}`;
+      const seen = effortReasons.get(key);
+      if (seen != null && seen !== reason) {
+        ambiguous.add(key);
+        continue;
+      }
+      effortReasons.set(key, reason);
+    }
+    for (const key of ambiguous) effortReasons.delete(key);
+  } catch (error) {
+    await reportError("llm:explanations", error, { stage: "effort" });
+  }
+  return { effortReasons, maxMeasuringRir };
 }
 
 /**
@@ -1092,6 +1161,32 @@ export function toFactsInputs(
   };
 
   const trend = context.trend;
+  // doc 21 §8 — the authored effort assignment. Every number comes off the
+  // RECORDED decision (`exerciseRir` / `exerciseSetCap` / `exerciseRepPosition`
+  // are engine inputs, so the explanation describes the assignment that priced
+  // THIS decision, not whatever the plan says today); only the reason and the
+  // measuring band are looked up. Undefined when the slot ran on the ramp.
+  const exerciseRir = fNum(inputs.exerciseRir);
+  const weekRir = week ? fNum(week.targetRir) : null;
+  const repPosition =
+    typeof inputs.exerciseRepPosition === "string" ||
+    typeof inputs.exerciseRepPosition === "number"
+      ? inputs.exerciseRepPosition
+      : null;
+  const maxMeasuring = context.maxMeasuringRir;
+  const effort =
+    exerciseRir != null && weekRir != null
+      ? {
+          assignedRir: exerciseRir,
+          weekRir,
+          backedOff: exerciseRir > weekRir,
+          measuring: maxMeasuring == null ? true : exerciseRir <= maxMeasuring,
+          setCap: fNum(inputs.exerciseSetCap),
+          repPosition,
+          reason: context.effortReason ?? null,
+        }
+      : null;
+
   const factsContext: FactsContext = {
     exerciseName: context.exerciseName,
     muscleGroup: context.muscleGroup,
@@ -1105,6 +1200,7 @@ export function toFactsInputs(
     sourceSession: context.sourceSession ?? null,
     lastSessionNoteFromSource: context.lastSessionNoteFromSource ?? null,
     macro: context.macro ?? null,
+    effort,
     pain:
       jointPain != null && jointPain > 0
         ? { recurring: false, lastReportSessionsAgo: 0 }

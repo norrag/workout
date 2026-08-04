@@ -8,6 +8,7 @@ import {
   daySetTotals,
   exerciseDone,
   impliedPrescriptionE1rm,
+  isReportableRir,
   loggedSetMarker,
   plannedSetCount,
   prescriptionBasisE1rm,
@@ -464,5 +465,42 @@ describe("reportedRirFromInput", () => {
       targetRir,
     });
     expect(reportedRirFromInput(String(prefill))).toBe(targetRir);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 Phase 6 — the pre-fill stops short of the unreportable (§9.4)
+// ---------------------------------------------------------------------------
+
+describe("captureRirDefault past the reportable range", () => {
+  it("pre-fills nothing when the prescription is above 10", () => {
+    // §4.3 made the ASK unbounded (0–30) while `rir_reported` stayed 0–10.
+    // Pre-filling 21 would print a number into a box labelled RIR and ask the
+    // athlete to confirm something they cannot mean.
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 21 }),
+    ).toBeNull();
+    expect(isReportableRir(21)).toBe(false);
+  });
+
+  it("still pre-fills at the top of the reportable range", () => {
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 10 }),
+    ).toBe(10);
+    expect(isReportableRir(10)).toBe(true);
+    expect(isReportableRir(0)).toBe(true);
+  });
+
+  it("a real report on a deep back-off still shows — the band gates the STAMP, not the capture", () => {
+    expect(
+      captureRirDefault({ loggedRir: 8, pendingRir: null, targetRir: 21 }),
+    ).toBe(8);
+    // and it survives the input parser, so the set becomes a measurement again
+    expect(reportedRirFromInput("8")).toBe(8);
+  });
+
+  it("an untouched empty cell reports nothing, which resolves to the prescription", () => {
+    expect(reportedRirFromInput("")).toBeNull();
+    expect(reportedRirFromInput("21")).toBeNull();
   });
 });

@@ -145,6 +145,14 @@ export interface ExplanationContext {
   /** doc 19 §5.2 — whether `lastSessionNote` was written in that same source
    *  session (matched by workout_exercise) rather than merely being recent. */
   lastSessionNoteFromSource?: boolean | null;
+  /** doc 21 §8/A7 — the stored reason for this slot's effort assignment. The
+   *  assignment's NUMBERS come off the recorded decision (`exerciseRir` and
+   *  friends are engine inputs); only the human's own words need a lookup. */
+  effortReason?: string | null;
+  /** doc 21 §6.1 — the active `e1rm.max_measuring_rir`, so the facts can say
+   *  whether the assignment is still a strength measurement. Absent ⇒ treated
+   *  as measuring, which is the pre-band behavior. */
+  maxMeasuringRir?: number | null;
   /** doc 19 §5.3 — the macrocycle goal this meso serves, when it has one */
   macro?: {
     goalType: "hypertrophy" | "strength" | "cut" | "maintain";

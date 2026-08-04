@@ -115,6 +115,37 @@ export interface MacroFacts {
   goal_notes?: string;
 }
 
+/**
+ * doc 21 §8 — an AUTHORED effort level for this slot this week: the athlete or
+ * the coach pulled this exercise off the week's ramp. It is in the payload for
+ * one reason above all others — so the coaching line can never narrate an
+ * *engine* rationale for a decision a *person* made. The engine did not choose
+ * this RIR; it priced the load to meet it.
+ *
+ * Qualitative where it can be: `backed_off` and `measured` are verdicts, not
+ * numbers to reconcile (§5's one-verdict-per-axis rule). The two RIR values are
+ * carried because the departure is the fact — an assignment stated without the
+ * week it departs from is exactly the silent semantics doc 21 §4.1 forbids.
+ */
+export interface EffortAssignmentFacts {
+  /** the assigned RIR this exercise is priced at this week */
+  target_rir: number;
+  /** the week's own ramp value, so the departure is legible */
+  week_target_rir: number;
+  /** assigned EASIER than the week it sits in (doc 21 §6.2's intent key) */
+  backed_off: boolean;
+  /** false ⇒ past the measuring band: priced normally, not a strength
+   *  measurement, and left out of the strength surfaces (§6.1) */
+  measured: boolean;
+  /** an authored working-set ceiling, when one is set (A4) */
+  set_cap?: number;
+  /** where in the rep window the load is priced, when authored (§4.2) */
+  rep_position?: string;
+  /** A7 — the human's own words for why. Free text, like the note, and fenced
+   *  the same way: it is the reason for the ASSIGNMENT, never a session event. */
+  reason?: string;
+}
+
 export interface ExplanationFacts {
   exercise: string;
   muscle_group?: string;
@@ -124,6 +155,9 @@ export interface ExplanationFacts {
   source_session?: SourceSession;
   /** §5.3 — the macrocycle goal this block serves, when the meso has one */
   macro?: MacroFacts;
+  /** doc 21 §8 — an authored effort level for this slot this week, when one is
+   *  assigned. Absent for every unassigned slot, which is the common case. */
+  effort_assignment?: EffortAssignmentFacts;
   prescription_change: PrescriptionChange;
   previous_work?: string;
   next_work: string;
@@ -228,6 +262,18 @@ export interface FactsContext {
   lastSessionNoteFromSource?: boolean | null;
   /** §5.3 — the macrocycle goal this meso serves, when it has one */
   macro?: MacroContext | null;
+  /** doc 21 §8 — the slot's effort assignment for the UPCOMING week, when one
+   *  is assigned. Structural: the caller resolves it (`queries/slot-effort.ts`)
+   *  and this layer only selects and labels. */
+  effort?: {
+    assignedRir?: number | null;
+    weekRir?: number | null;
+    backedOff?: boolean | null;
+    measuring?: boolean | null;
+    setCap?: number | null;
+    repPosition?: string | number | null;
+    reason?: string | null;
+  } | null;
   /** doc 19 §4.3 — did the previous session actually report RIR on a working
    *  set? true ⇒ observed, false ⇒ inferred, null/undefined ⇒ unknown. */
   effortObserved?: boolean | null;
@@ -490,6 +536,38 @@ export function projectSourceSession(
   };
 }
 
+/**
+ * doc 21 §8 — the authored effort assignment, or undefined when the slot runs on
+ * the week's ramp (every slot, until someone assigns one). Undefined and not a
+ * zeroed object: absence is the strongest gate (§5.1), and a payload that always
+ * carried an `effort_assignment: null` would invite the model to mention that
+ * nothing was assigned.
+ *
+ * The reason is truncated on the note's budget — it is the one free-text field
+ * this block contributes, and it is standing intent rather than a session event.
+ */
+export function projectEffortAssignment(
+  context: FactsContext,
+): EffortAssignmentFacts | undefined {
+  const effort = context.effort;
+  if (!effort) return undefined;
+  const assigned = effort.assignedRir;
+  const week = effort.weekRir;
+  if (assigned == null || week == null) return undefined;
+  const reason = effort.reason?.trim();
+  const position =
+    effort.repPosition == null ? undefined : String(effort.repPosition);
+  return {
+    target_rir: assigned,
+    week_target_rir: week,
+    backed_off: effort.backedOff ?? assigned > week,
+    measured: effort.measuring !== false,
+    ...(effort.setCap != null ? { set_cap: effort.setCap } : {}),
+    ...(position ? { rep_position: position } : {}),
+    ...(reason ? { reason: truncateNote(reason, GOAL_NOTE_MAX_CHARS) } : {}),
+  };
+}
+
 /** §5.3 — the macro goal layer, qualitative plus ONE formatted target sentence. */
 export function projectMacro(context: FactsContext): MacroFacts | undefined {
   const macro = context.macro;
@@ -578,6 +656,7 @@ export function buildExplanationFacts(
   const sourceSession = projectSourceSession(decision, context);
   const note = projectNote(context, sourceSession);
   const macro = projectMacro(context);
+  const effortAssignment = projectEffortAssignment(context);
 
   return {
     exercise: context.exerciseName,
@@ -585,6 +664,7 @@ export function buildExplanationFacts(
     ...(week ? { week } : {}),
     ...(sourceSession ? { source_session: sourceSession } : {}),
     ...(macro ? { macro } : {}),
+    ...(effortAssignment ? { effort_assignment: effortAssignment } : {}),
     prescription_change: projectChange(decision),
     ...(previousWork ? { previous_work: previousWork } : {}),
     next_work: nextWork ?? "unpriced",

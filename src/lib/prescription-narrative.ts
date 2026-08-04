@@ -42,6 +42,12 @@ import type {
   AuditTraceStep,
   DecisionOutputNumbers,
 } from "@/lib/queries/audit";
+import {
+  composeEffortLines,
+  effortAskPhrase,
+  hasEffortDisclosure,
+  type SlotEffortView,
+} from "@/lib/slot-effort-display";
 
 export interface PrescriptionNarrativeInput {
   /** the live row's prescription tuple (engine-written; overrides excluded) */
@@ -78,6 +84,15 @@ export interface PrescriptionNarrativeInput {
    */
   weekNumber?: number | null;
   mesoWeeks?: number | null;
+  /**
+   * doc 21 §8 (Phase 6) — the slot's resolved effort assignment for this week,
+   * when it carries one. Two jobs: it prices the ask's effort clause through
+   * the §9.4 qualitative band, and it puts the AUTHORED effort level (and its
+   * reason) at the head of the why, above every engine-authored line. Absent /
+   * unassigned ⇒ every line below is byte-identical to what it was before the
+   * lever existed.
+   */
+  effort?: SlotEffortView | null;
 }
 
 export interface PrescriptionNarrative {
@@ -92,13 +107,6 @@ export interface PrescriptionNarrative {
    * never a replacement for `lines`.
    */
   coach: string | null;
-}
-
-/** "2 reps short of failure" / "1 rep short of failure" / "right at failure". */
-function rirPhrase(targetRir: number): string {
-  if (targetRir <= 0) return "taken right to failure";
-  if (targetRir === 1) return "stopped 1 rep short of failure";
-  return `stopped ${targetRir} reps short of failure`;
 }
 
 /** The load half of the ask, per load type. */
@@ -129,7 +137,7 @@ function joinClauses(parts: string[]): string {
 export function composeAsk(
   input: Pick<
     PrescriptionNarrativeInput,
-    "weight" | "reps" | "sets" | "targetRir" | "loadType"
+    "weight" | "reps" | "sets" | "targetRir" | "loadType" | "effort"
   >,
 ): string | null {
   const { weight, reps, sets, targetRir, loadType } = input;
@@ -138,7 +146,12 @@ export function composeAsk(
     return null;
   const setCount = sets ?? 1;
   const setsPart = setCount === 1 ? "1 set" : `${setCount} sets`;
-  return `${setsPart} of ${reps} ${loadPhrase(loadType, weight ?? 0)}, each ${rirPhrase(targetRir)}.`;
+  // doc 21 §9.4 — past the measuring band the effort clause states the BAND,
+  // not the number: "@ 21 RIR" is arithmetically fine and humanly strange, and
+  // the app will not treat it as a measurement, so the quick-read does not ask
+  // the athlete to internalize it. The audit sheet still prints the tuple.
+  const measuring = input.effort?.measuring ?? true;
+  return `${setsPart} of ${reps} ${loadPhrase(loadType, weight ?? 0)}, each ${effortAskPhrase(targetRir, measuring)}.`;
 }
 
 /** Signed lb difference phrase: "up 5 lb" / "down 10 lb" / null when equal. */
@@ -169,16 +182,22 @@ function repsDelta(cur: number | null, prev: number | null): string | null {
 export function composeDelta(
   input: Pick<
     PrescriptionNarrativeInput,
-    "weight" | "reps" | "sets" | "targetRir" | "previous"
+    "weight" | "reps" | "sets" | "targetRir" | "previous" | "effort"
   >,
 ): string | null {
   const prev = input.previous;
   if (!prev) return null;
   const dW = weightDelta(input.weight, prev.weight);
   const dR = repsDelta(input.reps, prev.reps);
-  // RIR moving DOWN week to week is the ramp: same numbers get harder
+  // RIR moving DOWN week to week is the ramp: same numbers get harder.
+  // doc 21 §8: when an ASSIGNMENT is in control of this week's RIR, the move
+  // isn't the ramp's and the assignment line above has already named it — so
+  // the ramp clause is dropped rather than crediting the program for an effort
+  // level a human chose.
   const rampSteps =
-    input.targetRir != null && prev.targetRir != null
+    input.effort?.assignedRir == null &&
+    input.targetRir != null &&
+    prev.targetRir != null
       ? prev.targetRir - input.targetRir
       : 0;
   const closer =
@@ -441,11 +460,22 @@ export function composePrescriptionNarrative(
     };
   }
 
+  // doc 21 §8 — the authored effort level leads the why, above every
+  // engine-authored line. Ordering IS the emphasis: a human chose this effort,
+  // and nothing beneath may be read as the program having chosen it.
+  const effortLines = composeEffortLines(input.effort);
+  lines.push(...effortLines);
+
   if (input.isDeload) {
-    // deloads neither earn nor step — the deload explanation IS the story
-    lines.push(
-      "A deload week, deliberately light to shed the block's fatigue. Extra reps are not the goal here.",
-    );
+    // deloads neither earn nor step — the deload explanation IS the story.
+    // An assignment on a deload week is legitimate (§4.1, absolute semantics),
+    // and when one is in control it has already said what this week asks, so
+    // the boilerplate deload line would contradict it.
+    if (input.effort?.assignedRir == null) {
+      lines.push(
+        "A deload week, deliberately light to shed the block's fatigue. Extra reps are not the goal here.",
+      );
+    }
     return { ask, lines, coach: null };
   }
 
@@ -459,14 +489,24 @@ export function composePrescriptionNarrative(
     lines.push(...composeWhyLines(input));
   }
 
-  if (input.kind != null && lines.length <= INTENT_LINE_BUDGET) {
+  if (
+    input.kind != null &&
+    lines.length - effortLines.length <= INTENT_LINE_BUDGET &&
+    // an authored effort level replaces the week's frame — "first week of the
+    // block" says nothing useful about a slot the athlete pulled off the ramp
+    !hasEffortDisclosure(input.effort)
+  ) {
     const context = composeProgramContextLine(input);
     if (context) lines.push(context);
   }
 
   if (input.outOfBand && input.decisionOutput) {
     const d = input.decisionOutput;
-    const computed = composeAsk({ ...d, loadType: input.loadType });
+    const computed = composeAsk({
+      ...d,
+      loadType: input.loadType,
+      effort: input.effort,
+    });
     lines.push(
       computed
         ? `These numbers were set by hand. The program's own target was ${computed.replace(/\.$/, "")}.`
