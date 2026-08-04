@@ -418,6 +418,7 @@ function mesoSummaryRow(overrides: Partial<VMesoSummaryRow> = {}): VMesoSummaryR
     n_pump: 60,
     n_overall_fatigue: 15,
     n_performance: 15,
+    backed_off_sets: 0,
     ...overrides,
   };
 }
@@ -437,6 +438,7 @@ describe("formatMesoSummary", () => {
         score_pct: 5,
         sessions: 4,
         trend: "improving",
+        backed_off_sessions: 0,
       },
     ]);
     expect(out.adherence_pct).toBe(Math.round((15 / 16) * 100));
@@ -485,6 +487,7 @@ describe("formatMesoSummary", () => {
           score_pct: -15.9, // raw-float pct that disagrees with the displayed values
           sessions: 3,
           trend: "declining",
+          backed_off_sessions: 0,
         },
       ],
     );
@@ -705,6 +708,7 @@ describe("formatExerciseHistory", () => {
       rir_source: null,
       effective_reps: null,
         is_deload: false,
+        backed_off: false,
         session_note: "elbow cranky",
       },
     ];
@@ -743,6 +747,7 @@ describe("formatExerciseHistory", () => {
       rir_source: null,
       effective_reps: null,
         is_deload: false,
+        backed_off: false,
         session_note: null,
       },
     ];
@@ -774,6 +779,7 @@ describe("formatMuscleGroupVolume", () => {
         muscle_group: "Chest",
         planned_sets: 12,
         logged_sets: 11,
+        backed_off_sets: 0,
       },
       {
         week_number: 1,
@@ -782,6 +788,7 @@ describe("formatMuscleGroupVolume", () => {
         muscle_group: "Chest",
         planned_sets: 10,
         logged_sets: 10,
+        backed_off_sets: 0,
       },
     ];
     const out = formatMuscleGroupVolume("m1", rows) as Record<string, unknown>;
@@ -800,6 +807,7 @@ describe("formatMuscleGroupVolume", () => {
       muscle_group: "Chest",
       planned_sets: 10,
       logged_sets: week_number === 3 ? 0 : 10,
+      backed_off_sets: 0,
     }));
     const out = formatMuscleGroupVolume("m1", rows, 5) as Record<string, unknown>;
     expect(out.weeks_total).toBe(5);
@@ -821,6 +829,7 @@ describe("formatMuscleGroupVolume", () => {
       muscle_group: "Chest",
       planned_sets: 10,
       logged_sets: week_number === 3 ? 0 : 10,
+      backed_off_sets: 0,
     }));
     const projected = [
       { week_number: 4, muscle_group_id: "g1", muscle_group: "Chest", projected_sets: 10, is_deload: false },
@@ -1183,5 +1192,64 @@ describe("read-tool registration", () => {
     await expect(tool.handler({}, fakeExtra(undefined))).rejects.toThrow(
       /authenticated session/i,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §6.2 (Phase 5) — the disclosure that travels with the numbers
+// ---------------------------------------------------------------------------
+
+describe("formatMesoSummary — back-off disclosure (§6.2)", () => {
+  it("reports the excluded set count and the comparability sentence", () => {
+    const out = formatMesoSummary(
+      mesoSummaryRow({ backed_off_sets: 24 }),
+      [],
+      [],
+      "3 sessions ran at an assigned back-off RIR",
+    );
+    expect(out.backed_off_sets).toBe(24);
+    expect(out.comparability).toBe(
+      "3 sessions ran at an assigned back-off RIR",
+    );
+  });
+
+  it("omits the sentence entirely when nothing was set aside", () => {
+    const out = formatMesoSummary(mesoSummaryRow(), []);
+    expect(out.backed_off_sets).toBe(0);
+    expect("comparability" in out).toBe(false);
+  });
+});
+
+describe("formatMuscleGroupVolume — back-off disclosure (§6.2)", () => {
+  const rows: WeightedWeekSets[] = [
+    {
+      week_number: 1,
+      is_deload: false,
+      muscle_group_id: "g1",
+      muscle_group: "Chest",
+      planned_sets: 12,
+      logged_sets: 12,
+      backed_off_sets: 0,
+    },
+    {
+      week_number: 2,
+      is_deload: false,
+      muscle_group_id: "g1",
+      muscle_group: "Chest",
+      planned_sets: 12,
+      logged_sets: 11,
+      backed_off_sets: 4.5,
+    },
+  ];
+
+  it("keeps the backed-off sets inside the volume and reports them beside it", () => {
+    const out = formatMuscleGroupVolume("m1", rows) as Record<string, unknown>;
+    const weeks = (out.groups as Record<string, unknown>[])[0]
+      .weeks as Record<string, unknown>[];
+    // §9.1: the work still counts — the volume number is untouched
+    expect(weeks[1].logged_sets).toBe(11);
+    expect(weeks[1].backed_off_sets).toBe(4.5);
+    // absent, not zero, where there is nothing to disclose
+    expect("backed_off_sets" in weeks[0]).toBe(false);
   });
 });

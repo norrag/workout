@@ -283,22 +283,29 @@ export function formatExerciseAnalysis(
   sessions: ExerciseSession[],
 ): Record<string, unknown> {
   const ov = overview.overview;
+  // doc 21 §6.2: sessions the plan deliberately ran easier than their week are
+  // set aside from every strength read below — the same treatment a deload
+  // gets, and for the same reason. They are counted and disclosed, never
+  // silently dropped; `fatigue_position` still sees them because where in the
+  // session a movement sits is a structural fact, not a strength claim.
+  const comparable = sessions.filter((s) => !s.backed_off);
+  const backedOffSessions = sessions.length - comparable.length;
   // headline = the current phase only (12 §Stage 3 #1/#2): rolling + phase +
   // confidence, so a single light-slot session no longer reads as a decline and
   // a cut→bulk transition is segmented, not alarmed.
-  const progress = analyzeComparableProgress(sessions);
-  const phases = segmentPhases(sessions);
-  const matched = matchedRirComparison(sessions);
-  const goals = phaseGoals(sessions.filter((s) => s.e1rm != null));
+  const progress = analyzeComparableProgress(comparable);
+  const phases = segmentPhases(comparable);
+  const matched = matchedRirComparison(comparable);
+  const goals = phaseGoals(comparable.filter((s) => s.e1rm != null));
   // Stage 5 — split the movement's two day-slots so a pooled sawtooth (the curl
   // on Day 1 at 25 lb vs Day 3 at 20 lb) reads as two clean series, and surface
   // where in the session it sits so a late-position dip isn't read as a decline.
-  const daySlots = analyzeByDaySlot(sessions);
+  const daySlots = analyzeByDaySlot(comparable);
   const multiSlot = daySlots.length > 1;
   const fatigue = fatiguePosition(sessions);
   // lifetime raw change is only honest *within* a phase; flag when it crosses one
   const crossesPhase = goals.length > 1;
-  const estimable = sessions.filter((s) => s.e1rm != null);
+  const estimable = comparable.filter((s) => s.e1rm != null);
   const lifetimeFirst = estimable[0]?.e1rm ?? null;
   const lifetimeLatest = estimable[estimable.length - 1]?.e1rm ?? null;
 
@@ -314,6 +321,10 @@ export function formatExerciseAnalysis(
     // RIR-folded, confidence-weighted current-phase best lives on `progress`.
     best_e1rm_estimate: ov?.best_e1rm ?? null,
     progress,
+    // doc 21 §6.2 — how many logged sessions this analysis set aside as
+    // deliberately easier work (an assigned RIR above the week's). Zero on
+    // every plan with no effort assignments.
+    backed_off_sessions: backedOffSessions,
     // raw lifetime endpoints, explicitly caveated when they span phases (12 §"Why")
     lifetime: {
       sessions: estimable.length,
@@ -343,8 +354,16 @@ export function formatExerciseAnalysis(
         "the same movement analysed separately per meso day-slot (workouts.day_number) when it occupies more than one — each slot is a like-with-like series instead of a pooled sawtooth",
       fatigue_position:
         "where in the session the movement is trained (1 = first); avg/min/max ordinal and avg session size. varies=true means it sits at a variable depth, so a later-position dip may be fatigue, not regression",
+      backed_off_sessions:
+        "logged sessions where this slot was assigned a target RIR ABOVE its week's (doc 21 §6.2) — deliberately easier work. Excluded from every trend/phase/matched comparison here; still counted in volume and times_trained",
     },
-    note: progressNote(progress, crossesPhase, multiSlot, fatigue),
+    note: progressNote(
+      progress,
+      crossesPhase,
+      multiSlot,
+      fatigue,
+      backedOffSessions,
+    ),
   };
 }
 
@@ -353,6 +372,7 @@ function progressNote(
   crossesPhase: boolean,
   multiSlot: boolean,
   fatigue: ReturnType<typeof fatiguePosition>,
+  backedOffSessions: number,
 ): string {
   const parts: string[] = [];
   if (progress.trend === "plateau") {
@@ -379,6 +399,11 @@ function progressNote(
   if (fatigue.varies) {
     parts.push(
       "It sits at a variable point in the session across weeks (see fatigue_position); a lower e1RM on a later-position week may be pre-fatigue, not a regression.",
+    );
+  }
+  if (backedOffSessions > 0) {
+    parts.push(
+      `${backedOffSessions} session${backedOffSessions === 1 ? " was" : "s were"} run at an assigned back-off RIR (doc 21 §6.2) and ${backedOffSessions === 1 ? "is" : "are"} excluded from these trends — the work was prescribed easier on purpose, so a lower estimate there is compliance, not regression.`,
     );
   }
   if (progress.confidence_mix.low > 0 && progress.confidence_mix.high + progress.confidence_mix.moderate === 0) {
@@ -452,6 +477,19 @@ export function formatCompareMesos(rows: VMesoSummaryRow[]): Record<string, unkn
   if (new Set(rows.map((r) => r.includes_deload)).size > 1) {
     warnings.push("Blocks differ in deload structure.");
   }
+  // doc 21 §6.2 — the comparability warning this feature adds: a block partly
+  // run at an assigned back-off RIR did less intense work on purpose. Its
+  // best_e1rm already excludes those sets, so the strength column is
+  // like-with-like, but its volume and set counts still include them.
+  const backedOff = rows.filter((r) => (r.backed_off_sets ?? 0) > 0);
+  if (backedOff.length > 0) {
+    warnings.push(
+      `${backedOff.map((r) => `${r.name} (${r.backed_off_sets} sets)`).join(", ")} ` +
+        "ran partly at an assigned back-off RIR — deliberately easier work. Those sets are " +
+        "excluded from best_e1rm but counted in volume and set totals, so compare intensity " +
+        "with that in mind.",
+    );
+  }
   return {
     count: rows.length,
     comparison_basis: "completed_workouts",
@@ -475,6 +513,9 @@ export function formatCompareMesos(rows: VMesoSummaryRow[]): Record<string, unkn
         volume_per_workout:
           perWorkout && r.total_volume != null ? round1(r.total_volume / completed) : null,
         best_e1rm_estimate: round1(r.best_e1rm),
+        // doc 21 §6.2: how much of this block was authored as a back-off —
+        // excluded from best_e1rm_estimate, included in working_sets/volume
+        backed_off_sets: r.backed_off_sets ?? 0,
         adherence_pct:
           r.sessions_due > 0
             ? Math.round((r.sessions_attended / r.sessions_due) * 100)

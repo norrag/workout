@@ -122,6 +122,26 @@ export function slotRepPosition(
   return parseRepPosition(assignment?.rep_position);
 }
 
+/**
+ * doc 21 §6.2 — the intent key, in one place. A slot is "backed off" for a week
+ * when it was authored to run EASIER than the week it sits in. Everything that
+ * treats a session as incomparable — the earn gate (§5), the strength trend, the
+ * PR scan, the exercise analysis — keys on exactly this, and the four stats
+ * views mirror it in SQL against the stored, already-resolved values
+ * (`workout_exercises.target_rir > microcycles.target_rir`).
+ *
+ * Deliberately NOT symmetric: a slot run HARDER than its week (an assignment
+ * below the ramp) stays fully comparable and keeps every strength claim it
+ * earns — the athlete really did that work, and §4.1 already discloses the
+ * hardening at authoring time.
+ */
+export function isBackedOffSlot(
+  slotRir: number | null | undefined,
+  weekRir: number | null | undefined,
+): boolean {
+  return slotRir != null && weekRir != null && slotRir > weekRir;
+}
+
 /** The resolved effort for one slot in one week (§4.1). */
 export interface ResolvedSlotEffort {
   /** the RIR the engine prices against: `slotRir ?? weekRir` */
@@ -161,7 +181,7 @@ export function resolveSlotEffort(
     setCap: slotSetCap(assignment, weekNumber),
     repPosition: slotRepPosition(assignment),
     reason: assignment?.effort_reason ?? null,
-    backedOff: assignedRir != null && assignedRir > weekRir,
+    backedOff: isBackedOffSlot(assignedRir, weekRir),
   };
 }
 

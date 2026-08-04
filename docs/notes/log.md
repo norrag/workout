@@ -4,6 +4,56 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-04 — Session 98: doc 21 Phase 5 built — the stats policy (N70)
+
+The read side of the lever: what a deliberately-easier session is allowed to say
+about the athlete's strength.
+
+- **N70 → Phase 5 done (PR #223).** Row updated; the item stays live (Phase 6
+  remains).
+- **One intent key.** `isBackedOffSlot(slotRir, weekRir)`, which
+  `resolveSlotEffort` now calls for its own `backedOff`, mirrored in SQL as
+  `workout_exercises.target_rir > microcycles.target_rir`. That is the *realized*
+  form of `resolvedRir > weekRir`, and hard rule 5 (a performed session's row is
+  never rewritten) makes it a permanent record of the intensity actually trained.
+- **Intent, not confidence — and not symmetric.** Excluding by `e1rm_confidence`
+  would drop honest high-rep work, since confidence degrades with effective reps
+  too. And a slot run *harder* than its week keeps every claim it earns; only the
+  back-off direction is set aside.
+- **Read-side only, which is the whole difference from §6.1.** The band asks "is
+  this a measurement at all" and answers it at the stamp; §6.2 asks "is this
+  measurement comparable". The set was genuinely measured and still anchors the
+  engine — so no stamp changes, no backfill, and a later policy change is free.
+- **Excluded from strength, kept in volume, disclosed in both.** Out of the trend,
+  `best_e1rm`, both PR views, and both sides of the meso PR scan (a backed-off
+  session can't set a PR *or* raise the bar a later one must clear). Still in
+  volume with a fractionally-weighted `logged_backed_off_sets` count, and still in
+  history with its numbers plus a `BACKED OFF` tag.
+- **The disclosure travels with the number.** `StrengthProgress.comparability` is
+  built from the same scores the block renders, so it can never contradict them;
+  MCP gets the same sentence, a `compare_mesocycles` warning, and per-week volume
+  disclosure. Everything omitted-not-zeroed when nothing is assigned.
+- **Last N71 corner closed.** `analyze_exercise_progress`'s session series was
+  still passing `rir_reported` raw into `estimateE1rm` — an unreported set read as
+  taken to failure, exactly the defect Phase 1 fixed elsewhere.
+- **Flagged, not decided.** `logged_hard_sets` bakes doc 10 §2's separate RIR ≤ 4
+  stimulus rule, so a back-off reported past RIR 4 leaves the hard-set count while
+  staying in the disclosure — and Phase 1's write surface means the "unreported
+  counts, benefit of the doubt" clause rarely applies any more. Whether a deep
+  back-off should read as under-dosed volume is §2's call; recorded in doc 10 §9
+  for the owner rather than changed here.
+- **Verified live.** Migration applied to the hosted project: every pre-existing
+  view column hashes byte-identically to the pre-migration baseline, all
+  disclosure counts 0, advisors clean. A simulated assignment over the real data
+  (no writes) flags 691 sessions / 1641 sets, confirming the shapes fire.
+
+### Next session — suggested starting point
+- **Doc 21 Phase 6** — the UI + explanation pass: planner/day-view disclosure of
+  an active assignment, the editor sheet, the deferred prescription-strip copy for
+  the set cap and the rep position, and the doc-19 layering. Needs a hard-rule-8
+  design pass in `09-design-changelog.md` first, and §9.4's settled answer (the
+  qualitative band for an out-of-band RIR) is its input.
+
 ## 2026-08-02 — Session 97: doc 21 Phase 4 built — the set lever bites, and the rep-position knob (N70)
 
 The second and third levers on a slot. Phase 3 made the assignment writable;

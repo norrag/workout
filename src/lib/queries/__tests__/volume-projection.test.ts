@@ -42,6 +42,7 @@ function roleRow(
     planned_sets: null,
     logged_sets: 0,
     logged_hard_sets: 0,
+    logged_backed_off_sets: 0,
     ...overrides,
   };
 }

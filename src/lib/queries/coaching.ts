@@ -1,12 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { type EngineParams } from "@/lib/engine";
+import { assumedRir, type EngineParams } from "@/lib/engine";
 import {
   pickSessionE1rm,
   type ExerciseSession,
   type SessionSet,
 } from "@/lib/analysis/comparability";
 import { getMuscleGroupsCached } from "./reference";
+import { isBackedOffSlot } from "./slot-effort";
 
 type Client = SupabaseClient<Database>;
 
@@ -446,12 +447,20 @@ export async function getExerciseSessions(
     // every exercise slot in those sessions — to rank the target movement's
     // performed position (1 = first) and the session's exercise count. Chunked
     // *and* paginated: a heavily trained lift's sessions can exceed the row cap.
-    selectAllForIds<{ id: string; workout_id: string; position: number }>(
+    // target_rir comes along for doc 21: the fallback half of `assumedRir`
+    // (§2 — an unreported set is not a set taken to failure) and the slot half
+    // of the §6.2 back-off comparison against the week's own RIR.
+    selectAllForIds<{
+      id: string;
+      workout_id: string;
+      position: number;
+      target_rir: number | null;
+    }>(
       workoutIds,
       (c, from, to) =>
         supabase
           .from("workout_exercises")
-          .select("id, workout_id, position")
+          .select("id, workout_id, position, target_rir")
           .in("workout_id", c)
           .order("workout_id")
           .order("position")
@@ -491,6 +500,7 @@ export async function getExerciseSessions(
     cur.push({ id: s.id, position: s.position });
     slotsByWorkout.set(s.workout_id, cur);
   }
+  const slotRirByWe = new Map(slotPositions.map((s) => [s.id, s.target_rir]));
   const ordinalByWe = new Map<string, number>();
   const sizeByWorkout = new Map<string, number>();
   for (const [wid, slots] of slotsByWorkout) {
@@ -502,22 +512,34 @@ export async function getExerciseSessions(
   // group by workout (one session), preserving the performed order
   const byWorkout = new Map<
     string,
-    { sets: SessionSet[]; first: (typeof sets)[number] }
+    { sets: SessionSet[]; first: (typeof sets)[number]; backedOff: boolean }
   >();
   for (const s of sets) {
+    // doc 21 §2, the one resolution rule: the athlete's report when there is
+    // one, otherwise what the slot prescribed. Passing `rir_reported` raw here
+    // was the last live corner of N71 — an unreported set read as taken to
+    // failure, which quietly inflated this series' e1RM against the stamp's.
+    const set = {
+      weight: s.weight,
+      reps: s.reps,
+      rir: assumedRir(s.rir_reported, slotRirByWe.get(s.workout_exercise_id)),
+    };
+    // §6.2: the movement can occupy two slots in one day, so the session is
+    // backed off if ANY of them was authored above the week's RIR
+    const backedOff = isBackedOffSlot(
+      slotRirByWe.get(s.workout_exercise_id),
+      targetRirByMicro.get(s.microcycle_id),
+    );
     const cur = byWorkout.get(s.workout_id);
-    if (!cur) {
-      byWorkout.set(s.workout_id, {
-        sets: [{ weight: s.weight, reps: s.reps, rir: s.rir_reported }],
-        first: s,
-      });
-    } else {
-      cur.sets.push({ weight: s.weight, reps: s.reps, rir: s.rir_reported });
+    if (!cur) byWorkout.set(s.workout_id, { sets: [set], first: s, backedOff });
+    else {
+      cur.sets.push(set);
+      cur.backedOff ||= backedOff;
     }
   }
 
   const out: ExerciseSession[] = [];
-  for (const { sets: workoutSets, first } of byWorkout.values()) {
+  for (const { sets: workoutSets, first, backedOff } of byWorkout.values()) {
     const pick = pickSessionE1rm(workoutSets, params);
     const meso = mesoById.get(first.mesocycle_id);
     const goal =
@@ -529,6 +551,7 @@ export async function getExerciseSessions(
       meso_name: meso?.name ?? "",
       goal_type: goal,
       target_rir: targetRirByMicro.get(first.microcycle_id) ?? null,
+      backed_off: backedOff,
       e1rm: pick?.value ?? null,
       confidence: pick?.confidence ?? null,
       top_weight: pick?.top_weight ?? null,

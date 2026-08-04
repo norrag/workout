@@ -383,6 +383,10 @@ export function formatMesoSummary(
   row: VMesoSummaryRow | null,
   scores: ExerciseProgressScore[],
   muscleProgress: MuscleGroupProgress[] = [],
+  /** doc 21 §6.2 — the strength block's comparability sentence, when the block
+   *  set any session aside as backed off. Null on every plan without an
+   *  effort assignment, which is where the added key stays absent entirely. */
+  comparability: string | null = null,
 ): Record<string, unknown> {
   if (!row) {
     return { found: false, summary: "No mesocycle summary is visible for that id." };
@@ -437,6 +441,13 @@ export function formatMesoSummary(
       n_performance: row.n_performance,
       scales: FEEDBACK_SCALES,
     },
+    // doc 21 §6.2: working sets logged on a slot assigned above its week's RIR.
+    // They count toward working_sets / volume / adherence above and are kept
+    // out of best_e1rm_estimate and the progress scores — a block run partly
+    // backed off is not comparable with one that wasn't, and this is the number
+    // that says so.
+    backed_off_sets: row.backed_off_sets,
+    ...(comparability ? { comparability } : {}),
     progress_scores: scores.map((s) => {
       // round the e1RM estimates for display and recompute the change from the
       // *rounded* values so the percent reconciles with the numbers shown
@@ -468,6 +479,8 @@ export function formatMesoSummary(
       trend: "improving / holding / declining, with a small dead-band so noise reads as holding",
       window: "this mesocycle",
       sessions: "non-deload sessions with an e1RM — the trend's data points",
+      backed_off_sets:
+        "working sets logged on a day-slot assigned a target RIR above its week's (doc 21 §6.2) — deliberately easier work. Excluded from best_e1rm_estimate and progress_scores; counted in working_sets, volume and adherence",
       muscle_group_progress: `role-weighted mean (primary 1.0 / secondary 0.5, engine_params.volume) of e1rm_change_pct over exercises with ≥${MIN_PROGRESS_SESSIONS} sessions — the in-app display applies the same ≥${MIN_PROGRESS_SESSIONS}-session rule (I11)`,
     },
     note: "e1RM values are estimates; adherence counts decided days over working (non-deload) weeks. Deload sessions are excluded from progress_scores but still count toward volume and PRs. For the lifetime trend of one exercise use analyze_exercise_progress.",
@@ -516,9 +529,10 @@ function registerGetMesoSummary(server: McpServer) {
             row.sessions_due,
           )
         : null;
-      return jsonResult(formatMesoSummary(row, scores, strength.muscles), {
-        dataQuality,
-      });
+      return jsonResult(
+        formatMesoSummary(row, scores, strength.muscles, strength.comparability),
+        { dataQuality },
+      );
     },
   );
 }
@@ -670,6 +684,10 @@ export function formatMacroSummary(
             e1rm_change_pct: m.score_pct,
             lifts: m.lifts,
           })),
+          // doc 21 §6.2 — present only when the macro contains backed-off work
+          ...(strength.comparability
+            ? { comparability: strength.comparability }
+            : {}),
           metric_definitions: {
             e1rm_change_pct: `recent best vs starting best (10 §6): best session e1RM over the most-recent ~3 sessions vs best over the earliest ~3, across this macrocycle; only exercises with ≥${MIN_PROGRESS_SESSIONS} non-deload sessions are listed (I11)`,
             est_strength_change_pct:
@@ -752,6 +770,10 @@ export function formatExerciseHistory(
       meso_name: s.meso_name,
       coordinate: s.coordinate,
       is_deload: s.is_deload,
+      // doc 21 §6.2: the slot was assigned an RIR above the week's, so this
+      // session was deliberately easier — read it like a deload, never as a
+      // decline, and don't compare it with the sessions around it.
+      backed_off: s.backed_off,
       top_weight: s.top_weight,
       reps_at_top: s.reps,
       // engine per-set e1RM (PH31), averaged across the session's working sets
@@ -836,7 +858,16 @@ export function formatMuscleGroupVolume(
     string,
     {
       name: string;
-      weeks: Map<number, { planned_sets: number | null; logged_sets: number; is_deload: boolean }>;
+      weeks: Map<
+        number,
+        {
+          planned_sets: number | null;
+          logged_sets: number;
+          /** doc 21 §6.2 disclosure — kept in logged_sets, reported beside it */
+          backed_off_sets: number;
+          is_deload: boolean;
+        }
+      >;
     }
   >();
   // weeks that actually have a generated workout (any group) — the engine
@@ -850,6 +881,7 @@ export function formatMuscleGroupVolume(
     entry.weeks.set(r.week_number, {
       planned_sets: r.planned_sets,
       logged_sets: r.logged_sets,
+      backed_off_sets: r.backed_off_sets,
       is_deload: r.is_deload,
     });
     byGroup.set(key, entry);
@@ -911,6 +943,11 @@ export function formatMuscleGroupVolume(
             week_number,
             planned_sets: cell.planned_sets,
             logged_sets: cell.logged_sets,
+            // doc 21 §6.2: only when there is something to disclose, so a plan
+            // with no effort assignments reads exactly as it did before
+            ...(cell.backed_off_sets > 0
+              ? { backed_off_sets: cell.backed_off_sets }
+              : {}),
             is_deload: cell.is_deload,
             status: cell.logged_sets > 0 ? ("logged" as const) : ("planned" as const),
           };
@@ -918,7 +955,7 @@ export function formatMuscleGroupVolume(
       }))
       .sort((a, b) => a.muscle_group.localeCompare(b.muscle_group)),
     note:
-      "Counts are fractional direct-equivalent sets (doc 10 §2): 1.0 per primary + 0.5 per secondary muscle of each exercise; logged_sets counts hard sets only (non-warmup, RIR ≤ 4 or unreported). Materialized weeks (status logged/planned) come from generated workouts. Weeks past weeks_generated show status projected: the engine's set-count projection — the last materialized week's autoregulated count carried forward, deload-scaled. It's a projection under neutral feedback (no forward set ramp), not a materialized plan; null/not_yet_generated only when even a projection has no basis.",
+      "Counts are fractional direct-equivalent sets (doc 10 §2): 1.0 per primary + 0.5 per secondary muscle of each exercise; logged_sets counts hard sets only (non-warmup, RIR ≤ 4 or unreported). backed_off_sets (present only where non-zero) discloses fractional sets logged on a slot assigned above its week's RIR (doc 21 §6.2): they stay inside the volume picture — the work consumed recovery budget — but they are not a subset of the hard-set count, so a week can show fewer logged_sets than backed_off_sets when the back-off was reported past RIR 4. Materialized weeks (status logged/planned) come from generated workouts. Weeks past weeks_generated show status projected: the engine's set-count projection — the last materialized week's autoregulated count carried forward, deload-scaled. It's a projection under neutral feedback (no forward set ramp), not a materialized plan; null/not_yet_generated only when even a projection has no basis.",
   };
 }
 

@@ -155,6 +155,7 @@ function session(over: Partial<ExerciseSession>): ExerciseSession {
     meso_name: "Block",
     goal_type: "hypertrophy",
     target_rir: 1,
+    backed_off: false,
     e1rm: 100,
     confidence: "high",
     top_weight: 100,
@@ -697,5 +698,94 @@ describe("formatExerciseAnalysis metric_definitions", () => {
     expect(defs.rolling_e1rm).toMatch(/rolling|last 3/i);
     expect(defs.matched_rir).toMatch(/prescribed/i);
     expect(out.times_trained).toBe(144);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §6.2 (Phase 5) — deliberately easier sessions are set aside, not read
+// as a decline, and the surfaces say so
+// ---------------------------------------------------------------------------
+
+describe("formatExerciseAnalysis — backed-off sessions (§6.2)", () => {
+  const overview = {
+    overview: {
+      exercise_name: "Hack Squat",
+      times_trained: 8,
+      last_performed_at: "2026-06-10",
+      weight_pr: 250,
+      best_e1rm: 300,
+    },
+  } as unknown as ExerciseOverview;
+
+  const climb: ExerciseSession[] = [
+    session({ performed_on: "2026-05-01", e1rm: 280 }),
+    session({ performed_on: "2026-05-08", e1rm: 290 }),
+    session({ performed_on: "2026-05-15", e1rm: 300 }),
+  ];
+  const rehab: ExerciseSession[] = [
+    session({ performed_on: "2026-05-22", e1rm: 210, backed_off: true }),
+    session({ performed_on: "2026-05-29", e1rm: 215, backed_off: true }),
+  ];
+
+  it("excludes them from the trend, and reports how many", () => {
+    const withRehab = formatExerciseAnalysis("e1", overview, [
+      ...climb,
+      ...rehab,
+    ]);
+    const clean = formatExerciseAnalysis("e1", overview, climb);
+    // the analysis is byte-identical to the block without the rehab weeks
+    expect(withRehab.progress).toEqual(clean.progress);
+    expect(withRehab.lifetime).toEqual(clean.lifetime);
+    expect(withRehab.backed_off_sessions).toBe(2);
+    expect(clean.backed_off_sessions).toBe(0);
+  });
+
+  it("says so in the note rather than letting a coach read a decline", () => {
+    const out = formatExerciseAnalysis("e1", overview, [...climb, ...rehab]);
+    expect(out.note).toMatch(/back-off RIR/);
+    expect(out.note).toMatch(/compliance, not regression/);
+    expect(formatExerciseAnalysis("e1", overview, climb).note).not.toMatch(
+      /back-off RIR/,
+    );
+  });
+});
+
+describe("formatCompareMesos — the back-off warning (§6.2)", () => {
+  const row = (over: Record<string, unknown>) =>
+    ({
+      mesocycle_id: "m1",
+      name: "Block 1",
+      status: "completed",
+      weeks: 5,
+      includes_deload: true,
+      workouts_completed: 16,
+      working_sets: 200,
+      working_reps: 2000,
+      total_volume: 100000,
+      best_e1rm: 300,
+      sessions_attended: 15,
+      sessions_due: 16,
+      avg_overall_fatigue: 2,
+      avg_performance: 3,
+      backed_off_sets: 0,
+      ...over,
+    }) as unknown as VMesoSummaryRow;
+
+  it("warns, naming the block and the set count", () => {
+    const out = formatCompareMesos([
+      row({ mesocycle_id: "m1", name: "May", backed_off_sets: 24 }),
+      row({ mesocycle_id: "m2", name: "June" }),
+    ]);
+    const warnings = out.warnings as string[];
+    expect(warnings.some((w) => w.includes("May (24 sets)"))).toBe(true);
+    expect(warnings.some((w) => w.includes("June"))).toBe(false);
+    const mesos = out.mesocycles as Record<string, unknown>[];
+    expect(mesos[0].backed_off_sets).toBe(24);
+    expect(mesos[1].backed_off_sets).toBe(0);
+  });
+
+  it("stays silent when no block ran backed off", () => {
+    const out = formatCompareMesos([row({}), row({ mesocycle_id: "m2" })]);
+    expect((out.warnings as string[]).join(" ")).not.toMatch(/back-off/);
   });
 });
