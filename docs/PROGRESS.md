@@ -20,6 +20,106 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > **(3)** the e2e suite is red on `main` (N84). All three are tracked in
 > [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-08-14 — Schema drift took out week generation, and the week-boundary + skip gaps it exposed (N85, authored 2026-08-04 as PR #222)
+
+> **On the date.** The investigation, the fix and the tests are all from 2026-08-04;
+> the PR then sat unmerged for ten days and is dated here by when it landed, so the
+> newest-first ordering stays honest. Tracked as **N85** — the branch wrote **N74**,
+> which the User Guide already held.
+
+Reported as "performing a week's workouts out of order created an odd state".
+It was not an ordering bug. Two users were stuck behind a migration that was
+never applied to the hosted database, and the app's own degrade-gracefully
+catches are what made a total outage render as reassurance.
+
+**Root cause.** PR #221 merged code reading `meso_exercises.rep_position` on
+2026-08-02 22:15 UTC; `supabase/migrations/20260802000004_slot_rep_position.sql`
+was never applied to hosted. `queries/slot-effort.ts::getSlotEffortRows` names
+that column in its `select` **and** in its `.or()` filter, so every call raised
+Postgres 42703. That killed `advanceWeekAfterWorkout` (next-week generation),
+`reconcilePrescriptions`/`loadMesoStaleInputs` (freshness + the generation
+gap-heal), `catchUpProgression` (the last-resort heal) and the MCP plan
+surfaces. Applied to hosted 2026-08-04 via the Supabase MCP
+(`20260804143526 / slot_rep_position`); column + CHECK verified and the failing
+query shape re-run clean. The two stuck users self-heal on next app open.
+
+**Out-of-order training is not a defect and was not changed.** Progression is
+day-slot keyed: `generateDay` builds W(N+1)·D from W(N)·D, each completed day
+generates its own counterpart independently, and the week-close branch only
+asks whether every sibling is closed. `muscleGroupWeeklySets` and
+`peakByExercise` read *prescribed* values across the week, so a partially
+complete week yields the same engine input regardless of completion order. The
+DayView week/day navigator and the cycles grid already treat any day of the
+active week as reachable. Owner confirmed the model: **free within a week,
+gated at the week boundary.**
+
+**Migration drift guard (`npm run db:check` + a `migration-drift` CI job).**
+Every other CI job applies migrations to a throwaway local stack, so all of
+them can only ever prove the repo is self-consistent — none can see that
+production is missing one. The guard compares repo migrations against hosted
+`supabase_migrations.schema_migrations` by **name stem**, not version: the
+hosted `version` is assigned at apply time (repo `20260802000004…` landed as
+`20260804143526`) and the `name` column is recorded inconsistently across this
+project's history (`20260702000005_write_integrity` vs `slot_rep_position`).
+Stems are verified unique. `initial_schema` and `design_pivot` predate the
+tracking table (earliest tracked version `20260613004448`) and are baselined
+after verifying their objects exist — a check that reports two permanent
+known-good failures is one everybody learns to scroll past, which is the
+failure mode being fixed. No-ops with a warning until the two secrets are set
+(`docs/deployment/manual-operations.md`), so it never blocks a fork PR.
+
+**Schema drift names itself in the report funnel.** `isSchemaDriftError`
+(42703 / 42P01 / 42883, with a message fallback) re-scopes to
+`schema-drift:<scope>` and adds a `remediation` hint. A retry never fixes one
+of these, so it should never have shared a channel with dropped connections and
+timeouts.
+
+**Two product gaps the outage exposed — both reachable without any drift:**
+
+- *The Workout-tab dead end.* An ACTIVE meso with no next workout is never a
+  normal resting state (the advance job activates week N+1 as the last day of
+  week N closes; the final week completes the meso), yet it rendered as "Every
+  workout this week is logged. Next week's targets generate when the engine
+  runs." — reassurance, and false in exactly the case it appeared. Replaced
+  with a stalled-week panel and `retryWeekGenerationAction`, which re-runs the
+  same two idempotent jobs the read path runs and *reports its outcome*.
+- *No terminal state for an untrained day.* "End workout" **completes** a day,
+  which is wrong for one you never trained, and it requires opening the day.
+  So a single dropped session left the week un-closable, the next week
+  ungeneratable and the tab with nothing to show — the same dead end, by
+  ordinary use. `skipWorkout` closes it as `skipped` (refusing any day with
+  logged sets — hard rule #5; that day is *completed*), then advances the week.
+
+**Week-boundary gate.** Completing W(N)·D materializes W(N+1)·D immediately, so
+the cycles grid deep-linked a future week's day at `/log/<id>` with no guard —
+it was loggable, and training into it would progress the engine off a partially
+complete week. `isWeekLocked` (microcycle `pending`) now makes such a day fully
+**viewable** but not loggable, enforced in `logSet` and not merely in the UI (a
+stale client or a queued op from before the week closed lands there too). The
+queue bounds its retries and parks the op with a visible message, so a hard
+refusal is safe. The gate opens exactly when the advance job activates the
+week — i.e. when the basis becomes complete.
+
+**One rule, one home.** `isWeekLocked` and `dayCloseOption` live in
+`src/lib/logging/end.ts` beside the existing early-end helpers, so the day view
+cannot offer an action the server will refuse.
+
+**Rule-8 deviations (recorded per hard rule 8).** No mockup figure covers
+either new state: fig 1.1 has no generation-failure variant, and there is no
+skip-day sheet in `docs/design/mockups/`. Both are built strictly from the 08
+§5 vocabulary — dashed 1.5px border for a not-yet-materialized thing, tracked
+all-caps label, ink for the primary action (never accent: neither panel is a
+current position or a selection), no hype and no exclamation marks. The
+skip-day confirm sheet reuses the existing "End workout" `BottomSheet` pattern
+verbatim, including the accent confirm button. Same precedent as the doc-16
+Phase-3 set-row marker, which also had no figure.
+
+**Tests.** +6 unit (`isWeekLocked`, `dayCloseOption`, `isSchemaDriftError`, the
+drift-guard diff incl. the exact incident shape and the pre-tracking baseline)
+and +3 integration (`logSet` refuses a pending week and writes nothing;
+`skipWorkout` closes a day, is idempotent, and completes the week; it refuses
+an open day carrying logged sets). Suite 1681 green; build green.
+
 ## 2026-08-13 — Release 1.1.0 production cut (N74 / N80 / N82, PR #247)
 
 The staged Guide block is frozen into `src/content/releases/1.1.0.ts` and added

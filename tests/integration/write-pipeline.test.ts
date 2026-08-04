@@ -24,6 +24,7 @@ import {
   logSet,
   saveExerciseFeedback,
   saveWorkoutFeedback,
+  skipWorkout,
 } from "@/lib/queries/logging";
 import { advanceWeekAfterWorkout } from "@/lib/queries/progression";
 
@@ -327,6 +328,30 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
     });
   });
 
+  // hard rule #5: a day carrying logged work is COMPLETED, never skipped —
+  // skipping it would drop real sets out of every weekly rollup. Day 1 is
+  // in_progress with sets on it at this point in the pipeline.
+  it("skipWorkout refuses an open day that has logged sets", async () => {
+    const { data: before } = await user
+      .from("workouts")
+      .select("status")
+      .eq("id", day1WorkoutId)
+      .single();
+    expect(before?.status).toBe("in_progress");
+
+    const result = await skipWorkout(user, userId, day1WorkoutId);
+    expect(result.skipped).toBe(false);
+    expect(result.error).toMatch(/logged sets/);
+
+    // the day is untouched — not skipped, not closed
+    const { data: after } = await user
+      .from("workouts")
+      .select("status")
+      .eq("id", day1WorkoutId)
+      .single();
+    expect(after?.status).toBe("in_progress");
+  });
+
   it("feedback + completeWorkout close the session and mark exercise statuses", async () => {
     // feedback must land BEFORE completion — RLS locks it once the workout
     // leaves in_progress (R5); this ordering is the app's contract.
@@ -417,6 +442,53 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
     expect(again).toHaveLength(1);
   });
 
+  // N74: completing week-1 day 1 materialized its week-2 counterpart above,
+  // and the cycles grid deep-links it — but week 1 is still open (day 2 is
+  // untrained), so week 2 must not be trainable yet. Week N+1 is priced off the
+  // WHOLE of week N.
+  it("refuses to log into a week whose predecessor has not closed", async () => {
+    const { data: micro2 } = await user
+      .from("microcycles")
+      .select("id, status")
+      .eq("mesocycle_id", mesoId)
+      .eq("week_number", 2)
+      .single();
+    expect(micro2?.status).toBe("pending");
+
+    const { data: wk2Day1 } = await user
+      .from("workouts")
+      .select("id")
+      .eq("microcycle_id", micro2!.id)
+      .eq("day_number", 1)
+      .single();
+    const { data: wk2Wes } = await user
+      .from("workout_exercises")
+      .select("id")
+      .eq("workout_id", wk2Day1!.id);
+
+    await expect(
+      logSet(user, userId, {
+        workout_exercise_id: wk2Wes![0].id,
+        set_number: 1,
+        weight: 100,
+        reps: 8,
+        rir_reported: 2,
+        set_type: "straight",
+        e1rm: 125,
+        e1rm_confidence: "moderate",
+        bodyweight: 180,
+        performed_on: "2026-07-04",
+      }),
+    ).rejects.toThrow(/Week 2 hasn't started yet/);
+
+    // and nothing was written
+    const { count } = await user
+      .from("logged_sets")
+      .select("*", { count: "exact", head: true })
+      .eq("workout_exercise_id", wk2Wes![0].id);
+    expect(count).toBe(0);
+  });
+
   it("closing out the week completes the microcycle and activates week 2", async () => {
     // complete day 2 (sets logged + feedback + complete, same contract)
     const { data: wes2 } = await user
@@ -471,4 +543,62 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
       .order("day_number");
     expect(wk2?.map((w) => w.day_number)).toEqual([1, 2]);
   });
+
+  // N74: a week must always be closable. Without a whole-day skip, one session
+  // the user simply didn't train leaves the week open, the next week
+  // ungeneratable and the Workout tab with nothing to show.
+  it("skipWorkout closes an untrained day and lets the week complete", async () => {
+    const { data: micro2 } = await user
+      .from("microcycles")
+      .select("id")
+      .eq("mesocycle_id", mesoId)
+      .eq("week_number", 2)
+      .single();
+    const { data: wk2 } = await user
+      .from("workouts")
+      .select("id, day_number")
+      .eq("microcycle_id", micro2!.id)
+      .order("day_number");
+
+    const first = await skipWorkout(user, userId, wk2![0].id);
+    expect(first).toEqual({ skipped: true, error: null });
+
+    const { data: skippedDay } = await user
+      .from("workouts")
+      .select("status")
+      .eq("id", wk2![0].id)
+      .single();
+    expect(skippedDay?.status).toBe("skipped");
+
+    // its exercises are skipped too — they must not read as pending work
+    const { data: skippedWes } = await user
+      .from("workout_exercises")
+      .select("status")
+      .eq("workout_id", wk2![0].id);
+    expect(skippedWes!.every((w) => w.status === "skipped")).toBe(true);
+
+    // one day still open ⇒ the week stays active
+    const { data: midWeek } = await user
+      .from("microcycles")
+      .select("status")
+      .eq("id", micro2!.id)
+      .single();
+    expect(midWeek?.status).toBe("active");
+
+    // idempotent: skipping an already-closed day converges instead of throwing
+    expect(await skipWorkout(user, userId, wk2![0].id)).toEqual({
+      skipped: false,
+      error: null,
+    });
+
+    // closing the last day closes the week
+    await skipWorkout(user, userId, wk2![1].id);
+    const { data: closed } = await user
+      .from("microcycles")
+      .select("status")
+      .eq("id", micro2!.id)
+      .single();
+    expect(closed?.status).toBe("completed");
+  });
+
 });

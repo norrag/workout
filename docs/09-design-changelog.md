@@ -1246,6 +1246,65 @@ less, or to carry the same things in fewer controls.
   `day-rules.ts::captureRirDefault` (now returns `number`, not
   `number | null`).
 
+## 2026-08-04 (session 3) — Two failure/boundary states get a real design (figs 1.1 + 1.6, N85)
+
+> **Landed 2026-08-14.** Designed and built on 2026-08-04 as PR #222, which then sat
+> unmerged for ten days (see `docs/notes/log.md`). Dated by the design session, placed
+> by it, and labelled `session 3` because two doc-21 sessions already carry this date.
+> Filed under **N85**; the branch originally wrote **N74**, an ID the User Guide holds.
+
+Driven by an incident, not a designer pass — so, like the 2026-06-14 metrics entry, the
+mockup is amended here. Both states existed in the product already; neither had a design,
+and one of them was actively misleading. **No mockup figure covers either**, so both are
+composed strictly from the 08 §5 vocabulary rather than improvised: 1.5px **dashed** border
+(the established "planned / not yet materialized" treatment), a 10px tracked all-caps label,
+`bg-ink` for the primary action — **never accent**, since neither panel is a current position
+or a selection — and no hype, no exclamation marks.
+
+### 1. Workout tab (1.6 resting) — the stalled-week panel — `NET-NEW`
+- **Was.** `Every workout this week is logged. Next week's targets generate when the engine
+  runs.` — plain body copy, no affordance.
+- **Problem.** An **active** mesocycle with no next workout is never a normal resting state:
+  the advance job activates week N+1 as the final day of week N closes, and the final week
+  flips the meso to `completed`. Reaching that copy means generation *failed* — so the
+  sentence is reassurance offered at the one moment it is false, with nothing the user can do.
+  Two users sat on it for two days in Aug 2026.
+- **Change.** A dashed panel: label `NEXT WEEK NOT BUILT`, a short honest paragraph that names
+  it as our fault and states logged history is safe, and a full-width `TRY AGAIN` (ink) that
+  re-runs generation. On a failed retry the panel says the problem has been reported rather
+  than repeating itself.
+- **Affected figures.** 1.6 (new state).
+- **Impact.** `NET-NEW`. New client component + one server action; no schema.
+
+### 2. Day View (1.1) — future-week days are viewable, not loggable — `NET-NEW`, `RETROFIT`
+- **Was.** Completing a day of week N generates its week-N+1 counterpart immediately, and the
+  cycles grid deep-links it at `/log/<id>`. It rendered as a normal, loggable day.
+- **Problem.** Logging into it trains week N+1 off a week N that is still open, which the
+  engine's autoregulation (whole-week feedback + weekly set volume) cannot price correctly.
+- **Change.** A day whose microcycle is still `pending` renders **read-only** — the full plan
+  stays visible, per the standing requirement that planned workouts are always inspectable in
+  full detail — above a dashed panel: `WEEK N NOT STARTED`, one sentence explaining that a
+  week opens once the previous one is fully logged or skipped and why, and a
+  `GO TO CURRENT WORKOUT` (ink) escape. Reuses the existing `readOnly` path, so logged rows
+  render as static text exactly as on a completed session (2026-06-13 §4).
+- **Affected figures.** 1.1.
+- **Impact.** `NET-NEW` panel, `RETROFIT` to the `readOnly` predicate.
+
+### 3. Day View options menu (1.1 header ⋮) — "Skip day" — `NET-NEW`, `DATA`
+- **Change.** The WORKOUT group's destructive row is now **either** `Skip day` **or**
+  `End workout`, never both: `Skip day` when the day has no logged sets, `End workout` when it
+  does. Amends 09 session-5 §9, which offered only End workout.
+- **Rationale.** "End workout" *completes* the day, which is the wrong terminal state for one
+  you never trained — and it was the only way to close a day at all, so a single dropped
+  session left the week un-closable and the next week ungeneratable. Skipping a day that
+  carries logged sets is refused outright (hard rule #5).
+- **Copy.** Sheet title `Skip day`, subtitle `CLOSE UNTRAINED · ADVANCE WEEK`, body naming
+  that it counts as a missed session in stats and can't be undone; confirm button `SKIP DAY`.
+  Reuses the End-workout `BottomSheet` pattern verbatim, accent confirm included.
+- **Affected figures.** 1.1 (menu + new sheet).
+- **Impact.** `NET-NEW`, `DATA`. New query + action; workout → `skipped`, its exercises →
+  `skipped`, then the standard week-close + advance.
+
 ## 2026-08-04 (session 2) — An effort assignment reads on the plan and prices in words, not a number nobody can estimate (figs 1.1 / 1.2 / 2.5b, doc 21 §8/§9.4, N70)
 
 The Phase-6 pass for exercise-level RIR. Four elements, none of which exists in

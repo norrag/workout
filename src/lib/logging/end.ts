@@ -1,4 +1,4 @@
-import type { WorkoutRow } from "@/lib/types/database";
+import type { MicrocycleRow, WorkoutRow } from "@/lib/types/database";
 
 // ---------------------------------------------------------------------------
 // Pure decision helpers for ending a workout / mesocycle early (fig 1.1
@@ -20,6 +20,39 @@ export function endWorkoutStatus(
   hasLoggedSets: boolean,
 ): "completed" | "skipped" {
   return hasLoggedSets ? "completed" : "skipped";
+}
+
+/**
+ * N74 — the week boundary. Completing a day of week N generates its week-N+1
+ * counterpart immediately, so that day exists (and is deep-linkable from the
+ * cycles grid) while week N is still open. A `pending` week is one whose
+ * predecessor has not closed: viewable in full, never loggable, because the
+ * engine's autoregulation prices week N+1 off the WHOLE of week N — its
+ * session feedback and its weekly set volume. The advance job flips the week
+ * to `active` the moment its predecessor closes, so this gate opens exactly
+ * when the basis becomes complete.
+ *
+ * Out-of-order training WITHIN a week is deliberately unaffected: progression
+ * is day-slot keyed (week N+1 day D advances from week N day D), so the order
+ * days are completed in is irrelevant to every engine input.
+ */
+export function isWeekLocked(status: MicrocycleRow["status"]): boolean {
+  return status === "pending";
+}
+
+/**
+ * N74 — which terminal state an open day is eligible for. A day with logged
+ * sets is *completed* (hard rule #5: logged work is never discarded, and
+ * skipping it would drop real sets out of every weekly rollup); an untrained
+ * day is *skipped*, which is what lets a week close when the user simply
+ * didn't train a session. An already-closed day is neither.
+ */
+export function dayCloseOption(
+  status: WorkoutRow["status"],
+  hasLoggedSets: boolean,
+): "skip" | "end" | null {
+  if (!isRemainingWorkout(status)) return null;
+  return hasLoggedSets ? "end" : "skip";
 }
 
 /**
