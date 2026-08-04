@@ -88,29 +88,51 @@ the mockup; every one built from a primitive the app already ships.
   a set reported at 8 becomes a measurement again — the band and the capture
   control compose rather than fight.
 - **Change (net-new sheet, fig 1.2 family — `Effort target`).** A bottom sheet off
-  the Day View exercise `⋯` menu, built to the **Load-step sheet** precedent
-  (doc 14 phase 3, `LoadStepSheet.tsx`): title + tracked-caps subtitle, a chip
-  row, an optional free entry, a clear affordance, `Cancel` / `SAVE`. Contents,
-  top to bottom:
-  1. the week's own value stated first — `WEEK 3 RAMP · 1 RIR` (§4.1's "show the
-     default beside the field"), `DELOAD · 6 RIR` on a deload week;
-  2. RIR chips `+1 +2 +4 +8` **relative to the week**, resolved on selection and
-     shown as the absolute value (`RIR 5`), plus `CUSTOM` for the 0–30 range —
-     the Load-step chip treatment exactly (`border-accent bg-accent` selected,
-     `border-dashed` for `CUSTOM`);
-  3. scope: `THIS WEEK` / `REST OF BLOCK` / `WHOLE BLOCK` — one selected, the
-     same chip treatment. A week whose session is already completed or in
-     progress renders **disabled**, not hidden;
+  the Day View exercise `⋯` menu. It takes its **shape** from the Load-step sheet
+  (doc 14 phase 3, `LoadStepSheet.tsx`) — title + tracked-caps subtitle, choice
+  controls, an optional free entry, a clear affordance, `Cancel` / `SAVE` — and
+  its **choice-control vocabulary from the settings screens** (fig 4.4 and the
+  profile editor), *not* from Load step. Revised 2026-08-04 after the owner
+  flagged the mismatch: Load step's chips are `13px` bold with an **accent** fill,
+  a full size larger and a different colour from every other choice control in
+  the app. The settings vocabulary is the house one and this sheet uses it:
+  - **section label** `10px / 600 / 0.14em / ink 55`;
+  - **contiguous button block** — `flex border-[1.5px] border-ink`, cells
+    `flex-1 py-2.5 text-center text-[10px] tracking-[0.1em]`, selected
+    `bg-ink font-bold text-bg-base`, unselected **paper with no fill**
+    (`font-medium text-ink/55`) divided by `border-l border-ink/30`;
+  - **full-width dashed button** for the two escape hatches, exactly the profile
+    editor's `CUSTOM VALUE` control, filling to ink when active;
+  - **helper `<p>`** under each block, `11px / 500 / normal / ink 60`.
+  Contents, top to bottom:
+  1. the week's own value stated first — `WEEK 3 RAMP` / `1 RIR` (§4.1's "show
+     the default beside the field"), `DELOAD WEEK` on a deload week;
+  2. `TARGET RIR` — a four-cell block of values `+1 +2 +4 +8` **relative to the
+     week**, resolved on selection and shown as the absolute value (`RIR 5`),
+     then `CUSTOM VALUE` (dashed, full width) for the 0–30 range, then
+     `USE THE WEEK'S RAMP (n RIR)` (dashed, full width) as the clear affordance;
+  3. `APPLIES TO` — `THIS WEEK` / `REST OF BLOCK` / `EVERY WEEK` as a three-cell
+     block, with a helper line that says what the **selected** scope actually
+     reaches and, always, the guarantee: *"Weeks you have already trained never
+     change — a performed session is the record of what you did."*;
   4. `REASON` — a one-line text field, 500 chars, stored with the assignment (A7)
      and surfaced in the strip;
-  5. `USE THE WEEK'S RAMP` — the clear affordance, in the Load-step
-     `USE DEFAULT` position and treatment;
-  6. warnings inline above the buttons, in **ink** (never accent): harder-than-
-     programmed, and a whole-block value covering the deload.
-  A cap or rep position set over the connector reads here as a **disclosure
-  line** (`WORKING-SET CAP · 2`), not an editable control — A4 keeps MCP the
-  primary surface for those two, and a lever the sheet cannot change must still
-  be visible where the athlete looks for it.
+  5. warnings after a save, in **ink** (never accent), under a `SAVED — NOTE`
+     rule: harder-than-programmed, and an every-week value covering the deload.
+  The `Cancel` / `SAVE` footer is unchanged at `13px` — that pairing is identical
+  in every sheet in the app **including the settings sheets**, so it was already
+  consistent; the mismatch was entirely in the choice controls.
+  A cap or rep position set over the connector reads here under a
+  `SET BY YOUR COACH` label as **settings rows** (`Working-set cap` · `2`), not
+  editable controls — A4 keeps MCP the primary surface for those two, and a lever
+  the sheet cannot change must still be visible where the athlete looks for it.
+- **Scope labels (revised 2026-08-04).** `WHOLE BLOCK` read as though it might
+  rewrite weeks already trained. It is now **`EVERY WEEK`** with the reach spelled
+  out beneath it. The real difference between it and `REST OF BLOCK` is **deload
+  coverage**: a flat `meso_exercises.target_rir` governs every week the per-week
+  schedule doesn't, and the deload falls off the end of that schedule by
+  construction (§4.1), so only the flat form reaches it. Neither reaches
+  backwards, and the sheet now says so instead of leaving it to be inferred.
 - **Change (fig 2.5b, the planned-day page).** The per-slot right-hand meta
   (`N SETS · M RIR`) resolves the assignment for that week, so a planned week
   shows the intensity it will actually be priced at, and appends ` · BACKED OFF`

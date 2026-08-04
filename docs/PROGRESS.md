@@ -59,10 +59,15 @@ and the new `setSlotEffortAction` runs the same planner — same refusals, same
 §4.1 warnings, same already-trained-week guard. `loadEffortContext` takes the
 active params as an argument rather than fetching them, because `generation.ts`
 already imports `slot-effort.ts`. The sheet's three scopes (`THIS WEEK` /
-`REST OF BLOCK` / `WHOLE BLOCK`) **overlay** the slot's existing per-week map
+`REST OF BLOCK` / `EVERY WEEK`) **overlay** the slot's existing per-week map
 instead of replacing it, so nudging one week can never silently drop an
 assignment on another; a §4.1 warning holds the sheet open under `SAVED — NOTE`
-rather than closing over it. The set cap and rep position **read** in the sheet
+rather than closing over it. The scopes differ in exactly one thing —
+**deload coverage** (only the flat `EVERY WEEK` form reaches it, by
+construction) — and **none reaches backwards**: `planEffortEdits` refuses an op
+naming an already-trained week, `regenerateOpenWorkouts` skips completed
+microcycles and any started workout in a live one, and hard rule #5 covers the
+logged sets. The sheet states that guarantee rather than leaving it inferred. The set cap and rep position **read** in the sheet
 and are not editable (A4) — a lever the sheet cannot change must still be visible
 where the athlete looks for it.
 
