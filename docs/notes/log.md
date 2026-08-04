@@ -56,6 +56,7 @@ look like normal operation.
   fully viewable but not loggable until its week activates — the engine prices
   a week off the whole of the week before it. Owner confirmed the model: free
   within a week, gated at the boundary.
+- **N74 → done (PR #222).**
 - **Rule-8 note:** no mockup figure covers either new state (fig 1.1 has no
   failure variant, and there is no skip-day sheet). Both are built from the 08
   §5 vocabulary and recorded in `docs/PROGRESS.md`.
