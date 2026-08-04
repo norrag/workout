@@ -27,6 +27,13 @@ export interface WeightedWeekSets {
   muscle_group: string | null;
   planned_sets: number | null;
   logged_sets: number;
+  /** doc 21 §6.2 disclosure, on the same fractional scale as `logged_sets`:
+   *  how much of this cell's work was authored as a back-off. The volume
+   *  itself is untouched (§9.1) — a backed-off set still consumes recovery
+   *  budget — but a cell that reads MEV-compliant off deliberately easy work
+   *  is a different fact from one that doesn't, so the number travels with it.
+   *  NOT a subset of `logged_sets`, which counts hard sets only (doc 10 §2). */
+  backed_off_sets: number;
 }
 
 /**
@@ -43,7 +50,7 @@ export function weightWeekMuscleSets(
   weights: VolumeCountingWeights,
   weekOf?: (row: VMesoWeekMuscleSetsRow) => number | undefined,
 ): WeightedWeekSets[] {
-  const byCell = new Map<string, { row: WeightedWeekSets; planned: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[]; logged: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[] }>();
+  const byCell = new Map<string, { row: WeightedWeekSets; planned: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[]; logged: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[]; backedOff: { role: VMesoWeekMuscleSetsRow["role"]; sets: number }[] }>();
   for (const r of rows) {
     const week = weekOf ? weekOf(r) : r.week_number;
     if (week == null) continue;
@@ -58,15 +65,20 @@ export function weightWeekMuscleSets(
           muscle_group: r.muscle_group,
           planned_sets: null,
           logged_sets: 0,
+          backed_off_sets: 0,
         },
         planned: [],
         logged: [],
+        backedOff: [],
       };
       byCell.set(key, cell);
     }
     if (r.planned_sets != null)
       cell.planned.push({ role: r.role, sets: r.planned_sets });
     cell.logged.push({ role: r.role, sets: r.logged_hard_sets });
+    // doc 21 §6.2: weighted through the SAME 1.0/0.5 role counting, so the
+    // disclosure is on the same scale as the volume it discloses
+    cell.backedOff.push({ role: r.role, sets: r.logged_backed_off_sets ?? 0 });
   }
   return [...byCell.values()].map((cell) => ({
     ...cell.row,
@@ -75,6 +87,7 @@ export function weightWeekMuscleSets(
         ? fractionalSetCount(cell.planned, weights)
         : null,
     logged_sets: fractionalSetCount(cell.logged, weights),
+    backed_off_sets: fractionalSetCount(cell.backedOff, weights),
   }));
 }
 

@@ -15,6 +15,7 @@ import {
   volumeWeightedStrengthTotal,
   qualifyingScores,
   rollupMuscleProgress,
+  strengthComparabilityNote,
   E1RM_OUTLIER_RATIO,
   MIN_PROGRESS_SESSIONS,
   type ExerciseProgressScore,
@@ -182,12 +183,14 @@ function historyRow(
   exercise_id: string,
   microcycle_id: string,
   e1rm: number | null,
+  backed_off = false,
 ) {
   return {
     exercise_id,
     exercise_name: exercise_id.toUpperCase(),
     microcycle_id,
     e1rm,
+    backed_off,
   };
 }
 
@@ -212,6 +215,7 @@ describe("foldProgressScores", () => {
         score_pct: 5,
         sessions: 3,
         trend: "improving",
+        backed_off_sessions: 0,
       },
     ]);
   });
@@ -373,6 +377,7 @@ describe("qualifyingScores (I11 — logged ≥3× in the window)", () => {
     score_pct,
     sessions,
     trend: "improving",
+    backed_off_sessions: 0,
   });
 
   it("keeps only exercises with enough sessions and a computable score", () => {
@@ -397,6 +402,7 @@ describe("rollupMuscleProgress (PH37)", () => {
       score_pct: 10,
       sessions: 4,
       trend: "improving",
+      backed_off_sessions: 0,
     },
     {
       exercise_id: "fly",
@@ -406,6 +412,7 @@ describe("rollupMuscleProgress (PH37)", () => {
       score_pct: 4,
       sessions: 3,
       trend: "improving",
+      backed_off_sessions: 0,
     },
   ];
 
@@ -468,5 +475,119 @@ describe("buildBalance scope wording (M8)", () => {
     expect(
       buildBalance(volume, weeks, "across this macrocycle").note,
     ).toContain("across this macrocycle");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §6.2 (Phase 5) — intent-keyed exclusion from the strength surfaces
+// ---------------------------------------------------------------------------
+
+describe("foldProgressScores — backed-off sessions (§6.2)", () => {
+  it("excludes a backed-off session from the trend AND the count, exactly like a deload", () => {
+    const backedOff = foldProgressScores(
+      [
+        historyRow("bench", "w1", 200),
+        historyRow("bench", "w2", 205),
+        historyRow("bench", "w3", 210),
+        historyRow("bench", "w4", 150, true), // rehab week — priced ~25% lighter
+      ],
+      new Set(),
+    );
+    const deloaded = foldProgressScores(
+      [
+        historyRow("bench", "w1", 200),
+        historyRow("bench", "w2", 205),
+        historyRow("bench", "w3", 210),
+        historyRow("bench", "dl", 150),
+      ],
+      new Set(["dl"]),
+    );
+    // the two exclusions produce the same trend — that parity IS the policy
+    expect(backedOff[0]).toMatchObject({
+      baseline_e1rm: deloaded[0].baseline_e1rm,
+      current_e1rm: deloaded[0].current_e1rm,
+      score_pct: deloaded[0].score_pct,
+      sessions: 3,
+    });
+    // …and the back-off is counted rather than silently dropped
+    expect(backedOff[0].backed_off_sessions).toBe(1);
+    expect(deloaded[0].backed_off_sessions).toBe(0);
+  });
+
+  it("without the exclusion a rehab block reads as a collapse; with it, the trend holds", () => {
+    // the failure this policy exists to prevent: three weeks of prescribed
+    // back-off fill the recent window, so the rolling best drops with it and
+    // complying with the plan looks exactly like regression
+    const rows = [200, 205, 210].map((v, i) => historyRow("bench", `w${i + 1}`, v));
+    const rehab = [150, 148, 152].map((v, i) =>
+      historyRow("bench", `w${i + 4}`, v, true),
+    );
+    const asIfCounted = foldProgressScores(
+      [...rows, ...rehab.map((r) => ({ ...r, backed_off: false }))],
+      new Set(),
+    );
+    expect(asIfCounted[0].score_pct).toBeLessThan(0);
+
+    const scored = foldProgressScores([...rows, ...rehab], new Set());
+    expect(scored[0].score_pct).toBe(5);
+    expect(scored[0].backed_off_sessions).toBe(3);
+  });
+
+  it("keeps an exercise trained ONLY in backed-off sessions visible, with no trend", () => {
+    // it has no comparable points, so it cannot score — but the surface must
+    // still be able to say why it is missing, which needs the entry to exist
+    const scores = foldProgressScores(
+      [
+        historyRow("rehab-row", "w1", 90, true),
+        historyRow("rehab-row", "w2", 92, true),
+      ],
+      new Set(),
+    );
+    expect(scores).toHaveLength(1);
+    expect(scores[0]).toMatchObject({
+      sessions: 0,
+      score_pct: null,
+      backed_off_sessions: 2,
+    });
+    // …and it still fails the I11 display rule, so no trend is ever shown
+    expect(qualifyingScores(scores)).toEqual([]);
+  });
+});
+
+describe("strengthComparabilityNote (§6.2)", () => {
+  const score = (
+    id: string,
+    backed_off_sessions: number,
+  ): ExerciseProgressScore => ({
+    exercise_id: id,
+    exercise_name: id,
+    baseline_e1rm: 100,
+    current_e1rm: 104,
+    score_pct: 4,
+    sessions: 3,
+    trend: "improving",
+    backed_off_sessions,
+  });
+
+  it("is null when nothing was set aside — the pre-doc-21 state", () => {
+    expect(strengthComparabilityNote([score("bench", 0)])).toBeNull();
+    expect(strengthComparabilityNote([])).toBeNull();
+  });
+
+  it("names the single lift and reads as one session", () => {
+    const note = strengthComparabilityNote([score("Bench Press", 1)])!;
+    expect(note).toContain("1 session");
+    expect(note).toContain("Bench Press");
+    expect(note).toContain("still count toward volume");
+  });
+
+  it("counts sessions across lifts and stops naming them past one", () => {
+    const note = strengthComparabilityNote([
+      score("Bench Press", 2),
+      score("Incline Press", 1),
+      score("Row", 0),
+    ])!;
+    expect(note).toContain("3 sessions");
+    expect(note).toContain("2 exercises");
   });
 });

@@ -681,8 +681,78 @@ bounds; unset ⇒ byte-identical output, trace and fingerprint on both levers.
   facts payload are **Phase 6**'s subject along with the rest of the explanation
   layering and its design pass.
 
-**Phase 5 — stats policy (§6).** Intent-keyed exclusion from strength surfaces,
-volume disclosure flag, comparability note on meso/macro rollups.
+**Phase 5 — stats policy (§6). ✅ SHIPPED 2026-08-04.** Intent-keyed exclusion
+from strength surfaces, volume disclosure flag, comparability note on meso/macro
+rollups.
+*Tests:* the exclusion is trend-identical to the deload exclusion on one fixture;
+a rehab block that would read as a collapse holds its trend; an
+only-backed-off lift stays visible with no trend; the note's null/singular/plural
+forms; `isBackedOffSlot`'s truth table incl. its deliberate asymmetry; the
+band applied to the read-side session series; MCP disclosure present-only.
+
+*As built:*
+- **One intent key, `isBackedOffSlot(slotRir, weekRir)`** (`queries/slot-effort.ts`),
+  which `resolveSlotEffort` now calls for its own `backedOff`. The four stats
+  views mirror it in SQL against the stored, already-resolved values —
+  `workout_exercises.target_rir > microcycles.target_rir`. That comparison is the
+  realized form of `resolvedRir > weekRir`, and because hard rule 5 never
+  rewrites a performed session's row, it reads the intensity that was **actually
+  trained** for history as much as for the live week. **Deliberately not
+  symmetric:** a slot run *harder* than its week keeps every strength claim it
+  earns.
+- **The exclusion is read-side only, and that is the difference from §6.1.** The
+  band asks *is this a measurement at all* and answers it at the stamp
+  (`e1rm = null`, confidence `none`); §6.2 asks *is this measurement comparable*
+  — the set was genuinely measured, still anchors the engine (§5), and is only
+  incomparable with the block around it. So the stamp is untouched, no backfill
+  exists to get wrong, and a future policy change costs nothing.
+- **Surfaces.** `v_exercise_history` gains `backed_off` (bool_or per session — an
+  exercise can hold two slots in a day) and **keeps its e1RM**: §6.2's closing
+  note says these sessions should be *shown and flagged*, not hidden.
+  `v_exercise_prs`, `v_exercise_overview.best_e1rm` and `v_meso_summary.best_e1rm`
+  drop the sets outright; the trend fold (`foldProgressScores`) drops the
+  sessions and **counts them per exercise**; the meso PR scan drops them from
+  **both** sides (a backed-off session can neither set a PR nor raise the bar a
+  later one must clear). `weight_pr` / `volume_pr` / totals keep every set —
+  those are observations, not strength estimates, and a lighter set cannot
+  displace them anyway.
+- **Volume keeps them and says how many** (§9.1). `logged_backed_off_sets` joins
+  the weekly role-grain facts and is weighted through the same 1.0/0.5 counting,
+  so the disclosure is on the scale of the number it discloses. It is **not a
+  subset of `logged_hard_sets`** — that column bakes doc 10 §2's separate RIR ≤ 4
+  stimulus rule — and the surfaces say so rather than let a rehab block read as
+  both fully dosed and under-dosed at once. *(That interaction is real and now
+  visible: Phase 1 made `rir_reported` actually written, so the hard-set rule's
+  "unreported counts, benefit of the doubt" clause rarely applies any more. Left
+  as doc 10's call to make, flagged for the owner, not quietly redefined here.)*
+- **The disclosure travels with every rollup.** `StrengthProgress.comparability`
+  is one sentence built from the same scores the block renders (so it can never
+  disagree with the numbers above it), surfaced in the meso and macro Performance
+  tabs, `get_mesocycle_summary`, `get_macrocycle_summary`; `compare_mesocycles`
+  gains a warning naming each block and its set count; `get_muscle_group_volume`
+  discloses per week × muscle. Every one of them is **omitted, not zeroed**, when
+  nothing is assigned — an unassigned plan reads byte-identical to before.
+- **An exercise trained ONLY in backed-off sessions still gets a score entry**
+  (sessions 0, no trend) so the note can name it. It fails the I11 ≥3-session
+  display rule, so no trend is ever shown — but the surface can explain the
+  absence instead of silently dropping the lift, which is exactly when the
+  athlete needs the explanation most.
+- **One more N71 corner closed.** `analyze_exercise_progress`'s session series
+  (`queries/coaching.ts::getExerciseSessions` → `analysis/comparability.ts`) was
+  still passing `rir_reported` **raw** into `estimateE1rm`, so an unreported set
+  read as taken to failure — the same defect Phase 1 closed at the stamp, the
+  anchor and the marker, and Phase 2b closed in `v_exercise_prs`. It now resolves
+  `assumedRir` from the slot's prescription and applies the §6.1 band, so the
+  read-side series and the stored stamp finally agree about what was measured.
+- **Live verification:** the migration is applied to the hosted project. With no
+  assignment in existence, the pre-existing columns of all five views hash
+  **byte-identically** to the pre-migration baseline and every disclosure count
+  is 0; a simulated assignment over the real data (no writes) exercises the
+  joins/`bool_or` and flags 691 sessions / 1641 sets, confirming the shapes fire
+  and the grain is unchanged. Advisors: no new findings, `security_invoker` kept
+  on all four views.
+- *Deliberately not here:* the day-view/planner disclosure of an active
+  assignment, the editor sheet, and the doc-19 explanation layering — Phase 6.
 
 **Phase 6 — UI + explanation.** 09-changelog design pass, planner/day-view
 disclosure, editor sheet, doc 19 layering.

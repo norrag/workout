@@ -21,6 +21,7 @@ function session(over: Partial<ExerciseSession>): ExerciseSession {
     meso_name: "Block",
     goal_type: "hypertrophy",
     target_rir: 1,
+    backed_off: false,
     e1rm: 100,
     confidence: "high",
     top_weight: 100,
@@ -335,5 +336,43 @@ describe("phaseGoals + CONFIDENCE_WEIGHT", () => {
   it("ranks confidence weights high > moderate > low", () => {
     expect(CONFIDENCE_WEIGHT.high).toBeGreaterThan(CONFIDENCE_WEIGHT.moderate);
     expect(CONFIDENCE_WEIGHT.moderate).toBeGreaterThan(CONFIDENCE_WEIGHT.low);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §6 (Phase 5) — the read-side series obeys the same two rules the
+// stamp does: the measuring band (§6.1) and the assumed-RIR resolution (§2)
+// ---------------------------------------------------------------------------
+
+describe("pickSessionE1rm — the measuring band (§6.1)", () => {
+  const BAND = {
+    ...P,
+    e1rm: { ...P.e1rm, max_measuring_rir: 8 },
+  };
+
+  it("ignores a set priced past the band — it was never a measurement", () => {
+    // a rehab slot at RIR 21: priced and performed, but ~70% assumption
+    const pick = pickSessionE1rm(
+      [
+        { weight: 170, reps: 9, rir: 21 },
+        { weight: 200, reps: 8, rir: 2 },
+      ],
+      BAND,
+    );
+    expect(pick!.top_weight).toBe(200);
+  });
+
+  it("a session made ONLY of non-measuring sets yields no estimate at all", () => {
+    expect(pickSessionE1rm([{ weight: 170, reps: 9, rir: 21 }], BAND)).toBeNull();
+  });
+
+  it("with the param absent nothing is excluded — today's behavior", () => {
+    expect(pickSessionE1rm([{ weight: 170, reps: 9, rir: 21 }], P)).not.toBeNull();
+  });
+
+  it("a set INSIDE the band still counts, however far from failure", () => {
+    // §5: a backed-off set is RIR-adjusted and therefore comparable — the band
+    // is about fabrication, not about effort
+    expect(pickSessionE1rm([{ weight: 180, reps: 9, rir: 8 }], BAND)).not.toBeNull();
   });
 });

@@ -2,7 +2,60 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-02 (latest) — doc 21 Phase 4: the set lever bites + the rep-position knob (N70)
+## 2026-08-04 (latest) — doc 21 Phase 5: the stats policy — what a backed-off session may claim (N70)
+
+The lever has bitten since Phase 2. Phase 5 is the read side: a session the plan
+deliberately ran easier than its week must not read as a decline, must not set a
+PR, and must not quietly vanish either.
+
+**One intent key, mirrored in SQL.** `isBackedOffSlot(slotRir, weekRir)` in
+`queries/slot-effort.ts` — which `resolveSlotEffort` now calls for its own
+`backedOff` — and `workout_exercises.target_rir > microcycles.target_rir` in the
+four stats views. That comparison is the *realized* form of
+`resolvedRir > weekRir`: hard rule 5 never rewrites a performed session's row, so
+it reads the intensity actually trained, for history as much as for this week.
+Keying on **plan intent** rather than measured confidence is deliberate —
+confidence degrades with effective reps too, so an honest 15-rep set at RIR 1 is
+already `low`, and excluding on that would drop real work. It is also **not
+symmetric**: a slot run *harder* than its week keeps every claim it earns.
+
+**Read-side only, and that is what separates §6.2 from the measuring band.** The
+band (§6.1) asks *is this a measurement at all* and answers it at the stamp.
+§6.2 asks *is this measurement comparable* — the set was genuinely measured and
+still anchors the engine, it just isn't like-with-like against the block around
+it. So no stamp changes, no backfill, and a future policy change costs nothing.
+
+**Excluded from strength, kept in volume, disclosed in both.**
+`v_exercise_history` gains `backed_off` and keeps its e1RM (shown and flagged,
+not hidden); the PR views, `best_e1rm` on the overview and the meso summary, the
+trend fold and the meso PR scan all drop it — the PR scan from *both* sides, so a
+backed-off session can neither set a PR nor raise the bar a later one must clear.
+Volume keeps every set (§9.1, owner-confirmed) and reports
+`logged_backed_off_sets` beside it, weighted through the same 1.0/0.5 counting.
+
+**The disclosure travels with the number.** `StrengthProgress.comparability` is
+one sentence built from the same scores the block renders, on the meso and macro
+Performance tabs and in `get_mesocycle_summary` / `get_macrocycle_summary`;
+`compare_mesocycles` warns per block; `get_muscle_group_volume` discloses per
+week × muscle; history rows carry a `BACKED OFF` tag (the DELOAD tag primitive —
+rule-8 pass recorded in `09-design-changelog.md`). All of it **omitted, not
+zeroed**, when nothing is assigned.
+
+**One more N71 corner closed.** `analyze_exercise_progress`'s session series was
+still passing `rir_reported` raw into `estimateE1rm` — an unreported set read as
+taken to failure, the same defect Phase 1 closed at the stamp/anchor/marker and
+Phase 2b closed in `v_exercise_prs`. It now resolves `assumedRir` from the slot's
+prescription and applies the §6.1 band.
+
+**Applied + verified on the live project** `juqvbiymmdcggctdqoiq`: with no
+assignment in existence, the pre-existing columns of all five views hash
+byte-identically to the pre-migration baseline and every disclosure count is 0; a
+simulated assignment over the real data (no writes) flags 691 sessions / 1641
+sets, confirming the joins and `bool_or` fire with the grain unchanged. Advisors
+clean; `security_invoker` preserved. Suite green (1683, +22), typecheck + lint
+clean.
+
+## 2026-08-02 — doc 21 Phase 4: the set lever bites + the rep-position knob (N70)
 
 The second and third levers on a day-slot. Phase 3 made an assignment writable
 over MCP; Phase 4 makes the working-set cap actually change a prescription, and

@@ -42,6 +42,46 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-04 — Backed-off sessions read as set-aside, not as decline (figs 3.2 / 4.3, doc 21 §6.2, N70)
+
+- **Change (fig 3.2, exercise History):** a session whose slot ran at an
+  **assigned RIR above its week's** carries a **`BACKED OFF` tag** on the row —
+  the *same* tag primitive as `DELOAD` (1px `ink/40` border, 8.5px bold,
+  `0.1em` tracking, `px-[5px] py-[2px]`, `align-[2px]`), rendered after it when
+  both apply. The session's numbers are unchanged: top weight, reps, e1RM, RIR
+  and effective reps all still show.
+- **Change (fig 4.3 + the macro Performance tab, `EST. STRENGTH …` block):** when
+  the rollup set any session aside, a **one-sentence comparability line** follows
+  the block's existing all-caps footnote, at the **Balance-note treatment**
+  (13px, `leading-[1.55]`, `ink/80`, sentence case): *"N sessions ran at an
+  assigned back-off RIR (…) and are left out of the trend — deliberately easier
+  work is not a like-with-like strength read. The sets still count toward
+  volume."* Absent entirely when nothing was set aside.
+- **Rationale:** doc 21 §6.2 excludes a deliberately-easier session from every
+  strength surface, exactly as deloads are already excluded (T-A2). An exclusion
+  the athlete cannot see is indistinguishable from missing data — worse here than
+  for deloads, because a rehab block can remove a lift from the trend entirely.
+  The tag answers "why is this session not counted"; the line answers "why did
+  the number move / why is this lift missing". Both state the other half too —
+  the volume still counts (§9.1) — so the disclosure cannot be read as "that work
+  didn't happen".
+- **Affected figures:** 3.2 (history rows, and the shared history sheet used by
+  the Performance drill-down), 4.3 (meso Performance), macro Performance (M8).
+- **Rule-8 pass:** **no mockup figure exists** for either element — verified
+  against `workout - App Screens v2.dc.html`, where history rows carry only the
+  `DELOAD` tag and the strength block carries only its all-caps footnote. Doc 21
+  §8 requires the house-style transcription to be recorded here before building;
+  same precedent as the 2026-08-02 RIR column and the P19/N35 marker glyphs.
+  House style honored: **existing primitives reused, none invented** — the tag is
+  the DELOAD tag, the line is the Balance note; ink only, **no accent** (orange
+  stays reserved for current position + selection); square corners; no
+  exclamation marks and no hype.
+- **Impact:** `RETROFIT` — `ExerciseHistoryList.tsx` (tag) and
+  `stats/StrengthProgress.tsx` (line); `DATA` — both read new fields
+  (`v_exercise_history.backed_off`, `StrengthProgress.comparability`).
+- **Deliberately not here:** the *planner/day-view* disclosure of an active
+  assignment and the editor sheet — those are Phase 6, with their own pass.
+
 ## 2026-08-02 — Day View: per-set RIR capture joins the set grid (fig 1.1, doc 21 §2/§8, N71/N38)
 
 - **Change:** the logging set grid gains a **third value column, `RIR`**, between

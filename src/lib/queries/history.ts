@@ -6,6 +6,7 @@ import {
   isBodyweightLoad,
 } from "@/lib/engine";
 import { getActiveEngineParams } from "./generation";
+import { isBackedOffSlot } from "./slot-effort";
 import type { Database } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
@@ -41,6 +42,11 @@ export interface HistoryEntry {
    * RIR so the estimate's basis is legible rather than implied. */
   effective_reps: number | null;
   is_deload: boolean;
+  /** doc 21 §6.2 — the slot ran at an assigned RIR above the week's, so this
+   *  session is deliberately easier work: shown with its numbers and tagged,
+   *  but left out of every trend and PR comparison (the same treatment a
+   *  deload gets, and marked the same way). */
+  backed_off: boolean;
   /** per-session log note (09 §8), shown as a tap-to-reveal note icon */
   session_note: string | null;
 }
@@ -215,8 +221,10 @@ export async function getExerciseHistory(
   ] = await Promise.all([
     supabase.from("mesocycles").select("id, name").in("id", mesoIds),
     supabase
+      // target_rir: the week's own value, the other half of the doc 21 §6.2
+      // back-off comparison against the slot's prescribed RIR
       .from("microcycles")
-      .select("id, week_number, is_deload")
+      .select("id, week_number, is_deload, target_rir")
       .in("id", microIds),
     supabase.from("workouts").select("id, day_number").in("id", workoutIds),
     supabase
@@ -310,6 +318,15 @@ export async function getExerciseHistory(
         };
       })(),
       is_deload: micro?.is_deload ?? false,
+      // doc 21 §6.2: any slot in the session assigned above the week's RIR
+      // makes it deliberately easier work — the same bool_or the view applies,
+      // since one exercise can occupy more than one slot in a day
+      backed_off: group.some((s) =>
+        isBackedOffSlot(
+          targetRirByWe.get(s.workout_exercise_id),
+          micro?.target_rir,
+        ),
+      ),
       session_note: noteByWe.get(group[0].workout_exercise_id) ?? null,
     };
   });

@@ -47,6 +47,11 @@ export interface ExerciseProgressScore {
   sessions: number;
   /** direction label with a dead-band: improving / holding / declining */
   trend: StrengthTrendLabel;
+  /** doc 21 §6.2: sessions set aside from the trend because the slot was
+   *  assigned an RIR above the week's — deliberately easier work, which is
+   *  not a like-with-like strength read (the same treatment deloads get).
+   *  Counted, never silently dropped: it is the comparability disclosure. */
+  backed_off_sessions: number;
 }
 
 /**
@@ -112,21 +117,34 @@ export function dropE1rmOutliers(e1rms: number[]): number[] {
 export function foldProgressScores(
   rows: Pick<
     VExerciseHistoryRow,
-    "exercise_id" | "exercise_name" | "microcycle_id" | "e1rm"
+    "exercise_id" | "exercise_name" | "microcycle_id" | "e1rm" | "backed_off"
   >[],
   deloadMicroIds: Set<string>,
   cfg: StrengthTrendConfig = DEFAULT_STRENGTH,
 ): ExerciseProgressScore[] {
-  const byExercise = new Map<string, { name: string; e1rms: number[] }>();
+  const byExercise = new Map<
+    string,
+    { name: string; e1rms: number[]; backedOff: number }
+  >();
+  const entry = (row: (typeof rows)[number]) => {
+    let cur = byExercise.get(row.exercise_id);
+    if (!cur) {
+      cur = { name: row.exercise_name, e1rms: [], backedOff: 0 };
+      byExercise.set(row.exercise_id, cur);
+    }
+    return cur;
+  };
   for (const row of rows) {
     if (row.e1rm == null) continue;
     if (deloadMicroIds.has(row.microcycle_id)) continue;
-    let cur = byExercise.get(row.exercise_id);
-    if (!cur) {
-      cur = { name: row.exercise_name, e1rms: [] };
-      byExercise.set(row.exercise_id, cur);
+    // doc 21 §6.2: a slot run above its week's RIR was deliberately easier, so
+    // it is not comparable with the block around it — set aside from the trend
+    // exactly like a deload session, and COUNTED so the surface can say so.
+    if (row.backed_off) {
+      entry(row).backedOff += 1;
+      continue;
     }
-    cur.e1rms.push(row.e1rm);
+    entry(row).e1rms.push(row.e1rm);
   }
 
   return [...byExercise.entries()].map(([exercise_id, v]) => {
@@ -140,6 +158,7 @@ export function foldProgressScores(
       score_pct: t.change_pct,
       sessions: t.sessions,
       trend: t.trend,
+      backed_off_sessions: v.backedOff,
     };
   });
 }
@@ -303,6 +322,36 @@ export interface StrengthProgress {
   /** qualifying exercises (≥3 non-deload sessions), best score first */
   exercises: ExerciseProgressScore[];
   muscles: MuscleGroupProgress[];
+  /** doc 21 §6.2 — the comparability disclosure: one sentence naming the
+   *  sessions this rollup set aside as backed off, or null when none were.
+   *  Null is the pre-doc-21 state, so a plan with no assignments reads
+   *  exactly as it did before the lever existed. */
+  comparability: string | null;
+}
+
+/**
+ * doc 21 §6.2 — the comparability note for a strength rollup. Pure, and built
+ * from the SAME scores the rollup renders so the sentence can never disagree
+ * with the numbers above it. Counts every scored exercise, including ones that
+ * fell short of the ≥3-session display rule: an exercise trained *only* in
+ * backed-off sessions has no trend at all, which is precisely when the athlete
+ * most needs to be told why it is missing.
+ */
+export function strengthComparabilityNote(
+  scores: ExerciseProgressScore[],
+): string | null {
+  const affected = scores.filter((s) => s.backed_off_sessions > 0);
+  if (affected.length === 0) return null;
+  const sessions = affected.reduce((n, s) => n + s.backed_off_sessions, 0);
+  const lifts =
+    affected.length === 1
+      ? affected[0].exercise_name
+      : `${affected.length} exercises`;
+  return (
+    `${sessions} ${sessions === 1 ? "session" : "sessions"} ran at an assigned back-off RIR ` +
+    `(${lifts}) and ${sessions === 1 ? "is" : "are"} left out of the trend — ` +
+    `deliberately easier work is not a like-with-like strength read. The sets still count toward volume.`
+  );
 }
 
 export async function buildStrengthProgress(
@@ -317,7 +366,12 @@ export async function buildStrengthProgress(
     supabase,
     exercises.map((s) => s.exercise_id),
   );
-  return { exercises, muscles: rollupMuscleProgress(exercises, links, weights) };
+  return {
+    exercises,
+    muscles: rollupMuscleProgress(exercises, links, weights),
+    // built from the full score list, not the qualifying subset (see above)
+    comparability: strengthComparabilityNote(scores),
+  };
 }
 
 /**
@@ -383,13 +437,18 @@ export async function getMacroStrength(
   params: EngineParams,
 ): Promise<MacroStrength> {
   if (mesoIds.length === 0)
-    return { exercises: [], muscles: [], estStrengthPct: null };
+    return {
+      exercises: [],
+      muscles: [],
+      comparability: null,
+      estStrengthPct: null,
+    };
   const weights = volumeCountingWeights(params);
   const [scores, muscleVolume] = await Promise.all([
     getProgressScores(supabase, userId, mesoIds, strengthConfig(params)),
     getMuscleVolume(supabase, userId, mesoIds, weights),
   ]);
-  const { exercises, muscles } = await buildStrengthProgress(
+  const { exercises, muscles, comparability } = await buildStrengthProgress(
     supabase,
     scores,
     weights,
@@ -397,6 +456,7 @@ export async function getMacroStrength(
   return {
     exercises,
     muscles,
+    comparability,
     estStrengthPct: volumeWeightedStrengthTotal(muscles, muscleVolume),
   };
 }
@@ -775,8 +835,23 @@ export async function getMesoStats(
     if (idx >= 0) mesoPosition = `MESO ${idx + 1} OF ${orderedMesos.length}`;
   }
 
+  // doc 21 §6.2: a deliberately easier session cannot set a PR, and cannot
+  // raise the bar a later PR has to clear either — so backed-off sessions are
+  // dropped from BOTH sides of the comparison. The history rows already carry
+  // the flag, so the (workout, exercise) pairs come free of an extra query.
+  const backedOffSessions = new Set(
+    (history ?? [])
+      .filter((h) => h.backed_off)
+      .map((h) => `${h.workout_id}:${h.exercise_id}`),
+  );
+  const comparableSets = (sets ?? []).filter(
+    (s) => !backedOffSessions.has(`${s.workout_id}:${s.exercise_id}`),
+  );
+
   // PRs this meso vs everything before it
-  const mesoExerciseIds = [...new Set((sets ?? []).map((s) => s.exercise_id))];
+  const mesoExerciseIds = [
+    ...new Set(comparableSets.map((s) => s.exercise_id)),
+  ];
   const priorBest = new Map<string, { weight: number; e1rm: number }>();
   if (mesoExerciseIds.length > 0) {
     const { data: prior, error: priorError } = await supabase
@@ -789,6 +864,7 @@ export async function getMesoStats(
     const firstMesoDate = (history ?? [])[0]?.performed_on ?? null;
     for (const row of prior ?? []) {
       if (firstMesoDate && row.performed_on >= firstMesoDate) continue;
+      if (row.backed_off) continue;
       const cur = priorBest.get(row.exercise_id);
       priorBest.set(row.exercise_id, {
         weight: Math.max(cur?.weight ?? 0, row.top_weight ?? 0),
@@ -811,7 +887,7 @@ export async function getMesoStats(
   }
   const mesoBest = mesoExerciseIds
     .map((exerciseId) => {
-      const best = (sets ?? [])
+      const best = comparableSets
         .filter((s) => s.exercise_id === exerciseId)
         .sort((a, b) => b.weight - a.weight || b.reps - a.reps)[0];
       if (!best) return null;
@@ -881,7 +957,7 @@ export async function getMacroStats(
   const empty: MacroStatsData = {
     balance: { push: 0, pull: 0, legs: 0, bars: [], note: "" },
     hasVolume: false,
-    strength: { exercises: [], muscles: [] },
+    strength: { exercises: [], muscles: [], comparability: null },
     estStrengthPct: null,
   };
   if (mesoIds.length === 0) return empty;

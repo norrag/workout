@@ -85,6 +85,7 @@ describe("groupHistoryByMeso", () => {
       rir_source: null,
       effective_reps: null,
     is_deload: false,
+    backed_off: false,
     session_note: null,
   });
 

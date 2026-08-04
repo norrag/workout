@@ -108,6 +108,14 @@ export function StrengthProgressSection({
             E1RM IS AN ESTIMATE
           </p>
         )}
+        {/* doc 21 §6.2 — the comparability disclosure. Sentence case at the
+            body size, like the Balance note: it explains a number's absence,
+            which the tracked all-caps caption grammar reads too quietly for. */}
+        {strength.comparability && (
+          <p className="mt-1.5 text-[13px] leading-[1.55] text-ink/80">
+            {strength.comparability}
+          </p>
+        )}
       </div>
 
       {strength.muscles.length > 0 && (

@@ -9,6 +9,7 @@ import {
   applySlotEffortPatch,
   assignmentHardensWeek,
   emptySlotEffort,
+  isBackedOffSlot,
   getSlotEffortAssignments,
   planSlotEffortEdit,
   restoreSlotEffortAssignments,
@@ -651,5 +652,37 @@ describe("restoreSlotEffortAssignments (the save_meso_plan replace)", () => {
   it("writes nothing at all when the meso has no assignments", async () => {
     const after = tables([]);
     expect(await restoreSlotEffortAssignments(fakeClient(after), "m1", new Map())).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 §6.2 (Phase 5) — the intent key the stats policy reads
+// ---------------------------------------------------------------------------
+
+describe("isBackedOffSlot (§6.2)", () => {
+  it("is true only when the slot runs EASIER than its week", () => {
+    expect(isBackedOffSlot(4, 1)).toBe(true);
+    expect(isBackedOffSlot(21, 2)).toBe(true);
+  });
+
+  it("is not symmetric: a slot run HARDER stays fully comparable", () => {
+    // an assignment below the ramp is disclosed at authoring time (§4.1) and
+    // keeps every strength claim it earns — the athlete really did that work
+    expect(isBackedOffSlot(0, 2)).toBe(false);
+  });
+
+  it("equal is not backed off — an assignment matching the week changes nothing", () => {
+    expect(isBackedOffSlot(2, 2)).toBe(false);
+  });
+
+  it("null on either side is never backed off (pre-doc-21 rows, unassigned slots)", () => {
+    expect(isBackedOffSlot(null, 2)).toBe(false);
+    expect(isBackedOffSlot(4, null)).toBe(false);
+    expect(isBackedOffSlot(undefined, undefined)).toBe(false);
+  });
+
+  it("agrees with resolveSlotEffort, which is the same rule at plan grain", () => {
+    const r = resolveSlotEffort(assignment({ target_rir: 6 }), 2, 2);
+    expect(r.backedOff).toBe(isBackedOffSlot(r.assignedRir, r.weekRir));
   });
 });

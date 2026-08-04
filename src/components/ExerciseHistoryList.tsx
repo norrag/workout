@@ -179,6 +179,16 @@ export function ExerciseHistoryList({
                         DELOAD
                       </span>
                     )}
+                    {/* doc 21 §6.2: the session ran at an assigned RIR above
+                        its week — deliberately easier, and left out of every
+                        trend and PR comparison. Same tag grammar as DELOAD,
+                        which is the same statement about the same kind of
+                        session. */}
+                    {row.backed_off && (
+                      <span className="ml-1.5 border border-ink/40 px-[5px] py-[2px] align-[2px] text-[8.5px] font-bold tracking-[0.1em]">
+                        BACKED OFF
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-baseline gap-1.5 text-right text-[10px] font-semibold tracking-[0.1em] text-ink/55">
                     {hasNote && (

@@ -592,6 +592,10 @@ export type VExerciseHistoryRow = {
   e1rm: number | null;
   avg_rir_reported: number | null;
   best_set_e1rm: number | null;
+  /** doc 21 §6.2: the slot ran at an assigned RIR ABOVE the week's — a
+   *  deliberately easier session. Excluded from strength trends and PRs
+   *  (like a deload), kept in volume, and still shown with its e1RM. */
+  backed_off: boolean;
 }
 
 /** R14: role-grain weekly-set facts for fractional volume counting (doc 10 §2).
@@ -608,6 +612,10 @@ export type VMesoWeekMuscleSetsRow = {
   logged_sets: number;
   /** non-warmup sets at rir_reported ≤ 4 or unreported — the §2 hard-set rule */
   logged_hard_sets: number;
+  /** doc 21 §6.2 disclosure: logged working sets on a slot assigned above its
+   *  week's RIR. Kept in the counts above (§9.1) — and NOT a subset of
+   *  `logged_hard_sets`, which bakes the separate RIR ≤ 4 stimulus rule. */
+  logged_backed_off_sets: number;
 }
 
 export type VExercisePrsRow = {
@@ -647,6 +655,10 @@ export type VMesoSummaryRow = {
   n_pump: number;
   n_overall_fatigue: number;
   n_performance: number;
+  /** doc 21 §6.2: working sets logged on a slot assigned above its week's RIR.
+   *  Excluded from `best_e1rm`, kept in volume/adherence — the comparability
+   *  disclosure for cross-block reads. */
+  backed_off_sets: number;
 }
 
 export type VMacroSummaryRow = {
@@ -678,8 +690,13 @@ export type VExerciseOverviewRow = {
   volume_pr: number | null;
   volume_pr_weight: number | null;
   volume_pr_reps: number | null;
+  /** doc 21 §6.2: excludes backed-off sets (and §6.1 non-measuring ones);
+   *  the weight/volume PRs above keep every working set — they are
+   *  observations, not strength estimates. */
   best_e1rm: number | null;
   best_session_volume: number | null;
+  /** lifetime working sets excluded from `best_e1rm` as backed off (§6.2) */
+  backed_off_sets: number;
 }
 
 /** doc 15 §2.2 (N34): per-user link to an external data provider. Status and

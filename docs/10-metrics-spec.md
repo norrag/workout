@@ -405,6 +405,23 @@ Params: `macro_target.<goal>` rate tables, `macro_target.sex_factor`, `macro_tar
   present the fallback as something the athlete told us: exercise history carries `rir_source`
   (`reported` / `assumed` / `mixed`) and marks an assumed value `~`, and the MCP history payload
   says the same. An assumed RIR is a *plan fact*, not an observation.
+- **Backed-off sessions are excluded from strength, kept in volume** (doc 21 §6.2,
+  2026-08-04). A slot assigned a target RIR *above* its week's ran deliberately easier, so it is
+  set aside from every strength surface — the e1RM trend, `best_e1rm`, and the PR views — the same
+  way deload sessions already are (T-A2). The key is the **plan's intent**
+  (`workout_exercises.target_rir > microcycles.target_rir`), never measured confidence: confidence
+  degrades with effective reps too, so excluding on it would silently drop honest high-rep work.
+  Those sets **stay** in volume / MEV-MAV-MRV / adherence with a disclosure count — the work
+  consumed recovery budget — and every rollup that hides one says so in a sentence. A lower
+  estimate inside a prescribed back-off is compliance, not regression, and no surface may present
+  it as the latter. *(A slot run **harder** than its week is fully comparable and keeps every
+  claim it earns.)*
+  - **Open interaction, flagged not decided:** `logged_hard_sets` (§2's stimulus rule, RIR ≤ 4 or
+    unreported) is a *different* filter, so a back-off reported past RIR 4 leaves the hard-set
+    count while remaining in the disclosure. The "unreported counts, benefit of the doubt" clause
+    that softened this now rarely applies — doc 21 Phase 1 gave `rir_reported` a write surface, so
+    it is usually written. Whether a deep back-off should read as under-dosed volume is §2's call
+    to make, not doc 21's.
 
 ### 9.1 The 2026-08-02 e1RM re-levelling (one-time, N71)
 

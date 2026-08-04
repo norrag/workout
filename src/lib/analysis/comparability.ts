@@ -20,7 +20,12 @@
  * is presented as a band not new precision, cross-phase reads are caveated.
  */
 
-import { estimateE1rm, type EngineParams, type E1rmConfidence } from "@/lib/engine";
+import {
+  estimateE1rm,
+  isMeasuringRir,
+  type EngineParams,
+  type E1rmConfidence,
+} from "@/lib/engine";
 
 // --- inputs ----------------------------------------------------------------
 
@@ -28,7 +33,10 @@ import { estimateE1rm, type EngineParams, type E1rmConfidence } from "@/lib/engi
 export interface SessionSet {
   weight: number;
   reps: number;
-  /** reported reps-in-reserve, or null (unknown ⇒ low confidence) */
+  /** the ASSUMED reps-in-reserve (doc 21 §2: `rir_reported ?? the slot's
+   *  prescribed target_rir`), or null when neither exists. Callers resolve it
+   *  once — the same rule the stamp and the anchor use — so this series can
+   *  never read an unreported set as taken to failure (that was N71). */
   rir: number | null;
 }
 
@@ -45,6 +53,10 @@ export interface ExerciseSession {
   goal_type: string;
   /** the microcycle's prescribed target RIR for matched-intent comparison */
   target_rir: number | null;
+  /** doc 21 §6.2: the slot was assigned an RIR above the week's, so this
+   *  session is deliberately easier work — reported, but set aside from every
+   *  trend/phase/matched comparison rather than read as a decline. */
+  backed_off: boolean;
   e1rm: number | null;
   confidence: E1rmConfidence | null;
   top_weight: number | null;
@@ -107,6 +119,10 @@ export function pickSessionE1rm(
   top_rir: number | null;
 } | null {
   const ests = sets
+    // doc 21 §6.1: past the measuring band the number is assumption, not
+    // observation — the stamp writes null there, and this read-side estimate
+    // has to agree or the two paths would disagree about what was measured
+    .filter((s) => isMeasuringRir(s.rir, params.e1rm))
     .map((s) => ({ s, est: estimateE1rm(s.weight, s.reps, s.rir, params) }))
     .filter((x): x is { s: SessionSet; est: NonNullable<typeof x.est> } => x.est != null);
   if (ests.length === 0) return null;
