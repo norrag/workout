@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   describeError,
+  isSchemaDriftError,
   reportError,
   reportEvent,
 } from "@/lib/observability/report";
@@ -26,6 +27,38 @@ describe("describeError", () => {
     expect(describeError("oops").message).toBe("oops");
     expect(describeError(7).name).toBe("NonError");
     expect(describeError({ weird: true }).message).toBe('{"weird":true}');
+  });
+});
+
+describe("isSchemaDriftError", () => {
+  // the exact PostgrestError the app raised for two days in Aug 2026
+  it("detects the undefined-column error by code", () => {
+    expect(
+      isSchemaDriftError({
+        code: "42703",
+        message: "column meso_exercises.rep_position does not exist",
+      }),
+    ).toBe(true);
+  });
+
+  it("detects undefined table and undefined function", () => {
+    expect(isSchemaDriftError({ code: "42P01", message: "relation x does not exist" })).toBe(true);
+    expect(isSchemaDriftError({ code: "42883", message: "function y does not exist" })).toBe(true);
+  });
+
+  it("falls back to the message when the code was lost crossing a boundary", () => {
+    expect(
+      isSchemaDriftError(new Error("column meso_exercises.rep_position does not exist")),
+    ).toBe(true);
+  });
+
+  it("does not claim ordinary failures", () => {
+    expect(isSchemaDriftError(new Error("fetch failed"))).toBe(false);
+    expect(isSchemaDriftError({ code: "42501", message: "permission denied" })).toBe(false);
+    // a genuinely absent row is not schema drift
+    expect(isSchemaDriftError({ code: "PGRST116", message: "no rows returned" })).toBe(false);
+    expect(isSchemaDriftError(null)).toBe(false);
+    expect(isSchemaDriftError("boom")).toBe(false);
   });
 });
 
@@ -97,6 +130,34 @@ describe("reportEvent / reportError", () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 429 }));
     await reportEvent({ scope: "s", name: "E", message: "m" });
     expect(consoleSpy).toHaveBeenCalledWith("[report] sentry ingest responded 429");
+  });
+
+  // N74: the scope prefix is what makes a self-inflicted outage greppable
+  // instead of looking like one more flaky-infrastructure line
+  it("re-scopes schema drift and flags it in context", async () => {
+    vi.stubEnv("SENTRY_DSN", "");
+    await reportError(
+      "actions:advance-week:complete",
+      { code: "42703", message: "column meso_exercises.rep_position does not exist" },
+      { workoutId: "w1" },
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[report:schema-drift:actions:advance-week:complete] 42703: column meso_exercises.rep_position does not exist",
+      expect.objectContaining({ workoutId: "w1", schema_drift: true }),
+      expect.any(String),
+    );
+  });
+
+  it("leaves an ordinary error's scope and context untouched", async () => {
+    vi.stubEnv("SENTRY_DSN", "");
+    await reportError("actions:advance-week:complete", new Error("timeout"), {
+      workoutId: "w1",
+    });
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[report:actions:advance-week:complete] Error: timeout",
+      { workoutId: "w1" },
+      expect.any(String),
+    );
   });
 
   it("treats a malformed DSN as console-only", async () => {

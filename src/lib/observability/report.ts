@@ -103,18 +103,66 @@ export async function reportEvent(input: ReportEventInput): Promise<void> {
   }
 }
 
-/** Report a caught error with a scope + optional structured context. */
+/**
+ * Postgres error codes that mean "the deployed code and the database schema
+ * disagree" — the object the query names is not there:
+ *
+ *   42703 undefined_column · 42P01 undefined_table · 42883 undefined_function
+ *
+ * These are categorically different from the transient failures the
+ * degrade-gracefully catches are designed for (a dropped connection, a timeout,
+ * a raced write). A retry never fixes one; every call fails identically until a
+ * human applies a migration. Left in the general error stream they read as
+ * ordinary noise — which is exactly what happened on 2026-08-02, when a missing
+ * `meso_exercises.rep_position` took out next-week generation for two days
+ * behind a calm "next week's targets generate when the engine runs".
+ */
+const SCHEMA_DRIFT_CODES = new Set(["42703", "42P01", "42883"]);
+
+/** Pure: does this look like deployed code running against a stale schema?
+ *  Reads the `code` PostgrestError/pg carry; falls back to the message text for
+ *  errors that lost their code crossing a boundary. Exported for unit tests. */
+export function isSchemaDriftError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  if (typeof code === "string" && SCHEMA_DRIFT_CODES.has(code)) return true;
+  const message = (error as { message?: unknown }).message;
+  return (
+    typeof message === "string" &&
+    /does not exist|undefined (column|table|function)/i.test(message) &&
+    /column|table|relation|function/i.test(message)
+  );
+}
+
+/**
+ * Report a caught error with a scope + optional structured context.
+ *
+ * Schema drift is re-scoped to `schema-drift:<scope>` and flagged in context
+ * (N74). Every call site that reaches here is a deliberate degrade-gracefully
+ * catch, so the user sees a friendly fallback either way — the scope prefix is
+ * what makes a total, self-inflicted outage greppable in the Vercel function
+ * logs and distinct in Sentry, instead of one more line that looks like flaky
+ * infrastructure.
+ */
 export async function reportError(
   scope: string,
   error: unknown,
   context?: Record<string, unknown>,
 ): Promise<void> {
   const shape = describeError(error);
+  const drift = isSchemaDriftError(error);
   await reportEvent({
-    scope,
+    scope: drift ? `schema-drift:${scope}` : scope,
     name: shape.name,
     message: shape.message,
     stack: shape.stack,
-    context: context ?? null,
+    context: drift
+      ? {
+          ...(context ?? {}),
+          schema_drift: true,
+          remediation:
+            "deployed code references a database object that does not exist — check for an unapplied migration (`npm run db:check`)",
+        }
+      : (context ?? null),
   });
 }

@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { endWorkoutStatus, isRemainingWorkout } from "@/lib/logging/end";
+import {
+  endWorkoutStatus,
+  isRemainingWorkout,
+  isWeekLocked,
+} from "@/lib/logging/end";
 import type {
   Database,
   ExerciseFeedbackRow,
@@ -514,7 +518,7 @@ export async function logSet(
   const { data: weData, error: weError } = await supabase
     .from("workout_exercises")
     .select(
-      "id, workout_id, exercise_id, workout:workouts(id, microcycle_id, status, microcycle:microcycles(id, mesocycle_id, mesocycle:mesocycles(id, macrocycle_id)))",
+      "id, workout_id, exercise_id, workout:workouts(id, microcycle_id, status, microcycle:microcycles(id, mesocycle_id, status, week_number, mesocycle:mesocycles(id, macrocycle_id)))",
     )
     .eq("id", input.workout_exercise_id)
     .single();
@@ -530,6 +534,8 @@ export async function logSet(
       microcycle: {
         id: string;
         mesocycle_id: string;
+        status: MicrocycleRow["status"];
+        week_number: number;
         mesocycle: { id: string; macrocycle_id: string | null };
       };
     } | null;
@@ -541,6 +547,20 @@ export async function logSet(
   // is gone (or RLS-hidden) — same failure the old serial .single()s threw on
   if (!workout || !micro || !meso)
     throw new Error("logSet: workout chain not found for workout_exercise");
+
+  // N74 week-boundary gate. Completing a day of week N materializes its
+  // week-N+1 counterpart immediately, so that day is reachable (and was
+  // loggable) from the cycles grid while week N is still open. Training into it
+  // would progress the engine off a partially-complete week — its
+  // autoregulation reads whole-week feedback and weekly set volume. The week
+  // becomes loggable the moment its predecessor closes, which is exactly when
+  // the advance job flips it to `active`. The day view already renders this
+  // read-only; this is the guarantee behind that (a stale client, a queued op
+  // from before the week closed, or a direct call all land here).
+  if (isWeekLocked(micro.status))
+    throw new Error(
+      `Week ${micro.week_number} hasn't started yet — finish or skip the rest of week ${micro.week_number - 1} first.`,
+    );
 
   // R3: upsert on (workout_exercise_id, set_number) — a retried/double-tapped
   // log converges onto ONE row (the newest values win) instead of inserting a
@@ -1550,6 +1570,96 @@ export async function completeWorkout(
       .eq("id", workout.microcycle_id);
     if (error) throw error;
   }
+}
+
+/**
+ * Skip a whole planned day (N74) — the missing way to close a week.
+ *
+ * Until this existed, the only way to close a workout was to complete it, and
+ * the only way to close a WEEK was to close every one of its days. A day the
+ * user simply decided not to train had no terminal state reachable from the
+ * UI: "End workout" completes rather than skips, and it requires opening the
+ * day. So a single dropped session left the week un-closable, the next week
+ * un-generatable, and the Workout tab stuck — the same dead end an unapplied
+ * migration produced in Aug 2026, reachable by ordinary use.
+ *
+ * Deliberately refuses a day with logged sets. That day is a *completed* one
+ * (hard rule #5 — logged history is never discarded), and `completeWorkout` is
+ * the correct path for it; silently skipping it would drop real work out of
+ * every weekly rollup. The caller surfaces the refusal.
+ *
+ * Idempotent: an already-closed day returns `false` rather than throwing, so a
+ * double tap or a retried request converges.
+ */
+export async function skipWorkout(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+): Promise<{ skipped: boolean; error: string | null }> {
+  const { data: workout, error: workoutError } = await supabase
+    .from("workouts")
+    .select("id, status, microcycle_id")
+    .eq("id", workoutId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (workoutError) throw workoutError;
+  if (!workout) return { skipped: false, error: "Workout not found." };
+  if (!isRemainingWorkout(workout.status))
+    return { skipped: false, error: null }; // already closed — converge quietly
+
+  const { data: wes, error: weError } = await supabase
+    .from("workout_exercises")
+    .select("id")
+    .eq("workout_id", workoutId);
+  if (weError) throw weError;
+  const weIds = (wes ?? []).map((w) => w.id);
+
+  if (weIds.length > 0) {
+    const { count, error: setsError } = await supabase
+      .from("logged_sets")
+      .select("*", { count: "exact", head: true })
+      .in("workout_exercise_id", weIds);
+    if (setsError) throw setsError;
+    if ((count ?? 0) > 0)
+      return {
+        skipped: false,
+        error:
+          "This day has logged sets — end it instead, so the work you did is kept.",
+      };
+
+    const { error } = await supabase
+      .from("workout_exercises")
+      .update({ status: "skipped" })
+      .in("id", weIds);
+    if (error) throw error;
+  }
+
+  const { error: updError } = await supabase
+    .from("workouts")
+    .update({ status: "skipped", performed_at: new Date().toISOString() })
+    .eq("id", workoutId)
+    .eq("user_id", userId);
+  if (updError) throw updError;
+
+  // same week-close bookkeeping as completeWorkout: the advance job (run by the
+  // caller) is what activates week N+1 off the closed week
+  const { data: siblings, error: siblingError } = await supabase
+    .from("workouts")
+    .select("status")
+    .eq("microcycle_id", workout.microcycle_id);
+  if (siblingError) throw siblingError;
+  const allDone = (siblings ?? []).every(
+    (w) => w.status === "completed" || w.status === "skipped",
+  );
+  if (allDone) {
+    const { error } = await supabase
+      .from("microcycles")
+      .update({ status: "completed" })
+      .eq("id", workout.microcycle_id);
+    if (error) throw error;
+  }
+
+  return { skipped: true, error: null };
 }
 
 // ---------------------------------------------------------------------------

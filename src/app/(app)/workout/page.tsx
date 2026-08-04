@@ -13,6 +13,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { VolumeView } from "@/components/stats/MesoStatsViews";
 import { InlineTerm } from "@/components/ui/InlineTerm";
 import { DayView } from "../log/[workoutId]/DayView";
+import { StalledWeek } from "./StalledWeek";
 
 /**
  * Workout tab (08 §2): the latest uncompleted workout IS the tab (fig 1.1).
@@ -114,11 +115,12 @@ export default async function WorkoutPage() {
         <h1 className="title-display text-4xl">workout</h1>
       </div>
 
+      {/* N74: an ACTIVE meso with no next workout is never a normal resting
+          state — the advance job activates week N+1 as the last day of week N
+          closes, and the final week completes the meso. Reaching here means
+          generation failed, so say so and give the user a way out. */}
       {state.mesocycle && !state.nextWorkout && (
-        <p className="mt-5 text-sm text-ink/60">
-          Every workout this week is logged. Next week&apos;s targets generate
-          when the engine runs.
-        </p>
+        <StalledWeek mesoId={state.mesocycle.id} />
       )}
 
       {restingStats && restingSummary && (
