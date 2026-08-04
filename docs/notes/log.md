@@ -4,6 +4,62 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-04 — Session 98: production schema drift (N74) — and the ordering model it was blamed on
+
+Reported as an out-of-order-workouts bug. It wasn't one. Two users were stuck
+behind an unapplied migration, and the app's own safety nets are what made it
+look like normal operation.
+
+- **Root cause: `20260802000004_slot_rep_position.sql` was never applied to
+  hosted.** PR #221 merged code reading `meso_exercises.rep_position` on
+  2026-08-02 22:15 UTC. `getSlotEffortRows` names that column in its `select`
+  *and* its `.or()` filter, so every call raised 42703 — taking out
+  `advanceWeekAfterWorkout`, `reconcilePrescriptions`, `catchUpProgression` and
+  the MCP plan surfaces. Postgres logs carried ~60 of the error in 24h.
+- **Out-of-order was exonerated.** Progression is day-slot keyed: W(N+1)·D
+  advances from W(N)·D, each completed day generates its own counterpart
+  independently, and the week-close branch only asks whether every day is
+  closed. Parrish's D3→D1→D2 week would have generated fine on 2026-08-01. The
+  DayView navigator and the cycles grid already treat any day of the active
+  week as reachable, so this was a *supported* interaction all along.
+- **Migration applied to hosted** via MCP (`20260804143526 / slot_rep_position`),
+  column + CHECK verified, and the exact failing query shape re-run clean.
+  Parrish and Sara self-heal on next app open — `catchUpMesoGeneration` finds
+  three closed days with no counterpart and fills them.
+- **Why nobody noticed for two days.** All four call sites are deliberate
+  degrade-gracefully catches (R20). They reported to console/Sentry — but
+  `SENTRY_DSN` is still an unset manual op, and the *user-facing* copy said
+  "Next week's targets generate when the engine runs." The engine had run three
+  times and thrown each time.
+- **The guard that was missing.** Every CI job applies migrations to a fresh
+  local stack, so all of them prove only that the repo is self-consistent; none
+  can see hosted. `npm run db:check` + a `migration-drift` CI job now compare
+  the two. It compares **name stems**, not versions: the hosted `version` is
+  assigned at apply time (repo `20260802000004…` landed as `20260804143526`)
+  and the `name` column is recorded inconsistently across the project's history
+  (`20260702000005_write_integrity` vs `slot_rep_position`). The two
+  pre-tracking migrations (`initial_schema`, `design_pivot` — verified live by
+  object existence, earliest tracked version is `20260613004448`) are
+  baselined, because a check that always reports two known-good failures is one
+  people learn to scroll past.
+- **Schema drift now names itself.** 42703/42P01/42883 re-scope to
+  `schema-drift:<scope>` with a `remediation` hint. A retry never fixes one, so
+  it should never have shared a channel with dropped connections.
+- **Two genuine product gaps the outage exposed**, both reachable without any
+  drift: an active meso with no next workout had *no* recourse in the UI (now a
+  stalled-week panel with a retry), and an untrained day had no terminal state
+  at all (now `skipWorkout` — "End workout" *completes*, which is wrong for a
+  day you never trained, and it made a single dropped session enough to leave a
+  week un-closable and the next week ungeneratable).
+- **Week boundary closed.** Completing W(N)·D materializes W(N+1)·D
+  immediately, and the cycles grid deep-linked it as *loggable*. It is now
+  fully viewable but not loggable until its week activates — the engine prices
+  a week off the whole of the week before it. Owner confirmed the model: free
+  within a week, gated at the boundary.
+- **Rule-8 note:** no mockup figure covers either new state (fig 1.1 has no
+  failure variant, and there is no skip-day sheet). Both are built from the 08
+  §5 vocabulary and recorded in `docs/PROGRESS.md`.
+
 ## 2026-08-02 — Session 97: doc 21 Phase 4 built — the set lever bites, and the rep-position knob (N70)
 
 The second and third levers on a slot. Phase 3 made the assignment writable;

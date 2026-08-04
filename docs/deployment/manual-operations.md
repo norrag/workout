@@ -93,6 +93,34 @@ required** (next section).
 > policies and indexes. No hosted action was needed (its version row already
 > exists there).
 
+### Migration drift guard — set the CI secrets (N74)
+
+The `migration-drift` CI job (`npm run db:check`) compares
+`supabase/migrations/` against the hosted `supabase_migrations.schema_migrations`
+table. Until both secrets below are set it **prints a warning and passes**, so
+it is currently a no-op — setting them is what turns it into a real gate.
+
+Why it exists: every other CI job applies migrations to a throwaway local stack,
+so all of them prove only that the repo is self-consistent. None can see that
+production is missing one. On 2026-08-02 PR #221 merged code reading
+`meso_exercises.rep_position` while `20260802000004_slot_rep_position.sql` was
+never applied to hosted; next-week generation, the freshness reconcile and the
+MCP plan surfaces raised 42703 for two days across four users, and the app's
+degrade-gracefully catches rendered it as normal operation.
+
+| Operation | Where | Notes |
+|---|---|---|
+| Set **`SUPABASE_ACCESS_TOKEN`** | GitHub → repo Settings → Secrets and variables → Actions | A Supabase **personal access token** (Supabase dashboard → Account → Access Tokens). Read-only use: the script issues one `select name from supabase_migrations.schema_migrations`. |
+| Set **`SUPABASE_PROJECT_REF`** | Same | `juqvbiymmdcggctdqoiq`. |
+
+Run it locally the same way: `SUPABASE_ACCESS_TOKEN=… SUPABASE_PROJECT_REF=… npm run db:check`.
+
+**When it reports drift:** apply the listed migrations to hosted (Supabase MCP
+`apply_migration`, `supabase db push`, or the dashboard SQL editor) — then
+re-run. Note that the hosted `version` is assigned at apply time and will not
+match the repo filename's timestamp; the guard compares name stems, so that is
+expected and not itself drift.
+
 ### Make the CI jobs required status checks (GitHub repo settings)
 
 CI is only a guardrail if red blocks the merge — PRs #92/#93 merged over a

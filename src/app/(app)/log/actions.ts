@@ -37,6 +37,7 @@ import {
   saveWorkoutFeedback,
   setSetSkipped,
   skipRemainingSets,
+  skipWorkout,
   unlogSet,
 } from "@/lib/queries/logging";
 import {
@@ -891,6 +892,59 @@ export async function endWorkoutAction(input: {
   revalidatePath("/workout");
   revalidatePath(`/log/${parsed.workout_id}`);
   return result;
+}
+
+const skipWorkoutSchema = z.object({ workout_id: z.string().uuid() });
+
+export interface SkipDayResult {
+  ok: boolean;
+  error: string | null;
+  nextWorkoutId: string | null;
+}
+
+/**
+ * Skip day = close an untrained day as `skipped`, then advance the week (N74).
+ *
+ * The counterpart to "End workout", for the case that had no terminal state:
+ * a day the user decided not to train at all. Without it a single dropped
+ * session left the week un-closable and the next week un-generatable — the
+ * out-of-order/partial-week dead end. Refuses when the day has logged sets
+ * (that day should be *completed*, hard rule #5); the refusal is surfaced
+ * rather than thrown so the sheet can explain it.
+ */
+export async function skipWorkoutAction(input: {
+  workout_id: string;
+}): Promise<SkipDayResult> {
+  const parsed = skipWorkoutSchema.parse(input);
+  const { supabase, user } = await requireUser();
+
+  const { skipped, error } = await skipWorkout(
+    supabase,
+    user.id,
+    parsed.workout_id,
+  );
+  if (error) return { ok: false, error, nextWorkoutId: null };
+
+  // the advance is what lets the now-closed week roll into the next one. Same
+  // degrade-loudly contract as the completion path (R20): a failure must not
+  // lose the skip, and the Workout tab's catch-up (or its retry) picks it up.
+  let nextWorkoutId: string | null = null;
+  try {
+    const result = await advanceWeekAfterWorkout(
+      createServiceClient(),
+      user.id,
+      parsed.workout_id,
+    );
+    nextWorkoutId = result.nextWorkoutId;
+  } catch (advanceError) {
+    await reportError("actions:advance-week:skip", advanceError, {
+      workoutId: parsed.workout_id,
+    });
+  }
+
+  revalidatePath("/workout");
+  revalidatePath(`/log/${parsed.workout_id}`);
+  return { ok: skipped, error: null, nextWorkoutId };
 }
 
 const endMesoSchema = z.object({
