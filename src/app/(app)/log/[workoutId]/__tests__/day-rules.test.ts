@@ -469,17 +469,21 @@ describe("reportedRirFromInput", () => {
 });
 
 // ---------------------------------------------------------------------------
-// doc 21 Phase 6 — the pre-fill stops short of the unreportable (§9.4)
+// doc 21 Phase 6 (revised 2026-08-05) — the pre-fill shows the real number,
+// unbounded; the input parser is the one place that stays honest about range
 // ---------------------------------------------------------------------------
 
 describe("captureRirDefault past the reportable range", () => {
-  it("pre-fills nothing when the prescription is above 10", () => {
+  it("still pre-fills the real number when the prescription is above 10", () => {
     // §4.3 made the ASK unbounded (0–30) while `rir_reported` stayed 0–10.
-    // Pre-filling 21 would print a number into a box labelled RIR and ask the
-    // athlete to confirm something they cannot mean.
+    // An earlier cut blanked the cell here; reconsidered — showing nothing
+    // trades a real number for no information, and it was never at risk of
+    // being silently mis-saved: `reportedRirFromInput` already discards
+    // anything outside 0–10 regardless of what the box displays. The caller
+    // mutes it (it's an assumption, not a report), it does not hide it.
     expect(
       captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 21 }),
-    ).toBeNull();
+    ).toBe(21);
     expect(isReportableRir(21)).toBe(false);
   });
 
@@ -499,8 +503,16 @@ describe("captureRirDefault past the reportable range", () => {
     expect(reportedRirFromInput("8")).toBe(8);
   });
 
-  it("an untouched empty cell reports nothing, which resolves to the prescription", () => {
+  it("the untouched out-of-range pre-fill never actually submits — the parser is the boundary, not the display", () => {
+    // this is what makes it safe to show 21 verbatim: whether the box reads
+    // "" or "21", leaving it alone reports null either way, which resolves
+    // server-side through `assumedRir` back to the same prescription
+    const prefill = captureRirDefault({
+      loggedRir: null,
+      pendingRir: null,
+      targetRir: 21,
+    });
+    expect(reportedRirFromInput(String(prefill))).toBeNull();
     expect(reportedRirFromInput("")).toBeNull();
-    expect(reportedRirFromInput("21")).toBeNull();
   });
 });

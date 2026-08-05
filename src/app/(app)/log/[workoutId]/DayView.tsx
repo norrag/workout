@@ -64,7 +64,6 @@ import type { PendingSet } from "@/lib/logging/queue";
 import {
   adoptServerRowState,
   captureRirDefault,
-  isReportableRir,
   daySetTotals,
   exerciseDone,
   impliedPrescriptionE1rm,
@@ -1693,10 +1692,15 @@ function SetRow({
   // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
   const [weight, setWeight] = useState(formatWeight(initialWeight));
   const [reps, setReps] = useState(String(initialReps));
-  const [rir, setRir] = useState(initialRir == null ? "" : String(initialRir));
+  const [rir, setRir] = useState(String(initialRir));
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
   const repsManual = useRef(false);
+  // has the athlete typed into THIS field this session? Distinct from
+  // `reportedRirOnRow` (a server-confirmed report) so a value they just typed
+  // reads at full strength immediately, before it's saved — only the untouched
+  // pre-fill (the assumption) reads muted.
+  const [rirTouched, setRirTouched] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   // per-row transition so the revalidation applies as a non-blocking background
   // update. The spinner is deliberately NOT the transition's pending flag (N12):
@@ -1759,9 +1763,10 @@ function SetRow({
       return;
     setWeight(formatWeight(initialWeight));
     setReps(String(initialReps));
-    setRir(initialRir == null ? "" : String(initialRir));
+    setRir(String(initialRir));
     edited.current = false;
     repsManual.current = false;
+    setRirTouched(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged?.id, logged?.weight, logged?.reps, logged?.rir_reported]);
 
@@ -2006,13 +2011,7 @@ function SetRow({
               (reportedRirOnRow != null ? "" : " text-ink/45")
             }
           >
-            {state === "logged"
-              ? rir
-              : /* doc 21 §9.4 — a prescription past the reportable range is
-                   not a number to confirm; the strip states the band instead */
-                isReportableRir(targetRir)
-                ? targetRir
-                : "—"}
+            {state === "logged" ? rir : targetRir}
           </div>
         </>
       ) : (
@@ -2086,21 +2085,32 @@ function SetRow({
               primitive as LB/REPS (09-changelog 2026-08-02), pre-filled with
               the prescribed target RIR so leaving it alone reports the
               prescription and only a CHANGED value carries new information.
-              The prescription is a suggestion: report what actually happened. */}
+              The prescription is a suggestion: report what actually happened.
+
+              Muted (doc 21 Phase 6, revised) whenever the number on screen is
+              still the ASSUMPTION rather than a report — untouched this
+              session AND no server-confirmed report on the row — even when
+              that assumption is past the 0–10 range a person can honestly
+              submit (§4.3's unbounded ask): showing nothing there traded a
+              real number for no information at all, and the submit-side
+              parser already turns anything unreportable into "no report"
+              regardless of what the box displays. The moment the athlete
+              types, it reads at full strength — it's their input now, whether
+              or not it will end up validating. */}
           <input
             type="text"
             inputMode="numeric"
             aria-label={`set ${setNumber} RIR`}
             value={rir}
-            /* empty only when the prescription is past the reportable range
-               (doc 21 §9.4) — the athlete may still report if they can */
-            placeholder="—"
             onChange={(e) => {
               setRir(e.target.value);
               edited.current = true;
+              setRirTouched(true);
             }}
             onBlur={() => state === "logged" && save()}
-            className={cell}
+            className={`${cell}${
+              !rirTouched && reportedRirOnRow == null ? " text-ink/45" : ""
+            }`}
           />
         </>
       )}

@@ -42,6 +42,35 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-05 — RIR capture cell shows the real number again (fig 1.1, corrects 2026-08-04 session 2, doc 21 §2, N70)
+
+- **Change.** The `RIR` capture cell's 2026-08-04 amendment (below) is
+  **reverted**: when the prescribed target RIR is above 10, the cell no longer
+  pre-fills empty with a `—` placeholder. It shows the **real prescribed
+  number, unbounded** (e.g. `21`), same as every value below 10 always has. What
+  is new is the **muting**: the number reads at `ink/45` — the grid's existing
+  convention for "this is the plan's assumption, not something you reported" —
+  for as long as the cell is untouched **this session** and the row carries no
+  server-confirmed report; the instant the athlete types, or once a real report
+  lands, it reads at full strength. A logged row with no reported RIR (or a
+  future/skipped/locked static row) uses the exact same muting rule it already
+  did.
+- **Rationale (owner review).** A blank cell tells the athlete nothing. The
+  2026-08-04 change reasoned by analogy to §9.4's qualitative band (the ask
+  sentence, the planner meta) — but those are narrative prose, where printing
+  "kept well short of failure" instead of "21 RIR" avoids asking the reader to
+  internalize a strange number. This cell is a plain numeric readout; the
+  strange-number problem doesn't apply to it the same way, and the safety
+  concern that motivated blanking it doesn't apply at all: `reportedRirFromInput`
+  already turns anything outside 0–10 into "no report", **whatever the box
+  displays** — so showing `21` was never at risk of writing an illegal
+  `rir_reported`. Muting communicates "not a confirmed report" without
+  discarding the information a `—` did.
+- **Affected figures.** 1.1 (set grid), same shared row component as 1.2/1.3.
+- **Impact.** `RETROFIT` — `DayView.tsx` (the capture cell's fill + muting) and
+  `day-rules.ts::captureRirDefault` (now returns `number`, not
+  `number | null`).
+
 ## 2026-08-04 (session 2) — An effort assignment reads on the plan and prices in words, not a number nobody can estimate (figs 1.1 / 1.2 / 2.5b, doc 21 §8/§9.4, N70)
 
 The Phase-6 pass for exercise-level RIR. Four elements, none of which exists in
@@ -78,15 +107,17 @@ the mockup; every one built from a primitive the app already ships.
   strip-only band line says why: *"Well short of failure by design — this one is
   priced light, so it is not read as a strength measurement."*
 - **Change (fig 1.1, the `RIR` capture cell — amends the 2026-08-02 pre-fill
-  rule).** When the prescribed target RIR is **above 10** (the range
-  `logged_sets.rir_reported` accepts, and the range a human can estimate at all),
-  the cell pre-fills **empty** with a `—` placeholder instead of the prescribed
-  number, and stays editable 0–10. An untouched cell still reports nothing and
-  still resolves to the prescription server-side, so the default stays a no-op;
-  what changes is that the app stops printing "21" in a box labelled RIR and
-  asking the athlete to confirm it. A real report *is* still accepted there, and
-  a set reported at 8 becomes a measurement again — the band and the capture
-  control compose rather than fight.
+  rule; itself superseded by 2026-08-05, above).** When the prescribed target
+  RIR is **above 10** (the range `logged_sets.rir_reported` accepts, and the
+  range a human can estimate at all), the cell pre-fills **empty** with a `—`
+  placeholder instead of the prescribed number, and stays editable 0–10. An
+  untouched cell still reports nothing and still resolves to the prescription
+  server-side, so the default stays a no-op; what changes is that the app stops
+  printing "21" in a box labelled RIR and asking the athlete to confirm it. A
+  real report *is* still accepted there, and a set reported at 8 becomes a
+  measurement again — the band and the capture control compose rather than
+  fight. ~~Reverted 2026-08-05: the cell shows the real number again, muted
+  instead of blanked — see the entry above.~~
 - **Change (net-new sheet, fig 1.2 family — `Effort target`).** A bottom sheet off
   the Day View exercise `⋯` menu. It takes its **shape** from the Load-step sheet
   (doc 14 phase 3, `LoadStepSheet.tsx`) — title + tracked-caps subtitle, choice

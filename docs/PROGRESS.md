@@ -2,7 +2,52 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-04 (latest) — doc 21 Phase 6: the lever reaches the app — disclosure, editor, explanation (N70)
+## 2026-08-05 (latest) — doc 21 Phase 6 follow-up: two owner review rounds on the Effort target UI (N70)
+
+Two small correction passes on the Phase 6 UI, both owner review.
+
+**Round 1 — sheet styling and scope semantics.** The Effort-target sheet's
+choice controls had copied the Load-step sheet's `13px` bold, accent-filled
+chips, a scale and colour that don't match anything else in the app; restyled
+to the settings screens' `10px` tracked-caps contiguous blocks (fig 4.4 / the
+profile editor), keeping only the sheet's overall *shape* (title, subtitle,
+clear affordance, `Cancel`/`SAVE`) from Load step. The scope labels
+(`REST OF BLOCK` / `WHOLE BLOCK`) read as though the wider option might rewrite
+already-trained weeks; renamed and given a one-line reach statement each. Also
+fixed: an empty `CUSTOM` field was silently equivalent to "clear the
+assignment," so opening the sheet and tapping `CUSTOM` armed a delete —
+clearing is now only the explicit "use the week's ramp" choice.
+
+**Round 2 — accent for selection, an `RIR 0` cell, plainer copy.** Selected
+cells now fill `bg-accent` rather than the settings screens' ink — a selected
+cell is exactly what hard rule 7 reserves orange for, and the settings screens'
+own ink fill predates that reading. `TARGET RIR` gained an absolute `RIR 0`
+cell (taken to failure — the hardest ask the lever can make) ahead of the four
+easier-than-the-week steps. Scope labels became `THIS WEEK` / `WORKING WEEKS` /
+`ALL WEEKS`, naming the real distinction (deload coverage — a flat
+`meso_exercises.target_rir` reaches the deload by construction, a per-week
+schedule doesn't); the standing "weeks you've trained never change" sentence
+was removed from the sheet (the three enforcing layers stay documented in doc
+21 §10, not restated on every render). The reason placeholder became
+direction-neutral, since the lever raises effort as often as it lowers it.
+
+**Round 2 also reopened, then corrected, the capture-cell defect from Phase
+6's own build.** Phase 6 had blanked the per-set RIR capture cell (the logging
+grid, not the Effort-target sheet) whenever the prescribed RIR sat above the
+0–10 reportable range, reasoning by analogy to §9.4's qualitative band. On
+review: §9.4 is about *narrative* surfaces (the ask sentence, the planner
+meta) where a raw number reads strange; the capture cell is a plain numeric
+readout, and a blank cell traded a real number for no information at all — the
+cell was never at risk the way the ask/meta surfaces are, since
+`reportedRirFromInput` already turns anything outside 0–10 into "no report"
+regardless of what the box displays. `captureRirDefault` now returns the real
+prescribed value unconditionally (`number`, not `number | null`); the cell
+shows it **muted** (the grid's existing "assumption, not a report" convention)
+until the athlete types or a real report lands, then reads at full strength.
+
+Full suite green (1730), typecheck + lint + production build clean both rounds.
+
+## 2026-08-04 — doc 21 Phase 6: the lever reaches the app — disclosure, editor, explanation (N70)
 
 The last of the six phases. Phases 1–5 made exercise-level RIR real, correct,
 writable over MCP and honest in the stats; Phase 6 makes it **visible and

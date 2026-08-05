@@ -421,9 +421,19 @@ pass.* --  QUALIATITIVE BAND
 only**: past `max_measuring_rir` the ask reads "each kept well short of failure"
 and the planner meta reads `LIGHT`, while the Engine audit sheet still prints the
 tuple verbatim (`171 × 9 @ 21 RIR`) and nothing about pricing, the trace, or the
-stored numbers changes. The same rule reached the capture control, which was the
-part this confirmation had not anticipated: a prescribed RIR above 10 no longer
-pre-fills the per-set RIR cell (see Phase 6 "as built").
+stored numbers changes.
+
+**Revised 2026-08-05 (owner review).** The first cut also blanked the per-set RIR
+*capture cell* past `rir_reported`'s 0–10 range, reasoning by analogy to this
+confirmation. Reconsidered: this confirmation is about the **ask sentence and
+planner meta** — narrative surfaces where a raw number reads strange — not about
+a numeric input whose whole job is to display the plan's number. A blank cell
+traded a real number for no information, and the capture cell was never at risk
+the ask/meta surfaces are: `reportedRirFromInput` already turns anything outside
+0–10 into "no report" regardless of what the box shows. The capture cell now
+shows the real number unbounded, muted (the grid's existing "assumption, not a
+report" convention) until the athlete either types or a real report lands (see
+Phase 6 "as built").
 
 ## 10. Phases (one per PR, each green on its own)
 
@@ -769,7 +779,8 @@ their exclusivity); the ask states the band and never the number past it; the
 assignment leads the why and suppresses the ramp clause and the week frame; a
 deload week with an assignment; unassigned ⇒ narrative and facts byte-identical;
 the scoped overlay never drops another week; the capture pre-fill past the
-reportable range; the facts block's presence/absence and the trigger.
+reportable range shows the real number and the parser still discards it if
+untouched; the facts block's presence/absence and the trigger.
 
 *As built:*
 - **One display module, `src/lib/slot-effort-display.ts`**, pure and client-safe
@@ -794,16 +805,25 @@ reportable range; the facts block's presence/absence and the trigger.
   entirely, because a week's frame says nothing useful about a slot pulled off
   the ramp. On a deload week the assignment REPLACES the deload boilerplate
   rather than sitting under a sentence that contradicts it.
-- **The pre-fill amendment nobody had noticed was needed.** §4.3 made the ask
-  unbounded (0–30) while `rir_reported` stayed 0–10, so Phase 1's "pre-fill the
-  prescribed target" would have printed `21` into a box labelled RIR and asked
-  the athlete to confirm it. `captureRirDefault` now returns null past the
-  reportable range and the cell renders empty with a `—` placeholder — still a
-  no-op default (an empty cell reports nothing and the server's `assumedRir`
-  resolves to the same prescription), but the app stops asking for a number it
-  itself refuses to treat as a measurement. A **real** report is still accepted
-  there, and a deep back-off reported at 8 becomes a measurement again: the band
-  and the capture control compose rather than fight.
+- **The pre-fill amendment nobody had noticed was needed — and its own
+  amendment (owner review, 2026-08-05).** §4.3 made the ask unbounded (0–30)
+  while `rir_reported` stayed 0–10, so Phase 1's "pre-fill the prescribed
+  target" would print `21` into a box labelled RIR. The first cut blanked the
+  cell past the reportable range, by analogy to §9.4's qualitative band —
+  reconsidered on review: §9.4 is about narrative surfaces (the ask sentence,
+  the planner meta) where a raw number reads strange; this is a numeric input
+  whose job is to show the plan's number, and a blank cell traded that
+  information away for nothing, since `reportedRirFromInput` already turns
+  anything outside 0–10 into "no report" regardless of what the box displays
+  — the cell was never at risk the way the ask/meta surfaces were. `captureRirDefault`
+  now returns the real prescribed value unconditionally (`number`, no longer
+  `number | null`); the caller mutes it (`text-ink/45`, the grid's existing
+  "assumption, not a report" convention) whenever it's still untouched this
+  session AND no server-confirmed report exists on the row, and reads it at full
+  strength the instant the athlete types — their input, whether or not it will
+  end up validating. The default stays exactly a no-op either way, and a real
+  report at 8 still re-enters the measuring band: the band and the capture
+  control compose rather than fight.
 - **The app is the second write surface, and there is exactly ONE authoring
   policy.** `planEffortEdits` + `loadEffortContext` moved from the MCP tool into
   `queries/slot-effort.ts` (re-exported from `tools/edit.ts` so the tool's tests

@@ -4,6 +4,37 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-05 — Session 100: two owner review rounds on the Phase 6 Effort target UI (N70, PR #224)
+
+N70 is already closed (Phase 6, PR #224); this session is polish on that PR
+before merge, not a new backlog item — no row change.
+
+- **Round 1:** the Effort-target sheet's choice controls were restyled off the
+  settings screens (fig 4.4) instead of Load step's oversized accent chips;
+  scope labels/copy corrected so the wider scope doesn't read as reaching
+  already-trained weeks; fixed an empty `CUSTOM` field silently acting as
+  "clear."
+- **Round 2:** selection fill moved from ink to **accent** (hard rule 7 —
+  orange is for current position/selection, and a selected cell is exactly
+  that); added an absolute `RIR 0` cell; scope labels became
+  `THIS WEEK` / `WORKING WEEKS` / `ALL WEEKS`; removed the standing
+  never-changes-a-trained-week sentence from the sheet (the enforcement stays
+  in doc 21 §10 code, not restated in copy); reason placeholder made
+  direction-neutral.
+- **The real one:** round 2 also reopened and reversed a Phase 6 decision —
+  the per-set RIR capture cell (logging grid) blanked the number whenever the
+  prescription sat above the 0–10 reportable range, reasoning by analogy to
+  §9.4's qualitative band. Owner pushback: a blank cell gives no information,
+  and the cell was never at risk of mis-saving the way §9.4's narrative
+  surfaces were — `reportedRirFromInput` already discards anything outside
+  0–10 whatever the box shows. Reverted to showing the real number, muted
+  until confirmed (typed, or a server report lands). `captureRirDefault` is
+  `number` again, not `number | null`.
+- Docs: doc 21 §9.4/§10 both now carry the correction in place (superseded
+  bullets marked, not deleted); 09-design-changelog gets a new dated entry
+  rather than a rewrite of the 2026-08-04 one; PROGRESS gets a new top entry.
+  Full suite green (1730), typecheck/lint/build clean both rounds.
+
 ## 2026-08-04 — Session 99: doc 21 Phase 6 built — the lever reaches the app (N70)
 
 The last phase. Five phases made the lever real, correct, writable over MCP and
