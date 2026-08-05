@@ -417,6 +417,24 @@ detail view; or cap the *displayed* RIR while keeping the real one for pricing.
 asking the athlete to estimate something they can't. Settle in the Phase 6 design
 pass.* --  QUALIATITIVE BAND
 
+**SETTLED in Phase 6 (2026-08-04).** The qualitative band, as a **display rule
+only**: past `max_measuring_rir` the ask reads "each kept well short of failure"
+and the planner meta reads `LIGHT`, while the Engine audit sheet still prints the
+tuple verbatim (`171 × 9 @ 21 RIR`) and nothing about pricing, the trace, or the
+stored numbers changes.
+
+**Revised 2026-08-05 (owner review).** The first cut also blanked the per-set RIR
+*capture cell* past `rir_reported`'s 0–10 range, reasoning by analogy to this
+confirmation. Reconsidered: this confirmation is about the **ask sentence and
+planner meta** — narrative surfaces where a raw number reads strange — not about
+a numeric input whose whole job is to display the plan's number. A blank cell
+traded a real number for no information, and the capture cell was never at risk
+the ask/meta surfaces are: `reportedRirFromInput` already turns anything outside
+0–10 into "no report" regardless of what the box shows. The capture cell now
+shows the real number unbounded, muted (the grid's existing "assumption, not a
+report" convention) until the athlete either types or a real report lands (see
+Phase 6 "as built").
+
 ## 10. Phases (one per PR, each green on its own)
 
 **Phase 1 — one RIR premise (N71 + N38). ✅ SHIPPED 2026-08-02.** `assumedRir =
@@ -754,8 +772,113 @@ band applied to the read-side session series; MCP disclosure present-only.
 - *Deliberately not here:* the day-view/planner disclosure of an active
   assignment, the editor sheet, and the doc-19 explanation layering — Phase 6.
 
-**Phase 6 — UI + explanation.** 09-changelog design pass, planner/day-view
-disclosure, editor sheet, doc 19 layering.
+**Phase 6 — UI + explanation. ✅ SHIPPED 2026-08-04.** 09-changelog design pass,
+planner/day-view disclosure, editor sheet, doc 19 layering.
+*Tests:* the disclosure vocabulary (eyebrow, band, the three sentence forms and
+their exclusivity); the ask states the band and never the number past it; the
+assignment leads the why and suppresses the ramp clause and the week frame; a
+deload week with an assignment; unassigned ⇒ narrative and facts byte-identical;
+the scoped overlay never drops another week; the capture pre-fill past the
+reportable range shows the real number and the parser still discards it if
+untouched; the facts block's presence/absence and the trigger.
+
+*As built:*
+- **One display module, `src/lib/slot-effort-display.ts`**, pure and client-safe
+  beside `prescription-narrative.ts`: the eyebrow suffix, the §9.4 band phrase
+  and the disclosure sentences all compose from it, so the day view, the
+  planned-day page and the sheet cannot drift into three vocabularies for one
+  state. Its guard rail is `hasEffortDisclosure` — every entry point returns
+  nothing for an unassigned slot, which is where "an unassigned plan reads
+  exactly as it did before the lever existed" is actually enforced.
+- **§9.4 is settled as the qualitative band, and it is a DISPLAY rule only.**
+  Past `e1rm.max_measuring_rir` the ask says "each kept well short of failure"
+  and the planner meta says `LIGHT`; the Engine audit sheet still prints
+  `171 × 9 @ 21 RIR` verbatim and the trace is untouched. The assignment line
+  and the ask are composed from the same predicate, so they can never disagree
+  about what is being asked.
+- **The authored effort level leads the why, and that ordering is the whole
+  point.** `composeEffortLines` renders above every engine-authored line — a
+  person chose this effort, the engine only priced the load to meet it. Two
+  consequences fall out and are pinned by test: the delta line drops its
+  "an easier effort target" clause when an assignment (not the ramp) moved the
+  RIR, and the program-intent frame ("first week of the block") is suppressed
+  entirely, because a week's frame says nothing useful about a slot pulled off
+  the ramp. On a deload week the assignment REPLACES the deload boilerplate
+  rather than sitting under a sentence that contradicts it.
+- **The pre-fill amendment nobody had noticed was needed — and its own
+  amendment (owner review, 2026-08-05).** §4.3 made the ask unbounded (0–30)
+  while `rir_reported` stayed 0–10, so Phase 1's "pre-fill the prescribed
+  target" would print `21` into a box labelled RIR. The first cut blanked the
+  cell past the reportable range, by analogy to §9.4's qualitative band —
+  reconsidered on review: §9.4 is about narrative surfaces (the ask sentence,
+  the planner meta) where a raw number reads strange; this is a numeric input
+  whose job is to show the plan's number, and a blank cell traded that
+  information away for nothing, since `reportedRirFromInput` already turns
+  anything outside 0–10 into "no report" regardless of what the box displays
+  — the cell was never at risk the way the ask/meta surfaces were. `captureRirDefault`
+  now returns the real prescribed value unconditionally (`number`, no longer
+  `number | null`); the caller mutes it (`text-ink/45`, the grid's existing
+  "assumption, not a report" convention) whenever it's still untouched this
+  session AND no server-confirmed report exists on the row, and reads it at full
+  strength the instant the athlete types — their input, whether or not it will
+  end up validating. The default stays exactly a no-op either way, and a real
+  report at 8 still re-enters the measuring band: the band and the capture
+  control compose rather than fight.
+- **The app is the second write surface, and there is exactly ONE authoring
+  policy.** `planEffortEdits` + `loadEffortContext` moved from the MCP tool into
+  `queries/slot-effort.ts` (re-exported from `tools/edit.ts` so the tool's tests
+  keep addressing them where they were defined), and `setSlotEffortAction` runs
+  the same planner — same refusals, same §4.1 warnings, same already-trained-week
+  guard. `loadEffortContext` now takes the active params as an argument instead
+  of fetching them: `generation.ts` already imports `slot-effort.ts`, and a
+  cycle between the two for one read is not worth the fragility.
+- **The three scopes differ in ONE thing the labels have to carry: deload
+  coverage.** `THIS WEEK` and `WORKING WEEKS` write a per-week schedule;
+  `ALL WEEKS` writes the flat `target_rir`, and a flat value governs every week
+  the schedule doesn't, the deload included, by construction (§4.1). (The first
+  cut labelled these `REST OF BLOCK` / `WHOLE BLOCK`, which read as though the
+  wider one might rewrite weeks already trained — the owner caught it.)
+  **No scope reaches backwards**, and three independent layers make that true
+  rather than conventional: `planEffortEdits` refuses an op that *names* an
+  already-trained week (a flat value is allowed and warns which weeks it can no
+  longer change), `regenerateOpenWorkouts` skips completed microcycles outright
+  and skips any `in_progress` / `completed` / `skipped` workout inside a live
+  one, and hard rule #5 means no path rewrites a logged set. `WORKING WEEKS`
+  still writes **forward only**, which is indistinguishable in outcome from
+  rewriting weeks 1..n and keeps the stored plan free of edits that could not
+  have had an effect.
+- **A scoped edit OVERLAYS, it does not replace.** `planSlotEffortEdit`'s
+  `value` + `weeks` form rewrites the whole schedule, which is right for a coach
+  stating a complete intent and wrong for a sheet nudging one week — it would
+  silently drop an assignment already sitting on week 4. `overlaySlotRirSchedule`
+  resolves the slot's current per-week map first and writes over only the weeks
+  in scope. One honest consequence, asserted by test: overlaying a **flat**
+  assignment converts it to a schedule, so it stops covering the deload week.
+- **The sheet keeps its warnings on screen.** A save that produced a §4.1
+  warning (this week now runs harder than programmed; an all-weeks value also
+  governs the deload) holds the sheet open with the warning under a
+  `SAVED — NOTE` rule instead of closing over it. It also reads on a **completed**
+  session — a performed session's effort target is part of its record — and only
+  refuses to write. The set cap and the rep position **read** there and are not
+  editable (A4): a lever the sheet cannot change must still be visible where the
+  athlete looks for it.
+- **doc 19 layering: every number comes off the RECORDED decision.**
+  `effort_assignment` is projected from `inputs.exerciseRir` / `exerciseSetCap` /
+  `exerciseRepPosition` against `inputs.week.targetRir`, so the explanation
+  describes the assignment that priced *that* decision rather than whatever the
+  plan says today. Only the reason needs a lookup, and it is **dropped when one
+  exercise carries two different reasons in one meso** — the day-slot hop costs
+  two more queries for a case that barely exists, and attaching the wrong reason
+  to a coaching line is worse than attaching none (§5.1: absence is the strongest
+  gate). The prompt gains the rule that matters: an assigned effort level was
+  chosen by a person, so the model may not explain it as a program decision,
+  argue with it, or read a backed-off block as a decline. A new
+  `effort_assignment` trigger fires on existence alone — a deliberately loose
+  gate for a deliberately rare fact.
+- *Deliberately not here:* the planner **board** (`PlannerBoard.tsx`), which is a
+  staged-draft editing surface for plan STRUCTURE; the week-scoped planned-day
+  page is where a per-week assignment can be shown truthfully, and it is what
+  §8's "the assignment reads on the planner slot" asks for.
 
 **Out of scope, tracked as N72:** bounded exercise substitution and the
 `LOOKBACK_WEEKS = 2` return cliff — the one clause this lever cannot express.

@@ -3,6 +3,16 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMesoPlan } from "@/lib/queries/cycles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
+import {
+  getSlotEffortAssignments,
+  resolveSlotEffort,
+  slotEffortKey,
+} from "@/lib/queries/slot-effort";
+import { isMeasuringRir } from "@/lib/engine";
+import {
+  effortEyebrowSuffix,
+  effortRirLabel,
+} from "@/lib/slot-effort-display";
 
 const WEEKDAY_LABELS = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -55,6 +65,28 @@ export default async function PlannedDayPage({
     return Math.round(meso.rir_start + (meso.rir_end - meso.rir_start) * t);
   };
   const targetRir = micro?.target_rir ?? previewRir();
+
+  // doc 21 §8 — the planner slot discloses the effort assignment resolved for
+  // THIS week, so a planned week shows the intensity it will actually be priced
+  // at rather than the ramp value it has been superseded by. One filtered read
+  // that returns nothing for a meso with no assignments.
+  const assignments = await getSlotEffortAssignments(supabase, mesoId);
+  const slotEffortFor = (exerciseId: string) => {
+    const assignment = assignments.get(slotEffortKey(dayNumber, exerciseId));
+    if (!assignment) return null;
+    const resolved = resolveSlotEffort(assignment, weekNumber, targetRir);
+    if (
+      resolved.assignedRir == null &&
+      resolved.setCap == null &&
+      resolved.repPosition == null
+    )
+      return null;
+    return {
+      ...resolved,
+      isDeload,
+      measuring: isMeasuringRir(resolved.rir, engineParams.e1rm),
+    };
+  };
 
   const dayName = `${planDay.weekday ? WEEKDAY_LABELS[planDay.weekday] : `D${planDay.day_number}`}${planDay.label ? ` — ${planDay.label.toUpperCase()}` : ""}`;
   const totalSets = planDay.groups.reduce(
@@ -130,10 +162,23 @@ export default async function PlannedDayPage({
                   {group.muscle_group.toUpperCase()}
                 </div>
               </div>
-              <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/55">
-                <span className="numeral">{fill.initial_sets}</span> SETS ·{" "}
-                {targetRir} RIR
-              </div>
+              {(() => {
+                const effort = slotEffortFor(fill.exercise_id);
+                const sets =
+                  effort?.setCap != null
+                    ? Math.min(fill.initial_sets, effort.setCap)
+                    : fill.initial_sets;
+                return (
+                  <div className="text-right text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                    <span className="numeral">{sets}</span> SETS ·{" "}
+                    {effortRirLabel(
+                      effort?.rir ?? targetRir,
+                      effort?.measuring ?? true,
+                    )}
+                    {effortEyebrowSuffix(effort, 1)}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         {planDay.groups.every((g) => g.fills.length === 0) && (

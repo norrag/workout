@@ -705,3 +705,106 @@ describe("appendCoaching (doc 19 §3 — the v3 additive seam)", () => {
     expect(appendCoaching(cold, coaching, false)).toBe(cold);
   });
 });
+
+// ---------------------------------------------------------------------------
+// doc 21 Phase 6 — the authored effort level leads the why (§8)
+// ---------------------------------------------------------------------------
+
+const assigned = {
+  rir: 4,
+  assignedRir: 4,
+  weekRir: 1,
+  isDeload: false,
+  setCap: null,
+  repPosition: null,
+  reason: "nerve flare — easing the lumbar load",
+  backedOff: true,
+  measuring: true,
+};
+
+describe("doc 21 §8 — an effort assignment leads the why", () => {
+  it("puts the assignment and its reason above every engine-authored line", () => {
+    const n = composePrescriptionNarrative({ ...w2d4, effort: assigned });
+    expect(n.lines[0]).toMatch(/^This exercise is set to 4 reps short of failure/);
+    expect(n.lines[1]).toBe("Noted: nerve flare — easing the lumbar load.");
+    // the engine's own reasoning still renders — beneath it, never instead
+    expect(n.lines.some((l) => /weight/i.test(l))).toBe(true);
+  });
+
+  it("does not credit the RIR move to the ramp when a person assigned it", () => {
+    const delta = composeDelta({
+      weight: 250,
+      reps: 9,
+      sets: 3,
+      targetRir: 4,
+      previous: { weight: 250, reps: 9, sets: 3, targetRir: 1 },
+      effort: assigned,
+    });
+    expect(delta).not.toMatch(/easier effort target/);
+    // without the assignment the same numbers DO read as the ramp easing
+    expect(
+      composeDelta({
+        weight: 250,
+        reps: 9,
+        sets: 3,
+        targetRir: 4,
+        previous: { weight: 250, reps: 9, sets: 3, targetRir: 1 },
+      }),
+    ).toMatch(/easier effort target/);
+  });
+
+  it("drops the program-intent frame — the assignment is the frame now", () => {
+    const framed = { ...w2d4, targetRir: 0, weekNumber: 4, mesoWeeks: 5 };
+    expect(
+      composePrescriptionNarrative(framed).lines.some((l) =>
+        /peak week/i.test(l),
+      ),
+    ).toBe(true);
+    expect(
+      composePrescriptionNarrative({
+        ...framed,
+        effort: { ...assigned, assignedRir: 0, rir: 0, weekRir: 1, backedOff: false },
+      }).lines.some((l) => /peak week/i.test(l)),
+    ).toBe(false);
+  });
+
+  it("discloses an assignment on a DELOAD week instead of the deload boilerplate", () => {
+    const deload = { ...w2d4, isDeload: true, targetRir: 3 };
+    expect(composePrescriptionNarrative(deload).lines[0]).toMatch(/deload week/i);
+    const overridden = composePrescriptionNarrative({
+      ...deload,
+      effort: {
+        ...assigned,
+        assignedRir: 3,
+        rir: 3,
+        weekRir: 6,
+        isDeload: true,
+        backedOff: false,
+      },
+    });
+    expect(overridden.lines[0]).toMatch(/harder than the deload week's/);
+    expect(overridden.lines.some((l) => /shed the block's fatigue/.test(l))).toBe(
+      false,
+    );
+  });
+
+  it("§9.4 — the ask states the band, not the number, past the measuring band", () => {
+    const deep = {
+      ...w2d4,
+      weight: 171,
+      targetRir: 21,
+      effort: { ...assigned, assignedRir: 21, rir: 21, measuring: false },
+    };
+    const ask = composeAsk(deep)!;
+    expect(ask).toBe("3 sets of 9 at 171 lb, each kept well short of failure.");
+    expect(ask).not.toMatch(/21/);
+  });
+
+  it("an UNASSIGNED row is byte-identical to the pre-lever narrative", () => {
+    const before = composePrescriptionNarrative(w2d4);
+    expect(composePrescriptionNarrative({ ...w2d4, effort: null })).toEqual(before);
+    expect(composePrescriptionNarrative({ ...w2d4, effort: undefined })).toEqual(
+      before,
+    );
+  });
+});

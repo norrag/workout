@@ -2,7 +2,139 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-04 (latest) — doc 21 Phase 5: the stats policy — what a backed-off session may claim (N70)
+## 2026-08-05 (latest) — doc 21 Phase 6 follow-up: two owner review rounds on the Effort target UI (N70)
+
+Two small correction passes on the Phase 6 UI, both owner review.
+
+**Round 1 — sheet styling and scope semantics.** The Effort-target sheet's
+choice controls had copied the Load-step sheet's `13px` bold, accent-filled
+chips, a scale and colour that don't match anything else in the app; restyled
+to the settings screens' `10px` tracked-caps contiguous blocks (fig 4.4 / the
+profile editor), keeping only the sheet's overall *shape* (title, subtitle,
+clear affordance, `Cancel`/`SAVE`) from Load step. The scope labels
+(`REST OF BLOCK` / `WHOLE BLOCK`) read as though the wider option might rewrite
+already-trained weeks; renamed and given a one-line reach statement each. Also
+fixed: an empty `CUSTOM` field was silently equivalent to "clear the
+assignment," so opening the sheet and tapping `CUSTOM` armed a delete —
+clearing is now only the explicit "use the week's ramp" choice.
+
+**Round 2 — accent for selection, an `RIR 0` cell, plainer copy.** Selected
+cells now fill `bg-accent` rather than the settings screens' ink — a selected
+cell is exactly what hard rule 7 reserves orange for, and the settings screens'
+own ink fill predates that reading. `TARGET RIR` gained an absolute `RIR 0`
+cell (taken to failure — the hardest ask the lever can make) ahead of the four
+easier-than-the-week steps. Scope labels became `THIS WEEK` / `WORKING WEEKS` /
+`ALL WEEKS`, naming the real distinction (deload coverage — a flat
+`meso_exercises.target_rir` reaches the deload by construction, a per-week
+schedule doesn't); the standing "weeks you've trained never change" sentence
+was removed from the sheet (the three enforcing layers stay documented in doc
+21 §10, not restated on every render). The reason placeholder became
+direction-neutral, since the lever raises effort as often as it lowers it.
+
+**Round 2 also reopened, then corrected, the capture-cell defect from Phase
+6's own build.** Phase 6 had blanked the per-set RIR capture cell (the logging
+grid, not the Effort-target sheet) whenever the prescribed RIR sat above the
+0–10 reportable range, reasoning by analogy to §9.4's qualitative band. On
+review: §9.4 is about *narrative* surfaces (the ask sentence, the planner
+meta) where a raw number reads strange; the capture cell is a plain numeric
+readout, and a blank cell traded a real number for no information at all — the
+cell was never at risk the way the ask/meta surfaces are, since
+`reportedRirFromInput` already turns anything outside 0–10 into "no report"
+regardless of what the box displays. `captureRirDefault` now returns the real
+prescribed value unconditionally (`number`, not `number | null`); the cell
+shows it **muted** (the grid's existing "assumption, not a report" convention)
+until the athlete types or a real report lands, then reads at full strength.
+
+Full suite green (1730), typecheck + lint + production build clean both rounds.
+
+## 2026-08-04 — doc 21 Phase 6: the lever reaches the app — disclosure, editor, explanation (N70)
+
+The last of the six phases. Phases 1–5 made exercise-level RIR real, correct,
+writable over MCP and honest in the stats; Phase 6 makes it **visible and
+editable where the athlete is**, and stops the explanation layers from narrating
+an engine rationale for a decision a person made.
+
+**Design pass first (hard rule 8).** No mockup figure exists for any element
+here — verified against `workout - App Screens v2.dc.html` — so the house-style
+transcription is recorded in
+[09-design-changelog](09-design-changelog.md) (2026-08-04 session 2) before
+building, per doc 21 §8. Every primitive is reused, none invented: the
+` · SKIPPED` eyebrow idiom carries the assignment, the strip's existing body line
+carries the disclosure, and the sheet is built to the Load-step precedent.
+
+**One pure display module.** `src/lib/slot-effort-display.ts` (client-safe, no
+I/O, unit-tested) owns every word the app says about an assignment — the eyebrow
+suffix, the §9.4 band phrase, the disclosure sentences. The day view, the
+planned-day page and the editor sheet all compose from it, so one state cannot
+acquire three vocabularies, and `hasEffortDisclosure` is the single place where
+*"an unassigned plan reads exactly as it did before the lever existed"* is
+enforced rather than hoped for.
+
+**§9.4 settled: the qualitative band, and it is a DISPLAY rule only.** Past
+`e1rm.max_measuring_rir` the ask reads *"3 sets of 9 at 171 lb, each kept well
+short of failure"* and the planner meta reads `LIGHT`. The Engine audit sheet
+still prints `171 × 9 @ 21 RIR` verbatim, the trace is untouched, and nothing
+about pricing or storage moves. A prescription at 21 RIR is arithmetically fine
+and humanly strange: printing it in the athlete's quick-read asks them to
+internalize a number the app itself refuses to treat as a measurement.
+
+**A defect the phase surfaced, and fixed.** §4.3 made the *ask* unbounded (0–30)
+while `rir_reported` stayed 0–10, so Phase 1's "pre-fill the prescribed target"
+would have printed `21` into a cell labelled RIR and asked for confirmation.
+`captureRirDefault` now returns null past the reportable range and the cell
+renders empty with a `—` placeholder. The default is still a no-op — an empty
+cell reports nothing and the server's `assumedRir` resolves to the same
+prescription — and a **real** report is still accepted, so a deep back-off
+reported at 8 becomes a measurement again. The band and the capture control
+compose rather than fight.
+
+**The ordering is the argument.** The assignment and its reason render above
+every engine-authored line in the prescription strip (doc 21 §8). Two
+consequences fall out and are pinned: the delta line drops its "an easier effort
+target" clause when an *assignment* rather than the ramp moved the RIR, and the
+program-intent frame is suppressed entirely — "first week of the block" says
+nothing useful about a slot pulled off the ramp. On a deload week the assignment
+*replaces* the deload boilerplate instead of sitting under a sentence that
+contradicts it.
+
+**Two write surfaces, one authoring policy.** `planEffortEdits` +
+`loadEffortContext` moved from `mcp/tools/edit.ts` into `queries/slot-effort.ts`
+(re-exported from the tool, so its tests address them where they were defined),
+and the new `setSlotEffortAction` runs the same planner — same refusals, same
+§4.1 warnings, same already-trained-week guard. `loadEffortContext` takes the
+active params as an argument rather than fetching them, because `generation.ts`
+already imports `slot-effort.ts`. The sheet's three scopes (`THIS WEEK` /
+`WORKING WEEKS` / `ALL WEEKS`) **overlay** the slot's existing per-week map
+instead of replacing it, so nudging one week can never silently drop an
+assignment on another; a §4.1 warning holds the sheet open under `SAVED — NOTE`
+rather than closing over it. The scopes differ in exactly one thing —
+**deload coverage** (only the flat `ALL WEEKS` form reaches it, by
+construction) — and **none reaches backwards**: `planEffortEdits` refuses an op
+naming an already-trained week, `regenerateOpenWorkouts` skips completed
+microcycles and any started workout in a live one, and hard rule #5 covers the
+logged sets. The set cap and rep position **read** in the sheet
+and are not editable (A4) — a lever the sheet cannot change must still be visible
+where the athlete looks for it.
+
+**doc 19 layering: every number comes off the recorded decision.**
+`effort_assignment` is projected from `inputs.exerciseRir` / `exerciseSetCap` /
+`exerciseRepPosition` against `inputs.week.targetRir`, so an explanation
+describes the assignment that priced *that* decision rather than whatever the
+plan says today. Only the reason needs a lookup, and it is dropped when one
+exercise carries two different reasons in a meso (§5.1 — absence beats the wrong
+reason). The prompt gains the rule that matters: an assigned effort level was
+chosen by a person, so the model may not explain it as a program decision, argue
+with it, or read a backed-off block as a decline. A new `effort_assignment`
+trigger fires on existence alone — a loose gate for a rare fact.
+
+**Deliberately not touched:** `PlannerBoard.tsx`. It is a staged-draft editor for
+plan *structure*, and an assignment is per week; the week-scoped planned-day page
+is where it can be shown truthfully, and that is what §8's "the assignment reads
+on the planner slot" asks for.
+
+Full suite green (1730, +47), typecheck + lint + production build clean.
+
+## 2026-08-04 — doc 21 Phase 5: the stats policy — what a backed-off session may claim (N70)
 
 The lever has bitten since Phase 2. Phase 5 is the read side: a session the plan
 deliberately ran easier than its week must not read as a decline, must not set a

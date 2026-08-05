@@ -142,6 +142,18 @@ export function adoptServerRowState(
  * the default a no-op: leaving it alone reports precisely what the server's
  * `assumedRir` fallback would have resolved to, so only a CHANGED value carries
  * information the app didn't already have.
+ *
+ * **Always the real prescribed number, unbounded (doc 21 Phase 6, revised
+ * 2026-08-05).** §4.3 made the *prescribed* RIR unbounded (0–30) while
+ * `rir_reported` stayed 0–10 — the range a human can actually estimate — and an
+ * earlier cut of this function returned null past that range, blanking the
+ * cell. Reconsidered: a blank cell tells the athlete nothing, and the number
+ * was never at risk of being silently mis-saved — `reportedRirFromInput` already
+ * turns anything outside 0–10 into "no report" regardless of what sat in the
+ * box. Showing the real number (muted, like every other unconfirmed assumption
+ * in this grid — the caller's job, not this function's) gives the information
+ * back at no cost: the default is still exactly a no-op, and a real report in
+ * range still re-enters the measuring band (§6.1).
  */
 export function captureRirDefault(args: {
   /** the server row's reported RIR, when this set is logged */
@@ -154,22 +166,30 @@ export function captureRirDefault(args: {
   return args.loggedRir ?? args.pendingRir ?? args.targetRir;
 }
 
+/** The range `logged_sets.rir_reported` accepts, and the range an athlete can
+ *  honestly estimate (doc 21 §3). Past it the honest report is "no idea". */
+export function isReportableRir(rir: number | null | undefined): boolean {
+  return rir != null && Number.isInteger(rir) && rir >= 0 && rir <= 10;
+}
+
 /**
  * doc 21 §2 — what the capture cell's raw text reports.
  *
- * `rir_reported` is capped at **0–10**: that is the range a human can actually
- * estimate, and past it the honest report is "no idea" (doc 21 §3). Anything
- * empty, non-integer, or out of range therefore reports **null** — which the
- * server resolves through `assumedRir` back to the slot's prescribed target,
- * i.e. exactly what the untouched pre-fill would have said. Reporting nothing
- * is always safer than reporting a wrong number.
+ * `rir_reported` is capped at **0–10** (`isReportableRir`): that is the range a
+ * human can actually estimate, and past it the honest report is "no idea"
+ * (doc 21 §3). Anything empty, non-integer, or out of range therefore reports
+ * **null** — which the server resolves through `assumedRir` back to the slot's
+ * prescribed target, i.e. exactly what the untouched pre-fill would have said.
+ * Reporting nothing is always safer than reporting a wrong number. This is the
+ * one boundary that makes it safe for `captureRirDefault` to show an
+ * out-of-range prescription verbatim: whatever the box displays, typing
+ * nothing (or leaving an unreportable number untouched) never submits it.
  */
 export function reportedRirFromInput(raw: string): number | null {
   const trimmed = raw.trim();
   if (trimmed === "") return null;
   const n = Number(trimmed);
-  if (!Number.isInteger(n) || n < 0 || n > 10) return null;
-  return n;
+  return isReportableRir(n) ? n : null;
 }
 
 /**

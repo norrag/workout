@@ -21,7 +21,8 @@ export type Trigger =
   | "completion_pattern"
   | "block_intent"
   | "unusual_prescription"
-  | "increment_coarse";
+  | "increment_coarse"
+  | "effort_assignment";
 
 /** Engine/DB-derived signals the facts object doesn't itself carry — kept
  *  separate so `scoreTriggers` stays a pure function of explicit inputs. */
@@ -81,6 +82,18 @@ function blockIntentFires(facts: ExplanationFacts): boolean {
   return week.deload || week.n === 1 || week.target_rir <= 0;
 }
 
+/**
+ * doc 21 §8 — an AUTHORED effort level. This fires on existence alone, which is
+ * a deliberately loose gate for a deliberately rare fact: an assignment means a
+ * person overrode the week for this exercise, and it is exactly the situation
+ * where a coaching line that narrated the *engine's* reasoning would be wrong
+ * about who decided what. Assignments are rare by construction, so the gate
+ * costs little; the model still abstains when there is nothing to add.
+ */
+function effortAssignmentFires(facts: ExplanationFacts): boolean {
+  return facts.effort_assignment != null;
+}
+
 function completionFires(signals: TriggerSignals): boolean {
   return (signals.consecutiveEarnedMisses ?? 0) >= 2 || signals.repeatedLaterSetShortfall === true;
 }
@@ -106,6 +119,7 @@ export function scoreTriggers(
   if (blockIntentFires(facts)) triggers.push("block_intent");
   if (unusualFires(signals)) triggers.push("unusual_prescription");
   if (signals.incrementCoarse === true) triggers.push("increment_coarse");
+  if (effortAssignmentFires(facts)) triggers.push("effort_assignment");
   return triggers;
 }
 

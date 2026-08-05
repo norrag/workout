@@ -11,7 +11,13 @@ import type {
   WorkoutExerciseRow,
   WorkoutRow,
 } from "@/lib/types/database";
-import { PROGRESSION_RULE } from "@/lib/engine";
+import { PROGRESSION_RULE, isMeasuringRir } from "@/lib/engine";
+import type { SlotEffortView } from "@/lib/slot-effort-display";
+import {
+  getSlotEffortAssignments,
+  resolveSlotEffort,
+  slotEffortKey,
+} from "./slot-effort";
 import { getActiveEngineParams } from "./generation";
 import { getExerciseE1rmAnchors } from "./anchors";
 import { getMuscleGroupsCached } from "./reference";
@@ -70,6 +76,19 @@ export interface LoggedExercise extends WorkoutExerciseRow {
    *  bodyweight movement; null when the profile has none. Same value across the
    *  day's exercises (read from the profile), shown by the editable BW chip. */
   bodyweight: number | null;
+  /**
+   * doc 21 §8 (Phase 6) — the slot's effort assignment resolved for this week,
+   * or null when the slot carries none (every slot until someone assigns one).
+   * Null — not a zeroed object — so an unassigned plan renders exactly what it
+   * rendered before the lever existed.
+   *
+   * `rir` is the value the ROW is priced at (`workout_exercises.target_rir`),
+   * not a re-resolution of the assignment: if a freshness reconcile hasn't
+   * caught up yet, the disclosure must describe the prescription the athlete is
+   * actually looking at. `assignedRir` is what the plan currently says, so the
+   * two disagreeing is itself visible rather than papered over.
+   */
+  slot_effort: SlotEffortView | null;
 }
 
 /** A programmed day in the navigator (fig 1.1 expanded header). */
@@ -341,10 +360,53 @@ export async function getWorkoutDetail(
   // recency-weighted strength anchors for the live reps predictor (doc 11) +
   // the recorded prescription-basis target anchors (doc 16 §5.2)
   const { params } = await getActiveEngineParams(supabase);
-  const [e1rmAnchors, targetAnchors] = await Promise.all([
+  const [e1rmAnchors, targetAnchors, slotEffort] = await Promise.all([
     getExerciseE1rmAnchors(supabase, userId, exerciseIds, params),
     getRecordedTargetAnchors(supabase, weIds),
+    // doc 21 §8 — one filtered, indexed read that returns nothing at all for a
+    // meso with no assignments (every meso until one is authored), so the
+    // disclosure costs an empty query on the hot path and nothing else.
+    getSlotEffortAssignments(supabase, microcycle.mesocycle_id),
   ]);
+  /** The per-slot effort disclosure for this day, or null when unassigned. */
+  const slotEffortFor = (
+    exerciseId: string,
+    rowRir: number | null,
+  ): SlotEffortView | null => {
+    if (slotEffort.size === 0) return null;
+    const assignment = slotEffort.get(
+      slotEffortKey(workout.day_number, exerciseId),
+    );
+    if (!assignment) return null;
+    const resolved = resolveSlotEffort(
+      assignment,
+      microcycle.week_number,
+      microcycle.target_rir,
+    );
+    if (
+      resolved.assignedRir == null &&
+      resolved.setCap == null &&
+      resolved.repPosition == null
+    ) {
+      // the slot carries an assignment on some OTHER week, not this one
+      return null;
+    }
+    // the row's own target is what the athlete is actually being asked for; a
+    // stale row (reconcile pending) discloses what it prices, not what the plan
+    // has since become
+    const rir = rowRir ?? resolved.rir;
+    return {
+      rir,
+      assignedRir: resolved.assignedRir,
+      weekRir: resolved.weekRir,
+      isDeload: microcycle.is_deload,
+      setCap: resolved.setCap,
+      repPosition: resolved.repPosition,
+      reason: resolved.reason,
+      backedOff: resolved.backedOff,
+      measuring: isMeasuringRir(rir, params.e1rm),
+    };
+  };
   // T-I2: the lifter's current bodyweight — the effective-load base for bodyweight
   // movements (the day-view chip + the live effective-load prediction/marker).
   const { data: bwProfile } = await supabase
@@ -411,6 +473,7 @@ export async function getWorkoutDetail(
       })(),
       prescription_anchor: targetAnchors.get(we.id) ?? null,
       bodyweight: userBodyweight,
+      slot_effort: slotEffortFor(we.exercise_id, we.target_rir),
     })),
   };
 }

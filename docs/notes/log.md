@@ -4,6 +4,83 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-05 — Session 100: two owner review rounds on the Phase 6 Effort target UI (N70, PR #224)
+
+N70 is already closed (Phase 6, PR #224); this session is polish on that PR
+before merge, not a new backlog item — no row change.
+
+- **Round 1:** the Effort-target sheet's choice controls were restyled off the
+  settings screens (fig 4.4) instead of Load step's oversized accent chips;
+  scope labels/copy corrected so the wider scope doesn't read as reaching
+  already-trained weeks; fixed an empty `CUSTOM` field silently acting as
+  "clear."
+- **Round 2:** selection fill moved from ink to **accent** (hard rule 7 —
+  orange is for current position/selection, and a selected cell is exactly
+  that); added an absolute `RIR 0` cell; scope labels became
+  `THIS WEEK` / `WORKING WEEKS` / `ALL WEEKS`; removed the standing
+  never-changes-a-trained-week sentence from the sheet (the enforcement stays
+  in doc 21 §10 code, not restated in copy); reason placeholder made
+  direction-neutral.
+- **The real one:** round 2 also reopened and reversed a Phase 6 decision —
+  the per-set RIR capture cell (logging grid) blanked the number whenever the
+  prescription sat above the 0–10 reportable range, reasoning by analogy to
+  §9.4's qualitative band. Owner pushback: a blank cell gives no information,
+  and the cell was never at risk of mis-saving the way §9.4's narrative
+  surfaces were — `reportedRirFromInput` already discards anything outside
+  0–10 whatever the box shows. Reverted to showing the real number, muted
+  until confirmed (typed, or a server report lands). `captureRirDefault` is
+  `number` again, not `number | null`.
+- Docs: doc 21 §9.4/§10 both now carry the correction in place (superseded
+  bullets marked, not deleted); 09-design-changelog gets a new dated entry
+  rather than a rewrite of the 2026-08-04 one; PROGRESS gets a new top entry.
+  Full suite green (1730), typecheck/lint/build clean both rounds.
+
+## 2026-08-04 — Session 99: doc 21 Phase 6 built — the lever reaches the app (N70)
+
+The last phase. Five phases made the lever real, correct, writable over MCP and
+honest in the stats; this one makes it visible and editable where the athlete
+actually is, and stops the coaching layer from claiming credit for a decision a
+person made.
+
+- **N70 → Phase 6 done (PR #224). The item CLOSES** — all six phases shipped.
+- **One display module for one state.** `src/lib/slot-effort-display.ts` (pure,
+  client-safe) owns every word: the eyebrow suffix, the §9.4 band phrase, the
+  disclosure sentences. Three surfaces compose from it, so they cannot drift into
+  three vocabularies. `hasEffortDisclosure` is where "unassigned reads exactly as
+  before" is enforced rather than hoped for.
+- **§9.4 settled: the qualitative band, as a DISPLAY rule.** Past
+  `max_measuring_rir` the ask says "each kept well short of failure" and the
+  planner meta says `LIGHT`; the audit sheet still prints `171 × 9 @ 21 RIR` and
+  nothing about pricing or the trace moves. The assignment line and the ask are
+  composed from the same predicate so they can never disagree.
+- **The defect this phase surfaced.** §4.3 made the ask unbounded (0–30) while
+  `rir_reported` stayed 0–10 — so Phase 1's pre-fill would have printed `21` into
+  a box labelled RIR and asked the athlete to confirm it. The pre-fill now returns
+  null past the reportable range and the cell renders empty. Still a no-op default
+  (empty reports nothing, the server's `assumedRir` resolves to the same
+  prescription), and a *real* report at 8 still makes the set a measurement again:
+  the band and the capture control compose rather than fight.
+- **The ordering IS the argument.** The assignment and its reason render above
+  every engine-authored line, the delta line drops its "easier effort target"
+  clause when an assignment (not the ramp) moved the RIR, the week frame is
+  suppressed, and on a deload the assignment replaces the deload boilerplate
+  instead of contradicting it. A person chose the effort; the engine only priced
+  the load to meet it, and no layer may imply otherwise.
+- **Two write surfaces, one authoring policy.** `planEffortEdits` +
+  `loadEffortContext` moved out of the MCP tool into `queries/slot-effort.ts`
+  (re-exported so the tool's tests are untouched) and the new
+  `setSlotEffortAction` runs the same planner — same refusals, same §4.1
+  warnings, same already-trained-week guard. The sheet's three scopes OVERLAY the
+  slot's existing per-week map instead of replacing it, so nudging one week can
+  never silently drop an assignment sitting on another.
+- **doc 19: the numbers come off the recorded decision.** `effort_assignment` is
+  projected from `inputs.exerciseRir` and friends, so an explanation describes the
+  assignment that priced *that* decision, not today's plan. Only the reason needs
+  a lookup, and it is dropped when one exercise carries two different reasons in a
+  meso — the wrong reason on a coaching line is worse than none.
+- Full suite green (1683 → 1730, +47 across five files), typecheck + lint +
+  production build clean.
+
 ## 2026-08-04 — Session 98: doc 21 Phase 5 built — the stats policy (N70)
 
 The read side of the lever: what a deliberately-easier session is allowed to say

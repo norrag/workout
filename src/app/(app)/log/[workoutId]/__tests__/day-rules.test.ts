@@ -8,6 +8,7 @@ import {
   daySetTotals,
   exerciseDone,
   impliedPrescriptionE1rm,
+  isReportableRir,
   loggedSetMarker,
   plannedSetCount,
   prescriptionBasisE1rm,
@@ -464,5 +465,54 @@ describe("reportedRirFromInput", () => {
       targetRir,
     });
     expect(reportedRirFromInput(String(prefill))).toBe(targetRir);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 Phase 6 (revised 2026-08-05) — the pre-fill shows the real number,
+// unbounded; the input parser is the one place that stays honest about range
+// ---------------------------------------------------------------------------
+
+describe("captureRirDefault past the reportable range", () => {
+  it("still pre-fills the real number when the prescription is above 10", () => {
+    // §4.3 made the ASK unbounded (0–30) while `rir_reported` stayed 0–10.
+    // An earlier cut blanked the cell here; reconsidered — showing nothing
+    // trades a real number for no information, and it was never at risk of
+    // being silently mis-saved: `reportedRirFromInput` already discards
+    // anything outside 0–10 regardless of what the box displays. The caller
+    // mutes it (it's an assumption, not a report), it does not hide it.
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 21 }),
+    ).toBe(21);
+    expect(isReportableRir(21)).toBe(false);
+  });
+
+  it("still pre-fills at the top of the reportable range", () => {
+    expect(
+      captureRirDefault({ loggedRir: null, pendingRir: null, targetRir: 10 }),
+    ).toBe(10);
+    expect(isReportableRir(10)).toBe(true);
+    expect(isReportableRir(0)).toBe(true);
+  });
+
+  it("a real report on a deep back-off still shows — the band gates the STAMP, not the capture", () => {
+    expect(
+      captureRirDefault({ loggedRir: 8, pendingRir: null, targetRir: 21 }),
+    ).toBe(8);
+    // and it survives the input parser, so the set becomes a measurement again
+    expect(reportedRirFromInput("8")).toBe(8);
+  });
+
+  it("the untouched out-of-range pre-fill never actually submits — the parser is the boundary, not the display", () => {
+    // this is what makes it safe to show 21 verbatim: whether the box reads
+    // "" or "21", leaving it alone reports null either way, which resolves
+    // server-side through `assumedRir` back to the same prescription
+    const prefill = captureRirDefault({
+      loggedRir: null,
+      pendingRir: null,
+      targetRir: 21,
+    });
+    expect(reportedRirFromInput(String(prefill))).toBeNull();
+    expect(reportedRirFromInput("")).toBeNull();
   });
 });

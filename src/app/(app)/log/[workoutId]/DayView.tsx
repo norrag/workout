@@ -35,6 +35,11 @@ const PrescriptionDetailSheet = dynamic(() =>
     (m) => m.PrescriptionDetailSheet,
   ),
 );
+// doc 21 §8 — the effort-target editor. Same treatment: a lever most sessions
+// never touch has no business in the day view's first-load JS.
+const EffortSheet = dynamic(() =>
+  import("./EffortSheet").then((m) => m.EffortSheet),
+);
 import type {
   LoggedExercise,
   NavWeek,
@@ -102,6 +107,7 @@ import {
   appendCoaching,
   composePrescriptionNarrative,
 } from "@/lib/prescription-narrative";
+import { effortEyebrowSuffix } from "@/lib/slot-effort-display";
 
 /**
  * T-I2: the bodyweight chip in a bodyweight exercise's header. The load is the
@@ -258,6 +264,8 @@ export function DayView({
   const [historyFor, setHistoryFor] = useState<LoggedExercise | null>(null);
   const [auditFor, setAuditFor] = useState<LoggedExercise | null>(null);
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
+  /** doc 21 §8 — the effort-target sheet (the assignment editor) */
+  const [effortFor, setEffortFor] = useState<LoggedExercise | null>(null);
   const [noteSheet, setNoteSheet] = useState<{
     we: LoggedExercise;
     origin: NoteOrigin;
@@ -379,6 +387,7 @@ export function DayView({
     (we: LoggedExercise) => setReplaceFor(we),
     [],
   );
+  const openEffort = useCallback((we: LoggedExercise) => setEffortFor(we), []);
   const openNote = useCallback(
     (we: LoggedExercise, origin: NoteOrigin) => setNoteSheet({ we, origin }),
     [],
@@ -449,6 +458,7 @@ export function DayView({
           onHistory={openHistory}
           onAudit={openAudit}
           onReplace={openReplace}
+          onEffort={openEffort}
           onNote={openNote}
           onFeedback={openFeedback}
           onToggleDrop={toggleDrop}
@@ -486,6 +496,16 @@ export function DayView({
         we={replaceFor}
         onClose={() => setReplaceFor(null)}
         commit={commit}
+      />
+      <EffortSheet
+        we={effortFor}
+        mesocycleId={mesocycle.id}
+        dayNumber={workout.day_number}
+        weekNumber={microcycle.week_number}
+        weekRir={microcycle.target_rir}
+        isDeload={microcycle.is_deload}
+        readOnly={readOnly}
+        onClose={() => setEffortFor(null)}
       />
       <HistorySheet
         target={
@@ -997,6 +1017,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onHistory,
   onAudit,
   onReplace,
+  onEffort,
   onNote,
   onFeedback,
   onToggleDrop,
@@ -1029,6 +1050,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onHistory: (we: LoggedExercise) => void;
   onAudit: (we: LoggedExercise) => void;
   onReplace: (we: LoggedExercise) => void;
+  onEffort: (we: LoggedExercise) => void;
   onNote: (we: LoggedExercise, origin: NoteOrigin) => void;
   onFeedback: (we: LoggedExercise) => void;
   onToggleDrop: (weId: string) => void;
@@ -1112,6 +1134,9 @@ const ExerciseBlock = memo(function ExerciseBlock({
       previous: rxAudit?.previous ?? null,
       outOfBand: rxOutOfBand,
       decisionOutput: rxAudit?.output ?? null,
+      // doc 21 §8 — the authored effort level leads the why and prices the
+      // ask's effort clause through the §9.4 band; null when unassigned
+      effort: we.slot_effort,
       // §4.3 — an assumed RIR is never spoken as an observed one
       effortStatus: rxAudit?.effortObserved === true ? "observed" : "inferred",
       weekNumber,
@@ -1132,6 +1157,10 @@ const ExerciseBlock = memo(function ExerciseBlock({
           {" — "}
           {we.muscle_group.toUpperCase() || "OTHER"}
           {skipped ? " · SKIPPED" : ""}
+          {/* doc 21 §8 — an authored effort level reads on the row itself, in
+              the same ` · SUFFIX` idiom as SKIPPED (09-changelog 2026-08-04
+              session 2). The strip carries the numbers and the reason. */}
+          {effortEyebrowSuffix(we.slot_effort)}
         </div>
         <div className="flex gap-2">
           <button
@@ -1375,6 +1404,21 @@ const ExerciseBlock = memo(function ExerciseBlock({
             router.push(
               `/exercises/${we.exercise_id}?from=/log/${we.workout_id}`,
             );
+          }}
+        />
+        {/* doc 21 §8 — the effort assignment for THIS slot, this week. The
+            sheet reads even when the day is read-only (a completed session's
+            assignment is part of its record); it only refuses to write. */}
+        <MenuRow
+          label="Effort target"
+          trailing={
+            we.slot_effort?.assignedRir != null
+              ? `RIR ${we.slot_effort.assignedRir}`
+              : "›"
+          }
+          onClick={() => {
+            onCloseMenu();
+            onEffort(we);
           }}
         />
         <MenuRow
@@ -1652,6 +1696,11 @@ function SetRow({
   const edited = useRef(false);
   // once the user types their own reps, stop auto-predicting for this row
   const repsManual = useRef(false);
+  // has the athlete typed into THIS field this session? Distinct from
+  // `reportedRirOnRow` (a server-confirmed report) so a value they just typed
+  // reads at full strength immediately, before it's saved — only the untouched
+  // pre-fill (the assumption) reads muted.
+  const [rirTouched, setRirTouched] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   // per-row transition so the revalidation applies as a non-blocking background
   // update. The spinner is deliberately NOT the transition's pending flag (N12):
@@ -1717,6 +1766,7 @@ function SetRow({
     setRir(String(initialRir));
     edited.current = false;
     repsManual.current = false;
+    setRirTouched(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged?.id, logged?.weight, logged?.reps, logged?.rir_reported]);
 
@@ -2035,7 +2085,18 @@ function SetRow({
               primitive as LB/REPS (09-changelog 2026-08-02), pre-filled with
               the prescribed target RIR so leaving it alone reports the
               prescription and only a CHANGED value carries new information.
-              The prescription is a suggestion: report what actually happened. */}
+              The prescription is a suggestion: report what actually happened.
+
+              Muted (doc 21 Phase 6, revised) whenever the number on screen is
+              still the ASSUMPTION rather than a report — untouched this
+              session AND no server-confirmed report on the row — even when
+              that assumption is past the 0–10 range a person can honestly
+              submit (§4.3's unbounded ask): showing nothing there traded a
+              real number for no information at all, and the submit-side
+              parser already turns anything unreportable into "no report"
+              regardless of what the box displays. The moment the athlete
+              types, it reads at full strength — it's their input now, whether
+              or not it will end up validating. */}
           <input
             type="text"
             inputMode="numeric"
@@ -2044,9 +2105,12 @@ function SetRow({
             onChange={(e) => {
               setRir(e.target.value);
               edited.current = true;
+              setRirTouched(true);
             }}
             onBlur={() => state === "logged" && save()}
-            className={cell}
+            className={`${cell}${
+              !rirTouched && reportedRirOnRow == null ? " text-ink/45" : ""
+            }`}
           />
         </>
       )}

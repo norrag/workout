@@ -158,3 +158,38 @@ describe("scoreTriggers — the §6.1 gates", () => {
     expect(shouldGenerate(routineFacts, { ...routineSignals, incrementCoarse: true })).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// doc 21 §8 — an authored effort level is worth a coaching pass
+// ---------------------------------------------------------------------------
+
+describe("effort_assignment trigger", () => {
+  const assigned = {
+    target_rir: 4,
+    week_target_rir: 1,
+    backed_off: true,
+    measured: true,
+    reason: "nerve flare",
+  };
+
+  it("does not fire on a routine, unassigned decision", () => {
+    expect(scoreTriggers(routineFacts, { trace: [] })).not.toContain(
+      "effort_assignment",
+    );
+  });
+
+  it("fires whenever a person assigned this exercise's effort", () => {
+    expect(
+      scoreTriggers(
+        { ...routineFacts, effort_assignment: assigned },
+        { trace: [] },
+      ),
+    ).toContain("effort_assignment");
+  });
+
+  it("is enough on its own to route the decision to the model", () => {
+    expect(
+      shouldGenerate({ ...routineFacts, effort_assignment: assigned }, { trace: [] }),
+    ).toBe(true);
+  });
+});

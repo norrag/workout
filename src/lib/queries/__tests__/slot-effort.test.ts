@@ -20,6 +20,7 @@ import {
   repPositionToDb,
   slotEffortInputs,
   orphanedSlotSchedules,
+  overlaySlotRirSchedule,
   resolveSlotEffort,
   slotEffortKey,
   slotEffortSignatureInput,
@@ -684,5 +685,85 @@ describe("isBackedOffSlot (§6.2)", () => {
   it("agrees with resolveSlotEffort, which is the same rule at plan grain", () => {
     const r = resolveSlotEffort(assignment({ target_rir: 6 }), 2, 2);
     expect(r.backedOff).toBe(isBackedOffSlot(r.assignedRir, r.weekRir));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// doc 21 Phase 6 — the app's scoped write (overlay, not replace)
+// ---------------------------------------------------------------------------
+
+describe("overlaySlotRirSchedule — a scoped edit never drops another week", () => {
+  const flat: SlotEffortAssignment = {
+    ...emptySlotEffort(),
+    target_rir: 4,
+  };
+  const perWeek: SlotEffortAssignment = {
+    ...emptySlotEffort(),
+    rir_schedule: [null, null, 5, 5],
+  };
+
+  it("this_week writes one week and resolves the rest from the current map", () => {
+    expect(overlaySlotRirSchedule(perWeek, 2, 7, "this_week", 4)).toEqual([
+      null,
+      7,
+      5,
+      5,
+    ]);
+  });
+
+  it("rest_of_block writes from this week forward", () => {
+    expect(overlaySlotRirSchedule(perWeek, 3, 7, "rest_of_block", 4)).toEqual([
+      null,
+      null,
+      7,
+      7,
+    ]);
+  });
+
+  it("carries a FLAT assignment onto the weeks it doesn't touch", () => {
+    // the point of the overlay: nudging week 2 must not silently un-assign the
+    // rest of the block, which `value` + `weeks` would have done
+    expect(overlaySlotRirSchedule(flat, 2, 6, "this_week", 4)).toEqual([
+      4, 6, 4, 4,
+    ]);
+  });
+
+  it("a null value clears just the weeks in scope back to the ramp", () => {
+    expect(overlaySlotRirSchedule(perWeek, 3, null, "this_week", 4)).toEqual([
+      null,
+      null,
+      null,
+      5,
+    ]);
+    expect(overlaySlotRirSchedule(perWeek, 3, null, "rest_of_block", 4)).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it("the planner refuses an all-null overlay, so the caller must clear instead", () => {
+    const schedule = overlaySlotRirSchedule(perWeek, 3, null, "rest_of_block", 4);
+    const result = planSlotEffortEdit(
+      perWeek,
+      { lever: "rir", schedule },
+      { weeks: 5, includesDeload: true },
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("round-trips through the planner: the overlay is what lands", () => {
+    const schedule = overlaySlotRirSchedule(flat, 2, 6, "this_week", 4);
+    const result = planSlotEffortEdit(
+      flat,
+      { lever: "rir", schedule },
+      { weeks: 5, includesDeload: true },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.byWeek).toEqual([4, 6, 4, 4]);
+    // a schedule no longer covers the deload — the flat value it replaced did
+    expect(result.plan.coversDeload).toBe(false);
   });
 });
