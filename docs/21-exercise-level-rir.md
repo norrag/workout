@@ -813,17 +813,20 @@ reportable range; the facts block's presence/absence and the trigger.
   of fetching them: `generation.ts` already imports `slot-effort.ts`, and a
   cycle between the two for one read is not worth the fragility.
 - **The three scopes differ in ONE thing the labels have to carry: deload
-  coverage.** `THIS WEEK` and `REST OF BLOCK` write a per-week schedule;
-  `EVERY WEEK` (renamed from `WHOLE BLOCK` on the owner's read — it implied a
-  retroactive rewrite) writes the flat `target_rir`, and a flat value governs
-  every week the schedule doesn't, the deload included, by construction (§4.1).
+  coverage.** `THIS WEEK` and `WORKING WEEKS` write a per-week schedule;
+  `ALL WEEKS` writes the flat `target_rir`, and a flat value governs every week
+  the schedule doesn't, the deload included, by construction (§4.1). (The first
+  cut labelled these `REST OF BLOCK` / `WHOLE BLOCK`, which read as though the
+  wider one might rewrite weeks already trained — the owner caught it.)
   **No scope reaches backwards**, and three independent layers make that true
   rather than conventional: `planEffortEdits` refuses an op that *names* an
   already-trained week (a flat value is allowed and warns which weeks it can no
   longer change), `regenerateOpenWorkouts` skips completed microcycles outright
   and skips any `in_progress` / `completed` / `skipped` workout inside a live
-  one, and hard rule #5 means no path rewrites a logged set. The sheet states
-  the guarantee under the block instead of leaving it to be inferred.
+  one, and hard rule #5 means no path rewrites a logged set. `WORKING WEEKS`
+  still writes **forward only**, which is indistinguishable in outcome from
+  rewriting weeks 1..n and keeps the stored plan free of edits that could not
+  have had an effect.
 - **A scoped edit OVERLAYS, it does not replace.** `planSlotEffortEdit`'s
   `value` + `weeks` form rewrites the whole schedule, which is right for a coach
   stating a complete intent and wrong for a sheet nudging one week — it would
@@ -832,7 +835,7 @@ reportable range; the facts block's presence/absence and the trigger.
   in scope. One honest consequence, asserted by test: overlaying a **flat**
   assignment converts it to a schedule, so it stops covering the deload week.
 - **The sheet keeps its warnings on screen.** A save that produced a §4.1
-  warning (this week now runs harder than programmed; an every-week value also
+  warning (this week now runs harder than programmed; an all-weeks value also
   governs the deload) holds the sheet open with the warning under a
   `SAVED — NOTE` rule instead of closing over it. It also reads on a **completed**
   session — a performed session's effort target is part of its record — and only

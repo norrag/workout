@@ -92,33 +92,45 @@ the mockup; every one built from a primitive the app already ships.
   (doc 14 phase 3, `LoadStepSheet.tsx`) — title + tracked-caps subtitle, choice
   controls, an optional free entry, a clear affordance, `Cancel` / `SAVE` — and
   its **choice-control vocabulary from the settings screens** (fig 4.4 and the
-  profile editor), *not* from Load step. Revised 2026-08-04 after the owner
-  flagged the mismatch: Load step's chips are `13px` bold with an **accent** fill,
-  a full size larger and a different colour from every other choice control in
-  the app. The settings vocabulary is the house one and this sheet uses it:
+  profile editor), *not* from Load step. Revised twice on 2026-08-04 after owner
+  review; the shipped treatment is:
   - **section label** `10px / 600 / 0.14em / ink 55`;
   - **contiguous button block** — `flex border-[1.5px] border-ink`, cells
-    `flex-1 py-2.5 text-center text-[10px] tracking-[0.1em]`, selected
-    `bg-ink font-bold text-bg-base`, unselected **paper with no fill**
-    (`font-medium text-ink/55`) divided by `border-l border-ink/30`;
+    `flex-1 py-2.5 text-center text-[10px] tracking-[0.1em]`, unselected **paper
+    with no fill** (`font-medium text-ink/55`) divided by `border-l border-ink/30`,
+    **selected `bg-accent font-bold text-bg-base`**;
   - **full-width dashed button** for the two escape hatches, exactly the profile
-    editor's `CUSTOM VALUE` control, filling to ink when active;
+    editor's `CUSTOM VALUE` control, filling to accent when active;
   - **helper `<p>`** under each block, `11px / 500 / normal / ink 60`.
+  The **scale** is the settings screens'; the **selected fill is accent**, not
+  their ink. Hard rule 7 reserves orange for current position and selection, and
+  a selected cell is exactly that — the settings screens predate that reading and
+  the Load-step sheet already fills with accent. What was wrong in the first cut
+  was only the scale: Load step's `13px` bold chips read a full size larger than
+  every other choice control in the app. One consequence: the custom-value
+  validation message is **ink**, not accent — inside this sheet orange now means
+  *selected*, so an orange error string would compete with the filled cells.
   Contents, top to bottom:
   1. the week's own value stated first — `WEEK 3 RAMP` / `1 RIR` (§4.1's "show
      the default beside the field"), `DELOAD WEEK` on a deload week;
-  2. `TARGET RIR` — a four-cell block of values `+1 +2 +4 +8` **relative to the
-     week**, resolved on selection and shown as the absolute value (`RIR 5`),
-     then `CUSTOM VALUE` (dashed, full width) for the 0–30 range, then
-     `USE THE WEEK'S RAMP (n RIR)` (dashed, full width) as the clear affordance;
-  3. `APPLIES TO` — `THIS WEEK` / `REST OF BLOCK` / `EVERY WEEK` as a three-cell
-     block, with a helper line that says what the **selected** scope actually
-     reaches and, always, the guarantee: *"Weeks you have already trained never
-     change — a performed session is the record of what you did."*;
+  2. `TARGET RIR` — a **five-cell** block: `RIR 0` (absolute — taken to failure,
+     the hardest thing this lever can ask for) then four steps **easier than the
+     week** (`+1 +2 +4 +8`), resolved on selection and shown as absolute values
+     (`RIR 5`). A step can never collide with the `0` cell, since every step
+     lands at least 1 above a week RIR that is itself ≥ 0. Then `CUSTOM VALUE`
+     (dashed, full width) for the 0–30 range, then `USE THE WEEK'S RAMP (n RIR)`
+     (dashed, full width) as the clear affordance;
+  3. `APPLIES TO` — `THIS WEEK` / `WORKING WEEKS` / `ALL WEEKS` as a three-cell
+     block, each with **one short line** saying what it reaches: *"Week 3 only."*
+     / *"Every working week — not the deload."* / *"Every working week and the
+     deload."*;
   4. `REASON` — a one-line text field, 500 chars, stored with the assignment (A7)
-     and surfaced in the strip;
-  5. warnings after a save, in **ink** (never accent), under a `SAVED — NOTE`
-     rule: harder-than-programmed, and an every-week value covering the deload.
+     and surfaced in the strip. Its placeholder is **direction-neutral** (*"why
+     this exercise runs differently"*): this lever raises effort as often as it
+     lowers it, and an example that only ever described a back-off framed it
+     wrongly;
+  5. warnings after a save, in **ink**, under a `SAVED — NOTE` rule:
+     harder-than-programmed, and an all-weeks value covering the deload.
   The `Cancel` / `SAVE` footer is unchanged at `13px` — that pairing is identical
   in every sheet in the app **including the settings sheets**, so it was already
   consistent; the mismatch was entirely in the choice controls.
@@ -127,12 +139,17 @@ the mockup; every one built from a primitive the app already ships.
   editable controls — A4 keeps MCP the primary surface for those two, and a lever
   the sheet cannot change must still be visible where the athlete looks for it.
 - **Scope labels (revised 2026-08-04).** `WHOLE BLOCK` read as though it might
-  rewrite weeks already trained. It is now **`EVERY WEEK`** with the reach spelled
-  out beneath it. The real difference between it and `REST OF BLOCK` is **deload
-  coverage**: a flat `meso_exercises.target_rir` governs every week the per-week
-  schedule doesn't, and the deload falls off the end of that schedule by
-  construction (§4.1), so only the flat form reaches it. Neither reaches
-  backwards, and the sheet now says so instead of leaving it to be inferred.
+  rewrite weeks already trained. The set is now **`THIS WEEK` / `WORKING WEEKS` /
+  `ALL WEEKS`**, which names the real distinction — **deload coverage**. A flat
+  `meso_exercises.target_rir` governs every week the per-week schedule doesn't,
+  and the deload falls off the end of that schedule by construction (§4.1), so
+  only `ALL WEEKS` reaches it. `WORKING WEEKS` still writes **forward only** from
+  the current week; that is indistinguishable in outcome from rewriting weeks
+  1..n — a trained week cannot change — and it keeps the stored plan free of
+  edits that could not have had an effect. The standing guarantee sentence
+  (*"weeks you have already trained never change"*) was **removed from the sheet**
+  at the owner's direction; the three layers that enforce it are recorded in doc
+  21 §10 and PROGRESS instead of restated on every render.
 - **Change (fig 2.5b, the planned-day page).** The per-slot right-hand meta
   (`N SETS · M RIR`) resolves the assignment for that week, so a planned week
   shows the intensity it will actually be priced at, and appends ` · BACKED OFF`

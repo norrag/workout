@@ -13,45 +13,53 @@ import {
  * The three scopes the sheet offers (doc 21 §8 — a week picker is friction on a
  * lever meant to be one tap mid-session).
  *
- * They differ in how far FORWARD the assignment reaches, and in one thing that
- * is easy to miss: only `whole_block` covers the **deload** week. That is not a
- * UI choice — a flat `meso_exercises.target_rir` governs every week the per-week
- * schedule doesn't, and the deload falls off the end of that schedule by
- * construction (§4.1). The scoped forms write a schedule, so the deload keeps
- * its own target.
+ * They differ in exactly one thing, and it is easy to miss: only `whole_block`
+ * covers the **deload** week. That is not a UI choice — a flat
+ * `meso_exercises.target_rir` governs every week the per-week schedule doesn't,
+ * and the deload falls off the end of that schedule by construction (§4.1). The
+ * scoped forms write a schedule, so the deload keeps its own target.
  *
- * What they do NOT differ in: none of them can reach backwards. A week whose
- * session for this day is completed, in progress or skipped is already trained,
- * and three independent layers keep it that way — `planEffortEdits` refuses an
- * op that NAMES such a week, `regenerateOpenWorkouts` skips completed
- * microcycles and any started workout inside a live one, and hard rule #5 never
- * lets a logged set be rewritten by anything. `EVERY WEEK` therefore reads as
- * "every week that hasn't happened yet"; the copy under the block says so
- * rather than leaving the athlete to infer it.
+ * `rest_of_block` is labelled WORKING WEEKS rather than "rest of block" because
+ * that is what it is *in effect*: it writes from this week forward, and the
+ * weeks behind it cannot change anyway — a session that is completed, in
+ * progress or skipped is already trained, and `planEffortEdits`,
+ * `regenerateOpenWorkouts` and hard rule #5 each independently keep it that way.
+ * Writing forward-only rather than rewriting weeks 1..n is the strictly safer
+ * form of the same outcome, so the stored plan never gains an edit that could
+ * not have had an effect.
  */
 const SCOPES = [
   { id: "this_week", label: "THIS WEEK" },
-  { id: "rest_of_block", label: "REST OF BLOCK" },
-  { id: "whole_block", label: "EVERY WEEK" },
+  { id: "rest_of_block", label: "WORKING WEEKS" },
+  { id: "whole_block", label: "ALL WEEKS" },
 ] as const;
 type Scope = (typeof SCOPES)[number]["id"];
 
-/** What each scope actually reaches, said plainly under the block. */
+/** What each scope reaches, in one short line under the block. */
 function scopeHelp(scope: Scope, weekNumber: number): string {
   switch (scope) {
     case "this_week":
-      return `Week ${weekNumber} only — the rest of the block stays on the ramp.`;
+      return `Week ${weekNumber} only.`;
     case "rest_of_block":
-      return `Week ${weekNumber} to the end of the block's working weeks. The deload keeps its own target.`;
+      return "Every working week — not the deload.";
     case "whole_block":
-      return "Every working week and the deload week.";
+      return "Every working week and the deload.";
   }
 }
 
-/** Steps offered relative to the week's own RIR. Absolute values are what get
- *  stored (A2) — the chips are relative only because "two notches easier" is
- *  how the request is actually formed. */
-const STEPS = [1, 2, 4, 8];
+/**
+ * The RIR values offered, left to right. `0` is absolute — taken to failure, the
+ * hardest thing this lever can ask for — and the rest are steps EASIER than the
+ * week's own target, resolved to absolute values on selection (A2 stores
+ * absolutes; the steps are relative only because "two notches easier" is how the
+ * request is actually formed). A step can never collide with the 0 cell, since
+ * every step is at least 1 above a week RIR that is itself ≥ 0.
+ */
+const EASIER_STEPS = [1, 2, 4, 8];
+
+function rirOptions(weekRir: number): number[] {
+  return [0, ...EASIER_STEPS.map((step) => weekRir + step)];
+}
 
 /** doc 21 §3 — what the column accepts; the ASK is unbounded in principle and
  *  30 is what the app persists. */
@@ -64,7 +72,7 @@ function parseRir(text: string): number | null {
 
 /**
  * doc 21 Phase 6 — the **Effort target** sheet: assign this slot's target RIR
- * for this week, the rest of the block, or the whole block, with a reason.
+ * for this week, the block's working weeks, or all of them, with a reason.
  *
  * Built to the Load-step precedent (doc 14 phase 3, `LoadStepSheet.tsx`) per §8,
  * and deliberately minimal per A4: MCP remains the primary surface, and the
@@ -111,11 +119,10 @@ export function EffortSheet({
   useEffect(() => {
     if (!we) return;
     const assigned = we.slot_effort?.assignedRir ?? null;
-    const isChip =
-      assigned != null && STEPS.some((s) => weekRir + s === assigned);
+    const onCell = assigned != null && rirOptions(weekRir).includes(assigned);
     setValue(assigned);
-    setCustom(assigned != null && !isChip);
-    setCustomText(assigned != null && !isChip ? String(assigned) : "");
+    setCustom(assigned != null && !onCell);
+    setCustomText(assigned != null && !onCell ? String(assigned) : "");
     setScope("this_week");
     setReason(we.slot_effort?.reason ?? "");
     setWarnings(null);
@@ -165,16 +172,18 @@ export function EffortSheet({
     });
   };
 
-  // The settings vocabulary (fig 4.4 / the profile editor), not the Load-step
-  // sheet's: 10px tracked caps, ink fill on selection, paper otherwise, and
-  // contiguous button BLOCKS rather than loose chips. The Load-step precedent
-  // governs the sheet's SHAPE (title, subtitle, chips, clear affordance,
-  // Cancel/SAVE) — its chip scale reads a full size larger than every other
-  // choice control in the app, which is what the owner caught here.
+  // The settings vocabulary (fig 4.4 / the profile editor) at the settings
+  // SCALE — 10px tracked caps in contiguous button BLOCKS, paper with no fill
+  // when unselected — but with **accent** on the selected cell rather than the
+  // settings screens' ink. Hard rule 7 reserves orange for current position and
+  // selection, which is exactly what a selected cell is; the settings screens
+  // predate that reading and the Load-step sheet already fills with accent.
+  // What was wrong before this pass was only the SCALE: Load step's 13px bold
+  // chips read a full size larger than every other choice control in the app.
   const label = "text-[10px] font-semibold tracking-[0.14em] text-ink/55";
   const help = "mt-[7px] text-[11px] font-medium leading-normal text-ink/60";
   const blockCell = "flex-1 py-2.5 text-center text-[10px] tracking-[0.1em]";
-  const cellOn = "bg-ink font-bold text-bg-base";
+  const cellOn = "bg-accent font-bold text-bg-base";
   const cellOff = "font-medium text-ink/55";
   const wideOff =
     "border border-dashed border-ink/40 font-medium text-ink/55";
@@ -203,12 +212,11 @@ export function EffortSheet({
 
       <div className={`mt-5 ${label}`}>TARGET RIR</div>
       <div className="mt-2 flex border-[1.5px] border-ink">
-        {STEPS.map((step, i) => {
-          const abs = weekRir + step;
+        {rirOptions(weekRir).map((abs, i) => {
           const active = !custom && value === abs;
           return (
             <button
-              key={step}
+              key={abs}
               type="button"
               disabled={readOnly}
               aria-pressed={active}
@@ -258,8 +266,10 @@ export function EffortSheet({
               RIR
             </span>
           </div>
+          {/* ink, not accent: inside this sheet accent now means SELECTED, so
+              an orange error string would compete with the filled cells */}
           {customInvalid && (
-            <span className="text-[10px] font-medium leading-[1.3] text-accent">
+            <span className="text-[10px] font-medium leading-[1.3] text-ink/70">
               Enter a whole number 0–{RIR_MAX}.
             </span>
           )}
@@ -301,10 +311,7 @@ export function EffortSheet({
           </button>
         ))}
       </div>
-      <p className={help}>
-        {scopeHelp(scope, weekNumber)} Weeks you have already trained never
-        change — a performed session is the record of what you did.
-      </p>
+      <p className={help}>{scopeHelp(scope, weekNumber)}</p>
 
       <div className={`mt-5 ${label}`}>REASON</div>
       <input
@@ -312,7 +319,7 @@ export function EffortSheet({
         value={reason}
         disabled={readOnly}
         onChange={(e) => setReason(e.target.value)}
-        placeholder="nerve flare — easing the lumbar load"
+        placeholder="why this exercise runs differently"
         aria-label="reason for the effort assignment"
         maxLength={500}
         className="mt-2 h-10 w-full border-[1.5px] border-ink bg-paper px-3 text-[13px] font-medium focus:outline-none disabled:opacity-40"
