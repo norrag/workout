@@ -54,7 +54,7 @@ export interface PrescriptionAudit {
    *  when the caller says the feature is serving (`llmExplanationsServe`) AND
    *  the row is a v3 row (`prompt_version >= 3`; v1–v2 whole-blob rows stop
    *  being served the moment the seam inverts, §3). Appended BENEATH the
-   *  deterministic why (never a replacement); the ask, why, and ENGINE AUDIT
+   *  deterministic why (never a replacement); the ask, why, and PRESCRIPTION DETAILS
    *  panel stay deterministic. Null ⇒ the composer stands alone. */
   explanation: string | null;
   /** doc 19 §4.3 — did the session this decision advanced from actually REPORT

@@ -140,19 +140,61 @@ function StandaloneRow({ meso }: { meso: MesocycleRow }) {
   );
 }
 
+/** A macrocycle nobody is training any more: closed outright, or every block in
+ *  it finished. Mirrors the `allComplete` line the rows already render from. */
+function macroIsClosed(macro: {
+  status: string;
+  mesos: MesocycleRow[];
+}): boolean {
+  return (
+    macro.status === "completed" ||
+    (macro.mesos.length > 0 &&
+      macro.mesos.every(
+        (m) => m.status === "completed" || m.status === "abandoned",
+      ))
+  );
+}
+
+/** A standalone mesocycle that is over — nothing left to open or log. */
+function mesoIsClosed(meso: MesocycleRow): boolean {
+  return meso.status === "completed" || meso.status === "abandoned";
+}
+
 /** Cycles tab (fig 2.1): macrocycles with positioned mesocycles, standalone mesos. */
-export default async function CyclesPage() {
+export default async function CyclesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ completed?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [{ macros, standaloneMesos }, draft] = await Promise.all([
-    getCyclesOverview(supabase, user.id),
-    getDraftMeso(supabase, user.id),
-  ]);
-  const empty = macros.length === 0 && standaloneMesos.length === 0;
+  const [{ macros: allMacros, standaloneMesos: allStandaloneMesos }, draft, { completed }] =
+    await Promise.all([
+      getCyclesOverview(supabase, user.id),
+      getDraftMeso(supabase, user.id),
+      searchParams,
+    ]);
+
+  // N76: finished cycles are hidden by default — the list is a working surface,
+  // and a year of closed blocks buries the one that is live. Only whole closed
+  // CYCLES are hidden: a completed mesocycle inside a macrocycle that is still
+  // running stays, because it is part of that macro's own record of progress.
+  const showCompleted = completed === "1";
+  const closedMacros = allMacros.filter(macroIsClosed).length;
+  const closedStandalone = allStandaloneMesos.filter(mesoIsClosed).length;
+  const closedCount = closedMacros + closedStandalone;
+  const macros = showCompleted ? allMacros : allMacros.filter((m) => !macroIsClosed(m));
+  const standaloneMesos = showCompleted
+    ? allStandaloneMesos
+    : allStandaloneMesos.filter((m) => !mesoIsClosed(m));
+
+  // "nothing here" is only true when nothing exists at all — a list emptied by
+  // the filter gets the toggle, not the first-run copy.
+  const empty = allMacros.length === 0 && allStandaloneMesos.length === 0;
 
   return (
     <div>
@@ -204,12 +246,7 @@ export default async function CyclesPage() {
 
       {macros.map((macro) => {
         const hasActive = macro.mesos.some((m) => m.status === "active");
-        const allComplete =
-          macro.status === "completed" ||
-          (macro.mesos.length > 0 &&
-            macro.mesos.every(
-              (m) => m.status === "completed" || m.status === "abandoned",
-            ));
+        const allComplete = macroIsClosed(macro);
         const goalLine = `GOAL ${macro.goal_type.toUpperCase()} · ${macro.mesos.length} MESOCYCLE${macro.mesos.length === 1 ? "" : "S"}${allComplete ? " · COMPLETE" : ""}`;
         return (
           <details
@@ -273,6 +310,40 @@ export default async function CyclesPage() {
             + PLAN A MESOCYCLE
           </Link>
         </div>
+      )}
+
+      {/* everything the user has is finished — say so, or the page reads as a
+          bug rather than as a filter doing its job */}
+      {!empty && !showCompleted && macros.length === 0 && standaloneMesos.length === 0 && (
+        <div className="mt-6">
+          <p className="text-sm leading-relaxed text-ink/70">
+            Nothing in progress. Every cycle you&apos;ve run is complete — start
+            a new one, or show the finished ones below.
+          </p>
+          <Link
+            href="/cycles/plan"
+            className="mt-5 block border-[1.5px] border-dashed border-ink/45 py-[13px] text-center text-[11px] font-bold tracking-[0.12em] text-ink/65"
+          >
+            + PLAN A MESOCYCLE
+          </Link>
+        </div>
+      )}
+
+      {/* N76: the completed-cycle toggle. Deliberately the quietest thing on the
+          page — no border, no accent, muted caps — and it carries the count so
+          hidden history never reads as lost history. A link, not a control with
+          state to keep: the page is a server render and `?completed=1` is the
+          whole mechanism. */}
+      {closedCount > 0 && (
+        <Link
+          href={showCompleted ? "/cycles" : "/cycles?completed=1"}
+          scroll={false}
+          className="mt-5 block py-3 text-center text-[9.5px] font-semibold tracking-[0.14em] text-ink/40"
+        >
+          {showCompleted
+            ? "HIDE COMPLETED CYCLES"
+            : `SHOW ${closedCount} COMPLETED CYCLE${closedCount === 1 ? "" : "S"}`}
+        </Link>
       )}
     </div>
   );

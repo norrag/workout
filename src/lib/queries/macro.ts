@@ -167,6 +167,49 @@ export interface CreateMacroInput {
   goal_notes: string | null;
 }
 
+/**
+ * The user's live macrocycle, if they have one (N79).
+ *
+ * N79 relaxed "one active mesocycle per user" so a standalone block can run
+ * beside a macrocycle's block. The owner drew the line at the macro level: one
+ * active macrocycle, always. A macrocycle is a single long-term direction with
+ * a single target and a single pacing band — two of them at once would have the
+ * engine pacing one athlete toward two contradictory contracts.
+ *
+ * Enforced here rather than as a unique index on purpose: an account that
+ * already carries two active macros would fail the migration outright, and no
+ * user's existing data may be held hostage to a new rule. The cost is that this
+ * is a check-then-act, so a genuinely simultaneous double-create could slip
+ * through — a cosmetic race on a once-a-quarter action, closable in the app by
+ * ending one.
+ */
+export async function findActiveMacrocycle(
+  supabase: Client,
+  userId: string,
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase
+    .from("macrocycles")
+    .select("id, name")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+/** The refusal sentence for a second macrocycle, or null when the way is clear. */
+export async function macrocycleCreationBlock(
+  supabase: Client,
+  userId: string,
+): Promise<string | null> {
+  const live = await findActiveMacrocycle(supabase, userId);
+  return live
+    ? `"${live.name}" is still running — a macrocycle is one long-term direction at a time, so end it before starting another. (A standalone mesocycle can run alongside it.)`
+    : null;
+}
+
 export async function createMacrocycleWithMesos(
   supabase: Client,
   userId: string,

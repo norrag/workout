@@ -174,6 +174,17 @@ rows migrate into the host mesos' `position`/`phase`; the table is dropped once 
 - **Migration delta:** add `position`, `phase`; add `unplanned` to the status check; drop
   `macro_slot_id`. Macro creation pre-creates the computed number of `unplanned` mesos with
   `position` + suggested `phase` (09 2026-06-13 §3–4).
+- **Concurrency invariant (N79, migration `20260806000001`).** Partial unique index
+  `mesocycles_one_active_per_macrocycle` on `(macrocycle_id) where status = 'active' and
+  macrocycle_id is not null`: **one live block per macrocycle**, exclusive and (via
+  `mesoActivationBlock`) sequential. **Standalone mesos are deliberately unconstrained** — one may
+  run alongside an active macrocycle's block (a rehab assignment, or work that has to happen beside
+  the plan rather than instead of it). This *replaces* R15's `mesocycles_one_active_per_user`
+  (`20260703000001`). One active **macrocycle** per user is enforced in the app
+  (`macrocycleCreationBlock`), not by an index, so the migration can't fail on an account that
+  already carries two. Consequence: "the active mesocycle" is a **resolution**, not a lookup —
+  `resolveActiveMesocycle` picks the block holding the most recently logged set, falling back to
+  newest-created.
 
 ### Groups-first plan: `meso_days` → `meso_day_groups` → `meso_exercises`
 The planner board (figs 2.4/2.5): days are columns of muscle-group blocks; each block has N exercise slots filled from the pre-filtered picker.

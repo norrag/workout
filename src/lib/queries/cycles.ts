@@ -1186,6 +1186,57 @@ export interface CurrentState {
 }
 
 /**
+ * **The** current mesocycle, when more than one may be live (N79).
+ *
+ * Until now this was a lookup: the DB guaranteed at most one active meso per
+ * user, so "the active one" was whichever row came back. Since a standalone
+ * block may now run alongside a macrocycle's block (a rehab assignment, a
+ * temporary step outside the plan), it becomes a **resolution**, and the owner
+ * set the rule: the current block is the one holding the **most recently logged
+ * set**. That is the right key because it is the only one the athlete controls
+ * by training rather than by bookkeeping — log a rehab session and the app
+ * follows the rehab block; log the macro's next day and it follows that again,
+ * with nothing to switch.
+ *
+ * Costs one query in the overwhelmingly common single-active case: the tiebreak
+ * read only runs when there is genuinely a tie to break. Falls back to
+ * newest-created when no candidate has been logged yet (a freshly started block
+ * has no sets, and "most recent of nothing" must not resolve to nothing).
+ */
+export async function resolveActiveMesocycle(
+  supabase: Client,
+  userId: string,
+): Promise<MesocycleRow | null> {
+  const { data: actives, error } = await supabase
+    .from("mesocycles")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!actives || actives.length === 0) return null;
+  if (actives.length === 1) return actives[0];
+
+  const { data: latest, error: setError } = await supabase
+    .from("logged_sets")
+    .select("mesocycle_id")
+    .eq("user_id", userId)
+    .in(
+      "mesocycle_id",
+      actives.map((m) => m.id),
+    )
+    .order("performed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (setError) throw setError;
+  return (
+    actives.find((m) => m.id === latest?.mesocycle_id) ??
+    // newest-created, per the `order` above
+    actives[0]
+  );
+}
+
+/**
  * `includeSlotEffort` is opt-in because the app's workout page calls this up to
  * three times per render and has no use for the disclosure (the day view reads
  * the resolved prescription itself); the MCP read surfaces, which DO have to
@@ -1196,15 +1247,7 @@ export async function getCurrentState(
   userId: string,
   opts: { includeSlotEffort?: boolean } = {},
 ): Promise<CurrentState> {
-  const { data: mesocycle, error: mesoError } = await supabase
-    .from("mesocycles")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (mesoError) throw mesoError;
+  const mesocycle = await resolveActiveMesocycle(supabase, userId);
   if (!mesocycle)
     return {
       macrocycle: null,

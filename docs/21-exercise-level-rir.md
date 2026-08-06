@@ -384,6 +384,25 @@ it.
   before the engine's own reasoning; the facts payload carries it so the
   coaching line never narrates an engine rationale for an authored effort level.
 
+> **Amendment 2026-08-06 (N78) — the planner board authors the FLAT column.**
+> Phase 6 left `PlannerBoard.tsx` alone, on the grounds that a per-week
+> assignment cannot be shown truthfully on a surface with no week axis. That
+> holds, and still does — but it is an argument about the **schedule**, not
+> about the column pair. `meso_exercises.target_rir` is flat by construction: it
+> is a statement about the whole block, which is exactly what a plan surface is
+> for. So the board now authors `target_rir` **only**, through the same
+> `planSlotEffortEdit`, and the per-week form stays on the day-view Effort
+> target sheet where the week is known. Three consequences hold this honest:
+> a slot carrying a `rir_schedule` displays as `RIR BY WEEK` and the sheet says
+> what a flat value would replace, rather than flattening it silently; an
+> unassigned slot displays `RIR —` rather than blank, so an assignment always
+> reads as a departure (§4.1); and the sheet states that a flat value governs
+> the deload week (§4.1's disclosure, made at authoring time rather than as a
+> post-hoc warning, since the board has no warning channel — it redirects on
+> save). The write is applied **after** `save_meso_plan`, whose
+> `restoreSlotEffortAssignments` would otherwise undo it. There are now three
+> write surfaces and still exactly one authoring policy.
+
 ---
 
 ## 9. Open confirmations

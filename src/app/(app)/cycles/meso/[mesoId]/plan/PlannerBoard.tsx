@@ -31,6 +31,7 @@ import {
   saveMesoAsTemplateAction,
   saveMesoPlanAction,
   setGroupExercisesAction,
+  setPlanSlotRirAction,
   updateDayAction,
   updateFillSetsAction,
   updateGroupAction,
@@ -86,6 +87,14 @@ interface ViewFill {
   slot_number: number;
   /** day-level order across all groups (#2 flat list) */
   day_position: number;
+  /** N78 (doc 21 §3) — this slot's flat target RIR for the whole block; null =
+   *  the meso's weekly RIR target governs. The board only ever writes the FLAT
+   *  column: it has no week axis, so a per-week assignment cannot be shown here
+   *  truthfully (that lives on the day view's Effort target sheet). */
+  target_rir: number | null;
+  /** true when the slot carries a per-WEEK assignment instead — display only,
+   *  so the sheet can say what it would replace rather than silently doing it */
+  has_rir_schedule: boolean;
 }
 interface ViewGroup {
   id: string;
@@ -110,6 +119,8 @@ type PickerTarget = {
    *  multi-select. Unset = fill open slots (the original add mode). */
   replaceFill?: ViewFill;
 };
+/** N78: the one filled row the exercise sheet is open for. */
+type FillTarget = { fill: ViewFill; group: ViewGroup; day: ViewDay };
 type Commit = (fn: () => Promise<void>) => void;
 
 function tmpId(): string {
@@ -159,6 +170,8 @@ function toWorkDays(days: PlannedDay[]): ViewDay[] {
           initial_sets: f.initial_sets,
           slot_number: f.slot_number ?? i + 1,
           day_position: dayPosById.get(f.id) ?? i + 1,
+          target_rir: f.target_rir,
+          has_rir_schedule: f.rir_schedule != null,
         })),
       })),
     };
@@ -174,6 +187,16 @@ function flatDayFills(day: ViewDay): { fill: ViewFill; group: ViewGroup }[] {
 
 function badge(name: string): string {
   return name.slice(0, 2).toUpperCase();
+}
+
+/** N78 — the row's effort line. "RIR —" (the meso's own ramp is in charge) is
+ *  said out loud rather than left blank, so an assignment always reads as a
+ *  departure from something (doc 21 §4.1) even where the board can't name the
+ *  week's number. A per-week assignment is named, never flattened into a lie. */
+function fillRirLabel(fill: ViewFill): string {
+  if (fill.target_rir != null) return `RIR ${fill.target_rir}`;
+  if (fill.has_rir_schedule) return "RIR BY WEEK";
+  return "RIR —";
 }
 
 function dayTabLabel(day: ViewDay): string {
@@ -192,6 +215,15 @@ function nextWeekday(used: (number | null)[]): number {
 // A week has 7 days, so the plan caps at 7 training days (DB checks enforce
 // day_number ≤ 7 and days_per_week ≤ 7).
 const MAX_DAYS = 7;
+
+// doc 21 §3/§4.3 bounds for a slot's target RIR, mirrored here (as the day
+// view's Effort sheet mirrors them) so this client chunk doesn't drag the
+// query-layer module — and its engine imports — into the bundle for two numbers.
+// The server re-validates through `planSlotEffortEdit` either way.
+const SLOT_RIR_MIN = 0;
+const SLOT_RIR_MAX = 30;
+/** Where "set a target" starts: a mid-ramp value, one tap from anywhere useful. */
+const DEFAULT_SLOT_RIR = 2;
 
 /** Smallest unused day number in 1..7 — not max+1, so removals don't push a
  *  later add past the day_number ≤ 7 check. Returns null when the week is full. */
@@ -255,6 +287,7 @@ export function PlannerBoard({
   // it was opened from there, not from the board's own + ADD MUSCLE GROUP).
   const [returnToDaySheet, setReturnToDaySheet] = useState(false);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
+  const [fillSheet, setFillSheet] = useState<FillTarget | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   const [saving, setSaving] = useState(false);
   // discard-confirm destination: set = the sheet is open, and DISCARD leaves
@@ -406,6 +439,43 @@ export function PlannerBoard({
     );
   };
 
+  // N78: this slot's target RIR for the whole block — the doc-21 lever, reached
+  // from the plan rather than mid-session. Flat only: the board has no week
+  // axis, so it writes `meso_exercises.target_rir` and leaves per-week
+  // schedules to the day view's Effort target sheet. Staged in editing mode
+  // (committed by SAVE CHANGES with the rest of the plan), a live single-row
+  // write on a draft — exactly the split `setFillSets` already uses.
+  const setFillRir = (fillId: string, rir: number | null) => {
+    if (rir != null && (rir < SLOT_RIR_MIN || rir > SLOT_RIR_MAX)) return;
+    if (editing) {
+      setWorkDays((ds) =>
+        ds.map((d) => ({
+          ...d,
+          groups: d.groups.map((g) => ({
+            ...g,
+            fills: g.fills.map((f) =>
+              f.id === fillId
+                ? // a flat value replaces any per-week schedule (the write does
+                  // the same); clearing drops both
+                  { ...f, target_rir: rir, has_rir_schedule: false }
+                : f,
+            ),
+          })),
+        })),
+      );
+      setDirty(true);
+      return;
+    }
+    commit(async () => {
+      const result = await setPlanSlotRirAction({
+        meso_id: meso.id,
+        meso_exercise_id: fillId,
+        target_rir: rir,
+      });
+      if (result.error) toast(result.error);
+    });
+  };
+
   const removeGroup = (groupId: string) => {
     if (editing) {
       setWorkDays((ds) =>
@@ -458,6 +528,10 @@ export function PlannerBoard({
                     initial_sets: l.initial_sets,
                     slot_number: l.slot_number,
                     day_position: prev?.day_position ?? ++nextDayPos,
+                    // an assignment belongs to the day-slot × EXERCISE, so a
+                    // retained exercise keeps it and a new one starts clean
+                    target_rir: prev?.target_rir ?? null,
+                    has_rir_schedule: prev?.has_rir_schedule ?? false,
                   };
                 }),
               };
@@ -564,6 +638,11 @@ export function PlannerBoard({
                           exercise_name:
                             exercises.find((e) => e.id === exerciseId)?.name ??
                             "",
+                          // the effort assignment belongs to the exercise, not
+                          // the slot — a different movement starts unassigned
+                          // (which is also what the re-key on save produces)
+                          target_rir: null,
+                          has_rir_schedule: false,
                         }
                       : f,
                   ),
@@ -664,6 +743,38 @@ export function PlannerBoard({
   };
 
   const doSave = () => {
+    // N78: the effort assignments ride alongside the structure rather than
+    // inside it. `save_meso_plan` re-mints every slot row and the assignments
+    // are re-keyed by day-slot × exercise afterwards, so they have to be
+    // applied AFTER that replace — sending them as their own list keeps the
+    // structural payload byte-identical to what the RPC has always taken.
+    // Only what actually changed is sent, so a plain reorder writes nothing.
+    const originalRir = new Map(
+      toWorkDays(plan.days).flatMap((d) =>
+        d.groups.flatMap((g) =>
+          g.fills.map(
+            (f) =>
+              [`${d.day_number}::${f.exercise_id}`, f.target_rir] as const,
+          ),
+        ),
+      ),
+    );
+    const effort = days.flatMap((d) =>
+      d.groups.flatMap((g) =>
+        g.fills
+          .filter(
+            (f) =>
+              (originalRir.get(`${d.day_number}::${f.exercise_id}`) ?? null) !==
+              f.target_rir,
+          )
+          .map((f) => ({
+            day_number: d.day_number,
+            exercise_id: f.exercise_id,
+            target_rir: f.target_rir,
+          })),
+      ),
+    );
+
     const payload = days.map((d) => {
       // normalise the flat day order to 1..n so saved positions are clean
       const orderById = new Map(
@@ -690,7 +801,7 @@ export function PlannerBoard({
       // board and discards the entire staged session (R16). Keep `workDays`
       // and the confirm sheet so SAVE CHANGES is a one-tap retry.
       try {
-        await saveMesoPlanAction({ meso_id: meso.id, days: payload });
+        await saveMesoPlanAction({ meso_id: meso.id, days: payload, effort });
         setSaving(false);
       } catch {
         toast("Couldn't save the plan — your changes are still here, try again");
@@ -866,66 +977,40 @@ export function PlannerBoard({
                   <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] font-extrabold">
                     {badge(group.muscle_group)}
                   </div>
+                  {/* N78: one target for the whole row. The row used to carry a
+                      −/N/+ stepper with its own micro-label AND a ✕, which is
+                      six controls per exercise before any new lever is added;
+                      everything an exercise can be is now behind this one tap
+                      (sets, effort, substitute, remove), and the row reads as a
+                      line of plan instead of a control panel. */}
                   <button
                     type="button"
-                    className="flex-1 text-left"
-                    onClick={() =>
-                      // N31: a filled row opens the picker in replace-in-place
-                      // mode (swap THIS slot), not the group multi-select
-                      setPicker({ group, day: activeDay, replaceFill: fill })
-                    }
+                    className="flex flex-1 items-center gap-3 text-left"
+                    aria-label={`${fill.exercise_name} options`}
+                    onClick={() => setFillSheet({ fill, group, day: activeDay })}
                   >
-                    <div className="text-[15px] font-semibold">
-                      {fill.exercise_name}
-                    </div>
-                    <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
-                      {group.muscle_group.toUpperCase()} ·{" "}
-                      {exercises
-                        .find((e) => e.id === fill.exercise_id)
-                        ?.equipment_type.toUpperCase() ?? ""}
-                    </div>
-                  </button>
-                  {/* N17: starting-set stepper — the group-slots stepper's
-                      grammar, compacted to fit the row */}
-                  <div className="flex flex-col items-center gap-[3px]">
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        aria-label={`fewer ${fill.exercise_name} sets`}
-                        disabled={fill.initial_sets <= 1}
-                        onClick={() =>
-                          setFillSets(fill.id, fill.initial_sets - 1)
-                        }
-                        className="flex h-7 w-7 items-center justify-center border-[1.5px] border-ink text-[14px] font-semibold disabled:opacity-25"
-                      >
-                        −
-                      </button>
-                      <div className="numeral flex h-7 w-[26px] items-center justify-center border-y-[1.5px] border-ink text-[13px] font-extrabold">
-                        {fill.initial_sets}
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`more ${fill.exercise_name} sets`}
-                        disabled={fill.initial_sets >= 20}
-                        onClick={() =>
-                          setFillSets(fill.id, fill.initial_sets + 1)
-                        }
-                        className="flex h-7 w-7 items-center justify-center border-[1.5px] border-ink text-[14px] font-semibold disabled:opacity-25"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="text-[7.5px] font-semibold tracking-[0.14em] text-ink/45">
-                      START SETS
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={`remove ${fill.exercise_name}`}
-                    onClick={() => clearFill(group.id, fill)}
-                    className="px-1 text-[13px] text-ink/40"
-                  >
-                    ✕
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold">
+                        {fill.exercise_name}
+                      </span>
+                      <span className="mt-[3px] block text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                        {group.muscle_group.toUpperCase()} ·{" "}
+                        {exercises
+                          .find((e) => e.id === fill.exercise_id)
+                          ?.equipment_type.toUpperCase() ?? ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="numeral block text-[9.5px] font-bold tracking-[0.1em] text-ink/70">
+                        {fill.initial_sets} SET{fill.initial_sets === 1 ? "" : "S"}
+                      </span>
+                      <span className="mt-[3px] block text-[8.5px] font-semibold tracking-[0.1em] text-ink/45">
+                        {fillRirLabel(fill)}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[15px] font-bold text-ink/45">
+                      ›
+                    </span>
                   </button>
                 </div>
               ));
@@ -1139,6 +1224,41 @@ export function PlannerBoard({
             onClose={() => closeAddGroups(target.id)}
           />
         ) : null;
+      })()}
+      {/* N78: everything one planned exercise can be — kept off the row so the
+          board reads as a plan. Re-derived from `days` on every render (not
+          held in the sheet's own state) so a staged edit made inside it is
+          reflected immediately, and the sheet closes itself if its row goes. */}
+      {(() => {
+        if (!fillSheet) return null;
+        const day = days.find((d) => d.id === fillSheet.day.id);
+        const group = day?.groups.find((g) => g.id === fillSheet.group.id);
+        const fill = group?.fills.find((f) => f.id === fillSheet.fill.id);
+        if (!day || !group || !fill) return null;
+        return (
+          <ExerciseSheet
+            fill={fill}
+            group={group}
+            equipment={
+              exercises
+                .find((e) => e.id === fill.exercise_id)
+                ?.equipment_type.toUpperCase() ?? ""
+            }
+            rampLine={rirSummary(meso.rir_schedule, meso.rir_start, meso.rir_end)}
+            includesDeload={meso.includes_deload}
+            onSets={(sets) => setFillSets(fill.id, sets)}
+            onRir={(rir) => setFillRir(fill.id, rir)}
+            onReplace={() => {
+              setFillSheet(null);
+              setPicker({ group, day, replaceFill: fill });
+            }}
+            onRemove={() => {
+              setFillSheet(null);
+              clearFill(group.id, fill);
+            }}
+            onClose={() => setFillSheet(null)}
+          />
+        );
       })()}
       <ExercisePicker
         target={picker}
@@ -1462,6 +1582,195 @@ function FinalizeSheet({
           </button>
         </div>
       </form>
+    </BottomSheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// N78 — exercise sheet: everything one planned exercise can be, in one place.
+//
+// Why a sheet at all. The board row previously carried a −/N/+ set stepper with
+// its own 7.5px label and a ✕, and the exercise NAME was secretly the substitute
+// control — six targets per row, one of them undiscoverable, and no room left
+// for the effort lever the owner asked for. Pulling all four into a sheet costs
+// one tap on the set stepper and buys back a row that reads as a line of plan.
+//
+// Why the RIR here is FLAT. `meso_exercises` carries both a flat `target_rir`
+// and a per-week `rir_schedule` (doc 21 §3). The board has no week axis — it is
+// one week's shape, repeated — so it can only write the flat column honestly.
+// A slot that already carries a per-week assignment says so and says what
+// setting a value here would replace; it is never silently flattened. The
+// per-week form stays where it can be shown truthfully: the day view's Effort
+// target sheet, which knows which week it is looking at.
+// ---------------------------------------------------------------------------
+
+function ExerciseSheet({
+  fill,
+  group,
+  equipment,
+  rampLine,
+  includesDeload,
+  onSets,
+  onRir,
+  onReplace,
+  onRemove,
+  onClose,
+}: {
+  fill: ViewFill;
+  group: ViewGroup;
+  equipment: string;
+  /** the meso's own RIR ramp / schedule, in one line — the thing an assignment
+   *  departs from (doc 21 §4.1: never show an assignment without its default) */
+  rampLine: string;
+  includesDeload: boolean;
+  onSets: (sets: number) => void;
+  onRir: (rir: number | null) => void;
+  onReplace: () => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const assigned = fill.target_rir;
+
+  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink/55";
+  const help = "mt-[7px] text-[11px] font-medium leading-normal text-ink/60";
+  const stepBtn =
+    "flex h-9 w-9 items-center justify-center border-[1.5px] border-ink text-[17px] font-semibold disabled:opacity-25";
+  const rowBtn =
+    "flex w-full items-center justify-between border-b border-ink/15 py-[13px] text-left";
+
+  return (
+    <BottomSheet
+      open
+      onClose={onClose}
+      title={fill.exercise_name}
+      subtitle={`${group.muscle_group.toUpperCase()}${equipment ? ` · ${equipment}` : ""}`}
+    >
+      <div className={label}>STARTING SETS</div>
+      <div className="mt-2 flex items-center gap-3">
+        <button
+          type="button"
+          aria-label="fewer starting sets"
+          disabled={fill.initial_sets <= 1}
+          onClick={() => onSets(fill.initial_sets - 1)}
+          className={stepBtn}
+        >
+          −
+        </button>
+        <div className="numeral min-w-[34px] text-center text-[19px] font-extrabold">
+          {fill.initial_sets}
+        </div>
+        <button
+          type="button"
+          aria-label="more starting sets"
+          disabled={fill.initial_sets >= 20}
+          onClick={() => onSets(fill.initial_sets + 1)}
+          className={stepBtn}
+        >
+          +
+        </button>
+      </div>
+      <p className={help}>
+        Week 1 only — the engine takes set progression from there.
+      </p>
+
+      <div className={`mt-6 flex items-baseline justify-between ${label}`}>
+        <span>TARGET RIR</span>
+        <span className="numeral font-medium text-ink/45">{rampLine}</span>
+      </div>
+      {/* two states, each with the fewest controls that can express it: unset
+          is one button, set is the stepper plus the way back. A stepper that
+          reads "—" and has to be nudged off it would make "no assignment" look
+          like a value. */}
+      {assigned == null ? (
+        <button
+          type="button"
+          onClick={() => onRir(DEFAULT_SLOT_RIR)}
+          className="mt-2 w-full border-[1.5px] border-dashed border-ink/45 py-3 text-center text-[11px] font-bold tracking-[0.1em] text-ink/65"
+        >
+          + SET A TARGET RIR
+        </button>
+      ) : (
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            type="button"
+            aria-label="lower target RIR"
+            disabled={assigned <= SLOT_RIR_MIN}
+            onClick={() => onRir(assigned - 1)}
+            className={stepBtn}
+          >
+            −
+          </button>
+          <div className="numeral min-w-[34px] text-center text-[19px] font-extrabold">
+            {assigned}
+          </div>
+          <button
+            type="button"
+            aria-label="raise target RIR"
+            disabled={assigned >= SLOT_RIR_MAX}
+            onClick={() => onRir(assigned + 1)}
+            className={stepBtn}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={() => onRir(null)}
+            className="ml-auto border border-dashed border-ink/40 px-3 py-2 text-[9.5px] font-semibold tracking-[0.1em] text-ink/60"
+          >
+            FOLLOW THE RAMP
+          </button>
+        </div>
+      )}
+      {/* the note the owner asked for: what an assignment DOES, said plainly,
+          before it is set rather than after */}
+      <p className={help}>
+        {assigned != null ? (
+          <>
+            This exercise runs at{" "}
+            <span className="numeral font-semibold text-ink/75">
+              RIR {assigned}
+            </span>{" "}
+            every week of this block — it <strong>overrides the weekly RIR
+            target</strong> for this exercise{includesDeload ? ", the deload week included" : ""}.
+            The weight is re-priced to meet it: easier means lighter, harder
+            means heavier. Clear it and the ramp takes over again.
+          </>
+        ) : fill.has_rir_schedule ? (
+          <>
+            This exercise has a target RIR set <strong>per week</strong> (from
+            the day view). Setting a value here replaces that with one target for
+            the whole block.
+          </>
+        ) : (
+          <>
+            Unset — this exercise follows the mesocycle&apos;s weekly RIR target.
+            Set one to override it for this exercise alone, every week of the
+            block.
+          </>
+        )}
+      </p>
+
+      <div className="mt-6 border-t-[1.5px] border-ink">
+        <button type="button" onClick={onReplace} className={rowBtn}>
+          <span className="text-sm font-semibold">Replace exercise</span>
+          <span className="text-[15px] font-bold text-ink/45">›</span>
+        </button>
+        <button type="button" onClick={onRemove} className={rowBtn}>
+          <span className="text-sm font-semibold text-accent">
+            Remove from day
+          </span>
+        </button>
+      </div>
+
+      <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          className="bg-ink px-8 py-3.5 text-[13px] font-bold tracking-[0.08em] text-bg-base"
+        >
+          DONE
+        </button>
+      </div>
     </BottomSheet>
   );
 }

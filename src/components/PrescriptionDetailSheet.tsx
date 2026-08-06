@@ -58,7 +58,7 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 /**
- * Engine audit — the technical/debug reveal behind a prescription (owner
+ * Prescription details — the technical reveal behind a prescription (owner
  * request 2026-06-25; reorganized 2026-07-19 into the debug half of the
  * prescription-presentation split: the quick-read strip in the day view is the
  * user-facing story, this panel keeps the full audit record). Grouped ledger:
@@ -67,6 +67,10 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
  * (status-coded steps). Fetches the latest decision on open (mirrors
  * HistorySheet). No mockup figure — light-ledger styling per rule #8;
  * deviation recorded in PROGRESS.md.
+ *
+ * N75: it was called "Engine audit" and lived as its own row in the exercise ⋮
+ * menu. Most people never need it, so it stopped occupying a menu slot: the
+ * strip's own ask line is now the (underlined) way in.
  */
 export function PrescriptionDetailSheet({
   target,
@@ -133,7 +137,7 @@ export function PrescriptionDetailSheet({
     <BottomSheet
       open
       onClose={onClose}
-      title="Engine audit"
+      title="Prescription details"
       subtitle={`${target.exerciseName.toUpperCase()} — ${target.equipmentType.toUpperCase()}`}
     >
       {!loaded ? (

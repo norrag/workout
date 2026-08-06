@@ -259,31 +259,22 @@ export default async function MesoDetailPage({
     });
   }
 
-  // I12: surface the activation gates PROACTIVELY on a planned meso — the same
-  // checks `startMeso` enforces (one live block per user, sequential order
-  // within a macro), so the button explains itself instead of failing on tap.
+  // I12: surface the activation gate PROACTIVELY on a planned meso — the same
+  // check `startMeso` enforces (exclusive + sequential activation within a
+  // macrocycle), so the button explains itself instead of failing on tap.
   // `startMeso` re-checks on submit either way; this is UX, not the guard.
+  // N79: the user-wide "another block is live" refusal is gone — a standalone
+  // meso may start beside an active macrocycle block.
   let startBlockReason: string | null = null;
-  if (meso.status === "planned") {
-    const { data: liveMesos, error: liveErr } = await supabase
+  if (meso.status === "planned" && meso.macrocycle_id) {
+    const { data: siblings, error: sibErr } = await supabase
       .from("mesocycles")
-      .select("name")
-      .eq("status", "active")
-      .neq("id", meso.id)
-      .limit(1);
-    if (liveErr) throw liveErr;
-    if (liveMesos && liveMesos.length > 0) {
-      startBlockReason = `another mesocycle ("${liveMesos[0].name}") is currently active — complete or abandon it before starting this one.`;
-    } else if (meso.macrocycle_id) {
-      const { data: siblings, error: sibErr } = await supabase
-        .from("mesocycles")
-        .select("position, status")
-        .eq("macrocycle_id", meso.macrocycle_id)
-        .neq("id", meso.id);
-      if (sibErr) throw sibErr;
-      const gate = mesoActivationBlock(siblings ?? [], meso.position);
-      if (gate.blocked) startBlockReason = gate.reason;
-    }
+      .select("position, status")
+      .eq("macrocycle_id", meso.macrocycle_id)
+      .neq("id", meso.id);
+    if (sibErr) throw sibErr;
+    const gate = mesoActivationBlock(siblings ?? [], meso.position);
+    if (gate.blocked) startBlockReason = gate.reason;
   }
 
   // read-only plan view rows: flat day order across groups (planner board #2)

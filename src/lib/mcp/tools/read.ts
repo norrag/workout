@@ -16,7 +16,13 @@ import {
   BF_PCT_NOISE_BAND,
 } from "@/lib/queries/body-comp";
 import { getNewestBodyScan } from "@/lib/queries/body-scans";
-import { getCyclesOverview, getMesoPlan, type CyclesOverview, type MesoPlan } from "@/lib/queries/cycles";
+import {
+  getCyclesOverview,
+  getMesoPlan,
+  resolveActiveMesocycle,
+  type CyclesOverview,
+  type MesoPlan,
+} from "@/lib/queries/cycles";
 import {
   getMesoProgressScores,
   getProgressScores,
@@ -1227,15 +1233,9 @@ export async function freshenActivePrescriptions(
   userId: string,
 ): Promise<void> {
   try {
-    const { data: activeMeso, error } = await client
-      .from("mesocycles")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
+    // N79: the current block among possibly several live ones — same
+    // most-recently-logged resolution as every other surface.
+    const activeMeso = await resolveActiveMesocycle(client, userId);
     if (!activeMeso) return;
     await ensureFreshPrescriptions(
       userId,

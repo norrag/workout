@@ -10,6 +10,7 @@ import { getProfile } from "@/lib/queries/profiles";
 import { getActiveEngineParams } from "@/lib/queries/generation";
 import {
   createMacrocycleWithMesos,
+  macrocycleCreationBlock,
   updateMacrocycle,
   getMacroDeletionImpact,
   deleteMacrocycle,
@@ -149,6 +150,9 @@ function registerCreateMacrocycle(server: McpServer) {
       const profile = await getProfile(client, userId);
       if (!profile)
         return jsonResult({ ok: false, error: "The user has no profile yet." });
+      // N79: one live macrocycle at a time (mesocycles may now overlap)
+      const blocked = await macrocycleCreationBlock(client, userId);
+      if (blocked) return jsonResult({ ok: false, error: blocked });
       const { params, version } = await getActiveEngineParams(client);
       const macro = await createMacrocycleWithMesos(
         client,

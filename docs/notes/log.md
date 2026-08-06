@@ -4,6 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-06 — Session 102: exercise menu, cycles list, planner editing, concurrent mesos (N75–N79)
+
+Owner handed over five items in one batch (Batch 32). All five built and shipped
+in **PR #226**; the whole batch is UI-and-plumbing except N79, which is a schema
+change.
+
+- **N75** — *Engine audit* → **Prescription details**, off the ⋮ menu and onto
+  the prescription strip's own ask line (underlined). This amends **N57**, whose
+  Batch-20 addendum had deliberately removed an in-strip link; the owner's point
+  is that the *ask line itself* is the right door, not a link beside it.
+- **N76** — completed cycles hidden by default on `/cycles`, with a muted
+  count-carrying toggle at the bottom (`?completed=1`, server render, no
+  settings entry). Completed mesos inside a *running* macro stay visible.
+- **N77** — the history e1RM row loses `EFF REPS` and the assumed-RIR `~`. Both
+  came from **N70 Phase 1**; the tilde's job was to keep an assumption from
+  reading as an observation, and the owner's call is that in this row the
+  distinction has no reader. It survives on `get_exercise_history`, where it does.
+- **N78** — the planner board opens for an in-progress meso. **The finding: the
+  board could already do this.** Staged working copy, transactional replace,
+  `regenerateOpenWorkouts`' structural merge that skips every started workout,
+  and a save-confirm sheet with a written-but-unreachable "LOGGED HISTORY IS
+  PROTECTED" branch. One `disabled={hasHistory}` was the whole lock, and it was
+  protecting nothing. Exercise-level RIR reaches the board as the **flat**
+  column only — N70 Phase 6 left `PlannerBoard.tsx` alone because a per-week
+  assignment can't be shown truthfully on a surface with no week axis, and that
+  reasoning still holds for the per-week form; the flat value is the part the
+  board can author honestly. The clutter ask was answered by **subtraction**:
+  six per-row targets (set stepper ×3 + its label, ✕, and a secretly-tappable
+  exercise name) collapsed into one exercise sheet, so adding a lever made the
+  row simpler rather than denser.
+- **N79** — concurrent mesocycles. Not a gate removal: **R15** made
+  one-active-per-user a DB guarantee, so the index had to be replaced
+  (`mesocycles_one_active_per_macrocycle`). The consequence worth naming is that
+  "the active meso" stops being a lookup and becomes a **resolution** —
+  `resolveActiveMesocycle`, most-recently-logged-set wins, per the owner's rule.
+  One active macrocycle is enforced in the app rather than by an index, because
+  an account already carrying two would fail the migration.
+
+Next: nothing new is blocked. **N74** (the manuals) still awaits owner review of
+doc 22 §4/§12 before Phase 0, and this batch adds three surfaces the eventual
+route-by-route inventory will have to describe (the cycles toggle, the planner
+exercise sheet, concurrent blocks).
+
 ## 2026-08-05 — Session 101: user manual + AI manual — plan written (N74)
 
 New owner task, not a note batch: review the repo, the app's real functionality

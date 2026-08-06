@@ -15,6 +15,7 @@ import { llmExplanationsMode } from "@/lib/llm/config";
 import { explanationModel } from "@/lib/llm/openai";
 import { COACHING_PROMPT_VERSION } from "@/lib/llm/coaching";
 import { getActiveCoachingPrompt } from "@/lib/queries/coaching-prompts";
+import { resolveActiveMesocycle } from "@/lib/queries/cycles";
 import { reconcilePrescriptions } from "@/lib/queries/regeneration";
 import { listOpenDecisionTargets } from "@/lib/queries/open-decisions";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -157,17 +158,11 @@ async function resolveMesoId(
       ? { mesoId: data.id }
       : { mesoId: null, error: `mesocycle ${mesocycleId} not found (or not yours)` };
   }
-  const { data, error } = await client
-    .from("mesocycles")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data
-    ? { mesoId: data.id }
+  // N79: more than one block can be live, so this is the same resolution every
+  // other "the current meso" surface uses — most recently logged wins.
+  const meso = await resolveActiveMesocycle(client, userId);
+  return meso
+    ? { mesoId: meso.id }
     : { mesoId: null, error: "no active mesocycle (pass mesocycle_id explicitly)" };
 }
 

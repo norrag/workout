@@ -127,6 +127,8 @@ export function MesoHeader({
 
   const iconBtn =
     "flex h-7 w-7 items-center justify-center border border-ink/35";
+  // a finished meso is a record, not a plan — nothing about it is editable
+  const frozen = status === "completed" || status === "abandoned";
 
   const saveTemplate = () => {
     startTemplate(async () => {
@@ -355,12 +357,17 @@ export function MesoHeader({
         <div className="border-b border-ink/15 px-4 pb-1.5 pt-2.5 text-[9px] font-bold tracking-[0.14em] text-ink/45">
           MESOCYCLE
         </div>
-        {/* Once any set is logged the plan is locked here — edits are made
-            from the workout page so the engine and history stay consistent. */}
+        {/* N78: the plan used to lock the moment a set was logged. It doesn't
+            any more — a block you're halfway through is exactly when you learn
+            it needs changing. The board's save reaches only days and weeks that
+            haven't started (`regenerateOpenWorkouts`), and hard rule #5 keeps
+            every logged set where it is, so there was never anything for the
+            lock to protect. A completed meso stays frozen — its plan is part of
+            the record. */}
         <MenuRow
-          label={status === "planned" ? "Edit plan" : "Edit weeks"}
-          disabled={hasHistory || savingTemplate}
-          trailing={hasHistory ? "LOCKED" : undefined}
+          label="Edit plan"
+          disabled={frozen || savingTemplate}
+          trailing={frozen ? "FINISHED" : undefined}
           onClick={() => {
             setMenuOpen(false);
             router.push(`/cycles/meso/${mesoId}/plan`);

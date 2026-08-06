@@ -50,15 +50,30 @@ vi.mock("@/lib/observability/report", () => ({
   reportError: (...args: unknown[]) => reportError(...(args as [])),
 }));
 
-/** Chainable stub for the active-meso lookup the freshness step performs. */
-function fakeClient(result: { data: unknown; error: unknown } | Error) {
+/**
+ * Chainable stub for the active-meso lookup the freshness step performs.
+ * N79: that lookup is `resolveActiveMesocycle`, which awaits the builder
+ * directly (a LIST of active mesos) rather than `.maybeSingle()` — the stub is
+ * thenable to match, and only reaches the logged-set tiebreak when the list has
+ * more than one row.
+ */
+function fakeClient(actives: { id: string }[] | Error) {
   const builder: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "order", "limit"]) {
+  for (const m of ["select", "eq", "in", "order", "limit"]) {
     builder[m] = () => builder;
   }
+  const resolve = async () => {
+    if (actives instanceof Error) throw actives;
+    return { data: actives, error: null };
+  };
+  builder.then = (
+    onFulfilled: (v: unknown) => unknown,
+    onRejected?: (e: unknown) => unknown,
+  ) => resolve().then(onFulfilled, onRejected);
+  // the tiebreak read (`logged_sets`) — only reached with >1 active meso
   builder.maybeSingle = async () => {
-    if (result instanceof Error) throw result;
-    return result;
+    if (actives instanceof Error) throw actives;
+    return { data: { mesocycle_id: actives[0]?.id ?? null }, error: null };
   };
   return {
     from: (table: string) => {
@@ -98,7 +113,7 @@ beforeEach(() => {
 describe("explain_prescription — doc 14 §5 freshness parity (N56)", () => {
   it("reconciles the active meso before reading the decision", async () => {
     resolveSession.mockReturnValue(
-      mockSession(fakeClient({ data: { id: "meso-1" }, error: null })),
+      mockSession(fakeClient([{ id: "meso-1" }])),
     );
     const out = (await explainHandler()(
       { exercise_id: decision.exercise_id },
@@ -121,7 +136,7 @@ describe("explain_prescription — doc 14 §5 freshness parity (N56)", () => {
 
   it("skips the reconcile when the user has no active meso", async () => {
     resolveSession.mockReturnValue(
-      mockSession(fakeClient({ data: null, error: null })),
+      mockSession(fakeClient([])),
     );
     const out = (await explainHandler()(
       { exercise_id: decision.exercise_id },
