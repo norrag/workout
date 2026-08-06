@@ -4,6 +4,54 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-05 — Session 101: user manual + AI manual — plan written (N74)
+
+New owner task, not a note batch: review the repo, the app's real functionality
+and all docs/notes to date, then produce a **User Guide** and a dedicated
+**AI/MCP Manual** (the latter living under the AI connector settings page), and
+afterward place links into the app at the points where they help most. Owner
+asked for the phased plan first, before any writing.
+
+- **New item N74** filed under workstream **M** (in-app help & education), the
+  home of the archived N25 `InfoDot`/glossary work. This is the mechanism-level
+  layer above N25's term-level layer; they share one glossary.
+- **Plan:** [`docs/22-user-manual.md`](../22-user-manual.md) — IA for both
+  manuals (18 User Guide chapters, 12 AI Manual chapters), content contracts,
+  navigation/search requirements, and nine phases sized to one PR each.
+- **The finding that shaped the plan.** Writing this manual from spec prose
+  would produce a wrong manual. The docs supersede each other in place
+  (09↔08↔06, 19↔18, 21 amends 11's RIR premise, 16↔17), and engine_params
+  **v20 and v23 shipped inactive** pending owner activation — so several
+  documented behaviors are not live. Hence **Phase 0**: four parallel
+  ground-truth audits (doc supersession map, route-by-route functional
+  inventory over all 25 pages, concept/FAQ inventory, connector inventory over
+  the 56 tools / 17 admin-gated / 3 resources) that gate every later phase and
+  produce `22b`/`22c`/`22d`.
+- **Structural calls** recorded as D1–D5 with recommendations: in-app for both
+  (the AI Manual's home is fixed by the ask; the User Guide should match or
+  link placement has no targets); content as a **typed block model** in
+  `src/content/manual/` rather than adding a markdown renderer (no new
+  dependency against the WS-J bundle guard, and one source feeds the renderer,
+  the search index, the anchor map and an optional `workout://user-guide`
+  resource); a three-layer depth model (one-line answer → plain-language
+  mechanism → collapsed exact rule) as the structural answer to "understandable
+  but informative".
+- **Anti-rot mechanisms**, because this codebase moves fast: a **claims ledger**
+  (`22a`) mapping every factual assertion to code (not prose), three
+  CI-enforced content contracts (glossary identity with `glossary.ts`, the
+  doc-10 §9 honesty guardrails as a copy test, link-target validity), and a
+  Phase-8 CLAUDE.md rule that a behavior-changing PR updates the manual in the
+  same PR — the discipline the backlog-row rule already enforces.
+- **Deferred by design:** link placement is Phase 7 (owner's own sequencing —
+  placements are decided against real sections, and gated by an owner-reviewed
+  audit so the app doesn't get sprayed with help icons).
+- Six open owner questions in doc 22 §12 (offline availability, User Guide
+  prominence, whether to document inactive engine behavior, AI Manual audience
+  floor, real vs synthetic transcript data, mining the FAQ from `docs/notes/`).
+
+No code written. Awaiting owner review of §4 decisions + §12 questions before
+Phase 0 starts.
+
 ## 2026-08-05 — Session 100: two owner review rounds on the Phase 6 Effort target UI (N70, PR #224)
 
 N70 is already closed (Phase 6, PR #224); this session is polish on that PR
