@@ -1,7 +1,8 @@
 # 22d — Connector inventory (doc 22, Phase 0d)
 
 **Status:** ground truth for the AI Manual. Working document — not user-facing prose.
-**Audited:** 2026-08-06, from `src/lib/mcp/` at `6d5d674` (post-Batch-32).
+**Audited:** 2026-08-06, from `src/lib/mcp/` at `6d5d674` (post-Batch-32);
+**re-verified at `6441e93`** after PR #230 (doc 23, N80) — see [§10](#10-re-verification-after-pr-230).
 **Scope:** doc 22 §11 Phase 0d — *"Per user-facing tool: one plain-language line,
 whether it writes, and which use-case chapter it belongs to. Plus the real auth
 flow, rate limits, and failure behavior. Admin tools are listed once as an
@@ -364,3 +365,44 @@ A deny-list distilled from this audit, for the AI Manual author.
 | 10 How to read its answers | ✅ envelope `data_quality`, `FEEDBACK_SCALES`, guardrails | `source: "projected"` must be named |
 | 11 Notes, exclusions & preferences | ✅ | none |
 | 12 When it gets something wrong | ✅ [§6.2](#62-failure-behavior) | none |
+
+---
+
+## 10. Re-verification after PR #230
+
+PR #230 (doc 23, N80) touched `src/lib/mcp/tools/admin.ts`. Re-counted from
+`registerTool` call sites at `6441e93`:
+
+| | Count | Change |
+|---|---|---|
+| Tools registered | **56** | unchanged |
+| Admin-gated | **17** | unchanged |
+| **User-facing** | **39** | unchanged |
+| Resources | **3** | unchanged |
+
+Every count and every name in [§1](#1-headline-counts)–[§4](#4-resources-3-today-5-after-phase-5)
+still holds. **No tool was added, removed, or renamed**, and nothing moved across
+the admin boundary — so the exclusion set is byte-identical and no chapter
+changes.
+
+**What did change, and why it is still excluded.** `propose_engine_params` and
+`activate_engine_params` gained a required `release_impact` argument
+(`none` / `fix` / `feature`), and `activate_engine_params` now **refuses** a
+`feature`-classified activation unless a live release announces it (doc 23 §9.5).
+Both tools are admin-gated and already in [§2](#2-the-exclusion-set--named-once-then-dropped);
+per doc 22 §1.2 they get no coverage in either manual. Recorded here only so a
+later re-verification can see the change was checked rather than missed.
+
+**Two consequences that do land outside the exclusion set:**
+
+1. **`/more/connector` is an allowlisted release-note link target.**
+   `src/content/releases/links.ts::LINKABLE_ROUTES` includes it, so a future
+   release entry can point a reader straight at the connector page — and, once
+   doc 22 Phase 2 populates `GUIDE_SECTION_IDS`, at an AI Manual section. Worth
+   knowing when Phase 6e reworks that page into the manual's hub.
+2. **The AI Manual is part of release 1.1.0** ([`22b`](./22b-source-map.md) §10),
+   so its routes ship behind `releaseActive("1.1.0")` alongside the User Guide's,
+   and its Phase-5 connector tools (`search_manual`, `get_manual_section`,
+   `workout://user-guide-index`) are a **user-visible capability** that owes an
+   `unreleased.ts` entry when it lands. [§8](#8-what-phase-6-must-not-do) rule 2
+   is unchanged: do not document them before they ship.

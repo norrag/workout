@@ -103,7 +103,141 @@ inactive-behavior exclusion list is explicit. **Next: Phase 1** — block model,
 section-ID scheme, the hard-rule-8 design pass recorded in
 `09-design-changelog.md`, and one exemplar chapter.
 
+### Rebased onto v1.0.0, and made to comply with doc 23
+
+Merged `main` after PR #230 shipped the versioning & release framework. No
+behavior the manual describes changed, but three things did:
+
+- **The app inventory gained a route, a modal and a label.**
+  [`22c`](22c-app-inventory.md) now carries `/more/whats-new` (route **27**, not
+  26), the What's New sheet and its suppression rule (`workouts.status =
+  in_progress` — the first logged set — not the Workout tab being open), and the
+  footer's change from the hardcoded `WORKOUT 0.1 — PRE-RELEASE` to
+  `WORKOUT {version} — WHAT'S NEW ›`.
+- **The connector surface is unchanged, and that was verified rather than
+  assumed.** [`22d`](22d-connector-inventory.md) §10: still 56 tools / 17
+  admin-gated / 39 user-facing at `6441e93`. `propose_engine_params` and
+  `activate_engine_params` gained `release_impact`, but both are admin-gated and
+  already excluded.
+- **Doc 22's *plan* is bound in five ways** — [`22b`](22b-source-map.md) §10, and
+  amended into doc 22 §11 itself. **The manuals are release 1.1.0**, so Phase 2
+  must ship the guide routes behind `releaseActive("1.1.0")` and must populate
+  `GUIDE_SECTION_IDS` for doc 23's `guide` link targets (one validator, two
+  consumers — doc 23 T11). The interleave makes **doc 22 Phases 1–2 the critical
+  path to 1.1.0**.
+
+One more finding, and it is the point of this audit: **doc 22 §2.2's stale
+inactive claim has already propagated.** Doc 23 **T10** cites "v20/v23/v26 all
+shipped inactive"; v20 and v23 are **active**. Doc 23's argument is unaffected —
+an activation is a user-visible change with no diff, which is exactly why it is a
+feature release — but the example was inherited unchecked. Recorded in
+[`22b`](22b-source-map.md) §6.3.
+
+Doc 23 §9.5 also **re-scopes O-B**: activating v26 moves numbers users see, so it
+classifies `release_impact: "feature"`, and `activate_engine_params` refuses a
+feature-classified activation with no live announcing release. v26 therefore
+rides a feature release, and ch. 8 gains the measuring band in the same block.
+
+**Release classification of this PR (doc 23 §4.2/§9.3):** *"Would a user who
+knows the app well see or do anything different after this deploy?"* — **no.**
+Working documents only; no route, no copy, no number. **No `unreleased.ts` entry,
+no version change.**
+
 Docs-only PR: no tests, typecheck or lint affected.
+## 2026-08-06 — Versioning & releases: the framework, and v1.0.0 (doc 23 phases 0–6, N80)
+
+The app stops being an unversioned pre-release. `package.json` said `0.1.0` and
+was referenced by nothing; the More footer hardcoded `WORKOUT 0.1 —
+PRE-RELEASE`; there was no per-user notification state and no tags. All seven
+phases of [doc 23](23-versioning-releases.md) land in one PR, and **1.0.0 is
+cut** — deliberately announcing nothing, because the first notified release must
+not also be the release that debuts the notification (§4.3 / O1).
+
+**Phase 0 — the design pass, first (hard rule 8).** No mockup exists for either
+new surface; the June round predates the idea of a release. Both are derived
+from the house system in the 2026-08-06 entry of
+[09-design-changelog.md](09-design-changelog.md), and **figs 4.6 (version
+history) / 4.7 (What's New sheet)** are claimed in the 08 §5 index with a
+footnote saying they have no mockup behind them. The derivation is the point: a
+release entry is a titled block of prose with an optional onward link — the same
+shape as a More settings row — so the design question was which existing
+patterns compose, not what to invent.
+
+**Phase 1 — identity and registry.** `src/lib/version/` is pure: `compare`
+(numeric per digit, so `1.10.0 > 1.9.0`), `step` (which digit advanced, and
+whether the ones to its right reset), the gate, the suppression predicate, and
+`releaseActive`. `src/content/releases/` is typed data — one file per release,
+an index that sorts and freezes, and `unreleased.ts` for entries accumulating
+between releases. **`index.ts` does not import `unreleased.ts`**, so an
+unreleased entry structurally cannot reach the version history; that property
+falls out of the data model rather than being enforced by a rule. Five CI gates
+run as pure unit tests inside the existing job: three-way version identity
+(`package.json` / `CURRENT_VERSION` / `max(RELEASES)`), the §5.3 invariants, the
+§5.2 content contracts, and both halves of link validation.
+
+**Phase 2 — version history.** `/more/whats-new`, newest first, with feature
+releases in full and fix releases collapsed behind a dashed row (O3). The More
+footer is now a link reading `WORKOUT <version> — WHAT'S NEW ›`, its number from
+the registry. `ReleaseEntryList` is the **one renderer, two surfaces** —
+nothing about an entry may render differently in the sheet and on the page, or
+the page stops being a faithful copy of what the user was shown.
+
+**Phase 3 — per-user state.** `20260806000002_last_seen_version` adds one
+nullable column to `profiles` and backfills every existing row to `'1.0.0'`.
+`null` is meaningful and is **not** the same as 1.0.0: it means *not yet
+primed*, which is what stops a new signup from being greeted by a changelog of
+releases that predate it. Onboarding primes it alongside `onboarded_at`; the
+acknowledgment path primes any `null` it meets later. RLS needed nothing new,
+and the migration comment says why that is deliberate rather than an oversight —
+this is the user's own notification state and the entire blast radius is seeing,
+or not seeing, a sheet about their own app.
+
+**Phase 4 — the sheet.** `WhatsNewGate` mounts in `(app)/layout.tsx` and
+resolves **on the server**: `CURRENT_VERSION` is compiled into the bundle, so a
+tab running yesterday's JS would otherwise compare against yesterday's constant.
+The gate returns a discriminated union — `prime` / `whats-new` / `none` — so a
+future guided tour is a branch rather than a rework, and `last_seen_version`
+stays single-purpose. Suppression follows §6.4: the Workout tab **is** the
+session, so the signal is `workouts.status`, which `logSet` flips
+`planned → in_progress` on the first logged set. Looking at a workout is
+`planned`; being in one is `in_progress`. A stale `in_progress` session cannot
+block the sheet forever because every other tab shows it — no time heuristic, no
+clock in the gate. Acknowledgment is an explicit action, never a render side
+effect, and writes `CURRENT_VERSION` (not the highest pending release) so a user
+who skipped 1.1 and 1.2 clears both.
+
+**Phase 5 — deep links, `app` half.** `LINKABLE_ROUTES` is an allowlist of
+stable, ID-free routes, asserted against the App Router's route files by walking
+`src/app` — so renaming a route breaks CI rather than a user's tap. The `guide`
+variant is typed and has no valid values until doc 22 Phase 2 lands; the
+registry test asserts exactly that rather than silently accepting an
+unresolvable link.
+
+**Phase 6 — process.** [`docs/deployment/release.md`](deployment/release.md) is
+the runbook: which digit, what an ordinary PR adds, the release-PR checklist,
+what CI enforces, how to preview a staged block, and the rollback rule.
+`scripts/release-notes.ts` generates the GitHub release body from the registry,
+so the tag and the app cannot drift. `propose_engine_params` and
+`activate_engine_params` now take a required `release_impact`, and **activation
+is refused** for a `feature`-classified set whose `announced_in` is missing,
+unknown, a fix release, or not yet deployed — which turns doc 23 T10 from
+runbook discipline into a check. `manual-operations.md` gains the
+announce-then-activate rule and the two new operational steps.
+
+**What is deliberately not here.** No in-app "reload to update" banner (the
+service worker already reaches a client on its next navigation), no
+runtime-editable notes, no long-lived release branch. Work merges to `main`
+continuously; what is staged is a feature's *visibility*, via
+`releaseActive("1.1.0")` — and because `CURRENT_VERSION` comes from the registry
+and the registry only gains `1.1.0.ts` in the release PR, **the release PR is
+the switch**.
+
+**Remaining / external.** Apply `20260806000002_last_seen_version` to hosted and
+confirm the backfill; optionally set `NEXT_PUBLIC_RELEASE_OVERRIDE` on Vercel's
+**Preview** scope when a staged block needs reviewing. Both are listed in
+[`manual-operations.md`](deployment/manual-operations.md). Next in this
+workstream is **1.1.0 = the manuals** (doc 23 §11.1), which sets the doc-22
+interleave.
 
 ## 2026-08-06 — Batch 32: prescription details, cycles filter, planner editing, concurrent mesos (N75–N79)
 

@@ -42,6 +42,116 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-06 — Two new surfaces: the What's New sheet and the version history (figs 4.6 / 4.7, N80 / doc 23 Phase 0)
+
+Hard rule 8 has no figure to point at here — the June mockup round predates the
+idea of a release, so **there is no mockup for either surface**. This entry is
+the design pass doc 23 Phase 0 requires, and it is what the build transcribes,
+taking the same route doc 16 Phase 3 took for the set-row marker: derive both
+screens from the house system rather than improvise them, and write the
+derivation down before any markup exists.
+
+Two new figure numbers are claimed in the 08 §5 index: **4.6 — version history
+(More → What's new)** and **4.7 — What's New sheet**.
+
+**Why they can be derived and not drawn.** Neither surface introduces a new
+kind of object. A release entry is a titled block of prose with an optional
+onward link — the same shape as the settings rows on More (fig 4.4) and the
+glossary cards behind an InfoDot. A release is a dated group of them, which is
+what every section rule in the app already expresses. So the design question is
+not "what should these look like" but "which existing patterns compose", and
+getting that wrong is visible immediately against the surrounding screens.
+
+### 1. The What's New sheet (fig 4.7)
+
+- **Change.** A new bottom sheet, reusing `BottomSheet` unchanged — ink scrim at
+  45%, cream panel rising from the tab edge behind a 2px ink rule, square, no
+  grab handle, ~280ms rise. **Title** is the newest pending release's headline
+  (`text-[26px] font-extrabold`, the sheet's standard). **Subtitle** is the
+  tracked all-caps line the sheet already reserves: the version — or the version
+  *span* when several releases accumulated — then the date, e.g.
+  `1.1.0 · 14 AUG 26` or `1.1.0 – 1.3.0 · 14 AUG 26`. Versions and dates set in
+  `.numeral`.
+- **Body** is the shared entry list (§3 below), newest release first, entries
+  concatenated. No per-release sub-heading inside the sheet: a returning user is
+  being told *what is new*, not *which release each thing shipped in* — the
+  history page is where that distinction is offered.
+- **Dismiss** is the full-width ink bar the app uses for a committing action
+  (`bg-ink py-4`, `text-[13px] font-bold tracking-[0.12em]`), reading
+  **GOT IT**. The sheet's own ✕ and the scrim dismiss it identically; all three
+  acknowledge, because all three are the user choosing to leave.
+- **Rationale.** O2 chose a sheet over a banner: a banner is easy to ignore,
+  which defeats the point, and a sheet is honest about interrupting. The
+  interruption is bounded by doc 23 §6.4, which only ever lets it land between
+  sessions. Reusing `BottomSheet` rather than inventing a modal also inherits
+  `useModalA11y` (escape, focus trap, focus return) and `useScrollLock` — R18
+  behavior that a bespoke overlay would have to re-earn.
+- **No accent.** The sheet carries no orange. Nothing on it is a current
+  position or a selection; the release being announced is simply the content.
+- **Affected figures.** 4.7 (new).
+- **Impact.** `NET-NEW`.
+
+### 2. Version history — More → What's new (fig 4.6)
+
+- **Change.** A new More sub-page at `/more/whats-new`, using the sub-page
+  header the other More children already use: the `‹ MORE` back link
+  (`text-[10px] font-bold tracking-[0.14em] text-ink/55`), then
+  `h1.title-display text-[32px]` reading **what's new**, then one tracked
+  all-caps meta line — `WORKOUT 1.0.0 · EVERY RELEASE, NEWEST FIRST`.
+- **A feature or major release** renders as a section: a `border-b-[1.5px]
+  border-ink` rule carrying the version (left) and the date (right), the
+  headline beneath it at `text-xl font-extrabold`, then the shared entry list.
+- **A fix release** collapses to a single dashed-bordered row —
+  `border border-dashed border-ink/35`, version, a `1 FIX` / `n FIXES` count and
+  the date, expanding to one line per entry. Dashed is the house marker for
+  something *held back* rather than laid out, which is exactly what a collapsed
+  fix release is; O3 wants maintenance visible without letting it compete with
+  feature releases for attention.
+- **The accent appears exactly once**: a ■ in orange against the version the app
+  is currently serving. That is the only "you are here" on the page, and it is
+  the same role the tab bar's ■ plays (hard rule 7).
+- **Entry point.** The More footer stops being the hardcoded string
+  `WORKOUT 0.1 — PRE-RELEASE` and becomes a link:
+  `WORKOUT <version> — WHAT'S NEW ›`, same weight and colour as before
+  (`text-[9.5px] font-medium tracking-[0.12em] text-ink/45`). It stays a footer,
+  not a settings row: the version is provenance, not a setting.
+- **Rationale.** This page is the durable copy of the sheet — a user who
+  dismissed it, or who wants to re-explore, comes here — and that is precisely
+  what allows the sheet to be strictly once-only.
+- **Affected figures.** 4.6 (new), 4.4 (footer).
+- **Impact.** `NET-NEW`, plus `RETROFIT` on fig 4.4's footer.
+
+### 3. `ReleaseEntryList` — one renderer, two surfaces
+
+- **Change.** A single component renders an entry in both places. A row is
+  `border-b border-ink/15 py-4`: an optional tracked all-caps area label
+  (`TRAINING` / `PLANNING` / `STATS` / `CONNECTOR` / `APP`, `text-[9.5px]
+  tracking-[0.12em] text-ink/45`), the title at `text-[15px] font-bold`, the
+  body at `text-sm leading-relaxed text-ink/70`, and an optional onward link in
+  the app's standard quiet-link form — `LABEL ›`, `text-[9.5px] font-semibold
+  tracking-[0.1em] text-ink/55`.
+- **Rationale.** Nothing about an entry may render differently in the two
+  places, or the history page stops being a faithful copy of what the user was
+  shown. Enforcing that with one component rather than with discipline is the
+  same call doc 22 D4 made.
+- **Impact.** `NET-NEW` (`src/components/releases/ReleaseEntryList.tsx`).
+
+### 4. Copy discipline is a test, not a habit
+
+- **Change.** Release copy is typed data in `src/content/releases/`, and the
+  house voice is enforced by unit tests over that data: no exclamation marks or
+  superlatives (hard rule 7), positive framing, plain language, the doc 10 §9
+  honesty guardrails (an estimate is named as an estimate), and a length budget
+  — headline ≤ 60 characters, entry title ≤ 60, body ≤ 240, at most six entries
+  in one release.
+- **Rationale.** Release notes are the copy most likely to drift toward
+  marketing, and they are written in small pieces weeks apart. The length budget
+  is also a design constraint: six entries is roughly what fits a sheet without
+  it becoming a document, and a block that produces more should have shipped as
+  two releases.
+- **Impact.** `NO-CODE` for layout; the constraint is enforced in
+  `src/content/releases/__tests__/registry.test.ts`.
+
 ## 2026-08-06 — Four surfaces get quieter: prescription details, the cycles filter, the history row, the planner exercise sheet (figs 1.1 / 1.2 / 2.1 / 2.5 / 3.2, N75–N78)
 
 One owner batch, one shared instinct: each screen was asked to carry one thing

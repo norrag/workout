@@ -2,7 +2,10 @@
 
 **Status:** ground truth for the User Guide. Working document — not user-facing prose.
 **Audited:** 2026-08-06, from the code at `6d5d674` — **post-Batch-32** (doc 22
-§11 requires this; N75–N79 moved four documented surfaces the day before).
+§11 requires this; N75–N79 moved four documented surfaces the day before) —
+and **re-checked against `6441e93`** after PR #230 shipped the versioning &
+release framework (doc 23, N80), which added one route, one modal and one
+changed label. Those are folded in below and marked **(doc 23)**.
 **Scope:** doc 22 §11 Phase 0b (route-by-route functional inventory) and
 Phase 0c (concept & FAQ inventory, appended per the plan).
 **Excludes:** sign-up / sign-in / onboarding (doc 22 §1.2), the OAuth consent
@@ -70,7 +73,8 @@ Full route inventory — every screen a standard user can reach:
 | 23 | `/more/connector` | AI connector setup → the AI Manual's hub | 18 |
 | 24 | `/more/bodyspec` | BodySpec DEXA connect / sync / scan list | 16 |
 | 25 | `/more/bodyspec/[scanId]` | One scan's detail ledger | 16 |
-| 26 | `/~offline` | Offline fallback for a navigation with no network | 19 |
+| 26 | `/more/whats-new` | **Version history** — every release, newest first (doc 23 §8) | 1, 19 |
+| 27 | `/~offline` | Offline fallback for a navigation with no network | 19 |
 
 Share **redemption has no route of its own** — it is the `RedeemForm` reached
 from `/cycles` → `Create new` → `OR ADD FROM A CODE` (`src/app/(app)/share/actions.ts`).
@@ -397,8 +401,24 @@ The three **bodyweight load meanings**, verbatim and worth a table in ch. 15:
 `WORKOUTS LOGGED` counter; `Set up your profile` when incomplete;
 `Log bodyweight` quick-entry (`MEASUREMENT · LB`); `SETTINGS` —
 `Theme` (`LIGHT` / `DARK` / `SYSTEM`), `AI connector` (`SET UP ›` or
-`CONNECTED`), `BodySpec DEXA`, `Account & data`; `SIGN OUT`;
-`WORKOUT 0.1 — PRE-RELEASE`.
+`CONNECTED`), `BodySpec DEXA`, `Account & data`; `SIGN OUT`.
+
+**(doc 23)** The footer is no longer the hardcoded `WORKOUT 0.1 — PRE-RELEASE`.
+It reads **`WORKOUT {version} — WHAT'S NEW ›`** and is a **link to
+`/more/whats-new`**; the number comes from the release registry, and CI asserts
+`package.json` / `CURRENT_VERSION` / `max(RELEASES)` agree. Ch. 1 should
+mention it as the door to "what changed".
+
+### B5.1a `/more/whats-new` — version history **(doc 23)**
+
+`what's new` · `WORKOUT {version} · EVERY RELEASE, NEWEST FIRST`. Newest first;
+**feature** and **major** releases render their entries in full through
+`ReleaseEntryList`; **fix** releases collapse to a version, date and one line,
+expandable (`FixReleaseRow`). The current version is marked.
+
+This page is the **durable copy** of the What's New sheet — which is why the
+sheet is strictly once-only. Ch. 19 covers it alongside export and account data;
+ch. 1 links to it as "how to see what changed".
 
 ### B5.2 `/more/profile`
 
@@ -458,6 +478,32 @@ per scan; `NO SCANS IMPORTED YET`;
 | **Offline** | `/~offline`: `OFFLINE` + `RETRY` | 19 |
 | **Toasts** | consistently *"…— check your connection"* | 19 |
 | **Route skeletons** | every list/detail route | 1 |
+| **What's New sheet** **(doc 23)** | `WhatsNewGate` in `(app)/layout.tsx` | 1, 19 |
+
+## B6a · The What's New sheet **(doc 23)**
+
+A modal the reader will meet, so ch. 1 and ch. 19 must account for it.
+
+- **What it is.** A bottom sheet listing every **feature** release the account
+  has not yet seen, accumulated — a user away for three releases sees **one**
+  sheet covering all three. Dismissing it is an explicit action that writes
+  `profiles.last_seen_version`; a force-quit means it appears again.
+- **Who never sees it.** A new account is primed at onboarding, so its history
+  starts now. Nobody saw one for 1.0.0 — every existing account was backfilled.
+- **When it is suppressed** (doc 23 §6.4), and this is the part worth a sentence
+  in ch. 5: it never appears over a workout you are **in**. The line is
+  `workouts.status = in_progress`, which `logSet` flips on your **first logged
+  set** — a workout you are *looking at* is `planned`, one you are *training* is
+  `in_progress`. Also suppressed on `/log/**` unconditionally and while the
+  set-logging queue still has pending writes.
+- **Where the copy lives.** `src/content/releases/` — same renderer as the
+  history page (`ReleaseEntryList`), so an entry reads identically in both.
+
+**Contract note for Phases 3 and 6.** Release notes are a *third* user-facing
+copy surface, and doc 23 §5.2 binds them to **doc 22's own contracts** — §8.4
+positive framing and §8.5 plain language, plus hard rule 7 and the doc 10 §9
+guardrails. The manual and the release notes must not describe the same feature
+in different words.
 
 ## B7 · Two levers the app shows but cannot set
 

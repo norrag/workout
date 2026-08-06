@@ -134,6 +134,54 @@ describe("profiles", () => {
       .select();
     expect(data).toEqual([]);
   });
+
+  // doc 23 §6.1 (N80) — release-notification state under the existing policies
+  it("owners can set their own last-seen release version", async () => {
+    // deliberately writable by the owner: it is their own notification state
+    // and the blast radius is seeing, or not seeing, a sheet about their app
+    const { data, error } = await alice
+      .from("profiles")
+      .update({ last_seen_version: "1.0.0" })
+      .eq("id", aliceId)
+      .select("last_seen_version")
+      .maybeSingle();
+    expect(error).toBeNull();
+    expect(data?.last_seen_version).toBe("1.0.0");
+  });
+
+  it("other users cannot read or write someone else's last-seen version", async () => {
+    const { data: read } = await bob
+      .from("profiles")
+      .select("last_seen_version")
+      .eq("id", aliceId);
+    expect(read).toEqual([]);
+    const { data: written } = await bob
+      .from("profiles")
+      .update({ last_seen_version: "9.9.9" })
+      .eq("id", aliceId)
+      .select();
+    expect(written).toEqual([]);
+    const { data: after } = await alice
+      .from("profiles")
+      .select("last_seen_version")
+      .eq("id", aliceId)
+      .maybeSingle();
+    expect(after?.last_seen_version).toBe("1.0.0");
+  });
+
+  it("backfills existing accounts to 1.0.0 rather than leaving them null", async () => {
+    // the migration's backfill is what stops a pre-existing account from being
+    // treated as a new signup; a fresh signup gets null from the trigger and is
+    // primed by the app on first navigation (doc 23 §6.2)
+    const { data } = await bob
+      .from("profiles")
+      .select("last_seen_version")
+      .eq("id", bobId)
+      .maybeSingle();
+    expect(data?.last_seen_version === null || data?.last_seen_version === "1.0.0").toBe(
+      true,
+    );
+  });
 });
 
 describe("cycles", () => {

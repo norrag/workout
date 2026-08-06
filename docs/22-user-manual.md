@@ -562,6 +562,28 @@ whether the manual is correct.**
 **Exit:** every chapter has an identified, non-conflicting source; the
 inactive-behavior exclusion list is explicit.
 
+> **⚠️ Amended by doc 23 §11.1 (2026-08-06, PR #230): the manuals are release
+> 1.1.0.** Three bindings on the phases below, detailed in
+> [`22b`](./22b-source-map.md) §10:
+>
+> 1. **Phase 2 must add the release gate with the routes.** The guide routes and
+>    the More-tab entry ship behind `releaseActive("1.1.0")` — one gate at the
+>    route boundary — or the manual goes live chapter by chapter and the 1.1.0
+>    announcement has nothing to announce. `NEXT_PUBLIC_RELEASE_OVERRIDE` on a
+>    Vercel **preview** deploy is how staged chapters get reviewed, including the
+>    Phase-1 exemplar.
+> 2. **Phase 2 owes doc 23 an export.** §9.4's section IDs are now literally an
+>    API with two consumers: release-note `guide` targets resolve through **the
+>    same** validator. `src/content/releases/links.ts::GUIDE_SECTION_IDS` ships
+>    empty and names doc 22 Phase 2 as the thing that fills it.
+> 3. **The interleave** is `doc 23 P0–P4 → doc 22 P0–P2 → doc 23 P5 → doc 22
+>    content phases → cut 1.1.0`. Doc 23 P0–P4/P6 and doc 22 Phase 0 are done, so
+>    **doc 22 Phases 1–2 are the critical path to 1.1.0**.
+>
+> From Phase 1 onward each PR also follows doc 23 §9.3: append to
+> `src/content/releases/unreleased.ts` when it changes something a user would
+> notice. Phase 0 did not, and owed no entry.
+
 ### Phase 1 — Architecture & one exemplar
 
 | Scope | Size |

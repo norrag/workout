@@ -124,7 +124,13 @@ renumbering).
 | 2.4 | Plan a mesocycle (4 paths) | 4.2 | Meso stats — Performance |
 | 2.5 | Planner board — view/edit meso (`PLAN \| STATS`, lock) | 4.4 | More — profile card + settings |
 | 2.6 | Day setup · groups & counts | 4.5 | Profile |
-| 2.6b | Add muscle group | | |
+| 2.6b | Add muscle group | 4.6 | Version history (More → What's new) † |
+| | | 4.7 | What's New sheet † |
 
+> † No mockup exists for 4.6/4.7 — the June round predates the idea of a release.
+> Both are **derived from the house system** in the 2026-08-06 entry of
+> [09-design-changelog.md](09-design-changelog.md) (doc 23 Phase 0), which is
+> what the build transcribes.
+>
 > The Volume stats tab (old 4.1) was removed; Balance→4.1, Performance→4.2. There is no 4.3.
 > Old 2.2 "Meso detail — RIR ramp" is gone — the planner board (2.5) is the single meso surface.

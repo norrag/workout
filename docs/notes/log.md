@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-08-06 — Session 104: user-manual Phase 0, the four ground-truth audits (N74)
+## 2026-08-06 — Session 107: user-manual Phase 0, the four ground-truth audits (N74)
 
 Doc 22 Phase 0 executed and landed as three working documents. The phase exists
 because spec prose alone yields a wrong manual (doc 22 §2); it found three
@@ -50,6 +50,156 @@ cannot read) — blocks ch. 17. **O-B** — will v26 activate before Phase 3d?
 
 **O7** (naming published programs in ch. 7) remains open and does not block
 Phase 1.
+
+**Merged `main` after N80's PR #230** and made the audits comply with doc 23:
+`22c` gains `/more/whats-new`, the What's New sheet and the new footer (26 → 27
+routes); `22d` §10 re-verifies 56/17/39 unchanged; `22b` §10 records the five
+ways doc 23 binds doc 22's plan — **the manuals are 1.1.0**, so Phase 2 ships the
+guide routes behind `releaseActive("1.1.0")` and must populate
+`GUIDE_SECTION_IDS`, and **Phases 1–2 are now the critical path to 1.1.0**. Doc
+22 §11 amended to say so. Also found that doc 22 §2.2's stale inactive claim had
+already been inherited by doc 23 **T10** (`22b` §6.3), and that doc 23 §9.5
+re-scopes **O-B**: v26 now rides a feature release rather than being activated
+independently. This PR classifies as **no release entry** (§4.2 — nothing a user
+would notice).
+## 2026-08-06 — Session 106: the versioning framework is built, v1.0.0 cut (N80, doc 23 phases 0–6)
+
+Doc 23 went from plan to shipped in one PR. Nothing in the plan needed
+rewriting, which is the useful signal: the two owner-review corrections
+(the `workouts.status` suppression rule and version-keyed gating) were the parts
+that would otherwise have been discovered in code.
+
+- **Phase 0 first, because hard rule 8 says so.** No mockup exists for the sheet
+  or the history page. Both are derived from the house system in a dated
+  09-changelog entry, and figs **4.6** / **4.7** are claimed in the 08 §5 index
+  with an explicit footnote that nothing was drawn for them. The derivation held
+  up: a release entry turned out to be the same object as a More settings row
+  plus a body paragraph, so no new pattern was invented.
+- **What the code forced, and what it didn't.** Only one plan detail changed on
+  contact: `/stats` is not a route (stats hang off a meso, which is ID-bearing),
+  so the allowlist links to `/cycles` instead — exactly the T7 case the doc
+  predicted, arriving from a direction it hadn't named. Everything else built as
+  written.
+- **The invisibility of unreleased work is structural, not a rule.**
+  `src/content/releases/index.ts` does not import `unreleased.ts`. There is no
+  path from a staged entry to `RELEASES`, so the history page cannot show one
+  even if someone wants it to. A test asserts the property, but the property
+  does not depend on the test.
+- **The guard is a real refusal, not a note.** `activate_engine_params` now
+  refuses a `feature`-classified activation whose `announced_in` is missing,
+  unknown, a fix release, or not yet deployed — the same shape as the existing
+  `confirm_version` echo. T10 stops being runbook discipline.
+- **Priming needed a client hop.** The `prime` branch writes from a one-shot
+  effect rather than during the server render: §6.3 is explicit that
+  acknowledgment is never a render side effect, and that reasoning applies to
+  priming for the same reason. It costs one write per account, once.
+- **Remaining / external.** Apply `20260806000002_last_seen_version` to hosted
+  and confirm the backfill; `NEXT_PUBLIC_RELEASE_OVERRIDE` goes on Vercel's
+  Preview scope only, when there is a staged block to review. Both are in
+  `manual-operations.md`.
+- **Next in workstream V:** 1.1.0 = the manuals (doc 23 §11.1), which sets the
+  doc-22 interleave — 22 P0–P2, then 23 P5's `guide` half, then 22's content
+  phases, then the cut.
+
+## 2026-08-06 — Session 105: versioning plan, owner review round 1 (N80, Batch 35)
+
+Owner reviewed [doc 23](../23-versioning-releases.md), **accepted all eight
+decisions**, and raised six points — three of which were defects. Doc revised on
+the same branch/PR (#229, still open). Verbatim in the backlog appendix as
+**Batch 35**.
+
+- **The live-workout rule was broken.** "Never over a live workout" was written
+  as route suppression, but `(app)/workout/page.tsx` renders `DayView` inline —
+  *"the latest uncompleted workout IS the tab (fig 1.1)"* — so the rule would
+  have suppressed the modal on the app's landing surface, i.e. always. Owner
+  caught it. Redefined off state the schema already carries: `workouts.status`,
+  which `queries/logging.ts::logSet` flips `planned → in_progress` on the **first
+  logged set**. Looking at a workout is `planned`; being in one is
+  `in_progress`. The stale-`in_progress` case is handled by allowing every other
+  tab to show the modal — no time heuristic, no clock in the gate (§6.4).
+- **"Dark shipping" was too vague to be a mechanism.** Owner asked the exact
+  right question: what keeps unreleased feature work hidden, and what flips it?
+  Answered as **version-keyed gating** — `releaseActive("1.1.0")` is
+  `compare(CURRENT_VERSION, "1.1.0") >= 0`, `CURRENT_VERSION` comes from the
+  registry, and the registry only gains `1.1.0.ts` in the release PR. **The
+  release PR is the switch**; one merge flips every accumulated gate, bumps the
+  digit, publishes the notes and starts the modals. History invisibility falls
+  out of the data model (`unreleased.ts` is never in `RELEASES`). The owner's
+  stated model is confirmed line-by-line in a §9.2 table, including the fix-digit
+  reset. Costs written down honestly: dual code paths until the cut, migrations
+  can't be gated this way, and a non-production `NEXT_PUBLIC_RELEASE_OVERRIDE`
+  is needed to preview a staged block.
+- **`release_impact` on the MCP param tools** (§9.5) — owner's instinct was right
+  and it is cheap: one required argument (`none`/`fix`/`feature`) on
+  `propose_`/`activate_engine_params`, and `activate` refuses a `feature`-classified
+  set when no live release announces it. That turns T10 from runbook discipline
+  into a guard, and `replay_decisions` (already used for the v19→v20 assessment)
+  informs the classification rather than leaving it to guesswork.
+- **CI cost audited** (§9.4). Every proposed gate is a pure unit test riding the
+  existing `npm run test` step — no new workflow, no new job, ~0 minutes; the
+  expensive jobs (`supabase start`, Playwright) predate this work. The one check
+  that *would* have needed its own workflow and `pull_request` write permission —
+  the "touched `src/app/**` without a release note" warning — was **dropped** and
+  became a checklist line, since it can't be trusted anyway.
+- **Guided tour accounted for** (§6.5): the gate returns a discriminated union so
+  `prime` is a named state a tour can hook, while `last_seen_version` stays
+  single-purpose — a user can finish a tour and still be owed three release
+  notes, so one column must not mean both.
+- **1.1.0 = the manuals** (owner). Sets the interleave with doc 22 (23 P0–P4 →
+  22 P0–P2 → 23 P5 → 22 content → cut 1.1.0) and adds a requirement: the
+  manual's routes sit behind the release gate, or the guide would go live
+  chapter-by-chapter and the announcement would be telling users about something
+  they'd already been reading (§11.1).
+- **O7 amended** with the owner's note that MEASURE will need its own versioning
+  once built: when it splits, the registry filters on `surface` and MEASURE gets
+  its own column, not a jsonb map on `last_seen_version`.
+
+N80 moves `needs-input` → **ready**; next is Phase 0, the hard-rule-8 design pass.
+
+## 2026-08-06 — Session 104: versioning & release framework (N80, Batch 34)
+
+Owner asked how to architect and implement discrete versioned releases from a
+fresh **v1.0.0**, with per-user last-seen tracking driving a What's New modal,
+a version history on More, and a defined process. Answered with a plan + build
+spec: [`docs/23-versioning-releases.md`](../23-versioning-releases.md) (PR #229).
+New workstream **V**; verbatim note in the backlog appendix as **Batch 34**.
+
+- **The proposed structure works, with one renaming.** `MAJOR.FEATURE.FIX`
+  keeps semver's shape but defines the digits by **audience**, not API compat —
+  there is no public API, so what matters is whether a person needs to be told.
+  The owner's "major versions (1.1)" are **feature releases**; `2.0.0` is
+  reserved for a rare product-model change. The decision rule is one question
+  (§4.2) with a rider that matters here: **a changed number counts even with no
+  UI diff** (doc 10 §9 honesty).
+- **Two things the code forced that prose alone would have missed.** (1) Hard
+  rule 8 — there is **no mockup** for either the modal or the history page, so a
+  `09-design-changelog` design pass gates the build (Phase 0). (2) Activating
+  `engine_params` changes prescriptions with **zero code diff** (v20/v23/v26 all
+  shipped inactive, activated later by an owner-gated MCP step), so under §4.2
+  an activation is a feature release — `manual-operations.md` gains an
+  announce-then-activate step (§9.4).
+- **The registry lives in the repo, not the DB** (§5.1): a release note is a
+  claim about deployed code, so note and feature must be one commit that
+  deploys and rolls back together. Same reasoning as doc 22 §14.
+- **Three correctness traps drive the design** (§2): the version comparison must
+  run **server-side** (a stale bundle compares against a stale constant); the
+  gate must **accumulate** skipped releases (users don't open the app every
+  release); new accounts must be **primed**, so `profiles.last_seen_version`
+  uses `null` = "not yet primed" rather than a default.
+- **"Push to main in blocks" resolved without a release branch** (§9.1): option
+  C — trunk + a staged `unreleased.ts` manifest + dark shipping for anything
+  that must not appear early. The repo already has that muscle (inactive params,
+  `LLM_EXPLANATIONS`). A long-lived `release/1.1` would fight the deployable-
+  `main` convention and conflict badly against this repo's large slices.
+- **Couples to doc 22.** Guide deep links are doc 22 §9.4 section IDs sharing
+  its validator — a dependency, not a blocker, which is why deep links are
+  Phase 5. The standing contract: a feature release that introduces a concept
+  ships its guide section in the same block, so "learn how this works" has a
+  destination.
+- **Six phases** (§11); phases 1–2 are shippable as 1.0.0 on their own and
+  replace the hardcoded `WORKOUT 0.1 — PRE-RELEASE` footer with an enforced
+  three-way identity. **Eight decisions returned to the owner** (§12 O1–O8);
+  N80 sits `needs-input` until they land.
 
 ## 2026-08-06 — Session 103: user-manual plan, owner review round 1 (N74, Batch 33)
 

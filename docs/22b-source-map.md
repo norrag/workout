@@ -2,7 +2,9 @@
 
 **Status:** ground truth for both manuals. Working document — not user-facing prose.
 **Audited:** 2026-08-06, against the repo at `6d5d674` (post-Batch-32) **and the
-live database** (`engine_params` read directly).
+live database** (`engine_params` read directly). **Re-checked against `6441e93`**
+after PR #230 shipped the versioning & release framework — no behavior the manual
+describes changed, but doc 22's *plan* is now bound in five ways: [§10](#10-what-doc-23-changes-for-this-manual).
 **Scope:** doc 22 §11 Phase 0a — *"Per topic, which doc is authoritative and
 which passages are superseded. Resolve 08↔09↔06, 18↔19, 11↔21, 16↔17,
 10-over-all. Flag every behavior that shipped **inactive** so the manual
@@ -87,6 +89,7 @@ would otherwise pick up.
 | **BodySpec / DEXA** | `docs/15-bodyspec-dexa-integration.md` for internals; `17` §6 for how it reaches the engine | — | Doc 22 ch. 16 |
 | **Glossary term wording** | `src/lib/glossary.ts` — **verbatim**, doc 22 §8.1 | every restatement of a term in 10/11/16/21 | A term the manual needs that the app lacks is **added to `glossary.ts`**, not defined only in the manual |
 | **Offline / caching behavior** | `src/app/sw.ts` + CLAUDE.md hard rule 9 | doc 02's pre-N68 no-outbox statement | Set-logging writes are queued (N68); reads are online-only |
+| **Version identity, release notes, the What's New gate, the release process** | `docs/23-versioning-releases.md` + `src/content/releases/` + `src/lib/version/` | the hardcoded `WORKOUT 0.1 — PRE-RELEASE` footer, and any pre-2026-08-06 statement that the app is unversioned | New as of PR #230. See [§10](#10-what-doc-23-changes-for-this-manual) — it binds doc 22's phases, not just its content |
 | **MEASURE (doc 20)** | — | **all of it** | Out of scope: not built. Doc 22 §1.2 |
 
 ---
@@ -336,12 +339,26 @@ parenthetical is the bug.
 engine averages Epley and Brzycki below the cutoff. One-line copy fix, tracked
 in [`22d`](./22d-connector-inventory.md) §7 K1. **Do not quote it as a source.**
 
-### 6.3 Doc 22 §2.2's inactive list
+### 6.3 The stale inactive claim has propagated into doc 23
 
-See [§4.0](#40-the-correction-to-doc-22-22). Correct doc 22 when it is next
-edited; this ledger governs in the meantime.
+`docs/23-versioning-releases.md` **T10** says *"`engine_params` (v20/v23/v26 all
+shipped inactive, activated later by an owner-gated MCP step)"*. **v20 and v23
+are active** ([§4.0](#40-the-correction-to-doc-22-22)); only v26 is not. Doc 23's
+*argument* is unaffected — an activation really is a user-visible change with no
+diff, and that is why it is a feature release — but its example inherits doc 22
+§2.2's error.
 
-### 6.4 Doc 22 §6.2's measuring-band bullets
+Worth recording precisely because it is what this audit exists to prevent: the
+claim was wrong in doc 22, went unchecked, and was cited as established fact by
+the next spec written. Correct it when doc 23 is next edited; [§4](#4-the-live-behavior-ledger)
+governs in the meantime, for both docs.
+
+### 6.4 Doc 22 §2.2's inactive list
+
+See [§4.0](#40-the-correction-to-doc-22-22). Corrected inline in doc 22 by this
+PR; this ledger remains the authority.
+
+### 6.5 Doc 22 §6.2's measuring-band bullets
 
 See [§4.1](#41-what-is-not-live) ①. Two of the four bullets describe an inactive
 rule. Ch. 8 is still writable in full — from §6.2's live policy.
@@ -406,7 +423,7 @@ None of these block Phase 1. All block a specific chapter in Phase 3/6.
 | # | Question | Blocks | Why Claude cannot answer it |
 |---|---|---|---|
 | **O-A** | Is `LLM_EXPLANATIONS` set to `on` or `shadow` in Vercel production? | ch. 17, AI Manual ch. 10 | Vercel env vars are a human-only step (`deployment/manual-operations.md`). DB evidence shows generation is running; serving is the unknown |
-| **O-B** | Will **v26** (the measuring band) be activated before Phase 3d? | ch. 8 | Owner-gated activation (`manual-operations.md` step ⑤). If yes, ch. 8 gains the band; if no, ch. 8 ships without it and gains it in a later PR |
+| **O-B** | Will **v26** (the measuring band) be activated before Phase 3d? | ch. 8 | Owner-gated activation (`manual-operations.md` step ⑤). **Re-scoped by doc 23 §9.5:** activating v26 changes a number users are shown, so it classifies `release_impact: "feature"` — and `activate_engine_params` now **refuses** a feature-classified activation unless a live release announces it. So v26 cannot be switched on ahead of a release note; it rides a feature release, and ch. 8 gains the band in the same block. Answering O-B is now a *sequencing* call, not a yes/no |
 | **O-C** | **O7** from doc 22 §13 — name published third-party programs in ch. 7, or describe by characteristic? | ch. 7 (via 3d-r) | Owner call, already framed in doc 22 §6.3 |
 | **O-D** | Should doc 22 §2.2, §6.1 and §6.2 be amended in place to match §4 above? | doc 22 hygiene | Recommended: yes, in the Phase-1 PR. This ledger governs regardless |
 
@@ -423,3 +440,85 @@ Doc 22 §2.4 is the reason this document has a shelf life. Two obligations:
 2. **Every claim entering `22a-manual-claims.md` cites code or the active
    params row** — never this document, and never a numbered spec — because a
    spec citation is what this whole audit exists to prevent.
+
+---
+
+## 10. What doc 23 changes for this manual
+
+PR #230 shipped the versioning & release framework (doc 23, N80) after this
+audit's first pass. It does not change any behavior the manual describes — but
+it **binds doc 22's plan** in five ways that Phase 1 must absorb before it
+starts.
+
+### 10.1 The manuals *are* release 1.1.0
+
+Doc 23 §11.1, owner decision: 1.0.0 is the framework, and **1.1.0 is the
+manuals**. That is the first release anyone is ever notified about. Two
+consequences:
+
+- **The manual must be dark-shippable.** Doc 22 ships its content over many PRs
+  across weeks; ungated, the guide would go live chapter by chapter and the
+  1.1.0 announcement would be telling users about something they had already
+  been reading. So **the guide routes and the More-tab entry sit behind
+  `releaseActive("1.1.0")`** — one gate at the route boundary, not gates
+  scattered through content. This is a **doc 22 Phase 2 deliverable** that doc 22
+  §11 does not currently mention.
+- **`NEXT_PUBLIC_RELEASE_OVERRIDE` is how chapters get reviewed** while staged.
+  It is honored only when `VERCEL_ENV !== "production"`, so a Vercel **preview**
+  deploy renders the staged release. Owner review of the Phase-1 exemplar
+  (doc 22 §11 Phase 1 exit) will run through that path, not through production.
+
+### 10.2 Doc 22 §9.4's section IDs now have a second consumer
+
+Doc 22 §9.4 already calls stable section IDs "an API". Doc 23 §7.2 / T11 makes
+that literal: **release-note `guide` targets are doc 22 section IDs**, resolved
+by **the same validator** doc 22 Phase 2 builds — one validator, two consumers.
+
+`src/content/releases/links.ts` ships `GUIDE_SECTION_IDS` as an **empty array**
+with a comment naming doc 22 Phase 2 as the thing that fills it, and the registry
+test asserts the `guide` variant is unusable until then. So doc 22 Phase 2 owes
+doc 23 a concrete export, not just an internal convention.
+
+### 10.3 The phase order is now interleaved
+
+Doc 23 §11.1 sets it, and it is not the order doc 22 §12 draws:
+
+```
+doc 23 P0–P4  →  doc 22 P0–P2  →  doc 23 P5  →  doc 22 content phases  →  cut 1.1.0
+```
+
+Doc 23 P0–P4 and P6 are **done**. **Doc 22 Phase 0 is done with this PR**, so
+the critical path is now **doc 22 Phases 1–2** — and those unblock doc 23 P5
+(guide deep links), which is the last thing standing between here and 1.1.0.
+
+### 10.4 Release notes are a third copy surface, bound by doc 22's contracts
+
+Doc 23 §5.2 adopts **doc 22 §8.4 (positive framing)** and **§8.5 (plain
+language)** by reference, plus hard rule 7 and the doc 10 §9 guardrails. So the
+manual and the release notes must describe the same feature in the same words —
+and the glossary-identity contract (§8.1) reaches both.
+
+Practical rule for Phases 3 and 6: **when a chapter introduces a concept, its
+release entry links to that chapter's section** rather than re-explaining it.
+That is also doc 23 §7.2's stated reason for coupling the two docs.
+
+### 10.5 Every doc-22 PR from Phase 1 onward carries release obligations
+
+Doc 23 §9.3: an ordinary PR appends its entries to
+`src/content/releases/unreleased.ts` **when it changes something a user would
+notice**, and §9.6 adds the documentation contract (behavior doc amended, 09
+changelog updated, backlog swept).
+
+| Doc 22 phase | User-visible? | Owes an `unreleased.ts` entry? |
+|---|---|---|
+| **Phase 0** (this PR) | no — working documents only | **no** |
+| Phase 1 (block model + exemplar) | no, if gated behind `releaseActive("1.1.0")` | no |
+| Phase 2 (reader infrastructure, routes, More entry) | **yes** — but gated | **yes**, staged for 1.1.0 |
+| Phases 3–4 (content) | gated | fold into the same 1.1.0 entries |
+| Phase 5 (connector retrieval) | **yes** — new connector capability | **yes** |
+| Phase 6 (AI Manual) | gated | fold in |
+| Phase 7 (link placement) | **yes** | **yes** |
+
+**The corollary that matters:** doc 22's Phase 2 must add the release gate at
+the same moment it adds the routes, or the manual goes live early and 1.1.0 has
+nothing to announce.
