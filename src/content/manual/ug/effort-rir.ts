@@ -289,7 +289,7 @@ export const UG_EFFORT_RIR: ManualChapter = {
           kind: "callout",
           tone: "honesty",
           label: "An estimate, not a tested max",
-          text: "An estimated 1RM is a trend read worked out from sets you actually did. It is sharpest on heavy sets taken near failure, and roughest on very high-rep sets or ones stopped a long way short of it.",
+          text: "An estimated one-rep max is a trend read worked out from sets you actually did. It is sharpest on heavy sets taken near failure, and roughest on very high-rep sets or ones stopped a long way short of it.",
         },
         {
           kind: "detail",
@@ -348,7 +348,25 @@ export const UG_EFFORT_RIR: ManualChapter = {
         },
         {
           kind: "para",
-          text: "A logged set shows a small marker for where it landed against its prescription — above it, level with it, or below it. The comparison runs through the estimated 1RM of each, so it weighs both halves at once: extra reps and the same reps taken closer to failure both read as above.",
+          text: "A logged set carries a small marker beside its set number, for where it landed against its prescription:",
+        },
+        {
+          kind: "legend",
+          items: [
+            {
+              mark: "set-marker:over",
+              text: "More than the ask — extra reps, or the same reps taken closer to failure.",
+            },
+            { mark: "set-marker:met", text: "The set the program asked for." },
+            {
+              mark: "set-marker:under",
+              text: "Short of the ask — fewer reps, or the same reps with more left in reserve.",
+            },
+          ],
+        },
+        {
+          kind: "para",
+          text: "The comparison runs through the estimated one-rep max of each, so it weighs both halves at once rather than counting reps alone.",
         },
         { kind: "heading", text: "What happens next" },
         {
@@ -368,11 +386,6 @@ export const UG_EFFORT_RIR: ManualChapter = {
         {
           kind: "para",
           text: "A fixed weekly increase asks the same thing of a week you slept four hours as of a week you were fresh, and keeps asking it. Re-deriving the weight from what you actually lifted is what lets the ask track the athlete.",
-        },
-        {
-          kind: "link",
-          to: "ug/effort-rir#why-honesty-matters",
-          label: "Why the reported number matters",
         },
       ],
       related: [
@@ -450,15 +463,10 @@ export const UG_EFFORT_RIR: ManualChapter = {
             " there and holds on to them, because the board shows one week's shape rather than the whole block.",
           ],
         },
-        {
-          kind: "link",
-          to: "ug/effort-rir#why-honesty-matters",
-          label: "Why the reported number matters",
-        },
       ],
       related: [
         "ug/effort-rir#the-weeks-ramp",
-        "ug/effort-rir#report-what-you-did",
+        "ug/effort-rir#why-honesty-matters",
       ],
     },
   ],

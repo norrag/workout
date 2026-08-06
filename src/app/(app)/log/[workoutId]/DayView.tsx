@@ -50,6 +50,7 @@ import type {
 // zod. `params` arrives already validated by the server (getActiveEngineParams).
 import { predictRepsAtWeight, type E1rmConfig } from "@/lib/engine/predict";
 import { complianceBand } from "@/lib/engine/rules/progression";
+import { SET_MARKERS } from "@/lib/set-markers";
 import {
   effectiveLoad,
   isBodyweightLoad,
@@ -1932,23 +1933,12 @@ function SetRow({
   ]);
 
   // ▲ over / ■ met / ▼ under (doc 16 §5.3) — shared by the live-input and the
-  // N50 locked-session renderings of a logged row
+  // N50 locked-session renderings of a logged row. Glyph and name come from
+  // `lib/set-markers.ts` so the manual demonstrates the same mark this renders.
   const markerGlyph = performance ? (
     <span
-      aria-label={
-        performance === "over"
-          ? "above prescription"
-          : performance === "met"
-            ? "met prescription"
-            : "below prescription"
-      }
-      title={
-        performance === "over"
-          ? "above prescription"
-          : performance === "met"
-            ? "met prescription"
-            : "below prescription"
-      }
+      aria-label={SET_MARKERS[performance].label}
+      title={SET_MARKERS[performance].label}
       className={`pointer-events-none absolute -right-1 leading-none text-ink/50 ${
         performance === "over"
           ? "-top-1 text-[8px]"
@@ -1957,7 +1947,7 @@ function SetRow({
             : "-bottom-1 text-[8px]"
       }`}
     >
-      {performance === "over" ? "▲" : performance === "met" ? "■" : "▼"}
+      {SET_MARKERS[performance].glyph}
     </span>
   ) : null;
 

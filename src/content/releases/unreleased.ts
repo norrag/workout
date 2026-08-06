@@ -20,7 +20,7 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     // `docs/22a-manual-claims.md`.
     id: "glossary-e1rm-rir-direction",
     title: "What reps in reserve do to a strength estimate",
-    body: "The definition card for estimated 1RM now states the direction plainly: at the same weight and reps, a set with reps still in reserve implies more strength than one taken to failure.",
+    body: "The card explaining your estimated one-rep max spells the term out, and says which way reps in reserve push it: at the same weight and reps, a set with reps to spare implies more strength than one taken to failure.",
     area: "training",
   },
 ];

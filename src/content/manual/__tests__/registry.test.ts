@@ -1,5 +1,8 @@
+import { readFileSync } from "fs";
+import path from "path";
 import { describe, expect, it } from "vitest";
 import {
+  adjacentSections,
   allSectionIds,
   budgetBreaches,
   CHAPTERS,
@@ -7,11 +10,14 @@ import {
   measureSection,
   parseSectionId,
   resolveSection,
+  readingOrder,
   SECTION_BUDGET,
   sectionId,
   sectionRoute,
 } from "../index";
+import { markLabel } from "../budget";
 import { GLOSSARY } from "@/lib/glossary";
+import { SET_MARKERS } from "@/lib/set-markers";
 import type { Inline, ManualBlock, RichText } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +45,8 @@ function blockRuns(block: ManualBlock): Inline[] {
       return [...(block.label ? [block.label] : []), ...runs(block.text)];
     case "term":
       return [GLOSSARY[block.term].label, GLOSSARY[block.term].body];
+    case "legend":
+      return block.items.flatMap((i) => [markLabel(i.mark), ...runs(i.text)]);
     case "link":
       return [block.label];
     case "detail":
@@ -51,6 +59,8 @@ function flatten(blocks: readonly ManualBlock[]): ManualBlock[] {
     b.kind === "detail" ? [b, ...flatten(b.blocks)] : [b],
   );
 }
+
+const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
 const everySection = CHAPTERS.flatMap((chapter) =>
   chapter.sections.map((section) => ({
@@ -172,6 +182,75 @@ describe("link targets resolve", () => {
   it("no section is listed as related to itself", () => {
     for (const { id, section } of everySection) {
       expect(section.related ?? [], id).not.toContain(id);
+    }
+  });
+
+  // Owner review round 2: a link needs to say why it is there. `related` rows
+  // render the target's summary, which is the reason — so every section that
+  // will be pointed at owes one, and every section that points owes a list.
+  it("every section carries a related list, so no link arrives cold", () => {
+    for (const { id, section } of everySection) {
+      expect((section.related ?? []).length, id).toBeGreaterThan(0);
+    }
+  });
+});
+
+// doc 22 §9.2 — prev/next crosses chapter boundaries, so cover-to-cover
+// reading stays "next, next, next" (owner review round 2).
+describe("reading order and adjacency", () => {
+  it("covers every section of a manual exactly once, in chapter order", () => {
+    const order = readingOrder("ug");
+    const ids = allSectionIds().filter((id) => id.startsWith("ug/"));
+    expect([...order].sort()).toEqual([...ids].sort());
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it("chains forward and backward, with open ends at the extremes", () => {
+    const order = readingOrder("ug");
+    expect(adjacentSections(order[0]).prev).toBeUndefined();
+    expect(adjacentSections(order[order.length - 1]).next).toBeUndefined();
+    for (let i = 0; i < order.length - 1; i++) {
+      expect(adjacentSections(order[i]).next?.id, order[i]).toBe(order[i + 1]);
+      expect(adjacentSections(order[i + 1]).prev?.id, order[i + 1]).toBe(order[i]);
+    }
+  });
+
+  it("never runs one manual into the other (D4 — separate reads)", () => {
+    for (const id of readingOrder("ug")) {
+      const { prev, next } = adjacentSections(id);
+      expect(prev?.chapter.manual ?? "ug").toBe("ug");
+      expect(next?.chapter.manual ?? "ug").toBe("ug");
+    }
+  });
+});
+
+// Owner review round 2: showing an app element beats describing it — but only
+// while the manual shows the SAME element the app renders.
+describe("legend marks come from the app, not from the manual", () => {
+  it("every mark resolves to a glyph and a name the app defines", () => {
+    for (const { id, section } of everySection) {
+      for (const block of flatten(section.blocks)) {
+        if (block.kind !== "legend") continue;
+        for (const item of block.items) {
+          const key = item.mark.slice("set-marker:".length);
+          expect(Object.keys(SET_MARKERS), `${id} → ${item.mark}`).toContain(key);
+          expect(markLabel(item.mark).length).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("the day view still renders those glyphs from the shared source", () => {
+    // WS-J-style source assertion: the marks are one definition, and the screen
+    // reads it rather than hardcoding characters the manual would then mirror.
+    const dayView = readFileSync(
+      path.join(REPO_ROOT, "src/app/(app)/log/[workoutId]/DayView.tsx"),
+      "utf8",
+    );
+    expect(dayView).toContain('from "@/lib/set-markers"');
+    expect(dayView).toContain("SET_MARKERS[performance].glyph");
+    for (const { glyph } of Object.values(SET_MARKERS)) {
+      expect(dayView).not.toContain(`"${glyph}"`);
     }
   });
 });

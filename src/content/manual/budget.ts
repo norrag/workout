@@ -6,14 +6,26 @@
 // collapsed by default and therefore does not count.
 //
 // Calibrated against the Phase-1 exemplar (chapter 6): its six sections run
-// 205–309 words over 6–8 blocks, median 229 words. So doc 22 §9.3's proposed
+// 205–323 words over 6–9 blocks, median 229 words. So doc 22 §9.3's proposed
 // 350 words / 12 blocks holds without adjustment — the typical section sits at
 // two thirds of it and the densest (the three-layer mechanism section, which is
-// the shape most at risk) at 88%, which is the right kind of tight: a ceiling
+// the shape most at risk) at 92%, which is the right kind of tight: a ceiling
 // a careful author brushes rather than one they never see.
+//
+// That densest section is also the calibration's live proof. Owner review round
+// 2 lengthened `GLOSSARY.e1rm` to spell out "one-rep max", and because a `term`
+// block counts the glossary's words, the section moved 309 → 323 without a line
+// of its prose changing. A budget that ignored borrowed copy would not have
+// noticed; this one puts the pressure where the reader feels it.
 
-import type { ManualBlock, ManualSection, RichText } from "./types";
+import type { ManualBlock, ManualMark, ManualSection, RichText } from "./types";
 import { GLOSSARY } from "@/lib/glossary";
+import { SET_MARKERS, type SetMarker } from "@/lib/set-markers";
+
+/** The app's own name for a mark the manual shows (`lib/set-markers.ts`). */
+export function markLabel(mark: ManualMark): string {
+  return SET_MARKERS[mark.slice("set-marker:".length) as SetMarker].label;
+}
 
 export const SECTION_BUDGET = {
   words: 350,
@@ -67,6 +79,11 @@ function blockWords(block: ManualBlock): number {
       break;
     case "term":
       parts.push(GLOSSARY[block.term].label, GLOSSARY[block.term].body);
+      break;
+    case "legend":
+      for (const item of block.items) {
+        parts.push(markLabel(item.mark), inlineWords(item.text));
+      }
       break;
     case "link":
       parts.push(block.label);

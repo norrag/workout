@@ -21,6 +21,7 @@ export type {
   ManualBlockKind,
   ManualChapter,
   ManualId,
+  ManualMark,
   ManualSection,
   RichText,
 } from "./types";
@@ -36,7 +37,12 @@ export {
   sectionRoute,
 } from "./ids";
 export type { ParsedSectionId } from "./ids";
-export { budgetBreaches, measureSection, SECTION_BUDGET } from "./budget";
+export {
+  budgetBreaches,
+  markLabel,
+  measureSection,
+  SECTION_BUDGET,
+} from "./budget";
 export type { SectionSize } from "./budget";
 
 /**
@@ -93,6 +99,38 @@ export function allSectionIds(): string[] {
   return CHAPTERS.flatMap((chapter) =>
     chapter.sections.map((s) => sectionId(chapter.manual, chapter.slug, s.slug)),
   );
+}
+
+/**
+ * doc 22 §9.2 — prev/next, **crossing chapter boundaries**, so reading a manual
+ * cover to cover stays "next, next, next" and an adjacent section never costs a
+ * trip up to the chapter page and back down (owner review round 2).
+ *
+ * Reading order is chapter number, then section order, within one manual: the
+ * User Guide and the AI Manual are separate reads (D4), so neither ever runs
+ * into the other.
+ */
+export function readingOrder(manual: ManualId): string[] {
+  return chaptersFor(manual).flatMap((chapter) =>
+    chapter.sections.map((s) => sectionId(manual, chapter.slug, s.slug)),
+  );
+}
+
+export interface Adjacent {
+  readonly prev?: ResolvedSection;
+  readonly next?: ResolvedSection;
+}
+
+export function adjacentSections(id: string): Adjacent {
+  const parsed = parseSectionId(id);
+  if (!parsed) return {};
+  const order = readingOrder(parsed.manual);
+  const at = order.indexOf(id);
+  if (at < 0) return {};
+  return {
+    prev: at > 0 ? resolveSection(order[at - 1]) : undefined,
+    next: at < order.length - 1 ? resolveSection(order[at + 1]) : undefined,
+  };
 }
 
 /**

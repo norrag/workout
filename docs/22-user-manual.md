@@ -412,6 +412,29 @@ places where a negative is the honest statement (the guardrails in AI Manual
 ch. 10, and safety statements such as *"it never deletes logged history"*, where
 the negative **is** the reassurance). Everywhere else, state the positive rule.
 
+### 8.4a Standing authoring rules from owner review round 2 (2026-08-07)
+
+Four notes came back off the Phase-1 exemplar. Three were fixed in place; all
+four are rules for **every chapter after it**, not one-off corrections.
+
+1. **A definition may not lean on an unexplained abbreviation.** Spell the term
+   out and tie the words to the letters before using them — inside the very card
+   that exists to explain it, above all. Enforced for `1RM`/`e1RM` by a test in
+   `src/lib/__tests__/glossary.test.ts`; extend the pattern as new abbreviations
+   enter the glossary (`MEV`, `MRV`, `RIR`, `DEXA`, `RMR`).
+2. **Show the app element, do not describe it.** Where a screen uses a mark, an
+   icon, or a distinctive control, render it — that is a thing this format can
+   do that spec prose cannot, and it is why the `legend` block exists. The mark
+   vocabulary is closed and each entry resolves through the app's own definition
+   (`src/lib/set-markers.ts` is the first), so the manual and the screen cannot
+   show different symbols.
+3. **A link states why it is there.** `related` renders each target's summary
+   under a labelled `RELATED` rule; an inline cross-link is introduced by the
+   sentence carrying it. A bare `link` block parked at the foot of a section is
+   the pattern this rule exists to prevent.
+4. **An adjacent section is one tap.** Prev/next in the section footer, naming
+   its destination rather than showing a bare arrow.
+
 ### 8.5 Plain-language vocabulary
 
 Per **O4**. A denylist test over manual copy: `LLM`, `large language model`,
@@ -606,23 +629,38 @@ inactive-behavior exclusion list is explicit.
 > `/more/guide/effort-rir[/<section>]`. [`22a-manual-claims.md`](./22a-manual-claims.md)
 > is open with **22 rows**, all verified against code.
 >
-> **It found one defect in shipped copy** (ledger `D-01`): `GLOSSARY.e1rm`
-> stated the RIR direction backwards. Fixed and pinned in the same PR — surfaced
-> precisely because [§8.1](#81-the-glossary-is-one-source-not-two) forces the
-> manual to render the glossary's own words.
+> **It found two defects in shipped copy** (ledger `D-01`, `D-02`), both in
+> `GLOSSARY.e1rm`: the RIR direction stated backwards, and a definition leaning
+> on the unexplained abbreviation "RM". Both fixed and pinned in the same PR —
+> surfaced precisely because [§8.1](#81-the-glossary-is-one-source-not-two)
+> forces the manual to render the glossary's own words.
+>
+> **Owner review round 2 (2026-08-07)** returned four notes, folded in above and
+> generalized as [§8.4a](#84a-standing-authoring-rules-from-owner-review-round-2-2026-08-07):
+> prev/next and the labelled `related` list were **pulled forward from Phase 2**,
+> the `legend` block was added (a tenth kind — show the mark, do not describe
+> it), and the abbreviation rule became a contract. The remaining note was
+> approval.
 
 **Exit:** owner has seen the rendered exemplar and signed off on look, depth,
-voice, and section granularity. Review path is a Vercel **preview** deploy with
-`NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0` ([`22b`](./22b-source-map.md) §10.1).
+voice, and section granularity — **round 2 answered, ✅ signed off**. Review path
+is a Vercel **preview** deploy with `NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0`
+([`22b`](./22b-source-map.md) §10.1).
+
+> **Navigation caveat for the reviewer:** the More-tab entry row and the guide
+> **map** are Phase 2, so until then the reader is reachable only by typing
+> `/more/guide/effort-rir`. That is scope, not a defect.
 
 ### Phase 2 — Reader infrastructure
 
 | Scope | Size |
 |---|---|
-| The **map** route (fig 4.8) and **search**; deep-link marking, prev/next across chapters, breadcrumb-back, related sections, the build-time index + search UI (lazily loaded), and the remaining content-contract tests from [§8](#8-content-contracts) — plus the two outstanding **D3 performance guards**: the import guard and the precache-exclusion assertion. More-tab entry row, and `GUIDE_SECTION_IDS` populated for doc 23 ([`22b`](./22b-source-map.md) §10.2). The `figure` block and its asset policy (09-changelog 2026-08-07 §5) | M–L |
+| The **map** route (fig 4.8) and **search**; deep-link marking, breadcrumb-back, the build-time index + search UI (lazily loaded), and the remaining content-contract tests from [§8](#8-content-contracts) — plus the two outstanding **D3 performance guards**: the import guard and the precache-exclusion assertion. More-tab entry row, and `GUIDE_SECTION_IDS` populated for doc 23 ([`22b`](./22b-source-map.md) §10.2). The `figure` block and its asset policy (09-changelog 2026-08-07 §5) | M–L |
 
-*(Phase 1 already shipped the chapter-contents and section routes, the block
-renderer, link-target validation, the release gate, and the length budget.)*
+*(Phase 1 shipped the chapter-contents and section routes, the block renderer,
+link-target validation, the release gate, and the length budget — plus, from
+owner review round 2, **prev/next and related sections**, which this row no
+longer owes.)*
 
 **Exit:** the exemplar chapter is reachable, searchable, deep-linkable; CI
 enforces the contracts *and* the performance guards. Everything after this is

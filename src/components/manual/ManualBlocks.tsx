@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { GLOSSARY } from "@/lib/glossary";
+import { SET_MARKERS, type SetMarker } from "@/lib/set-markers";
 import {
+  adjacentSections,
   ESTIMATE_CAVEAT,
+  MANUAL_ROOT,
+  resolveSection,
   sectionRoute,
   type Inline,
   type ManualBlock,
+  type ManualMark,
   type ManualSection,
   type RichText,
 } from "@/content/manual";
@@ -78,6 +83,12 @@ function TermCard({ term }: { term: keyof typeof GLOSSARY }) {
       <div className="mt-1.5 text-xs leading-[1.55] text-ink/80">{entry.body}</div>
     </div>
   );
+}
+
+/** Resolve a mark token to the app's own glyph and name for it. */
+function markFor(mark: ManualMark): { glyph: string; label: string } {
+  const key = mark.slice("set-marker:".length) as SetMarker;
+  return SET_MARKERS[key];
 }
 
 function Block({ block }: { block: ManualBlock }) {
@@ -183,9 +194,11 @@ function Block({ block }: { block: ManualBlock }) {
             </div>
           )}
           <div
-            className={`text-xs leading-[1.55] text-ink/80 ${
-              block.tone === "honesty" && block.label ? "mt-1.5" : ""
-            }`}
+            className={
+              block.tone === "honesty" && block.label
+                ? "mt-1.5 text-xs leading-[1.55] text-ink/80"
+                : "text-xs leading-[1.55] text-ink/80"
+            }
           >
             <Rich text={block.text} />
           </div>
@@ -194,6 +207,35 @@ function Block({ block }: { block: ManualBlock }) {
 
     case "term":
       return <TermCard term={block.term} />;
+
+    case "legend":
+      // show the mark, then name it, then say what it means — the app's own
+      // glyph and its own words for it, never a redrawing
+      return (
+        <div className="border-t border-ink/15">
+          {block.items.map((item, i) => {
+            const { glyph, label } = markFor(item.mark);
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-3 border-b border-ink/10 py-2.5"
+              >
+                <span className="flex w-[22px] flex-shrink-0 justify-center pt-[3px] text-[11px] leading-none text-ink/50">
+                  {glyph}
+                </span>
+                <span className="flex-1">
+                  <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
+                    {label}
+                  </span>
+                  <span className="mt-1 block text-sm leading-[1.65] text-ink/80">
+                    <Rich text={item.text} />
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
 
     case "link": {
       const href = sectionRoute(block.to);
@@ -242,5 +284,102 @@ export function ManualSectionBody({ section }: { section: ManualSection }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * doc 22 §9.4.7 — related sections.
+ *
+ * Under its own labelled rule, and **each row carries the target's summary**.
+ * A link with no stated reason is a link a reader has to open to evaluate
+ * (owner review round 2); the summary is the reason, and it costs nothing
+ * because every section already owes one.
+ */
+export function ManualRelated({
+  section,
+  id,
+}: {
+  section: ManualSection;
+  /** this section's own ID, so adjacency can be de-duplicated */
+  id: string;
+}) {
+  // prev/next sits directly below this list, so a related row pointing at an
+  // adjacent section would be the same link offered twice on one screen. The
+  // author still lists it — which of the two surfaces carries it is a rendering
+  // question, and staying silent here keeps `related` meaningful when Phase 3's
+  // chapters change what "adjacent" means.
+  const { prev, next } = adjacentSections(id);
+  const adjacent = new Set([prev?.id, next?.id].filter(Boolean));
+  const related = (section.related ?? [])
+    .filter((target) => !adjacent.has(target))
+    .map((target) => resolveSection(target))
+    .filter((r): r is NonNullable<typeof r> => r != null);
+  if (related.length === 0) return null;
+  return (
+    <div className="mt-8">
+      <div className="label-caps border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
+        Related
+      </div>
+      {related.map(({ id, chapter, section: target }) => (
+        <Link
+          key={id}
+          href={`${MANUAL_ROOT[chapter.manual]}/${chapter.slug}/${target.slug}`}
+          className="flex items-start gap-3 border-b border-ink/15 py-3.5"
+        >
+          <span className="flex-1">
+            <span className="block text-[14px] font-bold">{target.title}</span>
+            <span className="mt-0.5 block text-[13px] leading-[1.5] text-ink/60">
+              {target.summary}
+            </span>
+          </span>
+          <span className="mt-[2px] text-base text-ink/50">›</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * doc 22 §9.2 — prev/next, so an adjacent section is one tap rather than a trip
+ * up to the chapter page and back down (owner review round 2). It crosses
+ * chapter boundaries, so cover-to-cover reading stays "next, next, next".
+ *
+ * Each side names its destination: a bare arrow makes the reader commit before
+ * knowing where they are going.
+ */
+export function ManualSectionNav({ id }: { id: string }) {
+  const { prev, next } = adjacentSections(id);
+  if (!prev && !next) return null;
+  return (
+    <nav className="mt-8 grid grid-cols-2 gap-3 border-t-[1.5px] border-ink pt-3.5">
+      {prev ? (
+        <Link
+          href={`${MANUAL_ROOT[prev.chapter.manual]}/${prev.chapter.slug}/${prev.section.slug}`}
+          className="block"
+        >
+          <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
+            ‹ Previous
+          </span>
+          <span className="mt-1 block text-[13px] font-semibold leading-[1.35]">
+            {prev.section.title}
+          </span>
+        </Link>
+      ) : (
+        <span />
+      )}
+      {next && (
+        <Link
+          href={`${MANUAL_ROOT[next.chapter.manual]}/${next.chapter.slug}/${next.section.slug}`}
+          className="block text-right"
+        >
+          <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
+            Next ›
+          </span>
+          <span className="mt-1 block text-[13px] font-semibold leading-[1.35]">
+            {next.section.title}
+          </span>
+        </Link>
+      )}
+    </nav>
   );
 }
