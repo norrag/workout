@@ -2,7 +2,110 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-06 (latest) — Batch 32: prescription details, cycles filter, planner editing, concurrent mesos (N75–N79)
+## 2026-08-06 (latest) — doc 22 Phase 0: the four ground-truth audits (N74)
+
+Docs only — no code, no schema, no behavior change. Doc 22 §11 Phase 0 is the
+phase that "determines whether the manual is correct", and it gates every line
+of user-facing prose. Three working documents, none of them user-facing:
+
+- **[`22b-source-map.md`](22b-source-map.md)** (0a) — the precedence ladder, a
+  topic → authoritative-source table resolving 08↔09↔06 / 18↔19 / 11↔21 / 16↔17
+  / 10-over-all, the superseded-passage list, and the **live-behavior ledger**.
+- **[`22c-app-inventory.md`](22c-app-inventory.md)** (0b + 0c) — 26 routes
+  walked from the code, every control / state / label, taken **after** Batch 32;
+  plus the concept inventory and 18 mined FAQ candidates.
+- **[`22d-connector-inventory.md`](22d-connector-inventory.md)** (0d) — 56 tools
+  (17 admin-gated, named once then dropped; 39 user-facing, each with a
+  plain-language line, a writes? verdict and its use-case chapter), the real
+  auth flow, the rate limit, and the failure shapes.
+
+### The ledger was read from the database, not the repo
+
+The decisive method choice. `supabase/migrations/` **under-reports the live
+params chain** — v22, v24 and v25 were admin-MCP micro-bumps with no committed
+migration — so the audit read `public.engine_params` directly.
+
+**Result: doc 22 §2.2's own inactive list is stale.** v20 activated 2026-07-11,
+v23 on 2026-07-12, and the chain has run to **v25 ACTIVE** (earned-step
+progression, `rate_source: "plan"`, the two-component strength model, and the
+self-gating envelope loop are all **live**). The one genuinely-inactive
+behavior is **v26 — the doc 21 §6.1 measuring band** (`e1rm.max_measuring_rir`,
+absent from v25, so `isMeasuringRir` returns true for every set).
+
+That matters more than a version number, because the band sits under **ch. 8**,
+which doc 22 §6.2 says must be written. §6.2's prose conflates two doc-21 rules
+with different live status: §6.1 (*is this a measurement at all*, at the stamp —
+**not live**) and §6.2 (*is this measurement comparable*, at read time — **live**
+since `20260804000001`). The reassurance the chapter actually owes the reader —
+a protected block does not read as a decline — is the live one. Ch. 8 is fully
+writable; it just cannot mention the band yet.
+
+### Two more corrections that would have shipped as wrong prose
+
+- **The Brzycki/Epley rationale in doc 22 §1.1/§5 is backwards.** It says
+  "Brzycki [drifts] low; averaging cancels". `predict.ts::e1rmFactor` and doc 10
+  §1's 2026-06-24 amendment say Brzycki *inflates* above ~10 effective reps, and
+  the operative rule is a **cutoff** at `e1rm.brzycki_max_eff_reps = 10` —
+  average inside the band where the two agree, **Epley alone above it**. Ch. 10
+  states both halves.
+- **The "MRV-stop rule the app actually measures" (doc 22 §6.1) is not
+  implemented.** What ships is the ±1 set workload model in
+  `rules/feedback.ts`, with MEV/MAV/MRV as an advisory classification library
+  and the `mg_set_ceiling` guard; doc 10 §3's graded ramp and auto-deload
+  trigger were deliberately deferred (T-A5, 2026-07-02, "do not amend doc 10").
+  So doc 10 §3 is aspirational on this one point, and ch. 9 must say the deload
+  is **scheduled** — with the joint-pain gate and the ±1 workload response as
+  the signals the app really acts on.
+
+### Findings that shape later phases
+
+- **`preview_mesocycle_volume` performs no mutation**, despite sitting under
+  "Cycles (write)" in doc 22 §7.2 — AI Manual ch. 6 presents it as the safe
+  rehearsal step.
+- **The working-set cap and the rep position are connector-only.** The Effort
+  sheet renders them read-only under `SET BY YOUR COACH`; nothing in the app
+  writes them. A strong worked example for AI Manual ch. 8, and a constraint on
+  User Guide ch. 8.
+- **Four glossary terms are defined but never surfaced** (`e1rm_confidence`,
+  `macrocycle`, `mesocycle`, `microcycle`) — three of them the app's core
+  vocabulary, used as headings with no way to ask what they mean. Feeds Phase 7a.
+- **~22 rendered terms have no definition anywhere**; 10 are recommended for
+  `glossary.ts` rather than manual-only, and that decision must precede ch. 3,
+  6, 10, 13, 14 and 15 (doc 22 §8.1 forbids the manual defining a shown term in
+  different words).
+- **`docs/notes/A-engine-metrics.md` is the best FAQ source and the most
+  dangerous to copy from** — a mid-2026 snapshot whose two-e1RM-systems framing,
+  "e1RM is never stored", "≥36 effective reps" cutoff and "v9 params" are all
+  superseded. Use it for the questions; re-derive every answer.
+- **The 2026-08-02 N71 re-levelling is FAQ material**: 9 087 stamps moved,
+  average +4.80 lb, strictly upward. A long-time user's history changed that
+  day, and that reads as a bug unless the manual says otherwise.
+
+### Two open items, each blocking one chapter
+
+- **O-A — is `LLM_EXPLANATIONS` set to `on` or `shadow` in production?** A
+  Vercel env var, human-only (`deployment/manual-operations.md`). The database
+  shows generation is running (203 rows, newest 2026-08-06 11:20 UTC); whether
+  the coaching line is *served* is the unknown. Blocks ch. 17's promise about
+  the third layer. Until answered, ch. 17 documents the deterministic ask and
+  why lines and treats the coaching line as conditional.
+- **O-B — will v26 activate before Phase 3d?** Owner-gated
+  (`manual-operations.md` step ⑤). If yes, ch. 8 gains the measuring band; if
+  no, it ships without and gains it later.
+
+**O7** (how far to name published programs in ch. 7) stays open and blocks only
+the 3d-r research pass, not Phase 1.
+
+**Exit criterion met:** every one of the 21 User Guide chapters and 12 AI Manual
+chapters has an identified, non-conflicting source
+([`22b`](22b-source-map.md) §7, [`22d`](22d-connector-inventory.md) §9), and the
+inactive-behavior exclusion list is explicit. **Next: Phase 1** — block model,
+section-ID scheme, the hard-rule-8 design pass recorded in
+`09-design-changelog.md`, and one exemplar chapter.
+
+Docs-only PR: no tests, typecheck or lint affected.
+
+## 2026-08-06 — Batch 32: prescription details, cycles filter, planner editing, concurrent mesos (N75–N79)
 
 Five owner items in one PR. Four are UI; the fifth replaces a database
 invariant.
