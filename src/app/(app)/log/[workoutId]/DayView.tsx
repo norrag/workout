@@ -1247,10 +1247,19 @@ const ExerciseBlock = memo(function ExerciseBlock({
            exists at all — is ruled off under its own tracked-caps label so it
            is never mistaken for a program fact. */
         <div className="mt-[7px] border-l-2 border-ink py-1.5 pl-2.5 text-[11px] font-medium leading-[1.5] text-ink/70">
+          {/* N75: the ask line IS the drill-in to Prescription details — the
+              row that used to sit in the ⋮ menu. Underlined so it reads as
+              tappable without a chevron or a second control competing with the
+              story. */}
           {narrative.ask && (
-            <div className="text-[11.5px] font-semibold leading-[1.45] text-ink">
+            <button
+              type="button"
+              onClick={() => onAudit(we)}
+              aria-label={`${we.exercise_name} prescription details`}
+              className="block w-full text-left text-[11.5px] font-semibold leading-[1.45] text-ink underline decoration-ink/35 underline-offset-[3px]"
+            >
               {narrative.ask}
-            </div>
+            </button>
           )}
           {rxState === "loading" && (
             <div className="mt-1 text-ink/40">Reading the program&apos;s decision…</div>
@@ -1279,8 +1288,6 @@ const ExerciseBlock = memo(function ExerciseBlock({
               <div className="mt-[3px] text-ink/75">{narrative.coach}</div>
             </div>
           )}
-          {/* drill-in to the Engine audit lives in the ⋮ menu only (owner
-              2026-07-19 follow-up) — the strip stays purely the story */}
         </div>
       )}
       {we.pinned_note && (
@@ -1383,17 +1390,10 @@ const ExerciseBlock = memo(function ExerciseBlock({
         <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
           EXERCISE — {we.exercise_name.toUpperCase()}
         </div>
-        {/* the raw engine rationale used to live here; the quick-read strip
-            (target button) is the user-facing story now, and the audit panel
-            keeps the technical record — this row is the subtle drill-in */}
-        <MenuRow
-          label="Engine audit"
-          trailing="›"
-          onClick={() => {
-            onCloseMenu();
-            onAudit(we);
-          }}
-        />
+        {/* N75: the "Engine audit" row is gone. It is now "Prescription
+            details", reached by tapping the ask line inside the prescription
+            strip — a menu slot for something most people never open was the
+            wrong trade. */}
         <MenuRow
           label="View exercise"
           trailing="›"

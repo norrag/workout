@@ -224,7 +224,7 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
     expect((decisions ?? []).length).toBeGreaterThan(0);
   });
 
-  it("startMeso refuses a second activation while a block is live (R15)", async () => {
+  it("startMeso activates a second standalone block while one is live (N79)", async () => {
     const second = await createMesocycle(user, userId, {
       name: "Second block",
       weeks: 3,
@@ -248,14 +248,22 @@ describe("write pipeline: activate/seed → log → complete → generate", () =
         ],
       },
     ]);
+    // N79: a standalone block runs BESIDE the live one (the rehab case) — the
+    // user-wide exclusivity gate is gone; only within-a-macrocycle stays exclusive.
     const { error } = await startMeso(user, userId, second.id, profile);
-    expect(error).toBeTruthy();
-    const { data: still } = await user
+    expect(error).toBeNull();
+    const { data: live } = await user
       .from("mesocycles")
-      .select("status")
-      .eq("id", second.id)
-      .single();
-    expect(still?.status).toBe("planned");
+      .select("id, status")
+      .eq("user_id", userId)
+      .eq("status", "active");
+    expect((live ?? []).length).toBe(2);
+
+    // leave the fixture with one live block so later cases read a single position
+    await user
+      .from("mesocycles")
+      .update({ status: "abandoned" })
+      .eq("id", second.id);
   });
 
   it("logSet stamps the cycle chain, flips the workout in_progress, and upserts on retry (R3)", async () => {

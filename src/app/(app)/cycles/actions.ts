@@ -29,6 +29,7 @@ import type { MesoDayRow } from "@/lib/types/database";
 import {
   attachMesoToMacro,
   createMacrocycleWithMesos,
+  macrocycleCreationBlock,
   manageMacroSlots,
   planUnplannedMeso,
   updateMacrocycle,
@@ -40,6 +41,14 @@ import {
   startMeso,
 } from "@/lib/queries/generation";
 import { getProfile } from "@/lib/queries/profiles";
+import {
+  getSlotEffortRows,
+  planSlotEffortEdit,
+  slotEffortKey,
+  writeSlotEffort,
+  SLOT_RIR_MAX,
+  SLOT_RIR_MIN,
+} from "@/lib/queries/slot-effort";
 import {
   applyTemplateToMeso,
   saveMesoAsTemplate,
@@ -93,6 +102,9 @@ export async function createMacrocycleAction(
   const { supabase, user } = await requireUser();
   const profile = await getProfile(supabase, user.id);
   if (!profile) redirect("/onboarding");
+  // N79: mesocycles may now run concurrently; macrocycles may not.
+  const blocked = await macrocycleCreationBlock(supabase, user.id);
+  if (blocked) return { error: blocked };
   const { params, version } = await getActiveEngineParams(supabase);
 
   await createMacrocycleWithMesos(
@@ -518,6 +530,103 @@ export async function reorderDayExercisesAction(input: {
 }
 
 // ---------------------------------------------------------------------------
+// N78 — per-slot target RIR from the planner board (doc 21 §3).
+//
+// The board is a WHOLE-BLOCK surface: it shows one week's shape, repeated, and
+// so it can only author the flat `meso_exercises.target_rir` column honestly.
+// The per-week form stays on the day view's Effort target sheet, which knows
+// which week it is looking at. Both surfaces run the same pure planner
+// (`planSlotEffortEdit`), so there is still exactly one authoring policy and
+// one set of bounds — this is a narrower door onto it, not a second one.
+// ---------------------------------------------------------------------------
+
+/** Apply flat per-slot RIR assignments, addressed by day-slot × exercise. */
+async function applySlotRirEdits(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  mesoId: string,
+  edits: { day_number: number; exercise_id: string; target_rir: number | null }[],
+): Promise<{ error: string | null }> {
+  const { data: meso, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select("id, status, weeks, includes_deload")
+    .eq("id", mesoId)
+    .maybeSingle();
+  if (mesoError) throw mesoError;
+  if (!meso) return { error: "That mesocycle isn't available." };
+  if (meso.status === "completed" || meso.status === "abandoned")
+    return { error: "This mesocycle is finished — its plan is a record now." };
+
+  const rows = await getSlotEffortRows(supabase, mesoId, false);
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  for (const edit of edits) {
+    const row = byKey.get(slotEffortKey(edit.day_number, edit.exercise_id));
+    // a slot the edit names but the saved plan doesn't have is not an error to
+    // fail the whole save over — the structure it referred to is simply gone
+    if (!row) continue;
+    const planned = planSlotEffortEdit(
+      row.assignment,
+      edit.target_rir == null
+        ? { lever: "rir", clear: true }
+        : { lever: "rir", value: edit.target_rir },
+      { weeks: meso.weeks, includesDeload: meso.includes_deload },
+    );
+    if (!planned.ok) return { error: planned.error };
+    await writeSlotEffort(supabase, row.id, planned.plan.patch);
+  }
+  return { error: null };
+}
+
+/**
+ * The draft (live-write) path for the board's target-RIR control. A draft's
+ * slot rows are real, so this writes one row immediately — the same split
+ * `updateFillSetsAction` uses for the starting-set count.
+ */
+export async function setPlanSlotRirAction(input: {
+  meso_id: string;
+  meso_exercise_id: string;
+  target_rir: number | null;
+}): Promise<FormState> {
+  const parsed = z
+    .object({
+      meso_id: z.string().uuid(),
+      meso_exercise_id: z.string().uuid(),
+      target_rir: z
+        .number()
+        .int()
+        .min(SLOT_RIR_MIN)
+        .max(SLOT_RIR_MAX)
+        .nullable(),
+    })
+    .parse(input);
+  const { supabase } = await requireUser();
+
+  const { data: meso, error: mesoError } = await supabase
+    .from("mesocycles")
+    .select("id, status, weeks, includes_deload")
+    .eq("id", parsed.meso_id)
+    .maybeSingle();
+  if (mesoError) throw mesoError;
+  if (!meso) return { error: "That mesocycle isn't available." };
+
+  const rows = await getSlotEffortRows(supabase, parsed.meso_id, false);
+  const row = rows.find((r) => r.id === parsed.meso_exercise_id);
+  if (!row) return { error: "That exercise isn't on the plan any more." };
+
+  const planned = planSlotEffortEdit(
+    row.assignment,
+    parsed.target_rir == null
+      ? { lever: "rir", clear: true }
+      : { lever: "rir", value: parsed.target_rir },
+    { weeks: meso.weeks, includesDeload: meso.includes_deload },
+  );
+  if (!planned.ok) return { error: planned.error };
+  await writeSlotEffort(supabase, row.id, planned.plan.patch);
+
+  revalidatePath(`/cycles/meso/${parsed.meso_id}/plan`);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
 // staged plan save (fig 2.5): editing a non-draft meso stages changes locally;
 // SAVE CHANGES commits the whole plan in one write. For an active meso, open
 // (not-yet-started) workouts are regenerated to match — logged history and
@@ -550,6 +659,19 @@ const planSaveSchema = z.object({
       }),
     )
     .max(7),
+  /** N78: per-slot flat target RIR, addressed by day-slot × exercise (the one
+   *  identity that survives `save_meso_plan`'s wholesale re-mint). Only the
+   *  slots whose value CHANGED are sent, so a plain reorder carries none. */
+  effort: z
+    .array(
+      z.object({
+        day_number: z.number().int().min(1).max(7),
+        exercise_id: z.string().uuid(),
+        target_rir: z.number().int().min(SLOT_RIR_MIN).max(SLOT_RIR_MAX).nullable(),
+      }),
+    )
+    .max(70)
+    .default([]),
 });
 
 export async function saveMesoPlanAction(input: {
@@ -569,11 +691,33 @@ export async function saveMesoPlanAction(input: {
       }[];
     }[];
   }[];
+  effort?: {
+    day_number: number;
+    exercise_id: string;
+    target_rir: number | null;
+  }[];
 }): Promise<void> {
   const parsed = planSaveSchema.parse(input);
   const { supabase, user } = await requireUser();
 
+  // N78: a draft/planned/active meso is editable (the regeneration below reaches
+  // only not-yet-started workouts); a finished one is a record. The page
+  // redirects too — this is the write-side half of the same rule.
+  const { data: target, error: targetError } = await supabase
+    .from("mesocycles")
+    .select("status")
+    .eq("id", parsed.meso_id)
+    .maybeSingle();
+  if (targetError) throw targetError;
+  if (target?.status === "completed" || target?.status === "abandoned")
+    redirect(`/cycles/meso/${parsed.meso_id}`);
+
   await saveMesoPlan(supabase, user.id, parsed.meso_id, parsed.days);
+  // AFTER the structural replace: `saveMesoPlan` re-mints every slot row and
+  // restores the previous assignments onto them, so writing effort first would
+  // be undone by its own restore.
+  if (parsed.effort.length > 0)
+    await applySlotRirEdits(supabase, parsed.meso_id, parsed.effort);
 
   const { data: meso } = await supabase
     .from("mesocycles")

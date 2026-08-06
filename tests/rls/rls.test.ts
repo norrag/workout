@@ -2055,17 +2055,23 @@ describe("coaching_prompts (doc 19)", () => {
   });
 });
 
-describe("single active meso (R15)", () => {
+// N79 replaces R15's user-wide index (`mesocycles_one_active_per_user`) with a
+// per-macrocycle one. Both halves of the new invariant are probed: concurrent
+// standalone blocks are ALLOWED, two blocks of one macrocycle are NOT.
+describe("concurrent mesocycles (N79)", () => {
   const service = createClient(URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  async function plannedMeso(name: string): Promise<string> {
+  async function plannedMeso(
+    name: string,
+    macroId: string | null = null,
+  ): Promise<string> {
     const { data, error } = await service
       .from("mesocycles")
       .insert({
-        // standalone (no macro) — exactly the path the old same-macro gate missed
         user_id: aliceId,
+        macrocycle_id: macroId,
         name,
         weeks: 4,
         days_per_week: 2,
@@ -2077,9 +2083,25 @@ describe("single active meso (R15)", () => {
     return data.id;
   }
 
-  it("the partial unique index allows one active meso and rejects a second (any macro)", async () => {
-    const first = await plannedMeso("r15 first");
-    const second = await plannedMeso("r15 second");
+  async function macro(name: string): Promise<string> {
+    const { data, error } = await service
+      .from("macrocycles")
+      .insert({
+        user_id: aliceId,
+        name,
+        goal_type: "hypertrophy",
+        start_date: "2026-08-01",
+        status: "active",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data.id;
+  }
+
+  it("allows two standalone mesocycles to be active at once", async () => {
+    const first = await plannedMeso("n78 standalone a");
+    const second = await plannedMeso("n78 standalone b");
 
     const { error: firstFlip } = await service
       .from("mesocycles")
@@ -2087,8 +2109,27 @@ describe("single active meso (R15)", () => {
       .eq("id", first);
     expect(firstFlip).toBeNull();
 
-    // a second concurrent activation must fail at the DB even though the two
-    // mesos share no macrocycle — the app gate is user-wide, this is its backstop
+    // the whole point of N79: a second block may run beside the first
+    const { error: secondFlip } = await service
+      .from("mesocycles")
+      .update({ status: "active" })
+      .eq("id", second);
+    expect(secondFlip).toBeNull();
+
+    await service.from("mesocycles").delete().in("id", [first, second]);
+  });
+
+  it("rejects a second active mesocycle inside the same macrocycle", async () => {
+    const macroId = await macro("n78 macro");
+    const first = await plannedMeso("n78 block 1", macroId);
+    const second = await plannedMeso("n78 block 2", macroId);
+
+    const { error: firstFlip } = await service
+      .from("mesocycles")
+      .update({ status: "active" })
+      .eq("id", first);
+    expect(firstFlip).toBeNull();
+
     const { error: secondFlip } = await service
       .from("mesocycles")
       .update({ status: "active" })
@@ -2096,7 +2137,7 @@ describe("single active meso (R15)", () => {
     expect(secondFlip).not.toBeNull();
     expect(secondFlip!.code).toBe("23505");
 
-    // completing the live block frees the slot — the next activation succeeds
+    // completing the live block frees the macro's slot
     const { error: complete } = await service
       .from("mesocycles")
       .update({ status: "completed" })
@@ -2108,7 +2149,7 @@ describe("single active meso (R15)", () => {
       .eq("id", second);
     expect(thirdFlip).toBeNull();
 
-    // cleanup so other tests (and reruns) never see a lingering active meso
     await service.from("mesocycles").delete().in("id", [first, second]);
+    await service.from("macrocycles").delete().eq("id", macroId);
   });
 });

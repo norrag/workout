@@ -2,7 +2,138 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-05 (latest) — doc 21 Phase 6 follow-up: two owner review rounds on the Effort target UI (N70)
+## 2026-08-06 (latest) — Batch 32: prescription details, cycles filter, planner editing, concurrent mesos (N75–N79)
+
+Five owner items in one PR. Four are UI; the fifth replaces a database
+invariant.
+
+**N75 — "Engine audit" is now "Prescription details," and it left the menu.**
+The sheet was a row in the exercise ⋮ menu, which is a fixed-height list where
+every row costs one of the few slots that surface has. Most people never open
+this one. It is now reached by tapping the prescription strip's own **ask
+line**, underlined to read as tappable. This amends N57: the Batch-20 addendum
+had explicitly removed an in-strip link so "the strip stays purely the story" —
+the owner's correction is that the ask line *is* the door, so nothing sits
+beside the story competing with it. One name everywhere (the copy references in
+`prescription-narrative.ts`, `slot-effort-display.ts` and `queries/audit.ts`
+were updated with it).
+
+**N76 — completed cycles are hidden on `/cycles` by default.** A closed cycle
+is a whole macrocycle (status `completed`, or every block in it
+completed/abandoned) or a closed standalone meso. A completed meso *inside* a
+running macro stays visible — it is that macro's own record of progress, not
+clutter. The toggle is the quietest thing on the page (no border, no accent,
+muted caps) and carries the count, so hidden history reads as hidden rather
+than lost. Mechanism is `?completed=1` on the server render: no client state to
+persist, no settings entry (the owner asked for it on the page).
+
+**N77 — the history e1RM row drops `EFF REPS` and the `~` on RIR.** Both came
+from doc 21 Phase 1, where the tilde's job was to stop an *assumed* RIR reading
+as an observation. The owner's call is that in this row every RIR is the value
+the estimate was priced at, so the mark distinguishes nothing a reader can act
+on. It survives where it does have a reader: `get_exercise_history` still
+reports `rir_source` and `effective_reps`, and the doc-10 §9 guardrail against
+presenting an assumption as a report is unaffected — the row makes no claim
+about where the number came from either way.
+
+**N78 — the planner board opens for an in-progress mesocycle, and carries the
+RIR lever.**
+
+*The lock was protecting nothing.* Everything the ask needs already existed:
+the board's staged working copy, `saveMesoPlan`'s transactional wholesale
+replace, `regenerateOpenWorkouts`' **structural merge** (which skips
+in-progress/completed/skipped workouts entirely and leaves every surviving
+row's engine-progressed prescription alone), and a save-confirm sheet with a
+written `LOGGED HISTORY IS PROTECTED` branch that had never been reachable.
+`disabled={hasHistory}` on the meso header's `Edit plan` row was the whole
+lock. Editing is now open through `active`; `completed`/`abandoned` are frozen
+at three layers (menu row reads `FINISHED`, the page redirects, the save action
+redirects) because a finished meso's plan is part of its record.
+
+*The RIR lever, and why it is flat here.* `meso_exercises` carries both a flat
+`target_rir` and a per-week `rir_schedule` (doc 21 §3). The board shows one
+week's shape, repeated — it has no week axis — which is exactly why doc 21
+Phase 6 left `PlannerBoard.tsx` alone. That reasoning still holds for the
+per-week form, which stays on the day view's Effort target sheet where the week
+is known. It does *not* hold for the flat column, which is a statement about
+the whole block and is the thing a plan surface can author honestly. So the
+board writes `target_rir` only, through the same pure planner every other
+surface uses (`planSlotEffortEdit` — one authoring policy, one set of bounds).
+A slot already carrying a per-week assignment says so (`RIR BY WEEK`) and the
+sheet says what setting a value would replace; it is never silently flattened.
+
+*Where the write goes.* Staged with the plan in editing mode and applied
+**after** `save_meso_plan` — that RPC re-mints every slot row and
+`restoreSlotEffortAssignments` re-keys the old assignments onto them, so
+writing effort first would be undone by its own restore. Only changed slots are
+sent, keyed by day-slot × exercise (the identity that survives the re-mint), so
+a plain reorder carries none. Repricing rides doc 14's dependency fingerprint
+(`exerciseRir` is already a key) on the next read, **not**
+`regenerateOpenWorkouts`, which is structural and by design does not re-price a
+surviving row.
+
+*The clutter ask, answered by subtraction.* The board row carried a −/N/+ set
+stepper with its own 7.5px label, a ✕, and an exercise name that was secretly
+the substitute control — six targets per exercise, one undiscoverable, and no
+room left for a new lever. All four moved into one **exercise sheet** (starting
+sets · target RIR · replace · remove) behind a single tap; the row now reads as
+a line of plan with a `3 SETS / RIR 4` summary. Adding a lever made the row
+simpler. The note the owner asked for is stated *before* a value is set rather
+than after, and says both what it overrides and that a flat value governs the
+deload week too.
+
+**N79 — more than one mesocycle may be live.**
+
+*This is a schema change, not a gate removal.* R15 (migration
+`20260703000001`) made "one active meso per user" a database guarantee after
+the app-level gate proved too narrow. Migration `20260806000001` drops
+`mesocycles_one_active_per_user` for
+`mesocycles_one_active_per_macrocycle` — partial unique on `macrocycle_id`
+where `status='active'`. Safe in both directions: dropping a unique index can
+never fail on data, and the replacement is strictly weaker than what it
+replaces (≤1 active per user implies ≤1 per macro), so every existing row
+satisfies it. Within a macrocycle, activation stays exclusive *and* sequential
+(`mesoActivationBlock`, untouched — two blocks of one macro running at once is
+incoherent, not flexible). Standalone mesos are deliberately unconstrained:
+that is the rehab case the owner asked for.
+
+*One active macrocycle, guarded in the app.* `macrocycleCreationBlock` refuses
+a second live macro from both write surfaces (the form action and
+`create_macrocycle`). Deliberately **not** a unique index: an account already
+carrying two active macros would fail the migration outright, and no user's
+data may be held hostage to a new rule. The cost is a check-then-act race on a
+once-a-quarter action; recorded rather than hidden.
+
+*The real consequence: a lookup becomes a resolution.* With uniqueness gone,
+"the active mesocycle" has to be *chosen*. `resolveActiveMesocycle` picks the
+block holding the **most recently logged set** (the owner's rule), falling back
+to newest-created when nothing has been logged yet. That key is right because
+it is the only one the athlete moves by training rather than by bookkeeping:
+log a rehab session and the app follows the rehab block; log the macro's next
+day and it follows that again, with nothing to switch. It costs one query in
+the single-active case — the tiebreak read only runs when there is a tie. Every
+"current meso" surface shares it: the Workout tab (via `getCurrentState`),
+`get_current_state`, `explain_prescription`'s freshness step, and the
+admin-LLM meso resolver. Tool descriptions for `activate_mesocycle` and
+`get_current_state` were restated to match.
+
+**Tests.** `resolveActiveMesocycle` gets six cases over the table-backed fake
+client (single-active never consults sets; recency beats creation order in both
+directions; empty-history fallback; another user's sets ignored). The RLS probe
+was rewritten to assert both halves of the new invariant — two standalone
+actives allowed, two blocks of one macro rejected with `23505` — and the
+write-pipeline integration case that asserted the old refusal now asserts the
+new permission.
+
+**Deviation from rule 8 (no mockup figure).** The planner exercise sheet has no
+figure. It is built from the light-ledger primitives already in use on this
+screen: `BottomSheet` with title/subtitle, the day sheet's `9px` stepper
+grammar for both steppers, dashed borders for the unset/optional affordances,
+and `border-b border-ink/15` rows for the two actions — the same vocabulary as
+`DaySetupSheet` directly above it in the same file. The cycles-page toggle is
+likewise unfigured: muted tracked caps, no border, no accent.
+
+## 2026-08-05 — doc 21 Phase 6 follow-up: two owner review rounds on the Effort target UI (N70)
 
 Two small correction passes on the Phase 6 UI, both owner review.
 

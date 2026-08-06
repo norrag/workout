@@ -205,8 +205,11 @@ export function registerGetCurrentState(server: McpServer) {
         "(an authored effort level that overrides the week's ramp for one " +
         "exercise, with its reason), plus any working-set cap or rep position " +
         "assigned to a slot. Call this first to ground any coaching or " +
-        "planning. Takes no arguments — it always reports the authenticated " +
-        "user's own state.",
+        "planning. More than one mesocycle can be live at once (a standalone " +
+        "block running alongside a macrocycle's block); the one reported here " +
+        "is the one holding the most recently logged set — the block the " +
+        "athlete is actually training right now. Takes no arguments — it " +
+        "always reports the authenticated user's own state.",
       inputSchema: {},
     },
     async (_args: Record<string, never>, extra: McpExtra) => {

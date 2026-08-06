@@ -54,6 +54,11 @@ export default async function MesoPlanPage({
   ]);
   if (linkError) throw linkError;
   if (!plan) notFound();
+  // N78 opened this surface to an in-progress meso (the save reaches only
+  // not-yet-started days). A FINISHED one stays closed — its plan is part of
+  // the record, and there is nothing left for an edit to reach.
+  if (plan.meso.status === "completed" || plan.meso.status === "abandoned")
+    redirect(`/cycles/meso/${mesoId}`);
 
   // logged-history flag → drives the immutability warning on SAVE CHANGES
   const { hasHistory } = await getMesoDeletionImpact(supabase, user.id, mesoId);

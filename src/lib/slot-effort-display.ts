@@ -123,7 +123,7 @@ export function effortEyebrowSuffix(
  * 21 §9.4, settled by the owner as the qualitative option. A prescription of
  * "@ 21 RIR" is arithmetically fine and humanly strange: printing it in the
  * quick-read asks the athlete to internalize a number the app itself refuses to
- * treat as a measurement. The number is not hidden — the Engine audit sheet
+ * treat as a measurement. The number is not hidden — the Prescription details sheet
  * still shows the tuple verbatim — it is simply not what the quick-read says.
  */
 export function effortAskPhrase(rir: number, measuring = true): string {

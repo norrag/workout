@@ -17,7 +17,7 @@
  * (doc 19 §2 A4 / §6.2, from the owner review's tone table):
  *
  * 1. **The program is the actor.** "the program" writes the prescription. The
- *    word "engine" lives only in the Engine audit sheet (doc 19 §4.2); "we"
+ *    word "engine" lives only in the Prescription details sheet (doc 19 §4.2); "we"
  *    and "I" appear nowhere.
  * 2. **Second person only for what the lifter actually did or reported** — you
  *    completed, you reported, you rated. Never for praise (doing the work is

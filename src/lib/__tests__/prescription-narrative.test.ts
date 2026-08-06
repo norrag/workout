@@ -216,7 +216,7 @@ describe("composeProgressionLine — program-language, no engine vocab (§4.2)",
     }
   });
 
-  it("never uses the word 'engine' (§4.2 — it lives only in the Engine audit)", () => {
+  it("never uses the word 'engine' (§4.2 — it lives only in Prescription details)", () => {
     const statuses = ["stepped", "vanished", "paced"];
     for (const status of statuses) {
       expect(

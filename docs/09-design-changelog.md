@@ -42,6 +42,68 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-06 — Four surfaces get quieter: prescription details, the cycles filter, the history row, the planner exercise sheet (figs 1.1 / 1.2 / 2.1 / 2.5 / 3.2, N75–N78)
+
+One owner batch, one shared instinct: each screen was asked to carry one thing
+less, or to carry the same things in fewer controls.
+
+- **Change (N75, figs 1.1/1.2).** The exercise ⋮ menu's `Engine audit ›` row is
+  **gone**. The sheet is renamed **Prescription details** and is opened by
+  tapping the prescription strip's **ask line**, which is now underlined
+  (`decoration-ink/35`, `underline-offset-[3px]`) to read as tappable without a
+  chevron or a second control.
+- **Rationale.** The ⋮ menu is a short fixed list where every row costs a slot,
+  and this is a panel most people never open. This **amends the 2026-07-19
+  entry** below, whose Batch-20 addendum removed an in-strip link so the strip
+  would stay "purely the story": the owner's correction is that the ask line
+  *is* the door, so nothing sits **beside** the story competing with it.
+- **Impact.** `RETROFIT` — `DayView.tsx`, `PrescriptionDetailSheet.tsx`.
+
+- **Change (N76, fig 2.1).** The cycles list hides **finished cycles** by
+  default — a whole closed macrocycle (status `completed`, or every block in it
+  completed/abandoned) and closed standalone mesos. A completed mesocycle
+  **inside a still-running macrocycle stays visible**. A single muted link sits
+  at the bottom of the list carrying the count: `SHOW 3 COMPLETED CYCLES` /
+  `HIDE COMPLETED CYCLES`, at `9.5px` tracked caps in `ink/40`, no border and
+  no accent.
+- **Rationale.** The list is a working surface; a year of closed blocks buries
+  the one that is live. The count is what keeps the toggle honest — hidden
+  history must read as hidden, never as lost. It is the quietest control on the
+  page on purpose: a filter is not an action.
+- **Impact.** `RETROFIT` — `cycles/page.tsx` (`?completed=1`, server render).
+
+- **Change (N77, fig 3.2).** The history list's flipped (e1RM) row drops the
+  `· N EFF REPS` clause and the `~` prefix on an assumed RIR. It now reads
+  `367.5 lb E1RM · 2 RIR`.
+- **Rationale.** Owner: the row was too busy, and the tilde marks a distinction
+  — assumed vs reported — that this row's reader can't act on. It survives on
+  `get_exercise_history`, where the distinction has a reader who needs it.
+  Supersedes the 2026-08-04 (session 2) entry's addition of both marks to this
+  row.
+- **Impact.** `RETROFIT` — `ExerciseHistoryList.tsx` (display only; the query
+  and MCP payload are unchanged).
+
+- **Change (N78, fig 2.5).** The planner board's exercise row is **one target**.
+  The inline `−/N/+` starting-set stepper, its `START SETS` micro-label, the `✕`
+  remove control, and the tap-the-name-to-substitute gesture are all replaced by
+  a single row-wide button opening an **exercise sheet**: `STARTING SETS`
+  (stepper) · `TARGET RIR` (unset = one dashed `+ SET A TARGET RIR` button; set
+  = stepper plus a dashed `FOLLOW THE RAMP`) · `Replace exercise ›` ·
+  `Remove from day`. The row itself now shows `3 SETS` over `RIR 4` (or
+  `RIR —` / `RIR BY WEEK`) and a `›`. The board is also reachable for an
+  **in-progress** mesocycle, not only a planned one.
+- **Rationale.** The row carried six targets per exercise, one of them
+  undiscoverable, and had no room for the effort lever the owner asked for —
+  so the lever arrived by **subtraction**. `RIR —` is said out loud rather than
+  left blank so an assignment always reads as a departure from something (doc 21
+  §4.1), and `RIR BY WEEK` names a per-week assignment rather than flattening it
+  into a value the board can't show. The sheet's note states what an assignment
+  overrides **before** it is set, and that a flat value governs the deload too.
+- **Impact.** `RETROFIT` — `PlannerBoard.tsx`, `MesoHeader.tsx`. No mockup
+  figure for the sheet; it is assembled from this screen's existing light-ledger
+  primitives (the day sheet's stepper grammar, dashed = optional/unset,
+  `border-ink/15` action rows). Deviation recorded in `PROGRESS.md`.
+
 ## 2026-08-05 — RIR capture cell shows the real number again (fig 1.1, corrects 2026-08-04 session 2, doc 21 §2, N70)
 
 - **Change.** The `RIR` capture cell's 2026-08-04 amendment (below) is
