@@ -5,6 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/queries/profiles";
 import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
+import { setLastSeenVersion } from "@/lib/queries/releases";
+import { CURRENT_VERSION } from "@/content/releases";
 import { localDayIso } from "@/lib/dates";
 
 // birthdate replaces the static age int (doc 17 §2.5) — age is derived fresh
@@ -63,6 +65,11 @@ export async function completeOnboarding(
       : null,
     onboarded_at: new Date().toISOString(),
   });
+
+  // doc 23 §6.2 (T3): a new account's history with the app starts now. Priming
+  // last-seen alongside `onboarded_at` is what stops every signup from being
+  // greeted by a changelog of releases that predate it.
+  await setLastSeenVersion(supabase, user.id, CURRENT_VERSION);
 
   // doc 17 §5: onboarding's bodyweight is the series' first measured point
   if (parsed.data.bodyweight != null)

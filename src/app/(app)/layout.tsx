@@ -4,12 +4,13 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { ToastProvider } from "@/components/ui/Toast";
 import { SetLogQueueProvider } from "@/components/logging/SetLogQueueProvider";
 import { SetLogQueueStatus } from "@/components/logging/SetLogQueueStatus";
+import { WhatsNewGate } from "@/components/releases/WhatsNewGate";
 import { getRequestAuth } from "@/lib/supabase/server";
 
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { user } = await getRequestAuth();
+  const { supabase, user } = await getRequestAuth();
   if (!user) redirect("/sign-in");
 
   return (
@@ -26,6 +27,9 @@ export default async function AppLayout({
           </main>
           <SetLogQueueStatus />
           <BottomNav />
+          {/* doc 23 §6.3 — resolved server-side, inside the queue provider so
+              the sheet can see whether a set is still draining (§6.4) */}
+          <WhatsNewGate supabase={supabase} userId={user.id} />
         </div>
       </SetLogQueueProvider>
     </ToastProvider>

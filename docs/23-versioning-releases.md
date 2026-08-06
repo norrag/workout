@@ -1,6 +1,9 @@
 # 23 — Versioning & Releases (build spec + phased plan)
 
-**Status:** plan — nothing built. Phases in [§11](#11-the-phased-plan);
+**Status:** **phases 0–6 built** (2026-08-06, PR for N80) — the framework is
+live and 1.0.0 is cut. Deep links carry the `app` half only; the `guide` half
+waits on doc 22 Phase 2, which is a dependency rather than a blocker
+([§7.2](#72-guide-targets)). Per-phase state in [§11](#11-the-phased-plan);
 **all eight decisions answered** in [§12](#12-decisions).
 **Revised 2026-08-06 after owner review round 1** — five corrections, three of
 them defects the owner caught: **"live workout" was undefined and the rule as
@@ -631,7 +634,7 @@ reason to have one.
 
 **S** ≈ a focused session, **M** ≈ substantial.
 
-### Phase 0 — Design pass *(gates everything)*
+### Phase 0 — Design pass *(gates everything)* — **DONE** (2026-08-06)
 
 Hard rule 8: there is no mockup for either surface. Transcribe the house system
 (08 §5 / 09) into a What's New sheet and a version-history list — square corners,
@@ -639,7 +642,7 @@ dashed borders for the collapsed fix rows, orange only for current position and
 selection, tracked all-caps labels — and record the decision in
 `docs/09-design-changelog.md` **before** any markup. Owner sees it. **S**
 
-### Phase 1 — Identity and registry
+### Phase 1 — Identity and registry — **DONE** (2026-08-06)
 
 `src/lib/version/` (pure — `compare`, the gate union, `releaseActive`),
 `src/content/releases/` with `1.0.0.ts` + an empty `unreleased.ts`, the CI gates
@@ -648,27 +651,27 @@ of [§9.4](#94-ci-gates-and-their-cost), `package.json` → `1.0.0`, the
 `CURRENT_VERSION` instead of a hardcoded string. No user-visible change beyond
 the footer. **S–M**
 
-### Phase 2 — Version history
+### Phase 2 — Version history — **DONE** (2026-08-06)
 
 `/more/whats-new`, `ReleaseEntryList`, the footer link. Builds the shared
 renderer and puts real copy on screen before anything depends on it. **S**
 
-### Phase 3 — Per-user state
+### Phase 3 — Per-user state — **DONE** (2026-08-06)
 
 Migration + backfill + RLS test, priming at onboarding, the acknowledgment
 action, and the pure gate with its full test matrix. Still no modal. **S–M**
 
-### Phase 4 — The modal
+### Phase 4 — The modal — **DONE** (2026-08-06)
 
 `WhatsNewGate` in `(app)/layout.tsx`, suppression rules, e2e. After this the
 framework is live and 1.1.0 can be announced. **M**
 
-### Phase 5 — Deep links
+### Phase 5 — Deep links — **DONE for `app` targets** (2026-08-06)
 
 `LINKABLE_ROUTES` + validation, links added to existing entries; the `guide`
 variant enabled when doc 22 Phase 2 lands. **S**
 
-### Phase 6 — Process
+### Phase 6 — Process — **DONE** (2026-08-06)
 
 The release checklist (in this doc's §9, plus a short `docs/deployment/release.md`
 runbook), the GitHub-release generator, the `release_impact` argument + guard on

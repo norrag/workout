@@ -29,6 +29,12 @@ import {
 } from "@/lib/queries/e1rm-restamp";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportError } from "@/lib/observability/report";
+import {
+  checkAnnouncement,
+  RELEASE_IMPACT_MEANING,
+  type ReleaseImpact,
+} from "@/lib/version/release-impact";
+import { CURRENT_VERSION, RELEASES } from "@/content/releases";
 import { registerLlmAdminTools, LLM_ADMIN_TOOL_NAMES } from "./admin-llm";
 import { registerCoachingPromptTools, COACHING_PROMPT_TOOL_NAMES } from "./admin-prompt";
 import { resolveAdmin } from "./admin-gate";
@@ -47,6 +53,14 @@ import { recordMcpWrite } from "../audit";
 function jsonResult(payload: Record<string, unknown>, opts: EnvelopeOpts = {}) {
   return toolResult(payload, opts);
 }
+
+/** doc 23 §9.5 — required on both parameter tools, so the classification is
+ *  made at the moment someone is looking at the diff rather than remembered. */
+const releaseImpactSchema = z
+  .enum(["none", "fix", "feature"])
+  .describe(
+    `what this does to users (doc 23 §9.5). none: ${RELEASE_IMPACT_MEANING.none}. fix: ${RELEASE_IMPACT_MEANING.fix}. feature: ${RELEASE_IMPACT_MEANING.feature}.`,
+  );
 
 /**
  * Human-readable text for a thrown value. `String(e)` alone yields the useless
@@ -392,15 +406,28 @@ function registerProposeEngineParams(server: McpServer) {
         "base_version to start from an existing version and pass only the keys " +
         "you want to change (deep-merged); or pass a full params object. The set " +
         "is zod-validated before storage — a malformed set is rejected and can " +
-        "never be activated. Activate it separately after reviewing a replay.",
+        "never be activated. Activate it separately after reviewing a replay. " +
+        "release_impact classifies what activating this set would do to users " +
+        "(doc 23 §9.5): " +
+        `none = ${RELEASE_IMPACT_MEANING.none}; ` +
+        `fix = ${RELEASE_IMPACT_MEANING.fix}; ` +
+        `feature = ${RELEASE_IMPACT_MEANING.feature}. ` +
+        "Run replay_decisions first — it reports the diff this version would " +
+        "produce, so the classification is a check rather than a guess.",
       inputSchema: {
         params: z.record(z.string(), z.unknown()),
         base_version: z.number().int().positive().optional(),
         notes: z.string().max(500).optional(),
+        release_impact: releaseImpactSchema,
       },
     },
     async (
-      args: { params: Record<string, unknown>; base_version?: number; notes?: string },
+      args: {
+        params: Record<string, unknown>;
+        base_version?: number;
+        notes?: string;
+        release_impact: ReleaseImpact;
+      },
       extra: McpExtra,
     ) => {
       const { client, userId } = await resolveAdmin(extra);
@@ -420,12 +447,29 @@ function registerProposeEngineParams(server: McpServer) {
           error: `params failed validation: ${errorMessage(e)}`,
         });
       }
-      const summary = `proposed engine_params v${newVersion} (inactive)`;
-      await recordMcpWrite(userId, PROPOSE_ENGINE_PARAMS, { base_version: args.base_version, notes: args.notes }, summary);
+      const summary = `proposed engine_params v${newVersion} (inactive, release_impact: ${args.release_impact})`;
+      await recordMcpWrite(
+        userId,
+        PROPOSE_ENGINE_PARAMS,
+        {
+          base_version: args.base_version,
+          notes: args.notes,
+          release_impact: args.release_impact,
+        },
+        summary,
+      );
       return jsonResult({
         ok: true,
         version: newVersion,
+        release_impact: args.release_impact,
         summary: `${summary}. Replay it before activating.`,
+        // the classification is carried forward by the caller, not stored:
+        // activation re-asks for it, so a set re-classified after a replay is
+        // judged on what it actually does rather than on the first guess
+        next:
+          args.release_impact === "feature"
+            ? "Announce this in a feature release BEFORE activating — activate_engine_params refuses a feature-classified set with no live announcing release (doc 23 §9.5)."
+            : "Activate when the replay looks right.",
       });
     },
   );
@@ -448,14 +492,38 @@ function registerActivateEngineParams(server: McpServer) {
         "reconcile detects the changed engine_params token and recomputes them). " +
         "If the new version changes the e1rm block, every stored per-set e1RM " +
         "stamp is recomputed under the new params (T-N33) — the result reports " +
-        "how many rows were restamped.",
+        "how many rows were restamped. " +
+        "release_impact classifies what this activation does to users (doc 23 " +
+        `§9.5): none = ${RELEASE_IMPACT_MEANING.none}; ` +
+        `fix = ${RELEASE_IMPACT_MEANING.fix}; ` +
+        `feature = ${RELEASE_IMPACT_MEANING.feature}. ` +
+        "A feature-classified activation must name announced_in — a live " +
+        "feature or major release that tells users about it — and is REFUSED " +
+        "without one. Announce, then activate.",
       inputSchema: {
         version: z.number().int().positive(),
         confirm_version: z.number().int().positive(),
+        release_impact: releaseImpactSchema,
+        announced_in: z
+          .string()
+          .optional()
+          .describe(
+            'the live release announcing this change, e.g. "1.1.0"; required when release_impact is "feature"',
+          ),
       },
     },
     async (
-      { version, confirm_version }: { version: number; confirm_version: number },
+      {
+        version,
+        confirm_version,
+        release_impact,
+        announced_in,
+      }: {
+        version: number;
+        confirm_version: number;
+        release_impact: ReleaseImpact;
+        announced_in?: string;
+      },
       extra: McpExtra,
     ) => {
       const { client, userId } = await resolveAdmin(extra);
@@ -464,6 +532,17 @@ function registerActivateEngineParams(server: McpServer) {
           ok: false,
           error: `confirm_version (${confirm_version}) must echo version (${version}).`,
         });
+      // doc 23 §9.5 / T10 — an activation is a user-visible change with no
+      // diff. The same shape of refusal as confirm_version: a check, not a
+      // reminder in a runbook.
+      const announcement = checkAnnouncement(
+        release_impact,
+        announced_in,
+        RELEASES,
+        CURRENT_VERSION,
+      );
+      if (!announcement.ok)
+        return jsonResult({ ok: false, error: announcement.error });
       // capture the outgoing active version BEFORE the flip, so the T-N33
       // restamp can compare e1rm blocks (already-active target ⇒ no change).
       let prior: EngineParams | null = null;
@@ -501,11 +580,18 @@ function registerActivateEngineParams(server: McpServer) {
         }
       }
 
-      const summary = `activated engine_params v${version}`;
-      await recordMcpWrite(userId, ACTIVATE_ENGINE_PARAMS, { version }, summary);
+      const summary = `activated engine_params v${version} (release_impact: ${release_impact}${announced_in ? `, announced in ${announced_in}` : ""})`;
+      await recordMcpWrite(
+        userId,
+        ACTIVATE_ENGINE_PARAMS,
+        { version, release_impact, announced_in },
+        summary,
+      );
       return jsonResult({
         ok: true,
         version,
+        release_impact,
+        announced_in: announced_in ?? null,
         summary: `${summary} — now live for future generation.`,
         e1rm_restamp: restampError
           ? { ran: true, error: restampError }

@@ -116,6 +116,9 @@ export type ProfileRow = {
   auto_match_weights: boolean;
   role: "user" | "admin";
   onboarded_at: string | null;
+  /** doc 23 §6.1 — highest release version this account has been shown;
+   *  null = not yet primed (a new signup sees no changelog) */
+  last_seen_version: string | null;
   created_at: string;
   updated_at: string;
 }

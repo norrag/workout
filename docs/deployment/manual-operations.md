@@ -597,6 +597,42 @@ One migration lands with PR #226: `20260806000001_concurrent_mesocycles`.
 > account carries at most one, the index can be added then — that is a data
 > question, not a code one, so it belongs here rather than in a TODO.
 
+### Apply the release-notification migration (N80)
+
+One migration lands with the doc 23 phases 0–6 PR:
+`20260806000002_last_seen_version`.
+
+| Step | What / why |
+|---|---|
+| **① Apply `20260806000002` to hosted** | Adds `profiles.last_seen_version text` (nullable) and backfills every existing row to `'1.0.0'`. Additive and idempotent (`add column if not exists`, `update ... where last_seen_version is null`); no RLS change — `profiles_update_own` already covers every column except `role` (doc 23 §6.1). |
+| **② Confirm the backfill** | `select count(*) from public.profiles where last_seen_version is null;` should be 0 immediately after. A row that is null later is a **new signup**, which is correct: the app primes it to `CURRENT_VERSION` and shows nothing. |
+
+### `NEXT_PUBLIC_RELEASE_OVERRIDE` (Vercel, Preview only)
+
+| Operation | Where | Notes |
+|---|---|---|
+| Set `NEXT_PUBLIC_RELEASE_OVERRIDE` | Vercel → Project → Settings → Environment Variables, **Preview** scope only | doc 23 §9.2 — raises the effective version on a preview deploy so a staged release block can be reviewed before it is flipped on. The code ignores it when the environment is production, so a mistaken Production entry is inert; still, do not set it there. Unset it once the block ships. |
+
+### Announce, then activate — `engine_params` (doc 23 §9.5)
+
+**Ordering rule, now enforced in the tool.** An `engine_params` activation is a
+user-visible change with no code diff: the numbers a user is prescribed move,
+while the deploy that carried the parameter set announced nothing. Under doc 23
+§4.2 that is a **feature release**.
+
+Both `propose_engine_params` and `activate_engine_params` take a required
+`release_impact` of `none` / `fix` / `feature`, and `activate_engine_params`
+**refuses** a `feature`-classified activation unless `announced_in` names a
+release that is a feature or major release, present in the registry, and
+already deployed. Run `replay_decisions` first — it reports the diff the version
+would produce, so the classification is a check rather than a guess.
+
+So every activation in the sections above now reads: classify → (if `feature`)
+cut and deploy the announcing release → activate the same day. Announcing a
+change slightly before it lands is a smaller error than a user finding their
+prescription moved with no explanation. Full checklist:
+[`release.md`](release.md).
+
 ---
 
 ## How Claude flags these

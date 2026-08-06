@@ -10,6 +10,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LogBodyweightRow } from "./LogBodyweightRow";
 import { formatHeight } from "@/lib/units";
 import { shortDate } from "@/lib/dates";
+import { displayVersion } from "@/lib/version";
 
 /** More tab (fig 4.4): profile card + inline settings. */
 export default async function MorePage() {
@@ -150,9 +151,16 @@ export default async function MorePage() {
         </SubmitButton>
       </form>
 
-      <div className="mt-6 text-[9.5px] font-medium tracking-[0.12em] text-ink/45">
-        WORKOUT 0.1 — PRE-RELEASE
-      </div>
+      {/* doc 23 §8 — the footer is the door to the version history, and its
+          number comes from the release registry (never a hardcoded string:
+          CI asserts package.json, CURRENT_VERSION and max(RELEASES) agree) */}
+      <Link
+        href="/more/whats-new"
+        className="mt-6 block text-[9.5px] font-medium tracking-[0.12em] text-ink/45"
+      >
+        WORKOUT <span className="numeral">{displayVersion()}</span> —
+        WHAT&apos;S NEW ›
+      </Link>
     </div>
   );
 }
