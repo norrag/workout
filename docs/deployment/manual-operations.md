@@ -604,8 +604,8 @@ One migration lands with the doc 23 phases 0–6 PR:
 
 | Step | What / why |
 |---|---|
-| **① Apply `20260806000002` to hosted** | Adds `profiles.last_seen_version text` (nullable) and backfills every existing row to `'1.0.0'`. Additive and idempotent (`add column if not exists`, `update ... where last_seen_version is null`); no RLS change — `profiles_update_own` already covers every column except `role` (doc 23 §6.1). |
-| **② Confirm the backfill** | `select count(*) from public.profiles where last_seen_version is null;` should be 0 immediately after. A row that is null later is a **new signup**, which is correct: the app primes it to `CURRENT_VERSION` and shows nothing. |
+| ~~**① Apply `20260806000002` to hosted**~~ **(done 2026-08-06)** | Adds `profiles.last_seen_version text` (nullable) and backfills every existing row to `'1.0.0'`. Additive and idempotent (`add column if not exists`, `update ... where last_seen_version is null`); no RLS change — `profiles_update_own` already covers every column except `role` (doc 23 §6.1). Applied via Supabase MCP `apply_migration`. |
+| ~~**② Confirm the backfill**~~ **(done 2026-08-06)** | `select count(*) from public.profiles where last_seen_version is null;` returned 0 (5/5 rows at `1.0.0`) immediately after. A row that is null later is a **new signup**, which is correct: the app primes it to `CURRENT_VERSION` and shows nothing. `get_advisors` re-checked clean — no new findings from this migration. |
 
 ### `NEXT_PUBLIC_RELEASE_OVERRIDE` (Vercel, Preview only)
 
