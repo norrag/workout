@@ -9,8 +9,8 @@ Append a dated entry whenever a session moves work. Newest first.
 Owner asked how to architect and implement discrete versioned releases from a
 fresh **v1.0.0**, with per-user last-seen tracking driving a What's New modal,
 a version history on More, and a defined process. Answered with a plan + build
-spec: [`docs/23-versioning-releases.md`](../23-versioning-releases.md). New
-workstream **V**; verbatim note in the backlog appendix as **Batch 34**.
+spec: [`docs/23-versioning-releases.md`](../23-versioning-releases.md) (PR #229).
+New workstream **V**; verbatim note in the backlog appendix as **Batch 34**.
 
 - **The proposed structure works, with one renaming.** `MAJOR.FEATURE.FIX`
   keeps semver's shape but defines the digits by **audience**, not API compat —
