@@ -11,6 +11,7 @@
 // makes that unavoidable rather than aspirational.
 
 import type { GlossaryKey } from "@/lib/glossary";
+import type { SetMarker } from "@/lib/set-markers";
 
 // ---------------------------------------------------------------------------
 // Inline runs
@@ -42,6 +43,13 @@ export type Inline =
 
 /** A paragraph's content: a plain string, or a run of inline spans. */
 export type RichText = string | readonly Inline[];
+
+/**
+ * An app mark the manual may show the reader verbatim, keyed to where it is
+ * defined in the app. Closed, and it grows one entry per design decision —
+ * a mark the manual can draw is a mark the app actually renders.
+ */
+export type ManualMark = `set-marker:${SetMarker}`;
 
 // ---------------------------------------------------------------------------
 // Blocks
@@ -78,6 +86,23 @@ export type ManualBlock =
     }
   /** a glossary card, rendered from `glossary.ts` at render time (§8.1) */
   | { readonly kind: "term"; readonly term: GlossaryKey }
+  /**
+   * Show the reader the actual mark, next to what it means (owner review round
+   * 2, 2026-08-07). Demonstrating an app element beats describing it, and it is
+   * something this format can do that spec prose cannot.
+   *
+   * The vocabulary is closed for the same reason the block union is: a symbol
+   * the manual invents is a symbol the app does not have. Each mark renders
+   * from the app's own definition — `SET_MARKERS` — so the manual and the
+   * screen cannot drift.
+   */
+  | {
+      readonly kind: "legend";
+      readonly items: readonly {
+        readonly mark: ManualMark;
+        readonly text: RichText;
+      }[];
+    }
   /** a standalone onward link to another section */
   | { readonly kind: "link"; readonly to: string; readonly label: string }
   /**

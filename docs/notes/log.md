@@ -37,6 +37,21 @@ Fixed, pinned by a test, logged as `D-01` and in `22b` §6.6, staged for 1.1.0.
 into doc 22's prose (§2.2 now names v26, §6.1 the ±1 workload model, §6.2/§6.3
 off the measuring band).
 
+**Owner review round 2, same day — signed off with four notes**, all folded in
+and generalized as doc 22 **§8.4a** so they bind every later chapter:
+
+1. **Prev/next in the section footer**, crossing chapter boundaries, naming its
+   destination — pulled forward from Phase 2.
+2. **`related` is a labelled list carrying each target's summary**, and skips
+   whatever prev/next already offers; the bare trailing `LABEL ›` links are
+   gone. Also pulled forward from Phase 2.
+3. **A tenth block kind, `legend`** — show the app's mark, do not describe it.
+   First use is the `▲`/`■`/`▼` set markers, whose glyphs moved to a shared
+   `src/lib/set-markers.ts` that `DayView.tsx` reads too (ledger `D-03`).
+4. **No definition may lean on an unexplained abbreviation** — `GLOSSARY.e1rm`
+   is now `ESTIMATED ONE-REP MAX (E1RM)` and ties the words to the letters
+   (ledger `D-02`), with two sibling cards following and a test pinning it.
+
 ## 2026-08-06 — Session 107: user-manual Phase 0, the four ground-truth audits (N74)
 
 Doc 22 Phase 0 executed and landed as three working documents. The phase exists

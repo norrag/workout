@@ -46,6 +46,20 @@ describe("glossary", () => {
     expect(GLOSSARY.deload.body.toLowerCase()).not.toContain("boost");
   });
 
+  // Owner review round 2 (doc 22): a definition may not lean on an unexplained
+  // abbreviation — "RM" means nothing to a reader meeting it for the first
+  // time, least of all inside the card that is supposed to explain the term.
+  it("spells out any abbreviation it uses (no bare RM)", () => {
+    for (const [key, entry] of entries) {
+      const text = `${entry.label} ${entry.body}`;
+      if (/\b(e?1RM)\b/i.test(text)) {
+        expect(text.toLowerCase(), `${key} uses "1RM" without spelling it out`).toContain(
+          "one-rep max",
+        );
+      }
+    }
+  });
+
   // doc 22 Phase 1 found this clause inverted. e1RM rises with effective reps
   // (= reps + RIR), so at the same weight × reps the set with reps LEFT implies
   // the greater strength — which is why the doc 21 §2 restamp moved every

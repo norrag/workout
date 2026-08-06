@@ -70,13 +70,44 @@ prose rather than sitting under it as blockquotes. Done: §2.2 now names **v26**
 as the inactive example, §6.1 states the ±1 workload model as what ships, and
 §6.2/§6.3 stop leaning on the measuring band.
 
+### Owner review round 2, folded in the same day
+
+Four notes off the rendered exemplar. Three were design changes, generalized as
+doc 22 §8.4a so they bind every later chapter rather than just this one.
+
+- **Prev/next in the section footer**, crossing chapter boundaries and naming
+  its destination — an adjacent section should not cost a trip up to the chapter
+  page and back down. **Pulled forward from Phase 2.**
+- **`related` became a labelled list carrying each target's summary**, and drops
+  any row the prev/next footer already offers. The bare `LABEL ›` links that sat
+  at the foot of two sections are gone: a link with no stated reason is one the
+  reader has to open to evaluate. **Also pulled forward from Phase 2.**
+- **A tenth block kind, `legend`** — show the app's actual mark next to what it
+  means, first used for the `▲` / `■` / `▼` set-compliance markers. The glyphs
+  moved to a new shared `src/lib/set-markers.ts` that `DayView.tsx` now reads
+  too, so the screen and the manual cannot show different symbols; a source
+  assertion keeps the day view off inline characters. This is the format doing
+  something spec prose cannot, and it is now a standing rule.
+- **`GLOSSARY.e1rm` was leaning on "RM"** — a definition opening with the
+  abbreviation it exists to explain. Label is now `ESTIMATED ONE-REP MAX
+  (E1RM)`, the body ties the words to the letters, and two sibling cards follow.
+  Pinned by a test. That is the §8.1 contract catching a second defect (`D-02`)
+  in one phase, and a third (`D-03`) that only the manual would ever have hit.
+
+The budget absorbed it visibly: because a `term` block counts the glossary's
+words, the densest section moved 309 → 323 with no prose change — 92% of the
+ceiling, which is the right kind of tight.
+
 ### Next
 
-**Phase 2** — the map (fig 4.8), search over the build-time index, prev/next,
-breadcrumb-back, related sections, the remaining §8 contract tests, the two
+**Phase 2** — the map (fig 4.8), search over the build-time index,
+breadcrumb-back, deep-link marking, the remaining §8 contract tests, the two
 outstanding D3 guards (import guard, precache exclusion), the More-tab entry
 row, and `GUIDE_SECTION_IDS` for doc 23. It is the last step before doc 23 P5
 and the 1.1.0 cut.
+
+**Until the More entry and the map land, the reader is reachable only by
+typing `/more/guide/effort-rir`** — scope, not a defect.
 
 ## 2026-08-06 — doc 22 Phase 0: the four ground-truth audits (N74)
 

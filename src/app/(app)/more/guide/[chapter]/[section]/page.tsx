@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { chaptersFor, resolveSection, sectionId } from "@/content/manual";
-import { ManualSectionBody } from "@/components/manual/ManualBlocks";
+import {
+  ManualRelated,
+  ManualSectionBody,
+  ManualSectionNav,
+} from "@/components/manual/ManualBlocks";
 import { releaseActive } from "@/lib/version";
 import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
@@ -9,9 +13,10 @@ import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
  * Guide — one section (fig 4.10; 09-changelog 2026-08-07 §1).
  *
  * The atomic unit: one section, one screen, one URL, one link target, one
- * search hit (doc 22 §9.1). Everything that makes a *collection* of sections
- * navigable — the map, search, prev/next across chapters, breadcrumb-back to
- * origin, related sections, the deep-link landing mark — is Phase 2.
+ * search hit (doc 22 §9.1). Carries its related list and prev/next, both pulled
+ * forward from Phase 2 in owner review round 2 — an adjacent section should not
+ * cost a trip up to the chapter page and back down. The map, search,
+ * breadcrumb-back to origin, and the deep-link landing mark remain Phase 2.
  */
 export function generateStaticParams() {
   if (!releaseActive(UNRELEASED_VERSION)) return [];
@@ -27,7 +32,8 @@ export default async function GuideSectionPage({
 }) {
   if (!releaseActive(UNRELEASED_VERSION)) notFound();
   const { chapter: chapterSlug, section: sectionSlug } = await params;
-  const resolved = resolveSection(sectionId("ug", chapterSlug, sectionSlug));
+  const id = sectionId("ug", chapterSlug, sectionSlug);
+  const resolved = resolveSection(id);
   if (!resolved) notFound();
   const { chapter, section, index } = resolved;
 
@@ -54,6 +60,8 @@ export default async function GuideSectionPage({
       </p>
 
       <ManualSectionBody section={section} />
+      <ManualRelated section={section} id={id} />
+      <ManualSectionNav id={id} />
     </div>
   );
 }

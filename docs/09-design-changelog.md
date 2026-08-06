@@ -170,14 +170,74 @@ against this entry's exemplar chapter: **≤ 350 words and ≤ 12 blocks per
 section**, `detail` contents excluded. The remaining four contracts land with
 the reader infrastructure in Phase 2.
 
-- **Calibration.** Chapter 6's six sections came out at 205–309 words over 6–8
+- **Calibration.** Chapter 6's six sections came out at 205–323 words over 6–9
   blocks, median 229. Doc 22 §9.3's proposed ceiling therefore stands unchanged:
   a typical section sits at two thirds of it, and the densest — the three-layer
-  mechanism section, which is the shape most at risk of sprawling — at 88%.
+  mechanism section, which is the shape most at risk of sprawling — at 92%.
 - **Rationale.** The budget is a design constraint before it is a content one:
   350 words is one to two phone screens at the body size fixed in §1, which is
   what makes "the section is the screen" true rather than aspirational.
 - **Impact.** enforced in `src/content/manual/__tests__/`.
+
+### Round-2 refinements (owner review of the exemplar, same day — all shipped)
+
+The exemplar did its job: four notes came back off the rendered screens, three
+of which are design changes rather than copy fixes.
+
+**7. A section's footer gains prev/next (fig 4.10) — `RETROFIT`**
+
+- **Change.** Below the related list, a two-column footer under a
+  `border-t-[1.5px] border-ink` rule: `‹ PREVIOUS` / `NEXT ›` in the tracked
+  `9.5px` caps the app uses for quiet labels, each **naming its destination**
+  underneath at `text-[13px] font-semibold`. It crosses chapter boundaries
+  (doc 22 §9.2), and the ends of a manual are simply open.
+- **Rationale.** Owner: reaching an adjacent section should not cost a trip up
+  to the chapter page and back down. Naming the destination rather than showing
+  a bare arrow is the same principle as §8 below — the reader should know where
+  a control goes before committing to it. Pulled forward from Phase 2.
+
+**8. `related` is a labelled list carrying each target's summary — `RETROFIT`**
+
+- **Change.** Related sections render under their own `RELATED` rule, one row
+  per target with its **title and its one-line summary**, in the fig-4.9 row
+  grammar. The bare `LABEL ›` links that previously sat at the foot of two
+  sections are gone. A row whose target is already the prev or next section is
+  **omitted**, since the footer directly beneath it offers that same link.
+- **Rationale.** Owner: a link dropped in cold does not say why it is there. The
+  target's summary is the reason, and it costs nothing because §9.4 already
+  makes every section owe one. The standalone `link` block stays in the model
+  for genuinely in-flow pointers introduced by the sentence before them — it is
+  the *unmotivated trailing* link that was the mistake, not the block kind.
+
+**9. New block kind: `legend` — show the mark, do not describe it — `NET-NEW`**
+
+- **Change.** A `legend` block renders rows of *the app's actual mark* beside
+  what it means: a fixed `22px` glyph cell in `text-ink/50` (the day view's own
+  weight), the app's own name for the mark in tracked caps, then one line of
+  explanation. First use is the `▲` / `■` / `▼` set-compliance markers in ch. 6.
+- **The mark vocabulary is closed**, exactly as the block union is: a symbol the
+  manual can draw is a symbol the app actually renders. Marks are addressed as
+  tokens (`set-marker:over`) and resolved through **`src/lib/set-markers.ts`**,
+  a new shared source that `DayView.tsx` now reads too — so the screen and the
+  manual cannot show different glyphs, and a test asserts the day view no longer
+  carries the characters inline.
+- **Rationale.** Owner: demonstrating an app element is a strength of this
+  format and should be used wherever it applies. Describing `■` as "level with
+  it" asks the reader to imagine a symbol that is three centimetres away on the
+  screen they are asking about.
+- **Impact.** `NET-NEW` (`legend`), plus `RETROFIT` on `DayView.tsx`'s marker.
+
+**10. Definitions may not lean on an unexplained abbreviation — `RETROFIT`**
+
+- **Change.** `GLOSSARY.e1rm`'s label becomes **`ESTIMATED ONE-REP MAX (E1RM)`**
+  and its body now ties the words to the letters before using them; the two
+  other cards that said "estimated 1RM" say "estimated one-rep max". A test
+  asserts any card mentioning `1RM`/`e1RM` also spells it out.
+- **Rationale.** Owner: a definition that opens with "1RM" explains nothing to
+  the reader who needed the definition. This is a glossary change rather than a
+  manual one **because §8.1 makes them the same text** — which is the contract
+  working as intended for the second time in one phase.
+- **Impact.** `RETROFIT` — every `InfoDot` for these terms, and the manual.
 
 ## 2026-08-06 — Two new surfaces: the What's New sheet and the version history (figs 4.6 / 4.7, N80 / doc 23 Phase 0)
 

@@ -41,8 +41,12 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     label: "DELOAD",
     body: "A deliberately light week, usually the last of a mesocycle, that sheds accumulated fatigue before the next block. Expect lighter prescriptions well short of failure — it protects progress rather than builds it.",
   },
+  // 2026-08-07 (doc 22, owner review round 2): the card must not lean on "RM".
+  // A definition that opens with an unexplained abbreviation explains nothing,
+  // so the label spells the term out and the body ties the words to the letters
+  // before using them.
   e1rm: {
-    label: "ESTIMATED 1RM (E1RM)",
+    label: "ESTIMATED ONE-REP MAX (E1RM)",
     // 2026-08-07 (doc 22 Phase 1): the last clause used to read "closer to
     // failure reads as stronger", which is the mechanic backwards. effective
     // reps = reps + RIR, and e1RM rises with effective reps — so at the same
@@ -50,15 +54,15 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     // The doc 21 §2 restamp is the proof: re-reading unreported sets at their
     // prescribed RIR instead of as taken to failure moved every historical
     // stamp UP (+4.85% average, 2026-08-02).
-    body: "The most you could theoretically lift for one all-out rep, worked out from a set you actually did — its weight, its reps, and how many reps you left in the tank (your RIR). Those left-over reps are folded in, so an easy set and a hard one at the same weight and reps don't score the same: the set with reps still in reserve implies more strength than the same set taken to failure. It's an estimate that tracks your strength over time, not a number you tested — and it's least reliable on very high-rep sets or ones stopped well short of failure.",
+    body: "Your one-rep max (1RM) is the heaviest you could lift for a single all-out rep. The e is for estimated: the app works it out from a set you actually did — its weight, its reps, and how many reps you left in the tank (your RIR) — so you never have to test one. Those left-over reps are folded in, so an easy set and a hard one at the same weight and reps don't score the same: the set with reps still in reserve implies more strength than the same set taken to failure. It tracks your strength over time, and it's least reliable on very high-rep sets or ones stopped well short of failure.",
   },
   e1rm_confidence: {
     label: "ESTIMATE CONFIDENCE",
-    body: "Not every estimated 1RM is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number. A set run far enough from failure isn't rated at all: it still counts as work and as volume, but it says nothing about your strength, so nothing is estimated from it.",
+    body: "Not every estimated one-rep max is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number. A set run far enough from failure isn't rated at all: it still counts as work and as volume, but it says nothing about your strength, so nothing is estimated from it.",
   },
   est_strength: {
     label: "EST. STRENGTH",
-    body: "One read on how your strength is trending. For each exercise we compare the best estimated 1RM of your most recent few sessions against the best of your earliest few in the block — a rolling window, so a single light day (like the opening session of a fresh mesocycle, which is meant to be easy) can't drag the number down. Each exercise's change rolls up into the muscles it trains, and the headline averages those muscle numbers, weighted by how much work each muscle actually got. It's an estimate of the trend, not a tested max.",
+    body: "One read on how your strength is trending. For each exercise we compare the best estimated one-rep max of your most recent few sessions against the best of your earliest few in the block — a rolling window, so a single light day (like the opening session of a fresh mesocycle, which is meant to be easy) can't drag the number down. Each exercise's change rolls up into the muscles it trains, and the headline averages those muscle numbers, weighted by how much work each muscle actually got. It's an estimate of the trend, not a tested max.",
   },
   volume_landmarks: {
     label: "MEV / MRV",
