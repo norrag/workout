@@ -4,6 +4,51 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-06 — Session 104: versioning & release framework (N80, Batch 34)
+
+Owner asked how to architect and implement discrete versioned releases from a
+fresh **v1.0.0**, with per-user last-seen tracking driving a What's New modal,
+a version history on More, and a defined process. Answered with a plan + build
+spec: [`docs/23-versioning-releases.md`](../23-versioning-releases.md). New
+workstream **V**; verbatim note in the backlog appendix as **Batch 34**.
+
+- **The proposed structure works, with one renaming.** `MAJOR.FEATURE.FIX`
+  keeps semver's shape but defines the digits by **audience**, not API compat —
+  there is no public API, so what matters is whether a person needs to be told.
+  The owner's "major versions (1.1)" are **feature releases**; `2.0.0` is
+  reserved for a rare product-model change. The decision rule is one question
+  (§4.2) with a rider that matters here: **a changed number counts even with no
+  UI diff** (doc 10 §9 honesty).
+- **Two things the code forced that prose alone would have missed.** (1) Hard
+  rule 8 — there is **no mockup** for either the modal or the history page, so a
+  `09-design-changelog` design pass gates the build (Phase 0). (2) Activating
+  `engine_params` changes prescriptions with **zero code diff** (v20/v23/v26 all
+  shipped inactive, activated later by an owner-gated MCP step), so under §4.2
+  an activation is a feature release — `manual-operations.md` gains an
+  announce-then-activate step (§9.4).
+- **The registry lives in the repo, not the DB** (§5.1): a release note is a
+  claim about deployed code, so note and feature must be one commit that
+  deploys and rolls back together. Same reasoning as doc 22 §14.
+- **Three correctness traps drive the design** (§2): the version comparison must
+  run **server-side** (a stale bundle compares against a stale constant); the
+  gate must **accumulate** skipped releases (users don't open the app every
+  release); new accounts must be **primed**, so `profiles.last_seen_version`
+  uses `null` = "not yet primed" rather than a default.
+- **"Push to main in blocks" resolved without a release branch** (§9.1): option
+  C — trunk + a staged `unreleased.ts` manifest + dark shipping for anything
+  that must not appear early. The repo already has that muscle (inactive params,
+  `LLM_EXPLANATIONS`). A long-lived `release/1.1` would fight the deployable-
+  `main` convention and conflict badly against this repo's large slices.
+- **Couples to doc 22.** Guide deep links are doc 22 §9.4 section IDs sharing
+  its validator — a dependency, not a blocker, which is why deep links are
+  Phase 5. The standing contract: a feature release that introduces a concept
+  ships its guide section in the same block, so "learn how this works" has a
+  destination.
+- **Six phases** (§11); phases 1–2 are shippable as 1.0.0 on their own and
+  replace the hardcoded `WORKOUT 0.1 — PRE-RELEASE` footer with an enforced
+  three-way identity. **Eight decisions returned to the owner** (§12 O1–O8);
+  N80 sits `needs-input` until they land.
+
 ## 2026-08-06 — Session 103: user-manual plan, owner review round 1 (N74, Batch 33)
 
 Owner reviewed [doc 22](../22-user-manual.md), accepted every decision (D1–D5)

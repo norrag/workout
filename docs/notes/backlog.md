@@ -71,6 +71,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N77 | **History e1RM view: drop effective reps and the `~` on RIR** (owner, 2026-08-06, Batch 32) — "it makes the screen too busy… the ~ is implied". The flipped row's `· N EFF REPS` clause is gone and the assumed-RIR tilde with it. Narrows **N70 Phase 1**'s disclosure, which introduced both: the `~` marked an RIR resolved from the prescription rather than reported, and the owner's call is that in this row every RIR is the value the estimate was priced at either way. `rir_source` / `effective_reps` stay in `queries/history` and on the MCP surface (`get_exercise_history` still distinguishes reported from assumed, where the distinction has a reader who needs it) | UX | MED | H | **done (PR #226)** |
 | N78 | **Edit an in-progress mesocycle from the planner board + exercise-level RIR on the board** (owner, 2026-08-06, Batch 32). The lock was one line: `disabled={hasHistory}` on the meso header's `Edit plan` row. Everything behind it already handled a live meso — the staged working copy, `saveMesoPlan`'s transactional replace, `regenerateOpenWorkouts`' structural merge (which skips in-progress/completed/skipped workouts and every logged set), and a save-confirm sheet whose "LOGGED HISTORY IS PROTECTED" branch was written for exactly this and had never been reachable. Now editable through `active`; `completed`/`abandoned` are frozen (menu row `FINISHED`, page redirects, action redirects). **Exercise-level RIR reaches the board** as the FLAT `meso_exercises.target_rir` only — the board has no week axis, so a per-week assignment cannot be shown on it truthfully and stays on the day view's Effort target sheet (this is the constraint N70 Phase 6 recorded when it deliberately left `PlannerBoard.tsx` alone; the flat column is the part the board *can* author honestly). Same pure planner as every other write surface (`planSlotEffortEdit`), staged with the plan in editing mode and applied AFTER `save_meso_plan`'s re-mint (which restores assignments by day-slot × exercise and would otherwise undo them), a live single-row write on a draft. Repricing rides doc 14's fingerprint (`exerciseRir` is already a dependency key), not `regenerateOpenWorkouts`, which is structural only. **The clutter ask answered by subtraction:** the row carried a −/N/+ set stepper with its own 7.5px label, a ✕, and a secretly-tappable exercise name — six targets, one undiscoverable, no room for a new lever. All four moved into one exercise sheet (starting sets · target RIR · replace · remove) behind a single tap, and the row now reads as a line of plan with a `3 SETS / RIR 4` summary. The RIR note the owner asked for is stated before the value is set, not after, and says what it overrides + that a flat value governs the deload too | F | HIGH | G | **done (PR #226)** |
 | N79 | **Concurrent mesocycles** (owner, 2026-08-06, Batch 32) — a rehab assignment, or any block that has to run *beside* the macrocycle rather than instead of it. This is a schema change, not a gate removal: **R15** made "one active meso per user" a DB guarantee (`mesocycles_one_active_per_user`, migration `20260703000001`). Replaced by `mesocycles_one_active_per_macrocycle` (partial unique on `macrocycle_id where status='active'`) — strictly weaker, so no existing row can fail it, and dropping a unique index can't fail on data either. Within a macro, activation stays exclusive AND sequential (`mesoActivationBlock`, untouched); standalone mesos are deliberately unconstrained. **One active macrocycle** is enforced in the app (`macrocycleCreationBlock`, both the form action and `create_macrocycle`) rather than as an index, on purpose: an account already carrying two would fail the migration outright. Removing uniqueness turns "the active meso" from a lookup into a **resolution** — `resolveActiveMesocycle` picks the block holding the most recently logged set (the owner's rule, and the only key the athlete moves by training rather than by bookkeeping), falling back to newest-created when nothing has been logged yet; one query in the single-active case. Every "current meso" surface now shares it: the Workout tab, `get_current_state`, `explain_prescription`'s freshness step, the admin-LLM meso resolver. Tool descriptions for `activate_mesocycle` / `get_current_state` restated. RLS probe rewritten to assert both halves (two standalone actives ALLOWED; two blocks of one macro rejected with 23505) | F | HIGH | G | **done (PR #226)** |
+| N80 | **Versioning & release framework** (owner, 2026-08-06, Batch 34) — the app ships as an unversioned pre-release (`package.json` `0.1.0` referenced by nothing; the More footer hardcodes `WORKOUT 0.1 — PRE-RELEASE`; no per-user notification state, no tags). Owner wants discrete versioned releases from a fresh **v1.0.0**: `MAJOR.FEATURE.FIX` defined by **audience** rather than API compat — feature releases (1.1.0) announce via a once-only **What's New** sheet driven by per-user last-seen tracking with deep links to explore, fix releases (1.0.1) ship quiet; plus a **version history** on More and a defined process so docs, notes and links stay correct. Plan written: [`docs/23-versioning-releases.md`](../23-versioning-releases.md) — the release **registry lives in the repo** (`src/content/releases/`, typed + CI-validated) so a note can never describe code that isn't deployed; the gate resolves **server-side** (a stale bundle would compare against a stale constant) and **accumulates skipped releases**; `profiles.last_seen_version` with `null` = "prime me" (new signups get no changelog); the sheet is suppressed on `/log/**` and while the N68 queue is draining. Two findings the code forced: **hard rule 8** — no mockup exists for either surface, so a 09-changelog design pass gates the build (Phase 0); and **an `engine_params` activation is a user-visible change with no diff** (v20/v23/v26 all shipped inactive) — under the §4.2 rule that is a feature release, so `manual-operations.md` gains an announce-then-activate step. Branch model recommended: **trunk + staged manifest + dark shipping** (option C) over a long-lived release branch, which would fight "keep `main` deployable". Consumes doc 22's section IDs as guide link targets and shares its validator — a dependency, not a blocker (Phase 5). 8 open decisions in §12 | F | HIGH | V | **needs-input** — plan + phases written; §12 O1–O8 need the owner's call, then Phase 0 (design pass) |
 
 
 > **N36–N39** are the doc-16 §11 deferred spine, filed 2026-07-09 during Phase R
@@ -1739,3 +1740,42 @@ the fold. → N56.)*
 > promoting that phase from optional), and the runtime-editing question answered
 > in §14 (keep content in the repo; errata overlay held in reserve). One new open
 > question, **O7**: how far to go in naming real published programs in chapter 7.]*
+
+### Batch 34 — versioning & release framework (2026-08-06, session task)
+
+> "This app is currently versioned as a pre-release.
+>
+> As I round out a production-ready baseline, I would like to introduce discrete
+> versioned updates starting with a fresh production v1.0.0. Major versions (1.1,
+> etc,) would get a per-user last-seen-version tracking which triggers a "What's
+> New" modal that appears when users first view a new version with deep-link
+> exploration functionality, and a version history on the More page with the same
+> deep-link functionality. Minor updates via 1.0.1 versions to represent small
+> changes and fixes would not receive promoted notification.
+>
+> The idea is to stage updates that affect the user experience within these
+> versioned releases, then push them to main in blocks. Each release would inform
+> users about the changes, allow them to explore new features, and help them stay
+> up to date.
+>
+> Ideally—and I have not fully fleshed this out yet—it would also be useful to
+> push minor bug fixes and updates that do not require explicit user
+> notification. That could follow a semantic versioning structure such as 1.0.0,
+> where the final digit represents small, transparent fixes and the middle digit
+> represents feature updates that are surfaced to users.
+>
+> I am not sure whether that exact structure is feasible, but I would like to
+> establish a clear and consistent framework, since version updates will need to
+> follow a defined process moving forward to ensure that documentation is
+> properly updated and notifications and links are correct. Please provide your
+> thoughts on how to architect and implement a solution for this"
+>
+> *[→ filed as **N80**, new workstream **V**. Answered with a plan +
+> build spec: [`docs/23-versioning-releases.md`](../23-versioning-releases.md).
+> The proposed digit structure is feasible and adopted, with the digits defined
+> by **audience** rather than semver's API-compat meaning, and the owner's
+> "major 1.1" renamed **feature release** so `2.0.0` stays available for a rare
+> product-model change. The "push to main in blocks" intent is preserved as a
+> block of *announcement and activation* rather than unmerged code (§9.1), since
+> a long-lived release branch would fight the repo's deployable-`main`
+> convention. Eight decisions returned to the owner in §12.]*
