@@ -4,6 +4,39 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-07 — Session 108: user-manual Phase 1, architecture + one exemplar chapter (N74)
+
+Doc 22 Phase 1 executed. The reading surface exists and chapter 6 fills it, all
+behind `releaseActive("1.1.0")` so nothing is live; owner review runs on a
+preview deploy with `NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0`.
+
+- **Design pass first** (hard rule 8, no mockup exists): `09-design-changelog.md`
+  gains a 2026-08-07 entry claiming figs **4.8 / 4.9 / 4.10** and deriving all
+  three from patterns already in the app.
+- **Architecture**: the nine-kind block union + inline vocabulary
+  (`src/content/manual/types.ts`), the section-ID scheme
+  (`ug/effort-rir#per-exercise`), the length budget, the registry, and the
+  house-styled renderer (`src/components/manual/ManualBlocks.tsx`).
+- **The budget was calibrated, not assumed**: chapter 6's six sections ran
+  205–309 words over 6–8 blocks, median 229, so doc 22 §9.3's 350/12 stands.
+- **`figure` deliberately deferred to Phase 2** — its assets live under
+  `public/`, which shares a 64-entry image cache with the app icons, so the
+  policy belongs with the other D3 guards.
+- **Claims ledger opened** ([`22a`](../22a-manual-claims.md)) with 22 rows, each
+  verified against code or the live v25 params row.
+
+**The §8.1 glossary-identity contract earned its keep immediately.** Writing
+ch. 6's mechanism section forced `GLOSSARY.e1rm` to be checked against
+`predict.ts`, and its closing clause was the mechanic backwards — *"closer to
+failure reads as stronger"*, when e1RM rises with effective reps (`reps + rir`),
+so the set with reps in reserve implies the greater strength. The doc 21 §2
+restamp (+4.85%, strictly upward) is the same fact observed in production.
+Fixed, pinned by a test, logged as `D-01` and in `22b` §6.6, staged for 1.1.0.
+
+**Doc hygiene:** `22b` §8's **O-D** closed — the Phase-0a corrections are folded
+into doc 22's prose (§2.2 now names v26, §6.1 the ±1 workload model, §6.2/§6.3
+off the measuring band).
+
 ## 2026-08-06 — Session 107: user-manual Phase 0, the four ground-truth audits (N74)
 
 Doc 22 Phase 0 executed and landed as three working documents. The phase exists

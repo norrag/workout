@@ -355,13 +355,33 @@ governs in the meantime, for both docs.
 
 ### 6.4 Doc 22 §2.2's inactive list
 
-See [§4.0](#40-the-correction-to-doc-22-22). Corrected inline in doc 22 by this
-PR; this ledger remains the authority.
+See [§4.0](#40-the-correction-to-doc-22-22). Corrected inline in doc 22 by the
+Phase-0 PR and **folded into its prose at Phase 1** (O-D); this ledger remains
+the authority.
 
 ### 6.5 Doc 22 §6.2's measuring-band bullets
 
 See [§4.1](#41-what-is-not-live) ①. Two of the four bullets describe an inactive
-rule. Ch. 8 is still writable in full — from §6.2's live policy.
+rule. Ch. 8 is still writable in full — from §6.2's live policy. Amended in doc
+22 at Phase 1 (O-D).
+
+### 6.6 `GLOSSARY.e1rm` stated the RIR direction backwards
+
+**Found at Phase 1, and fixed there.** The card's closing clause read *"closer
+to failure reads as stronger"*. The engine computes the opposite: effective reps
+= `reps + rir` and e1RM is increasing in effective reps (`predict.ts::e1rmFactor`
+— Epley `1 + effReps/30`, Brzycki `36/(37 − effReps)`, both monotonic), so at
+the same weight × reps the set with reps **in reserve** implies the greater
+strength. Production had already demonstrated it: the doc 21 §2 restamp moved
+every historical stamp **upward** (+4.85%) precisely by re-reading unreported
+sets at their prescribed RIR instead of as taken to failure.
+
+Recorded here because of *how* it surfaced. Doc 22 §8.1 requires the manual to
+reproduce the glossary's own words, so writing ch. 6's mechanism section forced
+the sentence to be checked against `predict.ts` — which is the contract doing
+the job it was designed for, one chapter into the build. Fixed in
+`src/lib/glossary.ts`, pinned by a test, and logged as `D-01` in
+[`22a`](./22a-manual-claims.md).
 
 ---
 
@@ -425,7 +445,7 @@ None of these block Phase 1. All block a specific chapter in Phase 3/6.
 | **O-A** | Is `LLM_EXPLANATIONS` set to `on` or `shadow` in Vercel production? | ch. 17, AI Manual ch. 10 | Vercel env vars are a human-only step (`deployment/manual-operations.md`). DB evidence shows generation is running; serving is the unknown |
 | **O-B** | Will **v26** (the measuring band) be activated before Phase 3d? | ch. 8 | Owner-gated activation (`manual-operations.md` step ⑤). **Re-scoped by doc 23 §9.5:** activating v26 changes a number users are shown, so it classifies `release_impact: "feature"` — and `activate_engine_params` now **refuses** a feature-classified activation unless a live release announces it. So v26 cannot be switched on ahead of a release note; it rides a feature release, and ch. 8 gains the band in the same block. Answering O-B is now a *sequencing* call, not a yes/no |
 | **O-C** | **O7** from doc 22 §13 — name published third-party programs in ch. 7, or describe by characteristic? | ch. 7 (via 3d-r) | Owner call, already framed in doc 22 §6.3 |
-| **O-D** | Should doc 22 §2.2, §6.1 and §6.2 be amended in place to match §4 above? | doc 22 hygiene | Recommended: yes, in the Phase-1 PR. This ledger governs regardless |
+| ~~**O-D**~~ | ~~Should doc 22 §2.2, §6.1 and §6.2 be amended in place to match §4 above?~~ | — | ✅ **Closed 2026-08-07 (Phase 1).** All three folded into doc 22's own prose, so the stale claim is no longer stated before its correction. This ledger still governs |
 
 ---
 

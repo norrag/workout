@@ -13,7 +13,17 @@ import type { ReleaseEntry } from "./types";
  * empty again. That merge is also what flips every `releaseActive("<version>")`
  * gate on: the release PR *is* the switch.
  */
-export const UNRELEASED_ENTRIES: ReleaseEntry[] = [];
+export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
+  {
+    // doc 22 Phase 1 (N74) — the manual renders the glossary's own words
+    // (§8.1), which is what surfaced the inverted clause. Ledger row D-01 in
+    // `docs/22a-manual-claims.md`.
+    id: "glossary-e1rm-rir-direction",
+    title: "What reps in reserve do to a strength estimate",
+    body: "The definition card for estimated 1RM now states the direction plainly: at the same weight and reps, a set with reps still in reserve implies more strength than one taken to failure.",
+    area: "training",
+  },
+];
 
 /**
  * The version these staged entries are slated for — the string used by

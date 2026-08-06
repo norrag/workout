@@ -2,7 +2,83 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-06 (latest) — doc 22 Phase 0: the four ground-truth audits (N74)
+## 2026-08-07 (latest) — doc 22 Phase 1: the manual's architecture, and one chapter end to end (N74)
+
+The reading surface exists, and chapter 6 fills it. Everything ships behind
+`releaseActive("1.1.0")` (doc 23 §9.2), so nothing is user-visible yet — the
+owner reviews it on a Vercel **preview** deploy with
+`NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0`, at
+`/more/guide/effort-rir` and its six sections.
+
+### The design pass came first (hard rule 8)
+
+No mockup exists for a manual reader — the June round predates the idea of one —
+so `docs/09-design-changelog.md` gains a **2026-08-07** entry claiming figs
+**4.8** (guide map), **4.9** (chapter contents) and **4.10** (a section), and
+deriving all three from patterns the app already ships: the More sub-page
+header, the `SETTINGS` rule, the `InfoDot` card, the quiet `LABEL ›` link, the
+planner's `ADVANCED` disclosure. The reader gets the app's **one** typographic
+concession — body prose at `text-sm leading-[1.65]` — because every other screen
+is a working surface where density wins, and a manual section is not.
+
+### What landed
+
+- **The block model** (`src/content/manual/types.ts`) — a closed union of nine
+  kinds plus a small inline vocabulary. `figure` is deliberately deferred to
+  Phase 2: it is an asset under `public/`, which `sw.ts` serves through a
+  64-entry image cache **shared with the app icons**, so its policy belongs with
+  the other D3 guards rather than ahead of them (changelog §5).
+- **The section-ID scheme** (`ids.ts`) — `ug/effort-rir#per-exercise`, with a
+  route mapper per manual. Doc 23 §7.2 already names this as the validator its
+  release-note `guide` targets share, so it is an API from the first commit.
+- **The length budget** (`budget.ts`), calibrated rather than assumed: chapter
+  6's six sections came out at **205–309 words over 6–8 blocks, median 229**, so
+  doc 22 §9.3's proposed 350/12 stands unchanged — two thirds of the ceiling for
+  a typical section, 88% for the densest.
+- **The renderer** (`src/components/manual/ManualBlocks.tsx`) — server
+  components throughout; a section of any depth costs the reader no JavaScript,
+  because layer 3 is a native `<details>`.
+- **Chapter 6, "Effort: RIR and the ramp"** — six sections: what RIR means, the
+  week's ramp, report what you actually did, why the reported number matters
+  (three-layer, with the worked example in real numbers), when a set misses the
+  ask, and one exercise with its own target.
+- **The claims ledger** ([`22a-manual-claims.md`](22a-manual-claims.md)) opens
+  with **22 rows**, each verified against code or the live v25 params row — never
+  against a spec, which is the rule [`22b`](22b-source-map.md) §9.2 exists to
+  enforce.
+
+### The contract caught a live defect in its first chapter
+
+Doc 22 §8.1 requires the manual to render the glossary's **own words**, which is
+what forced `GLOSSARY.e1rm` to be checked against `predict.ts`. It ended
+*"closer to failure reads as stronger"* — the mechanic inverted. Effective reps
+are `reps + rir` and e1RM is increasing in effective reps, so at the same weight
+× reps the set with reps **in reserve** implies the greater strength. Production
+had already shown this: the doc 21 §2 restamp moved every historical stamp
+**upward** (+4.85%) precisely by re-reading unreported sets at their prescribed
+RIR instead of as taken to failure.
+
+Fixed in `src/lib/glossary.ts`, pinned by a test so it cannot invert again,
+logged as `D-01` in the claims ledger and §6.6 of `22b`, and staged in
+`unreleased.ts` for 1.1.0. One chapter in, the manual has already corrected the
+app.
+
+### Doc hygiene (O-D, closed)
+
+`22b` §8's O-D asked for the Phase-0a corrections to be folded into doc 22's own
+prose rather than sitting under it as blockquotes. Done: §2.2 now names **v26**
+as the inactive example, §6.1 states the ±1 workload model as what ships, and
+§6.2/§6.3 stop leaning on the measuring band.
+
+### Next
+
+**Phase 2** — the map (fig 4.8), search over the build-time index, prev/next,
+breadcrumb-back, related sections, the remaining §8 contract tests, the two
+outstanding D3 guards (import guard, precache exclusion), the More-tab entry
+row, and `GUIDE_SECTION_IDS` for doc 23. It is the last step before doc 23 P5
+and the 1.1.0 cut.
+
+## 2026-08-06 — doc 22 Phase 0: the four ground-truth audits (N74)
 
 Docs only — no code, no schema, no behavior change. Doc 22 §11 Phase 0 is the
 phase that "determines whether the manual is correct", and it gates every line

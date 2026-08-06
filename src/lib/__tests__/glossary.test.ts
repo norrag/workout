@@ -45,4 +45,14 @@ describe("glossary", () => {
     expect(GLOSSARY.e1rm.body.toLowerCase()).not.toContain("exact");
     expect(GLOSSARY.deload.body.toLowerCase()).not.toContain("boost");
   });
+
+  // doc 22 Phase 1 found this clause inverted. e1RM rises with effective reps
+  // (= reps + RIR), so at the same weight × reps the set with reps LEFT implies
+  // the greater strength — which is why the doc 21 §2 restamp moved every
+  // historical stamp upward. The card must not claim the opposite again.
+  it("e1rm explains the RIR direction the way the engine computes it", () => {
+    const body = GLOSSARY.e1rm.body.toLowerCase();
+    expect(body).toContain("reps still in reserve implies more strength");
+    expect(body).not.toContain("closer to failure reads as stronger");
+  });
 });
