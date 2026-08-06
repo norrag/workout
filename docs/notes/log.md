@@ -4,6 +4,64 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-06 — Session 107: user-manual Phase 0, the four ground-truth audits (N74)
+
+Doc 22 Phase 0 executed and landed as three working documents. The phase exists
+because spec prose alone yields a wrong manual (doc 22 §2); it found three
+places where doc 22 itself is one of the wrong sources.
+
+- **[`22b-source-map.md`](../22b-source-map.md) (0a).** The precedence ladder,
+  a topic → authoritative-source table, and the **live-behavior ledger** read
+  straight out of `public.engine_params` rather than out of the repo.
+- **[`22c-app-inventory.md`](../22c-app-inventory.md) (0b + 0c).** 26 routes
+  walked from the code post-Batch-32, with every control, state and label; plus
+  the concept inventory (13 glossary terms, 4 of them never surfaced; ~22
+  undefined rendered terms, 10 recommended for `glossary.ts`) and 18 mined FAQ
+  candidates.
+- **[`22d-connector-inventory.md`](../22d-connector-inventory.md) (0d).** 56
+  tools confirmed, 17 admin-gated and named once as an exclusion set, 39
+  user-facing each with a plain-language line, a writes? verdict and its
+  use-case chapter — plus the real auth flow, the 120 req/min limit, and the
+  four failure shapes.
+
+**Three corrections to doc 22, all of which would have shipped as wrong prose:**
+
+1. **§2.2's inactive list is stale.** v20 (earned-step progression) activated
+   2026-07-11 and v23 (strength-rate band) 2026-07-12; the chain has since run
+   to **v25 active**. The genuinely-inactive behavior is **v26, the doc 21 §6.1
+   measuring band** — and it sits directly under ch. 8, which doc 22 §6.2 says
+   must be written. The reassurance ch. 8 actually needs ("a protected block
+   does not read as a decline") is doc 21 **§6.2**, which *is* live. Two of
+   §6.2's four bullets need amending.
+2. **§5 ch. 10's headline rationale is backwards.** Doc 22 says "Epley drifts
+   high at high reps, Brzycki low; averaging cancels". The code says Brzycki
+   *inflates* above ~10 effective reps, and the operative rule is a **cutoff**
+   (`e1rm.brzycki_max_eff_reps = 10`): average inside the band where they agree,
+   Epley alone above it.
+3. **§6.1's "the MRV-stop rule the app actually measures" is not implemented.**
+   What ships is a ±1 set workload model with MEV/MAV/MRV as an advisory
+   classification library; doc 10 §3's graded ramp and auto-deload trigger were
+   deliberately deferred (T-A5). Ch. 9 must say the deload is **scheduled**.
+
+**Two open items now blocking specific chapters** (not Phase 1): **O-A** — is
+`LLM_EXPLANATIONS` `on` or `shadow` in production? (203 explanations exist,
+newest today, so generation is running; serving is a Vercel env var Claude
+cannot read) — blocks ch. 17. **O-B** — will v26 activate before Phase 3d?
+
+**O7** (naming published programs in ch. 7) remains open and does not block
+Phase 1.
+
+**Merged `main` after N80's PR #230** and made the audits comply with doc 23:
+`22c` gains `/more/whats-new`, the What's New sheet and the new footer (26 → 27
+routes); `22d` §10 re-verifies 56/17/39 unchanged; `22b` §10 records the five
+ways doc 23 binds doc 22's plan — **the manuals are 1.1.0**, so Phase 2 ships the
+guide routes behind `releaseActive("1.1.0")` and must populate
+`GUIDE_SECTION_IDS`, and **Phases 1–2 are now the critical path to 1.1.0**. Doc
+22 §11 amended to say so. Also found that doc 22 §2.2's stale inactive claim had
+already been inherited by doc 23 **T10** (`22b` §6.3), and that doc 23 §9.5
+re-scopes **O-B**: v26 now rides a feature release rather than being activated
+independently. This PR classifies as **no release entry** (§4.2 — nothing a user
+would notice).
 ## 2026-08-06 — Session 106: the versioning framework is built, v1.0.0 cut (N80, doc 23 phases 0–6)
 
 Doc 23 went from plan to shipped in one PR. Nothing in the plan needed
