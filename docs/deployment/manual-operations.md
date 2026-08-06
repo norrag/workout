@@ -579,6 +579,24 @@ screen shows `NOT AVAILABLE IN THIS ENVIRONMENT` and nothing else changes.
 > `registration_access_token`, which must land directly in a secret store —
 > not in a session transcript or CI log.
 
+
+### Apply the concurrent-mesocycles migration (N79)
+
+One migration lands with PR #226: `20260806000001_concurrent_mesocycles`.
+
+| Step | What / why |
+|---|---|
+| **① Apply `20260806000001` to hosted** | Drops the R15 partial unique index `mesocycles_one_active_per_user` and creates `mesocycles_one_active_per_macrocycle` (`(macrocycle_id) where status='active' and macrocycle_id is not null`). Apply via `supabase db push` or Supabase MCP `apply_migration` at/after merge. **Cannot fail on data**: dropping a unique index never can, and the replacement is strictly weaker than the one it replaces (≤1 active per user implies ≤1 active per macrocycle), so every existing row already satisfies it. No RLS change (index-only on an already RLS-locked table). |
+| **② Optional sanity check (read-only)** | `select macrocycle_id, count(*) from public.mesocycles where status='active' and macrocycle_id is not null group by 1 having count(*) > 1;` should return 0 rows before and after. |
+
+> **Not in this migration, on purpose:** "one active macrocycle per user" is
+> enforced in the app (`macrocycleCreationBlock`) rather than by a partial
+> unique index on `macrocycles`. An account that already carries two active
+> macrocycles would make that index fail the migration outright, and no user's
+> existing data may be held hostage to a new rule. If a future audit shows every
+> account carries at most one, the index can be added then — that is a data
+> question, not a code one, so it belongs here rather than in a TODO.
+
 ---
 
 ## How Claude flags these
