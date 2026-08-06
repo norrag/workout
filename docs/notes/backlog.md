@@ -71,7 +71,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 | N77 | **History e1RM view: drop effective reps and the `~` on RIR** (owner, 2026-08-06, Batch 32) — "it makes the screen too busy… the ~ is implied". The flipped row's `· N EFF REPS` clause is gone and the assumed-RIR tilde with it. Narrows **N70 Phase 1**'s disclosure, which introduced both: the `~` marked an RIR resolved from the prescription rather than reported, and the owner's call is that in this row every RIR is the value the estimate was priced at either way. `rir_source` / `effective_reps` stay in `queries/history` and on the MCP surface (`get_exercise_history` still distinguishes reported from assumed, where the distinction has a reader who needs it) | UX | MED | H | **done (PR #226)** |
 | N78 | **Edit an in-progress mesocycle from the planner board + exercise-level RIR on the board** (owner, 2026-08-06, Batch 32). The lock was one line: `disabled={hasHistory}` on the meso header's `Edit plan` row. Everything behind it already handled a live meso — the staged working copy, `saveMesoPlan`'s transactional replace, `regenerateOpenWorkouts`' structural merge (which skips in-progress/completed/skipped workouts and every logged set), and a save-confirm sheet whose "LOGGED HISTORY IS PROTECTED" branch was written for exactly this and had never been reachable. Now editable through `active`; `completed`/`abandoned` are frozen (menu row `FINISHED`, page redirects, action redirects). **Exercise-level RIR reaches the board** as the FLAT `meso_exercises.target_rir` only — the board has no week axis, so a per-week assignment cannot be shown on it truthfully and stays on the day view's Effort target sheet (this is the constraint N70 Phase 6 recorded when it deliberately left `PlannerBoard.tsx` alone; the flat column is the part the board *can* author honestly). Same pure planner as every other write surface (`planSlotEffortEdit`), staged with the plan in editing mode and applied AFTER `save_meso_plan`'s re-mint (which restores assignments by day-slot × exercise and would otherwise undo them), a live single-row write on a draft. Repricing rides doc 14's fingerprint (`exerciseRir` is already a dependency key), not `regenerateOpenWorkouts`, which is structural only. **The clutter ask answered by subtraction:** the row carried a −/N/+ set stepper with its own 7.5px label, a ✕, and a secretly-tappable exercise name — six targets, one undiscoverable, no room for a new lever. All four moved into one exercise sheet (starting sets · target RIR · replace · remove) behind a single tap, and the row now reads as a line of plan with a `3 SETS / RIR 4` summary. The RIR note the owner asked for is stated before the value is set, not after, and says what it overrides + that a flat value governs the deload too | F | HIGH | G | **done (PR #226)** |
 | N79 | **Concurrent mesocycles** (owner, 2026-08-06, Batch 32) — a rehab assignment, or any block that has to run *beside* the macrocycle rather than instead of it. This is a schema change, not a gate removal: **R15** made "one active meso per user" a DB guarantee (`mesocycles_one_active_per_user`, migration `20260703000001`). Replaced by `mesocycles_one_active_per_macrocycle` (partial unique on `macrocycle_id where status='active'`) — strictly weaker, so no existing row can fail it, and dropping a unique index can't fail on data either. Within a macro, activation stays exclusive AND sequential (`mesoActivationBlock`, untouched); standalone mesos are deliberately unconstrained. **One active macrocycle** is enforced in the app (`macrocycleCreationBlock`, both the form action and `create_macrocycle`) rather than as an index, on purpose: an account already carrying two would fail the migration outright. Removing uniqueness turns "the active meso" from a lookup into a **resolution** — `resolveActiveMesocycle` picks the block holding the most recently logged set (the owner's rule, and the only key the athlete moves by training rather than by bookkeeping), falling back to newest-created when nothing has been logged yet; one query in the single-active case. Every "current meso" surface now shares it: the Workout tab, `get_current_state`, `explain_prescription`'s freshness step, the admin-LLM meso resolver. Tool descriptions for `activate_mesocycle` / `get_current_state` restated. RLS probe rewritten to assert both halves (two standalone actives ALLOWED; two blocks of one macro rejected with 23505) | F | HIGH | G | **done (PR #226)** |
-| N80 | **Versioning & release framework** (owner, 2026-08-06, Batch 34) — the app ships as an unversioned pre-release (`package.json` `0.1.0` referenced by nothing; the More footer hardcodes `WORKOUT 0.1 — PRE-RELEASE`; no per-user notification state, no tags). Owner wants discrete versioned releases from a fresh **v1.0.0**: `MAJOR.FEATURE.FIX` defined by **audience** rather than API compat — feature releases (1.1.0) announce via a once-only **What's New** sheet driven by per-user last-seen tracking with deep links to explore, fix releases (1.0.1) ship quiet; plus a **version history** on More and a defined process so docs, notes and links stay correct. Plan written: [`docs/23-versioning-releases.md`](../23-versioning-releases.md) — the release **registry lives in the repo** (`src/content/releases/`, typed + CI-validated) so a note can never describe code that isn't deployed; the gate resolves **server-side** (a stale bundle would compare against a stale constant) and **accumulates skipped releases**; `profiles.last_seen_version` with `null` = "prime me" (new signups get no changelog); the sheet is suppressed on `/log/**` and while the N68 queue is draining. Two findings the code forced: **hard rule 8** — no mockup exists for either surface, so a 09-changelog design pass gates the build (Phase 0); and **an `engine_params` activation is a user-visible change with no diff** (v20/v23/v26 all shipped inactive) — under the §4.2 rule that is a feature release, so `manual-operations.md` gains an announce-then-activate step. Branch model recommended: **trunk + staged manifest + dark shipping** (option C) over a long-lived release branch, which would fight "keep `main` deployable". Consumes doc 22's section IDs as guide link targets and shares its validator — a dependency, not a blocker (Phase 5). 8 open decisions in §12 | F | HIGH | V | **needs-input** — plan + phases written (PR #229); §12 O1–O8 need the owner's call, then Phase 0 (design pass) |
+| N80 | **Versioning & release framework** (owner, 2026-08-06, Batch 34) — the app ships as an unversioned pre-release (`package.json` `0.1.0` referenced by nothing; the More footer hardcodes `WORKOUT 0.1 — PRE-RELEASE`; no per-user notification state, no tags). Owner wants discrete versioned releases from a fresh **v1.0.0**: `MAJOR.FEATURE.FIX` defined by **audience** rather than API compat — feature releases (1.1.0) announce via a once-only **What's New** sheet driven by per-user last-seen tracking with deep links to explore, fix releases (1.0.1) ship quiet; plus a **version history** on More and a defined process so docs, notes and links stay correct. Plan written: [`docs/23-versioning-releases.md`](../23-versioning-releases.md) — the release **registry lives in the repo** (`src/content/releases/`, typed + CI-validated) so a note can never describe code that isn't deployed; the gate resolves **server-side** (a stale bundle would compare against a stale constant) and **accumulates skipped releases**; `profiles.last_seen_version` with `null` = "prime me" (new signups get no changelog); the sheet is suppressed on `/log/**` and while the N68 queue is draining. Two findings the code forced: **hard rule 8** — no mockup exists for either surface, so a 09-changelog design pass gates the build (Phase 0); and **an `engine_params` activation is a user-visible change with no diff** (v20/v23/v26 all shipped inactive) — under the §4.2 rule that is a feature release, so `manual-operations.md` gains an announce-then-activate step. Branch model recommended: **trunk + staged manifest + dark shipping** (option C) over a long-lived release branch, which would fight "keep `main` deployable". Consumes doc 22's section IDs as guide link targets and shares its validator — a dependency, not a blocker (Phase 5). 8 open decisions in §12. **Owner review round 1 (2026-08-06, Batch 35) — all eight decisions accepted; five doc corrections, three of them defects the owner caught:** (1) **"live workout" was undefined and the rule as written would have suppressed every modal forever** — the Workout tab renders `DayView` inline (*"the latest uncompleted workout IS the tab"*), so route-based suppression blocks the app's landing surface; redefined off `workouts.status`, which `logSet` flips `planned → in_progress` on the **first logged set**, plus "show on every other tab" as the release valve for a stale session (no time heuristic, no clock in the gate). (2) **§9.1's "dark shipping" couldn't answer "what is the go-live switch"** — now **version-keyed gating**: `releaseActive("1.1.0") = compare(CURRENT_VERSION, "1.1.0") >= 0`, so the release PR that adds `1.1.0.ts` to the registry IS the switch; `unreleased.ts` is never in `RELEASES`, so unreleased entries structurally cannot appear in history. Owner's model confirmed point-by-point (§9.2 table) incl. the fix-digit reset. Costs stated: dual code paths until cut, migrations can't be gated, `NEXT_PUBLIC_RELEASE_OVERRIDE` (non-prod only) for previewing a staged block. (3) **`release_impact: none|fix|feature` on `propose_/activate_engine_params`** — `activate` refuses a `feature`-classified set with no live announcing release, turning T10 from runbook discipline into a guard; `replay_decisions` informs the classification. (4) Guided-tour hook: the gate returns a discriminated union so `prime` is a named state; `last_seen_version` stays single-purpose (a tour needs its own signal). (5) CI cost audited — every gate is a pure unit test in the existing job, ~0 added minutes; the warn-only bot check was **dropped** (own workflow + PR-write permission for an untrustworthy signal) and became a checklist line. **1.1.0 = the manuals** (owner), which sets the doc-22 interleave (23 P0–P4 → 22 P0–P2 → 23 P5 → 22 content → cut) and requires the manual's routes behind a release gate so chapters don't go live as they're written | F | HIGH | V | **ready** — decisions closed, doc revised (PR #229); next is Phase 0 (design pass, hard rule 8) |
 
 
 > **N36–N39** are the doc-16 §11 deferred spine, filed 2026-07-09 during Phase R
@@ -1779,3 +1779,67 @@ the fold. → N56.)*
 > block of *announcement and activation* rather than unmerged code (§9.1), since
 > a long-lived release branch would fight the repo's deployable-`main`
 > convention. Eight decisions returned to the owner in §12.]*
+
+### Batch 35 — owner review round 1 on the versioning plan (2026-08-06, session task)
+
+> "Here are my notes and questions on this doc. Overall it looks good but I want
+> to offer my comments and wrap my head around this more. Please help.
+>
+> * "Modal never appears over a live workout" — I'm not sure how "live workout"
+>   is defined. The app always opens to the workout page with the next workout
+>   active, which sounds like it could block all modals.
+> * The new user manual documentation will likely be a good source for deep
+>   linking. I would begin versioning with the documentation as the first feature
+>   release. Ideally, the versioning system would be staged alongside that update
+>   so both release simultaneously.
+> * We run many CI checks through GitHub, but are there limitations to doing this
+>   without incurring additional costs?
+> * We may eventually develop a guided tour for newly onboarded users. This
+>   should be accounted for, perhaps through the null version.
+> * I don't fully understand how Sections 9.1–9.2 would work. The main
+>   requirement is that FEATURE versions should not be delivered until they are
+>   announced, while FIX versions should go live immediately.
+>   If FEATURE changes are pushed to `main` but remain accumulated as unreleased,
+>   can they stay hidden from users? If so, what is the go-live mechanism, and how
+>   is it activated—a release PR, for example?
+>   If I make a series of FEATURE changes before going live, would all accumulated
+>   changes be included in a single feature-version bump? Ideally, yes.
+>   My understanding is that FIX updates pushed to `main` would go live
+>   immediately. Those small changes would enter the changelog without an
+>   announcement but would still be visible to users in the version history.
+>   FEATURE updates, by contrast, would accumulate without going live or appearing
+>   in the version history. Once released, users would receive the modal, the
+>   changes would appear in version history, the feature digit would increase, and
+>   the fix digit would reset to zero.
+>   Is that how it would work? If so, I like the design.
+> * Regarding parameter updates through MCP, some updates are trivial and others
+>   are more substantial, so they could qualify as either a feature or a fix. It
+>   would be useful to designate the update type within MCP alongside the parameter
+>   changes so they follow the same release paths described above. That may be too
+>   complicated, though, and I do not want to overcomplicate the system.
+> * Decisions
+>    * O1 — Recommendation accepted
+>    * O2 — Explicit dismiss
+>    * O3 — Recommendation accepted
+>    * O4 — Recommendation accepted
+>    * O5 — Recommendation accepted
+>    * O6 — Recommendation accepted
+>    * O7 — Recommendation accepted; MEASURE is not yet built, but it will likely
+>      need its own versioning once developed
+>    * O8 — Recommendation accepted"
+>
+> *[→ all folded into **N80** / [doc 23](../23-versioning-releases.md) round-1
+> revision. The live-workout question was a real defect (route-based suppression
+> would have blocked every modal, since the Workout tab renders `DayView`
+> inline) — redefined off `workouts.status`, §6.4. The 9.1/9.2 question was
+> answered by making the mechanism concrete: **version-keyed gating**, where the
+> release PR is the switch and the owner's stated model holds point-for-point
+> (§9.2 table). `release_impact` added to the two `engine_params` MCP tools with
+> an activation guard (§9.5) — not too complicated: one argument, one check. CI
+> cost audited (§9.4; the one gate that would have needed its own workflow was
+> dropped). Guided tour accounted for via a named `prime` state, with
+> `last_seen_version` kept single-purpose (§6.5). **1.1.0 = the manuals**, which
+> fixes the doc-22 interleave and requires the manual behind a release gate
+> (§11.1). All eight decisions closed (§12); O7 amended with the owner's note
+> that MEASURE will need its own line — recorded as a second column, not a jsonb
+> map.]*

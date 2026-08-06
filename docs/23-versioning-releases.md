@@ -1,7 +1,20 @@
 # 23 — Versioning & Releases (build spec + phased plan)
 
-**Status:** plan — nothing built. Phases in [§11](#11-the-phased-plan); owner
-decisions still open in [§12](#12-open-decisions).
+**Status:** plan — nothing built. Phases in [§11](#11-the-phased-plan);
+**all eight decisions answered** in [§12](#12-decisions).
+**Revised 2026-08-06 after owner review round 1** — five corrections, three of
+them defects the owner caught: **"live workout" was undefined and the rule as
+written would have suppressed every modal forever** (the Workout tab renders the
+day view inline — [§6.4](#64-where-and-when-it-appears)); **§9.1's "dark
+shipping" was too vague to answer "what is the go-live switch"**, now made
+concrete as **version-keyed release gating** where the release PR *is* the switch
+([§9.2](#92-the-go-live-mechanism-the-version-is-the-flag)); **the MCP parameter
+tools gain a `release_impact` argument** so an activation follows the same two
+paths and can be *enforced* rather than remembered
+([§9.5](#95-parameter-activations-carry-their-own-release-impact)); plus a
+first-run hook for a future guided tour ([§6.5](#65-first-run-vs-returning-user))
+and a CI-cost audit ([§9.4](#94-ci-gates-and-their-cost)). **1.1.0 is now the manuals**
+([§11](#11-the-phased-plan)).
 **Owner ask (2026-08-06):** the app is versioned as a pre-release; round out a
 production baseline and start shipping **discrete versioned releases from a
 fresh v1.0.0**. Feature releases get per-user last-seen tracking that triggers a
@@ -33,7 +46,8 @@ notifications, and links stay correct.
 
 - A user who has been away for three feature releases sees **one** modal covering all three, not three modals and not just the newest.
 - A user who signs up today sees **no** modal — their history starts now.
-- A modal **never** appears over a live workout.
+- A modal **never** appears over a live workout — where "live" means a set has been logged ([§6.4](#64-where-and-when-it-appears)), not merely that the Workout tab is open.
+- A feature merged to `main` but unreleased is **invisible to users and absent from the version history**, and one merge makes the whole accumulated block live at once ([§9.2](#92-the-go-live-mechanism-the-version-is-the-flag)).
 - Every deep link in every release note resolves — enforced by a test, not by care.
 - The version shown in the app footer, in `package.json`, and at the top of the release registry cannot disagree — CI fails if they do.
 - A release note cannot describe a feature the deployed bundle doesn't contain, because the note and the feature are the same commit.
@@ -72,9 +86,12 @@ the first feature release or every new signup gets greeted by a changelog.
 The gate selects *all* unseen feature releases, not the newest one.
 → [§6.3](#63-the-gate).
 
-**T5 — The modal must never interrupt a session.** The app's most valuable state
-is a workout in progress; a modal over the day view is a real harm, not a nit.
-Suppression is a rule with a test, not a hope about where users are.
+**T5 — The modal must never interrupt a session, and "session" is not a route.**
+The app's most valuable state is a workout in progress. But the Workout tab
+**renders the day view inline** — `(app)/workout/page.tsx`: *"the latest
+uncompleted workout IS the tab (fig 1.1)"* — so a route-based rule either
+suppresses the modal on the app's landing surface (i.e. always) or pops it over
+a live set. The signal has to come from the workout's state, not its URL.
 → [§6.4](#64-where-and-when-it-appears).
 
 **T6 — There is no mockup for either surface.** Hard rule 8 means the modal and
@@ -102,7 +119,7 @@ Activating `engine_params` (v20/v23/v26 all shipped inactive, activated later by
 an owner-gated MCP step) changes the numbers a user is prescribed while the code
 deploy that carried it announced nothing. Under this framework that is a
 **feature release**. → [§4.2](#42-the-rule-that-makes-it-decidable) and
-[§9.4](#94-the-parameter-activation-coupling).
+[§9.5](#95-parameter-activations-carry-their-own-release-impact).
 
 **T11 — A guide deep link is only as real as the manual.** Doc 22's section IDs
 are explicitly an API. Release notes become a second consumer of that API, so a
@@ -147,6 +164,12 @@ Naming matters for the process: the owner's "major versions (1.1, etc.)" are
 **feature releases** in this doc, and `2.0.0` is a separate, rarer thing. Prose,
 commits, and PR titles use *feature release* / *fix release* so the two never get
 confused.
+
+**Digits to the right reset.** `1.0.3 → 1.1.0`, `1.4.2 → 2.0.0`. Fix numbers
+count fixes *since the last feature release*, so the third digit is a running
+count within a block rather than a global tally — which is what makes the
+[§9.2](#92-the-go-live-mechanism-the-version-is-the-flag) timeline read
+correctly. Enforced by the [§5.3](#53-registry-invariants-tested) invariants.
 
 ### 4.2 The rule that makes it decidable
 
@@ -315,17 +338,68 @@ failure direction.
 
 ### 6.4 Where and when it appears
 
+**"Live workout" needs a definition, and the app already has one.** The Workout
+tab is not a menu that leads to a session — it *is* the session
+(`(app)/workout/page.tsx` renders `DayView` directly). So "suppress on the
+workout screen" would suppress the modal on the surface the app opens to, which
+is every launch: the modal would never appear at all.
+
+The signal that separates the two states already exists in the schema.
+`workouts.status` runs `planned → in_progress → completed`, and
+`queries/logging.ts::logSet` flips `planned → in_progress` on the **first logged
+set**. That is exactly the line: a workout the user is *looking at* is `planned`;
+a workout they are *in* is `in_progress`.
+
 | Rule | Why |
 |---|---|
-| Never on `/log/**` or the workout day view | T5 — a session in progress outranks any announcement |
-| Never while the set-logging queue has pending ops (`SetLogQueueProvider`, N68) | the user is mid-session even if they navigated away |
-| Otherwise on the first `(app)` navigation after the deploy | it should feel like opening the app, not like an interception |
-| Once per release block, then only from More → version history | the history page is the resumable copy ([§8](#8-version-history)) |
-| Not on `/onboarding`, auth routes, or `/~offline` | those users have no history |
+| **Suppress when the rendered workout is `in_progress`** | the user has logged at least one set — they are training, not browsing |
+| **Show when it is `planned`** (or when no workout is active and the tab falls back to the meso summary) | this is the ordinary landing state, and the right moment |
+| Suppress on `/log/**` unconditionally | the explicit day-view route is only reached deliberately, mid-session or reviewing |
+| Suppress while the set-logging queue has pending ops (`SetLogQueueProvider`, N68) | the user is mid-set even if they navigated away, and a queued write is an unfinished action |
+| **Otherwise show — including on Cycles, Stats and More** | this is the release valve for the stale case below |
+| Not on `/onboarding`, auth routes, or `/~offline` | those users have no history to show |
+| Once per release block; afterwards only from More → version history | the history page is the resumable copy ([§8](#8-version-history)) |
 
-Suppression is a `usePathname()` predicate plus the queue state — both tested,
-including an e2e that opens the day view under a pending release and asserts no
-modal.
+**The stale-session case.** A workout left `in_progress` for a week would block
+the modal indefinitely if the Workout tab were the only surface that could show
+it. Allowing every other tab to show it removes the need for any time-based
+heuristic: the modal simply waits until the user navigates off the Workout tab,
+which happens within a session or two. No "abandoned after N hours" rule, no
+clock in the gate — which also keeps the engine-purity habit intact.
+
+Tested three ways: unit tests over the suppression predicate; an e2e that logs
+one set under a pending release and asserts no modal on the Workout tab; and an
+e2e that navigates to Stats in the same state and asserts the modal **does**
+appear.
+
+---
+
+### 6.5 First-run vs. returning user
+
+A guided tour for newly onboarded users is a likely future feature (owner,
+2026-08-06), and it wants exactly the state this gate computes: *this account has
+no history with the app.* So the gate returns a **discriminated union**, not an
+array:
+
+```ts
+type VersionGate =
+  | { kind: "prime" }                          // last_seen_version is null
+  | { kind: "whats-new"; releases: Release[] } // unseen feature releases
+  | { kind: "none" };
+```
+
+`prime` is the tour's hook. Today it does one thing — write `CURRENT_VERSION`,
+show nothing — but naming the state now means a tour is added as a branch rather
+than as a rework of the gate. Same cheap forward-compat as `surface` in
+[§5](#5-the-release-registry).
+
+**`last_seen_version` stays single-purpose.** It answers "which releases has this
+account been told about," and nothing else. A tour needs its own signal (a
+`tour_completed_at` column, or a flags object) because the two questions come
+apart immediately: a user can finish the tour and still be owed three release
+notes, and re-running a tour must not re-announce releases. Overloading one
+column to mean both is the kind of shortcut that is free to take and expensive to
+undo.
 
 ---
 
@@ -358,7 +432,7 @@ same block, so "learn how this works" has a destination.
 
 Guide sections reuse doc 22 §9.4's brief landed-section marking. App routes
 navigate plainly in v1 — a "you came from What's New" marker on arbitrary app
-screens is extra surface for little gain ([§12](#12-open-decisions) O4).
+screens is extra surface for little gain ([§12](#12-decisions) O4).
 
 ---
 
@@ -389,18 +463,68 @@ Three options were considered:
 |---|---|---|
 | **A** | Long-lived `release/1.1` branch; features merge there; the branch merges to main at cut time | Fights "keep `main` deployable, vertical-slice PRs"; this repo's slices are large and would conflict badly; the deployed app diverges from trunk for weeks |
 | **B** | Pure trunk; a release is just a version bump over whatever landed | Features reach users before they're announced — which the owner explicitly does not want for user-visible work |
-| **C** | **Trunk + staged manifest + inactive shipping** *(recommended)* | Requires discipline about flags for anything that must stay dark |
+| **C** | **Trunk + staged manifest + version-keyed gating** *(adopted)* | Gated features carry two code paths until the release lands |
 
-**Recommendation: C.** Work merges to `main` continuously and stays deployable.
-What is *staged* is the **announcement**: entries accumulate in
-`unreleased.ts`. Where a feature genuinely must not be visible before its
-announcement, it ships dark — and this repo already has that muscle: engine
-params v20/v23/v26 all shipped inactive behind an owner-gated activation, and
-`LLM_EXPLANATIONS` gates the explanation generator. The block the owner wants is
-real; it is a block of *announcement and activation*, not a block of unmerged
-code.
+**Adopted: C.** Work merges to `main` continuously and `main` stays deployable.
+What is *staged* is the feature's **visibility**, and the mechanism is
+[§9.2](#92-the-go-live-mechanism-the-version-is-the-flag). The block is real —
+it is a block of *announcement and activation*, not a block of unmerged code.
 
-### 9.2 The two PR shapes
+### 9.2 The go-live mechanism: the version **is** the flag
+
+Owner review asked the right question: if feature work is merged to `main` but
+unreleased, what actually keeps it hidden, and what flips it on? The answer needs
+no separate flag system, no env var, no database toggle.
+
+A user-visible change lands behind a gate keyed to the version it is slated for:
+
+```ts
+// src/lib/version/index.ts
+export const releaseActive = (v: string) => compare(CURRENT_VERSION, v) >= 0;
+
+// at the call site
+if (releaseActive("1.1.0")) { /* the new surface */ } else { /* today's */ }
+```
+
+`CURRENT_VERSION` is derived from the registry, and the registry only gains
+`1.1.0.ts` in the release PR. **So the release PR is the switch.** One merge
+simultaneously: flips every accumulated `1.1.0` gate on, bumps the version,
+publishes the notes, makes them visible in the history, and starts the modals.
+Before that merge, `releaseActive("1.1.0")` is `false` everywhere and the
+entries sit in `unreleased.ts`, which is never part of `RELEASES` — so the
+history page **cannot** show them. That property falls out of the data model
+rather than being enforced by a rule.
+
+**This is exactly the model owner review described, confirmed point by point:**
+
+| Owner's statement | Holds? |
+|---|---|
+| FIX changes go live on merge to `main`, unannounced | **Yes** — fixes are ungated; the release PR for `1.0.1` can be the fix PR itself |
+| FIX changes still appear in the version history | **Yes** — collapsed, per [§8](#8-version-history) / O3 |
+| FEATURE changes accumulate without going live | **Yes** — `releaseActive("1.1.0")` is false until the cut |
+| FEATURE changes are invisible in version history until released | **Yes** — structurally; `unreleased.ts` is not in `RELEASES` |
+| A series of feature changes releases as **one** version bump | **Yes** — that is what the staged manifest is for |
+| On release: modal, history, feature digit +1, **fix digit resets to 0** | **Yes** — `1.0.3 → 1.1.0`, enforced by the [§5.3](#53-registry-invariants-tested) invariants |
+
+**A worked timeline:**
+
+```
+1.0.0  ── released ────────────────────────────────── live, in history
+  ├─ fix PR       → 1.0.1  live on merge, quiet, in history
+  ├─ feature PR A → gated on "1.1.0", entry → unreleased.ts   (invisible)
+  ├─ fix PR       → 1.0.2  live on merge, quiet, in history
+  ├─ feature PR B → gated on "1.1.0", entry → unreleased.ts   (invisible)
+  └─ release PR   → 1.1.0  A and B go live together, modal, history
+```
+
+#### The costs, stated honestly
+
+1. **A gated feature carries both code paths** until the release lands, and a cleanup PR removes the dead branch afterwards. This is the real price of the model, and it argues for **time-boxing a block to weeks, not months**, and for gating only what genuinely must not appear early. A new settings row nobody will notice does not need a gate; a redesigned Workout tab does.
+2. **Migrations cannot be gated this way** — a migration applies at deploy. Additive schema (a column nothing reads yet) is invisible and ships ungated; anything that changes existing behavior must ship in the release itself. Worth checking at release-PR time.
+3. **Previewing a staged block needs an override.** The owner will want to see 1.1.0 before flipping it. `NEXT_PUBLIC_RELEASE_OVERRIDE`, honored **only** when `VERCEL_ENV !== "production"`, makes any Vercel preview deploy render the staged release. Env-gated rather than user-gated, so there is no auth surface and no way to reach it in production.
+4. **Cleanup is part of the release, not after it.** The release PR opens a follow-up to strip that version's gates; left undone, the codebase accumulates permanent `releaseActive("1.1.0")` checks that are dead but never obviously dead.
+
+### 9.3 The two PR shapes
 
 **An ordinary PR** (unchanged from today) additionally appends its entries to
 `src/content/releases/unreleased.ts` when it changes something a user would
@@ -412,14 +536,23 @@ identity:
 1. `unreleased.ts` → `1.1.0.ts` with `version`, `date`, `kind`, `headline`; a fresh empty `unreleased.ts`;
 2. bump `package.json.version` (CI asserts the three-way equality);
 3. edit passes over the accumulated entries — they were written one PR at a time and need to read as one release;
-4. `docs/PROGRESS.md` gains the release line; `docs/notes/log.md` gains the dated entry; backlog rows the block closed are set to `done (PR #n)`;
-5. green CI, including link validation and the content contracts;
-6. after merge: tag `v1.1.0` and cut a GitHub release whose body is **generated from the registry** — never hand-written, so the two can't drift.
+4. confirm the [§9.2](#92-the-go-live-mechanism-the-version-is-the-flag) checks: every `releaseActive("1.1.0")` gate is intended to flip, and no ungated migration in the block changes existing behavior;
+5. `docs/PROGRESS.md` gains the release line; `docs/notes/log.md` gains the dated entry; backlog rows the block closed are set to `done (PR #n)`;
+6. green CI, including link validation and the content contracts;
+7. after merge: tag `v1.1.0`, cut a GitHub release whose body is **generated from the registry** (never hand-written, so the two can't drift), and open the gate-cleanup follow-up.
 
 A fix release does not need this ceremony: the fix PR itself may carry the
 `1.0.1.ts` file and the bump.
 
-### 9.3 CI gates
+### 9.4 CI gates and their cost
+
+Every gate below is a **pure unit test** over typed data — no browser, no
+database, no network. They run inside the existing `npm run test` step of the
+existing job, so they add **no new workflow, no new job, and no measurable
+minutes**. The expensive jobs in `.github/workflows/ci.yml` are the ones that
+already exist: `supabase start` for the RLS/integration job and the Playwright
+job. This framework does not add to either, except for the three e2e assertions
+in [§10](#10-testing), which extend a spec file that already runs.
 
 | Gate | Kind |
 |---|---|
@@ -427,19 +560,48 @@ A fix release does not need this ceremony: the fix PR itself may carry the
 | Registry invariants ([§5.3](#53-registry-invariants-tested)) | **fail** |
 | Every `app` target in the allowlist; every `guide` target resolves | **fail** |
 | Content contracts ([§5.2](#52-content-contracts-tested-per-doc-22-8s-pattern)) | **fail** |
-| Modal/history renderers pinned by e2e (shows once, dismiss persists, suppressed on the day view) | **fail** |
-| A PR touching `src/app/**` with no `src/content/releases/**` change | **warn only** — many legitimate PRs are refactors; a hard gate here would train people to write empty entries |
+| Modal/history behavior (shows once, dismiss persists, suppressed mid-session) | **fail** (e2e, existing job) |
 
-### 9.4 The parameter-activation coupling
+**Dropped from the first draft:** the "PR touches `src/app/**` without touching
+`src/content/releases/**`" warning. It was the only proposed gate needing its own
+workflow with `pull_request` write permission to leave a comment, which is real
+setup and real minutes for a check that cannot be trusted anyway (most such PRs
+are legitimately note-free). It becomes a line in the release-PR checklist
+instead — free, and applied at the moment someone is actually reviewing the
+block.
 
-`docs/deployment/manual-operations.md` gains a step in the activation runbook:
-**if activating a parameter set changes numbers users see, the feature release
-announcing it ships first** (same day), and the activation is performed after.
-Ordering matters — announcing a change that hasn't happened yet is a smaller
-error than a user finding their prescription moved with no explanation, and it
-keeps the note truthful at every moment for the users who read it.
+**On billing generally:** GitHub Actions is unmetered for public repositories.
+For a private repository the included allowance is 2,000 minutes/month on Free
+and 3,000 on Pro, and this repo's cost is dominated by the Supabase-stack and
+Playwright jobs that predate this work. If minutes ever become the constraint,
+the lever is running the heavy jobs on a narrower trigger — not trimming these
+gates, which are nearly free.
 
-### 9.5 The documentation contract
+### 9.5 Parameter activations carry their own release impact
+
+Owner review: some parameter updates are trivial and some are substantial, so the
+tool should say which — and it should not be complicated. It isn't; it is one
+argument and one guard.
+
+`propose_engine_params` and `activate_engine_params`
+(`src/lib/mcp/tools/admin.ts`) take a required `release_impact`:
+
+| Value | Meaning | Path |
+|---|---|---|
+| `none` | no number any user sees moves (a parameter added but not yet read, a comment, a re-tuning that replays identically) | no note, no version change |
+| `fix` | a number was wrong and is now right | rides a fix release; one line in the history |
+| `feature` | behavior users should be told about changed | **requires a feature release announcing it, live before activation** |
+
+Two things make this more than bookkeeping:
+
+1. **It can be enforced, not just documented.** `activate_engine_params` already refuses to act unless `confirm_version` echoes `version`; the same guard refuses a `feature`-classified activation when no live release announces it. That converts [T10](#2-the-traps) from runbook discipline into a check.
+2. **The classification does not have to be a guess.** `replay_decisions` already reports the diff a version would produce — it is how v19→v20 was assessed as "11/15 changed / 0 errors". The tool surfaces that diff when asking for the classification, so `none` is a claim the caller can check rather than assume.
+
+`docs/deployment/manual-operations.md` keeps the ordering rule: **announce, then
+activate**, same day. Announcing a change slightly before it lands is a smaller
+error than a user finding their prescription moved with no explanation.
+
+### 9.6 The documentation contract
 
 A feature release is not done when the code merges. Its block must also leave:
 
@@ -455,12 +617,13 @@ reason to have one.
 
 ## 10. Testing
 
-- **Pure:** `compare` (including `1.10.0 > 1.9.0`), `pendingFeatureReleases` — new user, up-to-date user, one skipped release, three skipped releases, fix-only interval, rollback (T8), null priming.
-- **Registry:** invariants + content contracts as data-driven tests over the real registry, so a bad release note fails the release PR.
+- **Pure:** `compare` (including `1.10.0 > 1.9.0`), the gate union — new user (`prime`), up-to-date user, one skipped release, three skipped releases, fix-only interval, rollback (T8); and `releaseActive` against a staged version, including the `NEXT_PUBLIC_RELEASE_OVERRIDE` branch being inert when `VERCEL_ENV === "production"`.
+- **Registry:** invariants + content contracts as data-driven tests over the real registry, so a bad release note fails the release PR. Includes the [§4.1](#41-the-digits) reset rule and the property that no `unreleased.ts` entry can reach `RELEASES`.
+- **Suppression:** the [§6.4](#64-where-and-when-it-appears) predicate over the matrix of `planned` / `in_progress` / `completed` / no-active-workout × route × queue state.
 - **Links:** allowlist resolution; guide resolution once doc 22 Phase 2 exists.
 - **RLS:** the new column under `profiles` policies (hard rule 1).
-- **Integration:** acknowledgment writes and is monotonic; priming at onboarding.
-- **e2e:** modal appears once for a returning user, survives a reload before acknowledgment, does not reappear after, is absent on the day view, and the history page lists every release.
+- **Integration:** acknowledgment writes and is monotonic; priming at onboarding; `activate_engine_params` refuses a `feature`-classified activation with no live announcing release ([§9.5](#95-parameter-activations-carry-their-own-release-impact)).
+- **e2e** (three additions to an existing spec, per [§9.4](#94-ci-gates-and-their-cost)): the modal appears once for a returning user and does not reappear after dismissal; it is **absent** on the Workout tab once a set is logged; it **appears** on Stats in that same state.
 
 ---
 
@@ -478,8 +641,10 @@ selection, tracked all-caps labels — and record the decision in
 
 ### Phase 1 — Identity and registry
 
-`src/lib/version/` (pure), `src/content/releases/` with `1.0.0.ts`, the CI gates
-of [§9.3](#93-ci-gates), `package.json` → `1.0.0`, and the More footer reading
+`src/lib/version/` (pure — `compare`, the gate union, `releaseActive`),
+`src/content/releases/` with `1.0.0.ts` + an empty `unreleased.ts`, the CI gates
+of [§9.4](#94-ci-gates-and-their-cost), `package.json` → `1.0.0`, the
+`NEXT_PUBLIC_RELEASE_OVERRIDE` preview escape, and the More footer reading
 `CURRENT_VERSION` instead of a hardcoded string. No user-visible change beyond
 the footer. **S–M**
 
@@ -506,36 +671,55 @@ variant enabled when doc 22 Phase 2 lands. **S**
 ### Phase 6 — Process
 
 The release checklist (in this doc's §9, plus a short `docs/deployment/release.md`
-runbook), the GitHub-release generator, and the
-`manual-operations.md` activation coupling. **S**
+runbook), the GitHub-release generator, the `release_impact` argument + guard on
+the two `engine_params` MCP tools ([§9.5](#95-parameter-activations-carry-their-own-release-impact)),
+and the `manual-operations.md` ordering rule. **S**
 
-**Sequencing note.** Phases 1–2 are shippable as 1.0.0 on their own and are worth
-doing first regardless of how the rest is decided — they replace a hardcoded
-string with an enforced identity. Phases 3–4 are what make 1.1.0 possible.
+### 11.1 The first two releases
+
+**1.0.0 = the framework itself**, plus the current app declared production
+(phases 0–4 and 6; §4.3). Nothing is announced, because there is nobody to
+announce to yet.
+
+**1.1.0 = the manuals** (owner, 2026-08-06). This is the right first
+announcement: it is a genuinely new user-facing surface, and it is the thing the
+deep links point *into*, so the first modal anyone sees demonstrates the whole
+mechanism rather than just describing it.
+
+That decision creates one ordering constraint and one requirement:
+
+- **Ordering.** Doc 22 Phase 2 (reader infrastructure, stable section IDs) must land before doc 23 Phase 5 can validate `guide` targets. So the interleave is: **doc 23 P0–P4 → doc 22 P0–P2 → doc 23 P5 → doc 22 content phases → cut 1.1.0.** Doc 23 Phase 6 can run in parallel anywhere after P1.
+- **The manual must be dark-shippable.** Doc 22 ships its content over several PRs across weeks; without a gate the guide would go live chapter by chapter and the 1.1.0 announcement would be telling users about something they had already been reading. So the manual's routes and its More-tab entry sit behind `releaseActive("1.1.0")` — one gate at the route boundary rather than gates scattered through the content, which is the cheapest possible instance of the [§9.2](#92-the-go-live-mechanism-the-version-is-the-flag) cost. The `NEXT_PUBLIC_RELEASE_OVERRIDE` preview escape is what makes the chapters reviewable while they are being written.
+
+**Sequencing note.** Phases 1–2 are shippable on their own and worth doing first
+regardless — they replace a hardcoded string with a CI-enforced identity. Phases
+3–4 are what make 1.1.0 possible.
 
 ---
 
-## 12. Open decisions
+## 12. Decisions
 
-| # | Question | Recommendation |
+**All eight answered by the owner, 2026-08-06** — every recommendation accepted.
+
+| # | Question | Decision |
 |---|---|---|
-| **O1** | Does 1.0.0 itself announce? | **No.** Backfill every existing account to `1.0.0`; the first modal anyone sees is 1.1.0 ([§4.3](#43-what-100-is)) |
-| **O2** | Blocking sheet, or a dismissible banner on Today? | **Sheet requiring an explicit dismiss**, once. A banner is easy to ignore, which defeats the point; a sheet that must be dismissed is honest about interrupting, and only ever does it between sessions |
-| **O3** | Do fix releases appear in the history at all? | **Yes, collapsed** — visible maintenance, no competition for attention |
-| **O4** | A "from What's New" marker when landing on an app route? | **Not in v1** — guide sections get doc 22's marker; app routes navigate plainly |
-| **O5** | Git tags + GitHub releases? | **Yes, generated from the registry after merge.** The registry stays the source of truth; the tag is an artifact |
-| **O6** | A user who was mid-session when the release landed — where does the modal go? | **Defer to the next app open.** Showing it on Workout Complete competes with the session summary, which is a designed moment |
-| **O7** | Does MEASURE (doc 20) share this version line? | **Share it initially**; the `surface` field is reserved now so a split later is a filter, not a migration (doc 20 §3.4) |
-| **O8** | How much of the pre-release history goes into 1.0.0's entry? | **One line.** "First production release" — a changelog of the pre-release period has no reader |
+| **O1** | Does 1.0.0 itself announce? | ✅ **No.** Backfill every existing account to `1.0.0`; the first modal anyone sees is 1.1.0 ([§4.3](#43-what-100-is)) |
+| **O2** | Blocking sheet, or a dismissible banner on Today? | ✅ **Sheet requiring an explicit dismiss**, once. A banner is easy to ignore, which defeats the point; a sheet is honest about interrupting, and [§6.4](#64-where-and-when-it-appears) guarantees it only ever does so between sessions |
+| **O3** | Do fix releases appear in the history? | ✅ **Yes, collapsed** — visible maintenance, no competition for attention |
+| **O4** | A "from What's New" marker when landing on an app route? | ✅ **Not in v1** — guide sections get doc 22's marker; app routes navigate plainly |
+| **O5** | Git tags + GitHub releases? | ✅ **Yes, generated from the registry after merge.** The registry stays the source of truth; the tag is an artifact |
+| **O6** | Where does the modal go for a user who was mid-session? | ✅ **Defer to the next app open** — and under [§6.4](#64-where-and-when-it-appears) that is usually the next tab they touch, not the next launch |
+| **O7** | Does MEASURE (doc 20) share this version line? | ✅ **Share it initially**, `surface` reserved. **Owner expects MEASURE to need its own version line once built** — so when it splits, the registry filters on `surface` and MEASURE gets its **own column** (`measure_last_seen_version`), not a jsonb map on the existing one. Two independent scalars stay legible and keep the doc 20 §3.4 separation clean |
+| **O8** | How much pre-release history goes into 1.0.0's entry? | ✅ **One line.** "First production release" — a changelog of the pre-release period has no reader |
 
 ---
 
 ## 13. Relationship to other docs
 
-- **Doc 22** owns the manual and its section IDs; this doc *consumes* them as link targets and shares its validator. A feature release that introduces a concept should ship the guide section in the same block ([§7.2](#72-guide-targets)).
+- **Doc 22** owns the manual and its section IDs; this doc *consumes* them as link targets and shares its validator. A feature release that introduces a concept should ship the guide section in the same block ([§7.2](#72-guide-targets)). **The manuals are release 1.1.0** — the interleaved phase order and the manual's release gate are in [§11.1](#111-the-first-two-releases).
 - **Doc 09** is authoritative for screen structure; the Phase 0 design pass is recorded there, and this doc never defines a layout.
 - **Docs 10 / 14 / 16 / 17 / 19 / 21** are authoritative for behavior; a release note reports them. A note that disagrees with a behavior doc is the note's bug.
-- **`docs/deployment/manual-operations.md`** gains the activation coupling ([§9.4](#94-the-parameter-activation-coupling)); a new `release.md` holds the release runbook.
+- **`docs/deployment/manual-operations.md`** gains the announce-then-activate ordering rule ([§9.5](#95-parameter-activations-carry-their-own-release-impact)); a new `release.md` holds the release runbook.
 - **`docs/PROGRESS.md`** keeps the build record; the registry is user-facing copy and is not a substitute for it.
 - **Doc 20** — MEASURE's `surface` reservation, per its §3.4 separation-readiness rules.
 - Workstream **V** ("Versioning & releases") in `docs/notes/` is this work's home; the tracking item is **N80**.
