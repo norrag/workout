@@ -43,7 +43,14 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   },
   e1rm: {
     label: "ESTIMATED 1RM (E1RM)",
-    body: "The most you could theoretically lift for one all-out rep, worked out from a set you actually did — its weight, its reps, and how many reps you left in the tank (your RIR). Those left-over reps are folded in, so an easy set and a hard one at the same weight and reps don't score the same: closer to failure reads as stronger. It's an estimate that tracks your strength over time, not a number you tested — and it's least reliable on very high-rep sets or ones stopped well short of failure.",
+    // 2026-08-07 (doc 22 Phase 1): the last clause used to read "closer to
+    // failure reads as stronger", which is the mechanic backwards. effective
+    // reps = reps + RIR, and e1RM rises with effective reps — so at the same
+    // weight and reps the set with reps to spare implies the greater strength.
+    // The doc 21 §2 restamp is the proof: re-reading unreported sets at their
+    // prescribed RIR instead of as taken to failure moved every historical
+    // stamp UP (+4.85% average, 2026-08-02).
+    body: "The most you could theoretically lift for one all-out rep, worked out from a set you actually did — its weight, its reps, and how many reps you left in the tank (your RIR). Those left-over reps are folded in, so an easy set and a hard one at the same weight and reps don't score the same: the set with reps still in reserve implies more strength than the same set taken to failure. It's an estimate that tracks your strength over time, not a number you tested — and it's least reliable on very high-rep sets or ones stopped well short of failure.",
   },
   e1rm_confidence: {
     label: "ESTIMATE CONFIDENCE",

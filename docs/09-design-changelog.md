@@ -42,6 +42,143 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-07 — The manual reader: map, chapter contents, section (figs 4.8 / 4.9 / 4.10, N74 / doc 22 Phase 1)
+
+Hard rule 8 again has no figure to point at: the June mockup round predates the
+idea of a manual, so **there is no mockup for any of the three surfaces**. This
+entry is the design pass doc 22 §2.6 requires, taking the same route the
+2026-08-06 entry took for the release surfaces — derive from the house system,
+write the derivation down, then transcribe it.
+
+Three figure numbers are claimed in the 08 §5 index: **4.8 — guide map (More →
+Guide)**, **4.9 — chapter contents**, **4.10 — a section**.
+
+**Why they can be derived and not drawn.** A manual introduces exactly one new
+object — a *block of reference prose* — and the app already renders every other
+piece: sub-page headers (fig 4.4's children), section rules (`SETTINGS` on More),
+glossary cards (`InfoDot`), quiet onward links (`LABEL ›`), and the dated
+entry list (fig 4.6). The design question is which of those compose, and the
+answer is checkable against the surrounding screens rather than a matter of
+taste.
+
+**The one genuinely new constraint** is that these are *reading* surfaces. Every
+other screen in the app is a working surface where density wins; a manual
+section is read once, in order, and the house's 12–13px tracked density would
+make it hostile. So the reader gets the app's **one** typographic concession:
+body prose at `text-sm leading-[1.65] text-ink/80`, roughly 60–70 characters a
+line at phone width. Nothing else changes — same cream, same ink, same square
+corners, same accent discipline.
+
+### 1. The section is the screen (fig 4.10)
+
+- **Change.** `/more/guide/[chapter]/[section]` renders **one section**, per doc
+  22 §9.1. Header is the More sub-page grammar with the **chapter** as parent:
+  the back link reads `‹ {CHAPTER TITLE}` (`text-[10px] font-bold
+  tracking-[0.14em] text-ink/55`), then the section title, then one tracked
+  all-caps meta line — `USER GUIDE · CH 6 · 3 OF 6`, numerals in `.numeral`.
+- **The section title is not a `title-display`.** Screen titles in this app are
+  one lowercase word or two (`more`, `what's new`); a section title is a
+  sentence and would set as three display lines on a phone. It renders in the
+  app's other bold-heading form instead — `text-[22px] font-extrabold
+  tracking-[-0.01em]`, sentence case — the same weight as fig 4.4's profile
+  name, one step up. The chapter page keeps `title-display`, because a chapter
+  title *is* a screen name.
+- **No accent anywhere on the page** in Phase 1. Orange marks current position
+  and selection only; a section being read is not a selection. It reappears in
+  Phase 2 for exactly one job — the ■ marking the landed section after a
+  deep-link entry (doc 22 §9.4.6), which is a current-position mark and so is
+  the accent's actual meaning.
+- **Affected figures.** 4.10 (new).
+- **Impact.** `NET-NEW`.
+
+### 2. Chapter contents (fig 4.9)
+
+- **Change.** `/more/guide/[chapter]` is a **contents page, never prose** (doc
+  22 §9.1). `‹ GUIDE` back link, `h1.title-display text-[32px]` with the chapter
+  title, a one-line chapter summary at `text-sm text-ink/60`, then the section
+  list: one row per section, `border-b border-ink/15 py-3.5`, carrying a
+  `.numeral` index in `text-ink/40`, the section title at `text-[15px]
+  font-bold`, its one-line summary at `text-[13px] text-ink/60`, and the app's
+  quiet chevron.
+- **Rationale.** This is fig 4.4's settings-row grammar with a summary line
+  added — the same shape as a release entry (fig 4.6 §3). Reusing it is what
+  makes the guide read as part of the app rather than as an embedded document.
+- **Affected figures.** 4.9 (new).
+- **Impact.** `NET-NEW`.
+
+### 3. The guide map (fig 4.8) — specified now, built in Phase 2
+
+- **Change.** `/more/guide` lists every chapter with **its sections inline**, so
+  a section is never behind a chapter page (doc 22 §9.2's one-tap requirement).
+  A chapter is the `border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold
+  tracking-[0.14em]` rule the app already uses for `SETTINGS`, carrying the
+  chapter number in `.numeral`; its sections are the §2 rows beneath it.
+- **Rationale.** The map is the whole answer to the owner's "not one
+  untraversable document" note. Expanding chapter-by-chapter would hide the
+  thing being navigated; the section rules are cheap enough to render the lot.
+- **Impact.** `NET-NEW` — **Phase 2**. Recorded here so the design pass covers
+  the reader as a whole rather than being reopened mid-build.
+
+### 4. The block vocabulary — nine kinds, each already in the house
+
+Content is typed data (doc 22 D2) and each block kind maps onto a pattern the
+app ships, so nothing here is invented:
+
+| Block | Renders as | Borrowed from |
+|---|---|---|
+| `heading` | tracked-caps rule, `border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]` | `SETTINGS` on More (4.4) |
+| `para` | `text-sm leading-[1.65] text-ink/80`; app copy quoted inside it is full ink at `font-medium` — the house has no italics | the reading concession above |
+| `list` | rows with a 3px `bg-ink/30` square marker; ordered lists use `.numeral` indices in `text-ink/40` | `W1` labels in the RIR schedule editor |
+| `steps` | numbered rows, `border-b border-ink/10 py-2.5`, tracked-caps label + body | the day view's ruled rows |
+| `table` | tracked-caps head under a `border-b-[1.5px] border-ink`, `border-b border-ink/15` rows, `overflow-x-auto` | meso stats tables |
+| `callout` | `border-[1.5px] border-ink px-4 py-3.5`; the `honesty` tone adds a tracked-caps label line | the `InfoDot` card |
+| `term` | **the `InfoDot` card's exact internals** — `label-caps text-[10px] font-bold tracking-[0.14em]` + `text-xs leading-[1.55] text-ink/80` — in the same bordered box | `InfoDot` (N25) |
+| `link` | the quiet onward link, `LABEL ›`, `text-[9.5px] font-semibold tracking-[0.1em] text-ink/55` | every settings row |
+| `detail` | `<details>` behind a quiet-link summary; opens into a `border-t border-ink/15` box | the planner's `ADVANCED` disclosures |
+
+- **The `term` block is the §8.1 contract made visible.** A glossary term
+  renders in the manual as the *same card* the `InfoDot` opens, with body copy
+  read from `src/lib/glossary.ts` at render time — so it is structurally
+  impossible for the manual to define a term in different words.
+- **Dashed borders stay out.** Hard rule 7 reserves dashed for planned/empty;
+  nothing in a manual section is either, so every border here is solid.
+- **`detail` is doc 22 D5's third depth layer** — collapsed by default, and
+  therefore excluded from the §9.3 length budget. Its summary is fixed copy,
+  `THE EXACT RULE ›`, so the reader learns one affordance rather than a new
+  label per section.
+- **Impact.** `NET-NEW` (`src/components/manual/`).
+
+### 5. `figure` is deferred to Phase 2, deliberately
+
+Doc 22 D2 names `figure` in the block union. It is **not** built here, and the
+reason is a design one rather than a scheduling one: a figure is an asset under
+`public/`, which `sw.ts` serves through `StaleWhileRevalidate` with a **64-entry
+cap shared with the app icons and splash screens**. A figure-heavy manual would
+quietly evict app chrome from that cache — precisely the kind of "the manual
+degraded the app" outcome doc 22 D3's condition exists to prevent. The asset
+policy therefore belongs with Phase 2's other D3 guards, not ahead of them.
+Until then a section describes a control in words and links to it.
+
+- **Impact.** `NO-CODE` — recorded so Phase 2 owns it.
+
+### 6. Copy discipline is a test, not a habit (again)
+
+Manual copy is typed data in `src/content/manual/`, and hard rule 7 plus the doc
+10 §9 guardrails are enforced over that data by unit tests — as they already are
+for release notes. Phase 1 lands the **length budget** (doc 22 §9.3), calibrated
+against this entry's exemplar chapter: **≤ 350 words and ≤ 12 blocks per
+section**, `detail` contents excluded. The remaining four contracts land with
+the reader infrastructure in Phase 2.
+
+- **Calibration.** Chapter 6's six sections came out at 205–309 words over 6–8
+  blocks, median 229. Doc 22 §9.3's proposed ceiling therefore stands unchanged:
+  a typical section sits at two thirds of it, and the densest — the three-layer
+  mechanism section, which is the shape most at risk of sprawling — at 88%.
+- **Rationale.** The budget is a design constraint before it is a content one:
+  350 words is one to two phone screens at the body size fixed in §1, which is
+  what makes "the section is the screen" true rather than aspirational.
+- **Impact.** enforced in `src/content/manual/__tests__/`.
+
 ## 2026-08-06 — Two new surfaces: the What's New sheet and the version history (figs 4.6 / 4.7, N80 / doc 23 Phase 0)
 
 Hard rule 8 has no figure to point at here — the June mockup round predates the

@@ -60,18 +60,19 @@ owns metric definitions. A manual written from prose alone will document behavio
 that was later corrected in review. **Phase 0a exists to resolve this before a
 word of user-facing prose is written.**
 
-**2.2 Some documented behavior is not live.** `engine_params` **v20**
-(earned-step progression) and **v23** (strength-rate band) shipped **inactive**,
-pending owner activation — see PROGRESS and
-`docs/deployment/manual-operations.md`. Per **O3**, the manual documents live
-behavior only.
+**2.2 Some documented behavior is not live.** An `engine_params` version can be
+written, tested, and merged and still be switched off, because activation is a
+separate owner-gated step (`docs/deployment/manual-operations.md`). Today that
+describes **v26 — the doc 21 §6.1 measuring band**, which ships complete and
+inert. Per **O3**, the manual documents live behavior only.
 
-> **Corrected by Phase 0a (2026-08-06).** Both were activated — v20 on
-> 2026-07-11, v23 on 2026-07-12 — and the chain has since run to **v25 active**.
-> The genuinely-inactive behavior is a different one: **v26, the doc 21 §6.1
-> measuring band**. The paragraph above stands as the *argument* (documented
-> behavior can be switched off) but not as the *example*.
-> **[`22b`](./22b-source-map.md) §4 is the authoritative ledger** and was read
+> **Amended 2026-08-06/07** (Phase 0a, then folded in here at Phase 1 per
+> [`22b`](./22b-source-map.md) §8 **O-D**). This paragraph originally named
+> **v20** and **v23** as the inactive pair. Both had in fact been activated —
+> v20 on 2026-07-11, v23 on 2026-07-12 — and the chain has since run to **v25
+> active**. The argument was right and the example was stale, which is the
+> failure mode this whole section is about.
+> **[`22b`](./22b-source-map.md) §4 is the authoritative ledger.** It was read
 > from the live `engine_params` row, not from `supabase/migrations/` — which
 > under-reports the chain, because v22/v24/v25 were micro-bumps with no
 > committed migration.
@@ -120,8 +121,11 @@ manual reader, so the house-style transcription must be recorded in
 | **Import-guard test pattern** — source-text assertion that a hot-path module never imports the schema layer | `src/lib/engine/__tests__/predict.test.ts` (WS-J) | The pattern the manual's performance guard copies |
 | **Docs 10 / 11 / 16 / 17 / 19 / 21** | `docs/` | Sources for the mechanism chapters |
 
-**Not present:** any markdown renderer, any `/guide` route, any search index, any
-manual-maintenance rule. Those are net-new — hence Phases 1–2.
+**Not present when this plan was written:** any renderer, any `/guide` route, any
+search index, any manual-maintenance rule. Those are net-new — hence Phases 1–2.
+Phase 1 has since landed the block model, the section-ID scheme, the length
+budget, the house-styled renderer, and the section/chapter routes; the search
+index and the maintenance rule remain outstanding (Phases 2 and 8).
 
 ---
 
@@ -256,7 +260,8 @@ wants the concept, the evidence, and the operation.
 
 - **What fatigue is in this context** — an accumulating performance decrement, distinct from soreness and from muscle damage, and why it is the thing a deload addresses.
 - **Conceptual purpose** — a deliberate reduction that sheds accumulated fatigue so the next block starts from a real baseline. A valve, not a stimulus.
-- **When one is realistically needed, per the research** — and this is where the chapter earns its keep, because the honest answer is *thinner than the fitness-culture default*. The lone RCT on a **planned mid-cycle** deload (Coleman 2024) found no benefit and a possible strength decrement. So: the app's default (end of a 4–6 week block) is a **[HEURISTIC]** scheduling convention. ⚠️ **Corrected by Phase 0a:** the **MRV-stop rule is not implemented** — doc 10 §3's graded MEV→MAV→MRV ramp and its two-week-at-MRV auto-deload trigger were deliberately deferred (T-A5), and what ships is a **±1 set** workload response (`rules/feedback.ts`) with MEV/MAV/MRV as an advisory classification library. The signals the app really acts on are the **joint-pain gate** (`pain_gate 2` vetoes additions, `pain_cut_gate 3` cuts a set) and the **workload slider** (≥ 8 cuts a set; ≤ 3 with a strong pump adds one). So frame it as: *the app deloads on a schedule, and adjusts your set counts week to week from your own feedback* — not as an automatic deload trigger. See [`22b`](./22b-source-map.md) §7.
+- **When one is realistically needed, per the research** — and this is where the chapter earns its keep, because the honest answer is *thinner than the fitness-culture default*. The lone RCT on a **planned mid-cycle** deload (Coleman 2024) found no benefit and a possible strength decrement. So: the app's default (end of a 4–6 week block) is a **[HEURISTIC]** scheduling convention.
+- **What the app actually acts on**, which is narrower than doc 10 §3 reads. The graded MEV→MAV→MRV ramp and its two-week-at-MRV auto-deload trigger were deliberately deferred (T-A5) and **are not implemented**; what ships is a **±1 set** workload response (`rules/feedback.ts`) with MEV/MAV/MRV as an advisory classification library. The live signals are the **joint-pain gate** (`pain_gate 2` vetoes additions, `pain_cut_gate 3` cuts a set) and the **workload slider** (≥ 8 cuts a set; ≤ 3 with a strong pump adds one). Frame the chapter as *the app deloads on a schedule, and adjusts your set counts week to week from your own feedback* — there is no automatic deload trigger to describe. (Phase 0a correction, folded in at Phase 1; see [`22b`](./22b-source-map.md) §7.)
 - **How to use them in the app** — where the deload week sits in a meso, how prescriptions change (read the live `engine_params` in Phase 0, do not copy the doc-10 defaults blind), that a deload week's sets are **set aside from strength reads** rather than counted as a decline (doc 21 Phase 5), how to shorten or skip one, and what to expect the week after.
 - **Guardrail (doc 10 §9, binding):** a deload is fatigue management, not a proven growth or strength booster. No growth framing anywhere in the chapter.
 
@@ -271,7 +276,7 @@ one that will be missed if not called out.
 - **Why it exists** — the week's RIR ramp is one number for the whole week, and real training has exceptions. Origin case (worth telling, because it explains the design): a live nerve episode where a coach-agreed rehab plan had nowhere to live.
 - **The semantics**, in plain language: an assignment is **absolute** — set it and it wins, leave it unset and the exercise follows the week's ramp. It is **unbounded**, so one lever spans deload → rehab → extra effort. The load is repriced through the normal rep-window path, **symmetrically** — backing off and pushing harder are the same mechanism in opposite directions, not two features.
 - **Use case A — lower the effort (rehab, a niggle, a lift you are protecting).** Assign a higher target RIR; the load reprices down; the sets still count as work and volume, and **a protected block does not read as a decline** — a slot run easier than its week is tagged `BACKED OFF`, dropped from PRs, `best_e1rm` and the strength trend (from both sides, so it can neither set a PR nor raise the bar), kept in volume and adherence, and disclosed in one sentence wherever the number appears. How to unwind it when you are ready.
-  > ⚠️ **Corrected by Phase 0a.** That reassurance is doc 21 **§6.2** (the read-time comparability policy), which **is live**. The **measuring band** (§6.1, `max_measuring_rir`) is a *different* rule — asked at the stamp, *is this a measurement at all* — and it ships **inactive** as v26, so today every set at every RIR is still treated as a measurement. Ch. 8 is fully writable from §6.2; it must not mention the band until v26 activates. [`22b`](./22b-source-map.md) §4.1 ①.
+  > **Source note (Phase 0a, folded in at Phase 1).** That reassurance is doc 21 **§6.2** — the read-time comparability policy, which **is live**. Write the chapter from it. The **measuring band** (§6.1, `max_measuring_rir`) is a *different* rule — asked at the stamp, *is this a measurement at all* — and it ships **inactive** as v26, so today every set at every RIR is still treated as a measurement. Ch. 8 must not mention the band until v26 activates. [`22b`](./22b-source-map.md) §4.1 ①.
 - **Use case B — raise the effort (a muscle the standard ramp does not limit).** The owner's case: systemic fatigue is not the constraint on small isolation work the way it is on heavy compounds, so a week sitting at 3 RIR can leave stimulus unclaimed on those exercises. Assign a lower target RIR. Cover the per-exercise set cap and the honest caveat that this buys stimulus with fatigue.
 - **The scopes** — `THIS WEEK` / `WORKING WEEKS` / `ALL WEEKS` — what each reaches, and specifically how they differ on deload coverage.
 - **Where the lever lives** — the day view and the exercise sheet, plus the planner board's flat column and why a per-week assignment reads `RIR BY WEEK` there instead of being flattened (N78). Phase 0b re-confirms these surfaces post-Batch-32.
@@ -296,7 +301,7 @@ Prose is written from that review, not from the open web.
 - **3 → 0 is a default, not a law**, and where in the app the ramp is set (meso create/edit start → end RIR).
 - **The relationship** — proximity to failure buys stimulus and costs fatigue, but not linearly: gains flatten past roughly 1–2 RIR while fatigue keeps climbing (Refalo 2023). "Closer to failure" is therefore not monotonically better, which is *why* the app ramps rather than sitting at 0.
 - **Ramps as style**, with the trade-off named for each: a conservative high-volume ramp (more sets tolerated, lower per-set fatigue); the standard hypertrophy ramp; a strength-biased pattern (closer to failure on the lifts that matter, effort spared elsewhere — usually expressed as a flatter ramp *plus* per-exercise assignments, which links chapter 8); a flat high-RIR ramp for maintenance or rehab.
-- **How ramp choice interacts with everything else** — set counts, deload timing, and how much of your data is usable as measurement (the measuring band again).
+- **How ramp choice interacts with everything else** — set counts and deload timing. *(The fourth interaction — how much of your data is usable as a strength measurement — belongs here only once v26 activates; see §6.2's source note.)*
 
 **Constraint on the "example programs" ask (open question O7).** Naming
 third-party published programs means making checkable claims about someone else's
@@ -584,20 +589,40 @@ inactive-behavior exclusion list is explicit.
 > `src/content/releases/unreleased.ts` when it changes something a user would
 > notice. Phase 0 did not, and owed no entry.
 
-### Phase 1 — Architecture & one exemplar
+### Phase 1 — Architecture & one exemplar — ✅ **BUILT 2026-08-07, awaiting owner sign-off**
 
 | Scope | Size |
 |---|---|
 | Block model types (`src/content/manual/types.ts`), the section-ID scheme, and the length budget calibrated against real copy. **Hard-rule-8 design pass** recorded in `docs/09-design-changelog.md` before building. Then **one chapter end-to-end** — proposed: **chapter 6 (Effort: RIR and the ramp)**, which exercises headings, glossary terms, tables, callouts, a three-layer mechanism section, cross-links, and a multi-section split | M |
 
+> **Landed.** `src/content/manual/{types,ids,budget,index}.ts` (9 block kinds —
+> `figure` deferred to Phase 2 with its asset policy, 09-changelog 2026-08-07
+> §5); IDs of the form `ug/effort-rir#per-exercise` with a route mapper per
+> manual; the budget **confirmed unchanged at 350 words / 12 blocks** against
+> real copy (six sections, 205–309 words, median 229). The design pass is the
+> 2026-08-07 changelog entry, claiming figs **4.8 / 4.9 / 4.10**. Chapter 6
+> ships as six sections behind `releaseActive("1.1.0")`, rendered by
+> `src/components/manual/ManualBlocks.tsx` at
+> `/more/guide/effort-rir[/<section>]`. [`22a-manual-claims.md`](./22a-manual-claims.md)
+> is open with **22 rows**, all verified against code.
+>
+> **It found one defect in shipped copy** (ledger `D-01`): `GLOSSARY.e1rm`
+> stated the RIR direction backwards. Fixed and pinned in the same PR — surfaced
+> precisely because [§8.1](#81-the-glossary-is-one-source-not-two) forces the
+> manual to render the glossary's own words.
+
 **Exit:** owner has seen the rendered exemplar and signed off on look, depth,
-voice, and section granularity.
+voice, and section granularity. Review path is a Vercel **preview** deploy with
+`NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0` ([`22b`](./22b-source-map.md) §10.1).
 
 ### Phase 2 — Reader infrastructure
 
 | Scope | Size |
 |---|---|
-| Routes (map / chapter contents / **section** / search), the block renderer, section anchors and deep-link marking, prev/next across chapters, breadcrumb-back, related sections, the build-time index + search UI (lazily loaded), link-target validation, and the five content-contract tests from [§8](#8-content-contracts) — plus the three **D3 performance guards**: the import guard, the precache-exclusion assertion, and the section-length budget. More-tab entry row | M–L |
+| The **map** route (fig 4.8) and **search**; deep-link marking, prev/next across chapters, breadcrumb-back, related sections, the build-time index + search UI (lazily loaded), and the remaining content-contract tests from [§8](#8-content-contracts) — plus the two outstanding **D3 performance guards**: the import guard and the precache-exclusion assertion. More-tab entry row, and `GUIDE_SECTION_IDS` populated for doc 23 ([`22b`](./22b-source-map.md) §10.2). The `figure` block and its asset policy (09-changelog 2026-08-07 §5) | M–L |
+
+*(Phase 1 already shipped the chapter-contents and section routes, the block
+renderer, link-target validation, the release gate, and the length budget.)*
 
 **Exit:** the exemplar chapter is reachable, searchable, deep-linkable; CI
 enforces the contracts *and* the performance guards. Everything after this is
