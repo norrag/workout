@@ -76,6 +76,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     auto_match_weights: false,
     role: "user",
     onboarded_at: "2026-01-01T00:00:00Z",
+    last_seen_version: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,

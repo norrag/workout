@@ -4,6 +4,45 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-06 — Session 106: the versioning framework is built, v1.0.0 cut (N80, doc 23 phases 0–6)
+
+Doc 23 went from plan to shipped in one PR. Nothing in the plan needed
+rewriting, which is the useful signal: the two owner-review corrections
+(the `workouts.status` suppression rule and version-keyed gating) were the parts
+that would otherwise have been discovered in code.
+
+- **Phase 0 first, because hard rule 8 says so.** No mockup exists for the sheet
+  or the history page. Both are derived from the house system in a dated
+  09-changelog entry, and figs **4.6** / **4.7** are claimed in the 08 §5 index
+  with an explicit footnote that nothing was drawn for them. The derivation held
+  up: a release entry turned out to be the same object as a More settings row
+  plus a body paragraph, so no new pattern was invented.
+- **What the code forced, and what it didn't.** Only one plan detail changed on
+  contact: `/stats` is not a route (stats hang off a meso, which is ID-bearing),
+  so the allowlist links to `/cycles` instead — exactly the T7 case the doc
+  predicted, arriving from a direction it hadn't named. Everything else built as
+  written.
+- **The invisibility of unreleased work is structural, not a rule.**
+  `src/content/releases/index.ts` does not import `unreleased.ts`. There is no
+  path from a staged entry to `RELEASES`, so the history page cannot show one
+  even if someone wants it to. A test asserts the property, but the property
+  does not depend on the test.
+- **The guard is a real refusal, not a note.** `activate_engine_params` now
+  refuses a `feature`-classified activation whose `announced_in` is missing,
+  unknown, a fix release, or not yet deployed — the same shape as the existing
+  `confirm_version` echo. T10 stops being runbook discipline.
+- **Priming needed a client hop.** The `prime` branch writes from a one-shot
+  effect rather than during the server render: §6.3 is explicit that
+  acknowledgment is never a render side effect, and that reasoning applies to
+  priming for the same reason. It costs one write per account, once.
+- **Remaining / external.** Apply `20260806000002_last_seen_version` to hosted
+  and confirm the backfill; `NEXT_PUBLIC_RELEASE_OVERRIDE` goes on Vercel's
+  Preview scope only, when there is a staged block to review. Both are in
+  `manual-operations.md`.
+- **Next in workstream V:** 1.1.0 = the manuals (doc 23 §11.1), which sets the
+  doc-22 interleave — 22 P0–P2, then 23 P5's `guide` half, then 22's content
+  phases, then the cut.
+
 ## 2026-08-06 — Session 105: versioning plan, owner review round 1 (N80, Batch 35)
 
 Owner reviewed [doc 23](../23-versioning-releases.md), **accepted all eight
