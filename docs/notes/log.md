@@ -4,6 +4,83 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-06 — Session 103: user-manual plan, owner review round 1 (N74, Batch 33)
+
+Owner reviewed [doc 22](../22-user-manual.md), accepted every decision (D1–D5)
+and every open question (O1–O6), and added content, scope, navigation and
+architecture notes plus two real questions. PR #225 had merged and #226 landed
+on top, so the revision came via a fresh branch off `main`. Verbatim notes in the
+backlog appendix as **Batch 33**.
+
+- **Three chapters added** (doc 22 §6, the areas the owner found missing):
+  **deloads** — the concept, plus the honest evidence position (the lone RCT on
+  a *planned mid-cycle* deload found no benefit and a possible strength
+  decrement, so the app's 4–6 week default is a scheduling heuristic while the
+  real signals are the MRV-stop rule the app already measures); **exercise-level
+  RIR** — both directions, the rehab back-off *and* the owner's push-harder case
+  for muscles the systemic ramp doesn't limit; **RIR ramps ↔ training styles**.
+- **The third one needs research the repo doesn't have.** Doc 10 and the
+  coaching guide establish the RIR/fatigue relationship but neither maps ramps to
+  styles nor discusses third-party programs — so chapter 7 gets a **research pass
+  first** (`docs/reviews/…-rir-ramps-and-training-styles.md`, evidence-tagged per
+  doc 10's convention, the pattern of the goal-rate-factor research). Filed as
+  Phase 3d-r. It also raised the one new open question, **O7**: naming real
+  published programs makes checkable third-party claims that go stale and can
+  read as endorsement — recommendation is characteristics-first, named only where
+  the ramp property is documented and citable.
+- **Scope cuts:** admin capabilities and admin-only tools are out of **both**
+  manuals (not even a "these exist" note — the §7.2 inventory now exists purely
+  so Phase 0d knows what to exclude); sign-up/auth is out, since a manual reader
+  already completed it.
+- **Two new copy contracts:** *positive framing* (describe what the app is, not
+  what it isn't — tested, with an allowlist for the places a negative is the
+  honest statement, e.g. "it never deletes logged history") and *plain language*
+  (O4 amendment — "Claude or ChatGPT" not "LLM", "connector"/"plug-in" not "MCP",
+  the latter allowed only where the reader must find that word in their own
+  client's UI).
+- **Navigation re-cut, the biggest structural change.** The owner's
+  "not an untraversable 100-page document" note moves the addressable unit from
+  the chapter to the **section**: chapter routes become contents pages, section
+  routes are the atomic linkable unit, every path to a section is ≤1 tap (map,
+  search, and in-app links all land on section routes), prev/next crosses chapter
+  boundaries so a linear read still works, and a **build-failing section-length
+  budget** (~≤350 words / ≤12 blocks, layer-3 `detail` blocks exempt) enforces it
+  at authoring time instead of leaving it to discipline.
+- **D3's condition is satisfiable at zero launch cost**, which is the useful
+  finding: `sw.ts` already runs `CacheFirst` over `/_next/static/**`, so
+  **cache-on-read rather than precache** gives offline access to anything already
+  opened without adding a byte to install or launch. Backed by three enforced
+  guards — a WS-J-style import guard (nothing outside the manual tree imports
+  manual content; Phase 7 links pass a section *ID*, never a module), a
+  precache-manifest exclusion assertion, and a lazily-fetched search index.
+- **Q: how will the connector find things — RAG?** Answered in §10:
+  **retrieve-then-read over the authored section graph, no vector RAG.** D2 makes
+  chunking an *authorship* product — titled, independently-addressable sections
+  with stable IDs, a length budget, and a related-sections graph are better chunks
+  than any splitter, and at ~130–200 sections a lexical index is competitive while
+  staying deterministic and CI-checkable. Design: a `workout://user-guide-index`
+  resource (the map, a few KB) + `search_manual` + `get_manual_section`, with the
+  glossary as the alias layer and an `app_route` on every hit so the AI hands back
+  a tappable link. Embeddings deferred behind a measured-recall trigger. This
+  **promoted the retrieval phase from optional to required** and moved it ahead of
+  the AI Manual content.
+- **Q: could an admin MCP tool edit the docs?** Answered in §14. Mechanically
+  no — Vercel's filesystem is read-only and rebuilt from git. The two ways to make
+  it work both cost more than they save: a GitHub-write token is a new
+  high-value secret in an app whose threat model has no repo access today *and*
+  bypasses the content contracts; DB-backed content forfeits CI enforcement,
+  offline, and a single source of truth. Recommendation: keep content in the repo
+  (a wording fix is a one-line data change), and hold a narrow **errata overlay**
+  — admin tool writes a dated correction note rendered *beneath* a section, body
+  untouched — in reserve if the latency ever proves to matter.
+
+Plan only; no code. Doc 22 revised throughout, CLAUDE.md's doc-22 entry updated.
+
+> **Housekeeping owed:** the reconciliation sweep found `done (PR #…)` rows whose
+> PRs have merged (#215–#226, incl. N70/N73/N75–N79). Left un-swept deliberately —
+> archiving them is a large, unrelated diff that would bury a docs-plan review.
+> Flagged to the owner; do it as its own pass.
+
 ## 2026-08-06 — Session 102: exercise menu, cycles list, planner editing, concurrent mesos (N75–N79)
 
 Owner handed over five items in one batch (Batch 32). All five built and shipped
