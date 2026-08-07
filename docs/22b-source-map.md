@@ -180,6 +180,11 @@ for those rows, and the **only** sanctioned set of numbers.
 > `params_hash 91887f0f…`, hash-verified — and `e1rm.max_measuring_rir` is
 > still absent, so [§4.1](#41-what-is-not-live) ① holds. The five
 > **ch. 2** rows below were added from that read, per this section's own rule.
+>
+> **Re-read again 2026-08-11** (doc 22 Phase 3e), same call. **Still v25,
+> still `91887f0f…`, still no `max_measuring_rir`.** The four
+> `session_*` / `pump_low` rows below were added from that read, and the
+> **ch. 11** chapter states each of them next to its path (doc 22 §8.2).
 
 | `engine_params` path | Value | Where the manual needs it |
 |---|---|---|
@@ -201,6 +206,10 @@ for those rows, and the **only** sanctioned set of numbers.
 | `mg_set_ceiling` | `20` | ch. 11 — the set-add guard |
 | `workload_high` / `workload_low` | `8` / `3` | ch. 11 — the autoregulation thresholds |
 | `set_add_pump_min` | `6` | ch. 11 — pump only corroborates |
+| `pump_low` | `2` | **ch. 11** — the low-pump-at-the-right-workload hint (a suggestion, never a set change) |
+| `session_dampen_require_both` | `true` | **ch. 11** — the session hold needs **both** signals, not either |
+| `session_fatigue_dampen_threshold` | `8` | **ch. 11** — the fatigue half of that pair |
+| `session_performance_dampen_threshold` | `3` | **ch. 11** — the performance half |
 | `pain_gate` / `pain_cut_gate` | `2` / `3` | ch. 11 — the joint-pain gate, **stated first** |
 | `progression.mode` / `pacing` / `rate_source` | `"earned_step"` / `"macro_rate"` / `"plan"` | ch. 10, ch. 14 |
 | `progression.min_confidence` | `"moderate"` | ch. 10 — the earn gate |
