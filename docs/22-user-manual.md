@@ -909,7 +909,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system — ✅ **BUILT 2026-08-11** | L |
 | **3e** | 11 Why the app asks how it felt · 12 Volume — ✅ **BUILT 2026-08-11** | M |
 | **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression — ✅ **BUILT 2026-08-11**, owner review gate open | L — own review gate |
-| **3g** | 13 Reading your stats · 14 Macrocycle goals | M |
+| **3g** | 13 Reading your stats · 14 Macrocycle goals — ✅ **BUILT 2026-08-11** | M |
 | **3h** | 16 Body data · 17 Prescription details · 19 Your data | M |
 | **3i** | 18 Connecting an AI · 20 Glossary (generated) · 21 Troubleshooting & FAQ | M |
 
@@ -1199,6 +1199,65 @@ contracts green.
 >   contracts that judge what a **reader takes away** — hype, precision,
 >   overclaiming — keep reading the glossary's words too, because the reader
 >   does not care who typed them.
+
+> **3g landed 2026-08-11 — and it is the phase where the audit's own reading of
+> a screen was wrong twice.** Chapters **13** (Reading your stats) and **14**
+> (Macrocycle goals), eleven sections, 148–305 words against the 350 budget; the
+> corpus median moves 215 → 209 over 78 sections, and ch. 6's mechanism section
+> (323) is still the ceiling-brusher after six content phases.
+>
+> **`D-15` — the macrocycle target band is computed, stored, and never shown.**
+> Doc 22 §5's own ch. 14 brief is *"the personalized target band and recommended
+> timeframe; why it is a conservative band"*, and
+> [`22c`](./22c-app-inventory.md) §B2.2 describes the create card as showing
+> `EST. STRENGTH` and *"a model band"*. **It shows neither.** `YOUR TARGET`, the
+> rate, the rationale and the model band are hidden by **N54** (owner,
+> 2026-07-11) on all three surfaces that would print them — the create form, the
+> edit form, and the macro Overview's `REALISTIC TARGET` card. `planMacrocycle`
+> still runs, `macrocycles.target_*` still persists, and the band still does two
+> jobs the reader feels: it paces how fast the weights climb, and it is what the
+> closeout grades against. So ch. 14 §3 documents a number **with no screen to
+> point at**, and names the two surfaces that do return it — a connected
+> assistant, and a completed macro's `RETROSPECTIVE` band. The second half of
+> the same finding: `macro_target.present: "conservative_end"` has **no code
+> consumer at all** — `COACHING_GUIDE`'s prose is its only reader, so *"you see
+> the conservative end"* is a rule about what an AI tells you. Both corrected in
+> [`22c`](./22c-app-inventory.md) and [`22b`](./22b-source-map.md) §4.2.
+>
+> **`D-16` closes the thread `D-12` opened.** `D-12` found the audit describing
+> a grid N10 had removed; this found the parameter that grid was the only reader
+> of — `key_lifts.n` / `selection`, live on v25, with no consumer anywhere in the
+> repo. [`22b`](./22b-source-map.md) §4.2 had it filed under ch. 13, and
+> [`22c`](./22c-app-inventory.md) §C2 recommended adding `KEY LIFTS` to the
+> glossary. Ch. 13 claims nothing about key lifts, and the §C2 row is closed
+> rather than re-sited: a card for a term no screen shows is the §C1-a defect
+> that table exists to shrink.
+>
+> **Ch. 13 is built around what a number is being compared against**, because
+> that is what the questions in `docs/notes/` are actually about. Its last two
+> sections carry the three exclusions (deloads, backed-off sessions, mis-log
+> outliers) with the disclosure line that explains a missing lift, and then the
+> two live surprises: **sets logged in a workout you have open count
+> immediately**, and **stats show each estimate undecayed while the prescription
+> path fades older sessions** ([`22b`](./22b-source-map.md) §5.6's PH39 note —
+> the one workstream-A passage that is still true and still confusing).
+>
+> **The asymmetry in the back-off policy is stated as the reassurance it is.**
+> A backed-off session leaves the strength trend, `best_e1rm` and the PR views,
+> and **stays** in volume, weight PRs and session-volume PRs — because those are
+> observations of what you lifted rather than estimates of what you could, and
+> the app holds the second kind to a stricter bar. **`est_strength` is
+> rendered**, which empties `PENDING_GLOSSARY_TERMS` outright: every one of the
+> fifteen glossary keys now resolves to a `term` block somewhere in the guide,
+> five phases ahead of ch. 20 generating them.
+>
+> **46 new [`22a`](./22a-manual-claims.md) rows** across the two chapters, plus
+> two deliberately-absent tables. The live row was **re-read a fourth time**
+> (`get_engine_params(25)`: still v25, `params_hash 91887f0f…`, hash-verified,
+> `max_measuring_rir` still absent) — and this read produced two *absences*
+> rather than values: `strength` is not on the row at all, so ch. 13's trend
+> runs on the engine's own defaults (`3` · `3` · `1.5`%), which is what its
+> layer 3 says.
 
 ### Phase 4 — User Guide review gate
 

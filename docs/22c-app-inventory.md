@@ -220,15 +220,32 @@ Empty state: `nothing here`.
 
 ### B2.2 `/cycles/new` — create a macrocycle
 
-Fields: `NAME` · `GOAL` (`HYPERTROPHY` / `STRENGTH` / `MAINTAIN`) ·
+Fields: `NAME` · `GOAL` (`HYPERTROPHY` / `STRENGTH` / `CUT` / `MAINTAIN`) ·
 `DURATION` (presets + `CUSTOM`, in `MONTHS`) · `MESOCYCLE LENGTH`
 (`incl. deload`, with a `SUGGESTED` marker) → `CREATE MACROCYCLE`.
 
-The **create engine card** shows what the engine derived: `PLAN`
-(`ACCUMULATE` / `INTENSIFY` / `PEAK`), `EST. STRENGTH`, a `model band`, and —
-when a previous block supplies it — `LAST BLOCK MEASURED` priming. Ch. 14 must
-say plainly that **the engine computes the target, the timeframe, the block
-count and the phases**; the reader chooses the goal and the length.
+The **create engine card** shows `PLAN` — how many blocks fit, and the
+`ACCUMULATE` / `INTENSIFY` / `PEAK` phase strip — plus, when a previous block
+supplies it, the `LAST BLOCK MEASURED` priming row (`+n%/MO EST. STRENGTH`).
+
+> **Corrected 2026-08-11 (doc 22 Phase 3g).** This section listed **four**
+> goals as three (`CUT` was missing), and described the card as showing
+> `EST. STRENGTH` and *"a model band"*. **It shows neither.** The `YOUR TARGET`
+> range, the per-month rate, the rationale line and the model band are hidden
+> by **N54** (owner, 2026-07-11 — rolled back until N43's v23 band is
+> trustworthy) on all three surfaces that would print them:
+> `CreateMacroForm.tsx:204`, `EditMacroForm.tsx:234`, and this macro's own
+> Overview (`macro/[macroId]/page.tsx:79`, `:178` — the `REALISTIC TARGET`
+> card). `EST. STRENGTH` on this screen is only the suffix on the
+> `LAST BLOCK MEASURED` row, which survives because it is measured rather than
+> modelled. Recorded as [`22a`](./22a-manual-claims.md) **`D-15`**.
+>
+> **The brief below still holds, with one word changed.** The engine does
+> compute the target, the timeframe, the block count and the phases, and the
+> reader chooses the goal and the lengths — but ch. 14 cannot tell the reader
+> to *look* at the target, because no screen prints it. The band reaches a user
+> through the connector (`formatMacroSummary.target`) and through a completed
+> macro's `RETROSPECTIVE` band, and that is how ch. 14 states it.
 
 ### B2.3 `/cycles/macro/[macroId]`
 
@@ -594,7 +611,7 @@ defined only in the manual. Recommendation in the last column.
 | **Phases**: `ACCUMULATE` / `INTENSIFY` / `PEAK` | create macro, meso details | 14 | **add to glossary** |
 | **`ADHERENCE`** | meso + macro stats | 13 | **add to glossary** |
 | **`BALANCE CHECK`**, `PUSH` / `PULL` / `LEGS` | meso Balance | 13 | manual-only; **advisory only** per doc 10 §9 |
-| **`KEY LIFTS`** | ~~`TOP SET BY WEEK — KEY LIFTS`~~ — **that grid was dropped by N10**; re-site this row before ch. 13 (§B2.4, corrected 2026-08-11) | 13 | **add to glossary** (auto-selected: 5, by frequency) — against whatever surface still renders them |
+| ~~**`KEY LIFTS`**~~ | **Closed 2026-08-11 (Phase 3g).** Nothing renders the term. The grid went with N10; `key_lifts.n` / `selection` remain on the live row with **no consumer in the repo** — schema plus two removal comments ([`22a`](./22a-manual-claims.md) `D-16`) | — | **no glossary entry.** A card for a term no screen shows is the [`22c`](./22c-app-inventory.md) §C1-a defect this table exists to shrink. Revisit if a key-lifts surface returns |
 | **`VOLUME PR`** / `BEST SESSION VOL` | exercise Overview | 13 | manual-only |
 | **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | **add to glossary** |
 | **`MEASURED RMR`** (`KCAL/DAY`) | macro Overview | 16 | manual-only |
