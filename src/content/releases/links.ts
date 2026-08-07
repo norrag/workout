@@ -146,6 +146,23 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/exercises-and-templates#your-own-exercises",
   "ug/exercises-and-templates#templates",
   "ug/exercises-and-templates#sharing-by-code",
+  // ch. 16 — Body data (Phase 3h)
+  "ug/body-data#two-kinds-of-bodyweight",
+  "ug/body-data#body-fat",
+  "ug/body-data#importing-scans",
+  "ug/body-data#comparing-two-scans",
+  "ug/body-data#what-body-data-changes",
+  // ch. 17 — Prescription details (Phase 3h)
+  "ug/prescription-details#the-strip",
+  "ug/prescription-details#opening-the-details",
+  "ug/prescription-details#when-a-prescription-changes",
+  "ug/prescription-details#who-writes-the-numbers",
+  // ch. 19 — Your data (Phase 3h)
+  "ug/your-data#what-is-stored",
+  "ug/your-data#taking-a-copy",
+  "ug/your-data#deleting-your-account",
+  "ug/your-data#live-reads-and-queued-logging",
+  "ug/your-data#seeing-what-changed",
 ];
 
 export function isGuideSectionId(id: string): boolean {
