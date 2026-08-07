@@ -68,7 +68,7 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   },
   volume_landmarks: {
     label: "MEV / MRV",
-    body: "The weekly working-set band per muscle. MEV is the floor — the least volume that still drives progress; MRV is the ceiling — the most you can recover from. Weekly sets steer between them off your workload, pump, and joint-pain feedback.",
+    body: "The weekly set band per muscle. MEV — minimum effective volume — is the floor: the least that still progresses you. MRV — maximum recoverable volume — is the ceiling: the most you can recover from. Sets steer between them off your workload, pump, and joint-pain feedback.",
   },
   fractional_sets: {
     label: "HOW SETS ARE COUNTED",

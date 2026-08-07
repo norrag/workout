@@ -50,6 +50,15 @@ Scheduled into **doc 22 Phase 7a**, which already owes the `InfoDot` vs
 manual-link ruling — three affordances, one grammar, decided together. The
 manual's stopgap needs no app change and shipped here (§8.4c rule 2).
 
+### D-11 — the card the fix rendered didn't define its own terms
+
+Rendering `volume_landmarks` for rule 2 above surfaced a defect in the card
+itself: `GLOSSARY.volume_landmarks` used `MEV`/`MRV` without ever spelling
+either out — `D-02`'s abbreviation defect, in a card that predates the fix.
+Body now spells both out within the 280-char cap, and `glossary.test.ts`
+gained a second abbreviation check generalizing `D-02`'s `e?1RM` one, so the
+next bare abbreviation fails CI rather than waiting for review to catch it.
+
 ## 2026-08-10 — doc 22 Phase 3b: planning a block, and the library (N74)
 
 Chapters **4 — Planning a mesocycle** and **15 — Exercises & templates**, six

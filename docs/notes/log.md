@@ -4,6 +4,21 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 111 (cont.): the MEV/MRV card itself was the gap (D-11)
+
+One more note off round 4, on the fix rather than the chapter: rendering
+`volume_landmarks` at first use surfaced that the card never spells out what
+`MEV` and `MRV` stand for — the same abbreviation defect `D-02` fixed on
+`e1rm`, sitting in a glossary entry `D-02`'s fix predated.
+
+- **Fixed**: body now reads *"MEV — minimum effective volume — is the
+  floor… MRV — maximum recoverable volume — is the ceiling…"*, trimmed to fit
+  the 280-character non-explainer cap.
+- **Generalized the test rather than just fixing the card.**
+  `glossary.test.ts`'s abbreviation check only matched `e?1RM`. Added a second
+  check for `MEV`/`MRV` so the next term with a bare abbreviation fails CI
+  instead of waiting for a reader to notice.
+
 ## 2026-08-11 — Session 111 (cont.): Phase 3b owner review round 4 (N74)
 
 Three notes on ch. 4, all folded in and generalized as **doc 22 §8.4c** so they

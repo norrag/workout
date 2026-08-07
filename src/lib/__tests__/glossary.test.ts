@@ -60,6 +60,28 @@ describe("glossary", () => {
     }
   });
 
+  // D-11: GLOSSARY.volume_landmarks used MEV/MRV without spelling either out —
+  // the same defect D-02 fixed on e1RM, in a card the abbreviation check above
+  // never covered. Generalized so the next abbreviated term is caught by a
+  // test rather than by re-reading the card in review.
+  it("spells out MEV and MRV wherever they appear", () => {
+    for (const [key, entry] of entries) {
+      const text = `${entry.label} ${entry.body}`;
+      if (/\bMEV\b/.test(text)) {
+        expect(
+          text.toLowerCase(),
+          `${key} uses "MEV" without spelling it out`,
+        ).toContain("minimum effective volume");
+      }
+      if (/\bMRV\b/.test(text)) {
+        expect(
+          text.toLowerCase(),
+          `${key} uses "MRV" without spelling it out`,
+        ).toContain("maximum recoverable volume");
+      }
+    }
+  });
+
   // doc 22 Phase 1 found this clause inverted. e1RM rises with effective reps
   // (= reps + RIR), so at the same weight × reps the set with reps LEFT implies
   // the greater strength — which is why the doc 21 §2 restamp moved every
