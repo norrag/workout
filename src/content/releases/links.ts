@@ -88,6 +88,18 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/effort-rir#why-honesty-matters",
   "ug/effort-rir#missing-the-ask",
   "ug/effort-rir#per-exercise",
+  // ch. 11 — Why the app asks how it felt (Phase 3e)
+  "ug/how-it-felt#what-your-answers-do",
+  "ug/how-it-felt#joint-pain-first",
+  "ug/how-it-felt#workload",
+  "ug/how-it-felt#pump-and-soreness",
+  "ug/how-it-felt#the-session-questions",
+  // ch. 12 — Volume (Phase 3e)
+  "ug/volume#what-volume-means-here",
+  "ug/volume#why-a-set-can-count-as-half",
+  "ug/volume#the-band",
+  "ug/volume#where-your-sets-show-up",
+  "ug/volume#weight-lifted-is-a-different-number",
   // ch. 15 — Exercises & templates (Phase 3b)
   "ug/exercises-and-templates#finding-an-exercise",
   "ug/exercises-and-templates#what-an-exercise-remembers",

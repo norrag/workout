@@ -6,9 +6,9 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3c with them** — chapters
-1, 2, 3, 4, 5, 6 and 15 are written, so the User Guide is seven chapters of
-twenty-one.
+**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3c + 3e with them** —
+chapters 1, 2, 3, 4, 5, 6, 11, 12 and 15 are written, so the User Guide is nine
+chapters of twenty-one.
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
@@ -860,7 +860,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | **3c** | 5 Training a session — ✅ **BUILT 2026-08-11** | M |
 | **3d-r** | **Research pass** for chapter 7 → `docs/reviews/2026-08-xx-rir-ramps-and-training-styles.md`, evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) | M |
 | **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system | L |
-| **3e** | 11 Why the app asks how it felt · 12 Volume | M |
+| **3e** | 11 Why the app asks how it felt · 12 Volume — ✅ **BUILT 2026-08-11** | M |
 | **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression | L — own review gate |
 | **3g** | 13 Reading your stats · 14 Macrocycle goals | M |
 | **3h** | 16 Body data · 17 Prescription details · 19 Your data | M |
@@ -964,6 +964,50 @@ contracts green.
 > rule 4). **31 new [`22a`](./22a-manual-claims.md) rows and no new defects** —
 > worth recording, because this screen has been through more review passes than
 > any other in the app.
+
+> **3e landed 2026-08-11, out of sequence and deliberately.** Chapters **11**
+> (Why the app asks how it felt) and **12** (Volume), five sections each,
+> 157–227 words against the 350 budget; the corpus median holds at 215 over 45
+> sections. 3d is gated on the 3d-r research pass ([§6.3](#63-rir-ramps-and-training-styles)),
+> and these two are the pair that ch. 5 and ch. 4 were already handing off to —
+> so taking them next closed a real forward debt rather than opening one.
+>
+> **The ±1 model is what these chapters document.** Doc 10 §3's graded
+> MEV→MAV→MRV volume ramp and its two-week-at-MRV auto-deload trigger were
+> deferred (T-A5) and are not implemented; [`22b`](./22b-source-map.md) §7 names
+> this as one of the two spec-vs-code gaps that must be written from the code.
+> Ch. 11 therefore describes one set off, one set on, or hold — and no automatic
+> deload — while ch. 12 keeps MEV/MAV/MRV in the advisory role the code gives
+> them.
+>
+> **Three things the chapters state that the specs do not.** The set-add branch
+> needs *four* conditions met at once, not two. `session_dampen_require_both` is
+> `true` on the live row, so a hard-but-strong session is **not** dampened — the
+> hold needs a wiped-out reading **and** a poor one. And volume's logged counts
+> apply a **hard-set filter** (non-warm-up, ≤ 4 reps in reserve, unreported
+> counting) that is baked into the SQL view rather than into `engine_params`,
+> which is exactly the kind of rule a spec-derived manual would have missed.
+>
+> The **pending-terms ledger shrank by three** — `pump`, `workload` and
+> `fractional_sets` are now rendered — leaving only `deload` (3d),
+> `e1rm_confidence` (3f) and `est_strength` (3g), each with the chapter that
+> owes it. **Four parameters were added to [`22b`](./22b-source-map.md) §4.2**
+> from a fresh read of the live row (still v25, hash-verified). Ch. 5's forward
+> debt is paid: its feedback section now links into ch. 11.
+>
+> **One finding, `D-12`:** [`22c`](./22c-app-inventory.md) §B2.4 listed
+> `TOP SET BY WEEK — KEY LIFTS` on the meso stats tabs; N10 removed that grid on
+> 2026-07-03. Corrected in 22c, and flagged in its §C2 because the glossary
+> recommendation attached to `KEY LIFTS` rests on a screen that no longer shows
+> them — which **ch. 13** would otherwise have inherited.
+>
+> **One contract-machinery change.** [§8.2](#82-the-honesty-contract)'s
+> "a current value carries its parameter path" check recognised **dotted** paths
+> only, and several live parameters sit at the top level of the row
+> (`pain_gate`, `workload_high`, `min_sets`). A bare identifier now counts as a
+> citation when — and only when — the schema resolves it, so the check reaches
+> the parameters these chapters actually cite. The dotted-path existence
+> assertion is untouched.
 
 ### Phase 4 — User Guide review gate
 

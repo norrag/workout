@@ -28,7 +28,8 @@
 //     propagation); this chapter owns the session's own controls — a set
 //     skipped, a set added, weights reset
 //   - ch. 11 owns what the feedback does; §5 here says when it is asked and
-//     what each question means. The typed cross-link is owed when ch. 11 lands
+//     what each question means, and links out to it (the cross-link landed with
+//     ch. 11 in Phase 3e, which is when its target first resolved)
 //   - ch. 17 owns the prescription strip's three layers and the details sheet;
 //     §1 names the strip and hands off
 
@@ -152,7 +153,7 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         },
         {
           kind: "para",
-          text: "Tap any chip to open that day. It stays open as you move around, so stepping back through last week's sessions is a chip a tap, not a trip through the menus.",
+          text: "Tap any chip to open that day. The panel stays open as you move around, so stepping back through last week's sessions is one chip at a time rather than a trip out through the menus.",
         },
         { kind: "heading", text: "Days that have not been built yet" },
         {
@@ -382,7 +383,9 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
           text: [
             "Everything in between is left alone. The sheet's own subtitle says where the answers land: ",
             { ui: "FEEDS W4 TARGETS" },
-            " — next week's set counts for that muscle, on this day.",
+            " — ",
+            { to: "ug/how-it-felt#what-your-answers-do", text: "next week's set counts" },
+            " for that muscle, on this day.",
           ],
         },
         { kind: "heading", text: "Answering it later, or changing it" },

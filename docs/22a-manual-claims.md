@@ -294,10 +294,88 @@ before doc 22 was written, and N68 changed what a log tap *does*.
 |---|---|
 | What the prescription strip's why lines and `COACH` line are, and what Prescription details shows | **Ch. 17's** subject (doc 19's three layers, N75). Ch. 5 says where the strip is, that its first line opens the working, and stops — and it must stay that way while the coaching line's serving mode is unconfirmed ([`22b`](./22b-source-map.md) §8 **O-A**) |
 | What the RIR box means, and what a set above or below the ask does to next week | Ch. 6 owns both (`C-rep-01`…`03`, `C-miss-01`/`02`). Ch. 5 links into it twice rather than restating the mechanic |
-| What the app does with soreness, pump and workload | **Ch. 11's** subject. §5 here covers when it is asked and what each question means; the typed cross-link is owed when ch. 11 lands (Phase 3e) |
+| What the app does with soreness, pump and workload | **Ch. 11's** subject. §5 here covers when it is asked and what each question means, and links out to `ug/how-it-felt#what-your-answers-do` — the cross-link landed with ch. 11 in Phase 3e, which is when its target first resolved |
 | Swapping, adding, reordering or removing an exercise, and `Repeat this change on this day in future weeks` | Ch. 4 owns editing a running block (`C-plan-21`/`22`) — those write the **plan**, not the session. Ch. 5 names them in one callout and links |
 | The `Set type` row and drop sets | The row is hidden (P18, owner 2026-07-02); the data model stays dormant. Documenting it would describe a feature the reader cannot reach (§8.4) |
 | The bodyweight chip on a bodyweight exercise's card | Ch. 16 (Body data) owns bodyweight, and ch. 15 owns the three load meanings (`C-lib-16`). Ch. 5 would be the third place to explain the same thing |
+
+---
+
+## User Guide ch. 11 — Why the app asks how it felt (`ug/how-it-felt`)
+
+Phase 3e. Verified against the repo at `2372056` and the **live v25 row**, re-read
+on 2026-08-11 via `get_engine_params(25)` — still active, `params_hash
+91887f0f…`, hash-verified. The four parameters this chapter states that
+[`22b`](./22b-source-map.md) §4.2 did not yet carry (`pump_low`,
+`session_dampen_require_both`, `session_fatigue_dampen_threshold`,
+`session_performance_dampen_threshold`) were added there under that section's
+own rule.
+
+> **The chapter documents the ±1 model, which is what ships.** Doc 10 §3's
+> graded MEV→MAV→MRV ramp and its two-week-at-MRV auto-deload were deferred
+> (T-A5) and are not implemented ([`22b`](./22b-source-map.md) §7). No sentence
+> in this chapter describes a volume ramp or an automatic deload trigger.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-fbk-01` | `ug/how-it-felt#what-your-answers-do` | Feedback moves **set counts**, never the weight directly: `modulateFromFeedback` returns a `setDelta` of −1, 0 or +1, and the load comes from the anchor path | `engine/rules/feedback.ts::modulateFromFeedback` (its `setDelta` is a three-value union — one off, one on, or hold); `engine/index.ts:582` (`clampSets(sets + mod.setDelta, params)`) | ✓ 2026-08-11 |
+| `C-fbk-02` | `ug/how-it-felt#what-your-answers-do` | The per-muscle answers reach the **same day slot in the following week**, since a week is generated from its own counterpart in the week before | `queries/progression.ts:380–402` (feedback for week N's workout feeds week N+1's same-day generation); same slot keying ch. 3 states (`C-cyc-03`) | ✓ 2026-08-11 |
+| `C-fbk-03` | `ug/how-it-felt#what-your-answers-do` | Wherever an answer moved a number, the prescription strip says which one — the engine's own note is rendered as a plain-language why line | `lib/prescription-narrative.ts:234–252` (a why line per feedback cause); the notes come from `modulateFromFeedback` | ✓ 2026-08-11 |
+| `C-fbk-04` | `ug/how-it-felt#what-your-answers-do` | Unanswered feedback holds: with no `exerciseFeedback` every branch is skipped and `setDelta` stays 0 | `feedback.ts` (every predicate is `fb?.x != null && …`) | ✓ 2026-08-11 |
+| `C-fbk-05` | `ug/how-it-felt#joint-pain-first` | Joint pain is evaluated **first and unconditionally** — the pain branches are checked before workload or pump are read at all | `feedback.ts` (`painCuts` → `else if (workloadHot)` → `else if (workloadEasy && pumpGood…)`), the doc 10 §3 "step 0" ordering | ✓ 2026-08-11 |
+| `C-fbk-06` | `ug/how-it-felt#joint-pain-first` | At `pain_gate` (**2**, `Moderate`) an added set is vetoed and a warranted weight increase is held at the previously handled load; at `pain_cut_gate` (**3**, `High`) a set is removed and substitution is suggested | `feedback.ts` (`painGated`, `painVetoesAdd`, `painCuts`); `engine/index.ts:540`, `:590` (the gate can only hold, never lift); values from the live v25 row | ✓ 2026-08-11 |
+| `C-fbk-07` | `ug/how-it-felt#joint-pain-first` | The four buttons are `None` · `Low` · `Moderate` · `High`, scored 0–3 | `DayView.tsx:2810` (`PAIN_OPTIONS`); `engine/types.ts:28` (`jointPain` 0–3). Same control ch. 5 names (`C-fb-03`) | ✓ 2026-08-11 |
+| `C-fbk-08` | `ug/how-it-felt#workload` | Workload is the primary set-count signal: at or above `workload_high` (**8**) a set is removed; at or below `workload_low` (**3**) a set becomes eligible; between them the count holds | `feedback.ts` (`workloadHot` / `workloadEasy`); live v25 | ✓ 2026-08-11 |
+| `C-fbk-09` | `ug/how-it-felt#workload` (layer 3) | Set counts are clamped to `min_sets` (**2**) and `max_sets_per_exercise` (**6**) whatever the feedback says | `engine/index.ts:1257` (`clampSets`); live v25 | ✓ 2026-08-11 |
+| `C-fbk-10` | `ug/how-it-felt#pump-and-soreness` | A set is added only when **all** of: workload easy, pump ≥ `set_add_pump_min` (**6**), the block's goal is growth (`gain` / `hypertrophy`), and the muscle's weekly sets are under `mg_set_ceiling` (**20**) — and never over a pain veto | `feedback.ts` (the `workloadEasy && pumpGood && goalType && muscleGroupWeeklySets < mg_set_ceiling` branch, with `painVetoesAdd` inside it); live v25 | ✓ 2026-08-11 |
+| `C-fbk-11` | `ug/how-it-felt#pump-and-soreness` | Pump can never move a set on its own — it only corroborates an easy session; a pump at or below `pump_low` (**2**) at an on-target workload produces the change-the-movement suggestion instead | `feedback.ts` (`pumpGood` appears only inside the add branch; the `pumpLow && workloadOnTarget` branch sets no delta); `prescription-narrative.ts:252` | ✓ 2026-08-11 |
+| `C-fbk-12` | `ug/how-it-felt#pump-and-soreness` | **Soreness is recorded, not read by the engine.** The engine's exercise-feedback input is `{jointPain, pump, workload}`; soreness and its duration are stored on the feedback row and surfaced to the connector | `engine/types.ts:27–31` (`exerciseFeedbackInputSchema`); `queries/logging.ts:1279–1312` (stored); `mcp/envelope.ts:28` (exposed as a 0–10 scale) | ✓ 2026-08-11 |
+| `C-fbk-13` | `ug/how-it-felt#pump-and-soreness` (layer 3) | The ceiling the add-branch checks is counted the same fractional way as every other volume number | `queries/progression.ts:243–265` (`weeklySetsByGroup` → 1.0 primary / 0.5 secondary); same counting rule as `C-vol-02` | ✓ 2026-08-11 |
+| `C-fbk-14` | `ug/how-it-felt#the-session-questions` | The session sliders act on the **weight**, not the sets: a dampened session holds a warranted increase at the load already handled | `feedback.ts` (`sessionDampened`); `engine/index.ts:539–541`, `:590` | ✓ 2026-08-11 |
+| `C-fbk-15` | `ug/how-it-felt#the-session-questions` | The hold needs **both** signals — fatigue ≥ `session_fatigue_dampen_threshold` (**8**) **and** performance ≤ `session_performance_dampen_threshold` (**3**) — because `session_dampen_require_both` is `true` on the live row | `feedback.ts` (`session_dampen_require_both ? fatigueHigh && performancePoor : …`); live v25 | ✓ 2026-08-11 |
+| `C-fbk-16` | `ug/how-it-felt#the-session-questions` | A hold keeps the handled load and re-derives the reps so the ask stays internally consistent — it never lowers the weight | `engine/index.ts:531–552` (`gateHeld`, `hold_rep_consistent: true` on v25), `:588–592` (rounding may not lift a held weight) | ✓ 2026-08-11 |
+| `C-fbk-17` | `ug/how-it-felt#the-session-questions` | `Effort` is stored with the session and read back by the connector and the explanation payload, and is not one of the two signals the hold is decided from | `engine/rules/feedback.ts` (reads `overallFatigue` / `performanceRating` only); `queries/logging.ts:1435–1441`; `mcp/tools/coaching.ts:266`; `lib/llm/explanations.ts:438`, `:567` | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 11
+
+| Not claimed | Why |
+|---|---|
+| A graded MEV→MAV→MRV volume ramp, or an automatic deload when a muscle sits at MRV | **Not implemented** — deferred as T-A5, so doc 10 §3 is aspirational on this one point ([`22b`](./22b-source-map.md) §7). The chapter describes the ±1 model that ships |
+| What MEV / MAV / MRV are, and where the band comes from | Ch. 12 owns it. Ch. 11 names the ceiling in words and links |
+| How the weight itself is chosen when nothing is held | Ch. 10's subject. Ch. 11 stops at *the answers move sets, and a rough day can hold a rise* |
+| Where the feedback sheets are and what each control looks like | Ch. 5 owns the surface (`C-fb-01`…`05`) |
+
+---
+
+## User Guide ch. 12 — Volume (`ug/volume`)
+
+Phase 3e. Verified against the repo at `2372056` and the live v25 row.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-vol-01` | `ug/volume#what-volume-means-here` | Volume is counted as **working sets per muscle per week**, and the planner preview, the stats matrix and the engine's ceiling check all fold through the one function | `engine/volume.ts::fractionalSetCount` — read by `PlannerBoard` (`C-plan-12`), `queries/volume-projection.ts::weightWeekMuscleSets`, and `queries/progression.ts::weeklySetsByGroup`; CLAUDE.md conventions ("one counting definition") | ✓ 2026-08-11 |
+| `C-vol-01a` | `ug/volume#what-volume-means-here` (layer 3) | A logged set credits volume when it is **not a warm-up** and was taken to **4 or fewer reps in reserve**, with an unreported RIR counting; planned counts have no such filter | `supabase/migrations/20260702000001_v_meso_week_muscle_sets.sql` (`logged_hard_sets`: `not is_warmup and (rir_reported is null or rir_reported <= 4)`, the §2 rule baked into SQL); `volume-projection.ts:78` reads `logged_hard_sets` for the logged cells | ✓ 2026-08-11 |
+| `C-vol-02` | `ug/volume#why-a-set-can-count-as-half` | An exercise credits **1.0 to each primary muscle and 0.5 to each secondary**, which is why counts carry halves | `engine/volume.ts::volumeCountingWeights` (`volume.direct ?? 1.0` / `volume.indirect ?? 0.5` — both keys absent from the v25 row, so the code defaults apply) + `::fractionalSetCount` | ✓ 2026-08-11 |
+| `C-vol-03` | `ug/volume#why-a-set-can-count-as-half` | Which muscles an exercise credits, and in which role, comes from the exercise's own primary/secondary links — the user's to set on a custom exercise | `exercise_muscle_groups.role`; `exercises/new/NewExerciseForm.tsx` (one primary, up to four secondaries — `C-lib-14`/`15`) | ✓ 2026-08-11 |
+| `C-vol-04` | `ug/volume#the-band` | Each muscle's band is `[MEV, MAV, MRV]` from `volume.landmarks`, scaled by `volume.experience_scale` (**0.7** beginner / **1.0** intermediate / **1.1** advanced) and rounded to whole sets | `engine/volume.ts::muscleVolumeLandmark`; live v25 (e.g. chest `[8, 20, 22]`, hamstrings `[6, 16, 20]`) | ✓ 2026-08-11 |
+| `C-vol-05` | `ug/volume#the-band` | MAV is the top of the productive zone: below MEV is too little, MEV–MAV is the productive zone, MAV–MRV is productive but near the recoverable ceiling, above MRV is more than can be recovered from | `engine/volume.ts::classifyVolume` + `ZONE_NOTE` (the four zones, in those words) | ✓ 2026-08-11 |
+| `C-vol-06` | `ug/volume#the-band` | **Ten** muscle groups carry a band; a muscle without one is still counted and shown, it simply has no range to be judged against | live v25 `volume.landmarks` (abs, back, chest, quads, biceps, calves, glutes, triceps, shoulders, hamstrings); `muscleVolumeLandmark` returns `null` otherwise | ✓ 2026-08-11 |
+| `C-vol-07` | `ug/volume#the-band` | The landmarks are heuristics carrying large individual variance — advisory, never a prescription | `engine/volume.ts` module header, quoting doc 10 §9; the same guardrail `GLOSSARY.volume_landmarks` carries | ✓ 2026-08-11 |
+| `C-vol-08` | `ug/volume#where-your-sets-show-up` | The planner board's preview is the **only screen** that calls a count high or low; the meso stats matrix reports counts without judging them | `PlannerBoard.tsx:1072–1125` (`UNDER MEV` / `OVER MRV`) vs `components/stats/MesoStatsViews.tsx:39–120` (no zone rendering). *(The connector's `get_muscle_group_volume` also assesses — that is a tool, not a screen)* | ✓ 2026-08-11 |
+| `C-vol-09` | `ug/volume#where-your-sets-show-up` | `SETS / WEEK` is a muscle × week grid — logged counts behind you, the current week accented, and future weeks marked `AUTOREGULATED PLAN` | `MesoStatsViews.tsx:39–120`; `queries/stats.ts::buildVolumeMatrix` (568–581, the `logged` / `current` / `planned` cell kinds) | ✓ 2026-08-11 |
+| `C-vol-10` | `ug/volume#where-your-sets-show-up` | `AVG SETS / WEEK — PLANNED` and the `PUSH` / `PULL` / `LEGS` cards average over **non-deload** weeks | `queries/stats.ts::buildBalance` (626–648, `filter(({w}) => !w.is_deload)`) | ✓ 2026-08-11 |
+| `C-vol-11` | `ug/volume#where-your-sets-show-up` | `BALANCE CHECK` states exactly two things — the push:pull ratio and the lowest-volume muscle — and makes no claim beyond them | `queries/stats.ts::buildBalance` (655–665, the two `parts`); doc 10 §9 makes push:pull advisory with no posture or injury claim | ✓ 2026-08-11 |
+| `C-vol-12` | `ug/volume#weight-lifted-is-a-different-number` | `TOTAL VOLUME · LB` is `sum(weight × reps)` over non-warm-up sets — a different quantity from the set counts the band judges | `supabase/migrations/20260616000004_adherence_rule.sql:26`, `:57` (`v_meso_summary` / `v_macro_summary`); rendered at `cycles/macro/[macroId]/page.tsx:387` | ✓ 2026-08-11 |
+| `C-vol-13` | `ug/volume#weight-lifted-is-a-different-number` | `VOLUME PR` is the best single set's `weight × reps`; `BEST SESSION VOL` is the best session total for that exercise | `supabase/migrations/20260615000004_exercise_overview.sql:24–52`; rendered at `exercises/[exerciseId]/page.tsx:216–223` | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 12
+
+| Not claimed | Why |
+|---|---|
+| That volume is what *causes* growth, or any dose-response curve | Doc 10 §9. The chapter says sets per muscle per week is the unit the evidence is clearest on, and that the band is a heuristic — no further claim |
+| How a set count actually changes week to week | Ch. 11 owns it (`C-fbk-01`…`10`); ch. 12 links out twice |
+| How to read the meso and macro stats screens generally | Ch. 13's subject. Ch. 12 covers only the volume surfaces on them |
+| That warm-up sets can be marked in the app | The column exists (`logged_sets.is_warmup`) and the day view has no control for it, so the chapter states only what counts, per §8.4 |
 
 ---
 
@@ -316,3 +394,4 @@ before doc 22 was written, and N68 changed what a log tap *does*.
 | **D-09** | Phase 3b, 2026-08-10 | [`22c`](./22c-app-inventory.md) §B2.6 tabulates **four** ways to start a block from `/cycles/plan`'s copy. `Meso builder` is rendered with `href: null` and no `scratch` flag, so it paints at 45% ink and appends `" (soon)"` (`cycles/plan/page.tsx:31–35`, `:103`) — three routes work. An audit transcribing copy without checking the row's state is exactly the failure doc 22 §2 warns about, one level down | **Recorded**; ch. 4 documents the three that work and stays quiet about the fourth per §8.4 (no absence framing). 22c §B2.6 should gain the state at the Phase-4 re-validation. Not a code defect — the row is deliberately a placeholder |
 | **D-10** | Phase 3b, 2026-08-10 | N46 (open): a saved custom template has **no edit path** — `/templates/[templateId]` offers start-from and share only, and `saveMesoAsTemplate` always inserts. Adjusting a saved split means starting a block from it, changing the board, and saving a second template | **Recorded, not fixed** (N46 is the backlog item; a template editor is a screen, so hard rule 8 applies). Ch. 15 states the positive rule — a template is saved *out of* a plan, so adjust and save again — rather than naming the gap, per §8.4 |
 | **D-11** | Phase 3b owner review round 4, 2026-08-11 | `GLOSSARY.volume_landmarks` was labelled `MEV / MRV` and its body used both abbreviations without ever spelling them out — the same defect `D-02` fixed on `e1rm`, reintroduced in a card that predates `D-02`'s fix. Ch. 4's `§8.4c` rule 2 fix rendered the card at first use, which surfaced the gap rather than caused it: the definition a reader lands on didn't define the term | **Fixed**: body now reads *"MEV — minimum effective volume — is the floor… MRV — maximum recoverable volume — is the ceiling…"*, within the 280-char cap. `glossary.test.ts` gained a second abbreviation check (`MEV`/`MRV`, generalizing the one `D-02` added for `1RM`), so this class of defect is now caught by a test rather than by re-reading a card in review |
+| **D-12** | Phase 3e, 2026-08-11 | [`22c`](./22c-app-inventory.md) §B2.4 lists `TOP SET BY WEEK — KEY LIFTS` among the meso page's Balance / Performance content. **N10 removed that grid** (owner, 2026-07-03) together with the `ACROSS MACRO` single-exercise chart, both as macro-scope content on a meso view — the removal is commented in `MesoStatsViews.tsx:202` and `queries/stats.ts:505`. Surfaced while reading the same file for ch. 12's volume surfaces | **Recorded**; 22c corrected in place, and its §C2 `KEY LIFTS` row flagged for re-siting. Not a code defect — the audit predates nothing here, it simply transcribed a surface that had already gone. It matters because §C2 recommends adding `KEY LIFTS` to the glossary on the strength of a screen that no longer shows it, which **ch. 13** (Phase 3g) would otherwise inherit |

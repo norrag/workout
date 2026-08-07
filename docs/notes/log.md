@@ -4,6 +4,44 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 112 (cont.): doc 22 Phase 3e — feedback and volume (N74)
+
+Chapters **11** and **12**, five sections each, taken **ahead of 3d** because 3d
+is gated on the ch. 7 research pass and these two are the chapters ch. 4 and
+ch. 5 were already deferring to. Corpus median holds at 215 over 45 sections.
+
+**The reason 3e needed the code and not the spec.** `22b` §7 flags two
+spec-vs-code gaps, and both live here. Doc 10 §3 specifies a graded
+MEV→MAV→MRV volume ramp with a two-week-at-MRV auto-deload; neither is built
+(T-A5), so ch. 11 documents the ±1 model that ships and never mentions an
+automatic deload. Ch. 12 gives MEV/MAV/MRV the advisory role the code gives it.
+
+**Three findings that came out of reading rather than transcribing:**
+
+- The set-add branch requires **four** conditions simultaneously — easy
+  workload, strong pump, a growth goal, and the muscle under `mg_set_ceiling` —
+  with a pain veto over all of them. Doc 10 reads like two.
+- `session_dampen_require_both` is **`true`** on the live row, so a hard session
+  you performed well in goes ahead with its increase. It takes fatigue ≥ 8 *and*
+  performance ≤ 3 to hold the weight. Worth stating plainly: a reader who thinks
+  "I said I was wiped out, so it went easy on me" would be wrong.
+- Volume's logged counts carry a **hard-set filter** — non-warm-up, ≤ 4 reps in
+  reserve, unreported counting — baked into `v_meso_week_muscle_sets` rather
+  than into `engine_params`. It explains a real discrepancy a user could hit
+  (sets logged very far from failure not showing up in the weekly count), and no
+  spec states it in those terms.
+
+**`D-12`** — `22c` §B2.4 listed `TOP SET BY WEEK — KEY LIFTS` on the meso stats
+tabs; N10 dropped that grid on 2026-07-03. Corrected in place. The part that
+matters is downstream: §C2 recommends adding `KEY LIFTS` to the glossary on the
+strength of that screen, so **ch. 13** needs the row re-sited before it states
+anything about key lifts.
+
+**One contract change.** §8.2's current-value-carries-its-path check recognised
+dotted paths only; `pain_gate`, `workload_high` and `min_sets` are top-level. A
+bare identifier now counts as a citation only when the schema resolves it — more
+reach, same grip.
+
 ## 2026-08-11 — Session 112: doc 22 Phase 3c — training a session (N74)
 
 Chapter **5**, six sections, 206–256 words against the 350 budget (corpus

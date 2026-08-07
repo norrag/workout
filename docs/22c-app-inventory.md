@@ -279,11 +279,22 @@ Body: `OVERVIEW` · `BALANCE` · `PERFORMANCE`, and a start action
 
 **Balance / Performance** (`MesoStatsViews`, `StrengthProgress`):
 `SETS / WEEK` · `AVG SETS / WEEK — PLANNED` (with a `fractional_sets` `InfoDot`)
-· `BALANCE CHECK` with `PUSH` / `PULL` / `LEGS` · `TOP SET BY WEEK — KEY LIFTS`
+· `BALANCE CHECK` with `PUSH` / `PULL` / `LEGS`
 · `PRS THIS MESO` (`No PRs yet this meso.`) · `STRENGTH BY MUSCLE GROUP`
 (`ROLE-WEIGHTED MEAN OF THE LIFTS ABOVE (PRIMARY 1.0 · SECONDARY 0.5)`), scoped
 `THIS MESO` / `THIS MACROCYCLE`. Threshold copy: *"Not enough data yet — an
 exercise trends after 3 sessions."*
+
+> **Corrected 2026-08-11 (doc 22 Phase 3e).** This section listed
+> `TOP SET BY WEEK — KEY LIFTS` on the meso stats tabs. **N10 dropped that
+> grid** (owner, 2026-07-03) along with the `ACROSS MACRO` single-exercise chart,
+> as macro-scope content on a meso view — `MesoStatsViews.tsx:202`,
+> `queries/stats.ts:505`. Found while writing ch. 12 against the same file.
+> **Consequence for ch. 13** (Phase 3g): `KEY LIFTS` is no longer rendered on
+> the meso page, so §C2's row for it — and the "add to glossary" recommendation
+> attached to it — needs re-siting against whatever surface still shows key
+> lifts before ch. 13 states anything about them.
+
 
 ### B2.5 `/cycles/meso/[mesoId]/plan` — the planner board
 
@@ -583,7 +594,7 @@ defined only in the manual. Recommendation in the last column.
 | **Phases**: `ACCUMULATE` / `INTENSIFY` / `PEAK` | create macro, meso details | 14 | **add to glossary** |
 | **`ADHERENCE`** | meso + macro stats | 13 | **add to glossary** |
 | **`BALANCE CHECK`**, `PUSH` / `PULL` / `LEGS` | meso Balance | 13 | manual-only; **advisory only** per doc 10 §9 |
-| **`KEY LIFTS`** | `TOP SET BY WEEK — KEY LIFTS` | 13 | **add to glossary** (auto-selected: 5, by frequency) |
+| **`KEY LIFTS`** | ~~`TOP SET BY WEEK — KEY LIFTS`~~ — **that grid was dropped by N10**; re-site this row before ch. 13 (§B2.4, corrected 2026-08-11) | 13 | **add to glossary** (auto-selected: 5, by frequency) — against whatever surface still renders them |
 | **`VOLUME PR`** / `BEST SESSION VOL` | exercise Overview | 13 | manual-only |
 | **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | **add to glossary** |
 | **`MEASURED RMR`** (`KCAL/DAY`) | macro Overview | 16 | manual-only |

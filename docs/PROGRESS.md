@@ -2,7 +2,72 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3c: training a session (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3e: feedback and volume (N74)
+
+Chapters **11 — Why the app asks how it felt** and **12 — Volume**, five
+sections each, still behind `releaseActive("1.1.0")`. Taken ahead of 3d, which
+is gated on the ch. 7 research pass: these two are what ch. 4 and ch. 5 were
+already handing off to, so doing them next paid a debt rather than opening one.
+
+Sections run 157–227 words against the 350 budget; the corpus median holds at
+215 across 45 sections.
+
+### Written from the code, against the spec
+
+`22b` §7 names two places where doc 10 is aspirational, and both land in these
+chapters:
+
+- **The ±1 model is what ships.** Doc 10 §3's graded MEV→MAV→MRV volume ramp and
+  its two-week-at-MRV auto-deload were deferred (T-A5). Ch. 11 documents one set
+  off, one set on, or hold — and describes no automatic deload, because there
+  isn't one.
+- **MEV/MAV/MRV is a classification library, not a controller.** Ch. 12 gives it
+  the role the code gives it: the planner board is the one screen that calls a
+  count high or low, and the stats report counts without judging them.
+
+Three things the chapters state that no spec does:
+
+1. **The set-add branch needs four conditions at once** — easy workload, a
+   strong pump, a growth goal, and the muscle under `mg_set_ceiling` — and a
+   pain veto beats all four.
+2. **`session_dampen_require_both` is `true` on the live row**, so a hard
+   session you performed well in is not dampened. The hold needs `Overall
+   fatigue` ≥ 8 **and** `Performance` ≤ 3.
+3. **Volume's logged counts apply a hard-set filter** — non-warm-up, taken to
+   4 or fewer reps in reserve, with an unreported RIR counting — and that rule
+   lives in the SQL view, not in `engine_params`. A spec-derived manual would
+   have missed it; it is now `C-vol-01a`.
+
+### Glossary and parameters
+
+The pending-terms ledger **shrank by three**: `pump`, `workload` and
+`fractional_sets` are rendered. Three remain — `deload` (3d),
+`e1rm_confidence` (3f), `est_strength` (3g) — each with the chapter that owes
+it. Four parameters were added to `22b` §4.2 from a fresh read of the live row
+(still v25, `91887f0f…`, hash-verified): `pump_low` and the three `session_*`
+keys.
+
+### One finding — `D-12`
+
+`22c` §B2.4 listed `TOP SET BY WEEK — KEY LIFTS` on the meso stats tabs. **N10
+removed that grid** on 2026-07-03, along with the `ACROSS MACRO` chart, as
+macro-scope content on a meso view. Corrected in 22c, and flagged in its §C2:
+the "add `KEY LIFTS` to the glossary" recommendation rests on a screen that no
+longer renders them, which **ch. 13** would otherwise have inherited.
+
+### One contract-machinery change
+
+§8.2's *"a current value carries its parameter path"* check matched **dotted**
+paths only, and several live parameters sit at the top level of the row —
+`pain_gate`, `workload_high`, `min_sets`. A bare identifier now counts as a
+citation when the schema resolves it, and only then. The dotted-path existence
+assertion is unchanged, so the contract got longer reach rather than a looser
+grip.
+
+Ch. 5's forward debt is paid in the same PR: its feedback section links into
+ch. 11.
+
+## 2026-08-11 — doc 22 Phase 3c: training a session (N74)
 
 Chapter **5 — Training a session**, six sections at
 `/more/guide/training-a-session`, still behind `releaseActive("1.1.0")`. The
