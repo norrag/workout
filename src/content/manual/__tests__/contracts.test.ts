@@ -40,8 +40,6 @@ import type { ManualBlock } from "../types";
  * then.
  */
 const PENDING_GLOSSARY_TERMS: readonly GlossaryKey[] = [
-  // ch. 10 (How your next weight is chosen), Phase 3f
-  "e1rm_confidence",
   // ch. 13 (Reading your stats), Phase 3g
   "est_strength",
 ];

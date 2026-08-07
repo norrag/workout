@@ -58,9 +58,18 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     // stamp UP (+4.85% average, 2026-08-02).
     body: "Your one-rep max (1RM) is the heaviest you could lift for a single all-out rep. The e is for estimated: the app works it out from a set you actually did — its weight, its reps, and how many reps you left in the tank (your RIR) — so you never have to test one. Those left-over reps are folded in, so an easy set and a hard one at the same weight and reps don't score the same: the set with reps still in reserve implies more strength than the same set taken to failure. It tracks your strength over time, and it's least reliable on very high-rep sets or ones stopped well short of failure.",
   },
+  // 2026-08-11 (doc 22 Phase 3f, ledger `D-14`): the body used to close with
+  // *"A set run far enough from failure isn't rated at all: it still counts as
+  // work and as volume, but it says nothing about your strength, so nothing is
+  // estimated from it."* That is the doc 21 §6.1 measuring band, which ships as
+  // engine_params **v26 and is inactive** — `e1rm.max_measuring_rir` is absent
+  // from the active row, so `isMeasuringRir` returns true for every set and no
+  // estimate is ever left unrated. The card described behavior no user has.
+  // Restore the sentence verbatim in the release that activates v26 (22b §8
+  // **O-B**); until then the three bands are the whole ladder.
   e1rm_confidence: {
     label: "ESTIMATE CONFIDENCE",
-    body: "Not every estimated one-rep max is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number. A set run far enough from failure isn't rated at all: it still counts as work and as volume, but it says nothing about your strength, so nothing is estimated from it.",
+    body: "Not every estimated one-rep max is equally trustworthy. A heavy set taken close to failure gives a sharp estimate; a very high-rep set, or one stopped far from failure, is more of a guess. Each estimate is rated high, moderate, or low so you know how much to lean on it — low-confidence reads are best treated as a rough band, not a precise number.",
   },
   est_strength: {
     label: "EST. STRENGTH",

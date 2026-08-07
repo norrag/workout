@@ -4,6 +4,52 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 113 (cont.): the headline chapter (N74)
+
+Doc 22 **Phase 3f** — chapter 10, and its owner review gate is now open.
+
+**This is the chapter every other one has been deferring to.** Ch. 4, 5, 6, 7, 8,
+9 and 12 all stop at some form of *"the weight comes from your recent sets"* and
+point here, which meant the debt was structural rather than stylistic: writing it
+late was right (it needed the vocabulary chapters first), and writing it in four
+ordered steps is what makes the deferrals resolve cleanly. A set becomes an
+estimate · the estimates fold into one anchor · the anchor prices a weight · a
+clean week earns one step on top.
+
+**The correction Phase 0a made to doc 22 itself finally lands as prose.** Doc 22
+§5's chapter-10 row used to say the Epley/Brzycki average cancels the two
+formulas' biases; the truth is a **cutoff** — Brzycki tracks Epley to about ten
+effective reps and inflates above it. Ch. 6 already carried the rule in layer 3;
+what ch. 10 owed was the reason, in words a reader can hold: the two agree over
+short heavy sets, one runs away upward on long ones, so the average is right
+inside that band and wrong above it.
+
+**Earned versus offered is the whole of why progression is explicable.** Doc 16
+draws the line and the chapter follows it: §5 is *did last session earn a step*
+(eight predicates), §6 is *is now when it gets spent* (the pacer and three
+governors). Principle 4 — budget, never quota — is the closing sentence, because
+without it the pacer reads as the app deciding how strong you are allowed to get.
+
+**Three things the live row knew and no chapter said.** The rep climb rides the
+RIR step, so reps hold on a ramp-hold week. Topping out is judged on the lowest
+performed working set, not the best one. And `goal_rate_factor` is 0 for cut and
+maintain — a cutting block earns no steps at all, which is exactly the kind of
+silence that reads as a bug.
+
+**`D-14` is the first defect O3 caught rather than the copy rules.**
+`GLOSSARY.e1rm_confidence` ended with a sentence describing the measuring band —
+v26, inactive — so the card promised a rating tier nobody has. It surfaced because
+ch. 10 is the first chapter to render that card: §8.1 makes the manual carry the
+app's own words, O3 forbids documenting inactive behavior, and the two collided on
+one sentence. Removed, with the exact text kept in a code comment so restoring it
+when v26 activates is a revert. The card has no `InfoDot` call site, so this was a
+latent defect rather than one a reader had hit — the same shape as `D-03`.
+
+Live row re-read a third time (still v25, hash-verified, `max_measuring_rir` still
+absent); ten parameters added to `22b` §4.2. 23 new `22a` rows and an eight-row
+deliberately-absent table, the longest yet — which is itself the honest signal
+that this chapter sits next to five other chapters' subjects.
+
 ## 2026-08-11 — Session 113: the effort cluster, and a research pass that corrected doc 10 (N74)
 
 Doc 22 **Phase 3d-r** (the research pass) and **Phase 3d** (chapters 7, 8, 9).

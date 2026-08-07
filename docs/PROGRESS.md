@@ -2,7 +2,68 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phases 3d-r + 3d: the effort cluster (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3f: how your next weight is chosen (N74)
+
+Chapter **10**, the headline chapter and the one doc 22 §11 gives its own review
+gate. Six sections, 185–292 words against the 350 budget; the corpus median holds
+at 215 over 67 sections. Every chapter written so far has been handing off to it —
+4, 5, 6, 7, 8, 9 and 12 each stop at *"the weight comes from your recent sets"*
+and point here.
+
+### The structure is the argument
+
+Four steps, in order, one per section: a set becomes an estimate · the estimates
+fold into one anchor · the anchor prices a weight · a clean week earns one step on
+top. A reader who stops anywhere has a true partial answer rather than half a
+mechanism.
+
+**The 22b §6.1 correction is stated as a reason, not as a rule.** Ch. 6 already
+carries the Epley/Brzycki **cutoff** in its layer 3; ch. 10 owes the *why* — the
+two formulas agree over short heavy sets and one runs away upward past roughly
+ten effective reps, so averaging is right inside that band and wrong above it.
+Doc 22 §5's own chapter-10 row was what Phase 0a had to correct; `C-wt-06` is
+where the prose is finally pinned to `e1rmFactor`.
+
+**Earned versus offered is the split that makes progression explicable.** Section
+5 answers *did last session earn a step* — the eight predicates, in the reader's
+words. Section 6 answers *is now when it gets spent* — the pacer plus three
+governors. Doc 16's principle 4, **budget, never quota**, closes the chapter,
+because "none of these ever invents a step" is what stops the pacer reading as
+the app deciding how strong you are.
+
+### Three facts no chapter had carried
+
+- The rep climb **rides the RIR step** (`climb_requires_rir_step`): a rep is added
+  in the weeks the target RIR steps down, and reps hold on a ramp-hold week.
+- Topping out is judged on your **lowest** performed working set
+  (`climb_on_performed_reps`), not your best and not the prescription.
+- `progression.goal_rate_factor` is **0 for cut and maintain**, so those blocks
+  earn no steps at all — holding strength through a cut is the win, and it was in
+  the live row and in no manual sentence.
+
+### D-14 — a glossary card describing behavior nobody has
+
+`GLOSSARY.e1rm_confidence` closed with *"A set run far enough from failure isn't
+rated at all…"*. That is the doc 21 §6.1 **measuring band**, which ships as v26
+and is **inactive** — `e1rm.max_measuring_rir` is absent from the active row, so
+every set is rated. Ch. 10 is the first chapter to render the card, and that is
+what surfaced it: §8.1 forces the manual to carry the app's own words while **O3**
+forbids documenting inactive behavior, so the two contracts collided on one
+sentence. Removed, with a code comment carrying the exact text to restore when v26
+activates. Third defect §8.1 has caught in a card the manual was about to render,
+and the first found by O3 rather than by the copy rules. The card has no `InfoDot`
+call site, so no reader had seen it.
+
+### Housekeeping
+
+Live row re-read a third time (`get_engine_params(25)`: still v25, `91887f0f…`,
+hash-verified, `max_measuring_rir` still absent); ten parameters added to `22b`
+§4.2 under its own rule. 23 new `22a` rows plus an eight-row deliberately-absent
+table — the longest yet, because this chapter sits next to five others' subjects.
+`e1rm_confidence` rendered, leaving `est_strength` (3g) as the last pending term.
+`GUIDE_SECTION_IDS` +6. All suites green; typecheck and lint clean.
+
+## 2026-08-11 — doc 22 Phases 3d-r + 3d: the effort cluster (N74)
 
 The **research pass** and the three chapters it gates — **7 Choosing your ramp**,
 **8 Exercise-level RIR**, **9 Deloads** — five sections each, still behind
