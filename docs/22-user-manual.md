@@ -910,7 +910,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | **3e** | 11 Why the app asks how it felt · 12 Volume — ✅ **BUILT 2026-08-11** | M |
 | **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression — ✅ **BUILT 2026-08-11**, owner review gate open | L — own review gate |
 | **3g** | 13 Reading your stats · 14 Macrocycle goals — ✅ **BUILT 2026-08-11** | M |
-| **3h** | 16 Body data · 17 Prescription details · 19 Your data | M |
+| **3h** | 16 Body data · 17 Prescription details · 19 Your data — ✅ **BUILT 2026-08-11** | M |
 | **3i** | 18 Connecting an AI · 20 Glossary (generated) · 21 Troubleshooting & FAQ | M |
 
 (Chapter 6 ships in Phase 1.) Each PR: content blocks + claims-ledger rows +
@@ -1258,6 +1258,56 @@ contracts green.
 > rather than values: `strength` is not on the row at all, so ch. 13's trend
 > runs on the engine's own defaults (`3` · `3` · `1.5`%), which is what its
 > layer 3 says.
+
+> **3h landed 2026-08-11.** Chapters **16** (Body data), **17** (Prescription
+> details) and **19** (Your data), fourteen sections, 118–214 words against the
+> 350 budget — the tightest group yet, and the corpus median moves 209 → 203
+> over 92 sections. Ch. 19's `#deleting-your-account` is the shortest section in
+> the manual at 118 words, which is the right length for it: the app's own copy
+> is already careful, and [§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+> rule 3 forbids describing a description.
+>
+> **`D-17` — the quick entry that does not update what the app trains you on.**
+> Three surfaces write a bodyweight and they do not behave alike: the profile
+> editor and the day view's bodyweight chip each write the profile figure **and**
+> append a measurement, while the More tab's `Log bodyweight` appends the
+> measurement **only**. That is doc 17 §5's deliberate boundary —
+> `bodyweight_log` is measurement substrate and the profile figure is the engine
+> input, never derived from it — but the row is labelled `Log bodyweight` and
+> shows the latest measurement, so a reader who weighs in there has every reason
+> to think the app now works from it. It does not: bodyweight-loaded movements
+> and the target model keep reading the older profile figure. Ch. 16 §1 states
+> the split as a three-row table and says which action serves which intent,
+> which is [§8.4c](#84c-standing-authoring-rules-from-owner-review-round-4-2026-08-11)
+> rule 3 (*find every surface that does X*) doing exactly what it was written
+> for — the rule found the third writer.
+>
+> **Ch. 17 is the chapter O-A constrains, and it is written to survive either
+> answer.** [`22b`](./22b-source-map.md) §4.1 ② is explicit: document the
+> deterministic ask and why as always rendered, and treat the coaching line as
+> conditional. So §4 states the doc 19 §3 architecture claim rather than the
+> feature — the engine authors every number, the deterministic lines are a
+> **complete** explanation, and a coaching line is additive under its own
+> `COACH` rule. Every sentence there is true whether serving is `on` or
+> `shadow`, so answering **O-A** adds a trigger-policy paragraph rather than
+> forcing a rewrite.
+>
+> **Ch. 19 is where hard rule 9 becomes a reader-facing sentence.** Reads are
+> live — a navigation with no connection reaches a short screen with a retry,
+> which the app's own offline copy already frames honestly — and set logging is
+> queued, so a tap is recorded on the phone and sent when it can be. The chapter
+> also picks up doc 23's two version surfaces ([`22c`](./22c-app-inventory.md)
+> §B5.1a assigns them here): the What's New sheet appears once per unseen feature
+> release, accumulates skipped ones, and stays away from a workout you have
+> started logging.
+>
+> **53 new [`22a`](./22a-manual-claims.md) rows** across the three chapters,
+> plus three deliberately-absent tables; `GUIDE_SECTION_IDS` +14. Ch. 19's table
+> is the first to record a **vocabulary** exclusion rather than a scope one:
+> row-level security, policies and service-role scoping are all real and all
+> named by their build words, so the chapter claims what a reader can act on —
+> the data is scoped by the database rather than by the screen — and leaves the
+> mechanism to doc 03.
 
 ### Phase 4 — User Guide review gate
 

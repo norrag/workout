@@ -2,7 +2,60 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3g: reading your stats, and macrocycle goals (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3h: body data, prescription details, your data (N74)
+
+Chapters **16**, **17** and **19**, fourteen sections, 118–214 words against the
+350 budget — the tightest group yet; the corpus median moves 209 → 203 across 92
+sections. All three behind `releaseActive("1.1.0")`.
+
+### D-17 — a quick entry that does not update what the app trains you on
+
+Three surfaces write a bodyweight and they do not behave alike. The profile
+editor and the day view's bodyweight chip each write `profiles.bodyweight` **and**
+append a measurement point; the More tab's `Log bodyweight` appends the point
+**only**. That is doc 17 §5's deliberate boundary — `bodyweight_log` is
+measurement substrate, `profiles.bodyweight` is the engine input and is never
+derived from it — but the row is labelled `Log bodyweight` and displays the
+latest measurement, so a reader who weighs in there has every reason to think the
+app now works from it. It does not: bodyweight-loaded movements and the
+macrocycle target model keep reading the older profile figure, whose `AS OF`
+label is the only visible hint.
+
+Ch. 16 §1 states the split as a three-row table — where you enter it · records a
+measurement · updates the profile figure — and says which action serves which
+intent. §8.4c rule 3 (*before writing "here is where you do X", find every
+surface that does X*) is what found the third writer.
+
+### Ch. 17 is written to survive either answer to O-A
+
+`22b` §4.1 ② is explicit: `LLM_EXPLANATIONS` is a Vercel env var and unreadable
+from a Claude session, so the chapter documents the deterministic ask and why as
+always rendered and treats the coaching line as conditional. §4 therefore states
+the doc 19 §3 *architecture* claim rather than the feature — the engine authors
+every number, the deterministic lines are a **complete** explanation, and a
+coaching line is additive beneath its own `COACH` rule. Every sentence holds
+whether serving is `on` or `shadow`, so answering **O-A** adds a trigger-policy
+paragraph rather than forcing a rewrite.
+
+### Ch. 19 turns hard rule 9 into a reader-facing sentence
+
+Reads are live — a navigation with no connection reaches a short screen with a
+retry, which the app's own offline copy already frames honestly — and set logging
+is queued, so a tap is recorded on the phone and sent when it can be. The chapter
+also picks up doc 23's two version surfaces (`22c` §B5.1a assigns them here): the
+What's New sheet appears once per unseen feature release, accumulates skipped
+ones, and stays away from a workout you have started logging.
+
+### Housekeeping
+
+53 new `22a` rows plus three deliberately-absent tables; `GUIDE_SECTION_IDS` +14.
+Ch. 19's absent-table is the first to record a **vocabulary** exclusion rather
+than a scope one — row-level security, policies and service-role scoping are all
+real and all named by build words, so the chapter claims what a reader can act on
+(scoped by the database, not by the screen) and leaves the mechanism to doc 03.
+All suites green; typecheck and lint clean.
+
+## 2026-08-11 — doc 22 Phase 3g: reading your stats, and macrocycle goals (N74)
 
 Chapters **13** and **14**, eleven sections, 148–305 words against the 350 budget;
 the corpus median moves 215 → 209 across 78 sections, and ch. 6's mechanism

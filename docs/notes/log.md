@@ -4,6 +4,56 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 114 (cont.): the three service chapters (N74)
+
+Doc 22 **Phase 3h** — chapters 16 (Body data), 17 (Prescription details) and 19
+(Your data). Fourteen sections, none over 214 words: these are chapters people
+arrive at with a specific question, and the right answer to a specific question
+is short.
+
+**`D-17`, and the rule that found it.** §8.4c rule 3 says *before writing "here
+is where you do X", find every surface that does X* — so before writing ch. 16's
+bodyweight section I grepped for the writers rather than for the screen. There
+are three, and they do not agree: the profile editor and the day view's chip
+each write `profiles.bodyweight` **and** append a measurement point; the More
+tab's `Log bodyweight` appends the point only.
+
+That is doc 17 §5's boundary working exactly as designed — the series is
+measurement substrate and the profile figure is the engine input, never derived
+from it. The problem is entirely in what a reader can see: the row says
+`Log bodyweight`, it displays your latest measurement, and nothing on it hints
+that the number your push-ups are priced off is a different one. So the chapter
+leads with a three-row table (where you enter it · records a measurement ·
+updates the profile figure) and then says the operative sentence plainly: log a
+weight to keep the record, edit the profile to change what the app works from —
+and the profile edit records the measurement too.
+
+**Ch. 17 was the one I expected O-A to block, and it turned out not to.** The
+open question is whether production serves the model-written coaching line or
+only generates it, and that is a Vercel environment variable no Claude session
+can read. What resolved it was noticing that doc 19 §3's claim is *architectural*
+rather than conditional: the deterministic ask and why always render and are a
+complete explanation, and a coaching line is only ever appended beneath them.
+That sentence is true in both modes. So §4 documents the division of labour —
+the engine authors every number, prose never changes one — and mentions the
+`COACH` line as something you may find rather than something you will. Answering
+O-A later adds a paragraph about when one appears; it does not invalidate a line.
+
+**Ch. 19's absent-table is the first vocabulary exclusion.** Row-level security,
+policies, service-role scoping: all real, all load-bearing, and all named in the
+build's words. §8.5 and §8.4b rule 4 between them make the fix obvious once
+stated — the reader-facing claim is that reads are scoped by the database rather
+than by the screen asking, which is the part that matters to them (a bug in a
+screen cannot reach past it) and needs none of the vocabulary.
+
+**Shortest section in the manual so far: `#deleting-your-account`, 118 words.**
+The delete screen's own copy is careful and complete, and §8.4b rule 3 forbids
+describing a description — so the chapter says where it is, what goes, that the
+export comes first, and that you type the word. Anything more would have been
+padding a page that exists to be read once.
+
+53 new `22a` rows; `GUIDE_SECTION_IDS` +14.
+
 ## 2026-08-11 — Session 114: the stats chapters, and two audits that were wrong (N74)
 
 Doc 22 **Phase 3g** — chapters 13 (Reading your stats) and 14 (Macrocycle goals).
