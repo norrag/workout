@@ -56,8 +56,7 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   // ch. 1 — What WORKOUT is (Phase 3a)
   "ug/what-workout-is#the-idea",
   "ug/what-workout-is#the-five-tabs",
-  "ug/what-workout-is#the-workout-tab",
-  "ug/what-workout-is#what-changed",
+  "ug/what-workout-is#the-workout-page",
   // ch. 2 — Your profile (Phase 3a)
   "ug/your-profile#what-it-is-for",
   "ug/your-profile#body-and-age",

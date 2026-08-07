@@ -55,6 +55,15 @@ export const UG_CYCLE_MODEL: ManualChapter = {
           kind: "para",
           text: "Training here nests: a long-term goal is made of blocks, a block is made of weeks, and a week is made of sessions. The three outer layers carry the names the screens use.",
         },
+        {
+          kind: "figure",
+          src: "/manual/cycle-nesting.svg",
+          alt: "Four nested frames: a macrocycle spanning months contains a mesocycle of weeks, which contains a microcycle of one week, which contains one workout — labelled W3·D2. Your profile sits outside them, feeding in with an arrow.",
+          width: 560,
+          height: 272,
+          caption:
+            "Each layer sits inside the one above it. Your profile is not one of them — it is what the outermost layer's goal is set from.",
+        },
         { kind: "term", term: "macrocycle" },
         { kind: "term", term: "mesocycle" },
         { kind: "term", term: "microcycle" },
@@ -71,13 +80,12 @@ export const UG_CYCLE_MODEL: ManualChapter = {
             " for a deload week.",
           ],
         },
-        { kind: "heading", text: "Why nest them" },
         {
           kind: "para",
           text: [
             "Each layer answers a different question. The week sets how hard to push — that is its ",
             { to: "ug/effort-rir#the-weeks-ramp", text: "target RIR" },
-            ". The block decides what is being trained and for how long. The macrocycle decides what all of it is for. Keeping them separate is what lets one week be easy without the goal changing.",
+            ". The block decides what is trained and for how long. The macrocycle decides what all of it is for. Keeping them separate is what lets one week be easy without the goal changing.",
           ],
         },
       ],
@@ -230,7 +238,7 @@ export const UG_CYCLE_MODEL: ManualChapter = {
       ],
       related: [
         "ug/cycle-model#finding-your-cycles",
-        "ug/what-workout-is#the-workout-tab",
+        "ug/what-workout-is#the-workout-page",
       ],
     },
   ],

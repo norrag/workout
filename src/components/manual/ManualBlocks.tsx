@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GLOSSARY } from "@/lib/glossary";
 import { SET_MARKERS, type SetMarker } from "@/lib/set-markers";
 import {
+  adjacentChapters,
   adjacentSections,
   ESTIMATE_CAVEAT,
   MANUAL_ROOT,
@@ -9,6 +10,7 @@ import {
   sectionRoute,
   type Inline,
   type ManualBlock,
+  type ManualId,
   type ManualMark,
   type ManualSection,
   type RichText,
@@ -381,39 +383,89 @@ export function ManualRelated({
  * Each side names its destination: a bare arrow makes the reader commit before
  * knowing where they are going.
  */
-export function ManualSectionNav({ id }: { id: string }) {
-  const { prev, next } = adjacentSections(id);
+interface NavTarget {
+  readonly href: string;
+  readonly title: string;
+}
+
+/** The shared two-column footer. One grammar, used at both levels. */
+function NavPair({ prev, next }: { prev?: NavTarget; next?: NavTarget }) {
   if (!prev && !next) return null;
   return (
     <nav className="mt-8 grid grid-cols-2 gap-3 border-t-[1.5px] border-ink pt-3.5">
       {prev ? (
-        <Link
-          href={`${MANUAL_ROOT[prev.chapter.manual]}/${prev.chapter.slug}/${prev.section.slug}`}
-          className="block"
-        >
+        <Link href={prev.href} className="block">
           <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
             ‹ Previous
           </span>
           <span className="mt-1 block text-[13px] font-semibold leading-[1.35]">
-            {prev.section.title}
+            {prev.title}
           </span>
         </Link>
       ) : (
         <span />
       )}
       {next && (
-        <Link
-          href={`${MANUAL_ROOT[next.chapter.manual]}/${next.chapter.slug}/${next.section.slug}`}
-          className="block text-right"
-        >
+        <Link href={next.href} className="block text-right">
           <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
             Next ›
           </span>
           <span className="mt-1 block text-[13px] font-semibold leading-[1.35]">
-            {next.section.title}
+            {next.title}
           </span>
         </Link>
       )}
     </nav>
+  );
+}
+
+export function ManualSectionNav({ id }: { id: string }) {
+  const { prev, next } = adjacentSections(id);
+  return (
+    <NavPair
+      prev={
+        prev && {
+          href: `${MANUAL_ROOT[prev.chapter.manual]}/${prev.chapter.slug}/${prev.section.slug}`,
+          title: prev.section.title,
+        }
+      }
+      next={
+        next && {
+          href: `${MANUAL_ROOT[next.chapter.manual]}/${next.chapter.slug}/${next.section.slug}`,
+          title: next.section.title,
+        }
+      }
+    />
+  );
+}
+
+/**
+ * The same affordance one level up (09-changelog 2026-08-09 §2). The map lists
+ * chapters only, so the chapter page is on the browse path and owes the reader
+ * a way onward that is not a trip back to the map.
+ */
+export function ManualChapterNav({
+  manual,
+  slug,
+}: {
+  manual: ManualId;
+  slug: string;
+}) {
+  const { prev, next } = adjacentChapters(manual, slug);
+  return (
+    <NavPair
+      prev={
+        prev && {
+          href: `${MANUAL_ROOT[prev.manual]}/${prev.slug}`,
+          title: prev.title,
+        }
+      }
+      next={
+        next && {
+          href: `${MANUAL_ROOT[next.manual]}/${next.slug}`,
+          title: next.title,
+        }
+      }
+    />
   );
 }

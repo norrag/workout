@@ -1,19 +1,25 @@
 // User Guide — chapter 1, "What WORKOUT is" (doc 22 §5).
 //
-// The reader's first screen, so it owes orientation rather than mechanism:
-// what the app does, where everything lives, where a tap lands, and how to see
-// what changed. Every mechanism it touches hands off to the chapter that owns
-// it.
+// The reader's first screen. It owes **orientation and nothing else**: what the
+// app does, where things live, and what the screen you land on shows you.
+//
+// Owner review round 3 rewrote it on exactly that point, and doc 22 §8.4b rule
+// 1 is the generalization — a chapter's depth is set by its place in the
+// reading order. Two things were cut rather than shortened:
+//   - **the Workout tab's session-resume pointer.** Real (`sessionStorage.
+//     lastWorkoutId`, `BottomNav.tsx:33–40`, gated to the active meso by
+//     `DayView.tsx:281`) but secondary, and it led a section that had not yet
+//     told the reader what the Workout page even shows. There is no expiry in
+//     the code; the pointer simply dies with the tab session, which is why a
+//     relaunched PWA lands on the current workout. **Ch. 5 owns it** (Phase 3c).
+//   - **the whole version-history section.** Not a primary function, and 22c
+//     §B5.1a/§B6a already assign the history page and the What's New sheet to
+//     **ch. 19** (Phase 3h). Ch. 1 keeps one clause in the tab table.
 //
 // GROUND TRUTH (22b §7 ch. 1 — README, doc 01, `BottomNav.tsx`, 22c Part A):
 //   - the tab list and its order are `BottomNav.tsx:11–17`
-//   - the Workout tab resolves to the last day viewed this session
-//     (`sessionStorage.lastWorkoutId`), NOT to "today" — 22c Part A calls this
-//     out as a behavior ch. 1 must state
 //   - `/workout` has three states, resolved in order (`workout/page.tsx`)
-//   - the More footer is the version, from the release registry, and it is a
-//     link to `/more/whats-new` (doc 23 §8; 22c §B5.1)
-//   - the What's New sheet's suppression rules are `lib/version/suppression.ts`
+//   - the day screen's four zones are 22c §B1.2, read against `DayView.tsx`
 //   - claims are registered in `docs/22a-manual-claims.md`
 
 import type { ManualChapter } from "../types";
@@ -24,7 +30,7 @@ export const UG_WHAT_WORKOUT_IS: ManualChapter = {
   number: 1,
   title: "What WORKOUT is",
   summary:
-    "The idea behind the app, the five tabs it is built from, and where a tap lands when you open it.",
+    "The idea behind the app, the five tabs it is built from, and the screen you land on when you open it.",
   sections: [
     // -----------------------------------------------------------------------
     {
@@ -125,70 +131,82 @@ export const UG_WHAT_WORKOUT_IS: ManualChapter = {
             ],
             [
               [{ ui: "More" }],
-              "Your profile, this guide, the theme, the AI connector, body scans, and your account and data.",
+              "Your profile, this guide, the theme, the AI connector, body scans, your account and data, and the version you are running.",
             ],
           ],
         },
-        {
-          kind: "para",
-          text: "Every list and detail screen paints its own frame the moment you tap, before the data arrives, so a tap never leaves you looking at the screen you just left.",
-        },
       ],
       related: [
-        "ug/what-workout-is#the-workout-tab",
+        "ug/what-workout-is#the-workout-page",
         "ug/what-workout-is#the-idea",
       ],
     },
     // -----------------------------------------------------------------------
     {
-      slug: "the-workout-tab",
-      title: "Where the Workout tab lands",
+      slug: "the-workout-page",
+      title: "The Workout page",
       summary:
-        "The tab is the session, not a menu into it — and it returns you to the day you were last looking at.",
+        "Where you land, what it shows you, and what you do on it — the screen you will spend most of your time on.",
       keywords: [
         "home screen",
+        "workout page",
         "today",
-        "opens on",
-        "wrong day",
-        "resting",
-        "no cycles",
+        "logging",
         "start here",
+        "next workout",
+        "no cycles",
       ],
       blocks: [
         {
           kind: "para",
-          text: "The Workout tab does not lead to a session. It is the session: the day you are training renders on the tab itself, with nothing to open first.",
+          text: "The Workout page shows the workout you are due to do next. Open the app and it is already in front of you — this is the screen you will spend most of your time on.",
         },
-        { kind: "heading", text: "It resumes, rather than resetting" },
-        {
-          kind: "para",
-          text: [
-            "Tapping ",
-            { ui: "Workout" },
-            " takes you to the last day you had open in this visit, which is usually not the same thing as today. Look back at Tuesday's session and the tab keeps you there until you move — close the app and open it again, and it goes back to the current day.",
-          ],
-        },
-        {
-          kind: "para",
-          text: [
-            "To move deliberately, tap the ",
-            { ui: "workout" },
-            " logotype at the top of the day screen. That opens the week and day navigator, where every week of the block and every day inside it is one tap away.",
-          ],
-        },
-        { kind: "heading", text: "When there is no session" },
+        { kind: "heading", text: "What is on it" },
         {
           kind: "list",
           items: [
             [
-              { strong: "Every day this week is logged" },
-              " — the tab shows your last finished block's summary and a link to its full stats. Next week's targets appear once the week closes.",
+              "Where you are in the block, at the top: ",
+              {
+                to: "ug/cycle-model#the-four-layers",
+                text: "week and day",
+              },
+              ", the date, and the effort to aim for this week.",
+            ],
+            "A thin bar under that, filling as you log — the session at a glance.",
+            "Then the day's exercises in order, each with a line saying what the program is asking of it and why.",
+            [
+              "Under each exercise, one row per set: the weight, the reps, and a box for ",
+              {
+                to: "ug/effort-rir#what-rir-means",
+                text: "how hard it was",
+              },
+              ".",
+            ],
+          ],
+        },
+        { kind: "heading", text: "What you do on it" },
+        {
+          kind: "para",
+          text: [
+            "Work down the sets, logging each one as you finish it. Weight and reps are editable, so if you did something other than what was asked, put in what you did. When the last set is in, ",
+            { ui: "COMPLETE WORKOUT" },
+            " at the foot closes the session and asks three quick questions about how it went — how tired you are, how hard it felt, and how you performed.",
+          ],
+        },
+        { kind: "heading", text: "When nothing is due" },
+        {
+          kind: "list",
+          items: [
+            [
+              { strong: "Everything this week is logged" },
+              " — you get your last finished block's summary and a link to its full stats. Next week appears once the week closes.",
             ],
             [
               { strong: "You have no blocks yet" },
-              " — the tab explains the cycle model in a line and offers ",
+              " — you get ",
               { ui: "SET UP CYCLES" },
-              ".",
+              ", which is where to start.",
             ],
           ],
         },
@@ -196,51 +214,6 @@ export const UG_WHAT_WORKOUT_IS: ManualChapter = {
       related: [
         "ug/what-workout-is#the-five-tabs",
         "ug/cycle-model#one-block-at-a-time",
-      ],
-    },
-    // -----------------------------------------------------------------------
-    {
-      slug: "what-changed",
-      title: "Seeing what changed",
-      summary:
-        "The app is versioned, and every release is written down where you can read it.",
-      keywords: [
-        "version",
-        "release notes",
-        "update",
-        "new features",
-        "what's new",
-        "changelog",
-      ],
-      blocks: [
-        {
-          kind: "para",
-          text: [
-            "The foot of the ",
-            { ui: "More" },
-            " tab carries the version you are running, and it is a link — ",
-            { ui: "WORKOUT … — WHAT'S NEW ›" },
-            ". It opens the full history, newest first, with the version you are on marked.",
-          ],
-        },
-        { kind: "heading", text: "The sheet that appears once" },
-        {
-          kind: "para",
-          text: "When a release adds something you would notice, a sheet describes it the next time you open the app. Dismissing it is the end of it — that release is marked as seen and never appears again. Releases you were away for arrive together in one sheet rather than one after another.",
-        },
-        {
-          kind: "para",
-          text: "It waits for a sensible moment. It stays away from the logging screen entirely, it does not appear once you have logged a set into the session on screen, and it holds off while a set is still saving. Smaller fixes ship quietly and are written down in the history rather than announced.",
-        },
-        {
-          kind: "callout",
-          tone: "note",
-          text: "The history page is the durable copy. Anything the sheet told you is still there to re-read, along with every release before it.",
-        },
-      ],
-      related: [
-        "ug/what-workout-is#the-five-tabs",
-        "ug/what-workout-is#the-idea",
       ],
     },
   ],

@@ -134,6 +134,33 @@ export interface Adjacent {
   readonly next?: ResolvedSection;
 }
 
+export interface AdjacentChapters {
+  readonly prev?: ManualChapter;
+  readonly next?: ManualChapter;
+}
+
+/**
+ * doc 22 §9.2 as amended 2026-08-08 (owner review round 3). The map now lists
+ * chapters only, so the chapter page is on the critical path and takes the same
+ * prev/next affordance sections have — one level up, so browsing the manual
+ * cover to cover works the way reading it already does.
+ *
+ * Ordered within one manual, like `readingOrder`: the User Guide and the AI
+ * Manual are separate reads (D4), so neither ever runs into the other.
+ */
+export function adjacentChapters(
+  manual: ManualId,
+  slug: string,
+): AdjacentChapters {
+  const chapters = chaptersFor(manual);
+  const at = chapters.findIndex((c) => c.slug === slug);
+  if (at < 0) return {};
+  return {
+    prev: at > 0 ? chapters[at - 1] : undefined,
+    next: at < chapters.length - 1 ? chapters[at + 1] : undefined,
+  };
+}
+
 export function adjacentSections(id: string): Adjacent {
   const parsed = parseSectionId(id);
   if (!parsed) return {};

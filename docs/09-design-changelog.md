@@ -42,7 +42,65 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
-## 2026-08-08 — The reader gets its map, its search, and a way in (figs 4.8 / 4.11, N74 / doc 22 Phase 2)
+## 2026-08-09 — The map becomes a table of contents (figs 4.8 / 4.9 amended, N74 / doc 22 Phase 3a review)
+
+Owner review of the Phase-3a chapters returned a navigation change, and it
+reverses a decision the 2026-08-08 entry made one day earlier. Recorded here
+rather than quietly rebuilt, because fig 4.8 was derived in this file and a
+figure is not re-derived without saying so.
+
+**The change.** *"The guide landing page should show only the chapter titles and
+one-liners, with click-through to view the subsections. This would keep each
+view manageable. From the chapter view, which shows the subsections, you could
+incorporate the same previous/next chapter navigation currently used within the
+sections."*
+
+**Why the previous derivation was wrong.** Fig 4.8 listed every section inline
+under its chapter, to satisfy doc 22 §9.2's "one tap from the map to anywhere".
+With one chapter shipped that read as a tidy 6-row list. At the manual's real
+size — 21 chapters, ~6 sections each — it is a ~130-row wall, which is the
+untraversable-document failure doc 22 §9 exists to prevent, relocated to the
+one screen whose whole job is orientation. The tap count was optimized and the
+**legibility** was not, and legibility is what a landing page is for.
+
+### 1. Fig 4.8 — the map, amended
+
+- **Chapter rows only**: number, title, and the chapter's one-line summary, each
+  row a link to the chapter page. Same row geometry the section rows used
+  (`border-b border-ink/15`, 14px bold title over a 13px `text-ink/60` summary,
+  a `›` at the right), so the change is what the rows *say*, not a new pattern.
+- The section-count field in the meta line **stays** — it is how a reader learns
+  the manual is bigger than 21 things without being shown all of them.
+- The search row is unchanged and keeps its position above the list. It now
+  carries more weight, since it is the 1-tap path for a reader who knows what
+  they want; the 2-tap browse path is for a reader who does not.
+
+### 2. Fig 4.9 — the chapter page gains prev/next
+
+The chapter page moves onto the critical path, so it takes the affordance the
+section footer already has (2026-08-07 §4, owner review round 2): a two-column
+footer rule, `‹ Previous` / `Next ›` in tracked caps over the **destination's
+name**, never a bare arrow.
+
+- It is the **same component grammar**, one level up — deliberately, so the
+  reader learns the pattern once. Rendered by `ManualChapterNav`, sibling to
+  `ManualSectionNav` in `ManualBlocks.tsx`.
+- It runs over chapter reading order **within one manual** (doc 22 D4: the User
+  Guide and the AI Manual are separate reads), so it never runs one into the
+  other — the same rule `readingOrder` already applies to sections.
+- Ends are open: chapter 1 has no previous, the last chapter no next.
+
+### 3. Fig 4.10 — one figure gains a diagram
+
+Ch. 3's opening section renders the cycle hierarchy as a `figure` rather than
+leaving the nesting to prose ("draw what is structural", doc 22 §8.4b rule 7).
+`public/manual/cycle-nesting.svg` follows the Phase-2 asset policy without
+amendment: single-colour line art, CSS mask filled with `currentColor`, its own
+aspect reserved. It shows **profile → macrocycle → mesocycle → microcycle →
+workout** as nested frames — the profile included on the owner's note that the
+goal arc rests on who you are, and drawn outside the cycle stack rather than as
+another layer of it, because it is an input to the arc and not a period of time.
+No tunable value is baked into the asset (`C-ramp-06`'s rule, applied again).
 
 Phase 1 built one chapter and the screen that renders a section. Phase 2 makes
 it a *manual*: a map, a search, a door on the More tab, and the deep-link entry
