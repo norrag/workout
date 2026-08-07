@@ -10,7 +10,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LogBodyweightRow } from "./LogBodyweightRow";
 import { formatHeight } from "@/lib/units";
 import { shortDate } from "@/lib/dates";
-import { displayVersion } from "@/lib/version";
+import { displayVersion, releaseActive } from "@/lib/version";
+import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /** More tab (fig 4.4): profile card + inline settings. */
 export default async function MorePage() {
@@ -91,6 +92,20 @@ export default async function MorePage() {
       <div className="mt-6 border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
         SETTINGS
       </div>
+      {/* doc 22 O2 — the User Guide's entry point, first because finding it is
+          the whole point of having one. Gated with the routes it opens (doc 23
+          §9.2): one gate at the route boundary, one here at the door. */}
+      {releaseActive(UNRELEASED_VERSION) && (
+        <Link
+          href="/more/guide"
+          className="flex items-center justify-between border-b border-ink/15 py-3.5"
+        >
+          <div className="text-sm font-semibold">Guide</div>
+          <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+            READ ›
+          </div>
+        </Link>
+      )}
       <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
         <div className="text-sm font-semibold">Theme</div>
         <ThemeToggle />

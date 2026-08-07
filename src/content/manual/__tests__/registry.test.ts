@@ -12,81 +12,11 @@ import {
   resolveSection,
   readingOrder,
   SECTION_BUDGET,
-  sectionId,
   sectionRoute,
 } from "../index";
 import { markLabel } from "../budget";
-import { GLOSSARY } from "@/lib/glossary";
 import { SET_MARKERS } from "@/lib/set-markers";
-import type { Inline, ManualBlock, RichText } from "../types";
-
-// ---------------------------------------------------------------------------
-// traversal helpers — `detail` children are content too, for everything except
-// the length budget (doc 22 §9.3)
-// ---------------------------------------------------------------------------
-
-function runs(text: RichText): Inline[] {
-  return typeof text === "string" ? [text] : [...text];
-}
-
-function blockRuns(block: ManualBlock): Inline[] {
-  switch (block.kind) {
-    case "heading":
-      return [block.text];
-    case "para":
-      return runs(block.text);
-    case "list":
-      return block.items.flatMap(runs);
-    case "steps":
-      return block.steps.flatMap((s) => [s.label, ...runs(s.text)]);
-    case "table":
-      return [...block.columns, ...block.rows.flatMap((r) => r.flatMap(runs))];
-    case "callout":
-      return [...(block.label ? [block.label] : []), ...runs(block.text)];
-    case "term":
-      return [GLOSSARY[block.term].label, GLOSSARY[block.term].body];
-    case "legend":
-      return block.items.flatMap((i) => [markLabel(i.mark), ...runs(i.text)]);
-    case "link":
-      return [block.label];
-    case "detail":
-      return block.blocks.flatMap(blockRuns);
-  }
-}
-
-function flatten(blocks: readonly ManualBlock[]): ManualBlock[] {
-  return blocks.flatMap((b) =>
-    b.kind === "detail" ? [b, ...flatten(b.blocks)] : [b],
-  );
-}
-
-const REPO_ROOT = path.resolve(__dirname, "../../../..");
-
-const everySection = CHAPTERS.flatMap((chapter) =>
-  chapter.sections.map((section) => ({
-    chapter,
-    section,
-    id: sectionId(chapter.manual, chapter.slug, section.slug),
-  })),
-);
-
-function proseOf(section: (typeof everySection)[number]): string {
-  return [
-    section.section.title,
-    section.section.summary,
-    ...flatten(section.section.blocks)
-      .flatMap(blockRuns)
-      .map((run) => {
-        if (typeof run === "string") return run;
-        if ("ui" in run) return run.ui;
-        if ("strong" in run) return run.strong;
-        if ("num" in run) return run.num;
-        if ("code" in run) return run.code;
-        if ("term" in run) return run.text ?? "";
-        return run.text;
-      }),
-  ].join(" ");
-}
+import { blockRuns, everySection, flatten, REPO_ROOT } from "./helpers";
 
 // ---------------------------------------------------------------------------
 
@@ -288,47 +218,37 @@ describe("section-length budget", () => {
   });
 });
 
-// The full doc 22 §8 contract suite lands in Phase 2 with the reader. These are
-// the two that cost nothing and that content landing now must already satisfy.
-describe("copy discipline", () => {
-  it("carries no exclamation marks (hard rule 7)", () => {
-    for (const section of everySection) {
-      expect(proseOf(section), section.id).not.toContain("!");
-    }
-  });
+// The doc 22 §8 copy contracts moved to `contracts.test.ts` when Phase 2
+// completed the set — one home for the five, so a new chapter has one file to
+// satisfy rather than two.
 
-  it("uses no hype vocabulary (hard rule 7)", () => {
-    const DENY = [
-      "amazing",
-      "awesome",
-      "blazing",
-      "crush",
-      "effortless",
-      "game-chang",
-      "incredible",
-      "magic",
-      "powerful",
-      "revolutionary",
-      "seamless",
-      "supercharge",
-      "unlock",
-    ];
-    for (const section of everySection) {
-      const prose = proseOf(section).toLowerCase();
-      for (const word of DENY) {
-        expect(prose, `${section.id} — "${word}"`).not.toContain(word);
+// doc 22 Phase 2 — `figure`. The asset policy is a D3 guard (`guards.test.ts`);
+// these are the properties a reader depends on.
+describe("figures", () => {
+  it("say what they show, and reserve their own space", () => {
+    for (const { id, section } of everySection) {
+      for (const block of flatten(section.blocks)) {
+        if (block.kind !== "figure") continue;
+        // a figure renders as a CSS mask, so a reader who cannot see it has
+        // nothing at all without this
+        expect(block.alt.length, `${id} → ${block.src}`).toBeGreaterThan(20);
+        expect(block.width).toBeGreaterThan(0);
+        expect(block.height).toBeGreaterThan(0);
       }
     }
   });
+});
 
-  it("flags a section that states a strength estimate (doc 22 §8.2)", () => {
-    for (const section of everySection) {
-      const prose = proseOf(section).toLowerCase();
-      const statesOne =
-        prose.includes("estimated 1rm") || prose.includes("strength estimate");
-      if (statesOne) {
-        expect(section.section.estimate, section.id).toBe(true);
-      }
+// The App Router serves static segments ahead of dynamic ones, so a chapter
+// slugged `search` would be permanently unreachable behind the search screen.
+describe("route segments the reader owns", () => {
+  const RESERVED = ["search"];
+
+  it("no chapter claims a slug the guide routes already use", () => {
+    for (const chapter of CHAPTERS) {
+      expect(RESERVED, `${chapter.manual}/${chapter.slug}`).not.toContain(
+        chapter.slug,
+      );
     }
   });
 });

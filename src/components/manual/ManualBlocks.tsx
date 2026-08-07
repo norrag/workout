@@ -237,6 +237,40 @@ function Block({ block }: { block: ManualBlock }) {
         </div>
       );
 
+    case "figure":
+      // a CSS mask filled with `currentColor`, not an `<img>` — the app carries
+      // an explicit light/dark switch, so a figure with baked ink would vanish
+      // in one of them (09-changelog 2026-08-08 §5). Single-colour line art is
+      // also the only figure style the light-ledger system has room for.
+      return (
+        <figure>
+          <div className="border-[1.5px] border-ink px-4 py-4">
+            <div
+              role="img"
+              aria-label={block.alt}
+              className="mx-auto w-full bg-ink/80"
+              style={{
+                maxWidth: block.width,
+                aspectRatio: `${block.width} / ${block.height}`,
+                WebkitMaskImage: `url(${block.src})`,
+                maskImage: `url(${block.src})`,
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+                WebkitMaskPosition: "center",
+                maskPosition: "center",
+                WebkitMaskSize: "contain",
+                maskSize: "contain",
+              }}
+            />
+          </div>
+          {block.caption && (
+            <figcaption className="mt-2 text-[11px] leading-[1.5] text-ink/55">
+              <Rich text={block.caption} />
+            </figcaption>
+          )}
+        </figure>
+      );
+
     case "link": {
       const href = sectionRoute(block.to);
       if (!href) return null;

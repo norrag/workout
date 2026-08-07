@@ -36,12 +36,11 @@ export default async function GuideChapterPage({
 
   return (
     <div>
-      {/* Phase 2 re-points this at the guide map (fig 4.8) once it exists */}
       <Link
-        href="/more"
+        href="/more/guide"
         className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink/55"
       >
-        ‹ More
+        ‹ Guide
       </Link>
       <h1 className="title-display mt-4 text-[32px]">{chapter.title}</h1>
       <p className="mt-2 text-[10px] font-medium tracking-[0.1em] text-ink/45">

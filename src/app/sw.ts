@@ -40,6 +40,26 @@ const staticAssetCaching: RuntimeCaching[] = [
     }),
   },
   {
+    // Manual figures (doc 22 D3 / 09-changelog 2026-08-08 §5). Their own cache,
+    // ahead of the general image rule, because the app-chrome cache below is
+    // capped at 64 entries shared with the icons and splash screens — a
+    // figure-heavy chapter read once would quietly evict app chrome, which is
+    // exactly the "the manual degraded the app" outcome D3's condition exists
+    // to prevent. Cache-on-read, never precached (next.config.ts globIgnores).
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith("/manual/"),
+    handler: new CacheFirst({
+      cacheName: "manual-figures",
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 32,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          maxAgeFrom: "last-used",
+        }),
+      ],
+    }),
+  },
+  {
     // Same-origin static images (app icons, iOS splash screens).
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && /\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i.test(url.pathname),

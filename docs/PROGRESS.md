@@ -2,7 +2,83 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-07 (latest) — doc 22 Phase 1: the manual's architecture, and one chapter end to end (N74)
+## 2026-08-08 (latest) — doc 22 Phase 2: the reader becomes a manual (N74)
+
+Phase 1 built one chapter and the screen that renders a section. Phase 2 adds
+everything that makes it navigable — a map, a search, a door, and deep-link
+entry — plus the five content contracts and the three D3 performance guards.
+Still entirely behind `releaseActive("1.1.0")`.
+
+### The design pass came first (hard rule 8)
+
+`docs/09-design-changelog.md` gains a **2026-08-08** entry claiming fig **4.11**
+(guide search) and building fig 4.8 (the map, specified in the 2026-08-07
+entry). Everything is composed from patterns already in the app; the one new
+object — a *reading* surface — was settled in Phase 1.
+
+### What landed
+
+- **The map** (`/more/guide`, fig 4.8) — chapters with their sections inline, so
+  doc 22 §9.2's one-tap-to-any-section requirement is true rather than intended.
+  The chapter rule is itself a link; a corpus count sits in the meta line; the
+  search row is above the list.
+- **Search** (`/more/guide/search`, fig 4.11) — live-filtering as you type (the
+  app's P20 grammar), results as section rows carrying a **snippet** of the
+  matched prose rather than the authored summary, and three distinct empty
+  states. `search.ts` is the lexical index doc 22 §10 designed, and it is the
+  same artifact Phase 5's `search_manual` will serve.
+- **Deep-link entry** — `?from=` re-points the breadcrumb at where the reader
+  came from (N27) and moves the chapter parent to the right of the row; the
+  landed section carries the accent ■. `from` is allowlist-validated.
+- **`figure`, with its asset policy** — single-colour line art under
+  `public/manual/`, rendered as a **CSS mask filled with `currentColor`** so it
+  is correct in both themes (an `<img>` would vanish in one; the app's theme is
+  an explicit `data-theme`, which `prefers-color-scheme` cannot see). Figures get
+  their own 32-entry runtime cache **ahead of** the app-chrome image rule, whose
+  64 entries they would otherwise evict. First use is the ramp diagram in ch. 6.
+- **The five §8 contracts as tests** — glossary identity (with a pending-terms
+  ledger that may only shrink), the honesty contract, the claims ledger parsed
+  and resolved, positive framing, plain language.
+- **The three D3 guards** — the import guard, the precache exclusion, and the
+  lazy index. CI re-runs the guard suite **after the build** so the precache
+  assertion reads the real service worker.
+- **`GUIDE_SECTION_IDS`** populated for doc 23, as literal strings with the
+  registry doing the resolving in a test — because `links.ts` is reachable from
+  the app shell, and importing the manual there would have broken D3 guard 1 on
+  its first use.
+- **The More-tab row** (`Guide`, first under `SETTINGS`), gated with the routes.
+
+### Two findings, both recorded
+
+- **doc 22 D3's third promise does not hold** (`22a` ledger row **D-04**).
+  "A chapter read once is a hashed immutable build asset, so it re-opens
+  offline" assumed the prose lives in `/_next/static/**`. It does not — the
+  reader is server-rendered, so a section is HTML plus an RSC payload, both
+  `NetworkOnly` under R7. **Offline manual reading is not delivered**, and doc 22
+  §4 withdraws the promise on the owner's own **O1** framing (accepted only
+  because it was free). D3's *condition* is untouched — the guards were never
+  about offline.
+- **The first pass at guard 2 was written against the wrong serwist entry
+  point** (**D-05**), adding a `globIgnores` option the webpack-plugin path does
+  not have, to exclude assets that were never precached. `tsc` caught it. The
+  real behavior is in 09-changelog 2026-08-08 §6.
+
+### Deviations recorded (hard rule 8)
+
+- **The deep-link landing mark does not fade.** doc 22 §9.4.6 says the section is
+  marked *briefly*; it is marked for the visit instead, and the mark is gone as
+  soon as the reader moves on (the next section carries no origin). A timed fade
+  is absent for the reader who looked up mid-scroll and would replay on every
+  client-side re-render.
+- **The section route no longer prerenders.** Reading `searchParams` for `?from=`
+  makes it render per request. It costs nothing — the section comes from a frozen
+  in-memory registry with no I/O — and the prerendered HTML was never reachable
+  offline anyway (see D-04).
+
+**Next:** Phase 3 content, one chapter group per PR. Phase 2 also unblocks doc 23
+P5 (guide deep links), the last item before the 1.1.0 cut.
+
+## 2026-08-07 — doc 22 Phase 1: the manual's architecture, and one chapter end to end (N74)
 
 The reading surface exists, and chapter 6 fills it. Everything ships behind
 `releaseActive("1.1.0")` (doc 23 §9.2), so nothing is user-visible yet — the

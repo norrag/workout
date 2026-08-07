@@ -6,6 +6,9 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
+**Phases 0–2 built** (2026-08-06/08); the reading surface is complete and
+Phase 3's content is the next work. **One decision is back with the owner:** D3's
+offline promise is withdrawn on the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
 ([§4](#4-decisions), [§13](#13-owner-decisions--answered-questions)); three
 content areas added ([§6](#6-the-three-added-content-areas)); admin content
@@ -123,9 +126,10 @@ manual reader, so the house-style transcription must be recorded in
 
 **Not present when this plan was written:** any renderer, any `/guide` route, any
 search index, any manual-maintenance rule. Those are net-new — hence Phases 1–2.
-Phase 1 has since landed the block model, the section-ID scheme, the length
-budget, the house-styled renderer, and the section/chapter routes; the search
-index and the maintenance rule remain outstanding (Phases 2 and 8).
+Phase 1 landed the block model, the section-ID scheme, the length budget, the
+house-styled renderer, and the section/chapter routes; **Phase 2 landed the map,
+search, deep-link entry, the five content contracts and the three D3 guards**.
+Only the maintenance rule remains outstanding (Phase 8).
 
 ---
 
@@ -177,16 +181,40 @@ with an enforcement:
 2. **The manual is not precached.** Precaching would download every chapter at
    service-worker install — bandwidth the owner is right to refuse for reference
    material. **Enforcement:** manual chunks are excluded from `__SW_MANIFEST`;
-   a test asserts the precache manifest carries no manual assets.
-3. **Offline still works, for free, for anything you have read.** `sw.ts` already
-   runs `CacheFirst` over `/_next/static/**` with a 30-day expiry. A chapter read
-   once is a hashed immutable build asset in that cache, so it re-opens offline
-   afterwards. Nothing extra to build, nothing added to launch.
+   a test asserts the precache manifest carries no manual assets. *(Phase 2:
+   shipped — and the mechanism was simpler than assumed, because
+   `additionalPrecacheEntries` already replaces the public-directory glob and
+   `server/**` is excluded by the plugin. 09-changelog 2026-08-08 §6.)*
+3. ~~**Offline still works, for free, for anything you have read.**~~ ⚠️
+   **Withdrawn at Phase 2 — this reasoning was wrong.** See the correction
+   below.
 
-Net: **cache-on-read, not precache.** No launch cost, offline for what you have
-actually opened, and fully within hard rule 9 (immutable build assets only). The
-search index is the one shared artifact big enough to matter, so it is lazily
-fetched on first search rather than imported by the guide routes.
+Net: **cache-on-read, not precache.** No launch cost, and fully within hard
+rule 9 (immutable build assets only). The search index is the one shared
+artifact big enough to matter, so it is lazily fetched on first search rather
+than imported by the guide routes.
+
+> **Correction (2026-08-08, Phase 2) — offline manual reading is not
+> delivered, and on the owner's own terms it should not be bought.**
+>
+> Promise 3 assumed a chapter becomes a hashed asset under `/_next/static/**`,
+> where `sw.ts`'s `CacheFirst` rule would pick it up. It does not. The reader is
+> **server-rendered** — deliberately, so a section of any depth costs the reader
+> no JavaScript (09-changelog 2026-08-07 §4) — so its prose lives in the HTML
+> and the RSC payload, both of which `sw.ts` serves `NetworkOnly` by design
+> (R7 / hard rule 9). Nothing about a chapter ever enters the static-asset
+> cache. Offline, a guide navigation gets `/~offline` like every other screen.
+>
+> Buying it back would mean either shipping the prose as client JavaScript
+> (contradicting the reader's own design and inflating every route) or
+> precaching the guide (contradicting **D3 guard 2** and the owner's launch-cost
+> condition outright). **O1** accepted offline reading *"only because it is
+> free"* — it is not free, so the recommendation is to leave it withdrawn.
+> **Owner call needed only if that reasoning is not accepted.**
+>
+> **D3's condition is unaffected and fully met**: the guards exist to keep the
+> manual off the app's hot paths, which was never the same question as offline.
+> All three shipped and are enforced ([§11](#11-the-phased-plan) Phase 2).
 
 ### D4 — Two surfaces, one system. ✅ accepted
 
@@ -651,7 +679,7 @@ is a Vercel **preview** deploy with `NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0`
 > **map** are Phase 2, so until then the reader is reachable only by typing
 > `/more/guide/effort-rir`. That is scope, not a defect.
 
-### Phase 2 — Reader infrastructure
+### Phase 2 — Reader infrastructure — ✅ **BUILT 2026-08-08**
 
 | Scope | Size |
 |---|---|
@@ -662,9 +690,51 @@ link-target validation, the release gate, and the length budget — plus, from
 owner review round 2, **prev/next and related sections**, which this row no
 longer owes.)*
 
+> **Landed.** The design pass first (hard rule 8): 09-changelog **2026-08-08**,
+> claiming fig **4.11 — guide search** and building fig 4.8.
+>
+> - **The map** (`/more/guide`) — every chapter with its sections inline, so
+>   [§9.2](#92-shortest-paths)'s one-tap requirement holds; a corpus count in
+>   the meta line, and the search row above the list.
+> - **Search** (`/more/guide/search`, fig 4.11) — live-filtering as you type
+>   (the app's own P20 grammar), results as section rows with a **snippet**
+>   rather than the authored summary, and three distinct empty states.
+>   `search.ts` is the lexical index [§10](#10-how-the-connector-finds-things-in-the-manual)
+>   describes — title/keyword/glossary-alias/summary/body weighting, prefix
+>   matching, an all-terms bonus — and it is the same artifact Phase 5's
+>   `search_manual` will serve. **The design claim is tested, not asserted:**
+>   `search.test.ts` queries the real chapter, including one hand-authored
+>   keyword the prose never says ([§10.3](#103-the-honest-limit-and-what-to-do-about-it)).
+> - **Deep-link entry** — `?from=` re-points the breadcrumb at the screen the
+>   reader came from (N27) and moves the chapter parent to the right of the same
+>   row; the landed section carries the accent ■. `from` is validated against an
+>   allowlist, never trusted. One recorded deviation: the mark persists for the
+>   visit rather than fading (09-changelog 2026-08-08 §3).
+> - **The five [§8](#8-content-contracts) contracts** are now tests
+>   (`contracts.test.ts`): glossary identity with a **pending-terms ledger that
+>   may only shrink**, the honesty contract including *every cited
+>   `engine_params` path resolving against the schema*, the claims ledger parsed
+>   and every row's section resolved, positive framing, and plain language.
+> - **The three D3 guards** (`guards.test.ts`), the third of them reading the
+>   **built** service worker — CI re-runs the suite after `npm run build`.
+> - **`figure`** with its asset policy: single-colour line art under
+>   `public/manual/`, rendered as a CSS mask so it is correct in both themes,
+>   in its own 32-entry runtime cache ahead of the app-chrome image rule. First
+>   use is the ramp diagram in ch. 6, which states shape and no tunable value.
+> - **`GUIDE_SECTION_IDS`** populated for doc 23 — as **literal strings**, since
+>   `links.ts` is reachable from the app shell and importing the registry there
+>   would break D3 guard 1 on its first use. `link-targets.test.ts` resolves
+>   every one through the registry instead: one validator, two consumers.
+> - **The More-tab row** (`Guide`, first under `SETTINGS`), gated with the
+>   routes.
+>
+> **Two findings.** The **D3 promise-3 correction** above — offline manual
+> reading is not delivered by this architecture — and the serwist reading in
+> 09-changelog 2026-08-08 §6, which the first pass at guard 2 got wrong.
+
 **Exit:** the exemplar chapter is reachable, searchable, deep-linkable; CI
-enforces the contracts *and* the performance guards. Everything after this is
-content.
+enforces the contracts *and* the performance guards — **met**. Everything after
+this is content.
 
 ### Phase 3 — User Guide content
 

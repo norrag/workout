@@ -92,6 +92,22 @@ export const UG_EFFORT_RIR: ManualChapter = {
           text: "Each week of a block carries one target RIR, and it steps down as the block goes on. That pattern is the ramp.",
         },
         { kind: "term", term: "rir_ramp" },
+        {
+          // the first `figure` (doc 22 Phase 2). It draws the ramp's *shape*
+          // and no tunable value — the deload week's own target is stated in
+          // prose below, next to the parameter that sets it (§8.2), because a
+          // number baked into an image is the least greppable kind there is.
+          kind: "figure",
+          src: "/manual/rir-ramp.svg",
+          alt: "Target RIR across a five-week block: weeks 1 to 4 step down 3, 2, 1, 0, and week 5, the deload, sits well above them.",
+          width: 560,
+          height: 215,
+          caption: [
+            "A five-week block on the default ramp: four working weeks stepping ",
+            { num: "3 → 0" },
+            ", then a deload week well short of failure.",
+          ],
+        },
         { kind: "heading", text: "Setting it" },
         {
           kind: "para",

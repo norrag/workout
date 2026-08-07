@@ -129,15 +129,17 @@ renumbering).
 | | | 4.8 | Guide map (More → Guide) ‡ |
 | | | 4.9 | Guide — chapter contents ‡ |
 | | | 4.10 | Guide — a section ‡ |
+| | | 4.11 | Guide — search ‡ |
 
 > † No mockup exists for 4.6/4.7 — the June round predates the idea of a release.
 > Both are **derived from the house system** in the 2026-08-06 entry of
 > [09-design-changelog.md](09-design-changelog.md) (doc 23 Phase 0), which is
 > what the build transcribes.
 >
-> ‡ Same for 4.8–4.10 — the June round predates the manuals. Derived from the
+> ‡ Same for 4.8–4.11 — the June round predates the manuals. Derived from the
 > house system in the 2026-08-07 entry of
-> [09-design-changelog.md](09-design-changelog.md) (doc 22 Phase 1).
+> [09-design-changelog.md](09-design-changelog.md) (doc 22 Phase 1) and the
+> 2026-08-08 entry (Phase 2, which claims 4.11 and builds 4.8).
 >
 > The Volume stats tab (old 4.1) was removed; Balance→4.1, Performance→4.2. There is no 4.3.
 > Old 2.2 "Meso detail — RIR ramp" is gone — the planner board (2.5) is the single meso surface.

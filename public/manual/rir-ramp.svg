@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 215" width="560" height="215" role="img">
+  <!-- doc 22 Phase 2 — the first manual figure (09-changelog 2026-08-08 §5).
+       Single-colour line art on transparent: the renderer uses it as a CSS mask
+       filled with `currentColor`, so it is correct in both themes.
+
+       It states the ramp's SHAPE and nothing tunable. The deload week is drawn
+       above every working week but carries no number, because
+       `deload.target_rir` is an engine parameter and an image is the least
+       greppable place a value could go stale in. -->
+  <g fill="#000" font-family="Helvetica, Arial, sans-serif">
+    <text x="0" y="13" font-size="13" font-weight="700" letter-spacing="1.6">TARGET RIR</text>
+
+    <!-- the axis sits at 0 RIR — the line the working weeks step down onto -->
+    <rect x="30" y="149.25" width="500" height="1.5"/>
+
+    <polyline points="75,90 175,110 275,130 375,150 485,30" fill="none" stroke="#000" stroke-width="2.5"/>
+
+    <rect x="70" y="85" width="10" height="10"/>
+    <rect x="170" y="105" width="10" height="10"/>
+    <rect x="270" y="125" width="10" height="10"/>
+    <rect x="370" y="145" width="10" height="10"/>
+    <rect x="480" y="25" width="10" height="10"/>
+
+    <g font-size="22" font-weight="800" text-anchor="middle">
+      <text x="75" y="74">3</text>
+      <text x="175" y="94">2</text>
+      <text x="275" y="114">1</text>
+      <text x="375" y="134">0</text>
+    </g>
+
+    <g font-size="14" font-weight="700" letter-spacing="1.6" text-anchor="middle">
+      <text x="75" y="175">W1</text>
+      <text x="175" y="175">W2</text>
+      <text x="275" y="175">W3</text>
+      <text x="375" y="175">W4</text>
+      <text x="485" y="175">W5</text>
+    </g>
+
+    <text x="485" y="197" font-size="12" font-weight="700" letter-spacing="1.4" text-anchor="middle">DELOAD</text>
+  </g>
+</svg>

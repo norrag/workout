@@ -4,6 +4,41 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-08 — Session 109: user-manual Phase 2, reader infrastructure (N74)
+
+Doc 22 Phase 2 executed. The exemplar chapter is now reachable, searchable and
+deep-linkable, and CI enforces the contracts and the performance guards — the
+phase's stated exit. Still behind `releaseActive("1.1.0")`.
+
+- **Design pass first** (hard rule 8): `09-design-changelog.md` gains a
+  2026-08-08 entry claiming fig **4.11** (guide search) and building fig 4.8.
+- **Navigation**: the map (`/more/guide`) with sections inline, search
+  (`/more/guide/search`), the `Guide` row on More, and `?from=` deep-link entry
+  with an allowlist-validated origin and the accent ■ on the landed section.
+- **Search** is the lexical index doc 22 §10 designed — no embeddings, and the
+  design claim is tested against the real chapter rather than asserted,
+  including a hand-authored keyword the prose never uses.
+- **The five §8 contracts** are now tests, including a glossary pending-terms
+  ledger that may only shrink and a check that every `engine_params` path the
+  manual cites resolves **against the schema** (not the defaults — several live
+  parameters are `.optional()` and absent from `DEFAULT_ENGINE_PARAMS`, which is
+  exactly the shape of `e1rm.brzycki_max_eff_reps`, a value ch. 6 states).
+- **`figure`** shipped with its asset policy: a CSS mask filled with
+  `currentColor`, because the app has an explicit light/dark switch and a baked
+  `<img>` would disappear in one of them. Verified by rendering it in both
+  themes before shipping. Own cache, ahead of the 64-entry app-chrome bucket.
+- **`GUIDE_SECTION_IDS`** populated for doc 23 — the last thing doc 22 owed it.
+
+**Two findings.** doc 22 **D3's third promise is wrong** (`22a` **D-04**):
+offline manual reading was never going to work, because the reader is
+server-rendered and its prose is HTML plus an RSC payload, both `NetworkOnly`
+under R7 — never a `/_next/static/**` asset. Doc 22 §4 withdraws it on the
+owner's own **O1** framing ("worth having only because it is free"), and flags
+it for the owner in case that reasoning is not accepted. Separately, the first
+pass at D3 guard 2 was written against the wrong `@serwist/next` entry point
+(**D-05**) — caught by `tsc`, and the real precache behavior is now written
+down.
+
 ## 2026-08-07 — Session 108: user-manual Phase 1, architecture + one exemplar chapter (N74)
 
 Doc 22 Phase 1 executed. The reading surface exists and chapter 6 fills it, all

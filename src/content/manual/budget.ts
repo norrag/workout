@@ -85,6 +85,11 @@ function blockWords(block: ManualBlock): number {
         parts.push(markLabel(item.mark), inlineWords(item.text));
       }
       break;
+    case "figure":
+      // the caption is read; the alt text is not, for the reader the budget is
+      // sizing the screen for
+      if (block.caption) parts.push(inlineWords(block.caption));
+      break;
     case "link":
       parts.push(block.label);
       break;

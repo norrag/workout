@@ -35,6 +35,25 @@ const withSerwist = withSerwistInit({
   additionalPrecacheEntries: [
     { url: "/~offline", revision: crypto.randomUUID() },
   ],
+  // doc 22 D3, guard 2 — the manual never enters the precache manifest.
+  //
+  // Three facts about what `withSerwistInit` actually precaches, written down
+  // because each is easy to get wrong from the outside (and was, on the first
+  // pass at this guard):
+  //
+  //  1. Supplying `additionalPrecacheEntries` **replaces** the public-directory
+  //     glob outright, so `public/**` — manual figures included — is already
+  //     out. The `/~offline` entry above is doing that job as a side effect;
+  //     adding figures to the precache would take deleting it.
+  //  2. Assets under `server/` are excluded by the plugin itself, so no
+  //     prerendered guide HTML is ever precached.
+  //  3. What remains is the client build: `static/chunks/**`. The manual's only
+  //     client artifact is the search index, and it is behind a *named* dynamic
+  //     import precisely so one pattern can name it here.
+  //
+  // Asserted by `src/content/manual/__tests__/guards.test.ts`, which also pins
+  // the chunk name at the import site.
+  exclude: [/^static\/chunks\/manual-search-index/],
 });
 
 // Security headers applied to every response (07 Phase 7 — security pass).
