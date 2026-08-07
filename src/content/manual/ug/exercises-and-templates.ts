@@ -328,7 +328,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
         },
       ],
       related: [
-        "ug/planning-a-mesocycle#three-ways-to-start",
+        "ug/planning-a-mesocycle#starting-a-block",
         "ug/exercises-and-templates#sharing-by-code",
       ],
     },

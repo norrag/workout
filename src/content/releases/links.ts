@@ -68,7 +68,7 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/cycle-model#finding-your-cycles",
   "ug/cycle-model#one-block-at-a-time",
   // ch. 4 — Planning a mesocycle (Phase 3b)
-  "ug/planning-a-mesocycle#three-ways-to-start",
+  "ug/planning-a-mesocycle#starting-a-block",
   "ug/planning-a-mesocycle#the-planner-board",
   "ug/planning-a-mesocycle#the-exercise-sheet",
   "ug/planning-a-mesocycle#the-volume-check",

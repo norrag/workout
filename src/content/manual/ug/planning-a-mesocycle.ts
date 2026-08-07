@@ -25,6 +25,22 @@
 //     the live `deload.target_rir` is 6 (ledger `D-08`). The chapter states the
 //     truth without quoting that line
 //   - claims are registered in `docs/22a-manual-claims.md`
+//
+// OWNER REVIEW ROUND 4 (2026-08-11) — three notes, generalized as doc 22 §8.4c:
+//   - §1 gained the **connector** as a planning route. The owner's point is that
+//     it is the best one, not a footnote, so it gets a heading and two
+//     paragraphs. It names the route and hands off; ch. 18 and the AI Manual
+//     own how to use it, and the typed cross-link is owed once they exist
+//     (`create_mesocycle` lands `planned`; `activate_mesocycle` is
+//     confirm-gated and told to prefer in-app activation — `C-plan-01a`)
+//   - §4 now **renders `volume_landmarks`** instead of deferring MEV/MRV to
+//     ch. 12. A definition belongs where the reader meets the term; ch. 12
+//     keeps the depth. It left `PENDING_GLOSSARY_TERMS` here
+//   - §6 gained the **day view** as the other editing surface. Ch. 4 had
+//     documented the board as though it were the only way to change a running
+//     block (`C-plan-21`/`22`): swaps and adds carry
+//     `Repeat this change on this day in future weeks`, and a reorder
+//     propagates with no checkbox at all
 
 import type { ManualChapter } from "../types";
 
@@ -38,10 +54,10 @@ export const UG_PLANNING_A_MESOCYCLE: ManualChapter = {
   sections: [
     // -----------------------------------------------------------------------
     {
-      slug: "three-ways-to-start",
-      title: "Three ways to start a block",
+      slug: "starting-a-block",
+      title: "Where a block comes from",
       summary:
-        "Copy a block you have run, start from a template, or start blank — all three open the same board.",
+        "Three routes into the planner board — copy, template, or blank — and a fourth where you plan it in conversation.",
       keywords: [
         "new mesocycle",
         "new block",
@@ -51,6 +67,9 @@ export const UG_PLANNING_A_MESOCYCLE: ManualChapter = {
         "from scratch",
         "draft",
         "how do i start",
+        "connector",
+        "claude",
+        "chatgpt",
       ],
       blocks: [
         {
@@ -96,10 +115,28 @@ export const UG_PLANNING_A_MESOCYCLE: ManualChapter = {
             " — and the page says plainly that starting a new plan below replaces it.",
           ],
         },
+        { kind: "heading", text: "Or plan it in conversation" },
+        {
+          kind: "para",
+          text: [
+            { strong: "The fourth route is usually the best one." },
+            " Connect the app to an AI assistant — Claude or ChatGPT — and planning becomes a conversation: you say what you want the block to do, it reads your actual training history, and it drafts one. Ask for a fourth day, more pressing volume, an exercise swapped for one your gym actually has, and it redraws.",
+          ],
+        },
+        {
+          kind: "para",
+          text: "What arrives is a planned block, sitting in Cycles like any other, which you open on the board and start yourself. Nothing goes live without you.",
+        },
         {
           kind: "callout",
           tone: "note",
-          text: "Copying is the usual choice once you have a block behind you. It keeps the structure your progress was measured against, which is what makes the next block comparable to the last one.",
+          text: [
+            "Set it up from ",
+            { ui: "More" },
+            " → ",
+            { ui: "AI connector" },
+            ", which carries its own manual — what it can do, and how to ask for it.",
+          ],
         },
       ],
       related: [
@@ -270,27 +307,22 @@ export const UG_PLANNING_A_MESOCYCLE: ManualChapter = {
             " sits under the day board and re-totals with every edit you make. It is the plan checking itself before a single set is logged against it.",
           ],
         },
-        { kind: "heading", text: "Reading it" },
+        { kind: "heading", text: "The range each count is judged against" },
+        { kind: "term", term: "volume_landmarks" },
         {
           kind: "para",
           text: [
-            "Each muscle gets a weekly set count and the range that count is being judged against. Inside the range, the line stays quiet. Outside it, the line goes bold and names which end you are past — ",
+            "Inside the band the line stays quiet. Outside it the line goes bold and names the end you are past — ",
             { ui: "UNDER MEV" },
-            " for too little to be worth the sessions, ",
+            " or ",
             { ui: "OVER MRV" },
-            " for more than you are likely to recover from. Both are worth a second look rather than an alarm; the range is scaled to your training experience, and the block adjusts your set counts week by week regardless.",
+            ". Treat either as worth a second look rather than an alarm: the band is scaled to your training experience, and the block adjusts your set counts week by week from your feedback regardless.",
           ],
         },
+        { kind: "heading", text: "Why a count lands on a half" },
         {
           kind: "para",
-          text: "A count can land on a half. An exercise gives a full set to the muscle it mainly trains and a half set to each muscle it also works, so a row of pressing shows up partly under shoulders and triceps. The preview counts sets exactly the way your stats will count them afterwards, which is what makes the plan and the result comparable.",
-        },
-        {
-          kind: "callout",
-          tone: "note",
-          text: [
-            "Tap the dot beside either heading on the board to get the app's own definition of the range and of the counting rule, without leaving the plan you are editing.",
-          ],
+          text: "An exercise gives a full set to the muscle it mainly trains and a half set to each muscle it also works, so a row of pressing shows up partly under shoulders and triceps. The preview counts sets exactly the way your stats will count them afterwards, which is what makes the plan and the result comparable.",
         },
       ],
       related: [
@@ -397,6 +429,26 @@ export const UG_PLANNING_A_MESOCYCLE: ManualChapter = {
           tone: "note",
           label: "WHAT AN EDIT REACHES",
           text: "Completed and in-progress workouts keep every set you logged in them, exactly as logged. An edit reaches the days that have not been started yet — the rest of this week, and the weeks after it, which pick up the new plan as they are generated. The save confirmation says so before you commit.",
+        },
+        { kind: "heading", text: "Or change it from the session itself" },
+        {
+          kind: "para",
+          text: [
+            "The board is not the only way in. Standing in the gym, an exercise's ",
+            { ui: "⋮" },
+            " menu on the day screen moves it up or down the order, swaps it for another movement, or sets its ",
+            { to: "ug/effort-rir#per-exercise", text: "effort target" },
+            "; the workout's own menu adds an exercise. Both surfaces write to the same plan.",
+          ],
+        },
+        {
+          kind: "callout",
+          tone: "note",
+          text: [
+            "Swapping or adding an exercise there offers ",
+            { ui: "Repeat this change on this day in future weeks" },
+            " — tick it and the same day in every later week that has not started yet gets the change too. Reordering carries forward on its own, without asking.",
+          ],
         },
         {
           kind: "para",

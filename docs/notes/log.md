@@ -4,6 +4,43 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 111 (cont.): Phase 3b owner review round 4 (N74)
+
+Three notes on ch. 4, all folded in and generalized as **doc 22 §8.4c** so they
+bind 3c onward, plus one design proposal spun out as **N81**.
+
+**All three notes are the same failure.** Each chapter had documented its own
+surface accurately and left the reader worse off than the app would have.
+
+- **Name a better path, even when another chapter owns it.** Ch. 4 listed three
+  in-app routes into a block and said nothing about planning one through the
+  connector — which the owner points out is the most capable and usually the
+  easiest route there is. §1 now gives it a heading and two paragraphs. It
+  **points, it does not explain**: ch. 18 and the AI Manual own the how. Verified
+  before writing — `create_mesocycle` lands the block **`planned`**, and
+  `activate_mesocycle` needs `confirm="activate"` and is itself told to prefer
+  letting the athlete activate in-app, so "nothing goes live without you" is
+  true. The typed cross-link is owed once those sections exist.
+- **Define an advanced term where the reader meets it.** §4 was putting
+  `UNDER MEV` / `OVER MRV` in front of a reader eight chapters before ch. 12
+  defines them, on my reading of §8.4b rule 1. That rule sets **depth**; it does
+  not license leaving a term undefined at first use. §8.1 makes the fix free —
+  render the card, which is the app's own words. `volume_landmarks` left the
+  pending-terms ledger.
+- **Before writing "here is where you do X", find every surface that does X.**
+  §6 had the planner board as the only way to change a running block. The day
+  view's exercise ⋮ menu reorders, swaps, sets effort targets, and the workout
+  menu adds exercises. Worth the check: swaps and adds carry
+  `Repeat this change on this day in future weeks`, and a **reorder propagates
+  with no checkbox at all** — the owner's note said "checkbox", and the code says
+  checkbox for two of the three.
+
+**N81** — the fourth note is a design proposal, not an authoring rule: an inline
+underlined term as a second definition affordance, so a definition can live
+inside a sentence rather than trailing a label. New interaction pattern ⇒ hard
+rule 8. Scheduled into **doc 22 Phase 7a**, which already owes the ruling on
+`InfoDot` vs a manual link — three affordances, one grammar, decided together.
+
 ## 2026-08-10 — Session 111: user-manual Phase 3b, chapters 4 & 15 (N74)
 
 The planning chapter and the library chapter, six sections each, written to
