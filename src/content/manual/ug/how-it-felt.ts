@@ -62,7 +62,7 @@ export const UG_HOW_IT_FELT: ManualChapter = {
         },
         {
           kind: "para",
-          text: "One set is the whole range of the move, and it lands on the same day of the following week — Tuesday's answers meet you next Tuesday, on the muscle you gave them about.",
+          text: "One set is the whole range of the move, and it lands on the same day of the following week — Tuesday's answers meet you next Tuesday, on the muscle they were about.",
         },
         { kind: "heading", text: "The two things being asked" },
         {
@@ -74,8 +74,8 @@ export const UG_HOW_IT_FELT: ManualChapter = {
               "next week's set count for that muscle, on that day",
             ],
             [
-              "Fatigue, effort and performance, once for the session",
-              "whether a warranted weight increase goes ahead next week",
+              "The three sliders at the end of the session",
+              "whether a warranted weight increase goes ahead next week — fatigue and performance are the two that decide it",
             ],
           ],
         },
@@ -127,11 +127,11 @@ export const UG_HOW_IT_FELT: ManualChapter = {
           kind: "steps",
           steps: [
             {
-              label: "Some pain",
+              label: "Moderate",
               text: "No set is added, and the weight is held where it was rather than climbing. Both stay in force until you stop reporting it.",
             },
             {
-              label: "Real pain",
+              label: "High",
               text: "A set comes off the exercise, and the reason offered is that a different movement for that muscle may fit better.",
             },
           ],
