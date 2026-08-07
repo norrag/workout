@@ -2,7 +2,55 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-10 (latest) — doc 22 Phase 3b: planning a block, and the library (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3b, owner review round 4 (N74)
+
+Three notes on chapter 4, folded in and generalized as **doc 22 §8.4c** so they
+bind Phase 3c onward. One design proposal spun out as **N81**.
+
+### The three notes are one failure
+
+Each is a chapter documenting its own surface accurately and leaving the reader
+worse off than the app would have.
+
+1. **Name a better path, even when another chapter owns it.** Ch. 4 listed three
+   in-app routes into a block and was silent on planning one through the
+   connector — the most capable and usually the easiest route there is. §1 now
+   gives it a heading and two paragraphs, names what it is better at, and hands
+   off. Checked before writing: `create_mesocycle` lands the block **`planned`**,
+   and `activate_mesocycle` requires `confirm="activate"` and is told to prefer
+   in-app activation — so *"nothing goes live without you"* is a true statement,
+   not a reassuring one. The typed cross-link is owed once ch. 18 and the AI
+   Manual exist.
+2. **Define an advanced term where the reader meets it.** §4 put `UNDER MEV` and
+   `OVER MRV` in front of a reader eight chapters before ch. 12 defines them, on
+   a reading of §8.4b rule 1 that stretched too far: reading position sets
+   **depth**, not whether a term is defined at all. §8.1 makes the fix free — the
+   `volume_landmarks` card is the app's own words. It left
+   `PENDING_GLOSSARY_TERMS`; ch. 12 keeps the depth.
+3. **Before writing "here is where you do X", find every surface that does X.**
+   §6 documented the planner board as the only way to change a running block. The
+   day view's exercise `⋮` menu reorders, swaps and sets effort targets, and the
+   workout menu adds exercises. The detail the check turned up: swaps and adds
+   carry `Repeat this change on this day in future weeks`, and a **reorder
+   propagates with no checkbox at all**.
+
+Sections 1 and 6 are now the chapter's heaviest (301 and 308 words against 350),
+which is §8.4b rule 6 working as intended — the two things the owner said were
+missing are the two that gained the space.
+
+### N81 — a second definition affordance
+
+The fourth note is a design proposal: an inline **underlined term** that opens
+the same glossary card, so a definition can sit inside a sentence instead of
+trailing a label. `InfoDot` only fits where a term is a label, and `22c` §C2
+counts ~22 rendered terms with no definition anywhere — the affordance gap is
+real. New interaction pattern, so hard rule 8 applies: design pass first, and the
+underline has to read as distinct from a link without leaning on colour.
+Scheduled into **doc 22 Phase 7a**, which already owes the `InfoDot` vs
+manual-link ruling — three affordances, one grammar, decided together. The
+manual's stopgap needs no app change and shipped here (§8.4c rule 2).
+
+## 2026-08-10 — doc 22 Phase 3b: planning a block, and the library (N74)
 
 Chapters **4 — Planning a mesocycle** and **15 — Exercises & templates**, six
 sections each, at `/more/guide/planning-a-mesocycle` and

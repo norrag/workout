@@ -506,6 +506,52 @@ abstract, ch. 3 is what it looks like.
    sequence, a `figure` carries it better than a list can. The reader should be
    able to see the shape.
 
+### 8.4c Standing authoring rules from owner review round 4 (2026-08-11)
+
+Three notes came back off the Phase-3b chapters. Like
+[§8.4a](#84a-standing-authoring-rules-from-owner-review-round-2-2026-08-07) and
+[§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08),
+these bind **every chapter after them**. All three are the same underlying
+failure — a chapter documented its own surface accurately and left the reader
+worse off than the app would have.
+
+1. **Where a better path exists, name it — even when another chapter owns it.**
+   Ch. 4 documented three in-app routes into a block and said nothing about
+   planning one through the connector, which is the most capable and usually the
+   easiest route there is. Completeness about one surface is not service to the
+   reader. The rule is **point, do not explain**: name the route, say what it is
+   better at, say where it lives, and hand off to the chapter that owns it. A
+   chapter that owns a *task* owes every way of doing it; a chapter that owns a
+   *surface* owes only that surface's depth.
+2. **Define an advanced term where the reader meets it, not where the manual
+   files it.** *This narrows [§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+   rule 1 rather than contradicting it.* Reading position sets **depth**; it does
+   not license leaving a term undefined at first use. Ch. 4's volume check put
+   `UNDER MEV` and `OVER MRV` in front of a reader eight chapters before ch. 12
+   defines them. [§8.1](#81-the-glossary-is-one-source-not-two) makes the fix
+   free — render the `term` card, which is the app's own words, and let the
+   owning chapter go deeper. If the term has no glossary entry, that is the
+   signal to add one, per [`22c`](./22c-app-inventory.md) §C2.
+3. **Before writing "here is where you do X", find every surface that does X.**
+   Ch. 4 described planner-board editing as though it were the only way to change
+   a running block; the day view's exercise menu does the same work, and carries
+   a propagation control the chapter never mentioned. A grep for the action, not
+   for the screen, is the check — and it is the same discipline
+   [`22b`](./22b-source-map.md) §9 already demands of claims.
+
+> **The owner's fourth note is a design proposal, not an authoring rule.**
+> *"Advanced terms deserve definitions when used, or perhaps links to the
+> glossary, or clickable pop-up definitions, identified with underline as an
+> alternate to the circled i icon. This could be a useful standard tool for
+> definitions of complex terms throughout the app."* That is a second `InfoDot`
+> affordance — an inline underlined term rather than a trailing ⓘ — which is a
+> new interaction pattern and therefore a hard-rule-8 design pass. Tracked as
+> **N81** and folded into [§11](#11-the-phased-plan) **Phase 7a**, where the
+> link-placement grammar is decided anyway: 7a already owes the ruling on
+> `InfoDot` (term-level) versus a manual link (mechanism-level), and this is the
+> third affordance in that same grammar. Rule 2 above is what the manual does in
+> the meantime, and it needs no app change.
+
 ### 8.5 Plain-language vocabulary
 
 Per **O4**. A denylist test over manual copy: `LLM`, `large language model`,
@@ -876,6 +922,18 @@ contracts green.
 > own failure mode occurring inside the audit written to prevent it (22c is
 > corrected in place); **`D-10`** — N46's missing template-edit path, which ch. 15
 > states as the positive rule instead ([§8.4](#84-positive-framing)).
+>
+> **Owner review round 4 (2026-08-11) returned three notes on ch. 4**, all folded
+> in and generalized as [§8.4c](#84c-standing-authoring-rules-from-owner-review-round-4-2026-08-11).
+> §1 gained **the connector as a planning route** — named, not explained, because
+> it is the most capable path and ch. 4 had been silent about it; §4 now
+> **renders the `volume_landmarks` card** where the reader first meets MEV and
+> MRV, instead of deferring both to ch. 12 (the pending-terms ledger shrank by
+> one); §6 gained **the day view as the other editing surface**, including the
+> `Repeat this change on this day in future weeks` control and the fact that a
+> reorder propagates without one. A fourth note — an inline underlined term as a
+> second definition affordance — is a design proposal, tracked as **N81** and
+> ruled on in Phase 7a with the rest of the link grammar.
 
 ### Phase 4 — User Guide review gate
 

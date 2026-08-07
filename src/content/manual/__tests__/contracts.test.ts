@@ -45,8 +45,10 @@ const PENDING_GLOSSARY_TERMS: readonly GlossaryKey[] = [
   "e1rm_confidence",
   // ch. 13 (Reading your stats), Phase 3g
   "est_strength",
-  // ch. 12 (Volume), Phase 3e
-  "volume_landmarks",
+  // ch. 12 (Volume), Phase 3e. `volume_landmarks` left this list at Phase 3b:
+  // ch. 4's volume check is where a reader first meets MEV and MRV, and doc 22
+  // §8.4c rule 2 puts the definition at first use rather than at the chapter
+  // that owns the depth.
   "fractional_sets",
   // ch. 11 (Why the app asks how it felt), Phase 3e
   "pump",
