@@ -2,7 +2,80 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-08 (latest) — doc 22 Phase 2: the reader becomes a manual (N74)
+## 2026-08-08 (latest) — doc 22 Phase 3a: the first three chapters (N74)
+
+Phase 2 finished the reading surface, so this is the first phase that is purely
+content: chapters **1 What WORKOUT is**, **2 Your profile** and **3 The cycle
+model**, twelve sections, still behind `releaseActive("1.1.0")`.
+
+**No design pass, deliberately.** Hard rule 8 binds a new rendered pattern, and
+Phase 3a introduces none — no new block kind, no new screen, no new control.
+That the phase is cheap is the return on Phases 1–2 having been expensive.
+
+### What the chapters carry
+
+- **Ch. 1** — the premise (structure you build, program that fills it), the five
+  tabs, and the behavior `22c` Part A singles out as one the manual must state:
+  the Workout tab resolves to the **last day you viewed this session**, not to
+  today, so it resumes rather than resetting. Plus the version footer, the
+  history page, and when the What's New sheet may interrupt you (it may not, on
+  `/log/**`, while the queue drains, or once you have logged a set).
+- **Ch. 2** — every profile field and *what it changes*. The app already answers
+  half of this on the screen (`Drives starting volumes…`, `Calibrates the
+  realistic muscle-gain target…`), so both lines are quoted verbatim and the
+  prose picks up where they stop, per `22c` §B5.2's instruction to extend rather
+  than restate.
+- **Ch. 3** — the four layers as glossary cards, day slots, the Cycles list with
+  its counted completed-toggle (N76), and **N79**: more than one block can be
+  live, and the app follows the one holding your most recently logged set.
+  `22b` §5.1 flagged that as a chapter debt; it is paid here.
+
+### Glossary
+
+`day_slot` was added to `src/lib/glossary.ts` — the first of `22c` §C2's ten
+recommendations, taken because ch. 3 depends on it and §8.1 forbids the manual
+defining a term the app renders in different words. **The decision on the other
+nine: each lands with the chapter that needs it**, so its definition is authored
+by the pass that verifies the behavior behind it rather than nine at once by a
+pass that verifies none of them.
+
+The pending-terms ledger shrank by three. `macrocycle`, `mesocycle` and
+`microcycle` are exactly the terms `22c` finding **C1-a** called out as defined
+in the glossary but surfaced by no `InfoDot` anywhere — used as headings on
+screens with no way to ask what they mean. Ch. 3 renders all three. Giving them
+an `InfoDot` in the app is still Phase 7a's.
+
+### Ground truth
+
+The active parameter row was **re-read, not trusted**: `get_engine_params(25)`
+confirms v25 is still active and hash-verified, and that
+`e1rm.max_measuring_rir` is still absent — so `22b` §4.1 ① holds and the
+measuring band stays out of the manual. The five parameters ch. 2 states were
+added to `22b` §4.2 under that section's own rule. `22a` gains **38 rows**.
+
+### Two findings, recorded not fixed
+
+Phase 3a is a content phase and doc 22 §1.2 forbids behavior changes, so both
+are logged for a later PR:
+
+- **`D-06`** — `profiles.preferred_equipment`, the `EQUIPMENT ACCESS` toggles,
+  has **no consumer in the app**. No picker filters on it, no engine path reads
+  it, and it appears nowhere under `src/lib/engine/`; its only reader is the
+  connector's `get_profile`. Toggling `barbell` off changes nothing the user can
+  see, which is not what the control implies. Ch. 2 states what it does do and
+  points at the Exercises tab's `EQUIP` filter for browsing (§8.4). The real fix
+  is a product call: wire it into the pickers, or drop the field.
+- **`D-07`** — the profile's own body-fat copy ends *"Skip it and we fall back to
+  training age."* Since v21 that is one step short: the model first substitutes a
+  representative body fat for the BMI leanness band
+  (`macro_target.bf_proxy_pct`, present on v25), and training age is the fallback
+  only when height or bodyweight is missing too. The proxy exists precisely so
+  that filling the field in moves a target *proportionally* rather than switching
+  it to a different model — the app is under-describing its own improvement.
+
+**Next:** Phase 3b (ch. 4 Planning a mesocycle · ch. 15 Exercises & templates).
+
+## 2026-08-08 — doc 22 Phase 2: the reader becomes a manual (N74)
 
 Phase 1 built one chapter and the screen that renders a section. Phase 2 adds
 everything that makes it navigable — a map, a search, a door, and deep-link

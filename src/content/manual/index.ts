@@ -11,7 +11,10 @@
 // Workout tab's first load. Phase 2 turns the rule into an import-guard test in
 // the WS-J style; until then it is this comment and code review.
 
+import { UG_CYCLE_MODEL } from "./ug/cycle-model";
 import { UG_EFFORT_RIR } from "./ug/effort-rir";
+import { UG_WHAT_WORKOUT_IS } from "./ug/what-workout-is";
+import { UG_YOUR_PROFILE } from "./ug/your-profile";
 import { parseSectionId, sectionId } from "./ids";
 import type { ManualChapter, ManualId, ManualSection } from "./types";
 
@@ -51,10 +54,17 @@ export { FIGURE_ROOT } from "./types";
 /**
  * Every chapter, in reading order within each manual.
  *
- * Phase 1 ships one: chapter 6, the exemplar. Phase 3 fills the User Guide and
- * Phase 6 the AI Manual, each appending here.
+ * Phase 1 shipped one: chapter 6, the exemplar. Phase 3 fills the User Guide
+ * and Phase 6 the AI Manual, each appending here. Order in this array does not
+ * matter — `chaptersFor` sorts on `number`, so a chapter written out of
+ * sequence still reads in its place.
  */
-export const CHAPTERS: readonly ManualChapter[] = Object.freeze([UG_EFFORT_RIR]);
+export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
+  UG_WHAT_WORKOUT_IS, // 1
+  UG_YOUR_PROFILE, // 2
+  UG_CYCLE_MODEL, // 3
+  UG_EFFORT_RIR, // 6
+]);
 
 export function chaptersFor(manual: ManualId): readonly ManualChapter[] {
   return CHAPTERS.filter((c) => c.manual === manual).sort(

@@ -6,9 +6,10 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08); the reading surface is complete and
-Phase 3's content is the next work. **One decision is back with the owner:** D3's
-offline promise is withdrawn on the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
+**Phases 0–2 built** (2026-08-06/08) and **Phase 3a with them** — chapters 1, 2,
+3 and 6 are written, so the User Guide is four chapters of twenty-one.
+**One decision is back with the owner:** D3's offline promise is withdrawn on
+the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
 ([§4](#4-decisions), [§13](#13-owner-decisions--answered-questions)); three
 content areas added ([§6](#6-the-three-added-content-areas)); admin content
@@ -742,7 +743,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 
 | Phase | Chapters | Size |
 |---|---|---|
-| **3a** | 1 What WORKOUT is · 2 Your profile · 3 The cycle model | M |
+| **3a** | 1 What WORKOUT is · 2 Your profile · 3 The cycle model — ✅ **BUILT 2026-08-08** | M |
 | **3b** | 4 Planning a mesocycle · 15 Exercises & templates | M |
 | **3c** | 5 Training a session | M |
 | **3d-r** | **Research pass** for chapter 7 → `docs/reviews/2026-08-xx-rir-ramps-and-training-styles.md`, evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) | M |
@@ -755,6 +756,26 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 
 (Chapter 6 ships in Phase 1.) Each PR: content blocks + claims-ledger rows +
 contracts green.
+
+> **3a landed 2026-08-08.** Chapters 1–3 as twelve sections, 139–243 words each
+> against the 350 budget (corpus median 211, so the exemplar's densest section
+> is still the ceiling-brusher). **`day_slot` was added to `glossary.ts`** — the
+> first of [`22c`](./22c-app-inventory.md) §C2's ten, taken because ch. 3
+> depends on it and [§8.1](#81-the-glossary-is-one-source-not-two) forbids a
+> manual-only definition. **The decision on the other nine: each lands with the
+> chapter that needs it**, so the definition is authored by the pass that
+> verifies the behavior behind it. The pending-terms ledger shrank by three
+> (`macrocycle` / `mesocycle` / `microcycle`, the three [`22c`](./22c-app-inventory.md)
+> finding C1-a names as defined-but-unsurfaced — ch. 3 renders all three).
+>
+> **Two findings, both recorded in [`22a`](./22a-manual-claims.md), neither
+> fixed here** (Phase 3a is content; [§1.2](#12-scope-boundaries) forbids
+> behavior changes): **`D-06`** — `EQUIPMENT ACCESS` has no consumer in the app
+> at all, only in the connector's `get_profile`, so a reader toggling `barbell`
+> off changes nothing they can see; **`D-07`** — the profile's own body-fat copy
+> says a blank field falls back to training age, which v21's `bf_proxy_pct`
+> made one step short. Ch. 2 documents the truth in both cases and states it
+> positively.
 
 ### Phase 4 — User Guide review gate
 

@@ -16,7 +16,8 @@ export type GlossaryKey =
   | "workload"
   | "macrocycle"
   | "mesocycle"
-  | "microcycle";
+  | "microcycle"
+  | "day_slot";
 
 export interface GlossaryEntry {
   /** tracked all-caps card heading */
@@ -91,5 +92,14 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   microcycle: {
     label: "MICROCYCLE",
     body: "One week within a mesocycle. Each carries its own target RIR from the block's ramp.",
+  },
+  // 2026-08-08 (doc 22 Phase 3a): added because chapter 3 depends on it and
+  // §8.1 forbids the manual defining a term in words the app does not use.
+  // The model is real — the engine's advance lookup is keyed on
+  // (mesocycle, day number, exercise) and `analyzeByDaySlot` splits a lift's
+  // history the same way — but the app had no name a reader could ask about.
+  day_slot: {
+    label: "DAY SLOT",
+    body: "A position in your training week — day 2 of this block, every week it runs. Progress is read slot against slot, so the same lift trained twice a week is compared with its own day rather than pooled with the other one, where alternating loads would look like a sawtooth.",
   },
 };
