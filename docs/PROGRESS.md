@@ -2,7 +2,70 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3b, owner review round 4 (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3c: training a session (N74)
+
+Chapter **5 — Training a session**, six sections at
+`/more/guide/training-a-session`, still behind `releaseActive("1.1.0")`. The
+app's densest screen, and the first chapter written under **§8.4c**.
+
+Sections run 206–256 words against the 350 budget. The corpus median moves
+215 → 218 across 35 sections and ch. 6's mechanism section (323) is still the
+only one near the ceiling — this chapter is six sections of very even weight,
+which is what a screen-walkthrough chapter should look like.
+
+### What the chapter carries
+
+- **The day screen** — the coordinate, the date, the week's effort ask, and the
+  progress rule *with the fact that skipped sets leave its denominator*, which is
+  the difference between "I cut it short" and "I failed to finish". Then the
+  exercise card, the prescription strip named and handed off, and the session
+  pointer: the Workout tab returns to the day you were last on, and closing the
+  app drops it. (`22a` recorded that behavior against ch. 5 at round 3, where it
+  was cut from ch. 1 for being an edge case ahead of its orientation.)
+- **Moving between days** — the navigator behind the logotype: weeks with the
+  deload as `DL`, day chips, the accent dot on the block's real position, and
+  what a not-yet-generated day opens as. Weights are absent there because they
+  are chosen from recent sets when the week arrives, which is the same premise
+  ch. 1 opens the manual with.
+- **Logging a set** — the four columns, and **N68 stated as the reader
+  experiences it**: a tap is recorded on the phone and sent when it can be, so
+  the gym's dead spot cannot strand a session. The queue strip is described by
+  what it says, not by its existence.
+- **Adjusting as you go** — the two menus, as a table of intent → control.
+  Skipping is framed as the honest way to stop, since it is what keeps the
+  progress count and the record truthful.
+- **The questions after an exercise** — *when* the sheet appears (first and
+  group-closing exercise only, never the ones between) and what each question
+  asks. What the app **does** with the answers is ch. 11's.
+- **Finishing the session** — `COMPLETE WORKOUT` and why it can read
+  `SAVING THE LAST SETS…`, the three session questions, and the two ways to end
+  a day or a block early, both of which keep everything logged.
+
+### Seams held (§8.4b rule 1, §8.4c rule 1)
+
+Ch. 5 links **into** ch. 6 twice rather than restating what the RIR box means or
+what a set above the ask does to next week, and into ch. 4 for the controls that
+edit the *plan* rather than the session. It names the prescription strip and
+stops: ch. 17 owns the three layers, and it must stay that way while the
+coaching line's serving mode is unconfirmed (`22b` §8 **O-A**). The one forward
+debt is the feedback seam — §5 owes ch. 11 a typed cross-link, which lands with
+ch. 11 in Phase 3e.
+
+### No new glossary term, and no design pass
+
+`22c` §C2 marks ch. 5's undefined strings (`straight`/`drop`/`amend` set types,
+`no report`) as manual-only, and the chapter needs neither: the set-type row is
+hidden (P18) and `no report` is ch. 6's. No new block kind, no new asset — the
+first content PR since Phase 2 that touches no design surface at all.
+
+### 31 new `22a` rows, no new defects
+
+Every row read off `DayView.tsx`, `day-rules.ts`, `log/actions.ts` and the queue
+runtime rather than off doc 09 — Batch 32 moved two of this screen's surfaces
+(N75, N77) and N68 changed what a log tap *does*. Nothing new surfaced, which is
+worth recording: this screen has been through more review passes than any other.
+
+## 2026-08-11 — doc 22 Phase 3b, owner review round 4 (N74)
 
 Three notes on chapter 4, folded in and generalized as **doc 22 §8.4c** so they
 bind Phase 3c onward. One design proposal spun out as **N81**.

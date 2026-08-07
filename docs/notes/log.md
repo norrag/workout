@@ -4,6 +4,43 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 112: doc 22 Phase 3c — training a session (N74)
+
+Chapter **5**, six sections, 206–256 words against the 350 budget (corpus
+median 215 → 218 over 35 sections). The first chapter written under §8.4c, and
+the first content PR since Phase 2 that touches no design surface: no new block
+kind, no asset, and no glossary term owed — `22c` §C2 marks every undefined
+string on this screen (`straight`/`drop`/`amend`, `no report`) as manual-only.
+
+**What the chapter had to get right.** This is the screen a reader is standing
+in front of mid-set, so three things carry the weight:
+
+- **The progress rule excludes skipped sets.** Stated plainly, because it is the
+  difference between "I cut it short" and "I failed to finish" — and the same
+  math is what the completion sheet's `{n} / {n}` counts on (R19 fixed them
+  disagreeing once already).
+- **N68 said as the reader meets it.** *"Logging is queued"* is a build fact;
+  *"a tap is recorded on the phone and sent when it can be, so a dead spot in
+  the gym cannot strand you mid-exercise"* is what it buys (§8.4b rule 4). The
+  queue strip is described by what it says, not by its existence.
+- **The session pointer.** Cut from ch. 1 at round 3 for arriving before the
+  reader knew what the Workout page was; it belongs here, and `22a` had already
+  parked it against ch. 5 with the note that the owner's *"only for a few
+  minutes"* read has no timer behind it — the pointer is session-scoped, so it
+  dies when the app does.
+
+**Seams held.** Ch. 6 owns the RIR box and what a set above or below the ask
+does to next week (linked twice inline rather than restated); ch. 4 owns the
+controls that write the **plan** rather than the session; ch. 17 owns the
+prescription strip's layers, which ch. 5 names and hands off — and must, while
+**O-A** (is `LLM_EXPLANATIONS` serving or shadowing?) is unanswered. One forward
+debt: §5 owes ch. 11 a typed cross-link, which lands with ch. 11 in 3e, because
+a `link` cannot be authored before its target resolves.
+
+**31 new `22a` rows, no new defects.** Worth recording after three consecutive
+content phases that each found one or three: this screen has had more review
+passes than any other in the app, and it read clean.
+
 ## 2026-08-11 — Session 111 (cont.): the MEV/MRV card itself was the gap (D-11)
 
 One more note off round 4, on the fix rather than the chapter: rendering

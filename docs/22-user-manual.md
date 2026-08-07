@@ -6,8 +6,8 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3b with them** — chapters
-1, 2, 3, 4, 6 and 15 are written, so the User Guide is six chapters of
+**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3c with them** — chapters
+1, 2, 3, 4, 5, 6 and 15 are written, so the User Guide is seven chapters of
 twenty-one.
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
@@ -857,7 +857,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 |---|---|---|
 | **3a** | 1 What WORKOUT is · 2 Your profile · 3 The cycle model — ✅ **BUILT 2026-08-08** | M |
 | **3b** | 4 Planning a mesocycle · 15 Exercises & templates — ✅ **BUILT 2026-08-10** | M |
-| **3c** | 5 Training a session | M |
+| **3c** | 5 Training a session — ✅ **BUILT 2026-08-11** | M |
 | **3d-r** | **Research pass** for chapter 7 → `docs/reviews/2026-08-xx-rir-ramps-and-training-styles.md`, evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) | M |
 | **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system | L |
 | **3e** | 11 Why the app asks how it felt · 12 Volume | M |
@@ -934,6 +934,36 @@ contracts green.
 > reorder propagates without one. A fourth note — an inline underlined term as a
 > second definition affordance — is a design proposal, tracked as **N81** and
 > ruled on in Phase 7a with the rest of the link grammar.
+
+> **3c landed 2026-08-11.** Chapter **5** (Training a session), six sections,
+> 206–256 words against the 350 budget — the corpus median moves 215 → 218 over
+> 35 sections. The first chapter written under
+> [§8.4c](#84c-standing-authoring-rules-from-owner-review-round-4-2026-08-11),
+> and the first content PR since Phase 2 that touches **no** design surface: no
+> new block kind, no new asset, and [`22c`](./22c-app-inventory.md) §C2 marks
+> every undefined string on this screen as manual-only, so no glossary term was
+> owed either.
+>
+> The chapter walks the day screen — header and progress rule (skipped sets
+> leave its denominator), the navigator, the set row, the two menus, the
+> feedback prompts and the completion sheet — and holds three seams rather than
+> restating them: **ch. 6** owns what the RIR box means and what a set above or
+> below the ask does next week (linked twice inline), **ch. 4** owns the
+> controls that edit the plan rather than the session, and **ch. 17** owns the
+> prescription strip's layers, which ch. 5 names and hands off. That last one is
+> also a live constraint, not only a seam: the coaching line's serving mode is
+> still unconfirmed ([`22b`](./22b-source-map.md) §8 **O-A**). **One forward
+> debt:** §5 (the feedback prompts) owes ch. 11 a typed cross-link, which lands
+> with ch. 11 in Phase 3e — a link cannot be authored before its target
+> resolves ([§9.4](#94-the-rest) 5).
+>
+> N68 is stated as the reader meets it — a tap is recorded on the phone and sent
+> when it can be — because *"logging is queued"* is a build fact and *"a dead
+> spot in the gym cannot strand you mid-exercise"* is what it buys
+> ([§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+> rule 4). **31 new [`22a`](./22a-manual-claims.md) rows and no new defects** —
+> worth recording, because this screen has been through more review passes than
+> any other in the app.
 
 ### Phase 4 — User Guide review gate
 

@@ -74,6 +74,13 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/planning-a-mesocycle#the-volume-check",
   "ug/planning-a-mesocycle#naming-and-starting",
   "ug/planning-a-mesocycle#editing-a-running-block",
+  // ch. 5 — Training a session (Phase 3c)
+  "ug/training-a-session#the-day-screen",
+  "ug/training-a-session#moving-between-days",
+  "ug/training-a-session#logging-a-set",
+  "ug/training-a-session#adjusting-as-you-go",
+  "ug/training-a-session#how-it-went",
+  "ug/training-a-session#finishing-the-session",
   // ch. 6 — Effort: RIR and the ramp (Phase 1)
   "ug/effort-rir#what-rir-means",
   "ug/effort-rir#the-weeks-ramp",
