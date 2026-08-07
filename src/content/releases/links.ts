@@ -107,6 +107,13 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/deloads#how-it-reads-afterwards",
   "ug/deloads#when-you-need-one",
   "ug/deloads#choosing-to-have-one",
+  // ch. 10 — How your next weight is chosen (Phase 3f)
+  "ug/how-your-weight-is-chosen#the-anchor",
+  "ug/how-your-weight-is-chosen#how-sharp-the-estimate-is",
+  "ug/how-your-weight-is-chosen#from-a-number-to-a-weight",
+  "ug/how-your-weight-is-chosen#reps-first-then-weight",
+  "ug/how-your-weight-is-chosen#leading-by-one-step",
+  "ug/how-your-weight-is-chosen#how-often-a-step-comes",
   // ch. 11 — Why the app asks how it felt (Phase 3e)
   "ug/how-it-felt#what-your-answers-do",
   "ug/how-it-felt#joint-pain-first",

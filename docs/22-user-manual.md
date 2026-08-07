@@ -6,8 +6,8 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3e with them** —
-chapters 1–9, 11, 12 and 15 are written, so the User Guide is twelve chapters of
+**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3f with them** —
+chapters 1–12 and 15 are written, so the User Guide is thirteen chapters of
 twenty-one. **O7 is answered** by the 3d-r research pass ([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
@@ -908,7 +908,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | **3d-r** | **Research pass** for chapter 7 → [`docs/reviews/2026-08-11-rir-ramps-and-training-styles.md`](./reviews/2026-08-11-rir-ramps-and-training-styles.md), evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) — ✅ **DONE 2026-08-11** | M |
 | **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system — ✅ **BUILT 2026-08-11** | L |
 | **3e** | 11 Why the app asks how it felt · 12 Volume — ✅ **BUILT 2026-08-11** | M |
-| **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression | L — own review gate |
+| **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression — ✅ **BUILT 2026-08-11**, owner review gate open | L — own review gate |
 | **3g** | 13 Reading your stats · 14 Macrocycle goals | M |
 | **3h** | 16 Body data · 17 Prescription details · 19 Your data | M |
 | **3i** | 18 Connecting an AI · 20 Glossary (generated) · 21 Troubleshooting & FAQ | M |
@@ -1117,6 +1117,58 @@ contracts green.
 > owes it. **One defect, `D-13`** (above); **`D-08`** is stated the Phase-3a way —
 > ch. 9 gives the true deload target and does not narrate the create sheet's
 > stale literal.
+
+> **3f landed 2026-08-11 — the headline chapter, and its review gate is open.**
+> Chapter **10 How your next weight is chosen**, six sections, 185–292 words
+> against the 350 budget; the corpus median holds at 215 over 67 sections. It is
+> the chapter every other one has been handing off to — ch. 4, 5, 6, 7, 8, 9 and
+> 12 each stop at *"the weight comes from your recent sets"* and point here.
+>
+> **The structure is the argument.** Four steps in order: a set becomes an
+> estimate · the estimates fold into one anchor · the anchor prices a weight ·
+> a clean week earns one step on top. Each section is one step, so a reader who
+> stops anywhere has a true partial answer rather than half a mechanism.
+>
+> **The [`22b`](./22b-source-map.md) §6.1 correction is stated as a reason, not
+> as a rule.** Ch. 6 already carries the Epley/Brzycki **cutoff** in its layer 3;
+> ch. 10 owes the *why* — the two formulas agree over short heavy sets and one
+> runs away upward past roughly ten effective reps, so averaging them is right
+> inside that band and wrong above it. This doc's own §5 chapter-10 row was the
+> thing Phase 0a corrected, and `C-wt-06` is where the prose is finally pinned to
+> `e1rmFactor`.
+>
+> **Earned versus offered is the split that makes progression explicable.**
+> §5 answers *did last session earn a step* (eight predicates, in the reader's
+> words); §6 answers *is now when it gets spent* (the pacer plus three
+> governors). Doc 16's principle 4 — **budget, never quota** — is the closing
+> line of the chapter, because "none of these ever invents a step" is what stops
+> the pacer reading as the app deciding how strong you are.
+>
+> **Two facts the chapter states that no chapter had.** The rep climb **rides
+> the RIR step** (`climb_requires_rir_step`) and topping out is judged on your
+> **lowest** performed working set (`climb_on_performed_reps`) — both live, both
+> the kind of thing that reads as a bug when it surprises you. And
+> `progression.goal_rate_factor` is **0 for cut and maintain**, so those blocks
+> earn no steps at all; that was in the live row and in no manual sentence.
+>
+> **One defect, `D-14`, fixed here.** `GLOSSARY.e1rm_confidence` closed with a
+> sentence describing the **measuring band** — v26, inactive — so the card
+> claimed a rating tier no user has. It surfaced because ch. 10 is the first
+> chapter to render that card: [§8.1](#81-the-glossary-is-one-source-not-two)
+> forces the manual to carry the app's own words and **O3** forbids documenting
+> inactive behavior, and the two contracts collided on one sentence. Removed,
+> with a code comment carrying the exact text to restore when v26 activates. It
+> is the third defect §8.1 has caught in a card the manual was about to render,
+> and the first found by **O3** rather than by the copy rules. The card has no
+> `InfoDot` call site, so no reader had seen it.
+>
+> **The live row was re-read a third time** (`get_engine_params(25)`: still v25,
+> `params_hash 91887f0f…`, hash-verified, `max_measuring_rir` still absent), and
+> ten parameters were added to [`22b`](./22b-source-map.md) §4.2 under its own
+> rule. **23 new [`22a`](./22a-manual-claims.md) rows** and an eight-row
+> deliberately-absent table — the longest yet, because this chapter sits next to
+> five others' subjects. **`e1rm_confidence` is rendered**, leaving `est_strength`
+> (3g) as the last pending glossary term.
 
 > **Owner review round 5 (2026-08-11) returned four notes across 3c and 3e**,
 > all folded in and generalized as

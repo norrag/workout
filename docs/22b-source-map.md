@@ -185,6 +185,14 @@ for those rows, and the **only** sanctioned set of numbers.
 > still `91887f0f…`, still no `max_measuring_rir`.** The four
 > `session_*` / `pump_low` rows below were added from that read, and the
 > **ch. 11** chapter states each of them next to its path (doc 22 §8.2).
+>
+> **Re-read a third time 2026-08-11** (doc 22 Phase 3f, the ch. 10 review
+> gate), same call. **Still v25, still `91887f0f…`, still no
+> `max_measuring_rir`** — so [§4.1](#41-what-is-not-live) ① holds through four
+> content phases. Ten rows added below: the six `progression.*` governors ch. 10
+> states, the three double-progression flags, and `goal_rate_factor`, whose
+> **`cut: 0` / `maintain: 0`** is a user-visible fact no chapter had carried —
+> a cutting or maintaining block earns no steps at all.
 
 | `engine_params` path | Value | Where the manual needs it |
 |---|---|---|
@@ -213,6 +221,16 @@ for those rows, and the **only** sanctioned set of numbers.
 | `pain_gate` / `pain_cut_gate` | `2` / `3` | ch. 11 — the joint-pain gate, **stated first** |
 | `progression.mode` / `pacing` / `rate_source` | `"earned_step"` / `"macro_rate"` / `"plan"` | ch. 10, ch. 14 |
 | `progression.min_confidence` | `"moderate"` | ch. 10 — the earn gate |
+| `progression.step` | `"min"` | **ch. 10** — the quantum is the *smaller* of one load step and one rep |
+| `progression.cadence` | `"microcycle"` | **ch. 10** — at most one step per exercise per week |
+| `progression.peak_week` | `"skip"` | **ch. 10** — no step on the final working week |
+| `progression.miss_rearm_sessions` | `2` | **ch. 10** — the re-arm after repeated earned-then-missed cycles |
+| `progression.max_gap_days` | `10` | **ch. 10** — "recent enough to still describe you" |
+| `progression.goal_rate_factor` | `cut 0` · `maintain 0` · `gain`/`hypertrophy` `0.75` · `strength 1` | **ch. 10** — a **cut or maintain block takes no steps at all**; ch. 14 owns the gain/strength values |
+| `progression.envelope.min_history_mesos` | `2` | ch. 2, **ch. 10** — the point pacing starts following a user's own blocks |
+| `climb_requires_rir_step` | `true` | **ch. 10** — the +1 rep rides the RIR step; on a ramp-hold week the reps hold |
+| `climb_on_performed_reps` | `true` | **ch. 10** — topping out is judged on the **lowest** performed working set |
+| `hold_rep_consistent` | `true` | **ch. 10** — a held week keeps the load and re-derives reps, so the triple agrees |
 | `progression.envelope.enabled` | `true` | ch. 10 — **live**, self-gating per user |
 | `progression.band_position` | `0.5` | ch. 14 |
 | `progression.goal_rate_factor.hypertrophy` | `0.75` | ch. 14 |
