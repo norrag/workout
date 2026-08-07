@@ -4,6 +4,42 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-10 — Session 111: user-manual Phase 3b, chapters 4 & 15 (N74)
+
+The planning chapter and the library chapter, six sections each, written to
+ch. 3's composition model. Sections run 138–228 words; the corpus median moves
+225 → 215 over 29 sections.
+
+- **Ch. 4 (Planning a mesocycle)** — three routes in, the planner board, the
+  N78 exercise sheet, the live volume check, creating and starting the block,
+  and editing one mid-block. The board's day → muscle-group → slot nesting is
+  **drawn** (§8.4b rule 7) as `planner-structure.svg`, with the open slot dashed
+  because that is the board's own mark for empty.
+- **Ch. 15 (Exercises & templates)** — the two-axis filter, what an exercise
+  remembers, the load step (N67: steps index off the last weight *entered*),
+  custom exercises with the three bodyweight load meanings verbatim, templates,
+  and share codes.
+- **`load_step` added to `glossary.ts`** — the second of 22c §C2's ten, under
+  Phase 3a's rule that each term lands with the chapter that needs it.
+- **§8.4b rule 1 did real work.** Both chapters name things they do not define —
+  MEV/MRV, `EST. 1RM`, `BACKED OFF`, the ramp's values — because ch. 12, 10, 8
+  and 6 own them. That is the discipline that keeps Phase 4's duplication pass
+  cheap.
+
+**Three findings, none fixed (content phase, §1.2):**
+
+- **`D-08`** — the create-mesocycle sheet hardcodes `DELOAD AT 4 RIR`; the live
+  `deload.target_rir` is **6**, and every other surface reads the parameter. The
+  screen where the deload is set up is the one that misstates it.
+- **`D-09`** — `22c` §B2.6 said there are four ways to start a block. `Meso
+  builder` renders disabled with `" (soon)"`; three work. **doc 22 §2's failure
+  mode, occurring inside the audit written to prevent it** — transcribed copy
+  without the row's state. 22c corrected in place.
+- **`D-10`** — N46: no edit path for a saved template. Ch. 15 takes the positive
+  rule instead.
+
+Next: **3c** (ch. 5, Training a session).
+
 ## 2026-08-09 — Session 110 (cont.): Phase 3a owner review round 3 (N74)
 
 Seven content notes plus a navigation change, all folded in and generalized as
