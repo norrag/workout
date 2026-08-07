@@ -103,6 +103,29 @@ export type ManualBlock =
         readonly text: RichText;
       }[];
     }
+  /**
+   * A drawn figure — doc 22 D2, built in Phase 2 with its asset policy
+   * (09-changelog 2026-08-08 §5).
+   *
+   * The asset is **single-colour line art** under `public/manual/`, rendered as
+   * a CSS mask filled with `currentColor` rather than as an `<img>`. That is
+   * what makes a figure theme-correct: the app has an explicit light/dark
+   * switch on `<html data-theme>`, so baked ink would disappear in one of them
+   * and `prefers-color-scheme` cannot see an explicit override.
+   *
+   * `width`/`height` are the asset's own aspect, reserving space so a figure
+   * never shifts the prose it sits in.
+   */
+  | {
+      readonly kind: "figure";
+      /** `/manual/<name>.svg` — the path policy the guards assert */
+      readonly src: string;
+      /** what the figure says, for a reader who cannot see it */
+      readonly alt: string;
+      readonly width: number;
+      readonly height: number;
+      readonly caption?: RichText;
+    }
   /** a standalone onward link to another section */
   | { readonly kind: "link"; readonly to: string; readonly label: string }
   /**
@@ -112,10 +135,10 @@ export type ManualBlock =
    */
   | { readonly kind: "detail"; readonly blocks: readonly ManualBlock[] };
 
-// `figure` is named in doc 22 D2 and is deliberately absent until Phase 2 —
-// see 09-changelog 2026-08-07 §5 (its asset policy is a D3-guard question).
-
 export type ManualBlockKind = ManualBlock["kind"];
+
+/** Every figure asset lives here, so one glob covers the whole asset policy. */
+export const FIGURE_ROOT = "/manual/";
 
 // ---------------------------------------------------------------------------
 // Sections and chapters

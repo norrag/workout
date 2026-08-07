@@ -23,6 +23,19 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     body: "The card explaining your estimated one-rep max spells the term out, and says which way reps in reserve push it: at the same weight and reps, a set with reps to spare implies more strength than one taken to failure.",
     area: "training",
   },
+  {
+    // doc 22 Phase 2 (N74) — the reading surface. The chapters themselves land
+    // over Phase 3; this entry is what 1.1.0 announces, so it describes the
+    // guide rather than any one chapter.
+    id: "user-guide",
+    title: "A guide to the app, built into it",
+    body: "More → Guide explains what each screen does and how the numbers are worked out, in short sections you can read one at a time. Search it, or open a chapter and read straight through.",
+    area: "app",
+    link: {
+      label: "Open the guide",
+      target: { kind: "app", href: "/more/guide" },
+    },
+  },
 ];
 
 /**

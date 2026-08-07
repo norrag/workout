@@ -42,6 +42,174 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-08 — The reader gets its map, its search, and a way in (figs 4.8 / 4.11, N74 / doc 22 Phase 2)
+
+Phase 1 built one chapter and the screen that renders a section. Phase 2 makes
+it a *manual*: a map, a search, a door on the More tab, and the deep-link entry
+Phase 7's in-app links will use. One new figure number is claimed in the 08 §5
+index: **4.11 — guide search**. Everything else here either builds a surface the
+2026-08-07 entry already specified (4.8) or amends 4.10.
+
+The derivation rule is unchanged from that entry: no mockup exists, so each
+surface is composed from patterns the app already ships and the composition is
+written down before it is transcribed.
+
+### 1. The guide map (fig 4.8) — built as specified
+
+Built exactly as the 2026-08-07 entry §3 specified it, with two additions that
+only became decisions once the screen existed:
+
+- **The meta line counts the corpus** — `USER GUIDE · 1 CHAPTER · 6 SECTIONS`,
+  in the tracked `10px` meta form, counts in `.numeral`. A manual should say how
+  big it is; a reader deciding whether to browse or search is asking exactly
+  that.
+- **A chapter rule is a link.** The `SETTINGS`-style rule carrying the chapter
+  number and title is tappable and carries the app's quiet chevron, so the
+  chapter contents page (fig 4.9) is reachable without being *on the way* to
+  anything. Sections remain listed inline beneath it, which is what keeps
+  doc 22 §9.2's one-tap requirement true.
+- **Search sits above the chapters**, as a full-width `border-[1.5px]
+  border-ink` row reading `Search the guide` with the standard `SEARCH ›` quiet
+  label — the settings-row grammar at emphasis weight. It is above the list
+  because it is the shortest path for a reader who arrived with a question
+  rather than with curiosity.
+- **Impact.** `NET-NEW` — `/more/guide`.
+
+### 2. Guide search (fig 4.11)
+
+- **Change.** `/more/guide/search`: the More sub-page header (`‹ GUIDE`,
+  `h1.title-display` reading **search**, one tracked meta line), then a single
+  bordered field, then results. A result row is the fig-4.9 row grammar with a
+  tracked-caps `CH n · CHAPTER TITLE` line above the section title and a
+  **snippet** — a ~150-character window of the section's own prose around the
+  first match — where the chapter list shows the authored summary.
+- **It live-filters as you type**, which is the app's own search grammar (P20,
+  the exercise library) rather than a submit-and-render form. A reader who does
+  not yet know the manual's vocabulary needs to watch the corpus move under the
+  query; that is the whole reason typing beats submitting here.
+- **The snippet, not the summary.** A search result has to show *why it
+  matched*. The summary is the right thing on the map, where the reader is
+  browsing; in results it would hide the sentence they were looking for.
+- **The empty states are three, and each says something different**: before the
+  minimum query length, what a result *is* ("results are sections — each one
+  opens on its own screen"); while the index loads, `SEARCHING…`; on no match, a
+  suggestion of what kind of word to try. A single "no results" line would be
+  the same screen for three different situations.
+- **No accent.** Nothing here is a current position or a selection.
+- **Affected figures.** 4.11 (new).
+- **Impact.** `NET-NEW`.
+
+### 3. Deep-link entry — the back link follows the reader (fig 4.10, `RETROFIT`)
+
+- **Change.** A section route accepts `?from=`, the app's existing origin
+  grammar (N4, already on the exercise page and meso stats). When it is present
+  and resolves, the breadcrumb row's left link becomes `‹ {ORIGIN}` — `‹ WORKOUT`
+  for a link tapped mid-session — and the **chapter parent moves to the right of
+  the same row** as `{CHAPTER TITLE} ›`, so nothing is lost. Without it, the row
+  is exactly what Phase 1 shipped.
+- **Rationale.** N27, the standing rule: always back-link where you came from.
+  This is the surface where it matters most, because Phase 7 sends readers here
+  from the middle of a workout, and a back link into the guide would strand
+  them. Keeping the chapter link visible is what stops the fix from trading one
+  lost affordance for another.
+- **The landing mark is the accent's one job in the reader.** A deep-linked
+  section carries a **■ in orange** at the head of its meta line. Hard rule 7
+  reserves orange for current position, and "the section you were just sent to"
+  is precisely that — the same role the tab bar's ■ plays.
+- **Deviation from doc 22 §9.4.6, recorded.** The spec says the mark is shown
+  *briefly*. It is not animated: it persists for the visit and is gone the
+  moment the reader moves on, because the next section carries no origin. A mark
+  that fades on a timer is absent for the reader who looked up mid-scroll, and
+  it would replay on every client-side re-render. "For as long as you are on the
+  screen you were sent to" is the honest reading of *briefly* here.
+- **`from` is validated, not trusted.** It is matched against an allowlist of
+  in-app prefixes (longest wins, so More's children keep their own names) and
+  anything else — protocol-relative, backslashed, off-site, or simply
+  unrecognized — is dropped and the chapter breadcrumb stands. A wrong-looking
+  back link is a worse failure than no origin at all.
+- **Impact.** `RETROFIT` — fig 4.10's header, now
+  `src/components/manual/ManualSectionHeader.tsx` (shared with the Phase-6 AI
+  Manual reader).
+
+### 4. The door: a `Guide` row on More (fig 4.4, `RETROFIT`)
+
+- **Change.** A settings row — `Guide` with the quiet `READ ›` label — as the
+  **first** row under the `SETTINGS` rule, above `Theme`.
+- **Rationale.** doc 22 **O2** put the entry point on the More tab, and the app
+  has no separate tab for settings, so this is where it goes. First rather than
+  last because discoverability is the entire purpose of having an entry point,
+  and the rows below it are toggles a reader already knows how to find. It is a
+  navigation row among settings rows, which the AI connector and BodySpec rows
+  already established as acceptable on this screen.
+- **Gated with the routes it opens** (`releaseActive("1.1.0")`, doc 23 §9.2) —
+  one gate at the route boundary and one at the door, so a dark release has no
+  visible handle.
+- **Impact.** `RETROFIT` — fig 4.4.
+
+### 5. `figure` — the tenth… eleventh block kind, and its asset policy
+
+The 2026-08-07 entry §5 deferred `figure` to this phase on the grounds that its
+asset policy was a D3-guard question. It was, and the answer has two parts.
+
+- **Change.** A `figure` block renders a bordered box containing the asset, with
+  an optional caption beneath at `text-[11px] leading-[1.5] text-ink/55`. The
+  asset is **single-colour line art** under `public/manual/`, and it is rendered
+  as a **CSS mask filled with `currentColor`** — `mask-image` plus
+  `background-color`, not an `<img>`.
+- **Why a mask.** The app carries an explicit light/dark switch on
+  `<html data-theme>`. An `<img>` with baked ink disappears in one of the two
+  themes, and `prefers-color-scheme` cannot see an explicit override, so
+  `<picture>` does not solve it either. A mask takes the theme's own ink token
+  and is exactly right in both — verified by rendering the first figure in both
+  themes before it shipped. It also constrains figures to single-colour line
+  art, which is the only figure style the light-ledger system has room for.
+- **`role="img"` + `aria-label`** carry the alt text a mask would otherwise
+  drop, and a test requires every figure to have one: a figure that renders as a
+  mask is *nothing at all* to a reader who cannot see it.
+- **The cache policy.** Figures get **their own runtime cache**
+  (`manual-figures`, 32 entries, `CacheFirst`), matched **ahead of** the general
+  same-origin image rule. That rule's cache is capped at 64 entries **shared
+  with the app icons and splash screens**, and a chapter of figures read once
+  would quietly evict app chrome — the "the manual degraded the app" outcome
+  D3's condition exists to prevent. Cache-on-read, never precached.
+- **The first figure states shape, not values.** `rir-ramp.svg` draws a
+  five-week block stepping `3 · 2 · 1 · 0` with the deload week well above the
+  others and **no number on it**, because the deload target is an
+  `engine_params` value and an image is the least greppable place a number can
+  go stale in. The prose states it, next to its parameter path (doc 22 §8.2).
+- **Impact.** `NET-NEW` — `figure` in the block union, its renderer, the
+  `manual-figures` cache in `sw.ts`, and `public/manual/`.
+
+### 6. What the D3 guards actually turned out to be
+
+Recorded because the first pass at them was wrong in a way the next person would
+repeat. `@serwist/next` behaves differently from its own config-entry sibling:
+
+1. Supplying `additionalPrecacheEntries` **replaces** the public-directory glob
+   outright. The `/~offline` entry has therefore been keeping `public/**` out of
+   the precache since R7 — figures were never at risk, and adding them would
+   take deleting that option.
+2. Assets under `server/` are excluded by the plugin itself, so **no prerendered
+   guide HTML is ever precached**.
+3. Measured against a real build, the manifest holds exactly one entry
+   (`/~offline`). The named `manual-search-index` chunk exclusion in
+   `next.config.ts` is therefore defence in depth rather than the mechanism —
+   kept because it is the line that would still bite if the scoping changed.
+
+The guard that carries the weight reads the **built artifact**: CI re-runs the
+guard suite after `npm run build` and asserts the emitted manifest names nothing
+manual.
+
+**One correction to doc 22 falls out of the same reading**, and it is a real
+one: D3's third promise — *"a chapter read once is a hashed immutable build
+asset, so it re-opens offline"* — **does not hold**, because the reader is
+server-rendered. A section's prose lives in HTML and the RSC payload, both of
+which `sw.ts` serves `NetworkOnly` by design; it never becomes a
+`/_next/static/**` asset. Offline manual reading is not delivered, and under the
+owner's own framing of **O1** (*worth having only because it is free*) it should
+not be bought. Recorded in doc 22 §4 for the owner; the guards keeping the
+manual off the hot path stand regardless, because they were never about offline.
+
 ## 2026-08-07 — The manual reader: map, chapter contents, section (figs 4.8 / 4.9 / 4.10, N74 / doc 22 Phase 1)
 
 Hard rule 8 again has no figure to point at: the June mockup round predates the

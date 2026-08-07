@@ -1,7 +1,9 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { GUIDE_SECTION_IDS } from "../links";
 import { LINKABLE_ROUTES } from "../links";
+import { allSectionIds, resolveSection } from "@/content/manual";
 
 /**
  * doc 23 §7.1 — the allowlist is asserted against the App Router's route files,
@@ -47,5 +49,27 @@ describe("LINKABLE_ROUTES", () => {
 
   it("lists each route once", () => {
     expect(new Set(LINKABLE_ROUTES).size).toBe(LINKABLE_ROUTES.length);
+  });
+});
+
+/**
+ * doc 23 §7.2 / T11, closed by doc 22 Phase 2 — one validator, two consumers.
+ * `links.ts` holds literal strings so the release surfaces never import manual
+ * content (doc 22 D3 guard 1); this is the join that keeps them honest.
+ */
+describe("GUIDE_SECTION_IDS", () => {
+  it("is populated — doc 22 Phase 2 owed doc 23 this export", () => {
+    expect(GUIDE_SECTION_IDS.length).toBeGreaterThan(0);
+  });
+
+  it("resolves every ID through the manual registry", () => {
+    for (const id of GUIDE_SECTION_IDS)
+      expect(resolveSection(id), `${id} does not resolve`).toBeDefined();
+  });
+
+  it("lists each ID once, and none that the manual has dropped", () => {
+    expect(new Set(GUIDE_SECTION_IDS).size).toBe(GUIDE_SECTION_IDS.length);
+    const live = new Set(allSectionIds());
+    for (const id of GUIDE_SECTION_IDS) expect(live.has(id), id).toBe(true);
   });
 });

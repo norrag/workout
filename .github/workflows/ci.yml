@@ -26,6 +26,11 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+      # doc 22 D3 guard 2 — the precache assertion reads `public/sw.js`, which
+      # only exists after a build. Re-running the guard suite here is what makes
+      # "the manual is never precached" a checked property rather than a claim.
+      - name: Manual performance guards (against the built service worker)
+        run: npx vitest run src/content/manual/__tests__/guards.test.ts
 
   rls-tests:
     runs-on: ubuntu-latest

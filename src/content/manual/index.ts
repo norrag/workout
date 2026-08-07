@@ -44,6 +44,9 @@ export {
   SECTION_BUDGET,
 } from "./budget";
 export type { SectionSize } from "./budget";
+export { resolveOrigin } from "./origin";
+export type { ManualOrigin } from "./origin";
+export { FIGURE_ROOT } from "./types";
 
 /**
  * Every chapter, in reading order within each manual.
