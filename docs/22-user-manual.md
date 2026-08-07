@@ -552,6 +552,47 @@ worse off than the app would have.
 > third affordance in that same grammar. Rule 2 above is what the manual does in
 > the meantime, and it needs no app change.
 
+### 8.4d Standing authoring rules from owner review round 5 (2026-08-11)
+
+Four notes came back on the Phase-3c and Phase-3e chapters. Like
+[§8.4a](#84a-standing-authoring-rules-from-owner-review-round-2-2026-08-07),
+[§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08) and
+[§8.4c](#84c-standing-authoring-rules-from-owner-review-round-4-2026-08-11),
+they bind **every chapter after them**.
+
+1. **Where the reader enters a value, say what the value does — and who reads
+   it.** *This is the counterweight to [§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+   rule 1, not an exception to it.* Reading position sets depth; it does not
+   license a section that asks for input and explains nothing. A reader lands on
+   the screen chapter or the mechanism chapter with equal probability, and
+   **either must leave them able to proceed**: the point of entry owes the
+   one-line effect and a link, the owning chapter owes the reasoning. Ch. 5's
+   feedback and completion sections described the controls without saying which
+   knob the reader was pulling.
+   The second half of the rule is the one that is easy to miss: **say who else
+   reads it.** Exercise and session notes are legible to the connector, which
+   makes a note a message to two readers — yourself next week, and whoever helps
+   you plan. That is load-bearing for how the app is actually used, and no
+   chapter had said it.
+2. **An overview section is an answer, not an index.** A first section whose
+   content is *"the sections below explain this"* has spent a screen and told
+   the reader nothing. It must be complete **at its own depth** — every field,
+   one line each — so a reader who stops there still knows what their answers
+   do. Ch. 11 §1 deferred all five of its subjects to its own later sections.
+3. **Never claim a virtue by negation.** A third shape of the failure
+   [§8.4](#84-positive-framing) and
+   [§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+   rule 5 already chase: praising the app for an absence of friction —
+   *"with nothing to wait for and nothing to confirm"*, *"nothing about it is
+   hidden"*, *"nothing is lost by dismissing the sheet"*. The owner's word for
+   it was **self-congratulatory**, and it is the right one: each of those
+   sentences had a direct positive form available and reached for applause
+   instead. **Enforced** by a denylist in `contracts.test.ts` over *authored*
+   prose — a `term` block's body is the glossary's copy, so a rule the manual
+   could satisfy only by paraphrasing a card (and breaking
+   [§8.1](#81-the-glossary-is-one-source-not-two)) is the app's decision, not
+   the manual's.
+
 ### 8.5 Plain-language vocabulary
 
 Per **O4**. A denylist test over manual copy: `LLM`, `large language model`,
@@ -1008,6 +1049,36 @@ contracts green.
 > citation when — and only when — the schema resolves it, so the check reaches
 > the parameters these chapters actually cite. The dotted-path existence
 > assertion is untouched.
+
+> **Owner review round 5 (2026-08-11) returned four notes across 3c and 3e**,
+> all folded in and generalized as
+> [§8.4d](#84d-standing-authoring-rules-from-owner-review-round-5-2026-08-11).
+>
+> - **Ch. 5 gained a seventh section, `#notes`.** Notes are legible to the
+>   connector — *"a note to yourself, and to your training coach"* — which is
+>   how the feature is actually used and which no chapter had said. The section
+>   states the seam in both directions: prescriptions come from logged sets, and
+>   a note is the context an assistant reasons from when you ask it to work
+>   around a niggle or find a movement that suits you better. It was split out
+>   rather than appended because the addition took `#adjusting-as-you-go` to 360
+>   words, ten over budget — [§9.3](#93-the-section-length-budget) doing exactly
+>   what it exists for.
+> - **Ch. 5 §6 and §7 now say what each answer moves**, one line each, and link
+>   into ch. 11 — a reader lands on either chapter and both must leave them able
+>   to proceed.
+> - **Ch. 11 §1 is now a complete answer at its own depth**: a five-row table
+>   covering every field the app asks for, including the two it records rather
+>   than acts on, so a reader who stops there is not left guessing.
+> - **Three sentences claimed a virtue by negation** and are now direct. The
+>   denylist that replaced them found a fourth the review had not named
+>   (*"nothing is lost by dismissing the sheet"*), and it is scoped to authored
+>   prose because `GLOSSARY.e1rm`'s *"so you never have to test one"* is the
+>   app's copy — the manual renders it verbatim by contract and cannot reword it
+>   ([§8.1](#81-the-glossary-is-one-source-not-two)). That scoping is a new
+>   helper, `authoredProseOf`: contracts that judge **authorship** use it;
+>   contracts that judge what a **reader takes away** — hype, precision,
+>   overclaiming — keep reading the glossary's words too, because the reader
+>   does not care who typed them.
 
 ### Phase 4 — User Guide review gate
 

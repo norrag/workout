@@ -6,6 +6,7 @@ import { z } from "zod";
 import { engineParamsSchema } from "@/lib/engine/params";
 import { resolveSection } from "../index";
 import {
+  authoredProseOf,
   blockRuns,
   everySection,
   flatten,
@@ -371,6 +372,38 @@ describe("§8.4 — positive framing", () => {
     /\bthere is no way to\b/i,
     /\bisn't (?:a|an) .*\bapp\b/i,
   ];
+
+  /**
+   * §8.4d rule 3 (owner review round 5, 2026-08-11): a third shape of the same
+   * failure. §8.4's list above catches capability-absence and §8.4b rule 5
+   * catches the rhetorical "X is not Y, it is Y"; this catches praising the app
+   * for an absence of friction — "nothing to wait for and nothing to confirm",
+   * "nothing about it is hidden". Every one of these is a virtue the sentence
+   * could have stated directly, and the owner's word for it was
+   * self-congratulatory.
+   */
+  const VIRTUE_BY_NEGATION = [
+    /\bnothing (?:to (?:wait|confirm|configure|set up|remember|do)|else to)\b/i,
+    /\bnothing (?:about it )?is (?:hidden|lost)\b/i,
+    /\bnothing is lost\b/i,
+    /\bno need to\b/i,
+    /\bwithout having to\b/i,
+    /\bnever have to\b/i,
+    /\bno waiting\b/i,
+  ];
+
+  it("states a virtue directly rather than as an absence (§8.4d)", () => {
+    // authored prose only: `GLOSSARY.e1rm` says an estimate means "you never
+    // have to test one", which is the card's own way of saying what an estimate
+    // is for. §8.1 makes that text the app's to change, not the manual's.
+    for (const entry of everySection) {
+      const prose = authoredProseOf(entry);
+      for (const pattern of VIRTUE_BY_NEGATION) {
+        const hit = prose.match(pattern);
+        expect(hit?.[0], `${entry.id}: "${hit?.[0]}" — say what happens`).toBeUndefined();
+      }
+    }
+  });
 
   it("describes what the app is, not what it is not (§1.2)", () => {
     for (const entry of everySection) {

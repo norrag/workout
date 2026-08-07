@@ -4,6 +4,37 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 112 (cont.): Phase 3c/3e owner review round 5 (N74)
+
+Four notes across ch. 5 and ch. 11, generalized as **doc 22 §8.4d** (binding on
+every later chapter): say what an input does *and who reads it*, where it is
+entered · an overview section is an answer, not an index · never claim a virtue
+by negation.
+
+**The note the owner is making about notes is a product point, not a copy
+point.** Exercise and session notes are legible to the connector, so a note is a
+message to two readers — you next week, and whoever helps you plan. Checked
+before writing it: pinned notes come back from `get_exercise_notes` (and ride
+along with `get_exercise_history`), per-session notes are `session_note` on each
+history entry, and the whole-session note is `notes` on `get_recent_sessions`.
+The chapter states the seam in **both** directions, because "the AI reads my
+notes" invites the assumption that a note moves a number — nothing in
+`src/lib/engine/` reads one.
+
+Ch. 5 now has **seven** sections: the addition took `#adjusting-as-you-go` to
+360 words against the 350 budget, so notes were split out rather than appended.
+First time the length budget has forced a structural decision rather than a trim,
+and it made the better call.
+
+**The denylist found a note the review had not.** *"Nothing is lost by dismissing
+the sheet"* is the same self-congratulatory move as the two sentences the owner
+named. It also hit `GLOSSARY.e1rm`'s *"so you never have to test one"* — which
+the manual renders verbatim by §8.1 and cannot reword. Rather than weaken the
+rule or paraphrase a glossary card, the check now runs over **authored** prose
+(`authoredProseOf`), while the honesty and hype checks keep reading term bodies:
+a rule about authorship excludes the app's copy, a rule about what the reader
+takes away does not.
+
 ## 2026-08-11 — Session 112 (cont.): doc 22 Phase 3e — feedback and volume (N74)
 
 Chapters **11** and **12**, five sections each, taken **ahead of 3d** because 3d

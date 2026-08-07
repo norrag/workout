@@ -27,9 +27,13 @@
 //   - ch. 4 owns changing the plan (swaps, adds, reorders and their
 //     propagation); this chapter owns the session's own controls — a set
 //     skipped, a set added, weights reset
-//   - ch. 11 owns what the feedback does; §5 here says when it is asked and
-//     what each question means, and links out to it (the cross-link landed with
-//     ch. 11 in Phase 3e, which is when its target first resolved)
+//   - ch. 11 owns *why* the feedback works the way it does; §6 and §7 here each
+//     state what every answer moves, in one line, and link into it. Owner
+//     review round 5 (doc 22 §8.4d rule 1): a reader lands on either chapter,
+//     so the point of entry owes the working answer and the owning chapter owes
+//     the depth
+//   - §5 (notes) exists because notes are legible to the connector (owner,
+//     round 5): a note is context for coaching, never an engine input
 //   - ch. 17 owns the prescription strip's three layers and the details sheet;
 //     §1 names the strip and hands off
 
@@ -305,17 +309,6 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
           kind: "para",
           text: "Skipping is the honest way to cut something short: the sets stay on the record as planned and not done, and the day's progress reads against what you actually took on.",
         },
-        { kind: "heading", text: "Notes, while you remember them" },
-        {
-          kind: "para",
-          text: [
-            "The note button on the exercise card writes either kind. Left as it is, a note is ",
-            { ui: "Saved with just this session" },
-            " and sits with that day in the exercise's history. Tick ",
-            { ui: "Pin to this exercise" },
-            " and it becomes a standing line at the top of the card in every workout — a cue about form, a seat setting, a bar you cannot use.",
-          ],
-        },
         {
           kind: "callout",
           tone: "note",
@@ -329,7 +322,59 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         },
       ],
       related: [
+        "ug/training-a-session#notes",
         "ug/planning-a-mesocycle#editing-a-running-block",
+      ],
+    },
+    // -----------------------------------------------------------------------
+    {
+      slug: "notes",
+      title: "Notes, and who reads them",
+      summary:
+        "A line to yourself next week, and to whoever helps you plan — the context your numbers cannot carry.",
+      keywords: [
+        "note",
+        "pinned note",
+        "session note",
+        "add note",
+        "remember",
+        "form cue",
+        "seat setting",
+        "ai",
+        "coach",
+        "context",
+      ],
+      blocks: [
+        {
+          kind: "para",
+          text: [
+            "The note button on the exercise card writes either kind. Left as it is, a note is ",
+            { ui: "Saved with just this session" },
+            " and stays with that day in the exercise's history. Tick ",
+            { ui: "Pin to this exercise" },
+            " and it becomes a standing line at the top of the card in every workout — a cue about form, a seat setting, a bar you cannot use.",
+          ],
+        },
+        { kind: "heading", text: "Two readers" },
+        {
+          kind: "para",
+          text: [
+            { strong: "Both kinds are legible to a connected AI, alongside your numbers." },
+            " Weights and set counts are worked out from the sets you log; a note is the context around them — an elbow that has been grumbling for three sessions, a machine that never sits right, a grip that finally made the movement click.",
+          ],
+        },
+        {
+          kind: "para",
+          text: "That is the difference between an assistant planning your next block from your numbers alone and one that also knows which movements you have been getting on with. Ask it to work around a niggle, or for something that would suit you better, and your own notes are what it reasons from.",
+        },
+        {
+          kind: "callout",
+          tone: "note",
+          text: "Write it in the moment you notice it. A pinned note is the right home for anything that will be true again next week; a session note is for how today went.",
+        },
+      ],
+      related: [
+        "ug/exercises-and-templates#what-an-exercise-remembers",
         "ug/training-a-session#how-it-went",
       ],
     },
@@ -381,11 +426,39 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Everything in between is left alone. The sheet's own subtitle says where the answers land: ",
+            "Everything in between is left alone. The sheet's subtitle says where the answers land — ",
             { ui: "FEEDS W4 TARGETS" },
-            " — ",
-            { to: "ug/how-it-felt#what-your-answers-do", text: "next week's set counts" },
-            " for that muscle, on this day.",
+            " — and this is what each one moves:",
+          ],
+        },
+        {
+          kind: "table",
+          columns: ["Your answer", "What it moves"],
+          rows: [
+            [
+              "Joint pain",
+              "acts on its own: it stops a set being added and holds the weight, and at its worst takes a set away",
+            ],
+            [
+              "Workload",
+              "the main dial — too much takes a set off next week, too easy can add one",
+            ],
+            [
+              "Pump",
+              "backs up an easy session, so a set is added only when the two agree",
+            ],
+            [
+              "Soreness",
+              "kept with the session as part of your record",
+            ],
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "All of it lands on that muscle, on this day of next week. ",
+            { to: "ug/how-it-felt#what-your-answers-do", text: "Chapter 11 has the reasoning in full" },
+            " — why workload leads, and why pump only ever corroborates.",
           ],
         },
         { kind: "heading", text: "Answering it later, or changing it" },
@@ -398,14 +471,14 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
             { ui: "Add feedback" },
             " — and ",
             { ui: "Edit feedback" },
-            " once there is something to change. Nothing is lost by dismissing the sheet mid-session and coming back to it while you rack the weights.",
+            " once there is something to change. Dismiss it mid-session and everything stays as it was, so you can come back to it while you rack the weights.",
           ],
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "Answer it as you found it",
-          text: "These are your impressions, and they are treated as such — a signal that nudges next week's set count, not a measurement. The one that carries real weight is joint pain, which will hold volume back on its own.",
+          text: "These are your impressions, and they are treated as such — a nudge to next week's set count rather than a measurement of anything. A rating that flatters a session buys you work you will then have to recover from.",
         },
       ],
       related: [
@@ -456,9 +529,19 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         {
           kind: "para",
           text: [
-            "A free-text box under them is saved with the session. ",
+            "Between them those three decide one thing: whether next week's weight goes up on this day. It takes a day you were wiped out on ",
+            { strong: "and" },
+            " performed badly in to hold it — a hard day you were strong in climbs as usual. ",
+            { to: "ug/how-it-felt#the-session-questions", text: "Chapter 11 has the exact reading" },
+            ".",
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "A free-text box under them is saved with the session, and is read back by you and by a connected AI later. ",
             { ui: "NEXT WORKOUT →" },
-            " files the lot and moves you on; the program re-reads everything you logged behind the scenes, with nothing to wait for and nothing to confirm.",
+            " files the lot and moves you on while the program works next week out from what you logged.",
           ],
         },
         { kind: "heading", text: "Stopping early" },

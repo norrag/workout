@@ -89,3 +89,27 @@ export function proseOf(entry: IndexedSection): string {
     ...flatten(entry.section.blocks).flatMap(blockRuns).map(runText),
   ].join(" ");
 }
+
+/**
+ * The words the **manual** wrote — `proseOf` minus every `term` block's body.
+ *
+ * A `term` card renders `GLOSSARY[key].body` verbatim (doc 22 §8.1), so those
+ * sentences are the app's copy, not the manual's. A copy rule the manual could
+ * only satisfy by rewording the glossary is a rule about the app, and it belongs
+ * to `glossary.test.ts` and a design decision — not to a content test that would
+ * otherwise be "fixed" by paraphrasing the card and breaking §8.1 outright.
+ *
+ * Contracts that judge *authorship* use this; contracts that judge what a reader
+ * takes away — the honesty guardrails, the hype and precision denylists — keep
+ * using `proseOf`, because the reader does not care who typed it.
+ */
+export function authoredProseOf(entry: IndexedSection): string {
+  return [
+    entry.section.title,
+    entry.section.summary,
+    ...flatten(entry.section.blocks)
+      .filter((b) => b.kind !== "term")
+      .flatMap(blockRuns)
+      .map(runText),
+  ].join(" ");
+}

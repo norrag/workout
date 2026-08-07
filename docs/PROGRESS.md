@@ -2,7 +2,61 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3e: feedback and volume (N74)
+## 2026-08-11 (latest) — doc 22 Phases 3c/3e, owner review round 5 (N74)
+
+Four notes across chapters 5 and 11, folded in and generalized as **doc 22
+§8.4d** so they bind every later chapter.
+
+### The rules
+
+1. **Where the reader enters a value, say what the value does — and who reads
+   it.** The counterweight to §8.4b rule 1: reading position sets *depth*, not
+   whether an input is explained at all. A reader lands on the screen chapter or
+   the mechanism chapter with equal probability and both must leave them able to
+   proceed.
+2. **An overview section is an answer, not an index.** A first section that
+   defers all of its subjects to its own later sections has spent a screen and
+   said nothing.
+3. **Never claim a virtue by negation.** The third shape of the failure §8.4 and
+   §8.4b rule 5 already chase — praising the app for an absence of friction.
+   Enforced by a denylist.
+
+### What changed
+
+- **Ch. 5 gained a seventh section, `#notes`.** Notes are legible to the
+  connector — the owner's framing is *"a note to yourself, and to your training
+  coach"* — and no chapter had said so. Verified before writing: pinned notes
+  come back from `get_exercise_notes` and ride along with `get_exercise_history`,
+  per-session notes are `session_note` on each history entry, and the
+  whole-session note is `notes` on `get_recent_sessions`. The section states the
+  seam in both directions, because "the AI reads my notes" invites the
+  assumption that a note moves a number, and it does not.
+  It was **split out rather than appended**: the addition took
+  `#adjusting-as-you-go` to 360 words, ten over budget. §9.3 catching a real
+  overrun on its first genuine encounter is the length budget working as
+  designed.
+- **Ch. 5 §6 and §7 now state what each answer moves** — one line each, then a
+  link into ch. 11.
+- **Ch. 11 §1 is a complete answer at its own depth**: five rows covering every
+  field the app asks for, including the two it records rather than acts on.
+- **Three sentences claimed a virtue by negation** and are now direct.
+
+### The denylist found a fourth
+
+*"Nothing is lost by dismissing the sheet"* — the same move, in a sentence the
+review had not flagged. That is the argument for making a rule a test rather
+than a note to self.
+
+It also hit `GLOSSARY.e1rm`'s *"so you never have to test one"*, which the
+manual renders verbatim by contract and therefore cannot reword. So the check is
+scoped to **authored** prose via a new `authoredProseOf` helper: contracts that
+judge *authorship* exclude `term` bodies; contracts that judge what a *reader
+takes away* — hype, precision, overclaiming — keep reading them, because the
+reader does not care who typed the sentence. A copy rule the manual could only
+satisfy by breaking §8.1 is a rule about the app, and it belongs to a design
+decision.
+
+## 2026-08-11 — doc 22 Phase 3e: feedback and volume (N74)
 
 Chapters **11 — Why the app asks how it felt** and **12 — Volume**, five
 sections each, still behind `releaseActive("1.1.0")`. Taken ahead of 3d, which

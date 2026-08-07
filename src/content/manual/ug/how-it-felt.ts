@@ -58,33 +58,45 @@ export const UG_HOW_IT_FELT: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Your answers change how much work you are given, not how heavy it is. The weight comes from the sets you logged; the questions decide whether next week's version of that muscle's work is a set longer, a set shorter, or the same.",
+          text: "Your answers set how much work you are given. The weight comes from the sets you logged; the questions decide whether next week's version of that muscle's work is a set longer, a set shorter, or the same.",
         },
         {
           kind: "para",
           text: "One set is the whole range of the move, and it lands on the same day of the following week — Tuesday's answers meet you next Tuesday, on the muscle they were about.",
         },
-        { kind: "heading", text: "The two things being asked" },
+        { kind: "heading", text: "Every answer, and what it moves" },
         {
           kind: "table",
-          columns: ["Asked", "Reads on"],
+          columns: ["You answer", "It moves"],
           rows: [
             [
-              "Joint pain, pump and workload, per muscle group",
-              "next week's set count for that muscle, on that day",
+              "Joint pain",
+              "on its own, ahead of everything else: it stops a set being added and holds the weight, and at its worst takes a set away",
             ],
             [
-              "The three sliders at the end of the session",
-              "whether a warranted weight increase goes ahead next week — fatigue and performance are the two that decide it",
+              "Workload",
+              "the main dial on set count — too much takes a set off, too easy can add one",
+            ],
+            [
+              "Pump",
+              "the second signature on adding a set; on its own it moves nothing",
+            ],
+            [
+              "Soreness and effort",
+              "kept with the session as part of your record, for you and a connected AI to read back",
+            ],
+            [
+              "Fatigue and performance",
+              "together, whether next week's weight increase on this day goes ahead",
             ],
           ],
         },
         {
           kind: "para",
           text: [
-            "Nothing about it is hidden. Wherever an answer moved a number, the ",
+            "Wherever an answer moved a number, the ",
             { to: "ug/training-a-session#the-day-screen", text: "prescription strip" },
-            " on that exercise says which one did it, in the same words you used to answer.",
+            " on that exercise says which one did it, in the same words you used to answer. The sections that follow are the reasoning behind each row.",
           ],
         },
         {
