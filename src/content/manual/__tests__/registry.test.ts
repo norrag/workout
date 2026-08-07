@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import {
+  adjacentChapters,
   adjacentSections,
   allSectionIds,
   budgetBreaches,
@@ -151,6 +152,36 @@ describe("reading order and adjacency", () => {
       expect(prev?.chapter.manual ?? "ug").toBe("ug");
       expect(next?.chapter.manual ?? "ug").toBe("ug");
     }
+  });
+});
+
+// doc 22 §9.2 as amended 2026-08-08 (owner review round 3): the map lists
+// chapters only, so the chapter page is on the browse path and carries the
+// section footer's affordance one level up (09-changelog 2026-08-09 §2).
+describe("chapter adjacency", () => {
+  it("chains in chapter-number order, with open ends", () => {
+    const chapters = chaptersFor("ug");
+    expect(adjacentChapters("ug", chapters[0].slug).prev).toBeUndefined();
+    expect(
+      adjacentChapters("ug", chapters[chapters.length - 1].slug).next,
+    ).toBeUndefined();
+    for (let i = 0; i < chapters.length - 1; i++) {
+      expect(adjacentChapters("ug", chapters[i].slug).next?.slug).toBe(
+        chapters[i + 1].slug,
+      );
+      expect(adjacentChapters("ug", chapters[i + 1].slug).prev?.slug).toBe(
+        chapters[i].slug,
+      );
+    }
+  });
+
+  it("stays inside one manual, and shrugs at an unknown slug", () => {
+    for (const chapter of chaptersFor("ug")) {
+      const { prev, next } = adjacentChapters("ug", chapter.slug);
+      expect(prev?.manual ?? "ug").toBe("ug");
+      expect(next?.manual ?? "ug").toBe("ug");
+    }
+    expect(adjacentChapters("ug", "no-such-chapter")).toEqual({});
   });
 });
 

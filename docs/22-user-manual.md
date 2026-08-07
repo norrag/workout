@@ -464,6 +464,47 @@ four are rules for **every chapter after it**, not one-off corrections.
 4. **An adjacent section is one tap.** Prev/next in the section footer, naming
    its destination rather than showing a bare arrow.
 
+### 8.4b Standing authoring rules from owner review round 3 (2026-08-08)
+
+Seven notes came back off the Phase-3a chapters. Like [§8.4a](#84a-standing-authoring-rules-from-owner-review-round-2-2026-08-07)
+these are **rules for every chapter after them**, not corrections to three.
+Chapter 3 was signed off as the composition model — *"focused and substantive.
+All chapters should aim to be composed this way"* — so where a rule below is
+abstract, ch. 3 is what it looks like.
+
+1. **Orientation before detail. A chapter's depth is set by its place in the
+   reading order.** Chapter 1 introduces basic operation; a behavior that is
+   secondary, conditional, or an edge case belongs to the chapter that owns the
+   surface. The test is *does a reader who has never opened this screen need
+   this yet?* — and if the answer is no, it moves, however true it is. Phase 3a
+   failed this three times in one chapter: the Workout tab's session-resume
+   pointer and the entire version-history feature were introduced before the
+   reader had been told what the Workout page shows.
+2. **Every sentence carries substance.** A sentence the reader would skip is a
+   sentence that should not be there. *"Every list and detail screen paints its
+   own frame the moment you tap"* was true, sourced, and useless.
+3. **Distill — never describe a description.** Where the app already explains
+   something on screen, state the **point**, once, in plain words. Quoting app
+   copy through a `ui` run is for labels, controls, and lines the reader must
+   **find** on screen; it is not for explanation they can already read there.
+   *This corrects the round-1 reading of [`22c`](./22c-app-inventory.md) §B5.2:*
+   "extend, do not restate" means **take it further**, not quote-then-gloss.
+4. **The reader's words, not the build's.** [§8.5](#85-plain-language-vocabulary)
+   bans the connector's vocabulary; this bans the app-designer's. *Renders*,
+   *surface*, *state*, *component*, *route* describe how the thing was made. A
+   reader has a page that shows things.
+5. **Never define a thing by what it is not** — including rhetorically.
+   [§8.4](#84-positive-framing)'s test catches capability-absence; the same
+   failure in the shape *"X does not lead to Y. It is Y"* passes the test and
+   fails the rule. Say what it is, first, in the first sentence.
+6. **Weight follows importance.** How much space a thing gets is a claim about
+   how much it matters. A section titled *what the profile is for* that spent
+   two paragraphs and a callout on bodyweight while barely answering its own
+   title is a proportion failure, independent of whether each sentence is true.
+7. **Draw what is structural.** Where the subject is a hierarchy, a nesting or a
+   sequence, a `figure` carries it better than a list can. The reader should be
+   able to see the shape.
+
 ### 8.5 Plain-language vocabulary
 
 Per **O4**. A denylist test over manual copy: `LLM`, `large language model`,
@@ -492,15 +533,39 @@ separate.
 
 ### 9.2 Shortest paths
 
+> **Amended 2026-08-08, owner review round 3.** This section originally required
+> the map to list **every section inline**, so that any section was one tap from
+> `/more/guide`. The owner reversed it: *"the guide landing page should show only
+> the chapter titles and one-liners, with click-through to view the subsections.
+> This would keep each view manageable."*
+>
+> **The reversal is right, and the original reasoning was the mistake.** §9's
+> whole premise is that a manual fails by becoming one untraversable document —
+> and an inline map is exactly that failure moved up a level. With 21 chapters at
+> ~6 sections it would have been a ~130-row wall, which is a worse orientation
+> surface than the thing it was optimizing a tap away from. **Browsing depth and
+> reading depth are different problems**: the tap budget below is what matters
+> for a reader who knows what they want, and search and Phase 7's in-app links
+> already serve them at 1 and 0 taps. A reader who is *browsing* wants the shape
+> of the manual, which is 21 titles, not 130 rows.
+>
+> The chapter page therefore joins the critical path, and in exchange it gains
+> **chapter-level prev/next** so cover-to-cover browsing works the way
+> section-level prev/next already makes cover-to-cover reading work
+> ([§8.4a](#84a-standing-authoring-rules-from-owner-review-round-2-2026-08-07)
+> rule 4, applied one level up).
+
 | From | To a section | Taps |
 |---|---|---|
 | A link placed in the app (Phase 7) | the exact section | **0** — the link *is* the section route |
 | Search | the section | **1** — results are section routes |
-| `/more/guide` (the map) | any section | **1** — the map lists chapters with their sections inline (expandable), so a section is never behind a chapter page |
+| `/more/guide` (the map) | any section | **2** — chapter, then section. The map is 21 titles with a one-line summary each, so the shape of the manual fits on a screen or two |
+| A chapter page | the next chapter | **1** — chapter prev/next |
 | A section | the next section | **1** — prev/next crosses chapter boundaries, so cover-to-cover reading stays "next, next, next" |
 
-The chapter route exists for orientation and for a stable parent in breadcrumbs;
-it is never on the critical path to a section.
+The chapter route is now both the orientation layer and the stable breadcrumb
+parent. Search is what keeps the second tap from mattering to a reader who
+already knows what they are looking for.
 
 ### 9.3 The section-length budget
 
@@ -514,7 +579,7 @@ discovered by a reader.
 
 ### 9.4 The rest
 
-1. **Contents page per manual** — chapters with one-line descriptions, in reading order, sections inline.
+1. **Contents page per manual** — chapters with one-line descriptions, in reading order. *(Amended 2026-08-08 per [§9.2](#92-shortest-paths): titles and summaries only. The section list is the chapter page's job.)*
 2. **Stable section IDs** — permanent slugs (`ug/effort-rir#per-exercise`). These are link targets for Phase 7 *and* retrieval keys for [§10](#10-how-the-connector-finds-things-in-the-manual), so they are an API: renaming one is a breaking change needing a redirect entry.
 3. **Search** — one field over both manuals, over section titles, body text, glossary terms, and hand-authored keywords ([§10.3](#103-the-honest-limit-and-what-to-do-about-it)). Built from the block model at build time, lazily fetched on first search (D3), client-side, no new dependency.
 4. **Breadcrumb-back to origin** — a reader who enters from the day view returns to the day view (the app's existing N27 rule).
@@ -757,9 +822,18 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 (Chapter 6 ships in Phase 1.) Each PR: content blocks + claims-ledger rows +
 contracts green.
 
-> **3a landed 2026-08-08.** Chapters 1–3 as twelve sections, 139–243 words each
-> against the 350 budget (corpus median 211, so the exemplar's densest section
-> is still the ceiling-brusher). **`day_slot` was added to `glossary.ts`** — the
+> **3a landed 2026-08-08; owner review round 3 revised it 2026-08-09.** Chapters
+> 1–3, now **eleven** sections, 114–285 words each against the 350 budget
+> (corpus median 225, so the exemplar's densest section is still the
+> ceiling-brusher). The review's seven rules are
+> [§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+> and its navigation reversal is [§9.2](#92-shortest-paths); **ch. 3 was signed
+> off as the composition model for every chapter after it**. Ch. 1 lost its
+> version-history section outright (not a primary function — 22c already assigns
+> it to ch. 19) and its Workout-tab section was rewritten from an edge case into
+> an orientation; ch. 2's first two sections were re-proportioned and stopped
+> quoting the app's own explanatory copy back at the reader; ch. 3 gained a
+> nesting figure. **`day_slot` was added to `glossary.ts`** — the
 > first of [`22c`](./22c-app-inventory.md) §C2's ten, taken because ch. 3
 > depends on it and [§8.1](#81-the-glossary-is-one-source-not-two) forbids a
 > manual-only definition. **The decision on the other nine: each lands with the

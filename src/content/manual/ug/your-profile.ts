@@ -1,11 +1,18 @@
 // User Guide — chapter 2, "Your profile" (doc 22 §5).
 //
 // The brief is "the fields the engine actually uses, and *what each one
-// changes*". 22c §B5.2 is explicit that the app already answers half of this
-// on the screen itself (`Drives starting volumes…`, `Calibrates the realistic
-// muscle-gain target…`) and that the manual must **extend** those lines rather
-// than restate them in different words — so both are quoted as `ui` and the
-// prose picks up where they stop.
+// changes*".
+//
+// **Owner review round 3 rewrote §1 and §2 of this chapter**, and the rules are
+// doc 22 §8.4b. The first draft read 22c §B5.2's "extend, do not restate" as
+// *quote the app's own line, then gloss it* — so `Drives starting volumes and
+// how aggressively autoregulation ramps.` and `Calibrates the realistic
+// muscle-gain target on your macrocycles.` were rendered as `ui` runs with the
+// prose commenting on them. That is describing a description (§8.4b rule 3):
+// the reader has already read that line on the screen, and what they want is
+// the point behind it. Both quotes are gone; the sections state the point.
+// §1 was also re-proportioned (rule 6) — it spent two paragraphs and a callout
+// on bodyweight while barely answering its own title.
 //
 // GROUND TRUTH (22b §7 ch. 2 — `/more/profile` code, doc 17, `engine/macro.ts`):
 //   - the field list and its copy are `more/profile/ProfileEditor.tsx`
@@ -37,14 +44,13 @@ export const UG_YOUR_PROFILE: ManualChapter = {
       slug: "what-it-is-for",
       title: "What the profile is for",
       summary:
-        "Every field on it is an input to something — none of it is decoration.",
+        "Six facts about you that the program reads, and the three jobs it reads them for.",
       keywords: [
         "profile",
         "settings",
         "personal details",
         "why does it ask",
-        "bodyweight",
-        "as of",
+        "what does it use",
       ],
       blocks: [
         {
@@ -52,36 +58,42 @@ export const UG_YOUR_PROFILE: ManualChapter = {
           text: [
             "Your profile lives under ",
             { ui: "More" },
-            " → your name. Every field on it feeds something: your starting set counts, the weight on a bodyweight movement, or how much progress a long-term goal should realistically expect from you.",
+            " → your name. It is short, and every field on it is read by the program rather than kept as a record. Three jobs between them:",
+          ],
+        },
+        {
+          kind: "list",
+          items: [
+            [
+              { strong: "How much you should expect to gain" },
+              " — sex, age, height, bodyweight and body fat set what a long-term goal can realistically plan for.",
+            ],
+            [
+              { strong: "How much work to start you on" },
+              " — your experience sets the weekly set counts a new block is built around.",
+            ],
+            [
+              { strong: "What you get offered" },
+              " — the equipment you have, and any movements you never want to see.",
+            ],
           ],
         },
         {
           kind: "para",
-          text: "It is short on purpose, and it is worth filling in properly once. Tap a row to edit it; changes save as you make them.",
+          text: "None of it changes what a single set asks of you — that comes from your recent sets. It shapes the plan those sets sit inside.",
         },
-        { kind: "heading", text: "Bodyweight, and when you weighed" },
+        { kind: "heading", text: "Keeping bodyweight current" },
         {
           kind: "para",
           text: [
-            "Bodyweight shows with the date it was taken — ",
+            "Bodyweight is the one field that goes stale, so it always shows the date it was taken — ",
             { ui: "AS OF 12 JUL" },
-            " — wherever it appears, because a number from four months ago should not read the same as one from this morning.",
-          ],
-        },
-        {
-          kind: "para",
-          text: [
-            "For quick entries, the ",
-            { ui: "More" },
-            " tab has a ",
+            ". It is also the load on a push-up or a pull-up, so a stale figure quietly misprices those. The ",
             { ui: "Log bodyweight" },
-            " row. That appends a dated measurement to your weight history rather than overwriting the profile figure, so the series is preserved.",
+            " row on the ",
+            { ui: "More" },
+            " tab adds a dated reading in one tap, and keeps the old ones.",
           ],
-        },
-        {
-          kind: "callout",
-          tone: "note",
-          text: "Bodyweight is also the load on a push-up or a pull-up, so keeping it current keeps those prescriptions honest as well as the long-term targets.",
         },
       ],
       related: [
@@ -94,7 +106,7 @@ export const UG_YOUR_PROFILE: ManualChapter = {
       slug: "body-and-age",
       title: "Sex, age, height, weight, body fat",
       summary:
-        "These five together set how much gain a macrocycle goal should realistically plan for.",
+        "These five say how much muscle you already carry relative to your potential, which is what a goal is paced against.",
       estimate: true,
       keywords: [
         "sex",
@@ -106,17 +118,12 @@ export const UG_YOUR_PROFILE: ManualChapter = {
         "dexa",
         "realistic target",
         "muscle gain",
+        "potential",
       ],
       blocks: [
         {
           kind: "para",
-          text: [
-            "The app's own line under ",
-            { ui: "SEX" },
-            " is ",
-            { ui: "Calibrates the realistic muscle-gain target on your macrocycles." },
-            " That is the job all five of these fields share: they set what a long-term goal should plan for, not what any single session asks of you.",
-          ],
+          text: "Someone in their first year of training and someone ten years in do not gain at the same rate, and a plan that expects the same of both is wrong for one of them. These five fields are how the app tells the difference.",
         },
         {
           kind: "table",
@@ -124,51 +131,57 @@ export const UG_YOUR_PROFILE: ManualChapter = {
           rows: [
             [
               [{ ui: "SEX" }],
-              "Scales the muscle-gain side of a target. Strength targets are scaled the same for everyone — the difference the model carries is in mass, not in relative strength.",
+              "Shifts how much muscle a block should expect to add. Strength is scaled the same for everyone — the difference the app models is in mass, not in how much stronger you get.",
             ],
             [
               [{ ui: "BIRTHDATE" }],
               [
-                "Older lifters are moved toward the conservative end of the range, from age ",
+                "From ",
                 { num: "40" },
                 " onward (",
                 { code: "macro_target.age_taper_start" },
-                "). A date rather than a number, so it stays true without editing.",
+                "), targets move toward the cautious end of their range. A date rather than a number, so it stays true without you editing it.",
               ],
             ],
             [
-              [{ ui: "HEIGHT" }, " · ", { ui: "BODYWEIGHT" }, " · ", { ui: "BODY FAT" }],
-              "Together these say how much muscle you already carry relative to the model's ceiling — the closer you are, the slower the gain a target plans for.",
+              [
+                { ui: "HEIGHT" },
+                " · ",
+                { ui: "BODYWEIGHT" },
+                " · ",
+                { ui: "BODY FAT" },
+              ],
+              "Together they say how much muscle you already carry against how much you could. The closer you are to that, the slower the gain a plan should expect — and the further away, the more it can ask for.",
             ],
           ],
         },
-        { kind: "heading", text: "Body fat: measured or estimated" },
+        { kind: "heading", text: "Body fat is the one worth the trouble" },
         {
           kind: "para",
           text: [
-            "Pick the closest band, enter a value you know, or connect a DEXA scan to fill it in as measured. The app keeps the two apart on the screen — ",
+            "It is optional, and it is the single biggest thing you can add: without it the app is reasoning about your muscle from height and weight alone, which cannot tell a lean 180 lb from a heavy one. Pick the closest band, enter a figure if you know it, or connect a DEXA scan — the screen keeps ",
             { ui: "BODY FAT — MEASURED" },
-            " against ",
+            " and ",
             { ui: "BODY FAT — ESTIMATE" },
-            " — so you always know which one your targets rest on.",
+            " apart so you know which one your targets rest on.",
           ],
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "A model, not a measurement",
-          text: "Everything derived here is a model applied to five facts about you. It produces a range, and the app shows you the conservative end of it deliberately. Treat it as a sensible plan to test, not a forecast.",
+          text: "All of this produces a range, and the app shows you the cautious end of it. It is a sensible plan to test against, not a forecast of what you will get.",
         },
         {
           kind: "detail",
           blocks: [
             {
               kind: "para",
-              text: "Height, weight and body fat give a fat-free mass index — lean mass for your height — which is compared against a modeled untrained baseline and a modeled ceiling. Your position between them is the single biggest input to a long-term target.",
+              text: "Height, weight and body fat give lean mass for your height, placed between a modelled untrained baseline and a modelled ceiling. Your position between the two is what paces a long-term goal.",
             },
             {
               kind: "para",
-              text: "Leave body fat blank and the model uses a representative value for your height-and-weight band instead, so filling the field in moves the target smoothly rather than switching it to a different model. With height or weight missing too, it falls back to training age.",
+              text: "Leave body fat blank and a representative value for your height-and-weight band stands in, so filling the field later moves the target smoothly rather than switching to a different calculation. With height or weight missing too, it falls back to how long you have been training.",
             },
           ],
         },
@@ -197,34 +210,17 @@ export const UG_YOUR_PROFILE: ManualChapter = {
         {
           kind: "para",
           text: [
-            { ui: "TRAINING SINCE" },
-            " is the date you started training seriously. ",
-            { ui: "TRAINING EXPERIENCE" },
-            " is the three-way choice under it, and the app's line there is ",
-            { ui: "Drives starting volumes and how aggressively autoregulation ramps." },
+            "How long you have trained decides how much work a block starts you on. A beginner grows on less and recovers from less than someone with years behind them, so the weekly set counts a new plan is built around scale with it — and so does how much progress a long-term goal expects per month.",
           ],
         },
-        { kind: "heading", text: "Which one wins" },
+        { kind: "heading", text: "Two fields, and which one wins" },
         {
           kind: "para",
           text: [
-            "The date does, where you have given one: under a year of training reads as beginner, under four years as intermediate, and longer as advanced. ",
+            { ui: "TRAINING SINCE" },
+            " is the date you started training seriously, and it wins wherever you have given one: under a year reads as beginner, under four years as intermediate, longer as advanced. ",
             { ui: "TRAINING EXPERIENCE" },
-            " is what gets used when the date is blank — and it is worth setting anyway, because the two are read in different places.",
-          ],
-        },
-        { kind: "heading", text: "What they change" },
-        {
-          kind: "list",
-          items: [
-            [
-              { strong: "Your weekly set band" },
-              " — the floor and ceiling of sets per muscle a plan is built against shift with experience, which is where your starting set counts come from.",
-            ],
-            [
-              { strong: "The pace of a long-term goal" },
-              " — how much strength a month is a reasonable thing for a plan to expect.",
-            ],
+            " — the three-way choice under it — is what stands in when the date is blank. Set both; they are read in different places.",
           ],
         },
         {

@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { chaptersFor, resolveChapter } from "@/content/manual";
+import { ManualChapterNav } from "@/components/manual/ManualBlocks";
 import { releaseActive } from "@/lib/version";
 import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
- * Guide — chapter contents (fig 4.9; 09-changelog 2026-08-07 §2).
+ * Guide — chapter contents (fig 4.9; 09-changelog 2026-08-07 §2, amended
+ * 2026-08-09 §2).
  *
- * A contents page, never prose: doc 22 §9.1 makes the **section** the unit, and
- * this page exists for orientation and for a stable breadcrumb parent. It is
- * deliberately not on the critical path to a section — Phase 2's map (fig 4.8)
- * lists sections inline so reaching one is a single tap.
+ * A contents page, never prose: doc 22 §9.1 makes the **section** the unit.
+ * Since owner review round 3 this page is also the map's click-through, so it
+ * carries chapter-level prev/next — the section footer's affordance one level
+ * up, so a reader browsing the manual is never sent back to the map to move on.
  *
  * Gated on the manuals' release (doc 23 §9.2 / 22b §10.1): content lands over
  * many PRs, and ungated the guide would go live chapter by chapter with nothing
@@ -70,6 +72,8 @@ export default async function GuideChapterPage({
           <span className="mt-[2px] text-base text-ink/50">›</span>
         </Link>
       ))}
+
+      <ManualChapterNav manual="ug" slug={chapter.slug} />
     </div>
   );
 }

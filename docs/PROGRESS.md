@@ -2,7 +2,72 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-08 (latest) — doc 22 Phase 3a: the first three chapters (N74)
+## 2026-08-09 (latest) — doc 22 Phase 3a, owner review round 3 (N74)
+
+Seven notes back on the Phase-3a chapters, plus a navigation change. All folded
+in, and generalized as **doc 22 §8.4b** so they bind Phases 3b onward rather
+than fixing three chapters. **Chapter 3 was signed off as the composition model
+for every chapter after it** — *"focused and substantive"*.
+
+### The navigation reversal (fig 4.8 amended, one day old)
+
+*"The guide landing page should show only the chapter titles and one-liners,
+with click-through to view the subsections."* Phase 2 had built the map with
+every section inline, to satisfy §9.2's "one tap from the map to anywhere".
+
+**The reversal is right and the original reasoning was the mistake.** With one
+chapter shipped, an inline map read as a tidy 6-row list; at 21 chapters × ~6
+sections it is a ~130-row wall — the untraversable-document failure §9 exists to
+prevent, relocated onto the one screen whose whole job is orientation. The tap
+count was optimized and legibility was not. Browsing depth and reading depth are
+different problems: search (1 tap) and Phase 7's in-app links (0) already serve
+a reader who knows what they want.
+
+- The map is now one row per chapter — number, title, summary.
+- The chapter page joins the critical path and gains **chapter-level prev/next**
+  (`ManualChapterNav`, sibling to `ManualSectionNav`, same grammar one level up),
+  pinned by two new registry tests.
+- Design pass first: 09-changelog **2026-08-09**, amending figs 4.8 and 4.9.
+
+### The seven authoring rules (doc 22 §8.4b)
+
+Orientation before detail · every sentence carries substance · distill, never
+describe a description · the reader's words not the build's · never define a
+thing by what it is not, including rhetorically · weight follows importance ·
+draw what is structural.
+
+Two are corrections to how earlier guidance was read. **Rule 3** re-reads 22c
+§B5.2: "extend, do not restate" means *take it further*, not *quote the app's
+line and gloss it* — the reader has already read that line on the screen. **Rule
+5** widens §8.4: its test catches capability-absence, but *"The Workout tab does
+not lead to a session. It is the session"* passes the test and fails the rule.
+
+### What changed in the chapters
+
+- **Ch. 1** — the `#what-changed` section deleted outright. Version history is
+  not a primary function, and 22c §B5.1a/§B6a already assign it and the What's
+  New sheet to **ch. 19**; ch. 1 keeps one clause in the tab table. The Workout
+  tab section became `#the-workout-page` and was rewritten as orientation —
+  what the screen shows and what you do on it — dropping the session-resume
+  pointer to **ch. 5**. The route-skeleton sentence went (rule 2).
+- **Ch. 2** — §1 re-proportioned to answer its own title (the three jobs the
+  profile's fields do) instead of spending half its length on bodyweight; §2 and
+  §3 stopped quoting `Drives starting volumes…` and `Calibrates the realistic
+  muscle-gain target…` back at the reader and state the point instead.
+- **Ch. 3** — gained the nesting figure (`public/manual/cycle-nesting.svg`),
+  with the profile drawn **outside** the cycle stack as an input, on the owner's
+  note that the goal arc rests on who you are. Verified by rendering it as the
+  mask in both themes at phone width, not by reading its coordinates.
+
+### One thing worth recording
+
+The owner's read of the resume behavior — *"only for a few minutes"* — has **no
+timer in the code**. The pointer is `sessionStorage`, so it dies with the tab
+session, which is why a relaunched PWA lands on the current workout. The
+observation was right and the mechanism is different; noted in `22a` so ch. 5
+documents it accurately.
+
+## 2026-08-08 — doc 22 Phase 3a: the first three chapters (N74)
 
 Phase 2 finished the reading surface, so this is the first phase that is purely
 content: chapters **1 What WORKOUT is**, **2 Your profile** and **3 The cycle

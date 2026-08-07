@@ -4,6 +4,38 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-09 — Session 110 (cont.): Phase 3a owner review round 3 (N74)
+
+Seven content notes plus a navigation change, all folded in and generalized as
+**doc 22 §8.4b** so they bind Phases 3b onward. **Ch. 3 signed off as the
+composition model for every chapter after it.**
+
+- **The map reverses to chapters-only** (fig 4.8 amended one day after it was
+  built; 09-changelog 2026-08-09). Phase 2 listed every section inline to hit
+  §9.2's "one tap to anywhere" — right at one chapter, a ~130-row wall at 21.
+  That is the untraversable-document failure §9 exists to prevent, moved onto
+  the orientation screen. The chapter page joins the critical path and takes
+  **chapter-level prev/next**, the section footer's grammar one level up.
+- **The seven rules**: orientation before detail · substance per sentence ·
+  distill, never describe a description · the reader's words not the build's ·
+  never define a thing by what it is not (including rhetorically) · weight
+  follows importance · draw what is structural.
+- **Two are corrections to earlier readings.** 22c §B5.2's "extend, do not
+  restate" was read as *quote the app's line, then gloss it*; it means take the
+  point further — the reader has already read that line on screen. And §8.4's
+  positive-framing test catches capability-absence, but *"The Workout tab does
+  not lead to a session. It is the session"* passes the test and fails the rule.
+- **Ch. 1** lost the version-history section outright (not a primary function;
+  22c already assigns it to ch. 19) and its Workout-tab section was rewritten
+  from an edge case into an orientation. **Ch. 2** §1 was re-proportioned to
+  answer its own title. **Ch. 3** gained a nesting figure with the profile drawn
+  outside the cycle stack as an input, checked by rendering it as the mask in
+  both themes rather than by reading coordinates.
+- **Worth recording**: the owner's read of the resume behavior ("a few minutes")
+  has no timer in the code — the pointer is `sessionStorage` and dies with the
+  tab session, which is why a relaunched PWA lands on the current workout. Right
+  observation, different mechanism; noted in `22a` for ch. 5.
+
 ## 2026-08-08 — Session 110: user-manual Phase 3a, chapters 1–3 (N74)
 
 Doc 22 Phase 3a executed — the first content group on top of Phase 2's reader.
