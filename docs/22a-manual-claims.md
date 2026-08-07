@@ -376,6 +376,7 @@ Phase 3e. Verified against the repo at `2372056` and the live v25 row.
 | How a set count actually changes week to week | Ch. 11 owns it (`C-fbk-01`…`10`); ch. 12 links out twice |
 | How to read the meso and macro stats screens generally | Ch. 13's subject. Ch. 12 covers only the volume surfaces on them |
 | That warm-up sets can be marked in the app | The column exists (`logged_sets.is_warmup`) and the day view has no control for it, so the chapter states only what counts, per §8.4 |
+| A glossary entry for **MAV** | The app never renders the term — the planner flags only `UNDER MEV` and `OVER MRV`, and `GLOSSARY.volume_landmarks` defines those two. §8.1's add-it-to-the-glossary rule fires on terms the app *shows*, so MAV is spelled out in place in the chapter instead |
 
 ---
 
