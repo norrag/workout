@@ -13,6 +13,8 @@
 
 import { UG_CYCLE_MODEL } from "./ug/cycle-model";
 import { UG_EFFORT_RIR } from "./ug/effort-rir";
+import { UG_EXERCISES_AND_TEMPLATES } from "./ug/exercises-and-templates";
+import { UG_PLANNING_A_MESOCYCLE } from "./ug/planning-a-mesocycle";
 import { UG_WHAT_WORKOUT_IS } from "./ug/what-workout-is";
 import { UG_YOUR_PROFILE } from "./ug/your-profile";
 import { parseSectionId, sectionId } from "./ids";
@@ -63,7 +65,9 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_WHAT_WORKOUT_IS, // 1
   UG_YOUR_PROFILE, // 2
   UG_CYCLE_MODEL, // 3
+  UG_PLANNING_A_MESOCYCLE, // 4
   UG_EFFORT_RIR, // 6
+  UG_EXERCISES_AND_TEMPLATES, // 15
 ]);
 
 export function chaptersFor(manual: ManualId): readonly ManualChapter[] {

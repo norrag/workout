@@ -67,6 +67,13 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/cycle-model#day-slots",
   "ug/cycle-model#finding-your-cycles",
   "ug/cycle-model#one-block-at-a-time",
+  // ch. 4 — Planning a mesocycle (Phase 3b)
+  "ug/planning-a-mesocycle#three-ways-to-start",
+  "ug/planning-a-mesocycle#the-planner-board",
+  "ug/planning-a-mesocycle#the-exercise-sheet",
+  "ug/planning-a-mesocycle#the-volume-check",
+  "ug/planning-a-mesocycle#naming-and-starting",
+  "ug/planning-a-mesocycle#editing-a-running-block",
   // ch. 6 — Effort: RIR and the ramp (Phase 1)
   "ug/effort-rir#what-rir-means",
   "ug/effort-rir#the-weeks-ramp",
@@ -74,6 +81,13 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/effort-rir#why-honesty-matters",
   "ug/effort-rir#missing-the-ask",
   "ug/effort-rir#per-exercise",
+  // ch. 15 — Exercises & templates (Phase 3b)
+  "ug/exercises-and-templates#finding-an-exercise",
+  "ug/exercises-and-templates#what-an-exercise-remembers",
+  "ug/exercises-and-templates#the-load-step",
+  "ug/exercises-and-templates#your-own-exercises",
+  "ug/exercises-and-templates#templates",
+  "ug/exercises-and-templates#sharing-by-code",
 ];
 
 export function isGuideSectionId(id: string): boolean {

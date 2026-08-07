@@ -2,7 +2,74 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-09 (latest) — doc 22 Phase 3a, owner review round 3 (N74)
+## 2026-08-10 (latest) — doc 22 Phase 3b: planning a block, and the library (N74)
+
+Chapters **4 — Planning a mesocycle** and **15 — Exercises & templates**, six
+sections each, at `/more/guide/planning-a-mesocycle` and
+`/more/guide/exercises-and-templates`, still behind `releaseActive("1.1.0")`.
+The first group written under §8.4b, with ch. 3 as the composition model.
+
+Sections run 138–228 words against the 350 budget; the corpus median moves
+225 → 215 across 29 sections, so ch. 6's three-layer mechanism section (323) is
+still the only one near the ceiling.
+
+### What the chapters carry
+
+- **Ch. 4** — the three routes into a block and the one-draft rule; the planner
+  board's structure, with the day → muscle-group → slot nesting **drawn**
+  (§8.4b rule 7) and the open slot dashed, which is the board's own mark; the
+  N78 exercise sheet (starting sets are week 1 only; the board's target RIR is
+  block-wide and a per-week assignment reads `RIR BY WEEK` rather than being
+  flattened); the live volume check; naming, length and the ramp disclosure, then
+  what `START MESOCYCLE` actually does and why a macrocycle sibling can block it;
+  and **N78's real payoff** — the board reopens mid-block, edits stage until
+  `SAVE CHANGES`, and everything logged is untouched.
+- **Ch. 15** — the two-axis library filter (and why a filter can never empty the
+  list); what an exercise remembers, across both tabs; the load step, including
+  **N67** — steps index off the last weight you *entered*, so 88 lb with a 10 lb
+  step goes to 98 or 78; custom exercises with the three bodyweight load meanings
+  verbatim; templates; and share codes — copy-on-accept, one redemption, and for
+  a block a snapshot taken when the code was minted.
+
+### Held to the chapter that owns them
+
+Ch. 15 names `EST. 1RM`, `BACKED OFF` and MEV/MRV without defining any of them —
+ch. 10, ch. 8 and ch. 12 own those, and §8.4b rule 1 makes depth a function of
+reading position. Ch. 4 does the same with the RIR ramp's values.
+
+### Glossary
+
+**`load_step`** added — the second of 22c §C2's ten, under Phase 3a's standing
+decision that each term lands with the chapter that needs it. It sits under the
+280-character cap the non-explainer terms carry; the depth is ch. 15's.
+
+### One design decision
+
+`public/manual/planner-structure.svg` (09-changelog **2026-08-10**). No new
+screen and no new block kind, so the only hard-rule-8 surface in this PR is the
+asset itself, which inherits Phase 2's figure policy unchanged.
+
+### Three findings, recorded not fixed
+
+doc 22 §1.2 makes Phase 3 documentation-only, and two of the three are design
+surfaces (hard rule 8).
+
+- **`D-08`** — the create-mesocycle sheet's summary line hardcodes
+  `DELOAD AT 4 RIR`. The live `deload.target_rir` is **6**, and every other
+  surface reads the parameter — `rirRamp` appends the week at it, the day header
+  renders it, and `RirScheduleEditor` deliberately declines to name a number at
+  all (`DELOAD — RIR SET BY THE ENGINE`). So the screen where a user *sets the
+  deload up* is the one that states it wrongly. Ch. 4 states the truth and quotes
+  the schedule editor instead.
+- **`D-09`** — `22c` §B2.6 tabulated **four** ways to start a block, read off the
+  page's copy. `Meso builder` renders with `href: null` and appends `" (soon)"`;
+  three are reachable. That is doc 22 §2's failure mode occurring *inside* the
+  audit written to prevent it, which is worth saying plainly. 22c is corrected in
+  place; ch. 4 documents the three and stays quiet about the fourth (§8.4).
+- **`D-10`** — N46: a saved template has no edit path. Ch. 15 states the positive
+  rule — a template is saved *out of* a plan, so adjust the block and save again.
+
+## 2026-08-09 — doc 22 Phase 3a, owner review round 3 (N74)
 
 Seven notes back on the Phase-3a chapters, plus a navigation change. All folded
 in, and generalized as **doc 22 §8.4b** so they bind Phases 3b onward rather

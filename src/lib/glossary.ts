@@ -17,7 +17,8 @@ export type GlossaryKey =
   | "macrocycle"
   | "mesocycle"
   | "microcycle"
-  | "day_slot";
+  | "day_slot"
+  | "load_step";
 
 export interface GlossaryEntry {
   /** tracked all-caps card heading */
@@ -101,5 +102,13 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   day_slot: {
     label: "DAY SLOT",
     body: "A position in your training week — day 2 of this block, every week it runs. Progress is read slot against slot, so the same lift trained twice a week is compared with its own day rather than pooled with the other one, where alternating loads would look like a sawtooth.",
+  },
+  // 2026-08-10 (doc 22 Phase 3b): the sheet and the custom-exercise form both
+  // say "load step" and neither says what it is. 22c §C2 recommended it for the
+  // glossary and chapter 15 is the pass that needed it, so it lands here rather
+  // than being defined in the manual alone (§8.1).
+  load_step: {
+    label: "LOAD STEP",
+    body: "The size of one weight jump on an exercise — what gets added when you meet what was asked. It follows what the equipment can actually do, so a barbell steps up in bigger jumps than a cable stack. Steps count from the last weight you entered, so an odd weight keeps its own ladder.",
   },
 };

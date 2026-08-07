@@ -6,8 +6,9 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08) and **Phase 3a with them** — chapters 1, 2,
-3 and 6 are written, so the User Guide is four chapters of twenty-one.
+**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3b with them** — chapters
+1, 2, 3, 4, 6 and 15 are written, so the User Guide is six chapters of
+twenty-one.
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
@@ -809,7 +810,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | Phase | Chapters | Size |
 |---|---|---|
 | **3a** | 1 What WORKOUT is · 2 Your profile · 3 The cycle model — ✅ **BUILT 2026-08-08** | M |
-| **3b** | 4 Planning a mesocycle · 15 Exercises & templates | M |
+| **3b** | 4 Planning a mesocycle · 15 Exercises & templates — ✅ **BUILT 2026-08-10** | M |
 | **3c** | 5 Training a session | M |
 | **3d-r** | **Research pass** for chapter 7 → `docs/reviews/2026-08-xx-rir-ramps-and-training-styles.md`, evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) | M |
 | **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system | L |
@@ -850,6 +851,31 @@ contracts green.
 > says a blank field falls back to training age, which v21's `bf_proxy_pct`
 > made one step short. Ch. 2 documents the truth in both cases and states it
 > positively.
+
+> **3b landed 2026-08-10.** Chapters **4** (Planning a mesocycle) and **15**
+> (Exercises & templates), six sections each, 138–228 words against the 350
+> budget — the corpus median moves 225 → 215, so ch. 6's mechanism section is
+> still the ceiling-brusher and the two new chapters sit comfortably under it.
+> Written to ch. 3's composition model
+> ([§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)):
+> ch. 4 draws the planner board's day → muscle-group → slot nesting as a
+> `figure` (rule 7, and the dashed open slot is the board's own mark), and
+> ch. 15 leaves MEV/MRV to ch. 12, the strength reads to ch. 10/13, and
+> `BACKED OFF` to ch. 8 rather than half-defining any of them (rule 1).
+> **`load_step` was added to `glossary.ts`** — the second of
+> [`22c`](./22c-app-inventory.md) §C2's ten, under 3a's standing decision that
+> each term lands with the chapter that needs it.
+>
+> **Three findings, all recorded in [`22a`](./22a-manual-claims.md), none fixed
+> here** ([§1.2](#12-scope-boundaries) again): **`D-08`** — the create-mesocycle
+> sheet hardcodes `DELOAD AT 4 RIR` while the live `deload.target_rir` is **6**,
+> so the one screen where a user sets the deload up is the one screen that
+> misstates it; **`D-09`** — [`22c`](./22c-app-inventory.md) §B2.6 tabulated
+> *four* ways to start a block from the page's copy, but `Meso builder` renders
+> disabled with `" (soon)"`, which is [§2](#2-why-this-is-harder-than-it-looks-read-before-phase-0)'s
+> own failure mode occurring inside the audit written to prevent it (22c is
+> corrected in place); **`D-10`** — N46's missing template-edit path, which ch. 15
+> states as the positive rule instead ([§8.4](#84-positive-framing)).
 
 ### Phase 4 — User Guide review gate
 

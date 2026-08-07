@@ -313,14 +313,23 @@ day → muscle-group block → exercise slots.
   `Add a training day to start planning the week.`,
   `Couldn't save the plan — your changes are still here, try again`.
 
-### B2.6 `/cycles/plan` — the four ways to start a block
+### B2.6 `/cycles/plan` — the ways to start a block
 
-| Path | Copy |
-|---|---|
-| **Copy a mesocycle** | *"Carry progressive overload forward — start from where you left off."* → `CARRY THE STRUCTURE FORWARD — LOADS RESEED FROM YOUR BEST` |
-| **Start with a template** | *"Pick a saved split and adjust from there."* → `THE PLANNER BOARD OPENS PREFILLED` |
-| **Meso builder** | *"Generated from your muscle-group priorities — emphasize, grow, maintain."* |
-| **From scratch** | *"Blank board. You name it and set the weeks at the end."* |
+> **Corrected 2026-08-10 (doc 22 Phase 3b; `22a` `D-09`).** This section was
+> headed *"the four ways"* and tabulated four rows read off the page's copy.
+> **Three are reachable.** `Meso builder` is rendered with `href: null` and no
+> `scratch` flag, so it paints at 45% ink and appends `" (soon)"`
+> (`cycles/plan/page.tsx:31–35`, `:103`). Transcribing copy without checking the
+> row's state is doc 22 §2's failure one level down — in the audit that exists to
+> prevent it. Ch. 4 documents the three that work and says nothing about the
+> fourth (doc 22 §8.4).
+
+| Path | State | Copy |
+|---|---|---|
+| **Copy a mesocycle** | live | *"Carry progressive overload forward — start from where you left off."* → `CARRY THE STRUCTURE FORWARD — LOADS RESEED FROM YOUR BEST` |
+| **Start with a template** | live | *"Pick a saved split and adjust from there."* → `THE PLANNER BOARD OPENS PREFILLED` |
+| **Meso builder** | **placeholder — ` (soon)`, not tappable** | *"Generated from your muscle-group priorities — emphasize, grow, maintain."* |
+| **From scratch** | live | *"Blank board. You name it and set the weeks at the end."* |
 
 A saved draft shows `DRAFT IN PROGRESS` with *"Starting a new plan below
 replaces this draft."*
@@ -567,7 +576,7 @@ defined only in the manual. Recommendation in the last column.
 | **`SEED`** / **`ADVANCE`** (decision kind) | Prescription details | 10, 17 | manual-only |
 | **`BACKED OFF`** | history rows, stats disclosures | 8, 13 | **add to glossary** — doc 21 §6.2, live, and easy to misread |
 | **`EFF LOAD`** (effective load) | history rows | 13 | **add to glossary** |
-| **`Load step`** | exercise ⋮, custom-exercise form | 15 | **add to glossary** |
+| **`Load step`** | exercise ⋮, custom-exercise form | 15 | **add to glossary** — ✅ added 2026-08-10 (Phase 3b, ch. 15) |
 | **`TARGET RIR`** (per exercise) vs the week's | Effort sheet, planner | 6, 8 | covered by an extended `rir` / new key |
 | **`RIR BY WEEK`** | planner board | 8 | manual-only |
 | **`Working-set cap`** / **`Priced at`** | Effort sheet (read-only) | 8 | manual-only — see [B7](#b7-two-levers-the-app-shows-but-cannot-set) |
@@ -579,7 +588,7 @@ defined only in the manual. Recommendation in the last column.
 | **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | **add to glossary** |
 | **`MEASURED RMR`** (`KCAL/DAY`) | macro Overview | 16 | manual-only |
 | **`NOT COMPARABLE`** | macro/DEXA surfaces | 13, 16 | manual-only — teach it as an answer |
-| **`day slot`** | not rendered, but the model behind "the same exercise on the same day" | 3, 13 | **add to glossary** — ch. 3 depends on it |
+| **`day slot`** | not rendered, but the model behind "the same exercise on the same day" | 3, 13 | **add to glossary** — ✅ added 2026-08-08 (Phase 3a, ch. 3) |
 | **`straight` / `drop` / `amend` set types** | per-set menu | 5 | manual-only |
 | **`no report`** (RIR) | set rows | 6 | manual-only — ties to the ch. 6 honesty message |
 
@@ -587,6 +596,11 @@ defined only in the manual. Recommendation in the last column.
 side-deliverable, not a Phase-0 one — but it must be decided **before** ch. 3,
 6, 10, 13, 14 and 15 are written, because §8.1 forbids the manual defining a
 term the app also shows in different words.
+
+> **Decided at Phase 3a (2026-08-08):** each term lands with the chapter that
+> needs it, so its definition is authored by the pass that verifies the behavior
+> behind it. `day slot` landed with ch. 3; **`Load step` landed with ch. 15
+> (Phase 3b, 2026-08-10)**. Eight to go.
 
 ## C3 · The vocabulary the app has already chosen
 

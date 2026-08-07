@@ -42,6 +42,38 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-10 — One manual figure: the planner board's structure (N74 / doc 22 Phase 3b)
+
+Phase 3b is content, so there is no new screen and no new block kind — the whole
+entry is one drawn asset, recorded here because the 2026-08-08 `figure` entry
+made the asset policy a design decision rather than an authoring one.
+
+### 1. `planner-structure.svg` — new figure, chapter 4
+
+- **Change.** A single-colour line-art tree under `public/manual/`, rendered in
+  `ug/planning-a-mesocycle#the-planner-board`: a day branching into two
+  muscle-group blocks, one carrying two filled exercise slots, the other one
+  **dashed** open slot.
+- **Rationale.** Doc 22 §8.4b rule 7 — *draw what is structural*. The planner
+  board is groups-first (day → muscle-group block → exercise slots), and that
+  nesting is the one thing a reader has to hold before any control on the screen
+  makes sense. A list makes them assemble it; a tree hands it over. Same argument
+  that produced `cycle-nesting.svg`, one level down.
+- **The dashed slot is not decoration.** Dashed borders mean planned/empty
+  (hard rule 7), and the board uses exactly that for an unfilled slot — so the
+  figure teaches the mark the reader is about to meet rather than inventing one.
+- **Nothing tunable is baked in**, per the standing rule the two earlier figures
+  set (`22a` `C-ramp-06`, `C-cyc-01a`): `3 SETS` is one plausible starting count,
+  never a default the engine owns, and the split is an example. A number the
+  engine can change lives in text, where a param bump is greppable to the prose
+  that states it.
+- **Affected figures.** None amended; this is an asset, not a screen.
+- **Impact.** `NET-NEW` — the asset plus one `figure` block. It inherits the
+  2026-08-08 policy unchanged (CSS mask filled with `currentColor`, the
+  `manual-figures` runtime cache, no precache).
+
+---
+
 ## 2026-08-09 — The map becomes a table of contents (figs 4.8 / 4.9 amended, N74 / doc 22 Phase 3a review)
 
 Owner review of the Phase-3a chapters returned a navigation change, and it
