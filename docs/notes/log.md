@@ -4,6 +4,49 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-08 — Session 110: user-manual Phase 3a, chapters 1–3 (N74)
+
+Doc 22 Phase 3a executed — the first content group on top of Phase 2's reader.
+Chapters **1 What WORKOUT is**, **2 Your profile** and **3 The cycle model**,
+twelve sections, still behind `releaseActive("1.1.0")`.
+
+- **No design pass needed**: no new block kind, no new rendered pattern. Phase
+  3a is content into the surface Phases 1–2 built, which is what makes a
+  content phase cheap.
+- **Sizes**: 139–243 words per section against the 350 budget; corpus median
+  moved 229 → 211, so ch. 6's three-layer mechanism section (323) is still the
+  ceiling-brusher and the budget still bites in the right place.
+- **`day_slot` added to `glossary.ts`** — the first of `22c` §C2's ten
+  recommendations, taken because ch. 3 depends on it and §8.1 forbids a
+  manual-only definition. **Decision on the other nine: each lands with the
+  chapter that needs it**, so the definition is written by the pass that
+  verifies the behavior. The pending-terms ledger shrank by three —
+  `macrocycle` / `mesocycle` / `microcycle`, the core vocabulary `22c` finding
+  **C1-a** flagged as defined-but-never-surfaced, now rendered as cards in
+  ch. 3 (they still have no in-app `InfoDot`; that is Phase 7a's).
+- **The live params were re-read**, not trusted: `get_engine_params(25)`
+  confirmed v25 still active and hash-verified, `e1rm.max_measuring_rir` still
+  absent (so `22b` §4.1 ① holds), and the five ch. 2 rows were added to `22b`
+  §4.2 under its own "read it before you state it" rule.
+- **Ledger**: 38 new rows in `22a` (`C-app-*`, `C-prof-*`, `C-cyc-*`), each
+  against code or the active row.
+
+**Two findings, recorded not fixed** (Phase 3a is content; doc 22 §1.2 forbids
+behavior changes). **`D-06`** — `profiles.preferred_equipment`, the
+`EQUIPMENT ACCESS` toggles, has **no consumer in the app**: no picker filters
+on it, no engine path reads it, and it appears nowhere in `src/lib/engine/`.
+Its only reader is the connector's `get_profile`. A user toggling `barbell`
+off changes nothing they can see, which is a reasonable expectation to have.
+Ch. 2 states what it *does* do (§8.4) and points at the Exercises tab's `EQUIP`
+filter for browsing. Worth a backlog item: wire it in, or drop the field.
+**`D-07`** — the profile's body-fat copy says a blank field falls back to
+training age; since v21 the model first substitutes a representative body fat
+for the BMI leanness band (`macro_target.bf_proxy_pct`, present on v25), and
+training age is the fallback only when height or weight is missing too. The app
+under-describes its own improvement. Ch. 2 documents the two-step version.
+
+Next: **3b** (ch. 4 Planning a mesocycle · ch. 15 Exercises & templates).
+
 ## 2026-08-08 — Session 109: user-manual Phase 2, reader infrastructure (N74)
 
 Doc 22 Phase 2 executed. The exemplar chapter is now reachable, searchable and

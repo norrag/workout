@@ -49,10 +49,26 @@ export function isLinkableRoute(href: string): href is LinkableRoute {
  * the registry, so a renamed or deleted section fails CI rather than a reader's
  * tap. Phase 7's in-app links follow the same rule for the same reason.
  *
- * Filled by doc 22 Phase 2 with chapter 6, the only chapter that exists.
+ * Filled by doc 22 Phase 2 with chapter 6, the only chapter that existed then.
  * Phases 3 and 6 append as their chapters land.
  */
 export const GUIDE_SECTION_IDS: readonly string[] = [
+  // ch. 1 — What WORKOUT is (Phase 3a)
+  "ug/what-workout-is#the-idea",
+  "ug/what-workout-is#the-five-tabs",
+  "ug/what-workout-is#the-workout-tab",
+  "ug/what-workout-is#what-changed",
+  // ch. 2 — Your profile (Phase 3a)
+  "ug/your-profile#what-it-is-for",
+  "ug/your-profile#body-and-age",
+  "ug/your-profile#experience",
+  "ug/your-profile#equipment-and-exclusions",
+  // ch. 3 — The cycle model (Phase 3a)
+  "ug/cycle-model#the-four-layers",
+  "ug/cycle-model#day-slots",
+  "ug/cycle-model#finding-your-cycles",
+  "ug/cycle-model#one-block-at-a-time",
+  // ch. 6 — Effort: RIR and the ramp (Phase 1)
   "ug/effort-rir#what-rir-means",
   "ug/effort-rir#the-weeks-ramp",
   "ug/effort-rir#report-what-you-did",

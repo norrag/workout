@@ -41,15 +41,16 @@ import type { ManualBlock } from "../types";
 const PENDING_GLOSSARY_TERMS: readonly GlossaryKey[] = [
   // ch. 9 (Deloads), Phase 3d
   "deload",
+  // ch. 10 (How your next weight is chosen), Phase 3f
   "e1rm_confidence",
+  // ch. 13 (Reading your stats), Phase 3g
   "est_strength",
+  // ch. 12 (Volume), Phase 3e
   "volume_landmarks",
   "fractional_sets",
+  // ch. 11 (Why the app asks how it felt), Phase 3e
   "pump",
   "workload",
-  "macrocycle",
-  "mesocycle",
-  "microcycle",
 ];
 
 function termsRenderedBy(blocks: readonly ManualBlock[]): GlossaryKey[] {

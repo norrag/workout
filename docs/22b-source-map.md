@@ -175,6 +175,12 @@ Transcribed from the active v25 row. Doc 22 §8.2 requires every numeric default
 the manual states to carry its `engine_params` path — this is the source table
 for those rows, and the **only** sanctioned set of numbers.
 
+> **Re-read 2026-08-08** (doc 22 Phase 3a), against the live row via
+> `get_engine_params(25)`. **v25 is still active and unchanged** —
+> `params_hash 91887f0f…`, hash-verified — and `e1rm.max_measuring_rir` is
+> still absent, so [§4.1](#41-what-is-not-live) ① holds. The five
+> **ch. 2** rows below were added from that read, per this section's own rule.
+
 | `engine_params` path | Value | Where the manual needs it |
 |---|---|---|
 | `e1rm.rir_offset` | `1` | ch. 10 — effective reps = `reps + rir × 1` |
@@ -204,8 +210,14 @@ for those rows, and the **only** sanctioned set of numbers.
 | `key_lifts.n` / `selection` | `5` / `"frequency"` | ch. 13 |
 | `increment.*` / `rounding.*` | 5 lb (10 bands, 9 kettlebell) | ch. 15 — the load step |
 | `experience_increment_scale` | `1.5 / 1.0 / 0.5` | ch. 15 |
-| `macro_target.present` | `"conservative_end"` | ch. 14 — **why you see the low end** |
+| `macro_target.present` | `"conservative_end"` | ch. 14 — **why you see the low end**; ch. 2 |
 | `macro_target.age_taper` | `true` (start 40) | ch. 14 |
+| `macro_target.age_taper_start` | `40` | **ch. 2** — the age the taper begins |
+| `macro_target.sex_factor_female` | `0.7` | **ch. 2** — the **hypertrophy** path only |
+| `macro_target.strength_sex_factor` | `{male: 1, female: 1}` | **ch. 2** — relative strength gains are modelled sex-equal, which is why ch. 2 must not carry the 0.7 across to strength |
+| `macro_target.bf_proxy_pct` | `male {10/16/25}`, `female {18/26/35}` | **ch. 2** — **present on v25**, so a blank body fat resolves to the BMI-band value before any training-age fallback (ledger `D-07`) |
+| `macro_target.ffmi_ceiling` / `ffmi_untrained` | `25 / 21.5`, `18.5 / 14.5` | **ch. 2** — the modelled ceiling and untrained baseline the proximity read sits between. Ch. 2 names them in words only; ch. 14 owns the numbers |
+| `progression.envelope.min_history_mesos` | `2` | **ch. 2** — the point pacing stops depending on the experience bucket |
 
 **Rule:** a number not in this table does not go in the manual until it has been
 read out of the code or the active row and added here.
