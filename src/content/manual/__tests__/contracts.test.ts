@@ -39,10 +39,7 @@ import type { ManualBlock } from "../types";
  * can only be satisfied at the end is a contract that enforces nothing until
  * then.
  */
-const PENDING_GLOSSARY_TERMS: readonly GlossaryKey[] = [
-  // ch. 13 (Reading your stats), Phase 3g
-  "est_strength",
-];
+const PENDING_GLOSSARY_TERMS: readonly GlossaryKey[] = [];
 
 function termsRenderedBy(blocks: readonly ManualBlock[]): GlossaryKey[] {
   return flatten(blocks).flatMap((block) =>

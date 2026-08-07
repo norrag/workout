@@ -126,6 +126,19 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/volume#the-band",
   "ug/volume#where-your-sets-show-up",
   "ug/volume#weight-lifted-is-a-different-number",
+  // ch. 13 — Reading your stats (Phase 3g)
+  "ug/reading-your-stats#where-to-look",
+  "ug/reading-your-stats#one-lift-at-a-time",
+  "ug/reading-your-stats#the-strength-trend",
+  "ug/reading-your-stats#records",
+  "ug/reading-your-stats#what-a-strength-read-leaves-out",
+  "ug/reading-your-stats#reading-like-with-like",
+  // ch. 14 — Macrocycle goals (Phase 3g)
+  "ug/macrocycle-goals#the-four-goals",
+  "ug/macrocycle-goals#setting-one-up",
+  "ug/macrocycle-goals#the-target-behind-it",
+  "ug/macrocycle-goals#how-it-paces-your-weights",
+  "ug/macrocycle-goals#finishing-an-arc",
   // ch. 15 — Exercises & templates (Phase 3b)
   "ug/exercises-and-templates#finding-an-exercise",
   "ug/exercises-and-templates#what-an-exercise-remembers",

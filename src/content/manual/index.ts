@@ -19,7 +19,9 @@ import { UG_EXERCISE_LEVEL_RIR } from "./ug/exercise-level-rir";
 import { UG_EXERCISES_AND_TEMPLATES } from "./ug/exercises-and-templates";
 import { UG_HOW_IT_FELT } from "./ug/how-it-felt";
 import { UG_HOW_YOUR_WEIGHT_IS_CHOSEN } from "./ug/how-your-weight-is-chosen";
+import { UG_MACROCYCLE_GOALS } from "./ug/macrocycle-goals";
 import { UG_PLANNING_A_MESOCYCLE } from "./ug/planning-a-mesocycle";
+import { UG_READING_YOUR_STATS } from "./ug/reading-your-stats";
 import { UG_TRAINING_A_SESSION } from "./ug/training-a-session";
 import { UG_VOLUME } from "./ug/volume";
 import { UG_WHAT_WORKOUT_IS } from "./ug/what-workout-is";
@@ -81,6 +83,8 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_HOW_YOUR_WEIGHT_IS_CHOSEN, // 10
   UG_HOW_IT_FELT, // 11
   UG_VOLUME, // 12
+  UG_READING_YOUR_STATS, // 13
+  UG_MACROCYCLE_GOALS, // 14
   UG_EXERCISES_AND_TEMPLATES, // 15
 ]);
 

@@ -2,7 +2,71 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3f: how your next weight is chosen (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3g: reading your stats, and macrocycle goals (N74)
+
+Chapters **13** and **14**, eleven sections, 148–305 words against the 350 budget;
+the corpus median moves 215 → 209 across 78 sections, and ch. 6's mechanism
+section (323) is still the ceiling-brusher after six content phases. Both still
+behind `releaseActive("1.1.0")`.
+
+### D-15 — a target that is computed, stored, and never shown
+
+Doc 22 §5's ch. 14 brief is *"the personalized target band and recommended
+timeframe; why it is a conservative band"*, and `22c` §B2.2 describes the create
+card as showing `EST. STRENGTH` and *"a model band"*. **It shows neither.** The
+`YOUR TARGET` range, the per-month rate, the rationale line and the model band are
+hidden by **N54** (owner, 2026-07-11 — rolled back until N43's v23 band is
+trustworthy) on all three surfaces that would print them: `CreateMacroForm.tsx`,
+`EditMacroForm.tsx`, and the macro Overview's `REALISTIC TARGET` card.
+
+`planMacrocycle` still runs, `macrocycles.target_*` still persists, and the band
+still does two jobs the reader feels — it paces how fast the weights climb, and it
+is what the closeout grades against. So ch. 14 §3 documents a number **with no
+screen to point at**, and names the two surfaces that do return it: a connected
+assistant (`formatMacroSummary.target`), and a completed macro's `RETROSPECTIVE`
+band. The second half of the same finding: `macro_target.present:
+"conservative_end"` has **no code consumer at all** — `COACHING_GUIDE`'s prose is
+its only reader, so *"you see the conservative end"* is a rule about what an AI
+tells you, not about a rendered number. `22c` §B2.2 and `22b` §4.2 both corrected;
+`22c` also listed the four goals as three (`CUT` was missing).
+
+### D-16 closes the thread D-12 opened
+
+`D-12` found the audit describing a grid N10 had removed. This found the parameter
+that grid was the only reader of: `key_lifts.n` / `selection`, live on v25, with
+**no consumer anywhere in the repo** — schema plus two removal comments. `22b`
+§4.2 had it filed under ch. 13 and `22c` §C2 recommended adding `KEY LIFTS` to the
+glossary; ch. 13 claims nothing about key lifts, and the §C2 row is now closed
+rather than re-sited.
+
+### Ch. 13 is organized around comparability
+
+Which is what the questions in `docs/notes/` are actually about. Its last two
+sections carry the three exclusions — deloads, backed-off sessions, mis-log
+outliers — with the disclosure line that explains a lift missing from the list,
+then the two live surprises: **sets logged in a workout you have open count
+immediately**, and **stats show each estimate undecayed while the prescription
+path fades older sessions** (`22b` §5.6's PH39 note, the one workstream-A passage
+still true and still confusing).
+
+The back-off policy's asymmetry is stated as the reassurance it is: a backed-off
+session leaves the strength trend, `best_e1rm` and the PR views, and **stays** in
+volume, weight PRs and session-volume PRs — those are observations of what you
+lifted rather than estimates of what you could.
+
+### Housekeeping
+
+Live row **re-read a fourth time** (`get_engine_params(25)`: still v25,
+`91887f0f…`, hash-verified, `max_measuring_rir` still absent) — and this read
+produced two *absences* rather than values: `strength` is not on the row, so
+ch. 13's trend runs on the engine's own defaults (`3` · `3` · `1.5`%), which is
+what its layer 3 says. **46 new `22a` rows** plus two deliberately-absent tables.
+**`est_strength` rendered empties `PENDING_GLOSSARY_TERMS` outright** — all
+fifteen glossary keys now resolve to a `term` block somewhere in the guide, five
+phases before ch. 20 generates them. `GUIDE_SECTION_IDS` +11. All suites green;
+typecheck and lint clean.
+
+## 2026-08-11 — doc 22 Phase 3f: how your next weight is chosen (N74)
 
 Chapter **10**, the headline chapter and the one doc 22 §11 gives its own review
 gate. Six sections, 185–292 words against the 350 budget; the corpus median holds

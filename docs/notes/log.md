@@ -4,6 +4,75 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 114: the stats chapters, and two audits that were wrong (N74)
+
+Doc 22 **Phase 3g** — chapters 13 (Reading your stats) and 14 (Macrocycle goals).
+
+**The interesting part of this phase was not the prose.** Both chapters were
+written against screens the Phase-0 audit had already inventoried, and in both
+cases the audit's description was wrong about something load-bearing — which is
+the exact failure mode doc 22 §2 predicted for *spec* prose, occurring one level
+down in the working documents written to prevent it.
+
+**`D-15`. The macrocycle target band is computed, stored, and never shown.**
+Doc 22 §5's brief for ch. 14 is "the personalized target band and recommended
+timeframe; why it is a conservative band". `22c` §B2.2 says the create card shows
+`EST. STRENGTH` and "a model band". Neither is true: **N54** (owner, 2026-07-11)
+hid the `YOUR TARGET` range, the rate, the rationale line and the model band on
+the create form, the edit form and the macro Overview alike, pending N43's v23
+band. What survives is `PLAN` (block count + phase strip) and, where a prior block
+supplies it, `LAST BLOCK MEASURED` — which stays precisely because it is measured
+rather than modelled.
+
+The chapter that would have been written from the brief is a chapter telling
+readers to look at a number that is not on their screen. What is actually true is
+better material: the band is still computed, still stored as the block's
+contract, and still does two jobs the reader feels — it paces how fast the app
+will lead the weights up, and it is what the closeout grades against. So §3
+documents it as background machinery and names the two surfaces that do return
+it: a connected assistant, and a completed macro's `RETROSPECTIVE` band.
+
+Second half of the same finding: `macro_target.present: "conservative_end"` has
+no code consumer at all. The only thing that reads it is `COACHING_GUIDE`'s prose
+instruction. "You see the conservative end" is therefore a rule about what an AI
+tells you — which is what ch. 14's honesty callout now says.
+
+**`D-16` closes the thread `D-12` opened.** `D-12` (Phase 3e) found `22c`
+describing a `KEY LIFTS` grid N10 had removed. This phase found the parameter that
+grid was the only reader of: `key_lifts.n` / `selection`, still on the live v25
+row, with no consumer anywhere in the repo — the schema block plus two comments
+recording the removal. `22b` §4.2 had them filed under ch. 13 and `22c` §C2
+recommended adding `KEY LIFTS` to the glossary; the §C2 row is now closed rather
+than re-sited, because a card for a term no screen shows is the §C1-a defect that
+table exists to shrink.
+
+**Ch. 13 is organized around comparability rather than around screens.** Reading
+the `docs/notes/` questions back, almost none of them are "where do I find X" and
+almost all of them are "why is this number lower than that number". So the map
+section is short and the last two sections carry the weight: the three exclusions
+(deloads, backed-off sessions, mis-log outliers) with the disclosure line that
+explains a lift missing from the list, and then the two things that genuinely
+surprise people — sets logged in a workout you have **open** count immediately,
+and the stats show each estimate **undecayed** while the prescription path fades
+older sessions. That second one is `22b` §5.6's PH39 note, the single
+workstream-A passage flagged as still true and still worth documenting.
+
+**The back-off policy's asymmetry is stated as reassurance, not as a rule.** A
+backed-off session leaves the strength trend, `best_e1rm` and the PR views, and
+stays in volume, weight PRs and session-volume PRs. The reason is worth a sentence
+because it generalizes: those are observations of what you lifted, and the trend
+is an estimate of what you could — the app holds the second kind to a stricter
+bar.
+
+**Housekeeping.** Live row re-read a fourth time (still v25, `91887f0f…`,
+hash-verified, `max_measuring_rir` still absent) and this read produced two
+*absences* rather than values, which is a first: `strength` is not on the row at
+all, so ch. 13's trend runs on the engine's own defaults, and that is what its
+layer 3 says. Rendering `est_strength` empties `PENDING_GLOSSARY_TERMS` outright
+— every one of the fifteen glossary keys now resolves to a `term` block somewhere
+in the guide, five phases ahead of ch. 20 generating them. 46 new `22a` rows;
+`GUIDE_SECTION_IDS` +11.
+
 ## 2026-08-11 — Session 113 (cont.): the headline chapter (N74)
 
 Doc 22 **Phase 3f** — chapter 10, and its owner review gate is now open.

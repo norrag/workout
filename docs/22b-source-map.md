@@ -186,6 +186,15 @@ for those rows, and the **only** sanctioned set of numbers.
 > `session_*` / `pump_low` rows below were added from that read, and the
 > **ch. 11** chapter states each of them next to its path (doc 22 §8.2).
 >
+> **Re-read a fourth time 2026-08-11** (doc 22 Phase 3g), same call. **Still
+> v25, still `91887f0f…`, still no `max_measuring_rir`** — five content phases
+> now. This read produced two **absences** rather than values: the `strength`
+> block is not on the row at all (so the ch. 13 trend runs on the engine's own
+> defaults), and `key_lifts` is on the row with no consumer anywhere in the
+> repo (`D-16`). Both rows below are annotated accordingly, and
+> `macro_target.present` is re-scoped — it turns out to govern the connector's
+> prose, not any rendered number (`D-15`).
+>
 > **Re-read a third time 2026-08-11** (doc 22 Phase 3f, the ch. 10 review
 > gate), same call. **Still v25, still `91887f0f…`, still no
 > `max_measuring_rir`** — so [§4.1](#41-what-is-not-live) ① holds through four
@@ -234,10 +243,11 @@ for those rows, and the **only** sanctioned set of numbers.
 | `progression.envelope.enabled` | `true` | ch. 10 — **live**, self-gating per user |
 | `progression.band_position` | `0.5` | ch. 14 |
 | `progression.goal_rate_factor.hypertrophy` | `0.75` | ch. 14 |
-| `key_lifts.n` / `selection` | `5` / `"frequency"` | ch. 13 |
+| `key_lifts.n` / `selection` | `5` / `"frequency"` | ~~ch. 13~~ — **no consumer** (`D-16`). N10 removed the only surface that read it; schema + removal comments only. **Do not state** |
+| `strength.window_sessions` / `min_sessions` / `tolerance_pct` | **absent from the row** ⇒ the code defaults `3` / `3` / `1.5` | ch. 13 — the trend windows, the ≥3-session floor, and the dead band that reads as *holding*. The schema carries the block, so the paths are citable; `queries/stats.ts::strengthConfig` is what resolves the fallback |
 | `increment.*` / `rounding.*` | 5 lb (10 bands, 9 kettlebell) | ch. 15 — the load step |
 | `experience_increment_scale` | `1.5 / 1.0 / 0.5` | ch. 15 |
-| `macro_target.present` | `"conservative_end"` | ch. 14 — **why you see the low end**; ch. 2 |
+| `macro_target.present` | `"conservative_end"` | ch. 14 — **not an app behavior** (`D-15`). No code reads it; `COACHING_GUIDE`'s prose is the only consumer, so it governs what an **assistant** quotes, not what a screen renders |
 | `macro_target.age_taper` | `true` (start 40) | ch. 14 |
 | `macro_target.age_taper_start` | `40` | **ch. 2** — the age the taper begins |
 | `macro_target.sex_factor_female` | `0.7` | **ch. 2** — the **hypertrophy** path only |
