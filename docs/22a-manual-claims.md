@@ -768,6 +768,103 @@ Phase 3h. Verified against the repo at `a8ac15f`.
 
 ---
 
+## User Guide ch. 18 — Connecting an AI (`ug/connecting-an-ai`)
+
+Phase 3i. Verified against the repo at `4f9c1ef` and [`22d`](./22d-connector-inventory.md).
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-ai-01` | `ug/connecting-an-ai#what-it-is` | The connector links an AI client to the reader's own account and lets it read cycles, history and progress and draft mesocycles and templates for review in the app | `more/connector/page.tsx:35–41` (the page's own paragraph); [`22d`](./22d-connector-inventory.md) §3 (39 user-facing tools — 22 read, 17 write) | ✓ 2026-08-11 |
+| `C-ai-02` | `ug/connecting-an-ai#what-it-is` · `#staying-in-control` | It only ever sees the reader's own data, and it never deletes logged history | Hard rule 5 (identity from the auth session; no deletes of logged history); `more/connector/page.tsx:39–41`; [`22d`](./22d-connector-inventory.md) §5 | ✓ 2026-08-11 |
+| `C-ai-03` | `ug/connecting-an-ai#setting-one-up` | Setup is `More` → `AI connector`: copy one address, add it in the client as a custom or remote connector, approve the sign-in, then ask | `more/connector/page.tsx:44–67` (`ENDPOINT`, `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR`, the three `HOW TO CONNECT` steps); `CopyField` | ✓ 2026-08-11 |
+| `C-ai-04` | `ug/connecting-an-ai#setting-one-up` | Access is granted per client and revoked either by removing the connector in that client or by withdrawing its authorization from the account's connected apps | `more/connector/page.tsx:69–79`, verbatim in substance; [`22d`](./22d-connector-inventory.md) §5 | ✓ 2026-08-11 |
+| `C-ai-05` | `ug/connecting-an-ai#what-it-is-good-at` | It can read a whole macrocycle at once — sessions, per-muscle volume, strength trends, and the reasoning behind individual prescriptions | [`22d`](./22d-connector-inventory.md) §3.2 (10 history & analysis tools) and §3.3; `get_macrocycle_summary`, `get_muscle_group_volume`, `explain_prescription` | ✓ 2026-08-11 |
+| `C-ai-06` | `ug/connecting-an-ai#what-it-is-good-at` | It can draft a block from a description and adjust one already running | [`22d`](./22d-connector-inventory.md) §3.4 (`create_mesocycle`, `edit_mesocycle`, `update_mesocycle`); doc 22 §8.4c rule 1 already names this route in ch. 4 | ✓ 2026-08-11 |
+| `C-ai-07` | `ug/connecting-an-ai#what-it-is-good-at` | It reaches two things no app screen shows: the macrocycle target band, and the per-exercise working-set cap and rep position | `mcp/tools/read.ts::formatMacroSummary` (`target`) against **`D-15`**; [`22c`](./22c-app-inventory.md) §B7 (`set_exercise_sets` / `set_exercise_rep_position` are connector-only, rendered `SET BY YOUR COACH`) | ✓ 2026-08-11 |
+| `C-ai-08` | `ug/connecting-an-ai#what-it-is-good-at` | Session and exercise notes are readable by the connector | `get_exercise_notes`, `get_exercise_history` (`session_note`), `get_recent_sessions` (`notes`); the same seam ch. 5 §7 states (`C-log-*`) | ✓ 2026-08-11 |
+| `C-ai-09` | `ug/connecting-an-ai#staying-in-control` | A block the connector creates lands as **planned**, for the reader to review and start | Hard rule 5 (write tools create drafts); `create_mesocycle` returns a planned block and `activate_mesocycle` is confirm-gated, preferring in-app activation | ✓ 2026-08-11 |
+| `C-ai-10` | `ug/connecting-an-ai#staying-in-control` | Every write is recorded, storing a fingerprint of the request rather than its contents | `recordMcpWrite()` → `mcp_write_audit` (tool name, argument **hash**, summary, server-derived user id); [`22d`](./22d-connector-inventory.md) §6.3 | ✓ 2026-08-11 |
+| `C-ai-11` | `ug/connecting-an-ai#staying-in-control` | A refusal is usually a rule and comes back with its reason — deleting a block with logged sets, deleting a stock exercise, removing a block that is planned or running | [`22d`](./22d-connector-inventory.md) §6.2 (`withErrorHandling` + `toolError`, `isError: true` with a structured body); `delete_mesocycle` / `delete_custom_exercise` / `manage_macrocycle_slots` | ✓ 2026-08-11 |
+| `C-ai-12` | `ug/connecting-an-ai#staying-in-control` | The engine computes every weight, rep count and set count; an assistant surfaces and interprets them | The MCP server instructions' own grounding paragraph (*"The progression engine — not you — computes all prescribed loads, reps, and set counts"*); `mcp/coaching-guide.ts` honesty guardrails | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 18
+
+| Not claimed | Why |
+|---|---|
+| The 17 admin-gated tools, engine-parameter tuning, replay, restamping | Doc 22 §1.2 excludes admin capabilities from both manuals; [`22d`](./22d-connector-inventory.md) §2 is the deny-list this chapter was checked against |
+| The rate limit as a number | Real (~120 requests/minute, `22d` §6.1) but set by an environment variable rather than an `engine_params` path, so §8.2's "state a live default beside the parameter that sets it" cannot be satisfied. No reader hits it by hand |
+| A tool-by-tool list | The AI Manual's subject (Phase 6). Ch. 18 gives the two shapes of work and hands off |
+| A typed cross-link into the AI Manual | **Forward debt.** `ai/**` sections do not exist yet, and doc 22 §9.4.5 forbids authoring a link before its target resolves — the ch. 5 → ch. 11 pattern. Phase 6e adds it |
+| The authorization handshake by name | §8.5 bans that vocabulary; `C-ai-03`/`04` state what the reader does and what it grants |
+
+---
+
+## User Guide ch. 20 — Glossary (`ug/glossary`)
+
+Phase 3i. Every definition is `glossary.ts` rendered at read time (§8.1), so the
+rows below claim the **grouping and the routing**, which is all this chapter
+authors.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-gloss-01` | `ug/glossary#cycles` | The four structural terms — macrocycle, mesocycle, microcycle, day slot — are the app's own definitions, identical to the card behind the circled i on any screen | `src/lib/glossary.ts`; the `term` block renders `GLOSSARY[key]` at render time, so identity is structural | ✓ 2026-08-11 |
+| `C-gloss-02` | `ug/glossary#effort` | RIR, the RIR ramp and deload are the effort vocabulary, and ch. 6 / ch. 9 are where each is explained | `glossary.ts` (`rir`, `rir_ramp`, `deload`); the routing matches doc 22 §5's chapter assignment | ✓ 2026-08-11 |
+| `C-gloss-03` | `ug/glossary#strength-estimates` | Estimated one-rep max and estimate confidence are the two cards behind every strength figure the app shows | `glossary.ts` (`e1rm`, `e1rm_confidence`); the two `InfoDot` call sites on the exercise page and the day view | ✓ 2026-08-11 |
+| `C-gloss-04` | `ug/glossary#progress-and-volume` | Est. strength, the MEV/MRV band and fractional set counting are the measurement vocabulary | `glossary.ts` (`est_strength`, `volume_landmarks`, `fractional_sets`); rendered by `StrengthProgress.tsx`, `MesoStatsViews.tsx`, the planner board | ✓ 2026-08-11 |
+| `C-gloss-05` | `ug/glossary#feedback-and-equipment` | Workload, pump and load step are what the app asks for after a session plus the size of one weight jump | `glossary.ts` (`workload`, `pump`, `load_step`); the feedback sheets and `LoadStepSheet` | ✓ 2026-08-11 |
+| `C-gloss-06` | `ug/glossary#cycles` · `#effort` · `#strength-estimates` · `#progress-and-volume` · `#feedback-and-equipment` | The chapter carries **every** term the app defines, each exactly once | `contracts.test.ts` §8.1 (*"files every glossary key into chapter 20, exactly once"*) — the assertion that replaced `PENDING_GLOSSARY_TERMS` | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 20
+
+| Not claimed | Why |
+|---|---|
+| Manual-only terms — a definition the app does not have | Doc 22 §5 allowed for them; none proved necessary. Doc 22 §8.1 forbids a manual-only definition of a term the app *does* define, and every advanced term a chapter needed got a `glossary.ts` entry instead (`day_slot`, `load_step`) — which is the same rule pushing the other way |
+| Any paraphrase or gloss of a card | §8.4b rule 3 (distill, never describe a description) plus §8.1: a lead sentence restating a card's opening is exactly what the identity contract's test flags |
+| The ~22 undefined rendered terms of [`22c`](./22c-app-inventory.md) §C2 | Each lands with the chapter that needs it, per Phase 3a's standing decision; a card invented here would be a definition with no screen behind it |
+
+---
+
+## User Guide ch. 21 — Troubleshooting & FAQ (`ug/troubleshooting`)
+
+Phase 3i. **Mined, not invented** (**O6**): every question is one of
+[`22c`](./22c-app-inventory.md) Part D's `F1`–`F18`, drawn from `docs/notes/`.
+Per [`22b`](./22b-source-map.md) §5.6 the questions come from that material and
+every answer is re-derived from code.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-faq-01` | `ug/troubleshooting#the-weight-changed` | **F1** — a weight can fall because each week is priced from recent sessions rather than stepped on a schedule | `engine/index.ts` (`weight_selection: "rep_window"` off the anchor); `queries/anchors.ts::recencyWeightedE1rm`; ch. 10 (`C-wt-01`) | ✓ 2026-08-11 |
+| `C-faq-02` | `ug/troubleshooting#the-weight-changed` | **F2** — the load is held while reps climb, and the climb rides the RIR step, so a same-weight week is a harder week | `engine/reps.ts`; `climb_requires_rir_step` (true on the live v25 row); ch. 10 (`C-wt-12`/`13`) | ✓ 2026-08-11 |
+| `C-faq-03` | `ug/troubleshooting#the-weight-changed` | **F7** — a prescription can move mid-session, because newly logged sets feed the anchor immediately; logged numbers are untouched | PH40 / T-A7 (**open decision** — [`22c`](./22c-app-inventory.md) Part E 4: state current behavior); `logSet` stamps and the anchor query carries no `workouts.status` predicate | ✓ 2026-08-11 |
+| `C-faq-04` | `ug/troubleshooting#a-number-looks-wrong` | **F4** — two causes: e1RM rises with effective reps (so a harder set can score lower), and stats are undecayed while the prescription anchor is recency-weighted | `engine/predict.ts::e1rmFactor` (increasing in `reps + rir`); [`22b`](./22b-source-map.md) §5.6 (PH39); ch. 6 (`C-e1rm-02`), ch. 13 (`C-stat-25`) | ✓ 2026-08-11 |
+| `C-faq-05` | `ug/troubleshooting#a-number-looks-wrong` | **F5** — a lifetime best is a single best estimate; the prescription figure is a recency-weighted read of a whole session and sits behind it | `v_exercise_overview.best_e1rm` (max over sets) against `queries/anchors.ts` (`session_best`, weighted); ch. 10 (`C-wt-02`) | ✓ 2026-08-11 |
+| `C-faq-06` | `ug/troubleshooting#a-number-looks-wrong` | **F11** — on 2026-08-02 the historical restamp moved **9 087** stamps upward, average **+4.80 lb (+4.85 %)**: unreported sets had been read as taken to failure and are now read at their prescribed effort. Logged data unchanged | `docs/PROGRESS.md` 2026-08-02; doc 21 §2 / N71; [`22b`](./22b-source-map.md) §4.3 (*"Ch. 21 should carry this"*) | ✓ 2026-08-11 |
+| `C-faq-07` | `ug/troubleshooting#a-number-looks-wrong` | **F18, rewritten** — the macrocycle target is kept and paces training rather than appearing on a screen | **`D-15`**; ch. 14 (`C-macro-10`/`11`). The mined question assumed a visible band, which no screen renders | ✓ 2026-08-11 |
+| `C-faq-08` | `ug/troubleshooting#sets-and-counting` | **F3** — fractional counting, 1.0 to the primary muscle and 0.5 to each secondary | `engine/volume.ts::fractionalSetCount`; ch. 12 (`C-vol-*`) | ✓ 2026-08-11 |
+| `C-faq-09` | `ug/troubleshooting#sets-and-counting` | **F6** — sets in an unfinished workout count immediately toward volume, records and estimates; next week's generation runs off completed workouts | PH41 / T-A8 (**open decision**); `queries/progression.ts` advances on workout completion, while the views filter on nothing | ✓ 2026-08-11 |
+| `C-faq-10` | `ug/troubleshooting#sets-and-counting` | **F8** — an added set becomes the following weeks' baseline within the block; a new block seeds from its planner board | S6; `queries/generation.ts` (planner baseline at seed) against the in-block carry-forward in `rules/feedback.ts` | ✓ 2026-08-11 |
+| `C-faq-11` | `ug/troubleshooting#sets-and-counting` | **F9** — deloads count as volume and can still set records, and sit out the strength trend | T-A2 (`foldProgressScores` skips `is_deload`); `v_exercise_prs` carries no deload predicate; ch. 13 (`C-stat-18`) | ✓ 2026-08-11 |
+| `C-faq-12` | `ug/troubleshooting#where-did-that-go` | **F14** — `Engine audit` is now `Prescription details`, reached from the underlined ask line rather than the exercise menu | N75; `PrescriptionDetailSheet.tsx`'s own note; ch. 17 (`C-rx-06`) | ✓ 2026-08-11 |
+| `C-faq-13` | `ug/troubleshooting#where-did-that-go` | **F15** — completed cycles are behind a toggle carrying their count; a finished block inside a running macrocycle stays visible | N76; [`22c`](./22c-app-inventory.md) §B2.1 (`?completed=1`, server-rendered) | ✓ 2026-08-11 |
+| `C-faq-14` | `ug/troubleshooting#where-did-that-go` | **F13** — with more than one block live, the app follows the block holding the most recently logged set | N79; ch. 3 (`C-cyc-*`) | ✓ 2026-08-11 |
+| `C-faq-15` | `ug/troubleshooting#where-did-that-go` | **F16** — the planner board opens on a running block and the day view's exercise menu edits the plan too; a finished block is frozen | N78; `MesoHeader.tsx` (`Edit plan` inert on `completed` / `abandoned`); ch. 4 (`C-plan-*`) | ✓ 2026-08-11 |
+| `C-faq-16` | `ug/troubleshooting#where-did-that-go` | **F12** — a template is saved out of a plan, so adjusting one means changing the board and saving again | N46 (**`D-10`**, open); `saveMesoAsTemplate` always inserts; ch. 15 states the same positive rule | ✓ 2026-08-11 |
+| `C-faq-17` | `ug/troubleshooting#it-did-not-save` | **F17** — a queued set is recorded on the phone, retried in the background, offers `TRY AGAIN`, and never blocks the session | N68 / N73; `src/lib/logging/queue.ts`; ch. 19 (`C-data-12`) | ✓ 2026-08-11 |
+| `C-faq-18` | `ug/troubleshooting#it-did-not-save` | An offline navigation reaches a screen with a retry rather than a stale copy, and anything already logged is safe on the phone | Hard rule 9; `app/~offline/page.tsx`; ch. 19 (`C-data-11`) | ✓ 2026-08-11 |
+| `C-faq-19` | `ug/troubleshooting#it-did-not-save` | Toasts ending in a note about the connection mean the action did not reach the server; other refusals carry their reason | `DayView.tsx:298`, `:846`, `:857` (*"— check your connection"*); [`22c`](./22c-app-inventory.md) §B6 (*"consistently"*) | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 21
+
+| Not claimed | Why |
+|---|---|
+| **F10** — how est. strength is calculated | Ch. 13 owns it (`C-stat-08`–`13`); answering it twice is how two chapters drift apart. Linked, not restated |
+| Any promise that T-A7 / T-A8 are settled | Both are open product decisions ([`22c`](./22c-app-inventory.md) Part E 4). `C-faq-03` and `C-faq-09` state current behavior and nothing about its future |
+| Anything about the measuring band | **Not live** ([`22b`](./22b-source-map.md) §4.1 ①) — and [`22c`](./22c-app-inventory.md) Part D excludes it from the mined set for that reason |
+| Engine-parameter tuning, replay, decision inspection | Admin surface, doc 22 §1.2 |
+| Errors quoted verbatim | Most are server- or provider-composed; `C-faq-19` claims the pattern the app is consistent about, not a string |
+
+---
+
 ## Defects this ledger surfaced
 
 | # | Found | What | Disposition |

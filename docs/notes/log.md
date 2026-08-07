@@ -4,6 +4,67 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-11 — Session 114 (cont.): Phase 3 finished (N74)
+
+Doc 22 **Phase 3i** — chapters 18 (Connecting an AI), 20 (Glossary) and 21
+(Troubleshooting & FAQ). That is the User Guide: **21 chapters, 106 sections**,
+median 200 words against the 350 budget.
+
+**The budget is the thing worth recording.** Ch. 6's mechanism section has been
+the longest in the manual since Phase 1, at 323 words, and it still is after
+nine content phases and eight rounds of authoring rules. The calibration note in
+`budget.ts` predicted exactly that — a ceiling a careful author brushes rather
+than one they never see — and it turns out to have been right for a corpus
+seventeen times the size it was calibrated on.
+
+**Ch. 20 is where §8.1 finally becomes enforceable.** Until now the glossary
+contract's end state — every key resolving to a card — was held by
+`PENDING_GLOSSARY_TERMS`, a list that could only shrink. That is a real
+mechanism while chapters land one at a time and a dead one afterwards: nothing
+fails if someone adds a term and forgets the list. The chapter replaces it with
+an assertion that every key is filed into exactly one of its five groups. Adding
+a term to `glossary.ts` now fails CI until it has a home.
+
+The grouping is authored and the definitions are not, which is the right split.
+"Generated from `glossary.ts`" in doc 22 §5 could have meant iterating
+`Object.keys()`, and that would have produced a chapter in insertion order with
+no reading logic at all. What matters is that no definition is retyped — and a
+test can guarantee that without also surrendering the order.
+
+Worth noting what did **not** happen: doc 22 §5 allowed for manual-only terms,
+and none were needed. Every advanced term a chapter met without a definition got
+a `glossary.ts` entry instead — `day_slot` in 3a, `load_step` in 3b — which is
+§8.1 pushing the other way, and better, because those cards are now available to
+`InfoDot` call sites too.
+
+**Ch. 18 spends §8.5's one allowance.** The plain-language rule bans `MCP`
+outright except where a reader has to find that word in their own client, and
+`MAY_SAY_MCP` was written empty in Phase 2 against exactly this moment. The
+app's field says `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR`; a reader told
+only about "a connector" cannot complete step one. So the word appears in one
+section and nowhere else in 106.
+
+**A mined question turned out to rest on a false premise.** `22c` Part D's F18
+is *"why is the target only the low end of the range?"* — mined from a real
+`docs/notes/` question, and answerable only if a range is on screen. `D-15` from
+Phase 3g says it is not: N54 hid every card that would print it. So the question
+became *where is my macrocycle target*, which is the question a reader would ask
+today. This is the second time the mined material has needed re-deriving rather
+than transcribing, which is what `22b` §5.6 warned about — it just warned about
+stale *answers*, and this was a stale premise.
+
+**One test moved rather than broke,** which is the good kind. Phase 2 asserted
+that searching *"estimated one-rep max"* finds ch. 6's honesty section, because
+that section renders the e1RM card without ever writing the phrase — the alias
+layer doing its job. With ch. 20 shipped, the glossary section ranks first
+instead. That is the correct answer to a bare term search, produced by the same
+mechanism, so the assertion now covers both.
+
+42 new `22a` rows; `GUIDE_SECTION_IDS` +14 and now covering all 106 sections.
+**Phase 4 next** — a cold read end to end, and a re-validation of every claims
+row and of `22b` / `22c` / `22d` against the code, which is the check Batch 32
+is the standing argument for.
+
 ## 2026-08-11 — Session 114 (cont.): the three service chapters (N74)
 
 Doc 22 **Phase 3h** — chapters 16 (Body data), 17 (Prescription details) and 19

@@ -30,16 +30,17 @@ import type { ManualBlock } from "../types";
 // ---------------------------------------------------------------------------
 
 /**
- * Terms the manual does not render yet. This list may only **shrink**: a
- * chapter that covers a term deletes its row, and chapter 20 (Glossary, Phase
- * 3i) is generated from `glossary.ts` and therefore empties it outright.
+ * §8.1's end state, reached in Phase 3i: **every** `GlossaryKey` resolves to a
+ * `term` block. The scaffolding it replaces was `PENDING_GLOSSARY_TERMS`, a list
+ * that could only shrink — a reasonable contract while chapters were landing one
+ * at a time, and dead weight once chapter 20 exists.
  *
- * It exists because §8.1's end state — every `GlossaryKey` resolving to a
- * `term` block — is a statement about the finished manual, and a contract that
- * can only be satisfied at the end is a contract that enforces nothing until
- * then.
+ * Chapter 20 is what retires it. The chapter groups the terms by hand (reading
+ * order is an authorial decision, not `Object.keys()` order) and the assertion
+ * below is what makes it *generated* in the sense that matters: a term added to
+ * `glossary.ts` and not filed into a group fails CI.
  */
-const PENDING_GLOSSARY_TERMS: readonly GlossaryKey[] = [];
+const GLOSSARY_CHAPTER = "ug/glossary";
 
 function termsRenderedBy(blocks: readonly ManualBlock[]): GlossaryKey[] {
   return flatten(blocks).flatMap((block) =>
@@ -72,21 +73,25 @@ describe("§8.1 — the glossary is one source, not two", () => {
     }
   });
 
-  it("accounts for every glossary key — covered, or explicitly still pending", () => {
-    const keys = Object.keys(GLOSSARY) as GlossaryKey[];
-    const pending = new Set(PENDING_GLOSSARY_TERMS);
-    for (const key of keys) {
-      expect(
-        covered.has(key) || pending.has(key),
-        `GLOSSARY.${key} is neither rendered nor listed as pending`,
-      ).toBe(true);
+  it("renders every glossary key somewhere in the guide", () => {
+    for (const key of Object.keys(GLOSSARY) as GlossaryKey[]) {
+      expect(covered.has(key), `GLOSSARY.${key} is never rendered`).toBe(true);
     }
-    for (const key of PENDING_GLOSSARY_TERMS) {
-      expect(keys, `${key} is not a glossary key`).toContain(key);
+  });
+
+  it("files every glossary key into chapter 20, exactly once", () => {
+    const inChapter = everySection
+      .filter((entry) => entry.id.startsWith(`${GLOSSARY_CHAPTER}#`))
+      .flatMap((entry) => termsRenderedBy(entry.section.blocks));
+    expect(inChapter.length, "chapter 20 renders nothing").toBeGreaterThan(0);
+    for (const key of Object.keys(GLOSSARY) as GlossaryKey[]) {
       expect(
-        covered.has(key),
-        `${key} is rendered now — delete its PENDING_GLOSSARY_TERMS row`,
-      ).toBe(false);
+        inChapter.filter((k) => k === key).length,
+        `GLOSSARY.${key} appears ${inChapter.filter((k) => k === key).length}× in chapter 20 — file it into exactly one group`,
+      ).toBe(1);
+    }
+    for (const key of inChapter) {
+      expect(GLOSSARY[key], `chapter 20 renders unknown term ${key}`).toBeDefined();
     }
   });
 
@@ -429,9 +434,12 @@ describe("§8.5 — plain-language vocabulary", () => {
 
   /**
    * §8.5's one allowance: `MCP` may appear where the reader has to find that
-   * word in their own AI client's interface. Phase 6 adds `ai/setup#…` here.
+   * word in their own AI client's interface. Phase 3i takes it for the first
+   * time — ch. 18's setup section, where the app's own field reads
+   * `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR` and a reader who has not been
+   * told the word cannot complete the step. Phase 6 adds `ai/setup#…` here.
    */
-  const MAY_SAY_MCP: readonly string[] = [];
+  const MAY_SAY_MCP: readonly string[] = ["ug/connecting-an-ai#setting-one-up"];
 
   it("uses the reader's words, not the build's", () => {
     for (const entry of everySection) {

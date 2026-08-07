@@ -49,9 +49,13 @@ describe("the index", () => {
     // doc 22 §10.2 — the synonym layer a lexical index otherwise lacks. Nothing
     // in ch. 6 writes the words "estimated one-rep max" into a heading; the
     // section is findable by them because it renders the card.
-    expect(top("estimated one-rep max")[0]).toBe(
-      "ug/effort-rir#why-honesty-matters",
-    );
+    //
+    // Phase 3i shipped chapter 20, so the definitional home now ranks first —
+    // which is the right answer to a bare term search, and the same mechanism
+    // producing it. Both sections carry the alias; neither writes the phrase.
+    const hits = top("estimated one-rep max");
+    expect(hits[0]).toBe("ug/glossary#strength-estimates");
+    expect(hits).toContain("ug/effort-rir#why-honesty-matters");
   });
 
   it("indexes layer-3 prose, which is exactly what someone searches for", () => {

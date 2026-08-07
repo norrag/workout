@@ -157,12 +157,29 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/prescription-details#opening-the-details",
   "ug/prescription-details#when-a-prescription-changes",
   "ug/prescription-details#who-writes-the-numbers",
+  // ch. 18 — Connecting an AI (Phase 3i)
+  "ug/connecting-an-ai#what-it-is",
+  "ug/connecting-an-ai#setting-one-up",
+  "ug/connecting-an-ai#what-it-is-good-at",
+  "ug/connecting-an-ai#staying-in-control",
   // ch. 19 — Your data (Phase 3h)
   "ug/your-data#what-is-stored",
   "ug/your-data#taking-a-copy",
   "ug/your-data#deleting-your-account",
   "ug/your-data#live-reads-and-queued-logging",
   "ug/your-data#seeing-what-changed",
+  // ch. 20 — Glossary (Phase 3i)
+  "ug/glossary#cycles",
+  "ug/glossary#effort",
+  "ug/glossary#strength-estimates",
+  "ug/glossary#progress-and-volume",
+  "ug/glossary#feedback-and-equipment",
+  // ch. 21 — Troubleshooting & FAQ (Phase 3i)
+  "ug/troubleshooting#the-weight-changed",
+  "ug/troubleshooting#a-number-looks-wrong",
+  "ug/troubleshooting#sets-and-counting",
+  "ug/troubleshooting#where-did-that-go",
+  "ug/troubleshooting#it-did-not-save",
 ];
 
 export function isGuideSectionId(id: string): boolean {

@@ -911,7 +911,7 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression — ✅ **BUILT 2026-08-11**, owner review gate open | L — own review gate |
 | **3g** | 13 Reading your stats · 14 Macrocycle goals — ✅ **BUILT 2026-08-11** | M |
 | **3h** | 16 Body data · 17 Prescription details · 19 Your data — ✅ **BUILT 2026-08-11** | M |
-| **3i** | 18 Connecting an AI · 20 Glossary (generated) · 21 Troubleshooting & FAQ | M |
+| **3i** | 18 Connecting an AI · 20 Glossary (generated) · 21 Troubleshooting & FAQ — ✅ **BUILT 2026-08-11** | M |
 
 (Chapter 6 ships in Phase 1.) Each PR: content blocks + claims-ledger rows +
 contracts green.
@@ -1308,6 +1308,59 @@ contracts green.
 > named by their build words, so the chapter claims what a reader can act on —
 > the data is scoped by the database rather than by the screen — and leaves the
 > mechanism to doc 03.
+
+> **3i landed 2026-08-11, and Phase 3 is complete.** Chapters **18**
+> (Connecting an AI), **20** (Glossary) and **21** (Troubleshooting & FAQ) —
+> fourteen sections, 135–236 words. **All 21 chapters, 106 sections**, median
+> **200** words against the 350 budget, and ch. 6's mechanism section (323) has
+> been the ceiling-brusher since Phase 1, which is the calibration holding
+> across nine content phases and eight authoring-rule revisions.
+>
+> **Ch. 20 retires `PENDING_GLOSSARY_TERMS`.** [§8.1](#81-the-glossary-is-one-source-not-two)'s
+> end state — every `GlossaryKey` resolving to a `term` block — was enforced
+> until now by a list that could only shrink, which is a contract that enforces
+> nothing until someone remembers to shorten it. The chapter replaces it with an
+> assertion: **every key is filed into exactly one of chapter 20's five groups**,
+> so a term added to `glossary.ts` and left unplaced fails CI. The grouping and
+> the one orienting line per group are authored; every definition is the app's
+> own copy rendered at read time, which is what "generated" was always supposed
+> to mean here. **No manual-only term proved necessary** — §5 allowed for them,
+> and every advanced term a chapter needed got a `glossary.ts` entry instead
+> (`day_slot`, `load_step`), which is the same rule pushing the other way.
+>
+> **Ch. 18 takes [§8.5](#85-plain-language-vocabulary)'s one allowance, for the
+> first time.** `MCP` appears in exactly one section — the setup steps — because
+> the app's own field reads `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR` and a
+> reader who has not been told the word cannot complete the step. `MAY_SAY_MCP`
+> in `contracts.test.ts` was written empty in Phase 2 for precisely this case.
+> The chapter carries **no typed link into the AI Manual**: `ai/**` sections do
+> not exist, and [§9.4](#94-the-rest) 5 forbids authoring a link before its
+> target resolves — a **forward debt** in the ch. 5 → ch. 11 pattern, paid by
+> Phase 6e.
+>
+> **Ch. 21 is mined, and one mined question had to be rewritten.**
+> [`22c`](./22c-app-inventory.md) Part D's `F18` asks *"why is the target only
+> the low end of the range?"* — a premise `D-15` disproves, since no app screen
+> shows the band at all. It is answered as *where is my macrocycle target*
+> instead, pointing at ch. 14. `F11` is the one [`22b`](./22b-source-map.md)
+> §4.3 insisted on: the 2026-08-02 re-levelling moved 9 087 historical estimates
+> **upward**, and nothing else in the manual would explain a long-time user's
+> numbers changing overnight. The two open product decisions (**T-A7**
+> in-session repricing, **T-A8** in-progress sets) are stated as current
+> behavior and promised nothing, per [`22c`](./22c-app-inventory.md) Part E 4.
+> `F10` is linked to ch. 13 rather than answered twice — answering a mechanism
+> in two chapters is how two chapters drift.
+>
+> **One test moved rather than broke.** Phase 2's search assertion pinned
+> *"estimated one-rep max"* to ch. 6, on the reasoning that a section is findable
+> by a card it renders without ever writing the phrase. With ch. 20 shipped the
+> glossary section ranks first — the right answer to a bare term search, produced
+> by the same alias mechanism. The test now asserts both.
+>
+> **42 new [`22a`](./22a-manual-claims.md) rows** and three deliberately-absent
+> tables; `GUIDE_SECTION_IDS` +14, and it now covers all 106 sections. **Phase 4
+> is next**: a cold read end to end, and a re-validation of every ledger row,
+> `22b`, `22c` and `22d` against the code.
 
 ### Phase 4 — User Guide review gate
 
