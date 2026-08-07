@@ -79,6 +79,7 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/training-a-session#moving-between-days",
   "ug/training-a-session#logging-a-set",
   "ug/training-a-session#adjusting-as-you-go",
+  "ug/training-a-session#notes",
   "ug/training-a-session#how-it-went",
   "ug/training-a-session#finishing-the-session",
   // ch. 6 — Effort: RIR and the ramp (Phase 1)
