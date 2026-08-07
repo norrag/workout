@@ -89,6 +89,24 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/effort-rir#why-honesty-matters",
   "ug/effort-rir#missing-the-ask",
   "ug/effort-rir#per-exercise",
+  // ch. 7 — Choosing your ramp: training styles (Phase 3d)
+  "ug/choosing-your-ramp#effort-and-fatigue",
+  "ug/choosing-your-ramp#why-a-ramp",
+  "ug/choosing-your-ramp#four-shapes",
+  "ug/choosing-your-ramp#judging-your-own-effort",
+  "ug/choosing-your-ramp#what-else-a-ramp-moves",
+  // ch. 8 — Exercise-level RIR (Phase 3d)
+  "ug/exercise-level-rir#why-one-exercise-differs",
+  "ug/exercise-level-rir#backing-an-exercise-off",
+  "ug/exercise-level-rir#what-it-does-to-your-numbers",
+  "ug/exercise-level-rir#pushing-an-exercise-harder",
+  "ug/exercise-level-rir#how-far-it-reaches",
+  // ch. 9 — Deloads (Phase 3d)
+  "ug/deloads#what-a-deload-is",
+  "ug/deloads#the-week-itself",
+  "ug/deloads#how-it-reads-afterwards",
+  "ug/deloads#when-you-need-one",
+  "ug/deloads#choosing-to-have-one",
   // ch. 11 — Why the app asks how it felt (Phase 3e)
   "ug/how-it-felt#what-your-answers-do",
   "ug/how-it-felt#joint-pain-first",

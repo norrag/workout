@@ -11,8 +11,11 @@
 // Workout tab's first load. Phase 2 turns the rule into an import-guard test in
 // the WS-J style; until then it is this comment and code review.
 
+import { UG_CHOOSING_YOUR_RAMP } from "./ug/choosing-your-ramp";
 import { UG_CYCLE_MODEL } from "./ug/cycle-model";
+import { UG_DELOADS } from "./ug/deloads";
 import { UG_EFFORT_RIR } from "./ug/effort-rir";
+import { UG_EXERCISE_LEVEL_RIR } from "./ug/exercise-level-rir";
 import { UG_EXERCISES_AND_TEMPLATES } from "./ug/exercises-and-templates";
 import { UG_HOW_IT_FELT } from "./ug/how-it-felt";
 import { UG_PLANNING_A_MESOCYCLE } from "./ug/planning-a-mesocycle";
@@ -71,6 +74,9 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_PLANNING_A_MESOCYCLE, // 4
   UG_TRAINING_A_SESSION, // 5
   UG_EFFORT_RIR, // 6
+  UG_CHOOSING_YOUR_RAMP, // 7
+  UG_EXERCISE_LEVEL_RIR, // 8
+  UG_DELOADS, // 9
   UG_HOW_IT_FELT, // 11
   UG_VOLUME, // 12
   UG_EXERCISES_AND_TEMPLATES, // 15

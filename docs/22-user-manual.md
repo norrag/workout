@@ -6,9 +6,9 @@ and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3c + 3e with them** —
-chapters 1, 2, 3, 4, 5, 6, 11, 12 and 15 are written, so the User Guide is nine
-chapters of twenty-one.
+**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3e with them** —
+chapters 1–9, 11, 12 and 15 are written, so the User Guide is twelve chapters of
+twenty-one. **O7 is answered** by the 3d-r research pass ([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
@@ -341,6 +341,12 @@ work, which go stale and can be wrong, and it risks reading as endorsement or as
 where the ramp property is a documented, citable feature of the published program,
 cite the source, and state plainly that WORKOUT is not implementing that program.
 Owner call in [§13](#13-owner-decisions--answered-questions).
+
+> **Taken, 2026-08-11 (3d-r).** No program is named. The research found no
+> citable ramp *specification* — the literature studies proximity to failure as a
+> variable, not as a published program's schedule — so a name would have rested
+> on that program's own commercial materials, which the claims ledger cannot
+> verify. Reasoning and the one-block reversal path: the review's §6.
 
 ---
 
@@ -899,8 +905,8 @@ One PR per group. Usage before mechanism; chapter 10 after its vocabulary.
 | **3a** | 1 What WORKOUT is · 2 Your profile · 3 The cycle model — ✅ **BUILT 2026-08-08** | M |
 | **3b** | 4 Planning a mesocycle · 15 Exercises & templates — ✅ **BUILT 2026-08-10** | M |
 | **3c** | 5 Training a session — ✅ **BUILT 2026-08-11** | M |
-| **3d-r** | **Research pass** for chapter 7 → `docs/reviews/2026-08-xx-rir-ramps-and-training-styles.md`, evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) | M |
-| **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system | L |
+| **3d-r** | **Research pass** for chapter 7 → [`docs/reviews/2026-08-11-rir-ramps-and-training-styles.md`](./reviews/2026-08-11-rir-ramps-and-training-styles.md), evidence-tagged per doc 10's convention ([§6.3](#63-rir-ramps-and-training-styles)) — ✅ **DONE 2026-08-11** | M |
+| **3d** | 7 Choosing your ramp · 8 Exercise-level RIR · 9 Deloads — the effort cluster, written together so the three levers read as one system — ✅ **BUILT 2026-08-11** | L |
 | **3e** | 11 Why the app asks how it felt · 12 Volume — ✅ **BUILT 2026-08-11** | M |
 | **3f** | **10 How your next weight is chosen** — anchor, e1RM, its role, confidence, double progression | L — own review gate |
 | **3g** | 13 Reading your stats · 14 Macrocycle goals | M |
@@ -1050,6 +1056,68 @@ contracts green.
 > the parameters these chapters actually cite. The dotted-path existence
 > assertion is untouched.
 
+> **3d-r and 3d landed 2026-08-11.** The **research pass**
+> ([`docs/reviews/2026-08-11-rir-ramps-and-training-styles.md`](./reviews/2026-08-11-rir-ramps-and-training-styles.md))
+> read all seven sources first-hand rather than summarizing doc 10's summary of
+> them, and that is what it was for: **it found doc 10 §4's own rationale
+> wrong.** *"Hypertrophy gains flatten past ~1–2 RIR"* is stated in doc 10 and
+> repeated verbatim in `COACHING_GUIDE`, and neither cited paper establishes a
+> plateau — Refalo 2023's failure-vs-non-failure effect is small but positive
+> throughout, and the Robinson meta-regression found a **continuing** negative
+> slope with intervals excluding null. Doc 10's *conclusion* survives (0 RIR is a
+> peak-week ceiling); its argument does not. The manual states the **trade**
+> instead — a small per-set gain, a steep per-set fatigue cost, and fatigue as
+> what limits weekly sets — which is stronger, and is what ch. 7 is written from.
+> Recorded as [`22a`](./22a-manual-claims.md) **`D-13`**; doc 10 and the
+> connector's guide are theirs to correct ([§1.2](#12-scope-boundaries)).
+>
+> **O7 is answered, at its conservative end: no third-party program is named.**
+> The recommendation in [§13](#13-owner-decisions--answered-questions) was
+> *describe by characteristic, name only where the ramp property is documented
+> and citable* — and the research turned up no citable ramp **specification**,
+> because the literature studies proximity to failure as a variable rather than
+> as a published program's schedule. Naming one would have meant sourcing it from
+> that program's own commercial materials, which [`22a`](./22a-manual-claims.md)'s
+> rule (code or the active params row) cannot verify. The four characteristic
+> shapes carry the instructional load; adding a name later is one `detail` block,
+> and the review's §6 records the cost so the owner can overrule cheaply.
+>
+> **Chapters 7, 8 and 9 — fifteen sections, 172–255 words against the 350
+> budget**; the corpus median moves 215 → 212 over 61 sections, so the ch. 6
+> exemplar's mechanism section (323) is still the ceiling-brusher after four
+> content phases. Written together because the three levers are one system: ch. 7
+> chooses the week's effort, ch. 8 overrides it per exercise, ch. 9 is the week
+> that spends none of it — and each hands the other two their seams rather than
+> half-explaining them.
+>
+> **Two things ch. 8 says that no spec does, both from the code.** The §6.2
+> read-time policy is **asymmetric**, and the manual states the asymmetry as the
+> reassurance it is: easier-than-the-week work is set aside from strength reads
+> *and kept in volume, weight PRs and session-volume PRs*, because those last
+> three are observations rather than estimates. And the earn gate refuses
+> **explicitly** with reason `exercise_rir`, so "the program stops leading the
+> weight up while you are backed off" is a stated behavior, not an inference.
+> Per [`22b`](./22b-source-map.md) §4.1 ①, the **measuring band appears nowhere**
+> — v26 is inactive, so today every logged set at every RIR is still treated as a
+> measurement, and ch. 8 gains the band in the release that activates it (**O-B**).
+>
+> **Ch. 9 is the chapter the specs would have got wrong.** Doc 22 §6.1's own
+> *"MRV-stop rule"* is not implemented, and doc 10 §3's graded volume ramp with
+> it ([`22b`](./22b-source-map.md) §7) — so the chapter says plainly that **the
+> app deloads on a schedule and nothing triggers one**, and points at ch. 11 for
+> what does happen week to week. Its evidence section carries a nuance doc 10
+> does not: the one controlled trial had its deload group **stop training for a
+> week**, which is a different intervention from the light week this app
+> prescribes, so the trial argues against skipping training mid-block and says
+> little about a deload week. Both halves are stated, because the first half
+> alone reads as *deloads are useless*, which the study does not show.
+>
+> **`deload` is rendered, clearing the last of the 3a-era pending terms bar two**
+> — `e1rm_confidence` (3f) and `est_strength` (3g), each with the chapter that
+> owes it. **One defect, `D-13`** (above); **`D-08`** is stated the Phase-3a way —
+> ch. 9 gives the true deload target and does not narrate the create sheet's
+> stale literal.
+
 > **Owner review round 5 (2026-08-11) returned four notes across 3c and 3e**,
 > all folded in and generalized as
 > [§8.4d](#84d-standing-authoring-rules-from-owner-review-round-5-2026-08-11).
@@ -1169,9 +1237,14 @@ Round 1, 2026-08-06.
 
 ### Still open
 
+> **O7 closed 2026-08-11** by the 3d-r research pass, which took the
+> recommendation below at its conservative end — ch. 7 names no third-party
+> program, and the reasoning plus the cheap reversal are in the review's §6. Left
+> in place rather than deleted because the owner may still want names.
+
 | # | Question | Recommendation |
 |---|---|---|
-| **O7** | Chapter 7 asks for "examples of programs that use different approaches". Name real published programs, or describe approaches generically? | **Describe approaches by characteristic**, and name a published program only where the ramp property is documented and citable, with the citation and an explicit "WORKOUT does not implement this program." Naming programs creates checkable third-party claims that go stale and can read as endorsement — but the owner asked for examples, so this is a call about *how far*, not *whether* ([§6.3](#63-rir-ramps-and-training-styles)) |
+| **O7** (closed) | Chapter 7 asks for "examples of programs that use different approaches". Name real published programs, or describe approaches generically? | **Describe approaches by characteristic**, and name a published program only where the ramp property is documented and citable, with the citation and an explicit "WORKOUT does not implement this program." Naming programs creates checkable third-party claims that go stale and can read as endorsement — but the owner asked for examples, so this is a call about *how far*, not *whether* ([§6.3](#63-rir-ramps-and-training-styles)) |
 | **O8** | Should manual edits be possible at runtime via an admin tool, rather than through a PR? | **Not as designed; keep content in the repo.** Full analysis in [§14](#14-could-an-admin-mcp-tool-edit-the-manual) — with a narrow errata overlay held in reserve if the friction turns out to be real |
 
 ---
