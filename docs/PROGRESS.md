@@ -2,7 +2,92 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phases 3c/3e, owner review round 5 (N74)
+## 2026-08-11 (latest) — doc 22 Phases 3d-r + 3d: the effort cluster (N74)
+
+The **research pass** and the three chapters it gates — **7 Choosing your ramp**,
+**8 Exercise-level RIR**, **9 Deloads** — five sections each, still behind
+`releaseActive("1.1.0")`. Written together because the three levers are one
+system: ch. 7 sets the week's effort, ch. 8 overrides it for one exercise, ch. 9
+is the week that spends none of it.
+
+Fifteen sections, 172–255 words against the 350 budget; the corpus median moves
+215 → 212 across 61 sections, and ch. 6's mechanism section (323) is still the
+ceiling-brusher after four content phases.
+
+### The research pass found doc 10's own rationale wrong
+
+`docs/reviews/2026-08-11-rir-ramps-and-training-styles.md` read all seven
+sources first-hand rather than summarizing doc 10's summary of them, which is
+what it was for.
+
+Doc 10 §4 justifies the RIR ramp with *"hypertrophy gains flatten past ~1–2 RIR
+while fatigue keeps rising"*, and `COACHING_GUIDE` repeats the sentence verbatim
+— so the connector coaches from it too. **Neither cited paper establishes a
+plateau.** Refalo 2023's failure-vs-non-failure effect is small but positive
+throughout (ES 0.19, 95% CI 0.00–0.37), and the Robinson meta-regression found a
+*continuing* negative slope for RIR on hypertrophy with intervals excluding
+null. Doc 10's conclusion survives — `0 RIR` is a peak-week ceiling — but its
+argument does not.
+
+The manual states the **trade** instead: a small per-set gain, a steep per-set
+fatigue cost (bar speed −8% at 3 RIR, −13% at 1, −25% at failure), and fatigue as
+what limits how many sets a week can hold. That is a stronger argument, and it is
+what ch. 7 is written from. Recorded as `22a` **`D-13`** — doc 10 and
+`coaching-guide.ts` are theirs to correct, since doc 22 §1.2 makes Phase 3
+documentation-only.
+
+**O7 closed at its conservative end: no third-party program is named.** The
+research turned up no citable ramp *specification* — the literature studies
+proximity to failure as a variable, not as a published program's schedule — so a
+name would have rested on that program's own commercial materials, which the
+claims ledger cannot verify. Four characteristic shapes carry the load; the
+review's §6 records the one-`detail`-block reversal so the owner can overrule
+cheaply.
+
+### Two app behaviors the specs do not state
+
+- **The back-off policy is asymmetric, and the asymmetry is the reassurance.**
+  Easier-than-the-week work is dropped from the strength trend, `best_e1rm` and
+  the PR view — and **kept** in volume, `weight_pr`, `volume_pr` and
+  `total_volume`, because those are observations rather than estimates. The
+  excluded sets are counted and reported as `backed_off_sets` rather than
+  vanishing. A slot run *harder* than its week keeps every claim it earns.
+- **The earn gate refuses explicitly**, with reason `exercise_rir`
+  (`rules/progression.ts:251`), so "the program stops leading the weight up while
+  an exercise is backed off" is stated behavior, not inference. Ch. 7 reaches the
+  same gate from the other side: a ramp whose easiest week is 4 RIR or above
+  yields only `low`-confidence estimates, and `progression.min_confidence` is
+  `moderate` — so a very conservative ramp holds the weight steady by
+  construction.
+
+### Ch. 9 is the chapter the specs would have got wrong
+
+Doc 22 §6.1's own *"MRV-stop rule"* is not implemented, and doc 10 §3's graded
+MEV→MAV→MRV volume ramp with it (`22b` §7, T-A5). The chapter says plainly that
+**the app deloads on a schedule and nothing triggers one**, and points at ch. 11
+for what does move week to week.
+
+Its evidence section carries a nuance doc 10 does not: the one controlled trial
+(Coleman 2024) had its deload group **stop training for a week**, which is a
+different intervention from the light week this app prescribes. So the trial
+argues against skipping training mid-block and says little about a deload week.
+Both halves are stated — the first alone reads as *deloads are useless*, which
+the study does not show. The practice consensus (Rogerson 2024: ~6.4 days every
+~5.6 weeks, pre-planned) is what the app's default actually sits inside.
+
+**Per `22b` §4.1 ①, the measuring band appears nowhere.** v26 is inactive, so
+every logged set at every RIR is still treated as a measurement; ch. 8 gains the
+band in the release that activates it (**O-B**).
+
+### Housekeeping
+
+`deload` is rendered, so the pending-glossary ledger is down to two —
+`e1rm_confidence` (3f) and `est_strength` (3g). 48 new `22a` rows across three
+chapters, plus the three "deliberately absent" tables. `GUIDE_SECTION_IDS` gains
+the fifteen new sections. Contracts, budget, registry, guards, search and the
+release link-target tests all green; `typecheck` and `lint` clean.
+
+## 2026-08-11 — doc 22 Phases 3c/3e, owner review round 5 (N74)
 
 Four notes across chapters 5 and 11, folded in and generalized as **doc 22
 §8.4d** so they bind every later chapter.

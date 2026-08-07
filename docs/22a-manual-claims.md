@@ -387,6 +387,130 @@ Phase 3e. Verified against the repo at `2372056` and the live v25 row.
 | A glossary entry for **MAV** | The app never renders the term — the planner flags only `UNDER MEV` and `OVER MRV`, and `GLOSSARY.volume_landmarks` defines those two. §8.1's add-it-to-the-glossary rule fires on terms the app *shows*, so MAV is spelled out in place in the chapter instead |
 
 ---
+## User Guide ch. 7 — Choosing your ramp: training styles (`ug/choosing-your-ramp`)
+
+Phase 3d. Verified against the repo at `bfc474f` and the live v25 row.
+
+> **This chapter carries two kinds of row, and they are sourced differently.**
+> Rows about **app behavior** cite code or the active params row, like every
+> other row in this file ([`22b`](./22b-source-map.md) §9.2). Rows about the
+> **evidence** cite the primary literature, read first-hand for the doc 22
+> Phase 3d-r research pass and recorded in
+> [`docs/reviews/2026-08-11-rir-ramps-and-training-styles.md`](./reviews/2026-08-11-rir-ramps-and-training-styles.md).
+> That review is a *record of sources*, not a spec of behavior, so citing it is
+> not the spec-citation §9.2 forbids — the paper behind each row is named.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-ramp-07` | `ug/choosing-your-ramp#effort-and-fatigue` | Strength gains are comparable across a wide range of distances from failure — the meta-regression's confidence intervals for estimated RIR contain null across all best-fit models | Robinson/Wolf/Refalo/Zourdos et al., *Sports Medicine* meta-regression series; research pass §2.1 | ✓ 2026-08-11 |
+| `C-ramp-08` | `ug/choosing-your-ramp#effort-and-fatigue` | Muscle growth improves a little as sets end closer to failure: pooled failure-vs-non-failure ES **0.19** (95% CI 0.00, 0.37), and a negative marginal RIR slope excluding null in the meta-regression | Refalo et al. 2023 *Sports Medicine* 53(3):649–665; Robinson et al. as above; research pass §2.1 | ✓ 2026-08-11 |
+| `C-ramp-09` | `ug/choosing-your-ramp#effort-and-fatigue` | Bar-speed loss four minutes after six bench sets at 75% 1RM was **−8%** at 3 RIR, **−13%** at 1 RIR and **−25%** at failure, and the proximity↔fatigue relationship was linear | Refalo et al. 2023 *Sports Medicine — Open* 9:10; research pass §2.2. Doc 10 §4 states the same pair | ✓ 2026-08-11 |
+| `C-ramp-09a` | `ug/choosing-your-ramp#effort-and-fatigue` | The chapter states the **trade** (small per-set gain, steep per-set fatigue cost, fatigue limits weekly sets) rather than doc 10 §4's "gains flatten past ~1–2 RIR", which neither source supports | research pass §2.2 and ledger `D-13`; the rewrite is the finding, not a paraphrase of doc 10 | ✓ 2026-08-11 |
+| `C-ramp-10` | `ug/choosing-your-ramp#why-a-ramp` | The app's default block is 5 weeks with a deload, ramping `3 → 0` | `supabase/migrations/20260611000001_initial_schema.sql:211–212` (`rir_start` default 3, `rir_end` default 0, each 0–5); `queries/cycles.ts:194–197` (`weeks ?? 5`, `includes_deload ?? true`) | ✓ 2026-08-11 |
+| `C-ramp-11` | `ug/choosing-your-ramp#why-a-ramp` · `#four-shapes` | The end value is the final **working** week's target, reached once, with the deload after it | `engine/rules/rir.ts::rirRamp` (`t = i/(workingWeeks−1)`, so the last working week sits on `rirEnd`; the deload is appended afterwards). Same rule ch. 6 states (`C-ramp-05`) | ✓ 2026-08-11 |
+| `C-ramp-12` | `ug/choosing-your-ramp#four-shapes` | Every shape the chapter names is reachable: start and end are each **0–5** with `end ≤ start`, over **3–8** weeks | `MesoHeader.tsx:640–684` (both cell rows are `[0,1,2,3,4,5]`, end disabled above start); `rirRamp` throws outside `3..8` and on `rir_end > rir_start` | ✓ 2026-08-11 |
+| `C-ramp-13` | `ug/choosing-your-ramp#judging-your-own-effort` | Reported RIR is more accurate close to failure and less accurate far from it, in long sets, and in lifters new to the scale | Zourdos et al. 2016 *JSCR* 30(1):267–275 (experienced > novice accuracy); Zourdos/Halperin et al. 2019 *JSCR* (accuracy rises with proximity, falls with set length); research pass §2.3 | ✓ 2026-08-11 |
+| `C-ramp-14` | `ug/choosing-your-ramp#judging-your-own-effort` | That report is an engine input, not a diary entry — it resolves the RIR every strength estimate is priced at | `engine/predict.ts::assumedRir` (`rir_reported ?? target_rir`); same chain ch. 6 states (`C-e1rm-01`/`05`) | ✓ 2026-08-11 |
+| `C-ramp-15` | `ug/choosing-your-ramp#what-else-a-ramp-moves` | A session reported past just right removes a set from that exercise next week, so a harder ramp tends to reduce set counts rather than raise them | `engine/rules/feedback.ts::modulateFromFeedback` (`workloadHot` ⇒ `setDelta = −1`), `workload_high` **8** on the live v25 row. Same claim as `C-fbk-08` | ✓ 2026-08-11 |
+| `C-ramp-16` | `ug/choosing-your-ramp#what-else-a-ramp-moves` | A set more than `e1rm.mod_max_rir` (**3**) reps short of failure lands in the lowest confidence band, and a step up is offered only from an anchor at `progression.min_confidence` (**moderate**) or better — so a ramp whose easiest value is 4 or above holds the weight | `engine/predict.ts::confidenceFor`; `engine/reps.ts::recencyWeightedE1rm` → `bestConfidence`; `engine/rules/progression.ts:266–273` (`not_earned`, reason `confidence`); values from live v25 | ✓ 2026-08-11 |
+| `C-ramp-17` | `ug/choosing-your-ramp#what-else-a-ramp-moves` | The deload week's target comes from the program whatever the ramp is, and deload timing follows the block's length rather than its steepness | `engine/rules/rir.ts::rirRamp` (the deload is appended at `params.deload.target_rir`, outside the interpolation and outside a per-week schedule) | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 7
+
+| Not claimed | Why |
+|---|---|
+| That gains **flatten** past 1–2 RIR | Neither source supports a plateau — see `D-13`. The chapter states the trade instead |
+| The measuring band, `max_measuring_rir`, "priced but not measured" | **Not live** ([`22b`](./22b-source-map.md) §4.1 ①). `C-ramp-16`'s confidence ladder is the live mechanism and predates doc 21 |
+| Any named third-party program | Research pass §6 takes doc 22 **O7**'s recommendation at its conservative end: the literature studies proximity as a variable, not as a published program's schedule, so a name would be a third-party claim this ledger cannot verify. Reversible — one `detail` block adds it |
+| An automatic deload, or an MRV stop | Not implemented ([`22b`](./22b-source-map.md) §7). Ch. 9 says the deload is scheduled |
+| A best ramp | Doc 10 §9. The chapter says the evidence supports the shape of the trade and not a winner |
+| The ramp **controls** — start/end cells, the per-week schedule, the deload's own line | Ch. 6 owns them (`C-ramp-01`…`05`). Ch. 7 links rather than restating (§8.4b rule 3) |
+
+---
+
+## User Guide ch. 8 — Exercise-level RIR (`ug/exercise-level-rir`)
+
+Phase 3d. Verified against the repo at `bfc474f` and the live v25 row.
+
+> **Written from doc 21 §6.2, not §6.1** — [`22b`](./22b-source-map.md) §4.1 ①'s
+> explicit instruction for this chapter. The reassurance a reader needs
+> ("a protected block does not read as a decline") is the read-time
+> comparability policy, which is **live**. The measuring band is a different
+> rule with different live status, and appears nowhere here.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-perex-05` | `ug/exercise-level-rir#why-one-exercise-differs` | Resolution is **absolute**: `resolvedRir = slotRir ?? weekRir`, with no floor, offset or clamp against the week — and clearing an assignment restores the ramp with nothing to unwind | `queries/slot-effort.ts::resolveSlotEffort` (+ the module header stating the rule); `engine/index.ts:158` | ✓ 2026-08-11 |
+| `C-perex-06` | `ug/exercise-level-rir#why-one-exercise-differs` | The week's own ramp stops at **5**; an exercise-level target is not bounded there — the sheet persists up to `RIR_MAX` (**30**) | `MesoHeader.tsx:640–684` (0–5 cells) vs `EffortSheet.tsx:66` (`RIR_MAX = 30`, "the ASK is unbounded in principle"); doc 21 §4.3 | ✓ 2026-08-11 |
+| `C-perex-07` | `ug/exercise-level-rir#why-one-exercise-differs` · `#backing-an-exercise-off` | Both directions reprice through the **same** path — the resolved RIR is substituted for pricing only, so a higher target buys a lighter weight and a lower one a heavier weight | `engine/index.ts:1049`; doc 21 §4.2 (28d, "no special case"). Same claim as `C-perex-02` | ✓ 2026-08-11 |
+| `C-perex-08` | `ug/exercise-level-rir#backing-an-exercise-off` | The sheet offers **0** plus steps of **1 · 2 · 4 · 8** above the week's value, and any whole number you type | `EffortSheet.tsx:59–63` (`EASIER_STEPS = [1,2,4,8]`, `rirOptions`), `:70` (`parseRir`, 0–30) | ✓ 2026-08-11 |
+| `C-perex-09` | `ug/exercise-level-rir#backing-an-exercise-off` | The `REASON` stored with an assignment is surfaced wherever the assignment reads, as a `Noted:` line above the engine's own reasoning | `EffortSheet.tsx:316–323`; `lib/slot-effort-display.ts::composeReasonLine`, `::composeEffortLines` (the effort block renders **above** the engine's why — doc 21 §8) | ✓ 2026-08-11 |
+| `C-perex-10` | `ug/exercise-level-rir#backing-an-exercise-off` · `#pushing-an-exercise-harder` | The exercise eyebrow reads `BACKED OFF` when the assignment is easier than its week and `PUSHED HARDER` when it is harder | `lib/slot-effort-display.ts::effortEyebrowParts`, `::isPushedHarder` | ✓ 2026-08-11 |
+| `C-perex-11` | `ug/exercise-level-rir#what-it-does-to-your-numbers` | "Backed off" keys on the **plan's intent** — `workout_exercises.target_rir > microcycles.target_rir` — never on measured confidence | `queries/slot-effort.ts::isBackedOffSlot`; migration `20260804000001_backed_off_stats_policy.sql` (the same predicate in SQL across four views); doc 10 §9 | ✓ 2026-08-11 |
+| `C-perex-12` | `ug/exercise-level-rir#what-it-does-to-your-numbers` | Backed-off sets are dropped from the strength claims — the best-set PR view, `v_exercise_overview.best_e1rm` and `v_meso_summary.best_e1rm` — and from the exercise's trend | migration `20260804000001`:160 (PR view comment + filter), `:213`, `:314–317`; `lib/analysis/comparability.ts` (`backed_off` sessions set aside from trend/phase/matched comparison) | ✓ 2026-08-11 |
+| `C-perex-13` | `ug/exercise-level-rir#what-it-does-to-your-numbers` | They are **kept** in volume and in the literal observations: weekly sets, `total_volume`, `times_trained`, `weight_pr` and `volume_pr` all count them | migration `20260804000001`:165–171 (the stated asymmetry), `:436–465` (`logged_backed_off_sets` is disclosure only and stays inside the counts) | ✓ 2026-08-11 |
+| `C-perex-14` | `ug/exercise-level-rir#what-it-does-to-your-numbers` | The exclusion is **disclosed, not hidden**: the excluded working sets are counted as `backed_off_sets` on the block and exercise rollups, and a session carries a `BACKED OFF` tag in exercise history beside the date, in the same grammar as `DELOAD` | migration `20260804000001`:214, `:322`, `:380`; `components/ExerciseHistoryList.tsx:179–182` | ✓ 2026-08-11 |
+| `C-perex-15` | `ug/exercise-level-rir#what-it-does-to-your-numbers` | While an assignment is easing an exercise the program stops leading the demand upward, and says so — the earn gate refuses with reason `exercise_rir`; the session also cannot arm the miss throttle | `engine/rules/progression.ts:251–256` (`slotBackedOff` ⇒ `notEarned("exercise_rir", …)`), and the comment above it (deload parity) | ✓ 2026-08-11 |
+| `C-perex-16` | `ug/exercise-level-rir#what-it-does-to-your-numbers` | The policy is **asymmetric by design**: a slot run harder than its week stays fully comparable and keeps every claim it earns | `queries/slot-effort.ts::isBackedOffSlot` (strictly `slotRir > weekRir`, documented as deliberately not symmetric); doc 10 §9's closing parenthesis | ✓ 2026-08-11 |
+| `C-perex-17` | `ug/exercise-level-rir#pushing-an-exercise-harder` | A set reported past just right removes a set from **that exercise** the following week | `engine/rules/feedback.ts::modulateFromFeedback` (`workloadHot`); the feedback grain is per exercise (`C-fbk-08`) | ✓ 2026-08-11 |
+| `C-perex-18` | `ug/exercise-level-rir#pushing-an-exercise-harder` | The working-set cap is read-only in the sheet under `SET BY YOUR COACH`, set through the connector; the program may prescribe fewer sets than the cap and never more, and an authored cap may go below the program's own floor | `EffortSheet.tsx:329–352` (read-only block + "Set through the AI connector"); `engine/index.ts:176–188` (`cappedSets`, "an authored cap below `params.min_sets` wins") | ✓ 2026-08-11 |
+| `C-perex-19` | `ug/exercise-level-rir#pushing-an-exercise-harder` | Above every assignment sits a ceiling of **6** working sets for one exercise (`max_sets_per_exercise`) | `engine/index.ts:1257` (`clampSets`); live v25. Same value as `C-fbk-09` | ✓ 2026-08-11 |
+| `C-perex-20` | `ug/exercise-level-rir#how-far-it-reaches` | `THIS WEEK` reaches one week; `WORKING WEEKS` reaches this week forward but not the deload; `ALL WEEKS` is the only choice that reaches the deload | `EffortSheet.tsx:31–46` (`SCOPES` + `scopeHelp`), and the module header's reason: a flat `target_rir` governs every week the schedule does not, and the deload falls off the end of the schedule by construction (`slot-effort.ts::pickWeek`) | ✓ 2026-08-11 |
+| `C-perex-21` | `ug/exercise-level-rir#how-far-it-reaches` | Weeks already behind are never rewritten — the scoped forms write from the current week forward | `EffortSheet.tsx:22–29` (the `rest_of_block` rationale); `planEffortEdits` / `regenerateOpenWorkouts` and hard rule 5 each keep it independently | ✓ 2026-08-11 |
+| `C-perex-22` | `ug/exercise-level-rir#how-far-it-reaches` | Assignments live on the plan, so duplicating a block carries them | `meso_exercises` holds the assignment columns (doc 21 §3 / A3); `duplicate_mesocycle` copies the plan rows; doc 21 §5 "Cross-meso" | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 8
+
+| Not claimed | Why |
+|---|---|
+| The measuring band, `e1rm.max_measuring_rir`, "priced but not treated as a measurement", `LIGHT` in place of an RIR | **Not live** — v26 is inactive, so today every logged set at every RIR is treated as a measurement ([`22b`](./22b-source-map.md) §4.1 ①). The code is complete and inert; the chapter gains it in the release that activates v26, per **O-B** |
+| Where the sheet is and how to open it | Ch. 6 owns the controls (`C-rir-03`, `C-perex-01`…`04`). Ch. 8 is about using the lever, not finding it |
+| `Priced at` / the rep position | Connector-set like the set cap, and a third lever would crowd the chapter. It is disclosed in the sheet; ch. 17 is the natural home once the prescription layers are written |
+| That a backed-off set is dropped from the strength **anchor** | It is **kept** — doc 21 §5 is explicit that backed-off sets still anchor, because dropping them would freeze the anchor and make the return prescription jump. Ch. 10 owns the anchor |
+| How the weight is actually re-priced | Ch. 10's subject. Ch. 8 stops at *lighter for a higher target, heavier for a lower one* |
+
+---
+
+## User Guide ch. 9 — Deloads (`ug/deloads`)
+
+Phase 3d. Verified against the repo at `bfc474f` and the live v25 row. Evidence
+rows are sourced as in ch. 7 — the primary paper is named, and the reading is
+recorded in the [3d-r research pass](./reviews/2026-08-11-rir-ramps-and-training-styles.md) §2.4.
+
+> **Doc 10 §9's deload guardrail is binding on every line**, and enforced:
+> `contracts.test.ts` fails the build on growth or strength framing in any
+> sentence mentioning a deload.
+
+| Claim ID | Manual location | Assertion | Source of truth | Verified |
+|---|---|---|---|---|
+| `C-deload-01` | `ug/deloads#what-a-deload-is` | A deload is a deliberately light week, usually a block's last, that sheds accumulated fatigue — it protects progress rather than builds it | `GLOSSARY.deload`, rendered verbatim as the section's `term` card (§8.1); doc 10 §9 | ✓ 2026-08-11 |
+| `C-deload-02` | `ug/deloads#the-week-itself` | The deload week's effort target is `deload.target_rir` — **6** on the live v25 row — and it comes from the program rather than from the ramp | `engine/rules/rir.ts::rirRamp` (appended at `params.deload.target_rir`, outside the interpolation); live v25. Same value as `C-ramp-04` | ✓ 2026-08-11 |
+| `C-deload-03` | `ug/deloads#the-week-itself` | Sets are roughly halved against the block's heaviest week (`deload.set_pct` **0.5**), with a floor of `min_sets` (**2**) | `engine/index.ts:310–313` and `rules/deload.ts` (`max(min_sets, round(baseSets × set_pct))`, then `clampSets`); live v25 | ✓ 2026-08-11 |
+| `C-deload-04` | `ug/deloads#the-week-itself` | The weight is chosen **the same way a working week's is** — the load that lands window-centred reps at the higher deload RIR, off the strength anchor | `engine/index.ts:251–325` (the `deload_anchor_rir` branch: `weightForRepsAtRir(anchor…, deloadRir)`, `boundRepsToWindow`, `predictRepsAtWeight`); `deload_anchor_rir` **true** on live v25. `deload.load_pct` is the no-anchor fallback (`rules/deload.ts`) | ✓ 2026-08-11 |
+| `C-deload-05` | `ug/deloads#the-week-itself` | The block's header carries `DELOAD W{n} — {rir} RIR` and its meta line `DELOAD`; the day screen's header reads `DELOAD WEEK` where a working week names its target | `cycles/meso/[mesoId]/page.tsx:318`, `:362–365`; `log/[workoutId]/DayView.tsx:644`. Same header claim as `C-rir-01` | ✓ 2026-08-11 |
+| `C-deload-06` | `ug/deloads#how-it-reads-afterwards` | Deload sessions are dropped from the strength trend, per exercise and per muscle group | `queries/stats.ts:196–200`, `:786–793` (`deloadMicroIds` → `foldProgressScores`) | ✓ 2026-08-11 |
+| `C-deload-07` | `ug/deloads#how-it-reads-afterwards` | They are left out of the block's attendance figures — `sessions_attended` and `sessions_due` both filter deload weeks out | migration `20260804000001`:296–302 (`not coalesce(is_deload, false)` on both) | ✓ 2026-08-11 |
+| `C-deload-08` | `ug/deloads#how-it-reads-afterwards` | Their sets, reps and weight lifted are counted in full; the muscle × week grid shows them, and the block's per-week averages leave them out | migration `20260804000001`:307–312 (`working_sets` / `total_volume` filter only on warm-ups); `queries/stats.ts::buildBalance` (626–634, `filter(({w}) => !w.is_deload)`). Same averaging claim as `C-vol-10` | ✓ 2026-08-11 |
+| `C-deload-09` | `ug/deloads#how-it-reads-afterwards` | A deload session is tagged `DELOAD` beside the date in exercise history | `components/ExerciseHistoryList.tsx:169–173` | ✓ 2026-08-11 |
+| `C-deload-10` | `ug/deloads#when-you-need-one` | **The app never triggers a deload.** A block's deload is its final week when `includes_deload` is set, and nothing watches for a condition to insert one | `engine/rules/rir.ts::rirRamp` (the deload is appended from the block's own flag, from no other input); `rules/feedback.ts::modulateFromFeedback` returns only a `setDelta` and a dampener — no deload signal exists in the engine's output type. Doc 10 §3's MRV-stop rule is **not implemented** ([`22b`](./22b-source-map.md) §7, T-A5) | ✓ 2026-08-11 |
+| `C-deload-11` | `ug/deloads#when-you-need-one` | Between deloads the app manages fatigue by moving an exercise's set count one at a time, from joint pain and workload | `engine/rules/feedback.ts::modulateFromFeedback`; the same ±1 model ch. 11 documents (`C-fbk-01`, `C-fbk-06`, `C-fbk-08`) | ✓ 2026-08-11 |
+| `C-deload-12` | `ug/deloads#when-you-need-one` | Surveyed competitive strength and physique athletes all deloaded, typically **6.4 ± 1.7 days** every **5.6 ± 2.3 weeks**, mostly pre-planned, triggered by stalled performance, soreness or joint stress | Rogerson, Nolan, Korakakis, Immonen, Wolf & Bell 2024, *Sports Medicine — Open* 10:26 (n = 246); research pass §2.4 | ✓ 2026-08-11 |
+| `C-deload-13` | `ug/deloads#when-you-need-one` | The one controlled trial of a planned mid-block deload had the deload group **abstain from training for a week**; that group finished with worse lower-body strength and no difference in hypertrophy, power or muscular endurance — so it tests a week off, not a light week | Coleman et al. 2024, *PeerJ* 12:e16777 (n = 39, 9-week programme, midpoint abstention); research pass §2.4, which is where the "different intervention" reading is recorded | ✓ 2026-08-11 |
+| `C-deload-14` | `ug/deloads#choosing-to-have-one` | `Final week is a deload` is the control, and a block of *n* weeks with it ticked has *n−1* working weeks | `PlannerBoard.tsx:1549–1561` / `MesoHeader.tsx:688–708` (the checkbox); `rirRamp` (`workingWeeks = includesDeload ? weeks − 1 : weeks`) | ✓ 2026-08-11 |
+| `C-deload-15` | `ug/deloads#choosing-to-have-one` | Both the deload flag and the block length are editable only while the block is `planned`; after that the details sheet edits the name | `MesoHeader.tsx:568` (`shapeLocked = status !== "planned"`), `:583`, `:599–612`. Same lock as `C-ramp-03` | ✓ 2026-08-11 |
+| `C-deload-16` | `ug/deloads#choosing-to-have-one` | Inside a running block, a per-exercise effort target is the way to ease off, and it can go as light as a deload on the exercises that need it | `queries/slot-effort.ts::resolveSlotEffort` (absolute, unbounded — `C-perex-05`/`06`); the assignment applies from the current week forward (`C-perex-21`) | ✓ 2026-08-11 |
+
+### Deliberately absent from ch. 9
+
+| Not claimed | Why |
+|---|---|
+| An automatic deload, an MRV stop, or a graded volume ramp | **Not implemented** — deferred as T-A5 ([`22b`](./22b-source-map.md) §7). This directly overrides doc 22 §6.1's "the MRV-stop rule (two weeks of workload ≥ 9 …)", which the Phase-0 audit had already corrected |
+| That the create-mesocycle sheet says the deload runs at 4 RIR | It does (`D-08`), and it is wrong. Per the Phase-3a precedent on `D-06`/`D-07`, the chapter states the truth and does not narrate the defect |
+| That a deload builds anything | Doc 10 §9, and enforced by `contracts.test.ts`. The chapter says a deload protects what you built |
+| That deload sets are excluded from your best estimated strength | They are **not** — only the strength *trend* and the attendance figures exclude them. Claiming more than the code does is what this ledger exists to prevent |
+| How the anchor and the rep window pick a weight | Ch. 10's subject. Ch. 9 says "the same way a working week's is" and links |
+
+---
 
 ## Defects this ledger surfaced
 
@@ -404,3 +528,4 @@ Phase 3e. Verified against the repo at `2372056` and the live v25 row.
 | **D-10** | Phase 3b, 2026-08-10 | N46 (open): a saved custom template has **no edit path** — `/templates/[templateId]` offers start-from and share only, and `saveMesoAsTemplate` always inserts. Adjusting a saved split means starting a block from it, changing the board, and saving a second template | **Recorded, not fixed** (N46 is the backlog item; a template editor is a screen, so hard rule 8 applies). Ch. 15 states the positive rule — a template is saved *out of* a plan, so adjust and save again — rather than naming the gap, per §8.4 |
 | **D-11** | Phase 3b owner review round 4, 2026-08-11 | `GLOSSARY.volume_landmarks` was labelled `MEV / MRV` and its body used both abbreviations without ever spelling them out — the same defect `D-02` fixed on `e1rm`, reintroduced in a card that predates `D-02`'s fix. Ch. 4's `§8.4c` rule 2 fix rendered the card at first use, which surfaced the gap rather than caused it: the definition a reader lands on didn't define the term | **Fixed**: body now reads *"MEV — minimum effective volume — is the floor… MRV — maximum recoverable volume — is the ceiling…"*, within the 280-char cap. `glossary.test.ts` gained a second abbreviation check (`MEV`/`MRV`, generalizing the one `D-02` added for `1RM`), so this class of defect is now caught by a test rather than by re-reading a card in review |
 | **D-12** | Phase 3e, 2026-08-11 | [`22c`](./22c-app-inventory.md) §B2.4 lists `TOP SET BY WEEK — KEY LIFTS` among the meso page's Balance / Performance content. **N10 removed that grid** (owner, 2026-07-03) together with the `ACROSS MACRO` single-exercise chart, both as macro-scope content on a meso view — the removal is commented in `MesoStatsViews.tsx:202` and `queries/stats.ts:505`. Surfaced while reading the same file for ch. 12's volume surfaces | **Recorded**; 22c corrected in place, and its §C2 `KEY LIFTS` row flagged for re-siting. Not a code defect — the audit predates nothing here, it simply transcribed a surface that had already gone. It matters because §C2 recommends adding `KEY LIFTS` to the glossary on the strength of a screen that no longer shows it, which **ch. 13** (Phase 3g) would otherwise inherit |
+| **D-13** | Phase 3d-r, 2026-08-11 | Doc 10 §4's RIR-ramp rationale reads *"hypertrophy gains flatten past ~1–2 RIR while fatigue keeps rising"*, and `COACHING_GUIDE` (`src/lib/mcp/coaching-guide.ts:72–78`) carries the same sentence verbatim. **Neither cited source establishes a flattening.** Refalo et al. 2023's failure-vs-non-failure effect is small but positive throughout (ES 0.19, 95% CI 0.00–0.37), and the Robinson et al. meta-regression found a *continuing* negative slope for RIR on hypertrophy with intervals excluding null — no plateau in either. The conclusion doc 10 draws from it (`0 RIR` is a peak-week ceiling) survives; the argument for it does not | **Recorded, not fixed** — doc 10 owns its own §4 wording and doc 22 §1.2 makes Phase 3 documentation-only. The manual states the **trade** instead (small per-set gain, steep per-set fatigue cost, fatigue limits weekly sets), which is the stronger argument and is what ch. 7 is written from (`C-ramp-09a`). Full working in the [3d-r research pass](./reviews/2026-08-11-rir-ramps-and-training-styles.md) §2.2. Worth a doc-10 amendment and a one-sentence `COACHING_GUIDE` edit, since the connector currently coaches from the same wrong rationale |
