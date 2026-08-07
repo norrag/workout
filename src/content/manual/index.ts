@@ -13,11 +13,13 @@
 
 import { UG_BODY_DATA } from "./ug/body-data";
 import { UG_CHOOSING_YOUR_RAMP } from "./ug/choosing-your-ramp";
+import { UG_CONNECTING_AN_AI } from "./ug/connecting-an-ai";
 import { UG_CYCLE_MODEL } from "./ug/cycle-model";
 import { UG_DELOADS } from "./ug/deloads";
 import { UG_EFFORT_RIR } from "./ug/effort-rir";
 import { UG_EXERCISE_LEVEL_RIR } from "./ug/exercise-level-rir";
 import { UG_EXERCISES_AND_TEMPLATES } from "./ug/exercises-and-templates";
+import { UG_GLOSSARY } from "./ug/glossary";
 import { UG_HOW_IT_FELT } from "./ug/how-it-felt";
 import { UG_HOW_YOUR_WEIGHT_IS_CHOSEN } from "./ug/how-your-weight-is-chosen";
 import { UG_MACROCYCLE_GOALS } from "./ug/macrocycle-goals";
@@ -25,6 +27,7 @@ import { UG_PLANNING_A_MESOCYCLE } from "./ug/planning-a-mesocycle";
 import { UG_PRESCRIPTION_DETAILS } from "./ug/prescription-details";
 import { UG_READING_YOUR_STATS } from "./ug/reading-your-stats";
 import { UG_TRAINING_A_SESSION } from "./ug/training-a-session";
+import { UG_TROUBLESHOOTING } from "./ug/troubleshooting";
 import { UG_VOLUME } from "./ug/volume";
 import { UG_WHAT_WORKOUT_IS } from "./ug/what-workout-is";
 import { UG_YOUR_DATA } from "./ug/your-data";
@@ -91,7 +94,10 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_EXERCISES_AND_TEMPLATES, // 15
   UG_BODY_DATA, // 16
   UG_PRESCRIPTION_DETAILS, // 17
+  UG_CONNECTING_AN_AI, // 18
   UG_YOUR_DATA, // 19
+  UG_GLOSSARY, // 20
+  UG_TROUBLESHOOTING, // 21
 ]);
 
 export function chaptersFor(manual: ManualId): readonly ManualChapter[] {

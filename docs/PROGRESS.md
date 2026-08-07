@@ -2,7 +2,59 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3h: body data, prescription details, your data (N74)
+## 2026-08-11 (latest) — doc 22 Phase 3i: the last three chapters, and Phase 3 is done (N74)
+
+Chapters **18** (Connecting an AI), **20** (Glossary) and **21**
+(Troubleshooting & FAQ) — fourteen sections, 135–236 words. That completes the
+User Guide: **21 chapters, 106 sections**, median **200** words against the 350
+budget, with ch. 6's mechanism section (323) still the ceiling-brusher it has
+been since Phase 1. All behind `releaseActive("1.1.0")`.
+
+### Ch. 20 retires PENDING_GLOSSARY_TERMS
+
+§8.1's end state — every `GlossaryKey` resolving to a `term` block — had been
+enforced by a list that could only shrink, which enforces nothing until someone
+remembers to shorten it. Chapter 20 replaces it with an assertion: **every key is
+filed into exactly one of its five groups**, so a term added to `glossary.ts` and
+left unplaced fails CI. The grouping and one orienting line per group are
+authored; every definition is the app's own copy rendered at read time, which is
+what "generated" was always supposed to mean. No manual-only term proved
+necessary — every advanced term a chapter needed got a `glossary.ts` entry
+instead (`day_slot`, `load_step`).
+
+### Ch. 18 takes §8.5's one allowance
+
+`MCP` appears in exactly one section — the setup steps — because the app's own
+field reads `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR` and a reader who has
+not been told the word cannot finish the step. `MAY_SAY_MCP` was written empty in
+Phase 2 for this case. The chapter carries **no typed link into the AI Manual**:
+`ai/**` sections do not exist and §9.4.5 forbids authoring a link before its
+target resolves — a forward debt in the ch. 5 → ch. 11 pattern, paid by Phase 6e.
+
+### Ch. 21 is mined, and one mined question had to be rewritten
+
+`22c` Part D's **F18** asks *"why is the target only the low end of the range?"* —
+a premise `D-15` disproves, since no app screen shows the band. It is answered as
+*where is my macrocycle target* instead. **F11** is the one `22b` §4.3 insisted
+on: the 2026-08-02 re-levelling moved 9 087 historical estimates upward, and
+nothing else in the manual would explain a long-time user's numbers changing
+overnight. The two open product decisions (T-A7 in-session repricing, T-A8
+in-progress sets) are stated as current behavior and promised nothing. F10 is
+linked to ch. 13 rather than answered twice.
+
+### One test moved rather than broke
+
+Phase 2's search assertion pinned *"estimated one-rep max"* to ch. 6 — a section
+findable by a card it renders without ever writing the phrase. With ch. 20
+shipped the glossary section ranks first, which is the right answer to a bare
+term search and the same alias mechanism producing it. The test asserts both now.
+
+42 new `22a` rows and three deliberately-absent tables; `GUIDE_SECTION_IDS` +14,
+now covering all 106 sections. **Phase 4 next**: a cold read end to end, plus a
+re-validation of every ledger row and of `22b` / `22c` / `22d` against the code.
+All suites green; typecheck and lint clean.
+
+## 2026-08-11 — doc 22 Phase 3h: body data, prescription details, your data (N74)
 
 Chapters **16**, **17** and **19**, fourteen sections, 118–214 words against the
 350 budget — the tightest group yet; the corpus median moves 209 → 203 across 92
