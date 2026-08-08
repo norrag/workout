@@ -51,6 +51,19 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     },
   },
   {
+    // N82 — the day-view focus pass. A layout change with no new capability,
+    // which is exactly the case doc 23 §4.2 says still owes an entry: the
+    // controls a returning user reaches for have moved.
+    id: "day-view-focus-pass",
+    title: "A quieter workout screen",
+    body: "Each exercise now carries one menu instead of a row of buttons. Tap the exercise's name to open the program's reasoning; its history, notes and effort target are grouped inside the menu.",
+    area: "training",
+    link: {
+      label: "Open your workout",
+      target: { kind: "app", href: "/workout" },
+    },
+  },
+  {
     // doc 22 Phase 5 (N74) — the connector's retrieval surface. `22d` §10
     // called this out in advance as a user-visible capability that owes an
     // entry: an AI that can read the guide answers differently.

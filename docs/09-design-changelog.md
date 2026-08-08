@@ -42,6 +42,138 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-14 — Day View: the focus pass (fig 1.1 / 1.2, N82, staged for 1.1.0)
+
+Owner-directed: "the Workout day view … has gained a number of visual elements
+that are beginning to create clutter and distraction. Retain functionality, ease
+and speed of use, and quick access to useful tools while reducing visual clutter
+and focusing the user on the elements that matter most and are used most
+frequently."
+
+The diagnosis, taken against the screen rather than the spec. The day view's hot
+path is the **set grid** — reading a target, editing a weight, ticking `LOG`.
+Everything else on the card is support. But support had accumulated at the same
+visual weight as the grid, and — critically — **at per-exercise cost**: the
+four-button icon row is four bordered 28px boxes *per card*, so a six-exercise
+day drew **24** of them in a column down the right edge, out-shouting the thing
+they exist to serve. Three of the four were controls a session touches rarely
+or never, and one of those three (`note`) was an exact duplicate of a row
+already in the `…` menu.
+
+Four changes. Every one is presentational or a menu rearrangement; **no action
+is removed, no write path moves, and no engine input changes.**
+
+### 1. The exercise icon row collapses four buttons to one (fig 1.1)
+
+- **Change.** The row above the exercise name is now the `…` menu **alone**. The
+  three departing controls land as follows:
+  - **prescription strip** → the exercise **name** becomes its disclosure (§2);
+  - **note** → deleted outright. `Notes` / `Add note` was already a `…` row
+    opening the same sheet with the same origin (`onNote(we, "menu")`) — the
+    icon was pure duplication;
+  - **history** → a `…` row (§4).
+  The surviving `…` keeps the mockup's 28px bordered box as its **visual**, but
+  now sits inside a 44×40 hit area (`-my-2 -mr-1`, R18) — alone in the row, it
+  can finally afford the touch target the four never could. Row height is
+  unchanged, so nothing below it moves.
+- **Rationale.** Prominence should track frequency. Ranked by how often a
+  session uses them, these four were roughly `1 : 0.2 : 0.2 : 0.3` and were
+  drawn `1 : 1 : 1 : 1`. Repetition is the multiplier that made it a page-level
+  problem rather than a card-level one.
+
+### 2. The exercise name is the prescription strip's disclosure (fig 1.1)
+
+- **Change.** The name gains a chevron and the whole `name + chevron` is the
+  toggle — `11px` chevron at `ink/45`, `1.5` gap, rotating 180° on open over
+  `200ms`. `aria-expanded` and the `<exercise> prescription` label move with it.
+- **Rationale.** This is the header's **own** idiom, one screen up: the
+  `workout` logotype + chevron already discloses the week/day navigator, and it
+  is the gesture this user performs most on this screen. Reusing it invents
+  nothing, and trades a 28px glyph for a 20px-bold title as the target.
+- **Default stays closed.** The strip's *ask* line largely restates what the set
+  rows already show (weight, reps, RIR); its non-redundant content is the
+  **why**, which is a question the lifter asks occasionally, not every set.
+- **Rule-8.** No mockup figure covers the strip at all (pre-existing deviation,
+  N57/N63, recorded in PROGRESS.md). House style honored: existing chevron
+  primitive, ink only, no accent, no new control type.
+
+### 3. The two note strips merge into one, ranked below the program (fig 1.1)
+
+- **Change.** `PINNED — …` and `NOTE — …` were two separate left-ruled strips;
+  they become **one** strip carrying up to two rows. The kind is named in the
+  ledger's tracked-caps label idiom (`9px / 600 / 0.16em / ink 45`) rather than
+  inline caps prose, and the strip's rule drops to `border-l border-ink/25`.
+- **Rationale.** The pinned strip wore `border-l-2 border-ink` — **identical to
+  the prescription strip**. A card with a prescription open, a pinned note and a
+  session note showed three near-identical bars with no way to tell the
+  program's voice from the lifter's. One rule per author, and the heavier rule
+  belongs to the program.
+
+### 4. The `…` menu gains `History`, and its rows are grouped (fig 1.2)
+
+- **Change (a).** `History ›` returns to the menu, **alongside** `View exercise
+  ›` — the in-place `THIS MACROCYCLE` sheet without leaving the session, versus
+  the whole exercise page. The 2026-06-26 entry that folded them into one row
+  did so expressly because "per-exercise history already has a dedicated control
+  in the Day View"; that control is gone, so its premise is gone with it.
+- **Change (b).** The menu's rows are grouped by a stronger rule
+  (`border-b border-ink/30` per group, via the new shared `MenuGroup`) into
+  *look it up* / *set it up* / *adjust this session* / *remove*. `MenuRow`'s
+  existing `last:` reset drops the hairline under each group's final row, so
+  grouping costs no doubled borders.
+- **Row order is untouched.** The groups fall on seams the list already had, so
+  nothing moves under a returning user's thumb — the only insertion is
+  `History`, directly under `View exercise`.
+- **Rationale.** Twelve flat rows mixing navigation, configuration, ordering,
+  structure and a destructive action is past a comfortable scan. Four short
+  lists is not.
+
+### 5. `TARGET n RIR` is stated in ink, not in the accent (fig 1.1)
+
+- **Change.** The header's effort label (and `DELOAD WEEK`) drops
+  `text-accent` for `text-ink`, keeping its bold weight.
+- **Rationale.** **Hard rule 7** — orange marks *current position and selection
+  only*. The week's effort ask is neither; it is a fact. It was also the single
+  loudest thing in the header, competing with the two elements that genuinely do
+  mark position (the navigator's active-week/day dots and the progress fill).
+  Hierarchy here comes from weight and size, which is the light-ledger system's
+  own instrument; the label keeps its rank without borrowing the accent's
+  meaning. On the day view, orange now means "where you are" and nothing else.
+
+### Deliberately not changed
+
+- **The set grid** — the hot path, and already right. Column count, cell
+  primitives, marker glyphs, per-set `⋮` and the `LB · REPS · RIR · LOG` header
+  are untouched.
+- **Per-exercise "next" row emphasis.** Every exercise keeps its own editable
+  next row rather than the page having one. Restricting it would read as more
+  focused and would break supersetting, which is a real way people train.
+- **The grid header repeating per card.** Three similar number columns need
+  their labels in view; it is already `9px / ink 50`.
+- **Equipment type on the name row.** Considered folding into the eyebrow as
+  ` · MACHINE`; rejected — the eyebrow's ` · SUFFIX` slot is spoken for by
+  doc 21 §8's effort suffixes (`· BACKED OFF`, `· CAPPED 2`) under a documented
+  two-suffix budget, and the name row's right edge is free now that the icons
+  have left it.
+
+### Staging + impact
+
+- **Staged behind `releaseActive("1.1.0")`** (doc 23 §9.2) via `focusPass()` in
+  `DayView.tsx`; the release PR is the switch. Both code paths ship until then,
+  which is the §9.2 cost, accepted. The menu **grouping** is gated too
+  (`MenuGroup ruled={…}`) so nothing about the menu changes early.
+- **Release note** — `day-view-focus-pass` staged in `unreleased.ts`. A changed
+  layout with no new capability is still a feature-release change (§4.2): the
+  controls a returning user reaches for have moved.
+- **Affected figures.** `1.1`, `1.2`.
+- **Impact.** `RETROFIT` — `DayView.tsx` (`DayHeader` effort label,
+  `ExerciseBlock` icon row / name row / note strips / menu) and
+  `components/ui/AnchoredMenu.tsx` (new `MenuGroup`). **No `DATA` change.**
+- **Manual.** `ug/training-a-session#the-day-screen` and `#notes` described the
+  four buttons, the note button, and the orange effort label; all three are
+  corrected in the same PR — doc 22 §2's whole point is that the manual and the
+  screen must not drift, and both ship in 1.1.0.
+
 ## 2026-08-13 — The AI Manual gets a reader (figs 4.8–4.11 reused; N74 / doc 22 Phase 6)
 
 Doc 22 Phase 6 writes the **AI Manual**, the second of D4's "two surfaces, one

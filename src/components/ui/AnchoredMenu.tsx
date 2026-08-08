@@ -112,6 +112,29 @@ export function AnchoredMenu({
   );
 }
 
+/**
+ * A run of related rows inside an `AnchoredMenu`. The group carries the
+ * stronger rule (`ink/30`) and `MenuRow`'s own `last:` reset drops the hairline
+ * under its final row, so grouping costs no doubled borders — a long menu reads
+ * as several short lists instead of one flat scan. `empty:hidden` keeps a group
+ * whose rows all conditioned themselves away from leaving a stray rule behind.
+ */
+export function MenuGroup({
+  children,
+  ruled = true,
+}: {
+  children: React.ReactNode;
+  /** false renders the rows inline, exactly as an ungrouped menu would */
+  ruled?: boolean;
+}) {
+  if (!ruled) return <>{children}</>;
+  return (
+    <div className="border-b border-ink/30 last:border-b-0 empty:hidden">
+      {children}
+    </div>
+  );
+}
+
 export function MenuRow({
   label,
   trailing,
