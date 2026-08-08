@@ -2,7 +2,57 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-13 (latest) — doc 22 Phase 6: the AI Manual (N74)
+## 2026-08-14 (latest) — Day View: the focus pass (N82, staged for 1.1.0)
+
+Owner-directed declutter of the day view. Full design record in
+[09-design-changelog.md](09-design-changelog.md) (2026-08-14); the short version
+is that the clutter was never any single element — it was **per-exercise
+repetition**. The four-button icon row costs four bordered boxes *per card*, so
+a six-exercise day drew 24 of them down the right edge, out-shouting the set
+grid they exist to serve; three of the four were rarely-used, and `note` was an
+exact duplicate of a `…` row opening the same sheet with the same origin.
+
+Five changes: icon row **4 → 1** (with a real 44px target at last); the
+**exercise name becomes the prescription strip's disclosure**; the two note
+strips **merge** under one lighter rule so the program's voice outranks the
+lifter's; `History ›` **returns to the `…` menu** and the menu's rows are
+**grouped** with the order untouched; `TARGET n RIR` states itself in **ink**
+rather than the accent. No action removed, no write path moved, no engine input
+touched.
+
+### Deviations recorded (hard rule 8)
+
+No mockup figure covers **any** of the elements this pass moves. Fig 1.1 shows
+two icon buttons (history + `…`), a three-column `LB / REPS / LOG` grid, no
+prescription strip, no progress bar and no accent on the header meta — it
+predates every one of them. The prescription strip's absence from the mockup is
+a **pre-existing** deviation already recorded for N57 / N63; this pass inherits
+it and adds two more, both transcribed from primitives the app already ships
+rather than improvised:
+
+- **the name-row chevron** — the header's own brand-row disclosure (`workout` +
+  chevron, 12px, 180° rotate over 200ms), re-used at 11px / `ink 45`;
+- **the grouped menu rule** — `border-b border-ink/30` per group, which is the
+  weight the menu's own header rule already uses, with `MenuRow`'s existing
+  `last:` reset preventing a doubled border.
+
+House style honored throughout: ink only, **no accent**, square corners, no new
+control type, tracked-caps labels for the note kinds.
+
+### Staged, not shipped
+
+Everything sits behind `releaseActive("1.1.0")` via `focusPass()` in
+`DayView.tsx` — the menu grouping included (`MenuGroup ruled={…}`), so no part
+of the menu changes before the release. Both code paths ship until the release
+PR flips them, which is doc 23 §9.2's stated and accepted cost. Release note
+`day-view-focus-pass` is staged in `unreleased.ts`.
+
+`22c` §B1.2 and the manual sections that described the four buttons, the note
+button and the orange effort label (`ug/training-a-session#the-day-screen`,
+`#notes`) are corrected in the same PR — they ship in 1.1.0 too, and doc 22 §2
+exists because that drift is the failure mode.
+
+## 2026-08-13 — doc 22 Phase 6: the AI Manual (N74)
 
 Twelve chapters, 48 sections, its own reader under `/more/connector/guide`, and
 the connector page reworked into its front door. Doc 22 Phase 6 is done; both

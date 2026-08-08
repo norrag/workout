@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { BottomSheet, useSheetTransition } from "@/components/ui/BottomSheet";
 import { useScrollLock } from "@/components/ui/useScrollLock";
 import { useModalA11y } from "@/components/ui/useModalA11y";
-import { AnchoredMenu, MenuRow } from "@/components/ui/AnchoredMenu";
+import { AnchoredMenu, MenuGroup, MenuRow } from "@/components/ui/AnchoredMenu";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { InfoDot } from "@/components/ui/InfoDot";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
@@ -109,6 +109,17 @@ import {
   composePrescriptionNarrative,
 } from "@/lib/prescription-narrative";
 import { effortEyebrowSuffix } from "@/lib/slot-effort-display";
+import { releaseActive } from "@/lib/version";
+import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
+
+/**
+ * N82 — the day-view focus pass, staged behind 1.1.0 (doc 23 §9.2: the release
+ * PR is the switch). Everything it gates is presentational or a menu
+ * rearrangement; no action, no write path, and no engine input moves.
+ */
+function focusPass(): boolean {
+  return releaseActive(UNRELEASED_VERSION);
+}
 
 /**
  * T-I2: the bodyweight chip in a bodyweight exercise's header. The load is the
@@ -783,7 +794,16 @@ function DayHeader({
             <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
               {dateLabel}
               <span className="flex items-center justify-end gap-1.5">
-                <span className="font-bold text-accent">{rirLabel}</span>
+                {/* N82: the week's effort ask is a fact, not a position or a
+                    selection, so it states itself in ink weight rather than in
+                    the accent (hard rule 7). Orange on this screen then means
+                    only "where you are": the navigator's dots and the progress
+                    fill, which is what the eye should find first. */}
+                <span
+                  className={`font-bold ${focusPass() ? "text-ink" : "text-accent"}`}
+                >
+                  {rirLabel}
+                </span>
                 <InfoDot term={isDeload ? "deload" : "rir"} small />
               </span>
             </div>
@@ -1149,6 +1169,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
 
   const iconBtn =
     "flex h-7 w-7 items-center justify-center border border-ink/35";
+  const focused = focusPass();
 
   return (
     <div className={`relative mt-5 ${skipped ? "opacity-40" : ""}`}>
@@ -1163,71 +1184,130 @@ const ExerciseBlock = memo(function ExerciseBlock({
               session 2). The strip carries the numbers and the reason. */}
           {effortEyebrowSuffix(we.slot_effort)}
         </div>
+        {/* N82: four equal-weight buttons per card put a column of bordered
+            boxes down the right edge of the whole page — repeated ink for
+            three controls the session rarely needs, competing with the set
+            grid that it is actually here to serve. The row collapses to the
+            one control that opens everything else; the strip moves onto the
+            exercise name (below), and note + history become menu rows. */}
         <div className="flex gap-2">
-          <button
-            type="button"
-            aria-label={`${we.exercise_name} prescription`}
-            aria-expanded={rxOpen}
-            className={`${iconBtn} ${rxOpen ? "border-ink bg-ink text-bg-base" : ""}`}
-            onClick={toggleRx}
-          >
-            {/* target glyph — the ask */}
-            <svg width="14" height="14" viewBox="0 0 14 14">
-              <circle
-                cx="7"
-                cy="7"
-                r="5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <circle cx="7" cy="7" r="1.4" fill="currentColor" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            aria-label={`${we.exercise_name} note`}
-            className={iconBtn}
-            onClick={() => onNote(we, "menu")}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14">
-              <path
-                d="M2.5 1.5h6L11.5 4.5v8h-9z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M4.5 6.5h5M4.5 9h5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-          <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={() => onHistory(we)}>
-            <svg width="14" height="14" viewBox="0 0 14 14">
-              <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-            </svg>
-          </button>
+          {!focused && (
+            <>
+              <button
+                type="button"
+                aria-label={`${we.exercise_name} prescription`}
+                aria-expanded={rxOpen}
+                className={`${iconBtn} ${rxOpen ? "border-ink bg-ink text-bg-base" : ""}`}
+                onClick={toggleRx}
+              >
+                {/* target glyph — the ask */}
+                <svg width="14" height="14" viewBox="0 0 14 14">
+                  <circle
+                    cx="7"
+                    cy="7"
+                    r="5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                  />
+                  <circle cx="7" cy="7" r="1.4" fill="currentColor" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label={`${we.exercise_name} note`}
+                className={iconBtn}
+                onClick={() => onNote(we, "menu")}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14">
+                  <path
+                    d="M2.5 1.5h6L11.5 4.5v8h-9z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M4.5 6.5h5M4.5 9h5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+              <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={() => onHistory(we)}>
+                <svg width="14" height="14" viewBox="0 0 14 14">
+                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                </svg>
+              </button>
+            </>
+          )}
           <button
             type="button"
             ref={menuBtnRef}
             aria-label={`${we.exercise_name} menu`}
             onClick={() => onOpenMenu(we.id)}
-            className={`${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`}
+            className={
+              focused
+                ? // alone now, so it can afford a real 44px target (R18)
+                  // without the box itself growing past the mockup primitive
+                  "-my-2 -mr-1 flex h-11 w-10 items-center justify-center"
+                : `${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`
+            }
           >
-            …
+            {focused ? (
+              <span
+                className={`${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`}
+              >
+                …
+              </span>
+            ) : (
+              "…"
+            )}
           </button>
         </div>
       </div>
       <div className="mt-0.5 flex items-baseline justify-between gap-2">
-        <div className="text-xl font-bold tracking-[-0.01em]">
-          {we.exercise_name}
-        </div>
+        {/* N82: the exercise name IS the prescription strip's disclosure —
+            name + chevron, the same idiom the header already uses for the
+            week/day navigator. A 20px title is a far better target than a
+            28px glyph, and the strip stops needing a control of its own. */}
+        {focused ? (
+          <button
+            type="button"
+            aria-label={`${we.exercise_name} prescription`}
+            aria-expanded={rxOpen}
+            onClick={toggleRx}
+            className="flex items-baseline gap-1.5 text-left"
+          >
+            <span className="text-xl font-bold tracking-[-0.01em]">
+              {we.exercise_name}
+            </span>
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 12 12"
+              aria-hidden
+              className="shrink-0 self-center text-ink/45 transition-transform duration-200"
+              style={{ transform: rxOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+            >
+              <path
+                d="M2.5 4.5 L6 8 L9.5 4.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : (
+          <div className="text-xl font-bold tracking-[-0.01em]">
+            {we.exercise_name}
+          </div>
+        )}
         <div className="flex flex-col items-end gap-0.5 text-right">
           <div className="text-[9.5px] font-medium tracking-[0.12em] text-ink/50">
             {we.equipment_type.toUpperCase()}
@@ -1291,7 +1371,62 @@ const ExerciseBlock = memo(function ExerciseBlock({
           )}
         </div>
       )}
-      {we.pinned_note && (
+      {/* N82: the two note kinds were two separate left-ruled strips, and the
+          pinned one wore the *same* `border-l-2 border-ink` as the
+          prescription strip above it — so a card with both showed three
+          near-identical bars and no way to tell the program's voice from the
+          lifter's. They become one strip, under one lighter rule: the program
+          keeps the heavy border, the notes sit beneath it as an annotation.
+          The kind stays named, in the ledger's own tracked-caps label. */}
+      {focused
+        ? (we.pinned_note || we.feedback?.notes) && (
+            <div className="mt-[7px] space-y-[3px] border-l border-ink/25 py-[5px] pl-2.5 text-[11px] font-medium text-ink/60">
+              {we.pinned_note && (
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  aria-label="edit pinned note"
+                  onClick={() => onNote(we, "pinned")}
+                  className="flex w-full items-start justify-between gap-2 text-left disabled:cursor-default"
+                >
+                  <span>
+                    <span className="mr-1 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+                      PINNED
+                    </span>
+                    {we.pinned_note.body}
+                  </span>
+                  {!readOnly && (
+                    <span aria-hidden className="shrink-0 px-1 text-ink/45">
+                      <PencilGlyph />
+                    </span>
+                  )}
+                </button>
+              )}
+              {we.feedback?.notes && (
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  aria-label="edit session note"
+                  onClick={() => onNote(we, "session")}
+                  className="flex w-full items-start justify-between gap-2 text-left disabled:cursor-default"
+                >
+                  <span>
+                    <span className="mr-1 text-[9px] font-semibold tracking-[0.16em] text-ink/45">
+                      NOTE
+                    </span>
+                    {we.feedback.notes}
+                  </span>
+                  {!readOnly && (
+                    <span aria-hidden className="shrink-0 px-1 text-ink/45">
+                      <PencilGlyph />
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+          )
+        : null}
+      {!focused && we.pinned_note && (
         <div className="mt-[7px] flex items-start justify-between gap-2 border-l-2 border-ink py-[5px] pl-2.5 text-[11px] font-medium text-ink/70">
           <span>PINNED — {we.pinned_note.body}</span>
           {!readOnly && (
@@ -1306,7 +1441,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
           )}
         </div>
       )}
-      {we.feedback?.notes && (
+      {!focused && we.feedback?.notes && (
         <button
           type="button"
           disabled={readOnly}
@@ -1394,62 +1529,116 @@ const ExerciseBlock = memo(function ExerciseBlock({
         {/* N75: the "Engine audit" row is gone. It is now "Prescription
             details", reached by tapping the ask line inside the prescription
             strip — a menu slot for something most people never open was the
-            wrong trade. */}
-        <MenuRow
-          label="View exercise"
-          trailing="›"
-          onClick={() => {
-            onCloseMenu();
-            // N4: carry the origin so the exercise page's back control returns
-            // here, not to the exercises list
-            router.push(
-              `/exercises/${we.exercise_id}?from=/log/${we.workout_id}`,
-            );
-          }}
-        />
-        {/* doc 21 §8 — the effort assignment for THIS slot, this week. The
-            sheet reads even when the day is read-only (a completed session's
-            assignment is part of its record); it only refuses to write. */}
-        <MenuRow
-          label="Effort target"
-          trailing={
-            we.slot_effort?.assignedRir != null
-              ? `RIR ${we.slot_effort.assignedRir}`
-              : "›"
-          }
-          onClick={() => {
-            onCloseMenu();
-            onEffort(we);
-          }}
-        />
-        <MenuRow
-          label={we.pinned_note || we.feedback?.notes ? "Notes" : "Add note"}
-          trailing={we.pinned_note || we.feedback?.notes ? "›" : undefined}
-          onClick={() => {
-            onCloseMenu();
-            onNote(we, "menu");
-          }}
-        />
-        {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
+            wrong trade.
+
+            N82: the menu absorbed the card's history button and grew past a
+            comfortable scan, so its rows are grouped — look it up / set it up /
+            adjust this session / remove — with a stronger rule at each seam.
+            The **order is untouched**: the groups fall on seams the list
+            already had, so nothing moves under a returning user's thumb. */}
+        <MenuGroup ruled={focused}>
           <MenuRow
-            label="Replace exercise"
+            label="View exercise"
             trailing="›"
             onClick={() => {
               onCloseMenu();
-              onReplace(we);
+              // N4: carry the origin so the exercise page's back control returns
+              // here, not to the exercises list
+              router.push(
+                `/exercises/${we.exercise_id}?from=/log/${we.workout_id}`,
+              );
             }}
           />
-        ) : (
-          <MenuRow label="Replace exercise" trailing="LOGGED" disabled />
-        )}
+          {/* N82: history returns to the menu, alongside — not instead of —
+              "View exercise". They are different destinations: this opens the
+              in-place sheet scoped to THIS MACROCYCLE without leaving the
+              session; that one opens the whole exercise page. The 2026-06-26
+              entry that folded them together did so because the card carried a
+              dedicated history control; it no longer does. */}
+          {focused && (
+            <MenuRow
+              label="History"
+              trailing="›"
+              onClick={() => {
+                onCloseMenu();
+                onHistory(we);
+              }}
+            />
+          )}
+        </MenuGroup>
+        <MenuGroup ruled={focused}>
+          {/* doc 21 §8 — the effort assignment for THIS slot, this week. The
+              sheet reads even when the day is read-only (a completed session's
+              assignment is part of its record); it only refuses to write. */}
+          <MenuRow
+            label="Effort target"
+            trailing={
+              we.slot_effort?.assignedRir != null
+                ? `RIR ${we.slot_effort.assignedRir}`
+                : "›"
+            }
+            onClick={() => {
+              onCloseMenu();
+              onEffort(we);
+            }}
+          />
+          <MenuRow
+            label={we.pinned_note || we.feedback?.notes ? "Notes" : "Add note"}
+            trailing={we.pinned_note || we.feedback?.notes ? "›" : undefined}
+            onClick={() => {
+              onCloseMenu();
+              onNote(we, "menu");
+            }}
+          />
+          {!readOnly && we.sets.length === 0 && we.muscle_group_id ? (
+            <MenuRow
+              label="Replace exercise"
+              trailing="›"
+              onClick={() => {
+                onCloseMenu();
+                onReplace(we);
+              }}
+            />
+          ) : (
+            <MenuRow label="Replace exercise" trailing="LOGGED" disabled />
+          )}
+        </MenuGroup>
         {!readOnly && (
           <>
-            {index > 0 && (
+            <MenuGroup ruled={focused}>
+              {index > 0 && (
+                <MenuRow
+                  label="Move up"
+                  onClick={() => {
+                    commit(() =>
+                      moveExerciseUpAction({
+                        workout_id: we.workout_id,
+                        workout_exercise_id: we.id,
+                      }),
+                    );
+                    onCloseMenu();
+                  }}
+                />
+              )}
+              {!isLast && (
+                <MenuRow
+                  label="Move down"
+                  onClick={() => {
+                    commit(() =>
+                      moveExerciseDownAction({
+                        workout_id: we.workout_id,
+                        workout_exercise_id: we.id,
+                      }),
+                    );
+                    onCloseMenu();
+                  }}
+                />
+              )}
               <MenuRow
-                label="Move up"
+                label="Add set"
                 onClick={() => {
                   commit(() =>
-                    moveExerciseUpAction({
+                    addSetAction({
                       workout_id: we.workout_id,
                       workout_exercise_id: we.id,
                     }),
@@ -1457,96 +1646,72 @@ const ExerciseBlock = memo(function ExerciseBlock({
                   onCloseMenu();
                 }}
               />
-            )}
-            {!isLast && (
               <MenuRow
-                label="Move down"
+                label={we.feedback ? "Edit feedback" : "Add feedback"}
                 onClick={() => {
-                  commit(() =>
-                    moveExerciseDownAction({
-                      workout_id: we.workout_id,
-                      workout_exercise_id: we.id,
-                    }),
-                  );
                   onCloseMenu();
+                  onFeedback(we);
                 }}
               />
-            )}
-            <MenuRow
-              label="Add set"
-              onClick={() => {
-                commit(() =>
-                  addSetAction({
-                    workout_id: we.workout_id,
-                    workout_exercise_id: we.id,
-                  }),
-                );
-                onCloseMenu();
-              }}
-            />
-            <MenuRow
-              label={we.feedback ? "Edit feedback" : "Add feedback"}
-              onClick={() => {
-                onCloseMenu();
-                onFeedback(we);
-              }}
-            />
-            {nextSetNumber !== 0 && (
+              {nextSetNumber !== 0 && (
+                <MenuRow
+                  label="Skip remaining sets"
+                  onClick={() => {
+                    commit(() =>
+                      skipRemainingAction({
+                        workout_id: we.workout_id,
+                        workout_exercise_id: we.id,
+                      }),
+                    );
+                    onCloseMenu();
+                  }}
+                />
+              )}
+              {Object.keys(we.set_weights ?? {}).length > 0 && (
+                <MenuRow
+                  label="Reset to prescription"
+                  onClick={() => {
+                    commit(() =>
+                      resetToPrescriptionAction({
+                        workout_id: we.workout_id,
+                        workout_exercise_id: we.id,
+                      }),
+                    );
+                    onCloseMenu();
+                  }}
+                />
+              )}
+              {we.skipped_set_numbers.length > 0 && (
+                <MenuRow
+                  label="Unskip all sets"
+                  onClick={() => {
+                    commit(() =>
+                      unskipAllAction({
+                        workout_id: we.workout_id,
+                        workout_exercise_id: we.id,
+                      }),
+                    );
+                    onCloseMenu();
+                  }}
+                />
+              )}
+            </MenuGroup>
+            <MenuGroup ruled={focused}>
               <MenuRow
-                label="Skip remaining sets"
+                label="Remove exercise"
+                destructive
                 onClick={() => {
-                  commit(() =>
-                    skipRemainingAction({
+                  commit(async () => {
+                    const result = await removeExerciseAction({
                       workout_id: we.workout_id,
                       workout_exercise_id: we.id,
-                    }),
-                  );
-                  onCloseMenu();
-                }}
-              />
-            )}
-            {Object.keys(we.set_weights ?? {}).length > 0 && (
-              <MenuRow
-                label="Reset to prescription"
-                onClick={() => {
-                  commit(() =>
-                    resetToPrescriptionAction({
-                      workout_id: we.workout_id,
-                      workout_exercise_id: we.id,
-                    }),
-                  );
-                  onCloseMenu();
-                }}
-              />
-            )}
-            {we.skipped_set_numbers.length > 0 && (
-              <MenuRow
-                label="Unskip all sets"
-                onClick={() => {
-                  commit(() =>
-                    unskipAllAction({
-                      workout_id: we.workout_id,
-                      workout_exercise_id: we.id,
-                    }),
-                  );
-                  onCloseMenu();
-                }}
-              />
-            )}
-            <MenuRow
-              label="Remove exercise"
-              destructive
-              onClick={() => {
-                commit(async () => {
-                  const result = await removeExerciseAction({
-                    workout_id: we.workout_id,
-                    workout_exercise_id: we.id,
+                    });
+                    setRemoveError(result.error);
                   });
-                  setRemoveError(result.error);
-                });
-                onCloseMenu();
-              }}
-            />
+                  onCloseMenu();
+                }}
+              />
+            </MenuGroup>
           </>
         )}
       </AnchoredMenu>
