@@ -7,57 +7,68 @@ Append a dated entry whenever a session moves work. Newest first.
 ## 2026-08-14 — Session 117: the day-view focus pass (N82)
 
 Owner asked for the Workout day view to be assessed and decluttered without
-losing functionality or speed of access, staged with 1.1.0.
+losing functionality or speed of access, staged with 1.1.0. Shipped as **PR
+#240**, then **revised through owner review round 1** the same day.
 
 **The assessment was done against the rendered screen, not the spec.** A
 throwaway harness compiled the real Tailwind theme over a transcription of the
-shipped markup so the page could actually be looked at — which is what surfaced
-the finding the code read had not: the clutter is not any one element, it is
-**per-exercise repetition**. The four-button icon row is four bordered 28px
-boxes *per card*; a six-exercise day draws 24 of them in a column down the right
-edge, out-shouting the set grid they exist to serve. Three of the four are
-rarely-used controls, and one (`note`) was an **exact duplicate** of a `…` row
-already opening the same sheet with the same origin.
+shipped markup so the page could actually be looked at — which surfaced what a
+code read had not: the clutter compounds **per exercise**. A four-button icon
+row is four bordered boxes *per card*, so a six-exercise day draws 24 of them
+down the right edge. The owner had already named the symptom: "too many tool
+icons".
 
-**Shipped (five changes, all presentational or menu-structural):**
+**Shipped (four changes, all presentational or menu-structural):**
 
-1. Icon row **4 → 1**. The `…` survives alone and finally gets a 44px hit area
-   (R18) while keeping the mockup's 28px box as its visual.
-2. The **exercise name becomes the prescription strip's disclosure** — name +
+1. The **exercise name becomes the prescription strip's disclosure** — name +
    chevron, which is the header's own week/day-navigator idiom reused rather
-   than a new control invented. Default stays closed: the ask line largely
-   restates the set rows; the *why* is the occasional question.
+   than a new control invented. This is the change that mattered: it takes an
+   icon off the row **without losing a capability**. Owner: *"That's good, as it
+   eliminates one icon in the strip without losing the functionality — exactly
+   what I was looking for."*
+2. Icon row **4 → 3**. Note and history keep their icons.
 3. The two note strips **merge into one** under `border-l border-ink/25`. The
    pinned strip had been wearing `border-l-2 border-ink` — *identical to the
-   prescription strip* — so a card with both showed three near-identical bars
-   and no way to tell the program's voice from the lifter's.
-4. `History ›` **returns to the `…` menu** beside `View exercise ›`. The
-   2026-06-26 entry that folded them into one row did so expressly because the
-   card carried a dedicated history control; removing that control removes the
-   premise. The menu's rows are also **grouped** by a stronger rule — with the
-   **order untouched**, since the groups fall on seams the list already had.
-5. `TARGET n RIR` is stated in **ink, not the accent**. Hard rule 7 reserves
-   orange for current position + selection; the week's effort ask is a fact, and
-   it was out-shouting the two elements that genuinely mark position. On the day
-   view orange now means "where you are" and nothing else.
+   prescription strip* — so a card with both showed two indistinguishable bars
+   written by two different authors.
+4. The `…` menu's rows are **grouped** by a stronger rule. Rows and order
+   untouched. Owner: *"I like your organization of the menu items also."*
+
+**Reversed at owner review — the lesson is worth keeping:**
+
+- **Cutting the row to `…` alone.** The draft moved note and history into the
+  menu on a frequency argument. Frequency was the wrong axis. **Interruption**
+  is the one that matters here: both are consulted *between sets*, with a rest
+  clock running and a bar to get back under, and a two-tap detour there costs
+  more than the ink it saves. The pass found the one genuinely redundant icon
+  (change 1) and then over-generalised from it. Owner: *"The only thing you
+  really did was take away the icons, which were functional."*
+- **De-accenting `TARGET n RIR`.** The draft read hard rule 7 literally — orange
+  marks position and selection, and the week's effort ask is a fact — and moved
+  it to ink. Overruled: the ask is the one number that governs every set on the
+  screen and is meant to be found instantly on a mid-session glance. **The
+  accent there is a standing, deliberate exception to rule 7**, now written into
+  `22c` §B1.2 so a future session does not "fix" it again.
+- A drafted `History ›` menu row existed only to compensate for removing the
+  history icon; it was withdrawn with the icon's restoration, and 2026-06-26
+  (one shortcut, not two) holds on its original reasoning.
 
 **Deliberately not changed**, and recorded as such: the set grid (the hot path,
 already right); per-exercise next-row emphasis (one active row per page would
 read as more focused but would break supersetting); the grid header repeating
-per card; equipment type on the name row (the eyebrow's ` · SUFFIX` slot is
-spoken for by doc 21 §8's effort suffixes under a two-suffix budget).
+per card; equipment type on the name row; the `Notes` row in the `…` menu (the
+owner was explicitly indifferent, and the row carries state the icon cannot —
+`Notes ›` vs `Add note`).
 
 **Staging.** Behind `releaseActive("1.1.0")` via `focusPass()` — the menu
 grouping too (`MenuGroup ruled={…}`), so nothing about the menu changes early.
 Release note `day-view-focus-pass` staged in `unreleased.ts`: a changed layout
 with no new capability is still a feature-release change (doc 23 §4.2).
 
-Shipped as **PR #240**.
-
 **Kept in sync in the same PR** (doc 22 §2's whole point): `22c` B1.2, and the
 manual's `ug/training-a-session#the-day-screen` / `#notes`, which described the
-four buttons, the note button, and the orange effort label. All three would
-otherwise have shipped in 1.1.0 describing a screen that no longer exists.
+button row. Both ship in 1.1.0 and would otherwise have described a screen that
+no longer exists.
 
 ## 2026-08-13 — Session 116: the AI Manual (N74, doc 22 Phase 6)
 

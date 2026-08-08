@@ -794,16 +794,13 @@ function DayHeader({
             <div className="text-right text-[10px] font-medium leading-[1.5] tracking-[0.1em] text-ink/60">
               {dateLabel}
               <span className="flex items-center justify-end gap-1.5">
-                {/* N82: the week's effort ask is a fact, not a position or a
-                    selection, so it states itself in ink weight rather than in
-                    the accent (hard rule 7). Orange on this screen then means
-                    only "where you are": the navigator's dots and the progress
-                    fill, which is what the eye should find first. */}
-                <span
-                  className={`font-bold ${focusPass() ? "text-ink" : "text-accent"}`}
-                >
-                  {rirLabel}
-                </span>
+                {/* The effort ask keeps the accent. A first pass moved it to
+                    ink on a hard-rule-7 reading (orange = position/selection,
+                    and the week's ask is a fact); the owner overruled it
+                    (2026-08-14) — the ask is the one number that governs every
+                    set on the screen, and it is meant to be found instantly.
+                    Rule 7 bends here on purpose; see 09-changelog. */}
+                <span className="font-bold text-accent">{rirLabel}</span>
                 <InfoDot term={isDeload ? "deload" : "rir"} small />
               </span>
             </div>
@@ -1184,88 +1181,72 @@ const ExerciseBlock = memo(function ExerciseBlock({
               session 2). The strip carries the numbers and the reason. */}
           {effortEyebrowSuffix(we.slot_effort)}
         </div>
-        {/* N82: four equal-weight buttons per card put a column of bordered
-            boxes down the right edge of the whole page — repeated ink for
-            three controls the session rarely needs, competing with the set
-            grid that it is actually here to serve. The row collapses to the
-            one control that opens everything else; the strip moves onto the
-            exercise name (below), and note + history become menu rows. */}
+        {/* N82: the row loses exactly ONE button — the prescription toggle,
+            whose job the exercise name now does (below). Note and history stay
+            as icons: they are the two things you reach for mid-set, and a menu
+            trip for either is the wrong trade. A first pass cut the row to the
+            `…` alone; the owner overruled it (2026-08-14) — the four-icon row
+            was the complaint, not icons as such. */}
         <div className="flex gap-2">
           {!focused && (
-            <>
-              <button
-                type="button"
-                aria-label={`${we.exercise_name} prescription`}
-                aria-expanded={rxOpen}
-                className={`${iconBtn} ${rxOpen ? "border-ink bg-ink text-bg-base" : ""}`}
-                onClick={toggleRx}
-              >
-                {/* target glyph — the ask */}
-                <svg width="14" height="14" viewBox="0 0 14 14">
-                  <circle
-                    cx="7"
-                    cy="7"
-                    r="5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                  />
-                  <circle cx="7" cy="7" r="1.4" fill="currentColor" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                aria-label={`${we.exercise_name} note`}
-                className={iconBtn}
-                onClick={() => onNote(we, "menu")}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14">
-                  <path
-                    d="M2.5 1.5h6L11.5 4.5v8h-9z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M4.5 6.5h5M4.5 9h5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-              <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={() => onHistory(we)}>
-                <svg width="14" height="14" viewBox="0 0 14 14">
-                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-                </svg>
-              </button>
-            </>
+            <button
+              type="button"
+              aria-label={`${we.exercise_name} prescription`}
+              aria-expanded={rxOpen}
+              className={`${iconBtn} ${rxOpen ? "border-ink bg-ink text-bg-base" : ""}`}
+              onClick={toggleRx}
+            >
+              {/* target glyph — the ask */}
+              <svg width="14" height="14" viewBox="0 0 14 14">
+                <circle
+                  cx="7"
+                  cy="7"
+                  r="5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                />
+                <circle cx="7" cy="7" r="1.4" fill="currentColor" />
+              </svg>
+            </button>
           )}
+          <button
+            type="button"
+            aria-label={`${we.exercise_name} note`}
+            className={iconBtn}
+            onClick={() => onNote(we, "menu")}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <path
+                d="M2.5 1.5h6L11.5 4.5v8h-9z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M4.5 6.5h5M4.5 9h5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          <button type="button" aria-label={`${we.exercise_name} history`} className={iconBtn} onClick={() => onHistory(we)}>
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+            </svg>
+          </button>
           <button
             type="button"
             ref={menuBtnRef}
             aria-label={`${we.exercise_name} menu`}
             onClick={() => onOpenMenu(we.id)}
-            className={
-              focused
-                ? // alone now, so it can afford a real 44px target (R18)
-                  // without the box itself growing past the mockup primitive
-                  "-my-2 -mr-1 flex h-11 w-10 items-center justify-center"
-                : `${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`
-            }
+            className={`${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`}
           >
-            {focused ? (
-              <span
-                className={`${iconBtn} pb-1 text-[13px] tracking-[1px] ${menuOpen ? "border-ink bg-ink text-bg-base" : ""}`}
-              >
-                …
-              </span>
-            ) : (
-              "…"
-            )}
+            …
           </button>
         </div>
       </div>
@@ -1531,11 +1512,14 @@ const ExerciseBlock = memo(function ExerciseBlock({
             strip — a menu slot for something most people never open was the
             wrong trade.
 
-            N82: the menu absorbed the card's history button and grew past a
-            comfortable scan, so its rows are grouped — look it up / set it up /
-            adjust this session / remove — with a stronger rule at each seam.
-            The **order is untouched**: the groups fall on seams the list
-            already had, so nothing moves under a returning user's thumb. */}
+            N82: twelve flat rows mixing navigation, configuration, ordering,
+            structure and a destructive action is past a comfortable scan, so
+            they are grouped — look it up / set it up / adjust this session /
+            remove — with a stronger rule at each seam. The **order and the rows
+            themselves are untouched**: the groups fall on seams the list
+            already had, so nothing moves under a returning user's thumb. No
+            `History` row — the card keeps its history icon (2026-06-26 still
+            holds: one shortcut, not two). */}
         <MenuGroup ruled={focused}>
           <MenuRow
             label="View exercise"
@@ -1549,22 +1533,6 @@ const ExerciseBlock = memo(function ExerciseBlock({
               );
             }}
           />
-          {/* N82: history returns to the menu, alongside — not instead of —
-              "View exercise". They are different destinations: this opens the
-              in-place sheet scoped to THIS MACROCYCLE without leaving the
-              session; that one opens the whole exercise page. The 2026-06-26
-              entry that folded them together did so because the card carried a
-              dedicated history control; it no longer does. */}
-          {focused && (
-            <MenuRow
-              label="History"
-              trailing="›"
-              onClick={() => {
-                onCloseMenu();
-                onHistory(we);
-              }}
-            />
-          )}
         </MenuGroup>
         <MenuGroup ruled={focused}>
           {/* doc 21 §8 — the effort assignment for THIS slot, this week. The
