@@ -2,6 +2,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTools } from "./tools";
 import { registerResources } from "./resources";
+import { manualRetrievalActive } from "./tools/manual";
 import { scopeAdminToolVisibility } from "./visibility";
 
 export const MCP_SERVER_NAME = "workout";
@@ -12,7 +13,7 @@ export const MCP_SERVER_VERSION = "0.1.0";
  * §Resources). Kept terse and grounded — the engine, not the model, owns every
  * prescribed number; the model proposes structure and reads progress.
  */
-export const MCP_INSTRUCTIONS = `
+const MCP_INSTRUCTIONS_BASE = `
 WORKOUT is a periodized strength-training tracker. Use these tools to ground
 coaching and planning in the user's real data — never invent numbers.
 
@@ -60,6 +61,29 @@ guardrails or the inline data_quality notes the tools already return.
 For the evidence, formulas, landmark tables, and autoregulation logic behind
 this, read the workout://coaching-guide resource.
 `.trim();
+
+/**
+ * doc 22 Phase 5 — the manual paragraph, appended only while the manual is live
+ * (doc 23 §9.2). Instructions that advertise tools a client cannot see are
+ * worse than silence, so the same gate governs the prose and the registration.
+ *
+ * Its job is one distinction the model will not otherwise draw: the guide
+ * explains the *app*, the data tools report the *user*. A question about how
+ * something works is a manual read, not a guess.
+ */
+export const MCP_MANUAL_INSTRUCTIONS = `
+Explaining the app itself: its user guide is readable here. search_manual ranks
+sections against a question, get_manual_section reads one, and
+workout://user-guide-index is the contents tree. Use them for how a screen
+works, what a term means, or why the engine did something — it is the app's own
+words, so prefer it to describing the app from memory, and pass on the app_route
+so the user can open the section. The guide documents the app, never this user's
+data; the tools above stay the only source for that.
+`.trim();
+
+export const MCP_INSTRUCTIONS = manualRetrievalActive()
+  ? `${MCP_INSTRUCTIONS_BASE}\n\n${MCP_MANUAL_INSTRUCTIONS}`
+  : MCP_INSTRUCTIONS_BASE;
 
 /** Register all tools + resources on a freshly-created server instance. */
 export function initializeMcpServer(server: McpServer) {

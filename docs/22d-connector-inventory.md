@@ -2,7 +2,9 @@
 
 **Status:** ground truth for the AI Manual. Working document — not user-facing prose.
 **Audited:** 2026-08-06, from `src/lib/mcp/` at `6d5d674` (post-Batch-32);
-**re-verified at `6441e93`** after PR #230 (doc 23, N80) — see [§10](#10-re-verification-after-pr-230).
+**re-verified at `6441e93`** after PR #230 (doc 23, N80) — see [§10](#10-re-verification-after-pr-230);
+**amended 2026-08-12** for doc 22 Phase 5, which added the manual's own retrieval
+surface — see [§11](#11-phase-5-landed-the-manual-retrieval-surface).
 **Scope:** doc 22 §11 Phase 0d — *"Per user-facing tool: one plain-language line,
 whether it writes, and which use-case chapter it belongs to. Plus the real auth
 flow, rate limits, and failure behavior. Admin tools are listed once as an
@@ -21,12 +23,19 @@ exclusion set and then dropped."*
 
 | | Count | Source |
 |---|---|---|
-| Tools registered | **56** | `registerTools()` → 6 modules |
+| Tools registered | **56** → **58** at 1.1.0 | `registerTools()` → 7 modules |
 | Admin-gated (excluded from the manual) | **17** | `ADMIN_TOOL_NAMES` in `tools/admin.ts:1001` |
-| **User-facing (the AI Manual's subject)** | **39** | 56 − 17 |
-| — of which read-only | 22 | |
+| **User-facing (the AI Manual's subject)** | **39** → **41** at 1.1.0 | 56 − 17, plus the two Phase-5 tools |
+| — of which read-only | 22 → 24 | |
 | — of which write | 17 | |
-| Resources | **3** | `registerResources()` in `mcp/resources.ts` |
+| Resources | **3** → **4** at 1.1.0 | `registerResources()` in `mcp/resources.ts` |
+
+> **"at 1.1.0"** is not hedging. `search_manual`, `get_manual_section` and
+> `workout://user-guide-index` are registered behind `manualRetrievalActive()`
+> (doc 23 §9.2), so on today's `main` a client sees 56/39/3 and after the release
+> PR it sees 58/41/4, with nothing else changing. [§11](#11-phase-5-landed-the-manual-retrieval-surface)
+> has the detail; AI Manual ch. 4 documents the post-release surface, because
+> the AI Manual ships **in** that release.
 
 Doc 22 §7.2's "56 tools, 17 admin-gated" is confirmed exactly. The §7.2 grouping
 also enumerates exactly these 39 names — no tool in the code is missing from it,
@@ -45,6 +54,7 @@ Per-module breakdown (registration order in `tools/index.ts`):
 | `admin.ts` | 9 | **yes** |
 | `admin-llm.ts` | 4 | **yes** |
 | `admin-prompt.ts` | 4 | **yes** |
+| `manual.ts` (doc 22 Phase 5) | 2 | no — release-gated |
 
 ---
 
@@ -194,17 +204,18 @@ recomputation, not a record of what actually happened.
 
 ---
 
-## 4. Resources (3 today, 5 after Phase 5)
+## 4. Resources (3 today, 4 at 1.1.0)
 
 | URI | What it is | Auth |
 |---|---|---|
 | `workout://profile` | Your profile, same shape as `get_profile`. | session-scoped |
 | `workout://current-cycle` | Your live macro → block → week → next workout with this week's target RIR (and slot effort). | session-scoped |
 | `workout://coaching-guide` | The app's training paradigm and honesty guardrails, as markdown. Identical for every client — no user data. | none needed |
+| `workout://user-guide-index` *(1.1.0)* | The user guide's contents tree: every chapter and section with its ID, one-line summary, and in-app route. Identical for every client — no user data. | none needed |
 
-Doc 22 §10.2 adds `workout://user-guide-index` plus `search_manual` and
-`get_manual_section` in Phase 5. **They do not exist yet** — AI Manual ch. 4 must
-not describe them until Phase 5 has landed.
+> **Corrected 2026-08-12.** This section's heading said *"5 after Phase 5"*. Doc
+> 22 §10.2 adds **one** resource and **two tools**; the count conflated them.
+> Phase 5 landed one resource, so it is 4.
 
 **Manual-relevant detail.** `workout://coaching-guide` is the same text doc 22
 §3 identifies as "a large fraction of the how-it-works chapters, translated to an
@@ -329,9 +340,12 @@ Feeding [§8](#8-what-phase-6-must-not-do) and `22b`.
 A deny-list distilled from this audit, for the AI Manual author.
 
 1. **Do not document the 17 admin tools**, or the existence of an admin tier.
-2. **Do not document `search_manual`, `get_manual_section`, or
-   `workout://user-guide-index`** until Phase 5 ships them. They are in doc 22's
-   plan, not in the code.
+2. ~~**Do not document `search_manual`, `get_manual_section`, or
+   `workout://user-guide-index`** until Phase 5 ships them.~~ **Lifted
+   2026-08-12** — Phase 5 shipped them ([§11](#11-phase-5-landed-the-manual-retrieval-surface)),
+   and they are release-gated on the same 1.1.0 that carries the AI Manual, so
+   ch. 4 documents them. It must describe them as they are: the guide, not the
+   user's data.
 3. **Do not say "MCP"** outside the ch. 2 allowlist (doc 22 §8.5). Note that the
    in-app copy already says *"ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR"* —
    that is exactly the allowlisted case (the reader must find that word in their
@@ -356,7 +370,7 @@ A deny-list distilled from this audit, for the AI Manual author.
 | 1 What the connector is | ✅ connector page copy, `MCP_INSTRUCTIONS` | K4 — the capability list is understated |
 | 2 Setup | ✅ [§5](#5-the-real-auth-flow) | none |
 | 3 The rules it operates under | ✅ `auth.ts`, hard rules 4/5, [§6.3](#63-every-write-is-audited) | none |
-| 4 What it can do | ✅ [§3](#3-the-user-facing-tools) | must exclude Phase-5 tools until they ship |
+| 4 What it can do | ✅ [§3](#3-the-user-facing-tools) + [§11](#11-phase-5-landed-the-manual-retrieval-surface) | none — the Phase-5 tools shipped and are in scope |
 | 5 Macrocycle use case | ✅ tools identified | transcript must be **run** |
 | 6 Mesocycle use case | ✅ tools identified | transcript must be **run** |
 | 7 Performance analysis | ✅ `analyze_exercise_progress` + comparability guards | transcript must be **run** |
@@ -406,3 +420,68 @@ later re-verification can see the change was checked rather than missed.
    `workout://user-guide-index`) are a **user-visible capability** that owes an
    `unreleased.ts` entry when it lands. [§8](#8-what-phase-6-must-not-do) rule 2
    is unchanged: do not document them before they ship.
+
+---
+
+## 11. Phase 5 landed — the manual retrieval surface
+
+**2026-08-12.** Doc 22 Phase 5 ([§10.2](../22-user-manual.md#102-the-design--retrieve-then-read))
+is built. This section is the ground truth for AI Manual ch. 4; it replaces the
+placeholder in [§4](#4-resources-3-today-4-at-110) and lifts
+[§8](#8-what-phase-6-must-not-do) rule 2.
+
+### 11.1 The three surfaces
+
+| Surface | Kind | Writes? | Reads user data? | Chapter |
+|---|---|---|---|---|
+| `workout://user-guide-index` | resource | no | **no** | 4 |
+| `search_manual` | tool | no | **no** | 4 |
+| `get_manual_section` | tool | no | **no** | 4 |
+
+Plain-language lines, drafted for ch. 4 to improve:
+
+- **`search_manual(query, limit?)`** — *"Find the parts of the app's guide that
+  answer a question."* Returns ranked pointers, not prose: `section_id`,
+  `chapter`, `title`, `summary`, a `snippet`, the in-app `app_route`, and a
+  relative `score`. `limit` defaults to **8**, capped at **25**. A query matching
+  nothing returns `count: 0` and a hint pointing at the index resource.
+- **`get_manual_section(section_id, include_related?)`** — *"Read one section of
+  the guide."* Returns the section as markdown plus its route, its position in
+  its chapter (`"3 of 6"`), and — unless `include_related: false` — the
+  author's related sections and the ones either side in reading order. An
+  unresolvable ID fails **in band** (`ok: false` → `isError`, per R25) with up to
+  five suggested IDs.
+
+### 11.2 Four facts ch. 4 must get right
+
+1. **They resolve no session at all.** These are the only tools on the surface
+   that never call `resolveSession` — the guide is identical for every reader, so
+   there is nothing to scope. The manual should say what that means for the
+   reader rather than how it is implemented: *asking the AI how the app works
+   never touches your training data.*
+2. **`app_route` is the point of the design.** Every result carries the in-app
+   route, so an assistant hands back a section the reader can open. Doc 22 §10.2
+   calls this out; it is a fact worth one sentence in ch. 4.
+3. **The estimate caveat survives the read.** A section flagged `estimate` comes
+   back with doc 22 §8.2's standing caveat appended to its markdown, exactly as
+   the screen renders it. Ch. 4 should not promise the AI *adds* caveats — it
+   should say the guide carries its own, and they come through intact.
+4. **No embeddings, and that is not a limitation to apologize for** (doc 22
+   §10.1). Ranking is over titles, authored keywords, glossary aliases,
+   summaries and body text. If ch. 4 mentions retrieval at all, the honest line
+   is that the guide is written in short titled sections, so finding the right
+   one is a lookup rather than a guess.
+
+### 11.3 The gate, and what it means for counting
+
+All three are registered behind `manualRetrievalActive()` — `releaseActive("1.1.0")`
+— at the two call sites (`tools/index.ts`, `resources.ts`). Before the release a
+client sees **56 tools / 39 user-facing / 3 resources**; after it, **58 / 41 / 4**.
+`MCP_INSTRUCTIONS` gains one gated paragraph naming the three surfaces and the
+distinction they exist to draw: *the guide documents the app, the data tools
+report the user.* The `unreleased.ts` entry
+[§10](#10-re-verification-after-pr-230) said this owed is filed as
+`connector-reads-the-guide`.
+
+**Re-verify at doc 22 Phase 6**, per this document's own rule: read the counts
+out of the code again rather than out of this section.

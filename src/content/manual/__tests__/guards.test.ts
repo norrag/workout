@@ -46,6 +46,11 @@ const MAY_IMPORT_CONTENT = [
   "src/app/(app)/more/guide/",
   // Phase 6's AI Manual reader, which does not exist yet
   "src/app/(app)/more/connector/guide/",
+  // Phase 5's connector retrieval (doc 22 §10.2). This guard is about *client*
+  // bundles, and the MCP surface is `import "server-only"` throughout — it
+  // cannot reach one. The second assertion below is what holds that reason to
+  // account rather than taking it on trust.
+  "src/lib/mcp/",
 ];
 
 /** Tests may import anything — they are not in a bundle. */
@@ -77,6 +82,21 @@ describe("guard 1 — manual content stays out of every other bundle", () => {
         IMPORTS_CONTENT.test(text),
     ).map(({ rel }) => rel);
     expect(leaks).toEqual([]);
+  });
+
+  it("lets the connector read the manual only from server-only modules", () => {
+    // The allowlist entry above is justified by `server-only`, which throws at
+    // build time if the module is pulled into a client component. Assert the
+    // justification, not just the exemption: an MCP module that dropped the
+    // directive would silently become bundle-reachable.
+    const unguarded = SOURCES.filter(
+      ({ rel, text }) =>
+        !isTest(rel) &&
+        rel.startsWith("src/lib/mcp/") &&
+        IMPORTS_CONTENT.test(text) &&
+        !/^import\s+["']server-only["'];/m.test(text),
+    ).map(({ rel }) => rel);
+    expect(unguarded).toEqual([]);
   });
 
   it("keeps the release registry on literal section IDs, not on an import", () => {

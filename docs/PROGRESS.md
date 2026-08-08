@@ -2,7 +2,80 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-11 (latest) — doc 22 Phase 3i: the last three chapters, and Phase 3 is done (N74)
+## 2026-08-12 (latest) — doc 22 Phase 5: the connector can read the manual (N74)
+
+`workout://user-guide-index`, `search_manual`, `get_manual_section` — doc 22
+§10.2's retrieve-then-read, over the same build-time index the in-app search
+screen uses. Built while the owner's Phase-4 cold read is in progress, which the
+sequencing allows: retrieval reads whatever the registry holds, so a wording
+change from the review needs no change here.
+
+### §10.1's design claim was tested, not assumed
+
+The claim was that authorship had already done the chunking — every section
+titled, summarized, keyworded, length-budgeted — so ranking would be enough and
+no embedding store was needed. The retrieval tests were written as its
+falsifier: plain paraphrase, in a reader's words, resolving to the section a
+person would have picked by hand.
+
+- *"why did my weight go up"* → `ug/how-your-weight-is-chosen#leading-by-one-step`
+- *"what does the app do with my answers"* → `ug/how-it-felt#what-your-answers-do`
+- *"estimated one-rep max"* → `ug/glossary#strength-estimates`
+
+They passed on the authored `keywords` as they stood — **no ranking tuned, no
+keyword added to make a test pass**. §10.3's mitigation-3 trigger (embeddings as
+an additive re-rank) has not fired and remains a deferred option.
+
+### A second renderer, not a second copy
+
+`src/content/manual/markdown.ts` renders the block model as markdown, so
+`get_manual_section` returns *the section the reader sees*. Three consequences
+that are the point of doing it this way rather than authoring connector copy:
+
+- a `term` block reads back as **the glossary's own words** (§8.1 holds across
+  the seam, not just inside the app);
+- a `detail` block — doc 22 D5 layer 3, collapsed on screen — is **never
+  withheld** from a read, because "the exact rule" is what a model is usually
+  after;
+- a section flagged `estimate` carries doc 22 §8.2's caveat into the payload.
+  Dropping it on the way to a model is exactly the overclaiming doc 10 §9
+  forbids, so it is asserted over every flagged section rather than reviewed.
+
+A cross-link renders as its **in-app route**, not its ID — the §10.2 refinement
+that lets an assistant hand back something tappable.
+
+### The gate, and a test that proves it opens
+
+The whole surface registers behind `releaseActive("1.1.0")` at both call sites,
+alongside the guide routes: before the release those routes 404, so a searchable
+manual would only hand out links the reader cannot open. `MCP_INSTRUCTIONS`
+gains one paragraph under the same gate, carrying the distinction a model will
+not otherwise draw — **the guide documents the app, the data tools report the
+user**.
+
+A gate asserted only in its off state is a gate nobody has tried. One test drives
+it open with `NEXT_PUBLIC_RELEASE_OVERRIDE` (doc 23 §9.2's staging lever, inert
+in production by construction) and asserts both tools and the resource appear —
+so the release PR is not the first thing to find out whether the switch works.
+`unreleased.ts` gains the `connector-reads-the-guide` entry that `22d` §10 said
+this owed.
+
+### D3's import guard, widened with its reason asserted
+
+The guard now allows `src/lib/mcp/` — it is about *client* bundles, and the MCP
+surface is `server-only` throughout, so it cannot reach one. That reason is now
+a second assertion rather than a comment: an MCP module that imports the manual
+and drops the `server-only` directive fails CI.
+
+**`22d` corrected while amending it.** Its §4 heading said "5 after Phase 5";
+doc 22 §10.2 adds one resource and two tools, and the count had conflated them.
+It is 4. Counts are now stated as **56/39/3 today → 58/41/4 at 1.1.0**, and §8
+rule 2 ("do not document the Phase-5 tools") is lifted with a new §11 as ch. 4's
+ground truth.
+
+Full suite green (1 915, +46), typecheck + lint clean.
+
+## 2026-08-11 — doc 22 Phase 3i: the last three chapters, and Phase 3 is done (N74)
 
 Chapters **18** (Connecting an AI), **20** (Glossary) and **21**
 (Troubleshooting & FAQ) — fourteen sections, 135–236 words. That completes the
