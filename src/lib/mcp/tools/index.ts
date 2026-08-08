@@ -6,6 +6,7 @@ import { registerCoachingTools } from "./coaching";
 import { registerWriteTools } from "./write";
 import { registerAuthoringTools } from "./authoring";
 import { registerAdminTools } from "./admin";
+import { manualRetrievalActive, registerManualTools } from "./manual";
 import { toolError } from "../envelope";
 import { reportError } from "@/lib/observability/report";
 
@@ -79,4 +80,8 @@ export function registerTools(server: McpServer) {
   registerWriteTools(guarded);
   registerAuthoringTools(guarded);
   registerAdminTools(guarded);
+  // doc 22 Phase 5 — the manual's retrieval surface, gated on the release that
+  // ships the manual itself (doc 23 §9.2). Before 1.1.0 the guide routes 404,
+  // so a searchable manual would only hand out links the reader cannot open.
+  if (manualRetrievalActive()) registerManualTools(guarded);
 }

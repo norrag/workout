@@ -4,6 +4,43 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-12 — Session 115: the connector can read the manual (N74)
+
+Doc 22 **Phase 5** — `workout://user-guide-index`, `search_manual`,
+`get_manual_section`. Built while the owner's Phase-4 read is in progress, which
+the sequencing allows: retrieval reads whatever the registry holds, so a wording
+change coming out of the review needs no change here.
+
+**The thing worth recording is that §10.1's argument was falsifiable and
+survived.** The design said no embeddings were needed because authorship had
+already done the chunking. That is the kind of claim a plan can assert and never
+check, so the retrieval tests were written as the check: queries in a reader's
+own words, resolving to the section a person would have picked — *"why did my
+weight go up"*, *"what does the app do with my answers"*. They passed on the
+`keywords` Phase 3 had already authored, with no ranking tuned and no keyword
+added to make a test pass. Nine content phases of authoring discipline are what
+paid for a retrieval layer that took an afternoon.
+
+**A second renderer, not a second copy.** `get_manual_section` returns markdown
+generated from the same block model the screen renders, so a `term` block reads
+back as the glossary's own words, a collapsed `detail` is never withheld from a
+model that is usually asking for exactly that rule, and a section flagged
+`estimate` carries its §8.2 caveat into the payload. The last one is asserted
+over every flagged section rather than reviewed, because dropping a caveat on
+the way to an LLM is precisely the overclaiming doc 10 §9 exists to stop.
+
+**A gate asserted only in its off state is a gate nobody has tried.** Everything
+here registers behind `releaseActive("1.1.0")`, which today is false, so every
+gate assertion would have passed against a surface that never worked. One test
+drives it open with `NEXT_PUBLIC_RELEASE_OVERRIDE` and asserts the tools and the
+resource actually appear. Same reasoning as the D3 import-guard widening: the
+allowlist entry for `src/lib/mcp/` is justified by `server-only`, so the
+justification is a second assertion rather than a comment.
+
+**`22d` was corrected while being amended** — "5 resources after Phase 5"
+conflated doc 22 §10.2's one resource with its two tools. It is 4. Its §8 rule 2
+is lifted and a new §11 is ch. 4's ground truth.
+
 ## 2026-08-11 — Session 114 (cont.): Phase 3 finished (N74)
 
 Doc 22 **Phase 3i** — chapters 18 (Connecting an AI), 20 (Glossary) and 21

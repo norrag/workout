@@ -1,14 +1,16 @@
 # 22 — User Manual & AI Manual (build spec + phased plan)
 
-**Status:** plan — no content written yet. Phases in [§11](#11-the-phased-plan).
+**Status:** building — Phases 0–3 and 5 are done. Phases in [§11](#11-the-phased-plan).
 **Owner ask (2026-08-05):** review the repository, the app's real functionality,
 and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
-**Phases 0–2 built** (2026-08-06/08) and **Phases 3a–3f with them** —
-chapters 1–12 and 15 are written, so the User Guide is thirteen chapters of
-twenty-one. **O7 is answered** by the 3d-r research pass ([§6.3](#63-rir-ramps-and-training-styles)).
+**Phases 0–3 built** (2026-08-06/11) — the User Guide is complete at **21
+chapters, 106 sections** — and **Phase 5 with them** (2026-08-12): the connector
+can search and read it. **Phase 4, the owner's cold read, is in progress**;
+Phase 6 (AI Manual content) is next. **O7 is answered** by the 3d-r research
+pass ([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
@@ -1368,11 +1370,35 @@ contracts green.
 |---|---|
 | Cold read end to end for coherence, duplication, and vocabulary drift across chapters written in different sessions. **Re-validate every claims-ledger row against code** — the check that catches a claim true at Phase 0 and changed during Phase 3 (Batch 32 is the proof this is needed). Owner review | M |
 
-### Phase 5 — Connector retrieval *(was Phase 6; promoted — [§10.4](#104-consequence-for-the-plan))*
+### Phase 5 — Connector retrieval *(was Phase 6; promoted — [§10.4](#104-consequence-for-the-plan))* — ✅ **DONE 2026-08-12**
 
 | Scope | Size |
 |---|---|
 | `workout://user-guide-index` resource, `search_manual` and `get_manual_section` tools over the build-time index, per-section `keywords` and glossary aliases, `app_route` on every result. Ships before the AI Manual content so chapter 4 describes a connector that can read the manual | M |
+
+> **Landed** — built while the owner's Phase-4 read is in progress, which the
+> sequencing allows: retrieval reads whatever the registry holds, so a wording
+> change from the review needs no change here.
+>
+> **The design claim held.** [§10.1](#101-why-not-rag) argued that authorship had
+> already done the chunking, so ranking would be enough and no embedding store
+> was needed. The retrieval tests were written as that claim's falsifier — plain
+> paraphrase, in a reader's words, resolving to the section a person would have
+> picked ("why did my weight go up" → `ug/how-your-weight-is-chosen#leading-by-one-step`,
+> "what does the app do with my answers" → `ug/how-it-felt#what-your-answers-do`).
+> They passed on the authored `keywords` as they stood, with no tuning of the
+> ranking and no keyword added to make a test pass. **No embeddings, and the
+> §10.3 mitigation 3 trigger has not fired.**
+>
+> **Three additions the plan did not name, each earning its place:**
+> - **A second renderer, not a second copy.** `src/content/manual/markdown.ts` renders the block model as markdown, so `get_manual_section` returns *the section the reader sees* — including the `detail` layer (collapsed on screen, never withheld from a read) and the [§8.2](#82-the-honesty-contract-is-a-test-not-an-intention) estimate caveat, whose omission on the way to a model is precisely the overclaiming doc 10 §9 forbids. A cross-link renders as its **in-app route**, not its ID.
+> - **The gate.** The whole surface is registered behind `releaseActive("1.1.0")` alongside the guide routes ([`22b`](./22b-source-map.md) §10, doc 23 §9.2) — before the release those routes 404, so a searchable manual would only hand out links the reader cannot open. A test drives the gate open via `NEXT_PUBLIC_RELEASE_OVERRIDE` and asserts the tools and the resource appear, so the release PR is not the first thing to find out whether the switch works. `unreleased.ts` gains the entry [`22d`](./22d-connector-inventory.md) §10 said this owed.
+> - **One line of server instructions**, gated with the tools, carrying the one distinction a model will not otherwise draw: **the guide documents the app, the data tools report the user.**
+>
+> **One guard was widened, with its reason asserted rather than trusted.** D3's
+> import guard now allows `src/lib/mcp/` — the guard is about *client* bundles
+> and the MCP surface is `server-only` throughout — and a companion assertion
+> fails if any MCP module that imports the manual drops the directive.
 
 ### Phase 6 — AI Manual content
 

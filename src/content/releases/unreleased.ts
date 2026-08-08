@@ -36,6 +36,19 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
       target: { kind: "app", href: "/more/guide" },
     },
   },
+  {
+    // doc 22 Phase 5 (N74) — the connector's retrieval surface. `22d` §10
+    // called this out in advance as a user-visible capability that owes an
+    // entry: an AI that can read the guide answers differently.
+    id: "connector-reads-the-guide",
+    title: "Your AI can read the guide",
+    body: "A connected AI can search the guide and read a section back, so an answer about how the app works comes from the guide's own words — and it can tell you which section to open.",
+    area: "connector",
+    link: {
+      label: "Connector settings",
+      target: { kind: "app", href: "/more/connector" },
+    },
+  },
 ];
 
 /**
