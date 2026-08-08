@@ -52,6 +52,8 @@ grouping too (`MenuGroup ruled={…}`), so nothing about the menu changes early.
 Release note `day-view-focus-pass` staged in `unreleased.ts`: a changed layout
 with no new capability is still a feature-release change (doc 23 §4.2).
 
+Shipped as **PR #240**.
+
 **Kept in sync in the same PR** (doc 22 §2's whole point): `22c` B1.2, and the
 manual's `ug/training-a-session#the-day-screen` / `#notes`, which described the
 four buttons, the note button, and the orange effort label. All three would
