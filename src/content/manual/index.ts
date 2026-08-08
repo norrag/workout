@@ -11,10 +11,18 @@
 // Workout tab's first load. Phase 2 turns the rule into an import-guard test in
 // the WS-J style; until then it is this comment and code review.
 
+import { AI_ANALYSIS } from "./ai/analysis";
+import { AI_COACHING } from "./ai/coaching";
+import { AI_GETTING_GOOD_ANSWERS } from "./ai/getting-good-answers";
+import { AI_MACROCYCLES } from "./ai/macrocycles";
+import { AI_MESOCYCLES } from "./ai/mesocycles";
+import { AI_NOTES_AND_PREFERENCES } from "./ai/notes-and-preferences";
+import { AI_READING_ANSWERS } from "./ai/reading-answers";
 import { AI_SETUP } from "./ai/setup";
 import { AI_THE_RULES } from "./ai/the-rules";
 import { AI_WHAT_IT_CAN_DO } from "./ai/what-it-can-do";
 import { AI_WHAT_IT_IS } from "./ai/what-it-is";
+import { AI_WHEN_IT_GETS_IT_WRONG } from "./ai/when-it-gets-it-wrong";
 import { UG_BODY_DATA } from "./ug/body-data";
 import { UG_CHOOSING_YOUR_RAMP } from "./ug/choosing-your-ramp";
 import { UG_CONNECTING_AN_AI } from "./ug/connecting-an-ai";
@@ -113,6 +121,14 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   AI_SETUP, // 2
   AI_THE_RULES, // 3
   AI_WHAT_IT_CAN_DO, // 4
+  AI_MACROCYCLES, // 5
+  AI_MESOCYCLES, // 6
+  AI_ANALYSIS, // 7
+  AI_COACHING, // 8
+  AI_GETTING_GOOD_ANSWERS, // 9
+  AI_READING_ANSWERS, // 10
+  AI_NOTES_AND_PREFERENCES, // 11
+  AI_WHEN_IT_GETS_IT_WRONG, // 12
 ]);
 
 export function chaptersFor(manual: ManualId): readonly ManualChapter[] {
