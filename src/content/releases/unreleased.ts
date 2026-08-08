@@ -37,6 +37,20 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     },
   },
   {
+    // doc 22 Phase 6 (N74) — the AI Manual, and the connector page becoming its
+    // front door. Its own entry rather than a line in `user-guide`: a reader who
+    // has never opened the connector settings has no use for it, and a reader
+    // who has is the whole audience.
+    id: "ai-manual",
+    title: "A manual for the AI connector",
+    body: "More → AI connector carries its own manual: how to connect a client, what it is allowed to do, and worked examples of planning a macrocycle, drafting a block, and checking whether a lift is really moving.",
+    area: "connector",
+    link: {
+      label: "Open the AI manual",
+      target: { kind: "app", href: "/more/connector/guide" },
+    },
+  },
+  {
     // doc 22 Phase 5 (N74) — the connector's retrieval surface. `22d` §10
     // called this out in advance as a user-visible capability that owes an
     // entry: an AI that can read the guide answers differently.

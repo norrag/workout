@@ -494,3 +494,31 @@ report the user.* The `unreleased.ts` entry
 
 **Re-verify at doc 22 Phase 6**, per this document's own rule: read the counts
 out of the code again rather than out of this section.
+
+### 11.4 Re-verified at Phase 6 (2026-08-13)
+
+Counted again from `registerTool` call sites and `ADMIN_TOOL_NAMES`, not from
+§1:
+
+| | Count | Change |
+|---|---|---|
+| Tools registered | **58** | unchanged (56 + the 2 gated manual tools) |
+| Admin-gated | **17** | unchanged |
+| **User-facing at 1.1.0** | **41** | unchanged |
+| Resources at 1.1.0 | **4** | unchanged |
+
+Per module: `read.ts` 13, `write.ts` 12, `coaching.ts` 7, `authoring.ts` 5,
+`admin.ts` 9, `admin-llm.ts` 4, `admin-prompt.ts` 4, `manual.ts` 2,
+`get-current-state.ts` 1, `edit.ts` 1. Every name in §3 is still registered and
+nothing has crossed the admin boundary, so no chapter changes.
+
+**What Phase 6 corrected in this document:** §5's per-client-scope claim about
+the audit trail (`D-18`, corrected in place above), and §7 **K1**, which is
+upgraded by `D-19` from *stale copy* to *self-contradicting copy* — the two
+wordings appear in the same response.
+
+**What Phase 6 could not run.** `create_macrocycle` cannot succeed while an arc
+is live, so AI Manual ch. 5 §1 documents the **refusal**, which is the real
+transcript. §8 rule 6's ban on invented transcripts is therefore satisfied in
+the strongest way available: nothing was imagined, and the one exchange that
+could not be completed is documented as the refusal it actually returns.

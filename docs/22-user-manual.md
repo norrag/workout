@@ -1,16 +1,20 @@
 # 22 — User Manual & AI Manual (build spec + phased plan)
 
-**Status:** building — Phases 0–3 and 5 are done. Phases in [§11](#11-the-phased-plan).
+**Status:** building — Phases 0–3, 5 and 6 are done. Phases in [§11](#11-the-phased-plan).
 **Owner ask (2026-08-05):** review the repository, the app's real functionality,
 and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
 connector settings page — and afterward place links to them at the points in the
 app where they help most.
 **Phases 0–3 built** (2026-08-06/11) — the User Guide is complete at **21
-chapters, 106 sections** — and **Phase 5 with them** (2026-08-12): the connector
-can search and read it. **Phase 4, the owner's cold read, is in progress**;
-Phase 6 (AI Manual content) is next. **O7 is answered** by the 3d-r research
-pass ([§6.3](#63-rir-ramps-and-training-styles)).
+chapters, 106 sections** — **Phase 5 with them** (2026-08-12): the connector can
+search and read it. **Phase 6 is built** (2026-08-13): the AI Manual is complete
+at **12 chapters, 48 sections**, its reader is mounted under `/more/connector`,
+and every chapter 5–8 example was run against the live connector as
+[§7.1](#71-worked-examples-are-the-deliverable) requires. **Phase 4, the owner's
+cold read, is in progress** and now covers both manuals; **Phase 7** (link
+placement) is next. **O7 is answered** by the 3d-r research pass
+([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
 **Revised 2026-08-06** after owner review round 1: D1–D5 and O1–O6 answered
@@ -401,8 +405,10 @@ no coverage at all.
 - ~~Admin-gated (17)~~ — **excluded from the manual**
 
 Resources: `workout://profile`, `workout://current-cycle`,
-`workout://coaching-guide`, plus the two added in Phase 6
-([§10](#10-how-the-connector-finds-things-in-the-manual)).
+`workout://coaching-guide`, plus `workout://user-guide-index` added in Phase 5
+([§10](#10-how-the-connector-finds-things-in-the-manual)) — four at 1.1.0.
+Re-verified from `registerTool` call sites at Phase 6: **58 registered, 17
+admin-gated and excluded, 41 user-facing**.
 
 ---
 
@@ -1400,7 +1406,7 @@ contracts green.
 > and the MCP surface is `server-only` throughout — and a companion assertion
 > fails if any MCP module that imports the manual drops the directive.
 
-### Phase 6 — AI Manual content
+### Phase 6 — AI Manual content — ✅ **BUILT 2026-08-13**
 
 | Phase | Chapters | Size |
 |---|---|---|
@@ -1409,6 +1415,57 @@ contracts green.
 | **6c** | 7 Performance analysis · 8 Coaching | M — same rule |
 | **6d** | 9 Getting good answers · 10 How to read its answers · 11 Notes/exclusions/preferences · 12 When it gets something wrong | M |
 | **6e** | Rework `/more/connector` into a hub: keep the endpoint and connect steps, add the manual entry; owner review over the whole AI Manual | S |
+
+> **Landed.** The design pass first (hard rule 8): 09-changelog **2026-08-13**,
+> whose governing decision is that **there is no second design**. D4 already
+> made the two manuals one system, and the block model, renderer, ID scheme,
+> budget and reader chrome were manual-agnostic from Phase 1 — the *routes* were
+> the only thing hardcoded to `ug`. So figs 4.8 / 4.9 / 4.10 are reused at a
+> second root rather than redrawn, **no new figure number is claimed**, and no
+> eleventh block kind was needed.
+>
+> - **The reader** (`/more/connector/guide[/<chapter>[/<section>]]`). The map and
+>   chapter screens lift into `ManualScreens.tsx` and both manuals' route files
+>   become thin callers; three things vary and all three are data the screens
+>   already read.
+> - **One search, over both manuals**, which is what [§9.4.3](#94-the-rest) asked
+>   for before either existed. A result row now leads with its manual — chapter
+>   numbers restart per manual, so `CH 4` alone named two chapters — and the back
+>   link follows the reader in through the same `?from=` allowlist the section
+>   screen uses.
+> - **12 chapters, 48 sections, 80 ledger rows** in [`22a`](./22a-manual-claims.md),
+>   every one verified against `src/lib/mcp/**` and the migrations rather than
+>   against [`22d`](./22d-connector-inventory.md) ([`22b`](./22b-source-map.md)
+>   §9.2 — and that discipline is what found `D-18`).
+> - **[§7.1](#71-worked-examples-are-the-deliverable) is met, not approximated.**
+>   Every chapter 5–8 exchange was run live on 2026-08-13, the write half as a
+>   create → capture → delete round-trip on the owner's explicit approval, with
+>   `get_macrocycles` re-read afterwards to confirm the account was as found.
+> - **6e**: `/more/connector` keeps its address and its three connect steps and
+>   loses the `ACCESS & REVOCATION` paragraph that was chapters 2 and 3 said
+>   worse; its intro is corrected per [`22d`](./22d-connector-inventory.md) §7
+>   **K3**. Ch. 18's **forward debt is paid** — the hand-off links it could not
+>   author in Phase 3i now resolve.
+>
+> **Two defects, both found by writing prose against code.** `D-18`:
+> [`22d`](./22d-connector-inventory.md) §5 said the requesting client is recorded
+> in the write audit; the table is `(user_id, tool, args_hash, summary,
+> created_at)` and has no client column. `D-19`: [`22d`](./22d-connector-inventory.md)
+> §7 **K1**'s stale e1RM caveat is worse than stale — one
+> `analyze_exercise_progress` response carries *"Epley-based"* in `data_quality`
+> and *"Epley·Brzycki"* in its own `metric_definitions`, so a connected assistant
+> is handed two accounts of the same number.
+>
+> **Two things the plan did not name.** `GUIDE_SECTION_IDS` gained the AI
+> Manual's 48 IDs **and a completeness test** — it had been complete in practice
+> since Phase 3 and nothing said so, and now a new section is a link target the
+> moment it exists. And the two links from `/more/connector` into the manual are
+> literal strings in their own module, resolved by a test: the page is outside
+> D3's import allowlist, and a route file may only export what Next reserves.
+
+**Exit:** both manuals are readable, searchable and connector-legible; the AI
+Manual's four use cases are demonstrated with exchanges that were run. Owner
+review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 
 ### Phase 7 — Link placement *(deliverable C)*
 
