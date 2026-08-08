@@ -11,6 +11,10 @@
 // Workout tab's first load. Phase 2 turns the rule into an import-guard test in
 // the WS-J style; until then it is this comment and code review.
 
+import { AI_SETUP } from "./ai/setup";
+import { AI_THE_RULES } from "./ai/the-rules";
+import { AI_WHAT_IT_CAN_DO } from "./ai/what-it-can-do";
+import { AI_WHAT_IT_IS } from "./ai/what-it-is";
 import { UG_BODY_DATA } from "./ug/body-data";
 import { UG_CHOOSING_YOUR_RAMP } from "./ug/choosing-your-ramp";
 import { UG_CONNECTING_AN_AI } from "./ug/connecting-an-ai";
@@ -50,8 +54,12 @@ export {
   chapterRoute,
   isManualId,
   isSlug,
+  MANUAL_HOME,
   MANUAL_LABEL,
+  MANUAL_NAME,
   MANUAL_ROOT,
+  MANUAL_SEARCH_ROUTE,
+  MANUAL_TITLE,
   parseSectionId,
   sectionId,
   sectionRoute,
@@ -71,10 +79,11 @@ export { FIGURE_ROOT } from "./types";
 /**
  * Every chapter, in reading order within each manual.
  *
- * Phase 1 shipped one: chapter 6, the exemplar. Phase 3 fills the User Guide
- * and Phase 6 the AI Manual, each appending here. Order in this array does not
- * matter — `chaptersFor` sorts on `number`, so a chapter written out of
- * sequence still reads in its place.
+ * Phase 1 shipped one: chapter 6, the exemplar. Phase 3 filled the User Guide
+ * and Phase 6 fills the AI Manual, each appending here. Order in this array
+ * does not matter — `chaptersFor` sorts on `number`, so a chapter written out
+ * of sequence still reads in its place, and the two manuals are separate reads
+ * (D4) however they are interleaved here.
  */
 export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_WHAT_WORKOUT_IS, // 1
@@ -98,6 +107,12 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_YOUR_DATA, // 19
   UG_GLOSSARY, // 20
   UG_TROUBLESHOOTING, // 21
+
+  // AI Manual (doc 22 §7) — its own reading order, its own root (D4)
+  AI_WHAT_IT_IS, // 1
+  AI_SETUP, // 2
+  AI_THE_RULES, // 3
+  AI_WHAT_IT_CAN_DO, // 4
 ]);
 
 export function chaptersFor(manual: ManualId): readonly ManualChapter[] {

@@ -42,6 +42,99 @@ each session. In it, for every discrete change include:
 
 ## Entries
 
+## 2026-08-13 — The AI Manual gets a reader (figs 4.8–4.11 reused; N74 / doc 22 Phase 6)
+
+Doc 22 Phase 6 writes the **AI Manual**, the second of D4's "two surfaces, one
+system". It needs somewhere to be read, and `/more/connector` has to stop being
+a settings page and become that manual's front door. Both are screens, so this
+is the hard-rule-8 design pass, written before any of Phase 6 is built.
+
+**The governing decision is that there is no second design.** D4 says the two
+manuals are one system; the block model, the renderer, the section-ID scheme,
+the length budget and the reader chrome are already built and already
+manual-agnostic (`MANUAL_ROOT`, `MANUAL_LABEL`, `ManualSectionHeader`,
+`ManualChapterNav`). A second look for the AI Manual would be a second thing to
+learn for no reader benefit. **No new figure number is claimed by this entry.**
+
+### 1. Figs 4.8 / 4.9 / 4.10 are reused at a second root
+
+- **Change.** The map, chapter-contents and section screens mount again under
+  `/more/connector/guide[/<chapter>[/<section>]]`, rendering the `ai` half of
+  the registry. Identical geometry, identical row grammar, identical prev/next.
+  Three things vary, and they are all **data the screens already read**:
+  the meta line's manual label (`AI MANUAL` rather than `USER GUIDE`), the
+  `h1.title-display` (**ai manual** rather than **guide**), and the map's back
+  link, which goes to `‹ AI connector` rather than `‹ More`.
+- **Rationale.** The chapter and section screens were already parameterized on
+  `ManualId` in Phase 1 — the routes were the only thing hardcoded to `ug`. The
+  build therefore lifts the map and chapter screens into shared components and
+  leaves four-line route files, rather than copying two screens and letting the
+  copies drift.
+- **Affected figures.** 4.8, 4.9, 4.10 — reused, not amended.
+- **Impact.** `NET-NEW` for the routes; `RETROFIT` for `/more/guide`'s two
+  screens, which become callers of the shared components with no visual change.
+
+### 2. Fig 4.11 — one search, over both manuals (`RETROFIT`)
+
+Doc 22 §9.4.3 says *one field over both manuals*, and it was written before
+either existed. Now that both do, it needs two amendments, because chapter
+numbers restart per manual and a result row reading `CH 4 · What it can do`
+would be ambiguous the moment the AI Manual lands.
+
+- **A result row names its manual.** The tracked-caps line becomes
+  `USER GUIDE · CH 6 · EFFORT: RIR AND THE RAMP` — the manual label first, in
+  the same 9.5px caps, then the existing chapter field. Always shown, not only
+  on cross-manual hits: a row whose label appears conditionally teaches the
+  reader nothing about what the label means.
+- **The back link follows the reader in.** The search screen accepts `?from=`
+  through the same `resolveOrigin` allowlist the section screen uses (2026-08-08
+  §3), so a reader who searched from the AI Manual returns to the AI Manual.
+  Without it the link stands as `‹ Guide`. Two new origins are named for this:
+  `/more/guide` → `GUIDE` and `/more/connector/guide` → `AI MANUAL`.
+- **One screen, one URL.** Search stays at `/more/guide/search` and the AI
+  Manual's map links to it with its own `from`. A second search route would be
+  two URLs for one index and a decision the reader has to make ("am I searching
+  the right one?") in place of a result they can read.
+- **The copy follows the scope.** The map's search row, the field's placeholder
+  and the no-match line say *the manuals*, and the meta line reads
+  `USER GUIDE + AI MANUAL · TITLES, TERMS AND TEXT`. A field labelled "search
+  the guide" that returns AI Manual rows is the kind of small lie that makes a
+  reader distrust the results they did want.
+- **Affected figures.** 4.11 — amended.
+
+### 3. `/more/connector` becomes the AI Manual's front door (`RETROFIT`)
+
+Built at Phase 6e, specified here. No mockup exists for this screen (the
+deviation the Phase-1 build already recorded), so it is composed from patterns
+the app ships, and the composition is written down before it is transcribed.
+
+- **What stays, unchanged.** The `ENDPOINT` copy field and the `HOW TO CONNECT`
+  three steps. They are the reason someone opens this page, and doc 22 §8.5's
+  one allowance exists precisely because the reader must find the word `MCP` in
+  their own client — this page is where they read it.
+- **What is added.** A manual entry row directly under the intro, in the
+  emphasis grammar the guide map already uses for its search row (full-width
+  `border-[1.5px] border-ink`, name at `text-sm font-semibold`, quiet tracked
+  caps at the right). It reads `AI manual` / `12 CHAPTERS ›`.
+- **What is replaced.** The `ACCESS & REVOCATION` paragraph, which is the AI
+  Manual's ch. 2 and ch. 3 said shorter and without their depth. The page keeps
+  one line and points at the section that owns it — the doc 22 §8.4c rule 1
+  shape (*point, do not explain*), applied to an app screen.
+- **The intro paragraph is corrected**, per `22d` §7 **K3**: it says the
+  connector drafts mesocycles and templates, which has been understated since
+  Batch 32 — it also drafts macrocycles, places blocks into macro slots, and
+  edits a **live** block's planner board.
+- **Impact.** `RETROFIT` — `/more/connector`, gated with the 1.1.0 routes for
+  the manual row only; the endpoint and connect steps stay live for everyone.
+
+### 4. No new block kind, and no new figure asset
+
+Phase 6 is content plus two route trees. The AI Manual writes to the ten block
+kinds that exist. Recorded because the 2026-08-07 §5 entry made a new block kind
+a design decision, and "we did not need one" is the answer this pass owes.
+
+---
+
 ## 2026-08-10 — One manual figure: the planner board's structure (N74 / doc 22 Phase 3b)
 
 Phase 3b is content, so there is no new screen and no new block kind — the whole

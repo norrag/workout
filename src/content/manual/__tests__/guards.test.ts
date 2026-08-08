@@ -44,7 +44,7 @@ const MAY_IMPORT_CONTENT = [
   "src/content/manual/",
   "src/components/manual/",
   "src/app/(app)/more/guide/",
-  // Phase 6's AI Manual reader, which does not exist yet
+  // Phase 6's AI Manual reader, mounted under the connector page it documents
   "src/app/(app)/more/connector/guide/",
   // Phase 5's connector retrieval (doc 22 §10.2). This guard is about *client*
   // bundles, and the MCP surface is `import "server-only"` throughout — it
@@ -224,9 +224,15 @@ describe("guard 3 — the search index is lazy", () => {
     expect(search.text).toMatch(/import\(\s*\/\* webpackChunkName/);
   });
 
-  it("keeps the guide routes off it entirely", () => {
+  it("keeps both manuals' reading routes off it entirely", () => {
+    // Phase 6 mounted a second reader under the connector page; the reading
+    // path is now two route trees and the guard has to cover both
+    const READERS = [
+      "src/app/(app)/more/guide/",
+      "src/app/(app)/more/connector/guide/",
+    ];
     for (const { rel, text } of SOURCES) {
-      if (!rel.startsWith("src/app/(app)/more/guide/")) continue;
+      if (!READERS.some((prefix) => rel.startsWith(prefix))) continue;
       expect(text, `${rel} pulls the index onto the reading path`).not.toContain(
         "search-index",
       );

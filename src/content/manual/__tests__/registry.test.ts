@@ -18,6 +18,15 @@ import {
 import { markLabel } from "../budget";
 import { SET_MARKERS } from "@/lib/set-markers";
 import { blockRuns, everySection, flatten, REPO_ROOT } from "./helpers";
+import type { ManualId } from "../types";
+
+/**
+ * Both manuals, everywhere the property is per-manual. Phase 6 landed the AI
+ * Manual, and every assertion below that once read `"ug"` was a property of
+ * *a* manual rather than of the guide — a suite that keeps testing only the
+ * first one is how the second acquires a reading order that skips a chapter.
+ */
+const MANUALS: readonly ManualId[] = ["ug", "ai"];
 
 // ---------------------------------------------------------------------------
 
@@ -128,16 +137,16 @@ describe("link targets resolve", () => {
 
 // doc 22 §9.2 — prev/next crosses chapter boundaries, so cover-to-cover
 // reading stays "next, next, next" (owner review round 2).
-describe("reading order and adjacency", () => {
+describe.each(MANUALS)("reading order and adjacency — %s", (manual) => {
   it("covers every section of a manual exactly once, in chapter order", () => {
-    const order = readingOrder("ug");
-    const ids = allSectionIds().filter((id) => id.startsWith("ug/"));
+    const order = readingOrder(manual);
+    const ids = allSectionIds().filter((id) => id.startsWith(`${manual}/`));
     expect([...order].sort()).toEqual([...ids].sort());
     expect(new Set(order).size).toBe(order.length);
   });
 
   it("chains forward and backward, with open ends at the extremes", () => {
-    const order = readingOrder("ug");
+    const order = readingOrder(manual);
     expect(adjacentSections(order[0]).prev).toBeUndefined();
     expect(adjacentSections(order[order.length - 1]).next).toBeUndefined();
     for (let i = 0; i < order.length - 1; i++) {
@@ -147,10 +156,10 @@ describe("reading order and adjacency", () => {
   });
 
   it("never runs one manual into the other (D4 — separate reads)", () => {
-    for (const id of readingOrder("ug")) {
+    for (const id of readingOrder(manual)) {
       const { prev, next } = adjacentSections(id);
-      expect(prev?.chapter.manual ?? "ug").toBe("ug");
-      expect(next?.chapter.manual ?? "ug").toBe("ug");
+      expect(prev?.chapter.manual ?? manual).toBe(manual);
+      expect(next?.chapter.manual ?? manual).toBe(manual);
     }
   });
 });
@@ -158,30 +167,30 @@ describe("reading order and adjacency", () => {
 // doc 22 §9.2 as amended 2026-08-08 (owner review round 3): the map lists
 // chapters only, so the chapter page is on the browse path and carries the
 // section footer's affordance one level up (09-changelog 2026-08-09 §2).
-describe("chapter adjacency", () => {
+describe.each(MANUALS)("chapter adjacency — %s", (manual) => {
   it("chains in chapter-number order, with open ends", () => {
-    const chapters = chaptersFor("ug");
-    expect(adjacentChapters("ug", chapters[0].slug).prev).toBeUndefined();
+    const chapters = chaptersFor(manual);
+    expect(adjacentChapters(manual, chapters[0].slug).prev).toBeUndefined();
     expect(
-      adjacentChapters("ug", chapters[chapters.length - 1].slug).next,
+      adjacentChapters(manual, chapters[chapters.length - 1].slug).next,
     ).toBeUndefined();
     for (let i = 0; i < chapters.length - 1; i++) {
-      expect(adjacentChapters("ug", chapters[i].slug).next?.slug).toBe(
+      expect(adjacentChapters(manual, chapters[i].slug).next?.slug).toBe(
         chapters[i + 1].slug,
       );
-      expect(adjacentChapters("ug", chapters[i + 1].slug).prev?.slug).toBe(
+      expect(adjacentChapters(manual, chapters[i + 1].slug).prev?.slug).toBe(
         chapters[i].slug,
       );
     }
   });
 
   it("stays inside one manual, and shrugs at an unknown slug", () => {
-    for (const chapter of chaptersFor("ug")) {
-      const { prev, next } = adjacentChapters("ug", chapter.slug);
-      expect(prev?.manual ?? "ug").toBe("ug");
-      expect(next?.manual ?? "ug").toBe("ug");
+    for (const chapter of chaptersFor(manual)) {
+      const { prev, next } = adjacentChapters(manual, chapter.slug);
+      expect(prev?.manual ?? manual).toBe(manual);
+      expect(next?.manual ?? manual).toBe(manual);
     }
-    expect(adjacentChapters("ug", "no-such-chapter")).toEqual({});
+    expect(adjacentChapters(manual, "no-such-chapter")).toEqual({});
   });
 });
 

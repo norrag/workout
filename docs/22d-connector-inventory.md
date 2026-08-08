@@ -265,9 +265,17 @@ should stay invisible in prose. The three steps the connector page already lists
 ch. 2 adds the consent-screen detail, per-client scope, verification ("ask it
 where I am in my block"), revocation, and the failure modes below.
 
-**Per-client scope.** The grant is per OAuth client (`client_id` is carried on
-every call and recorded in the audit trail). Two AI clients are two grants,
+**Per-client scope.** The grant is per OAuth client (`client_id` is resolved
+from the token on every call — `auth.ts:99–106`). Two AI clients are two grants,
 revocable independently.
+
+> **Corrected 2026-08-13** (doc 22 Phase 6a, `22a` defect **D-18**). This
+> paragraph said `client_id` was *"recorded in the audit trail"*. It is not:
+> `mcp_write_audit` is `(user_id, tool, args_hash, summary, created_at)` and
+> `recordMcpWrite()` takes no client argument. The claim was inferred from the
+> value being available rather than read out of the migration — exactly the
+> failure this document's own rule exists to prevent, caught by AI Manual ch. 3
+> checking §6.3 against `20260612000001_design_pivot.sql:281`.
 
 ---
 
@@ -312,7 +320,8 @@ consequence and reads correctly as reassurance.
 
 `recordMcpWrite()` writes a `mcp_write_audit` row for each mutation — tool name,
 a **hash** of the arguments (never the raw arguments, which can contain note
-text), and a short summary, always under the server-derived user id. The audit
+text), and a short summary, always under the server-derived user id. **The row
+carries no client identifier** (`D-18`). The audit
 insert is deliberately non-fatal: a failed audit never inverts a successful write
 into an error.
 
