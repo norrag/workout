@@ -1,18 +1,13 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { chaptersFor, resolveChapter } from "@/content/manual";
-import { ManualChapterNav } from "@/components/manual/ManualBlocks";
+import { ManualChapterContents } from "@/components/manual/ManualScreens";
 import { releaseActive } from "@/lib/version";
 import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * Guide — chapter contents (fig 4.9; 09-changelog 2026-08-07 §2, amended
- * 2026-08-09 §2).
- *
- * A contents page, never prose: doc 22 §9.1 makes the **section** the unit.
- * Since owner review round 3 this page is also the map's click-through, so it
- * carries chapter-level prev/next — the section footer's affordance one level
- * up, so a reader browsing the manual is never sent back to the map to move on.
+ * 2026-08-09 §2). The screen is `ManualChapterContents`, shared with the AI
+ * Manual (09-changelog 2026-08-13 §1).
  *
  * Gated on the manuals' release (doc 23 §9.2 / 22b §10.1): content lands over
  * many PRs, and ungated the guide would go live chapter by chapter with nothing
@@ -36,44 +31,5 @@ export default async function GuideChapterPage({
   const chapter = resolveChapter("ug", slug);
   if (!chapter) notFound();
 
-  return (
-    <div>
-      <Link
-        href="/more/guide"
-        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink/55"
-      >
-        ‹ Guide
-      </Link>
-      <h1 className="title-display mt-4 text-[32px]">{chapter.title}</h1>
-      <p className="mt-2 text-[10px] font-medium tracking-[0.1em] text-ink/45">
-        <span className="label-caps">USER GUIDE · CHAPTER </span>
-        <span className="numeral">{chapter.number}</span>
-      </p>
-      <p className="mt-4 text-sm leading-[1.65] text-ink/60">{chapter.summary}</p>
-
-      <div className="mt-6 border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
-        SECTIONS
-      </div>
-      {chapter.sections.map((section, i) => (
-        <Link
-          key={section.slug}
-          href={`/more/guide/${chapter.slug}/${section.slug}`}
-          className="flex items-start gap-3 border-b border-ink/15 py-3.5"
-        >
-          <span className="numeral mt-[2px] w-[16px] flex-shrink-0 text-[13px] font-semibold text-ink/40">
-            {i + 1}
-          </span>
-          <span className="flex-1">
-            <span className="block text-[15px] font-bold">{section.title}</span>
-            <span className="mt-0.5 block text-[13px] leading-[1.5] text-ink/60">
-              {section.summary}
-            </span>
-          </span>
-          <span className="mt-[2px] text-base text-ink/50">›</span>
-        </Link>
-      ))}
-
-      <ManualChapterNav manual="ug" slug={chapter.slug} />
-    </div>
-  );
+  return <ManualChapterContents chapter={chapter} />;
 }

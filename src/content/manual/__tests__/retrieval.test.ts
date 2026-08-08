@@ -55,10 +55,15 @@ describe("workout://user-guide-index — the map", () => {
     }
   });
 
-  it("omits a manual with no chapters rather than shipping an empty branch", () => {
-    // the AI Manual is Phase 6; until it has a chapter, the map does not
-    // advertise a surface a client would then find empty
-    expect(index.manuals.map((m) => m.manual)).toEqual(["ug"]);
+  it("carries both manuals, in reading order, and no empty branch", () => {
+    // Phase 6 landed the AI Manual, so the map now has two branches. The
+    // property under test is unchanged and still the one that matters: a
+    // manual appears when it has chapters, so a client is never pointed at a
+    // surface it would then find empty.
+    expect(index.manuals.map((m) => m.manual)).toEqual(["ug", "ai"]);
+    for (const manual of index.manuals) {
+      expect(manual.chapters.length, manual.manual).toBeGreaterThan(0);
+    }
   });
 
   it("stays small enough to load once and keep", () => {

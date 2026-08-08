@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { SearchHit, SearchIndex } from "@/content/manual/search";
 import { searchManual } from "@/content/manual/search";
+// `ids` and never the registry barrel: this is a client component, and the
+// barrel would pull every chapter into the reading path's bundle (D3 guard 1)
+import { MANUAL_LABEL } from "@/content/manual/ids";
 
 /**
  * Guide search (fig 4.11; 09-changelog 2026-08-08 §2).
@@ -63,8 +66,8 @@ export function ManualSearch() {
           type="search"
           value={query}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search the guide"
-          aria-label="Search the guide"
+          placeholder="Search the manuals"
+          aria-label="Search the manuals"
           className="w-full bg-transparent px-4 py-3.5 text-sm outline-none placeholder:text-ink/35"
         />
       </div>
@@ -81,7 +84,7 @@ export function ManualSearch() {
         </p>
       ) : hits.length === 0 ? (
         <p className="mt-4 text-[13px] leading-[1.5] text-ink/55">
-          Nothing matched that. Try a word the guide would use — a screen name,
+          Nothing matched that. Try a word the manuals would use — a screen name,
           a term from the app, or what you are trying to do.
         </p>
       ) : (
@@ -98,8 +101,12 @@ export function ManualSearch() {
               href={doc.route}
               className="block border-b border-ink/15 py-3.5"
             >
+              {/* the manual label leads, always: chapter numbers restart per
+                  manual, so `CH 4` alone names two different chapters once the
+                  AI Manual lands (09-changelog 2026-08-13 §2) */}
               <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
-                CH <span className="numeral">{doc.chapterNumber}</span> ·{" "}
+                {MANUAL_LABEL[doc.manual]} · CH{" "}
+                <span className="numeral">{doc.chapterNumber}</span> ·{" "}
                 {doc.chapterTitle}
               </span>
               <span className="mt-1 block text-[15px] font-bold">

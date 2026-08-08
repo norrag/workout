@@ -83,3 +83,37 @@ export const MANUAL_LABEL: Record<ManualId, string> = {
   ug: "USER GUIDE",
   ai: "AI MANUAL",
 };
+
+/** The lowercase logotype-style `h1` each manual's map screen carries. */
+export const MANUAL_TITLE: Record<ManualId, string> = {
+  ug: "guide",
+  ai: "ai manual",
+};
+
+/** Sentence case, for a back link or a row that names the manual in prose. */
+export const MANUAL_NAME: Record<ManualId, string> = {
+  ug: "Guide",
+  ai: "AI manual",
+};
+
+/**
+ * The screen a manual hangs off, and therefore where its map's back link goes
+ * (doc 22 D1). The User Guide is a More-tab child; the AI Manual hangs off the
+ * connector page it documents, so a reader who went looking for the connector
+ * finds its manual without leaving the settings branch.
+ */
+export const MANUAL_HOME: Record<
+  ManualId,
+  { readonly href: string; readonly label: string }
+> = {
+  ug: { href: "/more", label: "More" },
+  ai: { href: "/more/connector", label: "AI connector" },
+};
+
+/**
+ * One search screen, over both manuals (doc 22 §9.4.3). It lives on the User
+ * Guide's branch because that is where the More tab's door is; the AI Manual's
+ * map links to it with its own `?from=`, so the way back is the way in
+ * (09-changelog 2026-08-13 §2).
+ */
+export const MANUAL_SEARCH_ROUTE = "/more/guide/search";

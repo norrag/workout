@@ -437,9 +437,15 @@ describe("§8.5 — plain-language vocabulary", () => {
    * word in their own AI client's interface. Phase 3i takes it for the first
    * time — ch. 18's setup section, where the app's own field reads
    * `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR` and a reader who has not been
-   * told the word cannot complete the step. Phase 6 adds `ai/setup#…` here.
+   * told the word cannot complete the step. Phase 6 adds the AI Manual's own
+   * setup section for the same reason and on the same evidence — those two
+   * sections are the entire allowance, and both quote the app's label rather
+   * than teaching the abbreviation as vocabulary.
    */
-  const MAY_SAY_MCP: readonly string[] = ["ug/connecting-an-ai#setting-one-up"];
+  const MAY_SAY_MCP: readonly string[] = [
+    "ug/connecting-an-ai#setting-one-up",
+    "ai/setup#connecting",
+  ];
 
   it("uses the reader's words, not the build's", () => {
     for (const entry of everySection) {
