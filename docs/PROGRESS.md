@@ -4,40 +4,55 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 
 ## 2026-08-14 (latest) — Day View: the focus pass (N82, staged for 1.1.0)
 
-Owner-directed declutter of the day view. Full design record in
-[09-design-changelog.md](09-design-changelog.md) (2026-08-14); the short version
-is that the clutter was never any single element — it was **per-exercise
-repetition**. The four-button icon row costs four bordered boxes *per card*, so
-a six-exercise day drew 24 of them down the right edge, out-shouting the set
-grid they exist to serve; three of the four were rarely-used, and `note` was an
-exact duplicate of a `…` row opening the same sheet with the same origin.
+Owner-directed declutter of the day view, **revised through owner review round 1
+the same day**. Full design record in
+[09-design-changelog.md](09-design-changelog.md) (2026-08-14); its §6 is the
+part worth reading twice, because two of the draft's changes were reversed and
+the reasoning that produced them was plausible enough to be re-derived by a
+later session.
 
-Five changes: icon row **4 → 1** (with a real 44px target at last); the
-**exercise name becomes the prescription strip's disclosure**; the two note
-strips **merge** under one lighter rule so the program's voice outranks the
-lifter's; `History ›` **returns to the `…` menu** and the menu's rows are
-**grouped** with the order untouched; `TARGET n RIR` states itself in **ink**
-rather than the accent. No action removed, no write path moved, no engine input
-touched.
+**What shipped.** The exercise **name becomes the prescription strip's
+disclosure** (name + chevron — the header's own navigator idiom reused), which
+removes the prescription icon from the card's button row **without removing a
+capability**; note and history keep their icons; the two note strips **merge**
+under one lighter rule so the program's voice outranks the lifter's; the `…`
+menu's rows are **grouped**, with rows and order untouched. `DayHeader` ends the
+pass unchanged.
+
+**What was reversed at review**, and must not be re-attempted without a fresh
+decision:
+
+- **Cutting the row to `…` alone.** The draft moved note and history into the
+  menu on a frequency argument. It mis-weighted the cost: frequency is not the
+  only axis — **interruption** is. Both are consulted *between sets*, with a
+  rest clock running, and a two-tap detour there is worth more than the ink it
+  saves. The screen's problem was one redundant icon; the pass found it and then
+  over-generalised from it.
+- **De-accenting `TARGET n RIR`.** The draft read hard rule 7 literally (orange
+  = position/selection; the effort ask is a fact) and moved the label to ink.
+  Overruled: the ask is the one number that governs every set and is meant to be
+  found instantly. **The accent on this label is a standing, deliberate
+  exception to rule 7**, now recorded in `22c` §B1.2 so it does not get "fixed"
+  again.
+- **A `History ›` menu row**, drafted only to compensate for removing the icon,
+  was withdrawn with it.
 
 ### Deviations recorded (hard rule 8)
 
-No mockup figure covers **any** of the elements this pass moves. Fig 1.1 shows
-two icon buttons (history + `…`), a three-column `LB / REPS / LOG` grid, no
-prescription strip, no progress bar and no accent on the header meta — it
-predates every one of them. The prescription strip's absence from the mockup is
-a **pre-existing** deviation already recorded for N57 / N63; this pass inherits
-it and adds two more, both transcribed from primitives the app already ships
-rather than improvised:
+No mockup figure covers the elements this pass moves. Fig 1.1 shows two icon
+buttons (history + `…`), a three-column `LB / REPS / LOG` grid, no prescription
+strip, no progress bar — it predates all of them. The strip's absence is a
+**pre-existing** deviation already recorded for N57 / N63; this pass inherits it
+and adds two more, both transcribed from primitives the app already ships:
 
 - **the name-row chevron** — the header's own brand-row disclosure (`workout` +
   chevron, 12px, 180° rotate over 200ms), re-used at 11px / `ink 45`;
-- **the grouped menu rule** — `border-b border-ink/30` per group, which is the
-  weight the menu's own header rule already uses, with `MenuRow`'s existing
-  `last:` reset preventing a doubled border.
+- **the grouped menu rule** — `border-b border-ink/30` per group, the weight the
+  menu's own header rule already uses, with `MenuRow`'s existing `last:` reset
+  preventing a doubled border.
 
-House style honored throughout: ink only, **no accent**, square corners, no new
-control type, tracked-caps labels for the note kinds.
+House style honored: ink only, no accent, square corners, no new control type,
+tracked-caps labels for the note kinds.
 
 ### Staged, not shipped
 
@@ -47,10 +62,10 @@ of the menu changes before the release. Both code paths ship until the release
 PR flips them, which is doc 23 §9.2's stated and accepted cost. Release note
 `day-view-focus-pass` is staged in `unreleased.ts`.
 
-`22c` §B1.2 and the manual sections that described the four buttons, the note
-button and the orange effort label (`ug/training-a-session#the-day-screen`,
-`#notes`) are corrected in the same PR — they ship in 1.1.0 too, and doc 22 §2
-exists because that drift is the failure mode.
+`22c` §B1.2 and the manual sections that described the button row
+(`ug/training-a-session#the-day-screen`, `#notes`) are corrected in the same PR
+— they ship in 1.1.0 too, and doc 22 §2 exists because that drift is the
+failure mode.
 
 ## 2026-08-13 — doc 22 Phase 6: the AI Manual (N74)
 

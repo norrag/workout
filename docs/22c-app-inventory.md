@@ -121,7 +121,7 @@ The app's densest screen and the subject of ch. 5. Four zones.
 | Navigator | collapsible; week selector with nested day chips. Stays open across day navigation (persisted in `sessionStorage.dayNavOpen`). Day chips carry status: `done` / `current` / `next` / `planned` / `empty` |
 | Coordinate | `W{week}·D{day}` at 46 px — the largest type on the screen |
 | Date | right of the coordinate |
-| Effort label | **`TARGET {n} RIR`**, or **`DELOAD WEEK`** on a deload, with an `InfoDot` (`rir` / `deload`). **N82 (1.1.0):** stated in bold ink, not accent orange — hard rule 7 reserves the accent for position/selection, which on this screen means the navigator dots and the progress fill and nothing else |
+| Effort label | **`TARGET {n} RIR`**, or **`DELOAD WEEK`** on a deload — in accent orange, with an `InfoDot` (`rir` / `deload`). **N82 tried de-accenting this on a literal hard-rule-7 reading and the owner reversed it (09-changelog 2026-08-14 §6): the effort ask is the one number governing every set, and it is meant to be found instantly. The accent here is a standing, deliberate exception to rule 7 — do not "fix" it.** |
 | `⋮` | workout & mesocycle options (below) |
 | **Progress bar** | 3 px rule, accent fill = `loggedSets / totalSets`. **Skipped slots are excluded from the denominator**, and a *queued* set counts as logged (the lifter did it) |
 
@@ -132,13 +132,13 @@ The app's densest screen and the subject of ch. 5. Four zones.
 
 **② Exercise card**
 
-> **N82 (1.1.0, the focus pass — 09-changelog 2026-08-14).** Top row is the
-> **`…` menu alone**. The **prescription strip toggle** moved onto the exercise
-> **name** (name + chevron, the header's own disclosure idiom); the **note**
-> button was deleted as an exact duplicate of the menu's `Notes` row; **history**
-> became a menu row. The description below is the shipped 1.0.0 screen; behind
-> `releaseActive("1.1.0")` it is the one sentence above plus the same name /
-> equipment / bodyweight-chip line.
+> **N82 (1.1.0, the focus pass — 09-changelog 2026-08-14).** Top row loses
+> **exactly one** button: the **prescription strip toggle**, whose job the
+> exercise **name** now does (name + chevron, the header's own disclosure
+> idiom). **Note and history stay as icons** — they are consulted between sets
+> and a menu trip for either was reversed at owner review. So the row is
+> **note · history · `…`**, and the name carries a chevron. Everything else in
+> this section is unchanged.
 
 Top row is four icon buttons: **prescription strip toggle**, **note**,
 **history**, **`…` menu**. Then the exercise name (20 px bold) with equipment
@@ -159,8 +159,11 @@ a tappable `Couldn't read the program's decision — tap to retry.`
 Below it, a `PINNED — {note}` line when the exercise carries a pinned note, and
 a `NOTE — {note}` line for a session note. **N82 (1.1.0):** the two merge into
 one strip under a single lighter rule (`border-l border-ink/25`), with `PINNED`
-/ `NOTE` as tracked-caps labels — the prescription strip keeps the heavy rule,
-so the program's voice and the lifter's stop looking identical.
+/ `NOTE` as tracked-caps labels. This fixed a real defect — the pinned strip had
+been wearing `border-l-2 border-ink`, **identical to the prescription strip**,
+so a card with both showed two indistinguishable bars from two different
+authors. The program keeps the heavy rule; the lifter's notes sit under a
+lighter one.
 
 **Exercise `…` menu** (all rows, current code):
 `View exercise` · `Effort target` · `Notes` / `Add note` · `Replace exercise` ·
@@ -171,10 +174,11 @@ so the program's voice and the lifter's stop looking identical.
 > **Correction for the manual:** there is **no `Engine audit` row.** Any source
 > that says there is predates 2026-08-06.
 
-> **N82 (1.1.0):** `History ›` is inserted directly after `View exercise ›` —
-> the in-place `THIS MACROCYCLE` sheet, distinct from the full exercise page —
-> and the rows are grouped by a stronger rule into *look it up* / *set it up* /
-> *adjust this session* / *remove*. **Order is otherwise unchanged.**
+> **N82 (1.1.0):** the rows are grouped by a stronger rule into *look it up* /
+> *set it up* / *adjust this session* / *remove*. **The rows and their order are
+> unchanged** — no row is added or removed. (A `History ›` row was drafted and
+> withdrawn once the card kept its history icon; 2026-06-26 still holds — one
+> shortcut, not two.)
 
 **③ Set rows**
 

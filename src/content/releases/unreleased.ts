@@ -56,7 +56,7 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     // controls a returning user reaches for have moved.
     id: "day-view-focus-pass",
     title: "A quieter workout screen",
-    body: "Each exercise now carries one menu instead of a row of buttons. Tap the exercise's name to open the program's reasoning; its history, notes and effort target are grouped inside the menu.",
+    body: "Tap an exercise's name to open the program's reasoning — the button that used to do it is gone, and its card is calmer for it. Notes read as one block, and the exercise menu is grouped into shorter lists.",
     area: "training",
     link: {
       label: "Open your workout",

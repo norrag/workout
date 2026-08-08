@@ -44,58 +44,56 @@ each session. In it, for every discrete change include:
 
 ## 2026-08-14 — Day View: the focus pass (fig 1.1 / 1.2, N82, staged for 1.1.0)
 
+**Revised through owner review round 1, same day.** The first pass over-cut; §6
+records exactly what was overruled and why, and the entry above it describes the
+**settled** design, not the draft.
+
 Owner-directed: "the Workout day view … has gained a number of visual elements
 that are beginning to create clutter and distraction. Retain functionality, ease
 and speed of use, and quick access to useful tools while reducing visual clutter
 and focusing the user on the elements that matter most and are used most
 frequently."
 
-The diagnosis, taken against the screen rather than the spec. The day view's hot
-path is the **set grid** — reading a target, editing a weight, ticking `LOG`.
-Everything else on the card is support. But support had accumulated at the same
-visual weight as the grid, and — critically — **at per-exercise cost**: the
-four-button icon row is four bordered 28px boxes *per card*, so a six-exercise
-day drew **24** of them in a column down the right edge, out-shouting the thing
-they exist to serve. Three of the four were controls a session touches rarely
-or never, and one of those three (`note`) was an exact duplicate of a row
-already in the `…` menu.
+The diagnosis, taken against the rendered screen rather than the spec. The day
+view's hot path is the **set grid** — reading a target, editing a weight,
+ticking `LOG`. Support furniture had accumulated at the same visual weight and,
+critically, **at per-exercise cost**: a four-button icon row is four bordered
+28px boxes *per card*, so a six-exercise day drew **24** of them in a column
+down the right edge. The owner named the symptom directly — "too many tool
+icons".
 
 Four changes. Every one is presentational or a menu rearrangement; **no action
 is removed, no write path moves, and no engine input changes.**
 
-### 1. The exercise icon row collapses four buttons to one (fig 1.1)
-
-- **Change.** The row above the exercise name is now the `…` menu **alone**. The
-  three departing controls land as follows:
-  - **prescription strip** → the exercise **name** becomes its disclosure (§2);
-  - **note** → deleted outright. `Notes` / `Add note` was already a `…` row
-    opening the same sheet with the same origin (`onNote(we, "menu")`) — the
-    icon was pure duplication;
-  - **history** → a `…` row (§4).
-  The surviving `…` keeps the mockup's 28px bordered box as its **visual**, but
-  now sits inside a 44×40 hit area (`-my-2 -mr-1`, R18) — alone in the row, it
-  can finally afford the touch target the four never could. Row height is
-  unchanged, so nothing below it moves.
-- **Rationale.** Prominence should track frequency. Ranked by how often a
-  session uses them, these four were roughly `1 : 0.2 : 0.2 : 0.3` and were
-  drawn `1 : 1 : 1 : 1`. Repetition is the multiplier that made it a page-level
-  problem rather than a card-level one.
-
-### 2. The exercise name is the prescription strip's disclosure (fig 1.1)
+### 1. The exercise name is the prescription strip's disclosure (fig 1.1)
 
 - **Change.** The name gains a chevron and the whole `name + chevron` is the
   toggle — `11px` chevron at `ink/45`, `1.5` gap, rotating 180° on open over
   `200ms`. `aria-expanded` and the `<exercise> prescription` label move with it.
-- **Rationale.** This is the header's **own** idiom, one screen up: the
-  `workout` logotype + chevron already discloses the week/day navigator, and it
-  is the gesture this user performs most on this screen. Reusing it invents
-  nothing, and trades a 28px glyph for a 20px-bold title as the target.
+- **Rationale.** This is the header's **own** idiom one screen up: the `workout`
+  logotype + chevron already discloses the week/day navigator. Reusing it
+  invents nothing, trades a 28px glyph for a 20px-bold title as the target, and
+  — the point — **removes an icon from the row without removing a capability.**
+  The owner's verdict on this change: *"That's good, as it eliminates one icon
+  in the strip without losing the functionality — exactly what I was looking
+  for."*
 - **Default stays closed.** The strip's *ask* line largely restates what the set
   rows already show (weight, reps, RIR); its non-redundant content is the
-  **why**, which is a question the lifter asks occasionally, not every set.
+  **why**, an occasional question rather than a per-set one.
 - **Rule-8.** No mockup figure covers the strip at all (pre-existing deviation,
   N57/N63, recorded in PROGRESS.md). House style honored: existing chevron
   primitive, ink only, no accent, no new control type.
+
+### 2. The icon row goes four buttons → three (fig 1.1)
+
+- **Change.** The **prescription toggle** leaves, its job now done by §1. The
+  **note** and **history** buttons stay exactly as they are, as does `…`.
+- **Rationale.** These two are what you reach for *mid-set* — "what did I do
+  last time", "write that down before I forget" — and a menu trip for either is
+  the wrong trade against a brief that asks for tools to stay fast. Owner:
+  *"notes and history are important to have."* The complaint was the **quantity
+  of the row**, not icons as a device; removing the one icon whose function had
+  a better home is the whole of the correct answer.
 
 ### 3. The two note strips merge into one, ranked below the program (fig 1.1)
 
@@ -103,45 +101,29 @@ is removed, no write path moves, and no engine input changes.**
   they become **one** strip carrying up to two rows. The kind is named in the
   ledger's tracked-caps label idiom (`9px / 600 / 0.16em / ink 45`) rather than
   inline caps prose, and the strip's rule drops to `border-l border-ink/25`.
-- **Rationale.** The pinned strip wore `border-l-2 border-ink` — **identical to
-  the prescription strip**. A card with a prescription open, a pinned note and a
-  session note showed three near-identical bars with no way to tell the
-  program's voice from the lifter's. One rule per author, and the heavier rule
-  belongs to the program.
+- **Rationale.** A real defect, not a preference: the pinned strip wore
+  `border-l-2 border-ink` — **identical to the prescription strip**. A card with
+  a prescription open, a pinned note and a session note showed three
+  near-identical bars with no way to tell the program's voice from the lifter's.
+  One rule per author, and the heavier rule belongs to the program. Both notes
+  keep their own edit target.
 
-### 4. The `…` menu gains `History`, and its rows are grouped (fig 1.2)
+### 4. The `…` menu's rows are grouped (fig 1.2)
 
-- **Change (a).** `History ›` returns to the menu, **alongside** `View exercise
-  ›` — the in-place `THIS MACROCYCLE` sheet without leaving the session, versus
-  the whole exercise page. The 2026-06-26 entry that folded them into one row
-  did so expressly because "per-exercise history already has a dedicated control
-  in the Day View"; that control is gone, so its premise is gone with it.
-- **Change (b).** The menu's rows are grouped by a stronger rule
-  (`border-b border-ink/30` per group, via the new shared `MenuGroup`) into
-  *look it up* / *set it up* / *adjust this session* / *remove*. `MenuRow`'s
-  existing `last:` reset drops the hairline under each group's final row, so
-  grouping costs no doubled borders.
-- **Row order is untouched.** The groups fall on seams the list already had, so
-  nothing moves under a returning user's thumb — the only insertion is
-  `History`, directly under `View exercise`.
+- **Change.** The rows are grouped by a stronger rule (`border-b border-ink/30`
+  per group, via the new shared `MenuGroup`) into *look it up* / *set it up* /
+  *adjust this session* / *remove*. `MenuRow`'s existing `last:` reset drops the
+  hairline under each group's final row, so grouping costs no doubled borders.
+- **The rows and their order are untouched.** The groups fall on seams the list
+  already had, so nothing moves under a returning user's thumb, and no row is
+  added or removed.
 - **Rationale.** Twelve flat rows mixing navigation, configuration, ordering,
   structure and a destructive action is past a comfortable scan. Four short
-  lists is not.
+  lists is not. Owner: *"I like your organization of the menu items also."*
 
-### 5. `TARGET n RIR` is stated in ink, not in the accent (fig 1.1)
+### 5. Deliberately not changed
 
-- **Change.** The header's effort label (and `DELOAD WEEK`) drops
-  `text-accent` for `text-ink`, keeping its bold weight.
-- **Rationale.** **Hard rule 7** — orange marks *current position and selection
-  only*. The week's effort ask is neither; it is a fact. It was also the single
-  loudest thing in the header, competing with the two elements that genuinely do
-  mark position (the navigator's active-week/day dots and the progress fill).
-  Hierarchy here comes from weight and size, which is the light-ledger system's
-  own instrument; the label keeps its rank without borrowing the accent's
-  meaning. On the day view, orange now means "where you are" and nothing else.
-
-### Deliberately not changed
-
+- **`TARGET n RIR` keeps the accent** — see §6.
 - **The set grid** — the hot path, and already right. Column count, cell
   primitives, marker glyphs, per-set `⋮` and the `LB · REPS · RIR · LOG` header
   are untouched.
@@ -152,9 +134,37 @@ is removed, no write path moves, and no engine input changes.**
   their labels in view; it is already `9px / ink 50`.
 - **Equipment type on the name row.** Considered folding into the eyebrow as
   ` · MACHINE`; rejected — the eyebrow's ` · SUFFIX` slot is spoken for by
-  doc 21 §8's effort suffixes (`· BACKED OFF`, `· CAPPED 2`) under a documented
-  two-suffix budget, and the name row's right edge is free now that the icons
-  have left it.
+  doc 21 §8's effort suffixes under a documented two-suffix budget.
+- **The `Notes` row in the `…` menu** stays alongside the note icon. The owner
+  was explicitly indifferent (*"they don't particularly bother me there"*), and
+  the row carries state the icon cannot — `Notes ›` versus `Add note`.
+
+### 6. Owner review round 1 — what was overruled
+
+Recorded because the reasoning that produced the draft was sound-sounding and
+still wrong; a later session must not re-derive it.
+
+- **Cutting the icon row to `…` alone. REVERSED.** The draft moved note and
+  history into the menu on a frequency argument (they are reached less often
+  than the grid, so they should cost a tap). The argument mis-weighted the
+  cost: *frequency* is not the only axis — **interruption** is. Both are
+  consulted **between sets**, with a rest clock running and a bar to get back
+  under, and a two-tap detour there is worth more than the ink it saves. The
+  owner's framing — "which were functional" — is the correct correction: the
+  screen's problem was one redundant icon, and the pass had found it (§1) before
+  over-generalising from it.
+- **`TARGET n RIR` in ink instead of the accent. REVERSED.** The draft read hard
+  rule 7 literally (orange marks *current position + selection only*; the week's
+  effort ask is a fact, so it should not wear it) and de-accented the label.
+  Overruled: the effort ask is the one number that governs every set on the
+  screen, and it is meant to be **found instantly** on a glance mid-session.
+  **Rule 7 bends here on purpose, and this is the standing exception** — a
+  literal reading that costs the screen its fastest read is a misreading of what
+  the rule is for. The label keeps `text-accent` bold.
+- **Adding a `History ›` row to the `…` menu. WITHDRAWN.** It existed only to
+  compensate for removing the history icon. With the icon restored, the
+  2026-06-26 entry that folded history into `View exercise` holds again on its
+  original reasoning: one shortcut, not two.
 
 ### Staging + impact
 
@@ -164,15 +174,15 @@ is removed, no write path moves, and no engine input changes.**
   (`MenuGroup ruled={…}`) so nothing about the menu changes early.
 - **Release note** — `day-view-focus-pass` staged in `unreleased.ts`. A changed
   layout with no new capability is still a feature-release change (§4.2): the
-  controls a returning user reaches for have moved.
+  control a returning user reaches for has moved.
 - **Affected figures.** `1.1`, `1.2`.
-- **Impact.** `RETROFIT` — `DayView.tsx` (`DayHeader` effort label,
-  `ExerciseBlock` icon row / name row / note strips / menu) and
-  `components/ui/AnchoredMenu.tsx` (new `MenuGroup`). **No `DATA` change.**
-- **Manual.** `ug/training-a-session#the-day-screen` and `#notes` described the
-  four buttons, the note button, and the orange effort label; all three are
-  corrected in the same PR — doc 22 §2's whole point is that the manual and the
-  screen must not drift, and both ship in 1.1.0.
+- **Impact.** `RETROFIT` — `DayView.tsx` (`ExerciseBlock` icon row / name row /
+  note strips / menu grouping) and `components/ui/AnchoredMenu.tsx` (new
+  `MenuGroup`). **No `DATA` change.** `DayHeader` ends the pass unchanged.
+- **Manual.** `ug/training-a-session#the-day-screen` said "four small buttons";
+  it now says three and describes the name-row chevron. `#notes` gained the menu
+  row alongside the note button. Both ship in 1.1.0 — doc 22 §2's whole point is
+  that the manual and the screen must not drift.
 
 ## 2026-08-13 — The AI Manual gets a reader (figs 4.8–4.11 reused; N74 / doc 22 Phase 6)
 
