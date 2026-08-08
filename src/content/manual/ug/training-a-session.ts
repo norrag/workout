@@ -70,7 +70,7 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
             { ui: "Workout" },
             " tab is the session itself. The top of the screen is the ledger line for the whole day: the coordinate ",
             { ui: "W3·D2" },
-            " in the largest type on the screen, the date beside it, and under that the week's effort ask in orange — ",
+            " in the largest type on the screen, the date beside it, and under that the week's effort ask — ",
             { ui: "TARGET 2 RIR" },
             ", or ",
             { ui: "DELOAD WEEK" },
@@ -87,16 +87,18 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
           text: [
             "One card per exercise, in the order you will train them, each headed by its place in the day and the muscle group it is there for — ",
             { ui: "03 — BACK" },
-            ". Under that heading sit four small buttons: the ",
-            { strong: "prescription strip" },
-            ", a note, this exercise's history, and the ",
+            ". Beside that heading is the ",
             { ui: "…" },
-            " menu — then the movement's name, its equipment, and a row per planned set.",
+            " menu; below it the movement's name, its equipment, and a row per planned set. Everything else about the exercise is behind those two.",
           ],
         },
         {
           kind: "para",
-          text: "The prescription strip is the program explaining itself — what it is asking for, and the reasons behind it. Its first line is underlined, and tapping it opens the full working behind the number.",
+          text: [
+            "The movement's name carries a chevron. Tapping it opens the ",
+            { strong: "prescription strip" },
+            " — the program explaining itself, in what it is asking for and the reasons behind it. The strip's first line is underlined, and tapping that opens the full working behind the number.",
+          ],
         },
         { kind: "heading", text: "Coming back to it" },
         {
@@ -348,7 +350,10 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         {
           kind: "para",
           text: [
-            "The note button on the exercise card writes either kind. Left as it is, a note is ",
+            { ui: "Notes" },
+            " in the exercise's ",
+            { ui: "…" },
+            " menu writes either kind. Left as it is, a note is ",
             { ui: "Saved with just this session" },
             " and stays with that day in the exercise's history. Tick ",
             { ui: "Pin to this exercise" },
