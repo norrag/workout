@@ -23,6 +23,8 @@ export const LINKABLE_ROUTES = [
   // doc 22 Phase 2 — the guide map. Safe as a release-note target because the
   // release that announces it is the same one that ungates it (doc 23 §9.2).
   "/more/guide",
+  // doc 22 Phase 6 — the AI Manual's map, ungated by the same release
+  "/more/connector/guide",
   "/more/profile",
   "/more/connector",
   "/more/account",
@@ -49,8 +51,11 @@ export function isLinkableRoute(href: string): href is LinkableRoute {
  * the registry, so a renamed or deleted section fails CI rather than a reader's
  * tap. Phase 7's in-app links follow the same rule for the same reason.
  *
- * Filled by doc 22 Phase 2 with chapter 6, the only chapter that existed then.
- * Phases 3 and 6 append as their chapters land.
+ * Filled by doc 22 Phase 2 with chapter 6, the only chapter that existed then;
+ * Phase 3 appended the rest of the User Guide and Phase 6 the AI Manual. It is
+ * now **complete by test** — `link-targets.test.ts` asserts it lists every
+ * section the registry publishes, so a new section is a link target the moment
+ * it exists rather than the moment someone remembers this file.
  */
 export const GUIDE_SECTION_IDS: readonly string[] = [
   // ch. 1 — What WORKOUT is (Phase 3a)
@@ -180,6 +185,65 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/troubleshooting#sets-and-counting",
   "ug/troubleshooting#where-did-that-go",
   "ug/troubleshooting#it-did-not-save",
+  // ── AI Manual (doc 22 Phase 6) ──────────────────────────────────────────
+  // ch. 1 — What the connector is
+  "ai/what-it-is#the-idea",
+  "ai/what-it-is#what-it-is-good-for",
+  "ai/what-it-is#two-kinds-of-question",
+  // ch. 2 — Setting it up
+  "ai/setup#connecting",
+  "ai/setup#approving-access",
+  "ai/setup#checking-it-works",
+  "ai/setup#more-than-one-assistant",
+  "ai/setup#when-it-will-not-connect",
+  // ch. 3 — The rules it operates under
+  "ai/the-rules#it-acts-as-you",
+  "ai/the-rules#plans-arrive-as-drafts",
+  "ai/the-rules#your-record-stands",
+  "ai/the-rules#the-engine-owns-the-numbers",
+  "ai/the-rules#every-change-is-recorded",
+  // ch. 4 — What it can do
+  "ai/what-it-can-do#where-you-are",
+  "ai/what-it-can-do#history-and-analysis",
+  "ai/what-it-can-do#planning-and-blocks",
+  "ai/what-it-can-do#library-and-preferences",
+  "ai/what-it-can-do#the-manuals-themselves",
+  // ch. 5 — Use case: a macrocycle
+  "ai/macrocycles#the-ask",
+  "ai/macrocycles#reading-the-target",
+  "ai/macrocycles#managing-the-arc",
+  "ai/macrocycles#checking-in-on-it",
+  // ch. 6 — Use case: a block
+  "ai/mesocycles#the-ask",
+  "ai/mesocycles#the-volume-check",
+  "ai/mesocycles#reviewing-and-starting",
+  "ai/mesocycles#changing-a-running-block",
+  // ch. 7 — Use case: is this working?
+  "ai/analysis#the-ask",
+  "ai/analysis#when-a-number-lies",
+  "ai/analysis#the-four-questions",
+  "ai/analysis#block-against-block",
+  // ch. 8 — Use case: coaching
+  "ai/coaching#the-ask",
+  "ai/coaching#push-or-back-off",
+  "ai/coaching#why-this-number",
+  "ai/coaching#a-niggle-becomes-an-assignment",
+  // ch. 9 — Getting good answers
+  "ai/getting-good-answers#ground-it-first",
+  "ai/getting-good-answers#ask-what-it-used",
+  "ai/getting-good-answers#what-a-good-answer-looks-like",
+  // ch. 10 — How to read its answers
+  "ai/reading-answers#which-numbers-are-estimates",
+  "ai/reading-answers#recorded-or-projected",
+  "ai/reading-answers#when-it-hedges",
+  // ch. 11 — Notes, exclusions and preferences
+  "ai/notes-and-preferences#notes",
+  "ai/notes-and-preferences#exclusions",
+  "ai/notes-and-preferences#per-exercise-settings",
+  // ch. 12 — When it gets something wrong
+  "ai/when-it-gets-it-wrong#spotting-it",
+  "ai/when-it-gets-it-wrong#a-refusal-is-usually-a-rule",
+  "ai/when-it-gets-it-wrong#putting-it-right",
 ];
 
 export function isGuideSectionId(id: string): boolean {

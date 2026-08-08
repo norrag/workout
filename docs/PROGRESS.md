@@ -2,7 +2,99 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-12 (latest) — doc 22 Phase 5: the connector can read the manual (N74)
+## 2026-08-13 (latest) — doc 22 Phase 6: the AI Manual (N74)
+
+Twelve chapters, 48 sections, its own reader under `/more/connector/guide`, and
+the connector page reworked into its front door. Doc 22 Phase 6 is done; both
+manuals now exist and Phase 7 (link placement) is what remains.
+
+### There is no second design
+
+The hard-rule-8 pass (09-changelog 2026-08-13) decided this before anything was
+built. D4 already made the two manuals one system, and everything below the
+routes was manual-agnostic from Phase 1 — `MANUAL_ROOT`, `MANUAL_LABEL`,
+`ManualSectionHeader`, `ManualChapterNav`, the block model, the budget. So the
+AI Manual reuses figs 4.8 / 4.9 / 4.10 at a second root, **claims no new figure
+number**, and needed no eleventh block kind. The map and chapter screens lifted
+into `ManualScreens.tsx` and both route trees became thin callers, which is the
+alternative to copying two screens and letting the copies drift.
+
+One amendment fell out of having two manuals: **chapter numbers restart per
+manual**, so a search result reading `CH 4 · What it can do` named two different
+chapters. The result row now leads with `USER GUIDE` / `AI MANUAL`, always
+rather than conditionally, and the single search screen (doc 22 §9.4.3, written
+before either manual existed) takes `?from=` so a reader who searched from the
+AI Manual is returned to it.
+
+### §7.1 was met by running everything, including the writes
+
+Doc 22 §7.1 makes "every example was actually run" an acceptance criterion, and
+`22d` §8 rule 6 bans invented transcripts outright. Chapters 5–8 were written
+from live calls on 2026-08-13; the write half was a create → capture → delete
+round-trip taken on the owner's explicit approval, after which `get_macrocycles`
+was re-read and returned `standalone_mesocycles: []`.
+
+What the live runs gave the chapters was better than anything that could have
+been constructed:
+
+- **Ch. 7's case is real.** One lift returned `change_pct: −22.7`,
+  `trend: "declining"`, `stalled: true` — and, in the same payload, matched-RIR
+  deltas of **+10.1 / +10.1 / +7.1 / +10.5 %** against the previous block. Both
+  numbers are correct and only one answers the question the reader meant. Three
+  of the four comparability guards applied to that single lift at once.
+- **Ch. 6's volume check failed on the first spec written**: a plausible
+  four-day, thirteen-exercise split came back below MEV on **seven** groups. The
+  created draft then showed fractional counting doing its work — `shoulders 1.5`
+  off secondary muscles alone.
+- **Ch. 5 §1 is a refusal.** `create_macrocycle` cannot succeed while an arc is
+  live, and *"a macrocycle is one long-term direction at a time"* teaches the
+  rule better than a successful draft would have.
+
+### Two defects, both from checking prose against code rather than against `22d`
+
+`22b` §9.2's rule — verify a claim against code, never against a document — is
+what found both, and both are in the audit rather than in the app.
+
+- **`D-18`.** `22d` §5 said the requesting client is *"recorded in the audit
+  trail"*. `client_id` is resolved per call, but `mcp_write_audit` is
+  `(user_id, tool, args_hash, summary, created_at)` and `recordMcpWrite()` takes
+  no client argument. Ch. 3 claims the action, the summary and the time.
+- **`D-19`.** `22d` §7 K1 called the connector's standing e1RM caveat stale. It
+  is self-contradicting: a single `analyze_exercise_progress` response carries
+  *"Epley-based estimates"* in `data_quality` and *"RIR-folded Epley·Brzycki"* in
+  its own `metric_definitions`. A connected assistant reading one response gets
+  two accounts of the same number, which is a stronger argument for fixing the
+  string than staleness was.
+
+Both are recorded rather than fixed — doc 22 §1.2 makes Phase 6 documentation
+only — and neither is quoted anywhere in the manual.
+
+### Two things the plan did not name
+
+- **`GUIDE_SECTION_IDS` gained a completeness test.** It had listed every User
+  Guide section since Phase 3 and nothing said so; now `link-targets.test.ts`
+  asserts it covers every section both manuals publish, so a new section is a
+  linkable target the moment it exists rather than the moment someone remembers
+  that file.
+- **The connector page's two manual links are literal strings in their own
+  module.** Literals because the page sits outside D3's import allowlist and
+  importing the registry for a route would put the whole manual in its payload;
+  *their own module* because a Next route file may only export the fields Next
+  reserves — a constant exported from `page.tsx` fails the build, which is how
+  that was found. A test resolves both through the registry.
+
+### Housekeeping
+
+The registry suite is parameterized over both manuals (every assertion that read
+`"ug"` was a property of *a* manual), guard 3 covers both reading routes,
+`MAY_SAY_MCP` gained its second and final entry, `unreleased.ts` gained
+`ai-manual`, and ch. 18's Phase-3i **forward debt is paid** — the hand-off links
+it could not author then now resolve. `22d` §11.4 records the Phase-6
+re-verification: 58 registered, 17 admin-gated, 41 user-facing, 4 resources.
+
+---
+
+## 2026-08-12 — doc 22 Phase 5: the connector can read the manual (N74)
 
 `workout://user-guide-index`, `search_manual`, `get_manual_section` — doc 22
 §10.2's retrieve-then-read, over the same build-time index the in-app search

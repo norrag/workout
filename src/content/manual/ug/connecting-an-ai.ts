@@ -2,10 +2,10 @@
 //
 // Short by design: what the connector is, how to set one up, what it is good
 // for, and what stays under the reader's control. The depth lives in the AI
-// Manual (Phase 6), which does not exist yet — so this chapter carries NO
-// typed cross-link into it (doc 22 §9.4.5: a link cannot be authored before its
-// target resolves). That is a FORWARD DEBT, the ch. 5 → ch. 11 pattern: Phase 6e
-// adds the hand-off link here when `ai/**` sections exist.
+// Manual, and **Phase 6e paid the forward debt this header recorded**: the
+// `ai/**` sections now resolve, so §1 and §4 carry typed hand-offs into them
+// (doc 22 §9.4.5). The chapter itself is unchanged otherwise — its job is still
+// to be the guide-depth answer, and to say where the rest of it lives.
 //
 // GROUND TRUTH (22b §7 ch. 18 — `22d`, `more/connector/page.tsx`,
 // `api/mcp/route.ts`, `mcp/tools/**`):
@@ -79,10 +79,15 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
             " at any time. It reads your data and drafts plans; the record of what you lifted is never its to remove.",
           ],
         },
+        {
+          kind: "link",
+          to: "ai/what-it-is#the-idea",
+          label: "The AI manual — setup, capabilities, and worked examples",
+        },
       ],
       related: [
         "ug/connecting-an-ai#setting-one-up",
-        "ug/connecting-an-ai#what-it-is-good-at",
+        "ai/what-it-is#the-idea",
       ],
     },
     // -----------------------------------------------------------------------
@@ -137,8 +142,8 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
         },
       ],
       related: [
+        "ai/setup#connecting",
         "ug/connecting-an-ai#what-it-is-good-at",
-        "ug/your-data#what-is-stored",
       ],
     },
     // -----------------------------------------------------------------------
@@ -204,7 +209,7 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
       ],
       related: [
         "ug/connecting-an-ai#staying-in-control",
-        "ug/planning-a-mesocycle#starting-a-block",
+        "ai/what-it-can-do#history-and-analysis",
       ],
     },
     // -----------------------------------------------------------------------
@@ -256,7 +261,7 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
         },
       ],
       related: [
-        "ug/connecting-an-ai#what-it-is-good-at",
+        "ai/the-rules#it-acts-as-you",
         "ug/prescription-details#who-writes-the-numbers",
       ],
     },

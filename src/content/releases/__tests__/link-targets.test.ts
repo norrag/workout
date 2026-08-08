@@ -72,4 +72,14 @@ describe("GUIDE_SECTION_IDS", () => {
     const live = new Set(allSectionIds());
     for (const id of GUIDE_SECTION_IDS) expect(live.has(id), id).toBe(true);
   });
+
+  it("covers every section both manuals publish (doc 22 Phase 6)", () => {
+    // The list was complete in practice from Phase 3 onward and nothing said
+    // so. Asserting it means a new section is a linkable target the moment it
+    // exists, rather than the moment someone remembers this file — the same
+    // one-validator-two-consumers discipline, applied in the other direction.
+    const listed = new Set(GUIDE_SECTION_IDS);
+    const missing = allSectionIds().filter((id) => !listed.has(id));
+    expect(missing).toEqual([]);
+  });
 });

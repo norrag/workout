@@ -4,6 +4,74 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-13 — Session 116: the AI Manual (N74, doc 22 Phase 6)
+
+Twelve chapters, 48 sections, a reader under `/more/connector/guide`, and the
+connector page reworked into its front door. Both manuals now exist; Phase 7
+(link placement) is what remains of doc 22.
+
+**The design pass decided there was nothing to design.** D4 said the two manuals
+were one system, and Phase 1 had built everything below the routes
+manual-agnostic — `MANUAL_ROOT`, `MANUAL_LABEL`, the section header, the chapter
+nav, the block model, the budget. Writing that down (09-changelog 2026-08-13)
+before building is what turned an afternoon of "make an AI-manual version of the
+guide screens" into lifting two components and writing four four-line route
+files. **No new figure number, no eleventh block kind.** The one real amendment
+came from having two manuals at all: chapter numbers restart per manual, so a
+search result reading `CH 4 · What it can do` had quietly started naming two
+different chapters.
+
+**§7.1 was the interesting constraint, and it paid for itself.** Doc 22 makes
+"every example was actually run" an acceptance criterion and `22d` §8 rule 6
+bans invented transcripts outright, so chapters 5–8 were written from live
+connector calls. The write half needed the owner's approval, taken explicitly,
+and was run as a create → capture → delete round-trip with `get_macrocycles`
+re-read afterwards to confirm the account was as found.
+
+Everything the runs returned was better than what would have been written:
+
+- **Ch. 7's whole case is real.** `analyze_exercise_progress` on one lift came
+  back `−22.7%`, `declining`, `stalled` — and carried matched-RIR deltas of
+  **+10.1 / +10.1 / +7.1 / +10.5 %** against the previous block in the same
+  payload. Three of the four comparability guards applied to that single lift at
+  once. A constructed example would have used one guard and been less true.
+- **Ch. 6's volume check failed on the first plan written for it** — a plausible
+  four-day split, below MEV on seven groups — and the created draft then showed
+  fractional counting doing its work (`shoulders 1.5` off secondaries alone).
+- **Ch. 5 §1 is a refusal**, because `create_macrocycle` cannot succeed while an
+  arc is live. *"A macrocycle is one long-term direction at a time"* teaches the
+  rule better than a successful draft would have, and it is the honest thing to
+  document.
+
+**Two defects, both in the Phase-0 audit rather than in the app**, and both
+found because `22b` §9.2 forbids verifying a claim against a document:
+
+- **`D-18`** — `22d` §5 said the write audit records the requesting client.
+  `client_id` is resolved per call, but `mcp_write_audit` is
+  `(user_id, tool, args_hash, summary, created_at)` and `recordMcpWrite()` has
+  no parameter for one. Ch. 3 claims the action, the summary and the time; a
+  chapter written from the audit would have promised a reader something the
+  table cannot give them.
+- **`D-19`** — `22d` §7 K1 called the connector's e1RM caveat stale. It is
+  self-contradicting: one response carries *"Epley-based estimates"* in
+  `data_quality` and *"RIR-folded Epley·Brzycki"* in its own
+  `metric_definitions`. That is a better argument for the one-line fix than
+  staleness was, and it is filed for a separate PR — Phase 6 is documentation
+  only.
+
+**Two things nobody planned.** `GUIDE_SECTION_IDS` had listed every User Guide
+section since Phase 3 and nothing said so, so it gained a completeness test —
+a new section is now a link target the moment it exists. And the connector
+page's two links into the manual live in their own module as literal strings:
+literals because the page is outside D3's import allowlist, their own module
+because a Next route file may only export what Next reserves, which is a rule I
+found by exporting a constant from `page.tsx` and watching the build refuse it.
+
+**Housekeeping.** Registry suite parameterized over both manuals, guard 3 widened
+to both reading routes, `MAY_SAY_MCP` at its second and final entry,
+`unreleased.ts` gained `ai-manual`, ch. 18's Phase-3i forward debt paid, and
+`22d` §11.4 records the Phase-6 re-verification (58 / 17 / 41 / 4, unchanged).
+
 ## 2026-08-12 — Session 115: the connector can read the manual (N74)
 
 Doc 22 **Phase 5** — `workout://user-guide-index`, `search_manual`,
