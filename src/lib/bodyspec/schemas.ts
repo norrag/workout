@@ -80,7 +80,7 @@ export type BodySpecScanInfo = z.infer<typeof scanInfoSchema>;
 
 export const compositionSchema = z.object({
   total: bodyRegionSchema,
-  regions: z.record(bodyRegionSchema),
+  regions: z.record(z.string(), bodyRegionSchema),
   android_gynoid_ratio: z.number().nullish(),
 });
 export type BodySpecComposition = z.infer<typeof compositionSchema>;
@@ -100,11 +100,11 @@ export const percentilesSchema = z.object({
   params: z
     .object({
       gender: z.string().optional(),
-      reference_age_range: z.record(z.number()).optional(),
+      reference_age_range: z.record(z.string(), z.number()).optional(),
       reference_dataset_size: z.number().optional(),
     })
     .optional(),
-  metrics: z.record(percentileMetricSchema),
+  metrics: z.record(z.string(), percentileMetricSchema),
 });
 export type BodySpecPercentiles = z.infer<typeof percentilesSchema>;
 

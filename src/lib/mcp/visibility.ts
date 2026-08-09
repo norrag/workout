@@ -1,6 +1,10 @@
 import "server-only";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ListToolsRequest,
+  ListToolsResult,
+  McpServer,
+  ServerContext,
+} from "@modelcontextprotocol/server";
 import { getProfile } from "@/lib/queries/profiles";
 import { resolveSession, type McpExtra } from "./session";
 import { ADMIN_TOOL_NAMES } from "./tools/admin";
@@ -18,12 +22,16 @@ import { ADMIN_TOOL_NAMES } from "./tools/admin";
  * handler can't be captured, we leave the stock handler in place: admin tools
  * become visible again but never callable — fail open on visibility, never on
  * access.
+ *
+ * Spec 2026-07-28 makes `tools/list` a *cacheable* result. Because this listing
+ * varies by principal, its cache hint must stay `cacheScope: "private"` — a
+ * shared cache would serve one caller's listing to another. That hint is set
+ * explicitly in `src/app/api/mcp/route.ts`; it is also the SDK default.
  */
-type ListedTool = { name: string };
 type ListHandler = (
-  request: unknown,
-  extra: unknown,
-) => Promise<{ tools: ListedTool[] }> | { tools: ListedTool[] };
+  request: ListToolsRequest,
+  ctx: ServerContext,
+) => Promise<ListToolsResult> | ListToolsResult;
 
 export function scopeAdminToolVisibility(server: McpServer) {
   const handlers = (
@@ -34,17 +42,16 @@ export function scopeAdminToolVisibility(server: McpServer) {
   const original = handlers?.get("tools/list");
   if (!original) return;
 
-  server.server.setRequestHandler(
-    ListToolsRequestSchema,
-    async (request, extra) => {
-      const result = await original(request, extra);
-      if (await isAdminSession(extra as McpExtra)) return result;
-      return {
-        ...result,
-        tools: result.tools.filter((t) => !ADMIN_TOOL_NAMES.has(t.name)),
-      };
-    },
-  );
+  // v2 keys request handlers by method string; the request schemas that the 1.x
+  // overload took are no longer public API.
+  server.server.setRequestHandler("tools/list", async (request, ctx) => {
+    const result = await original(request, ctx);
+    if (await isAdminSession(ctx as McpExtra)) return result;
+    return {
+      ...result,
+      tools: result.tools.filter((t) => !ADMIN_TOOL_NAMES.has(t.name)),
+    };
+  });
 }
 
 async function isAdminSession(extra: McpExtra): Promise<boolean> {

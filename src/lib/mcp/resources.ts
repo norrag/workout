@@ -1,5 +1,5 @@
 import "server-only";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { getCurrentState } from "@/lib/queries/cycles";
 import { getProfile } from "@/lib/queries/profiles";
 import { resolveSession, type McpExtra } from "./session";
@@ -40,6 +40,18 @@ function guardResource<A extends unknown[], R>(
  * (05 §Resources). Each resolves identity from the session; the data shapes
  * match the tool surface so analysis in chat is consistent either way.
  */
+/**
+ * Cache hint for the two resources that carry no user data (spec 2026-07-28
+ * made `resources/read` cacheable). They change only when the app is
+ * redeployed, so an hour in a shared cache saves re-sending a large body on
+ * every connection. Every user-scoped resource deliberately omits this and
+ * falls back to the private, uncached default set in the route handler.
+ */
+const STATIC_RESOURCE_CACHE = {
+  ttlMs: 3_600_000,
+  cacheScope: "public",
+} as const;
+
 export function registerResources(server: McpServer) {
   server.registerResource(
     "profile",
@@ -107,6 +119,9 @@ export function registerResources(server: McpServer) {
         "the §9 honesty guardrails — the depth behind the server instructions. " +
         "Read it to interpret metrics the way the engine intends.",
       mimeType: "text/markdown",
+      // Static app content, identical for every reader and changing only on
+      // deploy, so the 2026-07-28 revision lets a shared cache hold it.
+      cacheHint: STATIC_RESOURCE_CACHE,
     },
     guardResource("coaching-guide", async (uri: URL) => ({
       contents: [
@@ -144,6 +159,7 @@ function registerGuideIndex(server: McpServer) {
         "sections against a question and get_manual_section to read one. No " +
         "user data — the guide is the same for every reader.",
       mimeType: "application/json",
+      cacheHint: STATIC_RESOURCE_CACHE,
     },
     guardResource("user-guide-index", async (uri: URL) => ({
       contents: [

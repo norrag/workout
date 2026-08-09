@@ -2,7 +2,7 @@ import "server-only";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { supabasePublicEnv } from "@/lib/env";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { AuthInfo } from "@modelcontextprotocol/server";
 import type { Database } from "@/lib/types/database";
 
 /**

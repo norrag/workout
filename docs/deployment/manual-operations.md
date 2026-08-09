@@ -635,6 +635,28 @@ prescription moved with no explanation. Full checklist:
 
 ---
 
+### Adopt CIMD once Supabase supports it (MCP 2026-07-28, DCR deprecation)
+
+The stateless MCP revision deprecates **Dynamic Client Registration** — which
+the connector's OAuth clients use today via Supabase's OAuth 2.1 server — in
+favour of **Client ID Metadata Documents** (the client identifies itself with an
+HTTPS URL serving its metadata). Deprecation carries a **twelve-month** support
+window from 2026-07-28, so nothing is broken now.
+
+This is not a code change here: `/api/mcp` is a pure resource server, and CIMD
+is implemented and advertised by the **authorization server**. Nothing to do
+until Supabase ships it.
+
+- **Check:** does `https://<project>.supabase.co/auth/v1/.well-known/oauth-authorization-server`
+  advertise `client_id_metadata_document_supported: true`?
+- **When it does:** confirm connector clients still register/authorize
+  end-to-end, then note it here. Re-check before **July 2027**, when DCR's
+  support window closes.
+- Related hardening in the same revision (also authorization-server side): RFC
+  9207 issuer validation and the `application_type` registration parameter.
+
+---
+
 ## How Claude flags these
 
 In PRs and PROGRESS entries, remaining human steps are listed under a

@@ -4,8 +4,47 @@ The MCP connector lets users plug their training data into the LLM of their choi
 
 ## Transport & hosting
 
-- MCP server implemented with `@modelcontextprotocol/sdk`, **Streamable HTTP** transport, hosted at `/api/mcp` in the Next.js app (same deployment, shared code).
+- MCP server implemented with the **v2 TypeScript SDK** (`@modelcontextprotocol/server`) behind `mcp-handler`, hosted at `/api/mcp` in the Next.js app (same deployment, shared code).
 - Works with any remote-MCP-capable client (Claude.ai connectors, Claude Code, etc.).
+
+### Protocol revision 2026-07-28 (stateless)
+
+The connector speaks the **stateless** MCP revision. The protocol is plain
+request/response: there is **no `initialize`/`initialized` handshake** and **no
+`Mcp-Session-Id`**, so any instance can answer any request and the endpoint sits
+behind an ordinary round-robin load balancer with no shared state. What this
+means for the implementation:
+
+- **A server per request.** `createMcpHandler` builds a fresh `McpServer` for
+  every request; nothing is carried between calls. Identity therefore lives only
+  in the per-request context — `ctx.http.authInfo`, resolved by `resolveSession`
+  (it was a top-level `extra.authInfo` under the 1.x SDK).
+- **Client identity travels in the request.** Protocol version, client info and
+  client capabilities arrive in each request's reserved `_meta` envelope
+  (`io.modelcontextprotocol/protocolVersion`, `…/clientInfo`,
+  `…/clientCapabilities`) instead of being established once at handshake.
+  `server/discover` is the optional capability negotiation that replaces it.
+- **Header-based routing.** Every request carries `MCP-Protocol-Version` and
+  `Mcp-Method`, plus `Mcp-Name` naming the target (the tool name for
+  `tools/call`, the URI for `resources/read`), so gateways can route and
+  rate-limit without parsing the body. The SDK **rejects with 400** a request
+  whose headers and body disagree.
+- **Cacheable results.** `tools/list`, `resources/list` and `resources/read`
+  carry `ttlMs`/`cacheScope`. Our `tools/list` is filtered per principal (admin
+  visibility) and the user-scoped resources are per-user, so both are pinned
+  `private`/`ttlMs: 0`; the two static resources (`workout://coaching-guide`,
+  `workout://user-guide-index`) carry no user data and are `public` for an hour.
+- **SSE is gone**, and with it the Redis dependency the old transport needed.
+  GET/DELETE — the 2025 session operations — answer `405`.
+- **Backwards compatible.** 2025-era Streamable HTTP clients are still served
+  from the same handler through the SDK's stateless legacy fallback, so existing
+  connectors keep working.
+- Deprecated in this revision with a twelve-month support window (none of which
+  this connector uses): **roots, sampling, logging**, the legacy HTTP+SSE
+  transport, and **Dynamic Client Registration** (see Auth below).
+
+`src/lib/mcp/__tests__/protocol.test.ts` drives the real handler over genuine
+requests of both eras and is the conformance guard for all of the above.
 
 ## Auth
 
@@ -13,6 +52,17 @@ The MCP connector lets users plug their training data into the LLM of their choi
 - Every tool/resource call resolves identity from the token session. **No tool accepts a `user_id` parameter** — the model can never address another user's data.
 - Data access uses an RLS-scoped client where possible; where service-role is required, queries are explicitly filtered by the session's `user_id`.
 - Tokens are revocable from More → AI connector (fig 4.4).
+
+> **DCR → CIMD (2026-07-28).** The revision deprecates **Dynamic Client
+> Registration** in favour of **Client ID Metadata Documents** — the OAuth client
+> identifies itself with an HTTPS URL serving its metadata — and hardens
+> authorization with RFC 9207 issuer validation and an `application_type` at
+> registration. Both are **authorization-server** concerns: `/api/mcp` is a pure
+> resource server, so nothing here changes, and the deprecation carries a
+> twelve-month support window. Adopting CIMD depends on Supabase advertising
+> `client_id_metadata_document_supported` in its RFC 8414 metadata; until then
+> DCR keeps working. Tracked in
+> [`deployment/manual-operations.md`](deployment/manual-operations.md).
 
 > **Implementation approach (2026-06-16 planning).** Use Supabase's native **OAuth 2.1
 > Server** as the authorization server: it provides authorization-code + PKCE, **dynamic

@@ -254,7 +254,9 @@ describe("edit_mesocycle tool", () => {
     const schema = tools.get(EDIT_MESOCYCLE)!.config.inputSchema as {
       operations: { parse: (v: unknown) => unknown };
     };
-    const slot = "22222222-2222-2222-2222-222222222222";
+    // zod 4's `.uuid()` enforces the RFC 9562 version/variant nibbles, so the
+    // placeholder has to be a well-formed v4 (as in logging/queue.test.ts).
+    const slot = "22222222-2222-4222-8222-222222222222";
     expect(() =>
       schema.operations.parse([
         { op: "set_exercise_rir", slot_id: slot, rir: 4, weeks: [3, 4], reason: "elbow" },

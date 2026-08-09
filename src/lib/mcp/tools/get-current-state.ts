@@ -1,5 +1,5 @@
 import "server-only";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { getCurrentState, type CurrentState } from "@/lib/queries/cycles";
 import { resolveSession, type McpExtra } from "../session";
 import { toolResult } from "../envelope";

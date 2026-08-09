@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { initializeMcpServer, MCP_SERVER_NAME, MCP_SERVER_VERSION } from "../server";
 import { ADMIN_TOOL_NAMES } from "../tools/admin";
 import { fakeAuthInfo, fakeExtra } from "./harness";
