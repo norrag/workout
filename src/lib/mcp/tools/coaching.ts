@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProfileRow, VMesoSummaryRow } from "@/lib/types/database";
 import { assessMuscleVolume, type EngineParams, type ExperienceLevel } from "@/lib/engine";
 import { getActiveEngineParams } from "@/lib/queries/generation";

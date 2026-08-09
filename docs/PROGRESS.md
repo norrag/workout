@@ -9365,3 +9365,66 @@ Full suite green (563, +3), typecheck + lint + production build clean.
   dashboard-only setting, tracked in `manual-operations.md`).
 
 No application code changed (view columns unchanged → no type regeneration).
+
+## 2026-08-09 — MCP connector on the stateless spec (2026-07-28) + SDK v2
+
+The MCP spec turned the protocol from a bidirectional stateful one into
+stateless request/response. The connector now speaks it.
+
+**Dependencies.** `@modelcontextprotocol/sdk@1.26.0` → `@modelcontextprotocol/server@^2.0.0`
+(the v2 SDK is split into per-role packages), `mcp-handler@^1.1.0` → `^2.1.0`,
+and `zod@^3.25.0` → `^4.2.0` (the v2 SDK requires zod 4). The Redis dependency
+the old SSE transport needed is gone from the tree with it.
+
+**Protocol.** No `initialize` handshake and no `Mcp-Session-Id`: a fresh server
+is built per request, so identity now resolves from `ctx.http.authInfo` rather
+than a top-level `extra.authInfo`. Client version/info/capabilities arrive in
+each request's reserved `_meta` envelope, with `server/discover` as the optional
+negotiation that replaces the handshake. `Mcp-Method`/`Mcp-Name` headers make
+the call routable without parsing the body — and a header/body disagreement is a
+400. GET/DELETE (the 2025 session operations) answer 405. **2025-era clients are
+still served from the same handler** through the SDK's stateless legacy
+fallback, so existing connectors keep working.
+
+**Cacheable results** are new in this revision. `tools/list` is filtered per
+principal (PH33 admin visibility) and the user-scoped resources are per-user, so
+both are pinned `private` / `ttlMs: 0` — a shared cache would serve one caller's
+view to another. The two resources that carry no user data
+(`workout://coaching-guide`, `workout://user-guide-index`) are `public` for an
+hour, which stops a large static body being re-sent on every connection.
+
+**API migration.** `registerTool`/`registerResource` were already the v2 shape,
+and raw-shape `inputSchema`s are still auto-wrapped, so the 58 tool
+registrations needed no edits. `visibility.ts` moved to the string-method
+`setRequestHandler("tools/list", …)` (the request-schema overload is no longer
+public API) and now types against the SDK's real `ListToolsResult` instead of a
+hand-rolled `{ name }` placeholder.
+
+**zod 4 fallout**, all outside the MCP layer:
+- `required_error` is removed → an `error` customizer narrowed on
+  `input === undefined` (`src/lib/env.ts`), preserving the old wording.
+- An enum-keyed `z.record` is now **exhaustive**; zod 3 accepted a subset. The
+  three affected `engine_params` fields moved to `z.partialRecord` to preserve
+  runtime semantics exactly — an exhaustive schema would fail any historical row
+  missing a key and flip its `is_replayable` / `params_hash`. Every reader
+  already falls back on a missing key (`params.rounding[eq] ?? step`), so the
+  now-`Partial` type needed no code changes.
+- `z.record(v)` requires an explicit key type (`src/lib/bodyspec/schemas.ts`).
+- `.uuid()` now enforces the RFC 9562 version/variant nibbles. Real IDs are
+  Postgres v4 UUIDs and pass; one synthetic test placeholder was not well-formed
+  and was corrected. This is a genuine (and welcome) tightening at the tool
+  boundary.
+
+**New:** `src/lib/mcp/__tests__/protocol.test.ts` — conformance against the
+**real** handler (every tool and resource registered) over genuine requests of
+both protocol eras, rather than the stubbed server the per-tool suites use. It
+covers the stateless listing, `server/discover`, the header/body agreement rule,
+cache scopes, admin-tool hiding, hard rule #5 (no `user_id` on any tool), the
+405s, and the legacy fallback. It is what will catch the next SDK upgrade that
+type-checks but no longer serves.
+
+Typecheck, lint, production build clean; suite green at 1935 (+12).
+
+**Remaining / external:** adopting **CIMD** (this revision deprecates DCR, with a
+twelve-month window) waits on Supabase's authorization server advertising it —
+no code change here, tracked in `deployment/manual-operations.md`.

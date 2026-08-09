@@ -17,12 +17,18 @@ import { z } from "zod";
  * it to `src/lib/supabase/service.ts`.
  */
 
+// zod 4 replaced `required_error` with a single `error` customizer; narrowing on
+// `input === undefined` keeps the "missing" wording for an unset var only, and
+// returning undefined defers to zod's default message for a wrong-typed one.
+const missingVar = (issue: { input: unknown }) =>
+  issue.input === undefined ? "missing (check the Vercel env vars)" : undefined;
+
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z
-    .string({ required_error: "missing (check the Vercel env vars)" })
+    .string({ error: missingVar })
     .url("must be a URL (e.g. https://<ref>.supabase.co)"),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
-    .string({ required_error: "missing (check the Vercel env vars)" })
+    .string({ error: missingVar })
     .min(1, "must not be empty"),
 });
 

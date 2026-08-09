@@ -14,6 +14,11 @@ export const runtime = "nodejs";
 // Auth is per-request from the bearer token — never cache.
 export const dynamic = "force-dynamic";
 
+// Spec 2026-07-28: the protocol is stateless request/response — no
+// `initialize` handshake, no `Mcp-Session-Id`, no SSE transport and so no Redis
+// (05 §Transport). `createMcpHandler` builds a fresh server per request and
+// serves 2025-era Streamable HTTP clients from the same handler via the SDK's
+// stateless legacy fallback, so existing connectors keep working.
 const handler = createMcpHandler(
   (server) => {
     initializeMcpServer(server);
@@ -21,12 +26,16 @@ const handler = createMcpHandler(
   {
     serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
     instructions: MCP_INSTRUCTIONS,
-  },
-  {
-    // Stateless Streamable HTTP at exactly /api/mcp; SSE is retired from the
-    // MCP spec and needs Redis, so it stays off (05 §Transport).
-    streamableHttpEndpoint: "/api/mcp",
-    disableSse: true,
+    // Cache hints for the spec's cacheable results. `tools/list` is filtered
+    // per principal (admin visibility, src/lib/mcp/visibility.ts), so it must
+    // never land in a shared cache; the user-scoped resources are private for
+    // the same reason. Explicit here rather than relying on the SDK default,
+    // because the default is what a future SDK could change.
+    cacheHints: {
+      "tools/list": { ttlMs: 0, cacheScope: "private" },
+      "resources/list": { ttlMs: 0, cacheScope: "private" },
+      "resources/read": { ttlMs: 0, cacheScope: "private" },
+    },
     verboseLogs: process.env.NODE_ENV !== "production",
   },
 );

@@ -1,5 +1,5 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { McpServer } from "@modelcontextprotocol/server";
+import type { AuthInfo } from "@modelcontextprotocol/server";
 import type { McpExtra } from "../session";
 
 /**
@@ -63,7 +63,12 @@ export function fakeAuthInfo(userId: string, token = "test.jwt.token"): AuthInfo
   };
 }
 
-/** An MCP handler `extra` with the given (or no) auth context. */
+/**
+ * An MCP handler context with the given (or no) auth context. Under SDK v2 the
+ * validated token hangs off `http.authInfo`, so an unauthenticated call is
+ * `http` present with no `authInfo` — the shape `withMcpAuth` produces when it
+ * lets a request through without one.
+ */
 export function fakeExtra(authInfo?: AuthInfo): McpExtra {
-  return { authInfo } as unknown as McpExtra;
+  return { http: { authInfo } } as unknown as McpExtra;
 }

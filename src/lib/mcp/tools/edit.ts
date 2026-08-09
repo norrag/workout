@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, WorkoutRow } from "@/lib/types/database";
 import { getProfile } from "@/lib/queries/profiles";

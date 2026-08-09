@@ -79,7 +79,13 @@ export const phaseNames = [
 
 // loadable step / progression jump per equipment, in pounds — the app records
 // and prescribes exclusively in imperial units.
-const perEquipmentStep = z.record(
+//
+// `partialRecord`, not `record`: zod 4 made an enum-keyed `z.record` exhaustive
+// (every key required), where zod 3 accepted a subset. Every reader already
+// falls back on a missing key (`params.rounding[eq] ?? step`), and a historical
+// `engine_params` row that omits an equipment key must keep parsing — an
+// exhaustive schema would fail it and flip its `is_replayable` / `params_hash`.
+const perEquipmentStep = z.partialRecord(
   z.enum(equipmentTypes),
   z.number().min(0),
 );
@@ -106,11 +112,14 @@ export const engineParamsSchema = z.object({
   // any more; progression is anchor-only (rep-window + bodyweight; hold without an
   // anchor).
   increment: perEquipmentStep,
-  experience_increment_scale: z.record(
+  // `partialRecord` for the same reason as `perEquipmentStep` above: these two
+  // are parsed only so historical rows still materialize, so they must stay as
+  // permissive as the zod 3 schema that wrote them.
+  experience_increment_scale: z.partialRecord(
     z.enum(experienceLevels),
     z.number().positive(),
   ),
-  progression_style: z.record(
+  progression_style: z.partialRecord(
     z.enum(goalTypes),
     z.enum(["load_first", "reps_first", "hold"]),
   ),
