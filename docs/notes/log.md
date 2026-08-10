@@ -4,6 +4,58 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-10 — Session 119: the v26 drift pass (N70 activation → N74 prose)
+
+> **On the date:** this entry sits above entries dated 2026-08-11 → 15 because it
+> is the newest session, and its date is the one the **database** gives —
+> `mcp_write_audit` timestamps the v26 activation at 2026-08-10 18:05 UTC and the
+> session ran after it. The doc-side dates from sessions 114–118 run ahead of that
+> clock. Left as found rather than renumbered: the ordering here is by session,
+> and the DB timestamps are the checkable ones.
+
+**Trigger: an owner question, not a task.** *"Aren't backed-off sets excluded
+from the strength anchor?"* — with the expectation that work at 8 RIR or above
+leaves the anchor, work at 3 RIR or below earns progression, and 7–4 RIR anchors
+without earning. That is `D-20` almost verbatim, asked again three days later —
+except that in between **the owner activated `engine_params` v26**, so the answer
+had changed underneath the manual.
+
+**What is actually true** (verified against the live row and the code, not the
+specs): the anchor's only per-sample exclusion is the measuring band, now live at
+`e1rm.max_measuring_rir: 8`, so a set leaves the anchor **above 8** — not at 8,
+and by absolute assumed RIR rather than by being backed off. Backed-off sets
+inside the band still anchor, on purpose (doc 21 §5: excluding them freezes the
+anchor and makes the return prescription jump to full load). They do leave the
+strength *trend*, `best_e1rm` and the PR views — doc 21 §6.2, a different rule,
+live since 2026-08-04. Progression is refused for **any** backed-off slot by name
+(`progression.ts:251`, reason `exercise_rir`) before confidence is even consulted;
+the 4-and-above story is the confidence floor, and it only bites when that session
+is the anchor's winning sample. So the owner's outcome intuition was right in all
+three parts and the mechanism was wrong in all three.
+
+**The drift pass.** Activating a parameter ages prose with no code diff to review,
+which is a failure mode this area had not seen before: four chapter ground-truth
+headers (chs. 6/7/8/10) and five *deliberately absent* ledger rows were written
+from "v26 is inactive", and `GLOSSARY.e1rm_confidence` was carrying a sentence
+`D-14` had removed for describing exactly this rule. Ch. 8 gained the band as the
+boundary case beyond §6.2 (its centre is unchanged — §6.2 is still the answer to
+"does a protected block read as a decline"); ch. 10 gained the fourth, unrated
+state below the three ratings; the `D-14` sentence came back verbatim off the code
+comment that had preserved it, which is the whole case for recording removed copy
+where the next author will stand. Chs. 6 and 7 still omit the band, now on **seam**
+grounds rather than liveness: their ramp spans 0–5 RIR and a deload 6, so nothing
+they document can reach above 8.
+
+**One finding worth keeping.** The activation classified `release_impact: "fix"`,
+which doc 23 §9.5 only permits when no user-visible number moves — and it held,
+because **no logged set in the database sits above the band** (0 of 11 834). The
+`checkAnnouncement` guard was therefore never exercised: the first activation that
+moves a number is where it bites, and it will refuse without a live announcing
+release (the only release is `1.0.0`). Recorded in `22b` §4.0/§6.3 and in the
+runbook, whose steps ④/⑤ are now closed out with the activation record.
+
+Ledger: [`22a`](../22a-manual-claims.md) **`D-21`**. `22b` **O-B** closed.
+
 ## 2026-08-15 — Session 118: owner review round 6, reconciled onto a moved main (N74)
 
 **Housekeeping first: PR #236 (Phases 3d-r/3d/3f) had already merged**, and `main` had moved a long way past it — Phases 3g, 3h, 3i, 5 and 6 all landed (the whole rest of both manuals), plus an unrelated day-view pass that happened to claim `N82`. Reset the branch onto `main`, reapplied this round's diff (the seven chapter/test files applied cleanly — nothing else had touched them since the merge — and the five shared registries needed manual reconciliation), and renumbered two collisions: `D-15` → `D-20`, `N82` → `N83`.

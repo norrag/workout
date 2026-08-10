@@ -7,9 +7,13 @@
 //   - NO "gains flatten past 1–2 RIR" — the meta-regression found a continuing
 //     gradient, not a plateau. Write the TRADE (review §2.2), which is the
 //     stronger argument and the one doc 10 §4 should have made
-//   - NO measuring band / `max_measuring_rir` — v26 is inactive (22b §4.1 ①).
-//     The live mechanism this chapter uses instead is the CONFIDENCE ladder,
-//     which predates doc 21 and gates the earned step (review §3.1)
+//   - NO measuring band / `max_measuring_rir` — **live since 2026-08-10**
+//     (v26, ledger `D-21`), but out of scope HERE: this chapter's control is
+//     0–5 RIR (review §1), so a ramp choice can never reach a band that starts
+//     above 8. The mechanism this chapter uses is the CONFIDENCE ladder, which
+//     predates doc 21 and gates the earned step (review §3.1). Ch. 8 owns the
+//     lever that reaches the band; doc 22 §5's ch. 7 note (the fourth ramp
+//     interaction) stays answered by that seam, not by liveness
 //   - NO automatic deload, no MRV stop — not implemented (22b §7); ch. 11 owns
 //     what the app actually does week to week
 //   - NO named third-party program — review §6 takes doc 22 O7's recommendation

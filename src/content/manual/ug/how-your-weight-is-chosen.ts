@@ -35,9 +35,18 @@
 // biases" rationale holds only inside the band. Ch. 6 states the rule in its
 // layer 3 (`C-e1rm-03`); this chapter states WHY.
 //
-// NOT LIVE — DO NOT WRITE (22b §4.1 ①): the measuring band, the `none`
-// confidence label, "priced but not measured". `GLOSSARY.e1rm_confidence`
-// carried that sentence and it is corrected in this PR (`D-14`).
+// THE MEASURING BAND IS LIVE (ledger `D-21`, 2026-08-10): v26 activated
+// 2026-08-10 18:05 UTC, so `e1rm.max_measuring_rir` is 8 on the active row and
+// `isMeasuringRir` returns false past it — a set at an assumed RIR above 8 is
+// stamped `none`, carries no estimate, and leaves the anchor and every strength
+// surface while volume keeps it. `GLOSSARY.e1rm_confidence` carries the
+// sentence again (`D-14`'s restore condition, 22b §8 **O-B**), so this chapter
+// renders it through the card and states the rule in its own ladder. Above 8 is
+// reachable only through ch. 8's per-exercise lever (the ramp stops at 5, the
+// deload at 6), which is why only these two chapters carry it.
+//
+// RE-CHECK BEFORE EDITING: true only while `e1rm.max_measuring_rir` is on the
+// ACTIVE row (22b §4.2) — doc 22 **O3** forbids documenting an inactive one.
 //
 // SEAMS: ch. 6 owns effective reps and the honest report; ch. 7 owns the ramp
 // as a choice; ch. 8 owns the per-exercise lever; ch. 11 owns feedback; ch. 13
@@ -160,6 +169,14 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
               ],
             ],
             [[{ strong: "Low" }], "longer than that, easier than that, or logged with no effort reported"],
+            [
+              [{ strong: "Not rated" }],
+              [
+                "further than ",
+                { num: "8" },
+                " reps from failure — the set counts as work and as volume, and the app reads no strength from it",
+              ],
+            ],
           ],
         },
         { kind: "heading", text: "Why two formulas, and why only sometimes" },
@@ -205,7 +222,9 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
                 { code: "e1rm.mod_max_eff_reps" },
                 " / ",
                 { code: "e1rm.mod_max_rir" },
-                " for the bands. An anchor takes the best rating present in its session.",
+                " for the bands, and ",
+                { code: "e1rm.max_measuring_rir" },
+                " for the point past which a set is priced but not measured. An anchor takes the best rating present in its session, and only measured sets reach it.",
               ],
             },
           ],
