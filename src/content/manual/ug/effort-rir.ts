@@ -10,10 +10,14 @@
 //   - the RIR premise is doc 21 §2, NOT doc 11 — a logged set carries the
 //     athlete's own report, and the prescribed target is the fallback:
 //     `assumedRir = rir_reported ?? target_rir` (`engine/predict.ts`)
-//   - every number below is from the active v25 row via 22b §4.2, and carries
-//     its `engine_params` path per doc 22 §8.2
-//   - the measuring band (`e1rm.max_measuring_rir`) is NOT live (22b §4.1 ①)
-//     and is mentioned nowhere in this chapter
+//   - every number below is from the active row via 22b §4.2, and carries its
+//     `engine_params` path per doc 22 §8.2. **v26 superseded v25 on 2026-08-10**
+//     and moved none of them: its only change is `e1rm.max_measuring_rir`
+//   - the measuring band IS live as of that activation (ledger `D-21`), and is
+//     still mentioned nowhere in this chapter — on SEAM grounds now rather than
+//     liveness: the week ramp this chapter owns stops at 5 RIR and the deload at
+//     6, so nothing here can reach a band that starts above 8. Ch. 8 owns the
+//     lever that can, and ch. 10 owns the estimate it stops
 //   - claims are registered in `docs/22a-manual-claims.md`
 
 import type { ManualChapter } from "../types";

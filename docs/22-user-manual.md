@@ -73,9 +73,14 @@ word of user-facing prose is written.**
 
 **2.2 Some documented behavior is not live.** An `engine_params` version can be
 written, tested, and merged and still be switched off, because activation is a
-separate owner-gated step (`docs/deployment/manual-operations.md`). Today that
-describes **v26 — the doc 21 §6.1 measuring band**, which ships complete and
-inert. Per **O3**, the manual documents live behavior only.
+separate owner-gated step (`docs/deployment/manual-operations.md`). Until
+2026-08-10 that described **v26 — the doc 21 §6.1 measuring band**, which shipped
+complete and inert; **v26 is now active and nothing on the list is inactive**.
+Per **O3**, the manual documents live behavior only — which cuts both ways, and
+the second cut is the expensive one: an activation makes prose that was correct
+when written **incomplete**, silently, with no code diff to review. The band's
+own activation did exactly that to four chapters and five ledger rows
+([`22a`](./22a-manual-claims.md) `D-21`).
 
 > **Amended 2026-08-06/07** (Phase 0a, then folded in here at Phase 1 per
 > [`22b`](./22b-source-map.md) §8 **O-D**). This paragraph originally named
@@ -312,7 +317,7 @@ one that will be missed if not called out.
 - **Why it exists** — the week's RIR ramp is one number for the whole week, and real training has exceptions. Origin case (worth telling, because it explains the design): a live nerve episode where a coach-agreed rehab plan had nowhere to live.
 - **The semantics**, in plain language: an assignment is **absolute** — set it and it wins, leave it unset and the exercise follows the week's ramp. It is **unbounded**, so one lever spans deload → rehab → extra effort. The load is repriced through the normal rep-window path, **symmetrically** — backing off and pushing harder are the same mechanism in opposite directions, not two features.
 - **Use case A — lower the effort (rehab, a niggle, a lift you are protecting).** Assign a higher target RIR; the load reprices down; the sets still count as work and volume, and **a protected block does not read as a decline** — a slot run easier than its week is tagged `BACKED OFF`, dropped from PRs, `best_e1rm` and the strength trend (from both sides, so it can neither set a PR nor raise the bar), kept in volume and adherence, and disclosed in one sentence wherever the number appears. How to unwind it when you are ready.
-  > **Source note (Phase 0a, folded in at Phase 1).** That reassurance is doc 21 **§6.2** — the read-time comparability policy, which **is live**. Write the chapter from it. The **measuring band** (§6.1, `max_measuring_rir`) is a *different* rule — asked at the stamp, *is this a measurement at all* — and it ships **inactive** as v26, so today every set at every RIR is still treated as a measurement. Ch. 8 must not mention the band until v26 activates. [`22b`](./22b-source-map.md) §4.1 ①.
+  > **Source note (Phase 0a, folded in at Phase 1; amended 2026-08-10).** That reassurance is doc 21 **§6.2** — the read-time comparability policy — and it is what the chapter is built around. The **measuring band** (§6.1, `max_measuring_rir`) is a *different* rule, asked at the stamp: *is this a measurement at all*. It shipped **inactive** as v26 and **went live 2026-08-10**, so ch. 8 now carries both: §6.2 as the reassurance, the band as the boundary case past it (a target further than 8 reps from failure is priced and performed but not measured). Ch. 10 states the same rule as a fourth, unrated rating. Chs. 6 and 7 still omit it, because their ramp spans 0–5 RIR and cannot reach it. [`22b`](./22b-source-map.md) §4.1 ①, [`22a`](./22a-manual-claims.md) `D-21`.
 - **Use case B — raise the effort (a muscle the standard ramp does not limit).** The owner's case: systemic fatigue is not the constraint on small isolation work the way it is on heavy compounds, so a week sitting at 3 RIR can leave stimulus unclaimed on those exercises. Assign a lower target RIR. Cover the per-exercise set cap and the honest caveat that this buys stimulus with fatigue.
 - **The scopes** — `THIS WEEK` / `WORKING WEEKS` / `ALL WEEKS` — what each reaches, and specifically how they differ on deload coverage.
 - **Where the lever lives** — the day view and the exercise sheet, plus the planner board's flat column and why a per-week assignment reads `RIR BY WEEK` there instead of being flattened (N78). Phase 0b re-confirms these surfaces post-Batch-32.
@@ -337,7 +342,7 @@ Prose is written from that review, not from the open web.
 - **3 → 0 is a default, not a law**, and where in the app the ramp is set (meso create/edit start → end RIR).
 - **The relationship** — proximity to failure buys stimulus and costs fatigue, but not linearly: gains flatten past roughly 1–2 RIR while fatigue keeps climbing (Refalo 2023). "Closer to failure" is therefore not monotonically better, which is *why* the app ramps rather than sitting at 0.
 - **Ramps as style**, with the trade-off named for each: a conservative high-volume ramp (more sets tolerated, lower per-set fatigue); the standard hypertrophy ramp; a strength-biased pattern (closer to failure on the lifts that matter, effort spared elsewhere — usually expressed as a flatter ramp *plus* per-exercise assignments, which links chapter 8); a flat high-RIR ramp for maintenance or rehab.
-- **How ramp choice interacts with everything else** — set counts and deload timing. *(The fourth interaction — how much of your data is usable as a strength measurement — belongs here only once v26 activates; see §6.2's source note.)*
+- **How ramp choice interacts with everything else** — set counts and deload timing. *(The fourth interaction — how much of your data is usable as a strength measurement — stays out of this chapter even now that v26 is live, on seam grounds: the ramp control spans 0–5 RIR, so no ramp choice can reach a band that starts above 8. Ch. 8's lever is the only way there. See §6.2's source note.)*
 
 **Constraint on the "example programs" ask (open question O7).** Naming
 third-party published programs means making checkable claims about someone else's
@@ -839,6 +844,10 @@ whether the manual is correct.**
 > rationale, and §6.1's MRV-stop claim — each corrected inline above. Two items
 > now block one chapter each: **O-A** (`LLM_EXPLANATIONS` mode → ch. 17) and
 > **O-B** (v26 activation → ch. 8); neither blocks Phase 1.
+>
+> **O-B closed 2026-08-10** — the owner activated v26 after ch. 8 shipped, so the
+> chapter was written from the live §6.2 policy and gained the band afterwards in
+> a drift pass ([`22a`](./22a-manual-claims.md) `D-21`). O-A remains open.
 
 | Phase | Scope | Output | Size |
 |---|---|---|---|
@@ -1172,6 +1181,9 @@ contracts green.
 > Per [`22b`](./22b-source-map.md) §4.1 ①, the **measuring band appears nowhere**
 > — v26 is inactive, so today every logged set at every RIR is still treated as a
 > measurement, and ch. 8 gains the band in the release that activates it (**O-B**).
+> *(Amended 2026-08-10: v26 activated, and the band was added to ch. 8 as the
+> boundary case beyond §6.2 — `D-21`. The paragraph above stands as the record of
+> what the chapter was written from.)*
 >
 > **Ch. 9 is the chapter the specs would have got wrong.** Doc 22 §6.1's own
 > *"MRV-stop rule"* is not implemented, and doc 10 §3's graded volume ramp with
@@ -1229,7 +1241,10 @@ contracts green.
 > chapter to render that card: [§8.1](#81-the-glossary-is-one-source-not-two)
 > forces the manual to carry the app's own words and **O3** forbids documenting
 > inactive behavior, and the two contracts collided on one sentence. Removed,
-> with a code comment carrying the exact text to restore when v26 activates. It
+> with a code comment carrying the exact text to restore when v26 activates.
+> *(Restored 2026-08-10 — v26 activated and the comment made the revert a single
+> edit, which is the case for recording removed copy where the next author will
+> stand: `D-21`.)* It
 > is the third defect §8.1 has caught in a card the manual was about to render,
 > and the first found by **O3** rather than by the copy rules. The card has no
 > `InfoDot` call site, so no reader had seen it.
@@ -1300,7 +1315,11 @@ contracts green.
 >   weight during a back-off is the **confidence ladder**. Recorded as
 >   [`22a`](./22a-manual-claims.md) **`D-20`**, and it is the strongest argument
 >   yet for the chapter existing: the person who specified the feature held the
->   inactive rule as their mental model.
+>   inactive rule as their mental model. *(Amended 2026-08-10: they then activated
+>   it. The rule now exists — above 8 assumed RIR, not "8 or above", and keyed on
+>   the effort performed rather than on the back-off — and the chapter says so.
+>   Everything else in this note holds: 4–8 RIR still anchors, and confidence is
+>   still what holds the weight. `D-21`.)*
 > - **Ch. 9 lost a section and gained a control.** *What a deload is* and *when
 >   you need one* merged, the *valve* / *shedding* / *performance debt* framing
 >   went, and the chapter now documents what the first draft had missed outright:

@@ -14,22 +14,33 @@
 //   - §6.2 read-time policy is LIVE. `best_e1rm` (v_exercise_overview,
 //     v_meso_summary) and the best-set PR view drop backed-off sets;
 //     `weight_pr` / `volume_pr` / `total_volume` / `times_trained` keep them
-//   - **backed-off sets STAY IN THE ANCHOR** (`queries/anchors.ts` — the only
-//     exclusion is `isMeasuringRir`, and v26 is inactive, so nothing is
-//     dropped today). Doc 21 §5 is explicit about why: excluding them would
-//     freeze the anchor and make the return prescription jump straight back to
-//     full load. What actually holds the weight during a back-off is the
-//     CONFIDENCE ladder — a set more than 3 RIR from failure is `low`, and
-//     `progression.min_confidence` is `moderate` (ledger `D-20`)
+//   - **backed-off sets STAY IN THE ANCHOR up to the measuring band**
+//     (`queries/anchors.ts` — the only per-sample exclusion is
+//     `isMeasuringRir`). Doc 21 §5 is explicit about why they are kept:
+//     excluding them would freeze the anchor and make the return prescription
+//     jump straight back to full load. What holds the weight during a shallow
+//     back-off is the CONFIDENCE ladder — a set more than 3 RIR from failure is
+//     `low`, and `progression.min_confidence` is `moderate` (ledger `D-20`)
+//   - **the measuring band is LIVE** — v26 activated 2026-08-10 18:05 UTC
+//     (`params_hash 6dd02244…`, `e1rm.max_measuring_rir: 8`), so a set at an
+//     assumed RIR ABOVE 8 is priced and performed but not measured: stamp
+//     `none`, out of the anchor and every strength surface, kept in volume
+//     (doc 21 §6.1). Nine is reachable only through THIS chapter's lever — the
+//     week ramp tops out at 5 and the deload at 6 — which is why the band is
+//     written here and in ch. 10 and nowhere else (ledger `D-21`)
+//   - the two rules are different questions and both are on: §6.1 asks *is this
+//     a measurement at all* (at the stamp), §6.2 asks *is it comparable* (at
+//     read time). A set can be inside the band and still backed off
 //   - the earn gate refuses explicitly — `progression.ts:251`, reason
 //     `exercise_rir`
 //   - the set cap and rep position are CONNECTOR-set, read-only in the sheet
 //     (`SET BY YOUR COACH`); `cappedSets` lets an authored cap go BELOW
 //     `min_sets`; the global ceiling is `max_sets_per_exercise` (6)
 //
-// NOT LIVE — DO NOT WRITE (22b §4.1 ①): the measuring band,
-// `max_measuring_rir`, "priced but not measured", and — per `D-20` — any claim
-// that easy sets are kept out of the anchor.
+// RE-CHECK BEFORE EDITING: every band sentence below is true only while
+// `e1rm.max_measuring_rir` is on the ACTIVE `engine_params` row (22b §4.2).
+// Doc 22 **O3** forbids documenting a parameter that is not live — which is
+// exactly why this prose was absent until 2026-08-10.
 //
 // VOICE (doc 22 §8.4e, owner review round 6): say what the lever does, what it
 // is for, how to use it, and which values change behavior. No origin story, no
@@ -216,7 +227,10 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
             ["your strength trend, and your best estimated strength", "left out"],
             ["records for the exercise and the block", "left out"],
             ["weekly sets per muscle, volume, weight and session records", "counted — those are things you did"],
-            ["the anchor your next weight is priced from", "counted, and the reason is below"],
+            [
+              "the anchor your next weight is priced from",
+              "counted while the target stays within reach of failure, and the reason is below",
+            ],
           ],
         },
         { kind: "heading", text: "Why easy sets still anchor" },
@@ -234,11 +248,35 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
             " or closer.",
           ],
         },
+        { kind: "heading", text: "Past a very easy target, nothing is measured" },
+        {
+          kind: "para",
+          text: [
+            "Set a target further than ",
+            { num: "8" },
+            " reps from failure and the app treats those sets as work rather than as a reading: priced and performed as usual, counted in your volume, and left out of any strength estimate. Your anchor holds at the last session it genuinely measured, so you come back to the weight you last earned.",
+          ],
+        },
         {
           kind: "callout",
           tone: "honesty",
           label: "One direction only",
           text: "An exercise run harder than its week keeps every claim it earns — those sets stay in your trend and can set records. Only the easier direction is set aside, because that is the one that would otherwise look like decline.",
+        },
+        {
+          kind: "detail",
+          blocks: [
+            {
+              kind: "para",
+              text: [
+                "The reading cutoff is ",
+                { code: "e1rm.max_measuring_rir" },
+                ". Past it a set is stored with no estimate and a rating of ",
+                { ui: "none" },
+                ", which is what keeps it out of the anchor and out of every strength surface while volume and adherence still count it. It is measured against the effort the set was performed at — your own report where you gave one, the prescribed target otherwise.",
+              ],
+            },
+          ],
         },
       ],
       related: [

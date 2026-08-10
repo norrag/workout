@@ -18,9 +18,11 @@ documents live behavior only (O3)."*
 > and [§4](#4-the-live-behavior-ledger) first.**
 
 **The headline finding:** doc 22 §2.2's own inactive-behavior list is **stale**.
-v20 and v23 are both **live**. The genuinely-inactive behavior is a different
-one — **the measuring band (v26)** — and it sits underneath a chapter doc 22
-§6.2 says must be written. See [§4](#4-the-live-behavior-ledger).
+v20 and v23 are both **live**. The one genuinely-inactive behavior it missed was
+a different one — **the measuring band (v26)** — which sat underneath a chapter
+doc 22 §6.2 says must be written. **v26 was activated 2026-08-10, so nothing on
+that list is inactive any more**; the ledger, not this paragraph, is the
+authority on any given day. See [§4](#4-the-live-behavior-ledger).
 
 ---
 
@@ -83,7 +85,7 @@ would otherwise pick up.
 | **Progression (earned step, pacer, earn gate)** | `docs/16-prescribed-progression.md` | `13-reps-prescription-unification.md`, `04`, `A-engine-metrics.md` §S4/§S5 | **Live** (v20 → v25). See [§4](#4-the-live-behavior-ledger) |
 | **Macrocycle goals, targets, pacing, closeout** | `docs/17-macrocycle-goals.md` | doc 10 §5's pre-N21 target engine, doc 16 on the rate source | **Live** (v21/v22/v23/v24/v25) |
 | **Prescription freshness / invalidation** | `docs/14-prescription-invalidation.md` | any `params_version` single-scalar gate description | User-visible as *"prescriptions refresh on next view; logged history is never touched"* |
-| **Exercise-level RIR, set cap, rep position** | `docs/21-exercise-level-rir.md` | doc 11's single-week-RIR model | Live **except** §6.1's measuring band — [§4.1](#41-what-is-not-live) |
+| **Exercise-level RIR, set cap, rep position** | `docs/21-exercise-level-rir.md` | doc 11's single-week-RIR model | **Live in full** since 2026-08-10, §6.1's measuring band included — [§4.1](#41-what-is-not-live) ① |
 | **Prescription explanation content** | `docs/19-...-v3.md` (+ its §12 amendment) | **doc 18 §6** (substitution seam), **doc 18 §10** (voice), doc 18's payload/trigger policy | Doc 18 keeps model/client, storage, decision-id lifecycle, post-check |
 | **The connector surface** | the code (`src/lib/mcp/`) → `docs/05-mcp-connector.md` | `12-connector-coaching-roadmap.md` (a roadmap, not a contract) | Fully inventoried in [`22d`](./22d-connector-inventory.md) |
 | **BodySpec / DEXA** | `docs/15-bodyspec-dexa-integration.md` for internals; `17` §6 for how it reaches the engine | — | Doc 22 ch. 16 |
@@ -114,8 +116,25 @@ directly from `public.engine_params` on 2026-08-06:
 | 22 | superseded | `rate_source` → `"plan"` (doc 17 Phase R3 / N37) — activated 2026-07-11 |
 | 23 | superseded | two-component strength-rate model (doc 17 §2.7 / N43) — activated 2026-07-12 |
 | 24 | superseded | `rate_source` → `"plan"` over the corrected band — activated 2026-07-12 |
-| **25** | **ACTIVE** | the doc 17 §7 / N36 self-gating **envelope loop** — active since 2026-07-12 |
-| 26 | **inactive** | the doc 21 §6.1 **measuring band** (`e1rm.max_measuring_rir = 8`) |
+| 25 | superseded | the doc 17 §7 / N36 self-gating **envelope loop** — active 2026-07-12 → 2026-08-10 |
+| **26** | **ACTIVE** | the doc 21 §6.1 **measuring band** (`e1rm.max_measuring_rir = 8`) — **activated 2026-08-10 18:05 UTC** |
+
+> **Re-read 2026-08-10** (the v26 drift pass, ledger `D-21`). **v26 is now the
+> active row** — `params_hash 6dd02244…`, hash-verified, `e1rm.max_measuring_rir`
+> present at `8` — recorded in `mcp_write_audit` as *"activated engine_params v26
+> (release_impact: fix)"*. It is v25 plus that one key and nothing else
+> (`get_engine_params(26, compare_to_version: 25)` returns a one-row diff), so
+> **every other value in §4.2 is unmoved** and only the band row changes.
+> [§4.1](#41-what-is-not-live) ① is retired by this read.
+>
+> The `fix` classification is defensible on the data rather than by argument: at
+> activation **no logged set in the database sat above the band** (0 of 11,834
+> working sets at an assumed RIR > 8, 0 stamped `none`), so the restamp the
+> activation triggers moved nothing and no number any user sees changed. Had a
+> set been past the band, doc 23 §9.5 would have made this a `feature` — and
+> `checkAnnouncement` would have refused it, since the only live release is
+> `1.0.0`. Worth stating plainly because the classification is what the guard
+> checks, and it was the caller's to assert.
 
 Doc 22's §2.2 sentence should be corrected when doc 22 is next touched; until
 then, **this table is the authority**. Note also that v22, v24 and v25 were
@@ -124,15 +143,25 @@ alone under-reports the live chain, and reading the repo is not sufficient.
 
 ### 4.1 What is NOT live
 
-Exactly three things. The manual documents none of them.
+Two things, since 2026-08-10. The manual documents neither.
 
-**① The measuring band — doc 21 §6.1 (`e1rm.max_measuring_rir`).**
-The code is complete (`predict.ts::isMeasuringRir`, `stampE1rm`), but the
-parameter is **`.optional()` and absent from the active v25 row**, so
-`isMeasuringRir` returns `true` for every set and the rule never fires. **Every
-logged set, at any RIR, is currently treated as a strength measurement.**
+**① ~~The measuring band~~ — RETIRED 2026-08-10: the band is LIVE.**
+`e1rm.max_measuring_rir` is `8` on the active v26 row, so `isMeasuringRir`
+returns `false` past it and a set at an assumed RIR **above 8** is priced,
+performed and counted as volume while carrying no estimate (stamp `null`,
+rating `none`) and reaching neither the anchor nor any strength surface.
+**Ch. 8 and ch. 10 now carry it; every other chapter still must not**, because
+above 8 is reachable only through ch. 8's per-exercise lever — the week ramp
+stops at `5` and the deload at `6`. The two-rule distinction below stands and is
+the thing to keep straight; only the liveness column changed.
 
-> **This is the single most consequential Phase-0 finding**, because doc 22 §6.2
+> The original finding is kept verbatim below because it is still how the two
+> rules differ, and because ch. 8's §6.2 reassurance was written from it and
+> does not change. **What changed on 2026-08-10:** the §6.1 row reads *live*,
+> and the closing instruction is superseded — ch. 8 writes the band as well as
+> §6.2, and ch. 10 gains the fourth rating. Ledger `D-21`.
+>
+> **This was the single most consequential Phase-0 finding**, because doc 22 §6.2
 > makes the band load-bearing in User Guide ch. 8: *"past the **measuring band**
 > (`max_measuring_rir`) they are priced and never treated as a measurement of
 > your strength — so a protected block does not read as a decline."*
@@ -141,8 +170,14 @@ logged set, at any RIR, is currently treated as a strength measurement.**
 >
 > | Rule | Question it answers | Live? |
 > |---|---|---|
-> | §6.1 measuring band | *Is this a measurement at all?* — asked at the stamp | **NO** (v26 inactive) |
+> | §6.1 measuring band | *Is this a measurement at all?* — asked at the stamp | ~~NO (v26 inactive)~~ → **YES** since 2026-08-10 |
 > | §6.2 backed-off stats policy | *Is this measurement comparable?* — asked at read time | **YES** (migration `20260804000001`, applied + verified 2026-08-04) |
+>
+> Both are on, and they are still **different rules**: a set can be inside the
+> band and backed off (measured, not comparable — the ordinary rehab case), or
+> past the band and backed off (not measured at all). The one combination the
+> data has never produced is past the band without a back-off, since only an
+> exercise-level assignment can put a slot above 8.
 >
 > The *reassurance the reader actually needs* — "a protected block does not read
 > as a decline" — is **§6.2, and it is live**: a slot run easier than its week is
@@ -151,10 +186,15 @@ logged set, at any RIR, is currently treated as a strength measurement.**
 > disclosed in one sentence wherever the number appears. Asymmetric by design:
 > a slot run *harder* than its week keeps every claim it earns.
 >
-> **Instruction for Phase 3d (ch. 8):** write the reassurance from §6.2. Do
+> ~~**Instruction for Phase 3d (ch. 8):** write the reassurance from §6.2. Do
 > **not** mention the measuring band, `max_measuring_rir`, or "priced but not
-> measured" until v26 activates. Doc 22 §6.2's third and fourth bullets need
-> amending on that basis.
+> measured" until v26 activates.~~ **Superseded 2026-08-10 (`D-21`):** v26 is
+> active, so ch. 8 keeps the §6.2 reassurance as its centre — that is still the
+> answer to *"does a protected block read as a decline"* — and adds the band as
+> the boundary case beyond it, in its own section. Ch. 10 states the fourth
+> rating in its confidence ladder, and `GLOSSARY.e1rm_confidence` carries the
+> `D-14` sentence again. Doc 22 §6.2's third and fourth bullets are correct as
+> written now; §6.2's own source note is amended to say so.
 
 **② The LLM coaching line — serving mode unknown.** `LLM_EXPLANATIONS` is a
 Vercel environment variable, not readable from a Claude session
@@ -171,9 +211,11 @@ line as conditional.
 
 ### 4.2 The active parameter values the manual may state
 
-Transcribed from the active v25 row. Doc 22 §8.2 requires every numeric default
-the manual states to carry its `engine_params` path — this is the source table
-for those rows, and the **only** sanctioned set of numbers.
+Transcribed from the active row — v25 through 2026-08-10, **v26 since**, which
+moved no value in this table and added exactly one (`e1rm.max_measuring_rir`).
+Doc 22 §8.2 requires every numeric default the manual states to carry its
+`engine_params` path — this is the source table for those rows, and the **only**
+sanctioned set of numbers.
 
 > **Re-read 2026-08-08** (doc 22 Phase 3a), against the live row via
 > `get_engine_params(25)`. **v25 is still active and unchanged** —
@@ -211,7 +253,7 @@ for those rows, and the **only** sanctioned set of numbers.
 | `e1rm.mod_max_eff_reps` / `mod_max_rir` | `12` / `3` | ch. 10 — moderate confidence |
 | `e1rm.anchor_method` | `"session_best"` | ch. 10 — the anchor |
 | `e1rm.recency_halflife_days` | `30` | ch. 10 — why old sessions fade |
-| `e1rm.max_measuring_rir` | **absent** | **do not state** — see §4.1 ① |
+| `e1rm.max_measuring_rir` | **`8`** (live 2026-08-10) | **ch. 8 and ch. 10 only** — past this assumed RIR a set is priced but not measured. Elsewhere it is out of scope on seam grounds: nothing but ch. 8's lever reaches above 8 |
 | `deload.target_rir` | `6` | ch. 9 — the deload week's target RIR |
 | `deload.load_pct` / `set_pct` | `0.55` / `0.5` | ch. 9 — **fallback path only** (see below) |
 | `deload_anchor_rir` | `true` | ch. 9 — with a confident anchor the deload load is chosen **the same way a working week's is** (window-centred reps at the higher deload RIR), not as a flat % of peak. `load_pct`/`set_pct` apply only when there is no usable anchor. `engine/index.ts:253` |
@@ -392,10 +434,17 @@ in [`22d`](./22d-connector-inventory.md) §7 K1. **Do not quote it as a source.*
 
 `docs/23-versioning-releases.md` **T10** says *"`engine_params` (v20/v23/v26 all
 shipped inactive, activated later by an owner-gated MCP step)"*. **v20 and v23
-are active** ([§4.0](#40-the-correction-to-doc-22-22)); only v26 is not. Doc 23's
-*argument* is unaffected — an activation really is a user-visible change with no
-diff, and that is why it is a feature release — but its example inherits doc 22
-§2.2's error.
+are active** ([§4.0](#40-the-correction-to-doc-22-22)); only v26 was not — and
+**v26 activated 2026-08-10**, so all three examples are now live and the
+sentence's tense is wrong end to end. Doc 23's *argument* is unaffected — an
+activation really is a user-visible change with no diff, and that is why it is a
+feature release — but its example inherits doc 22 §2.2's error.
+
+> **The v26 activation is also the argument's first live test, and it passed on
+> the exception rather than the rule** (`D-21`): classified `fix`, because no
+> logged set sat above the band, so nothing a user sees moved. `checkAnnouncement`
+> only refuses a `feature`, so the guard was never exercised. The next
+> activation that moves a number is where it bites.
 
 Worth recording precisely because it is what this audit exists to prevent: the
 claim was wrong in doc 22, went unchecked, and was cited as established fact by
@@ -410,9 +459,12 @@ the authority.
 
 ### 6.5 Doc 22 §6.2's measuring-band bullets
 
-See [§4.1](#41-what-is-not-live) ①. Two of the four bullets describe an inactive
-rule. Ch. 8 is still writable in full — from §6.2's live policy. Amended in doc
-22 at Phase 1 (O-D).
+See [§4.1](#41-what-is-not-live) ①. Two of the four bullets described a rule that
+was inactive when doc 22 was written; ch. 8 was written from §6.2's live policy
+instead, and doc 22 was amended at Phase 1 (O-D). **Resolved 2026-08-10:** v26
+activated, so those two bullets are simply true now and ch. 8 carries both rules
+(`D-21`). The amendment stays — it records why the chapter is built the way it
+is, with §6.2 as the reassurance and the band as the boundary.
 
 ### 6.6 `GLOSSARY.e1rm` stated the RIR direction backwards
 
@@ -448,7 +500,7 @@ source; the inactive-behavior exclusion list is explicit."*
 | 5 Training a session | `/log/[id]` code, doc 09, doc 21, N75/N77 | ✅ | ask line opens Prescription details |
 | 6 Effort: RIR and the ramp | **doc 21 §2** (over doc 11), doc 10, glossary | ✅ §5.2 | — |
 | 7 Ramps & training styles ⭐ | doc 10, `COACHING_GUIDE`, **+ the 3d-r research pass** | ⚠️ **content does not exist yet** — 3d-r is a hard prerequisite | O7 still open (doc 22 §13) |
-| 8 Exercise-level RIR ⭐ | doc 21, `slot-effort-display.ts`, `queries/slot-effort.ts` | ✅ | **§6.1 band NOT live — write from §6.2** (§4.1 ①) |
+| 8 Exercise-level RIR ⭐ | doc 21, `slot-effort-display.ts`, `queries/slot-effort.ts` | ✅ | §6.2 is the centre; **the §6.1 band is live since 2026-08-10** and is the boundary case (`D-21`) |
 | 9 Deloads ⭐ | doc 10, `COACHING_GUIDE`, doc 21 §6.2, active `deload.*` | ✅ | MRV-stop auto-deload is **spec, not code** — see below |
 | 10 How your next weight is chosen | `engine/predict.ts`, `reps.ts`, doc 10 §1, doc 16, doc 21 | ✅ §6.1 | state the **cutoff**; envelope loop affects pacing |
 | 11 Why the app asks how it felt | `rules/feedback.ts`, doc 10, active params | ✅ | the ±1 model is what ships (see below) |
@@ -492,7 +544,7 @@ None of these block Phase 1. All block a specific chapter in Phase 3/6.
 | # | Question | Blocks | Why Claude cannot answer it |
 |---|---|---|---|
 | **O-A** | Is `LLM_EXPLANATIONS` set to `on` or `shadow` in Vercel production? | ch. 17, AI Manual ch. 10 | Vercel env vars are a human-only step (`deployment/manual-operations.md`). DB evidence shows generation is running; serving is the unknown |
-| **O-B** | Will **v26** (the measuring band) be activated before Phase 3d? | ch. 8 | Owner-gated activation (`manual-operations.md` step ⑤). **Re-scoped by doc 23 §9.5:** activating v26 changes a number users are shown, so it classifies `release_impact: "feature"` — and `activate_engine_params` now **refuses** a feature-classified activation unless a live release announces it. So v26 cannot be switched on ahead of a release note; it rides a feature release, and ch. 8 gains the band in the same block. Answering O-B is now a *sequencing* call, not a yes/no |
+| ~~**O-B**~~ | ~~Will **v26** (the measuring band) be activated before Phase 3d?~~ | — | ✅ **Closed 2026-08-10 — the owner activated v26** (`release_impact: fix`, 18:05 UTC), after ch. 8 shipped. So the answer was *after*, and the doc-23 §9.5 sequencing worry did not bind: with **no set in the database above the band**, the activation moved no user-visible number and classified `fix` rather than `feature`, which is the one path that needs no announcing release. Ch. 8 and ch. 10 gained the band in the drift pass that followed (`D-21`), and `GLOSSARY.e1rm_confidence` got its `D-14` sentence back. **The general rule survives:** a later activation that *does* move a number is a feature release and `checkAnnouncement` will refuse it without one |
 | **O-C** | **O7** from doc 22 §13 — name published third-party programs in ch. 7, or describe by characteristic? | ch. 7 (via 3d-r) | Owner call, already framed in doc 22 §6.3 |
 | ~~**O-D**~~ | ~~Should doc 22 §2.2, §6.1 and §6.2 be amended in place to match §4 above?~~ | — | ✅ **Closed 2026-08-07 (Phase 1).** All three folded into doc 22's own prose, so the stale claim is no longer stated before its correction. This ledger still governs |
 

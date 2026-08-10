@@ -700,8 +700,12 @@ review docs.
 | **F18** | *"Why is the target only the low end of the range?"* | `macro_target.present: "conservative_end"` — the conservative end is shown deliberately, and there is no progress bar | doc 10 §5, doc 17 | ready |
 
 **Two candidates deliberately excluded:** anything about engine-parameter tuning
-or replay (admin, doc 22 §1.2), and anything about the measuring band (not live
-— [`22b`](./22b-source-map.md) §4.1).
+or replay (admin, doc 22 §1.2), and anything about the measuring band — which was
+excluded as *not live* and is **live since 2026-08-10**
+([`22b`](./22b-source-map.md) §4.1 ①, [`22a`](./22a-manual-claims.md) `D-21`).
+It stays out of the FAQ set on different grounds now: no mined question asks
+about it, since a user meets it only by giving an exercise a very easy target,
+and ch. 8 answers it there. Revisit if a question shows up in real use.
 
 ---
 
