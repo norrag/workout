@@ -137,11 +137,9 @@ export const UG_EFFORT_RIR: ManualChapter = {
         {
           kind: "para",
           text: [
-            "When a block's final week is a deload, its target comes from the program rather than from the ramp — currently ",
+            "When a block's final week is a deload, its target comes from the program rather than from the ramp — ",
             { num: "6" },
-            " RIR (",
-            { code: "deload.target_rir" },
-            "), which is deliberately well short of failure. The week editor says as much: ",
+            " reps in reserve, deliberately well short of failure. The week editor says as much: ",
             { ui: "W6 DELOAD — RIR SET BY THE ENGINE" },
             ".",
           ],
@@ -169,7 +167,13 @@ export const UG_EFFORT_RIR: ManualChapter = {
             },
             {
               kind: "para",
-              text: "A per-week schedule replaces that arithmetic outright — the values are used as written, in whatever order you set them. Either way the deload week is appended afterwards at the program's own deload target, so it is never part of the interpolation.",
+              text: [
+                "A per-week schedule replaces that arithmetic outright — the values are used as written, in whatever order you set them. Either way the deload week is appended afterwards at ",
+                { code: "deload.target_rir" },
+                ", currently ",
+                { num: "6" },
+                ", so it is never part of the interpolation.",
+              ],
             },
           ],
         },

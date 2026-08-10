@@ -607,6 +607,70 @@ they bind **every chapter after them**.
    [§8.1](#81-the-glossary-is-one-source-not-two)) is the app's decision, not
    the manual's.
 
+### 8.4e Standing authoring rules from owner review round 6 (2026-08-11)
+
+Six notes came back on the Phase-3d and Phase-3f chapters. Like
+[§8.4a](#84a-standing-authoring-rules-from-owner-review-round-2-2026-08-07)
+through [§8.4d](#84d-standing-authoring-rules-from-owner-review-round-5-2026-08-11),
+they bind **every chapter after them** — and unlike the earlier rounds, two of
+them are about *what the manual believes*, not about how it writes.
+
+1. **Effort is the thing this app is for. Do not write a cautious manual.**
+   The owner's framing, and it is a correction to a real drift across the effort
+   cluster: *"leaving reps in reserve is a fatigue-management tool, not a growth
+   tool. If you can recover from the fatigue, pushing to or near failure more
+   frequently can yield better results… If I had to guess, most people probably
+   do not train hard enough."* Where a trade-off is real, give **both** sides
+   their weight; a sentence that only ever names the cost of effort is not
+   neutral, it is an argument. Chapter 7 had four ramp descriptions in which the
+   easier option always sounded safer and the harder one always sounded
+   expensive, which is not what the evidence in its own research pass says.
+
+2. **A build identifier belongs in the exact-rule layer and nowhere else.**
+   *"Do not mention app variable names, such as `e1rm.mod_max_rir`, outside of
+   the exact-rules sections."* This is [§8.4b](#84b-standing-authoring-rules-from-owner-review-round-3-2026-08-08)
+   rule 4 in its most literal form. Layer 1–2 states the **value in the reader's
+   terms** ("3 or fewer reps short of failure"); the greppable parameter name
+   goes in a `detail`. **Enforced** by a test over non-`detail` blocks, and
+   [§8.2](#82-the-honesty-contract)'s "a current value carries its path" check
+   moved from block scope to **section** scope so the grep chain survives the
+   move. Where a derived relationship is what the reader gets, **the ledger
+   records the derivation** so a parameter change finds the prose that depends
+   on it.
+
+3. **Give the real formula.** Where a formula is the answer, print it —
+   `w × (1 + r ÷ 30)` beats "the Epley formula, see `e1rm.rir_offset`". A reader
+   who wants the mechanism wants the mechanism.
+
+4. **Say it and move on.** No rule-counting scaffolding (*"Two rules cover the
+   whole feature"*), no origin stories, and no elaborate metaphor where a plain
+   noun exists — the owner struck *valve*, *shedding* and *performance debt* from
+   chapter 9 in one pass, and the plain sentences that replaced them are shorter
+   and say more. The owner's word for the failure was **classroom lecture**.
+
+5. **Consolidate.** *"We do not need to spread closely related topics across so
+   much surface area."* Chapter 9 lost a section by merging *what a deload is*
+   with *when you need one*, because they are one question. The
+   [§9.3](#93-the-section-length-budget) budget stops a section sprawling; it
+   does nothing about a **chapter** sprawling, and this rule is that gap closed.
+
+6. **A control chapter owes the values that change behavior.** *"Users need to
+   know what exercise-level RIR does, what it is for, how to use it, and which
+   actual values trigger meaningful behavior in the app."* Where a reader types a
+   number, the chapter owes a table of which numbers cross a threshold — not the
+   thresholds' parameter names, per rule 2, but the numbers themselves.
+
+> **One note is a product proposal, not an authoring rule.** *"Bar speed is
+> frequently discussed as one of the better methods of estimating true RIR. I
+> wonder if this can be generalized into guidance that helps users estimate
+> proximity to failure. This could be included in an info card somewhere in the
+> app or emphasized in coaching explanations."* That is a new in-app surface (an
+> `InfoDot` or a coaching-line trigger), so it is a hard-rule-8 design pass and
+> is tracked as **N83** (N82 was independently claimed by the day-view focus
+> pass while this review sat unmerged). Chapter 7 §4 carries the guidance as
+> *prose* in the
+> meantime, which needs no app change.
+
 ### 8.5 Plain-language vocabulary
 
 Per **O4**. A denylist test over manual copy: `LLM`, `large language model`,
@@ -1208,6 +1272,52 @@ contracts green.
 >   overclaiming — keep reading the glossary's words too, because the reader
 >   does not care who typed them.
 
+> **Owner review round 6 (2026-08-11) returned notes across 3d and 3f**, all
+> folded in and generalized as [§8.4e](#84e-standing-authoring-rules-from-owner-review-round-6-2026-08-11).
+> Two of them are about what the manual *believes*, which is a first.
+>
+> - **The effort cluster had drifted cautious.** *"Leaving reps in reserve is a
+>   fatigue-management tool, not a growth tool… most people probably do not train
+>   hard enough."* Ch. 7 §3 now opens on exactly that, names the practical case
+>   for visiting failure (it is the only way to calibrate what your own 0 feels
+>   like, which every later report depends on), and closes on **effort and
+>   consistency as the drivers** rather than on a menu of cautions. The
+>   research pass supported this all along — its §2.1 has hypertrophy improving
+>   toward failure and strength flat across RIR — and the first draft had read
+>   the same evidence timidly.
+> - **Parameter names left the prose.** Nine `code` runs sat in layer 1–2 across
+>   six chapters, including two in the signed-off ch. 6 and ch. 2; all nine moved
+>   into `detail` blocks, and [§8.2](#82-the-honesty-contract)'s current-value
+>   check moved from **block** scope to **section** scope so the grep chain
+>   survived. A new test fails the build on a parameter name outside a `detail`.
+>   Where the reader now gets a derived relationship instead of a name, the
+>   **ledger records the derivation** (`C-ramp-16`).
+> - **Ch. 8 answered a question its own specifier got wrong.** The owner asked
+>   whether backed-off sets leave the strength anchor. They do not — the anchor's
+>   only exclusion is the measuring band, which is **inactive**, so every set at
+>   every RIR anchors. Doc 21 §5 wants it that way (excluding them would freeze
+>   the anchor and make the return jump to full load). What actually holds the
+>   weight during a back-off is the **confidence ladder**. Recorded as
+>   [`22a`](./22a-manual-claims.md) **`D-20`**, and it is the strongest argument
+>   yet for the chapter existing: the person who specified the feature held the
+>   inactive rule as their mental model.
+> - **Ch. 9 lost a section and gained a control.** *What a deload is* and *when
+>   you need one* merged, the *valve* / *shedding* / *performance debt* framing
+>   went, and the chapter now documents what the first draft had missed outright:
+>   a started deload **can** be dropped, via `End mesocycle` in the day view (or
+>   `Skip remaining sets` per exercise), and attendance is untouched because
+>   deload days never counted toward it.
+> - **Ch. 10 states the formulas** — `w × (1 + r ÷ 30)` and `w × 36 ÷ (37 − r)` —
+>   and corrects its own account of recency: **age decides which session wins,
+>   not what it is worth.** The winning set is an argmax over estimate × recency;
+>   the anchor's value is then that session's mean at full value. The first draft
+>   implied stored numbers fade, and they never do.
+>
+> **One note is a product proposal**, tracked as **N83**: generalize bar speed
+> into in-app guidance for judging proximity to failure, as a glossary card or a
+> coaching-line trigger. It joins N81 in Phase 7a's affordance grammar. Ch. 7 §4
+> carries the cue as prose meanwhile, which needs no app change.
+>
 > **3g landed 2026-08-11 — and it is the phase where the audit's own reading of
 > a screen was wrong twice.** Chapters **13** (Reading your stats) and **14**
 > (Macrocycle goals), eleven sections, 148–305 words against the 350 budget; the

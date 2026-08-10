@@ -2,7 +2,102 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-14 (latest) — Day View: the focus pass (N82, staged for 1.1.0)
+## 2026-08-15 (latest) — doc 22 owner review round 6: effort over caution (N74)
+
+Notes across the Phase-3d and Phase-3f chapters, folded in and generalized as
+**doc 22 §8.4e** (six rules, binding on every later chapter). Two of them are
+about what the manual *believes* rather than how it writes, which is a first for
+this review series.
+
+### The effort cluster had drifted cautious
+
+The owner's framing: *"leaving reps in reserve is a fatigue-management tool, not
+a growth tool. If you can recover from the fatigue, pushing to or near failure
+more frequently can yield better results… most people probably do not train hard
+enough."*
+
+Ch. 7 §3 now opens on exactly that, adds the practical case for visiting failure
+(it is the only way to calibrate what your own 0 feels like, and every later
+report depends on that), gives each ramp a single `Set as` value, and closes on
+effort and consistency as the drivers rather than on a menu of cautions. §4's
+guidance is now *do not train easy all the time*, with **bar speed** as the
+usable in-set cue. §5 fixes a causality error: a hard ramp does not mechanically
+cost sets — reporting sessions as too much does, which is the system finding the
+ceiling you can actually train at.
+
+The research pass supported this all along (§2.1: hypertrophy improves toward
+failure, strength is flat across RIR). The first draft read its own evidence
+timidly.
+
+### Parameter names left the prose
+
+*"Do not mention app variable names, such as `e1rm.mod_max_rir`, outside of the
+exact-rules sections."* Nine `code` runs sat in layer 1–2 across six chapters,
+two of them in the signed-off ch. 2 and ch. 6. All nine moved into `detail`
+blocks.
+
+Two contract changes carry it: a new test fails the build on a parameter name
+outside a `detail`, and §8.2's "a current value carries its path" check moved
+from **block** scope to **section** scope so the grep chain survived the move.
+Where the reader now gets a derived relationship instead of a name — *"3 or fewer
+reps short of failure"* rather than `progression.min_confidence` — the ledger
+records the derivation (`C-ramp-16`), so a parameter change still finds the prose
+that depends on it.
+
+### D-20 — ch. 8 answered a question its own specifier got wrong
+
+The owner asked whether backed-off sets are excluded from the strength anchor.
+**They are not.** `queries/anchors.ts` applies one per-sample filter,
+`isMeasuringRir`, which returns `true` for every set while
+`e1rm.max_measuring_rir` is absent — so every backed-off set at every RIR anchors,
+and there is no 8-RIR cutoff and no 7–5 band. Doc 21 §5 wants it that way:
+excluding them would freeze the anchor at pre-back-off values and make the return
+prescription jump straight back to full load.
+
+The owner's *outcome* intuition was right (the weight does not jump on return,
+and easy work does not earn) — the *mechanism* is the confidence ladder, not
+exclusion. A set more than 3 RIR from failure is a `low` read, and a step needs
+`moderate` or better. Ch. 8 now says so explicitly. That the person who specified
+the feature held the inactive rule as their mental model is the strongest
+argument yet for the chapter existing.
+
+### Ch. 9 lost a section and gained a control
+
+*What a deload is* and *when you need one* merged — one question. The *valve*,
+*shedding* and *performance-debt* framing went, and the plain sentences that
+replaced it are shorter and say more. "Halved" is now unmistakably about **sets**
+and nothing else.
+
+The chapter also documents what the first draft had missed outright: a started
+deload **can** be dropped, via `End mesocycle` in the day view's ⋮ menu (or `Skip
+remaining sets` per exercise), and attendance is untouched because deload days
+never counted toward it.
+
+### Ch. 10 states the formulas, and corrects itself on recency
+
+Epley `w × (1 + r ÷ 30)` and Brzycki `w × 36 ÷ (37 − r)`, in layer 3, with `r` the
+effective reps. And the anchor: **age decides which session wins, not what it is
+worth** — recency weights the argmax that picks the winning set, and the anchor's
+value is that session's mean at full value. The first draft implied stored numbers
+fade. They never do.
+
+### One product proposal, tracked
+
+**N83** — generalize bar speed into in-app guidance for judging proximity to
+failure, as a glossary card or a coaching-line trigger. Hard rule 8, and it joins
+**N81** in doc 22 Phase 7a's affordance grammar rather than being decided alone.
+Ch. 7 §4 carries the cue as prose meanwhile.
+
+This round touched 20 sections across chapters 7–10 (ch. 9 is four sections,
+not five); 106–323 words, median 192 across the full 151-section corpus of both
+manuals — most of which landed in the Phases 3g–3i/5/6 that merged onto `main`
+while this round sat unreconciled. Reconciled onto that state (see the
+`docs/notes/log.md` entry for the mechanics); two number collisions resolved —
+`D-15` → `D-20`, `N82` → `N83`. All suites green; typecheck and lint clean.
+
+## 2026-08-11 — doc 22 Phase 3f: how your next weight is chosen (N74)
+
+## 2026-08-14 — Day View: the focus pass (N82, staged for 1.1.0)
 
 Owner-directed declutter of the day view, **revised through owner review round 1
 the same day**. Full design record in

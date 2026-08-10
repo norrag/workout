@@ -110,7 +110,6 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/deloads#what-a-deload-is",
   "ug/deloads#the-week-itself",
   "ug/deloads#how-it-reads-afterwards",
-  "ug/deloads#when-you-need-one",
   "ug/deloads#choosing-to-have-one",
   // ch. 10 — How your next weight is chosen (Phase 3f)
   "ug/how-your-weight-is-chosen#the-anchor",

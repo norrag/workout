@@ -4,6 +4,58 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-15 — Session 118: owner review round 6, reconciled onto a moved main (N74)
+
+**Housekeeping first: PR #236 (Phases 3d-r/3d/3f) had already merged**, and `main` had moved a long way past it — Phases 3g, 3h, 3i, 5 and 6 all landed (the whole rest of both manuals), plus an unrelated day-view pass that happened to claim `N82`. Reset the branch onto `main`, reapplied this round's diff (the seven chapter/test files applied cleanly — nothing else had touched them since the merge — and the five shared registries needed manual reconciliation), and renumbered two collisions: `D-15` → `D-20`, `N82` → `N83`.
+
+Notes on the effort cluster and ch. 10, generalized as **doc 22 §8.4e**. Two are
+about what the manual believes, which no earlier round has been.
+
+**The one that matters most: the chapters had drifted cautious.** Every ramp
+description made the easier option sound safer and the harder one sound
+expensive, and four sections in a row can add up to an argument nobody wrote. The
+owner's correction is the right reading of my own research pass — its §2.1 has
+hypertrophy improving toward failure and strength flat across RIR, which is not a
+finding that supports a careful tone. *Reps in reserve are a fatigue-management
+tool, not a growth tool*; if you recover, training closer to failure more often is
+the productive direction; most people have room there. Ch. 7 §3 now says that
+first. Worth remembering as a failure mode: honest hedging repeated across
+sections stops being hedging.
+
+**`D-20` is the finding of the round** (renumbered from a first-draft `D-15` — `D-15`–`D-19` were independently claimed by Phases 3g/3h/6a/6c while this review sat unmerged). The owner asked whether backed-off sets
+leave the strength anchor, describing an 8-RIR cutoff and a 7–5 band. That is doc
+21 §6.1 — **v26, inactive**. Live, `anchors.ts` has exactly one per-sample filter
+and it passes everything. So the person who specified the feature was holding the
+unshipped rule as their model of the shipped one. Doc 21 §5 argues for the live
+behavior on purpose (excluding easy sets would freeze the anchor and make the
+return prescription jump to full load), and the owner's *outcome* intuition was
+right anyway — the mechanism is just the confidence ladder rather than exclusion.
+This is the clearest evidence so far that "the specs and the code disagree" is not
+an abstract risk in this repo.
+
+**Parameter names are out of the prose.** Nine of them, across six chapters,
+including two in chapters already signed off. The interesting part was the
+contract: §8.2 requires a stated default to be greppable to its parameter, and
+moving the names into `detail` would have broken that if the check stayed at
+block scope. Moved to section scope, plus a new test that fails on a parameter
+name outside a `detail`. Where the reader now gets a derived relationship instead
+of a name, the ledger row carries the derivation so the chain still holds.
+
+**Ch. 9 was over-built.** *What a deload is* and *when you need one* are one
+question; *valve*, *shedding* and *performance debt* were three metaphors doing
+the work of one plain sentence. It also turned out I had documented the deload as
+unavoidable once started, which is wrong — `End mesocycle` in the day view drops
+it, and attendance never counted those days anyway. That is the §8.4c rule 3
+failure (find every surface that does X) recurring, and it is worth noting it
+recurred in a chapter written *after* that rule existed.
+
+**N83** — bar speed as in-app guidance (renumbered from a first-draft `N82`, which the day-view focus pass claimed independently) for judging proximity to failure. The
+evidence is already in the repo and unusually direct: the study that priced
+fatigue measured it *as* velocity loss, so the same quantity is observable
+mid-set. Glossary card or coaching-line trigger; hard rule 8 either way, and it
+joins N81 in Phase 7a's affordance grammar. Ch. 7 §4 carries it as prose now.
+
+
 ## 2026-08-14 — Session 117: the day-view focus pass (N82)
 
 Owner asked for the Workout day view to be assessed and decluttered without

@@ -113,3 +113,18 @@ export function authoredProseOf(entry: IndexedSection): string {
       .map(runText),
   ].join(" ");
 }
+
+/**
+ * doc 22 §8.4e rule 2 (owner review round 6, 2026-08-11) — the reader's layers
+ * and the exact-rule layer, kept apart.
+ *
+ * Returns every block **outside** a `detail`, i.e. what a reader meets before
+ * opening anything (D5 layers 1–2). `flatten` deliberately hoists `detail`
+ * children alongside their parent because most contracts judge *all* the words;
+ * this one judges *where* a word may appear, so it needs the boundary intact.
+ */
+export function surfaceBlocks(
+  blocks: readonly ManualBlock[],
+): ManualBlock[] {
+  return blocks.filter((b) => b.kind !== "detail");
+}
