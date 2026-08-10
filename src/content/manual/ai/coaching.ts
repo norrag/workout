@@ -143,7 +143,7 @@ export const AI_COACHING: ManualChapter = {
       ],
       related: [
         "ai/coaching#a-niggle-becomes-an-assignment",
-        "ug/deloads#when-you-need-one",
+        "ug/deloads#what-a-deload-is",
       ],
     },
     // -----------------------------------------------------------------------

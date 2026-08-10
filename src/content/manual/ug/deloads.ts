@@ -2,39 +2,41 @@
 //
 // GROUND TRUTH (22b §7 ch. 9 — `engine/index.ts:251–325`, `rules/deload.ts`,
 // `rules/rir.ts`, `queries/stats.ts::foldProgressScores`, migration
-// `20260804000001`, `MesoHeader.tsx`, plus the doc 22 Phase 3d-r research pass
-// `docs/reviews/2026-08-11-rir-ramps-and-training-styles.md` §2.4):
-//   - the deload week's target RIR is `deload.target_rir` (6 on the live v25
-//     row), appended by `rirRamp` OUTSIDE the ramp — the ramp never sets it
-//   - with a usable strength anchor and `deload_anchor_rir` on, the load is
-//     chosen the SAME way a working week's is: the weight that lands
-//     window-centred reps at the higher deload RIR. `deload.load_pct` (0.55) is
-//     the fallback for when there is no anchor to price from
-//   - sets = round(peak sets × `deload.set_pct` 0.5), floored at `min_sets` and
-//     clamped by `max_sets_per_exercise`
+// `20260804000001`, `MesoHeader.tsx`, `DayView.tsx` (`End mesocycle`,
+// `Skip remaining sets`), plus the 3d-r research pass §2.4):
+//   - the deload week's target RIR is `deload.target_rir` (6 on live v25),
+//     appended by `rirRamp` OUTSIDE the ramp
+//   - sets = round(peak sets × `deload.set_pct` 0.5), floored at `min_sets` (2)
+//   - the LOAD is chosen the same way a working week's is (`deload_anchor_rir`
+//     true): the weight that lands window-centred reps at the deload RIR.
+//     `deload.load_pct` is the no-anchor fallback only. "Halved" applies to
+//     SETS and to nothing else (owner review round 6)
 //   - deload sessions are dropped from the strength trend
-//     (`foldProgressScores(deloadMicroIds)`) and from the meso's attendance
-//     figures (`sessions_attended` / `sessions_due` filter `not is_deload`);
-//     working sets, reps and volume totals keep them
-//   - `includes_deload` and the block length are editable only while the block
-//     is `planned` (`MesoHeader.tsx:568`)
+//     (`foldProgressScores(deloadMicroIds)`) and were never counted in
+//     attendance (`sessions_attended` / `sessions_due` filter `not is_deload`)
+//   - `includes_deload` and block length are editable while `planned`
+//     (`MesoHeader.tsx:568`) — and a started deload can still be SKIPPED:
+//     `End mesocycle` in the day view's ⋮ menu skips all remaining sets on all
+//     remaining days and completes the block; `Skip remaining sets` does one
+//     exercise (owner review round 6)
 //
-// SPEC-VS-CODE GAP, written from the code (22b §7): doc 10 §3's graded
-// MEV→MAV→MRV volume ramp and its two-week-at-MRV auto-deload trigger were
-// deferred (T-A5) and are NOT implemented. There is no automatic deload to
-// describe. What ships is the joint-pain gate plus the ±1 workload response
-// (ch. 11) and a deload that is SCHEDULED. This chapter says so.
+// SPEC-VS-CODE GAP, written from the code (22b §7): doc 10 §3's graded volume
+// ramp and its two-week-at-MRV auto-deload were deferred (T-A5) and are NOT
+// implemented. Nothing triggers a deload; it is scheduled.
 //
-// DEFECT `D-08`, not fixed here (doc 22 §1.2 forbids behavior changes): the
-// create-mesocycle sheet hardcodes `DELOAD AT 4 RIR` while the live target is
-// 6. Per the Phase-3a precedent (`D-06`/`D-07`), this chapter states the truth
-// positively and does not narrate the discrepancy.
+// DEFECT `D-08`, not fixed here: the create-mesocycle sheet hardcodes
+// `DELOAD AT 4 RIR` while the live target is 6. Per the Phase-3a precedent this
+// chapter states the truth and does not narrate the discrepancy.
 //
-// GUARDRAIL (doc 10 §9, binding, and enforced by `contracts.test.ts`): a deload
-// is fatigue management. No growth or strength framing anywhere in the chapter.
+// VOICE (doc 22 §8.4e, owner review round 6): a deload is a fatigue-management
+// tool, said plainly. No "valve", no "shedding", no "performance debt" — the
+// elaborate framing was doing no work the plain sentence does not. Four
+// sections, not five: "when you need one" belongs with what it is.
 //
-// Claims: `C-deload-01` onward in 22a. Glossary: renders `deload`, which clears
-// its PENDING_GLOSSARY_TERMS row.
+// GUARDRAIL (doc 10 §9, enforced by `contracts.test.ts`): no growth or strength
+// framing anywhere in the chapter.
+//
+// Claims: `C-deload-01` onward in 22a. Renders `deload`.
 
 import type { ManualChapter } from "../types";
 
@@ -44,52 +46,63 @@ export const UG_DELOADS: ManualChapter = {
   number: 9,
   title: "Deloads",
   summary:
-    "What a deload week is for, what changes in one, how it reads in your numbers afterwards, and how honest the evidence for it actually is.",
+    "A light week for managing fatigue — what changes in one, whether you need it, and how to drop it when you do not.",
   sections: [
     // -----------------------------------------------------------------------
     {
       slug: "what-a-deload-is",
-      title: "What a deload is for",
+      title: "What a deload is, and when you need one",
       summary:
-        "A light week that clears accumulated fatigue so the next block starts from a real baseline.",
+        "A light week for managing fatigue. Take one when accumulated fatigue would hold back the next block, and skip it when it would not.",
       keywords: [
         "deload",
         "light week",
         "recovery week",
         "fatigue",
         "what is a deload",
-        "rest week",
+        "do i need a deload",
+        "how often deload",
       ],
       blocks: [
         { kind: "term", term: "deload" },
-        { kind: "heading", text: "The fatigue it clears" },
         {
           kind: "para",
-          text: "Fatigue here means one specific thing: a performance debt. Weeks of hard training leave you producing less force than you are capable of, so what you can lift drifts below what you have actually built. It is not soreness, and it is not damage — it is the gap between your capacity and today's output.",
+          text: "A deload manages fatigue and does nothing else. Weeks of hard training leave you lifting below what you are capable of; a light week lets that clear while you keep training, so the next block starts from what you can actually do rather than from the bottom of the last one.",
         },
         {
           kind: "para",
-          text: "That gap accumulates quietly, which is what makes it worth planning around. A block's last weeks are its hardest, and they are also the weeks where the debt is deepest, so what you lift stops being a clean read on where you are.",
+          text: [
+            { strong: "You will not always need one." },
+            " It depends on how well you have been recovering. If the last two weeks were a grind, take it. If you finished the block fresh, drop it and start the next one — a deload you did not need is a week of training you did not get.",
+          ],
         },
+        { kind: "heading", text: "How often, honestly" },
         {
           kind: "para",
-          text: "A light week lets the debt clear while you keep training. You come out of it lifting closer to what you can, which is a better place to start the next block from than the bottom of the previous one.",
+          text: "Competitive lifters surveyed on this all deload, typically for about a week every five or six, planned in advance and prompted by stalled performance, soreness or joint stress. The app's default sits inside that. It is a sensible convention rather than a proven rule.",
         },
         {
-          kind: "callout",
-          tone: "honesty",
-          label: "It is a valve, not a stimulus",
-          text: "A deload is fatigue management. It protects what you built rather than adding to it, and the app never treats a light week as a week that grew anything.",
+          kind: "detail",
+          blocks: [
+            {
+              kind: "para",
+              text: "The one controlled trial of a planned mid-block deload had its deload group stop training entirely for a week. That group finished slightly worse on lower-body strength, with no difference in muscle size, power or endurance. A week off and a light week are different interventions, so the trial argues against skipping training mid-block and says little about the week this app prescribes.",
+            },
+            {
+              kind: "para",
+              text: "Which is why the app schedules a deload and never diagnoses one. Nothing watches your training and inserts a light week — that call is yours, made when you plan the block or when you get to it.",
+            },
+          ],
         },
       ],
-      related: ["ug/deloads#the-week-itself", "ug/deloads#when-you-need-one"],
+      related: ["ug/deloads#the-week-itself", "ug/deloads#choosing-to-have-one"],
     },
     // -----------------------------------------------------------------------
     {
       slug: "the-week-itself",
       title: "What changes in a deload week",
       summary:
-        "Same exercises, well short of failure, roughly half the sets, and a lighter weight chosen the same way as any other.",
+        "Same exercises, well short of failure, about half the sets, and a weight chosen the same way as any other.",
       keywords: [
         "deload week",
         "how light",
@@ -101,55 +114,70 @@ export const UG_DELOADS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: [
-            "The deload is the block's final week when you have asked for one, and it keeps the same days and the same exercises. Three things change. The effort target is ",
-            { num: "6" },
-            " reps in reserve (",
-            { code: "deload.target_rir" },
-            ") rather than anything the ramp would have reached.",
-          ],
+          text: "The deload is the block's final week when you have asked for one, with the same days and the same exercises. Three things change.",
         },
-        {
-          kind: "para",
-          text: [
-            "The sets are roughly halved against the block's heaviest week (",
-            { code: "deload.set_pct" },
-            "), with a floor of ",
-            { num: "2" },
-            " working sets so nothing disappears entirely.",
-          ],
-        },
-        {
-          kind: "para",
-          text: "And the weight comes down to suit — chosen exactly the way a working week's weight is chosen, as the load that puts you in your usual rep range while leaving those six reps in the tank. The result is a real training week that asks much less of you.",
-        },
-        { kind: "heading", text: "Where you see it" },
         {
           kind: "list",
           items: [
             [
-              "The mesocycle's header, as ",
-              { ui: "DELOAD W6 — 6 RIR" },
-              ", and in the block's meta line as ",
-              { ui: "DELOAD" },
-              ".",
+              { strong: "Effort" },
+              " — the target is ",
+              { num: "6" },
+              " reps in reserve, set by the program rather than by your ramp.",
             ],
             [
-              "The day screen's header, which reads ",
-              { ui: "DELOAD WEEK" },
-              " where a working week names its target.",
+              { strong: "Sets" },
+              " — about half what the block's heaviest week carried, with a floor of ",
+              { num: "2" },
+              " working sets per exercise.",
             ],
+            [
+              { strong: "Weight" },
+              " — chosen the same way as any other week: the load that puts you in your usual rep range with those six reps left over. In practice that lands well below your working weight.",
+            ],
+          ],
+        },
+        { kind: "heading", text: "Where you see it" },
+        {
+          kind: "para",
+          text: [
+            "The block's header reads ",
+            { ui: "DELOAD W6 — 6 RIR" },
+            " and its meta line carries ",
+            { ui: "DELOAD" },
+            "; the day screen's header reads ",
+            { ui: "DELOAD WEEK" },
+            " where a working week names its target.",
           ],
         },
         {
           kind: "para",
           text: [
-            "Log it the way you log any week, and ",
+            "Log it like any week and ",
             {
               to: "ug/effort-rir#report-what-you-did",
               text: "report the effort you actually used",
             },
             ". A deload set you took closer to failure than asked is worth saying so.",
+          ],
+        },
+        {
+          kind: "detail",
+          blocks: [
+            {
+              kind: "para",
+              text: [
+                "The target comes from ",
+                { code: "deload.target_rir" },
+                " and the set count from ",
+                { code: "deload.set_pct" },
+                " against the block's peak week, floored at ",
+                { code: "min_sets" },
+                ". The load is priced off the strength anchor at the deload target; a flat percentage of peak (",
+                { code: "deload.load_pct" },
+                ") applies only when there is no usable anchor to price from.",
+              ],
+            },
           ],
         },
       ],
@@ -176,14 +204,14 @@ export const UG_DELOADS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A light week produces light numbers, and the app treats them as what they are: a week that was asked to be easy, rather than a week you underperformed.",
+          text: "A light week produces light numbers, and the app treats them as what they are: a week that was asked to be easy.",
         },
         {
           kind: "table",
           columns: ["Number", "A deload session"],
           rows: [
             ["the block's strength trend, per exercise and per muscle", "left out"],
-            ["your attendance figure for the block", "left out — it was never one of the sessions you owed"],
+            ["your attendance figure", "left out — deload days were never sessions you owed"],
             ["working sets, reps and total weight lifted", "counted in full"],
             ["the muscle-by-week set grid, and the block's averages", "shown, and left out of the averages"],
           ],
@@ -193,19 +221,18 @@ export const UG_DELOADS: ManualChapter = {
           text: [
             "In your exercise history a deload session is tagged ",
             { ui: "DELOAD" },
-            " beside the date, so a lighter row in the list explains itself at a glance.",
+            " beside the date, so a lighter row explains itself.",
           ],
         },
-        { kind: "heading", text: "And the week after" },
         {
           kind: "para",
           text: [
-            "The next block opens from what your recent sets say you can do, so a deload does not reset you to the start of anything. Where the opener comes from is ",
+            "The next block opens from what your recent sets say you can do, so a deload resets nothing — it is ",
             {
-              to: "ug/effort-rir#why-honesty-matters",
+              to: "ug/how-your-weight-is-chosen#the-anchor",
               text: "the same machinery as every other week",
             },
-            ", reading a body that has had its debt cleared.",
+            ", reading a recovered body.",
           ],
         },
       ],
@@ -216,119 +243,70 @@ export const UG_DELOADS: ManualChapter = {
     },
     // -----------------------------------------------------------------------
     {
-      slug: "when-you-need-one",
-      title: "When a deload is actually needed",
-      summary:
-        "The honest answer is thinner than the fitness-culture one: the app schedules them, and adjusts your sets week to week from your own feedback.",
-      keywords: [
-        "how often deload",
-        "do i need a deload",
-        "every 4 weeks",
-        "evidence",
-        "research",
-        "automatic deload",
-        "when to deload",
-      ],
-      blocks: [
-        {
-          kind: "para",
-          text: [
-            { strong: "The app deloads on a schedule." },
-            " A block is 3 to 8 weeks and the deload is its last week when you asked for one. Nothing watches for a moment to trigger one — that is a decision you make when you plan the block.",
-          ],
-        },
-        {
-          kind: "para",
-          text: [
-            "Between deloads, the app adjusts the dose instead. Joint pain and ",
-            {
-              to: "ug/how-it-felt#workload",
-              text: "how hard a session felt",
-            },
-            " each move an exercise's set count by one, week to week, which is a steadier way to manage fatigue than waiting for a valve to open.",
-          ],
-        },
-        { kind: "heading", text: "What the evidence supports" },
-        {
-          kind: "para",
-          text: "Surveyed competitive lifters all deload, typically for about a week, roughly every five to six weeks, mostly planned in advance and triggered by stalled performance, soreness or joint stress. That is a practice consensus, and the app's default sits inside it.",
-        },
-        {
-          kind: "callout",
-          tone: "honesty",
-          label: "The one trial tested something else",
-          text: "The only controlled trial of a planned mid-block deload had lifters take a week off entirely, and that group finished with slightly worse lower-body strength and no advantage anywhere else. A light week is a different intervention from a week off, so the trial argues against skipping training mid-block and says little about the week this app prescribes. Scheduling one every four to six weeks is a sensible convention rather than a proven rule.",
-        },
-        {
-          kind: "para",
-          text: "Which is a reason to treat the schedule as yours to set. If a block leaves you fresh, shorten the next one's deload out of the plan; if the last two weeks were a grind, keep it.",
-        },
-      ],
-      related: [
-        "ug/how-it-felt#workload",
-        "ug/deloads#choosing-to-have-one",
-      ],
-    },
-    // -----------------------------------------------------------------------
-    {
       slug: "choosing-to-have-one",
-      title: "Choosing to have one, or not",
+      title: "Adding one, and dropping one",
       summary:
-        "One checkbox while a block is still planned, and the block's length around it.",
+        "A checkbox while the block is planned, and two ways out of it once the block is running.",
       keywords: [
         "skip deload",
         "turn off deload",
         "final week is a deload",
         "block length",
         "no deload",
-        "change deload",
+        "end mesocycle",
       ],
       blocks: [
         {
           kind: "para",
           text: [
-            "A deload is a property of the block, set by ",
             { ui: "Final week is a deload" },
-            " when you plan it. Tick it and the last of your weeks becomes the deload; leave it clear and every week is a working week.",
-          ],
-        },
-        {
-          kind: "para",
-          text: [
-            "The block's length is the other half of the decision. A ",
+            " is the control, set when you plan the block. Tick it and your last week becomes the deload; leave it clear and every week is a working week. A ",
             { num: "6" },
-            "-week block with the box ticked gives you five working weeks and a deload; the same six weeks without it gives you six working weeks and no light week at the end.",
-          ],
-        },
-        { kind: "heading", text: "While it is still planned" },
-        {
-          kind: "para",
-          text: [
-            "Both are editable from the mesocycle's details sheet up until the block starts, alongside ",
-            {
-              to: "ug/effort-rir#the-weeks-ramp",
-              text: "the effort ramp",
-            },
-            ". Once a block is running its shape holds, and the sheet edits the name from then on.",
+            "-week block with it ticked gives you five working weeks and a deload.",
           ],
         },
         {
           kind: "para",
           text: [
-            "So a deload you decide you want mid-block is really a decision about the ",
-            { strong: "next" },
-            " one. Inside a running block, the tool for easing off is a ",
+            "Both the checkbox and the block length stay editable from the mesocycle's details sheet until the block starts, alongside ",
+            { to: "ug/effort-rir#the-weeks-ramp", text: "the effort ramp" },
+            ". After that the shape holds.",
+          ],
+        },
+        { kind: "heading", text: "Dropping it mid-block" },
+        {
+          kind: "para",
+          text: [
+            "Reaching the deload week and deciding you do not need it takes one step: the day view's ",
+            { ui: "…" },
+            " menu → ",
+            { ui: "End mesocycle" },
+            ", which skips the remaining days and marks the block complete. Everything you logged is kept, and your attendance figure is untouched because deload days never counted toward it.",
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "To keep part of it, use ",
+            { ui: "Skip remaining sets" },
+            " on the exercises you want to leave out and train the rest.",
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "For easing off inside a working week rather than at the end of a block, the tool is a ",
             {
               to: "ug/exercise-level-rir#backing-an-exercise-off",
               text: "per-exercise effort target",
             },
-            ", which can go as light as a deload on the exercises that need it while the rest of the week carries on.",
+            ", which can go as light as a deload on the exercises that need it.",
           ],
         },
       ],
       related: [
         "ug/exercise-level-rir#backing-an-exercise-off",
-        "ug/planning-a-mesocycle#naming-and-starting",
+        "ug/training-a-session#finishing-the-session",
       ],
     },
   ],

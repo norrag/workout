@@ -13,6 +13,7 @@ import {
   proseOf,
   REPO_ROOT,
   runText,
+  surfaceBlocks,
 } from "./helpers";
 import type { ManualBlock } from "../types";
 
@@ -248,28 +249,50 @@ describe("§8.2 — the honesty contract", () => {
     }
   });
 
-  it("states a live default only next to the parameter that sets it", () => {
-    // "currently 6 RIR (`deload.target_rir`)" is the shape: a number the
-    // engine owns is greppable back to the row that owns it, so a param change
-    // finds the prose that states it (§8.2, last bullet)
+  it("states a live default only in a section that cites the parameter", () => {
+    // §8.2's last bullet: a number the engine owns is greppable back to the row
+    // that owns it. Checked at SECTION scope rather than block scope since
+    // §8.4e rule 2 moved the citations into `detail` — the grep chain has to
+    // survive, but it no longer has to run through the reader's prose.
     for (const entry of everySection) {
-      for (const block of flatten(entry.section.blocks)) {
-        if (block.kind === "detail") continue;
+      const all = flatten(entry.section.blocks);
+      const citesSomewhere = all.some((block) =>
+        blockRuns(block).some(
+          (run) =>
+            typeof run !== "string" && "code" in run && citesParam(run.code),
+        ),
+      );
+      for (const block of surfaceBlocks(entry.section.blocks)) {
         const inlines = blockRuns(block);
         const text = inlines.map(runText).join(" ");
         if (!/\bcurrently\b/i.test(text)) continue;
-        const hasNumber = inlines.some(
-          (run) => typeof run !== "string" && "num" in run,
-        );
-        if (!hasNumber) continue;
-        const hasPath = inlines.some(
-          (run) =>
-            typeof run !== "string" && "code" in run && citesParam(run.code),
-        );
+        if (!inlines.some((run) => typeof run !== "string" && "num" in run)) {
+          continue;
+        }
         expect(
-          hasPath,
+          citesSomewhere,
           `${entry.id} states a current value with no engine_params path: "${text}"`,
         ).toBe(true);
+      }
+    }
+  });
+
+  it("names an engine parameter only in the exact-rule layer (§8.4e)", () => {
+    // Owner review round 6: "Do not mention app variable names, such as
+    // `e1rm.mod_max_rir`, outside of the exact-rules sections." A build
+    // identifier in layer 1–2 prose is the §8.4b rule 4 failure (the reader's
+    // words, not the build's) in its most literal form — and it is unnecessary,
+    // because the value itself is what the reader needs and `detail` is where
+    // the greppable name belongs.
+    for (const entry of everySection) {
+      for (const block of surfaceBlocks(entry.section.blocks)) {
+        for (const run of blockRuns(block)) {
+          if (typeof run === "string" || !("code" in run)) continue;
+          expect(
+            citesParam(run.code),
+            `${entry.id} names "${run.code}" outside a detail block — state the value, cite the parameter in layer 3`,
+          ).toBe(false);
+        }
       }
     }
   });

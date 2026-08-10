@@ -59,7 +59,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       slug: "the-anchor",
       title: "The strength anchor",
       summary:
-        "One number per exercise, taken from your best recent session and faded as it ages.",
+        "One number per exercise, taken from your strongest recent session — age decides which session, not what it is worth.",
       estimate: true,
       keywords: [
         "strength anchor",
@@ -82,16 +82,15 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Recent counts for more. Each set's weight in that search halves every ",
+            { strong: "Age decides which session wins, not what it is worth." },
+            " Each candidate is discounted by half for every ",
             { num: "30" },
-            " days (",
-            { code: "e1rm.recency_halflife_days" },
-            "), so a session from last week outweighs one from two months ago without the old one being thrown away.",
+            " days since you did it, so a recent session outranks an older and slightly better one. Once a session has won, the anchor is that session's own average at full value — ageing picks the numbers, it never shrinks them.",
           ],
         },
         {
           kind: "para",
-          text: "Which is why the anchor moves the way your training does: it climbs when you have been lifting more, and it settles rather than collapsing when you have been away.",
+          text: "So the anchor tracks your training: it climbs when you have been lifting more, and it holds rather than sliding when you have been away, because an old session that is still your best is still what gets used.",
         },
         {
           kind: "detail",
@@ -99,11 +98,15 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
             {
               kind: "para",
               text: [
-                "The strongest session is found by weighting each set's estimate by its age, then taking the session behind the winning set (",
+                "The winning set is the one maximising estimate × recency, where recency is ",
+                { num: "0.5" },
+                " raised to (days ÷ half-life). The anchor's value is then the mean of that set's whole session, undiscounted. Parameters: ",
                 { code: "e1rm.anchor_method" },
-                " is ",
+                " (",
                 { ui: "session_best" },
-                "). An exercise you last trained months ago still has an anchor — the weighting is relative among that exercise's own sets, so nothing ages out entirely.",
+                ") and ",
+                { code: "e1rm.recency_halflife_days" },
+                ". The discount is relative among one exercise's own sets, so a lift you last trained months ago still has an anchor.",
               ],
             },
           ],
@@ -176,9 +179,25 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
             {
               kind: "para",
               text: [
-                "The formulas are Epley and Brzycki, averaged up to ",
+                "With ",
+                { strong: "w" },
+                " the weight and ",
+                { strong: "r" },
+                " the effective reps (reps plus reps in reserve), the two formulas are Epley — ",
+                { num: "w × (1 + r ÷ 30)" },
+                " — and Brzycki — ",
+                { num: "w × 36 ÷ (37 − r)" },
+                ". They are averaged up to ",
+                { num: "10" },
+                " effective reps; above that Brzycki climbs away from Epley, so Epley runs alone.",
+              ],
+            },
+            {
+              kind: "para",
+              text: [
+                "Parameters: ",
                 { code: "e1rm.brzycki_max_eff_reps" },
-                " effective reps and Epley alone above it. The bands come from ",
+                " for the cutoff, ",
                 { code: "e1rm.high_max_eff_reps" },
                 " / ",
                 { code: "e1rm.high_max_rir" },
@@ -186,7 +205,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
                 { code: "e1rm.mod_max_eff_reps" },
                 " / ",
                 { code: "e1rm.mod_max_rir" },
-                ", and an anchor takes the best rating present in its session.",
+                " for the bands. An anchor takes the best rating present in its session.",
               ],
             },
           ],
@@ -417,10 +436,21 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
         },
         {
           kind: "para",
-          text: [
-            "A block whose goal is cutting or maintaining takes no steps at all (",
-            { code: "progression.goal_rate_factor" },
-            "). Holding your strength through a cut is the win there, and asking for more while you are eating less is asking for a miss.",
+          text: "A block whose goal is cutting or maintaining takes no steps at all. Holding your strength through a cut is the win there, and asking for more while you are eating less is asking for a miss.",
+        },
+        {
+          kind: "detail",
+          blocks: [
+            {
+              kind: "para",
+              text: [
+                "Which goals take steps is ",
+                { code: "progression.goal_rate_factor" },
+                ", currently ",
+                { num: "0" },
+                " for cut and maintain.",
+              ],
+            },
           ],
         },
         {

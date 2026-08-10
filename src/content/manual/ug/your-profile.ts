@@ -138,9 +138,7 @@ export const UG_YOUR_PROFILE: ManualChapter = {
               [
                 "From ",
                 { num: "40" },
-                " onward (",
-                { code: "macro_target.age_taper_start" },
-                "), targets move toward the cautious end of their range. A date rather than a number, so it stays true without you editing it.",
+                " onward, targets move toward the cautious end of their range. A date rather than a number, so it stays true without you editing it.",
               ],
             ],
             [
@@ -175,6 +173,16 @@ export const UG_YOUR_PROFILE: ManualChapter = {
         {
           kind: "detail",
           blocks: [
+            {
+              kind: "para",
+              text: [
+                "The age taper starts at ",
+                { code: "macro_target.age_taper_start" },
+                ", currently ",
+                { num: "40" },
+                ".",
+              ],
+            },
             {
               kind: "para",
               text: "Height, weight and body fat give lean mass for your height, placed between a modelled untrained baseline and a modelled ceiling. Your position between the two is what paces a long-term goal.",
