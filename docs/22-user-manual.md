@@ -317,7 +317,7 @@ one that will be missed if not called out.
 - **Why it exists** — the week's RIR ramp is one number for the whole week, and real training has exceptions. Origin case (worth telling, because it explains the design): a live nerve episode where a coach-agreed rehab plan had nowhere to live.
 - **The semantics**, in plain language: an assignment is **absolute** — set it and it wins, leave it unset and the exercise follows the week's ramp. It is **unbounded**, so one lever spans deload → rehab → extra effort. The load is repriced through the normal rep-window path, **symmetrically** — backing off and pushing harder are the same mechanism in opposite directions, not two features.
 - **Use case A — lower the effort (rehab, a niggle, a lift you are protecting).** Assign a higher target RIR; the load reprices down; the sets still count as work and volume, and **a protected block does not read as a decline** — a slot run easier than its week is tagged `BACKED OFF`, dropped from PRs, `best_e1rm` and the strength trend (from both sides, so it can neither set a PR nor raise the bar), kept in volume and adherence, and disclosed in one sentence wherever the number appears. How to unwind it when you are ready.
-  > **Source note (Phase 0a, folded in at Phase 1; amended 2026-08-10).** That reassurance is doc 21 **§6.2** — the read-time comparability policy — and it is what the chapter is built around. The **measuring band** (§6.1, `max_measuring_rir`) is a *different* rule, asked at the stamp: *is this a measurement at all*. It shipped **inactive** as v26 and **went live 2026-08-10**, so ch. 8 now carries both: §6.2 as the reassurance, the band as the boundary case past it (a target further than 8 reps from failure is priced and performed but not measured). Ch. 10 states the same rule as a fourth, unrated rating. Chs. 6 and 7 still omit it, because their ramp spans 0–5 RIR and cannot reach it. [`22b`](./22b-source-map.md) §4.1 ①, [`22a`](./22a-manual-claims.md) `D-21`.
+  > **Source note (Phase 0a, folded in at Phase 1; amended 2026-08-12).** That reassurance is doc 21 **§6.2** — the read-time comparability policy — and it is what the chapter is built around. The **measuring band** (§6.1, `max_measuring_rir`) is a *different* rule, asked at the stamp: *is this a measurement at all*. It went live in v26 and moved to **5 RIR** in v27, so ch. 8 carries both: §6.2 as the reassurance, the band as the boundary case past it (a target further than 5 reps from failure is priced and performed but not measured). Ch. 10 states the same rule as a fourth, unrated rating. Ch. 9 owns the consequence for the standard deload, now 8 RIR and therefore above the band. [`22b`](./22b-source-map.md) §4.1 ①, [`22a`](./22a-manual-claims.md) `D-21`/`D-22`.
 - **Use case B — raise the effort (a muscle the standard ramp does not limit).** The owner's case: systemic fatigue is not the constraint on small isolation work the way it is on heavy compounds, so a week sitting at 3 RIR can leave stimulus unclaimed on those exercises. Assign a lower target RIR. Cover the per-exercise set cap and the honest caveat that this buys stimulus with fatigue.
 - **The scopes** — `THIS WEEK` / `WORKING WEEKS` / `ALL WEEKS` — what each reaches, and specifically how they differ on deload coverage.
 - **Where the lever lives** — the day view and the exercise sheet, plus the planner board's flat column and why a per-week assignment reads `RIR BY WEEK` there instead of being flattened (N78). Phase 0b re-confirms these surfaces post-Batch-32.
@@ -342,7 +342,7 @@ Prose is written from that review, not from the open web.
 - **3 → 0 is a default, not a law**, and where in the app the ramp is set (meso create/edit start → end RIR).
 - **The relationship** — proximity to failure buys stimulus and costs fatigue, but not linearly: gains flatten past roughly 1–2 RIR while fatigue keeps climbing (Refalo 2023). "Closer to failure" is therefore not monotonically better, which is *why* the app ramps rather than sitting at 0.
 - **Ramps as style**, with the trade-off named for each: a conservative high-volume ramp (more sets tolerated, lower per-set fatigue); the standard hypertrophy ramp; a strength-biased pattern (closer to failure on the lifts that matter, effort spared elsewhere — usually expressed as a flatter ramp *plus* per-exercise assignments, which links chapter 8); a flat high-RIR ramp for maintenance or rehab.
-- **How ramp choice interacts with everything else** — set counts and deload timing. *(The fourth interaction — how much of your data is usable as a strength measurement — stays out of this chapter even now that v26 is live, on seam grounds: the ramp control spans 0–5 RIR, so no ramp choice can reach a band that starts above 8. Ch. 8's lever is the only way there. See §6.2's source note.)*
+- **How ramp choice interacts with everything else** — set counts and deload timing. *(The fourth interaction — how much of your data is usable as a strength measurement — stays out of this chapter on seam grounds: all working-ramp values remain measurable through v27's 5-RIR cutoff. Ch. 8 owns exercise-level targets beyond it; ch. 9 owns the appended 8-RIR deload. See §6.2's source note.)*
 
 **Constraint on the "example programs" ask (open question O7).** Naming
 third-party published programs means making checkable claims about someone else's
@@ -1042,7 +1042,7 @@ contracts green.
 >
 > **Three findings, all recorded in [`22a`](./22a-manual-claims.md), none fixed
 > here** ([§1.2](#12-scope-boundaries) again): **`D-08`** — the create-mesocycle
-> sheet hardcodes `DELOAD AT 4 RIR` while the live `deload.target_rir` is **6**,
+> sheet hardcodes `DELOAD AT 4 RIR` while the live `deload.target_rir` is **8**,
 > so the one screen where a user sets the deload up is the one screen that
 > misstates it; **`D-09`** — [`22c`](./22c-app-inventory.md) §B2.6 tabulated
 > *four* ways to start a block from the page's copy, but `Meso builder` renders
@@ -1318,8 +1318,10 @@ contracts green.
 >   inactive rule as their mental model. *(Amended 2026-08-10: they then activated
 >   it. The rule now exists — above 8 assumed RIR, not "8 or above", and keyed on
 >   the effort performed rather than on the back-off — and the chapter says so.
->   Everything else in this note holds: 4–8 RIR still anchors, and confidence is
->   still what holds the weight. `D-21`.)*
+>   `D-21`. **Amended again 2026-08-12:** v27 lowered the boundary to 5, so only
+>   work at 5 RIR or closer still anchors; confidence governs the 4–5 range and
+>   exclusion governs anything easier. The standard deload moved to 8 and now
+>   sits beyond the band by design.)*
 > - **Ch. 9 lost a section and gained a control.** *What a deload is* and *when
 >   you need one* merged, the *valve* / *shedding* / *performance debt* framing
 >   went, and the chapter now documents what the first draft had missed outright:

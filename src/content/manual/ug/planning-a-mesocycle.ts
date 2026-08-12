@@ -22,7 +22,7 @@
 //     SAVE CHANGES (`PlannerBoard.tsx:238–241`), and a completed/abandoned one
 //     redirects away from the board (`plan/page.tsx:57–60`)
 //   - **the create sheet's deload line is stale** — it hardcodes "4 RIR" while
-//     the live `deload.target_rir` is 6 (ledger `D-08`). The chapter states the
+//     the live `deload.target_rir` is 8 (ledger `D-08`). The chapter states the
 //     truth without quoting that line
 //   - claims are registered in `docs/22a-manual-claims.md`
 //

@@ -64,7 +64,7 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Open the reasoning under any exercise in a session and you get a short ledger, ruled off down its left edge. It has a fixed shape, and reading it in order answers most of what people want to know about a prescription.",
+          text: "The strip under each exercise states what to do and why the prescription changed. Read the underlined ask first, then the explanation beneath it.",
         },
         {
           kind: "table",
@@ -82,14 +82,12 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
         },
         {
           kind: "para",
-          text: "The ask reads instantly, because it comes from the row itself. The reasoning takes a moment longer, since the decision behind it is fetched — you may see a line saying it is being read, and if the connection drops you get a line you can tap to try again rather than a blank space.",
+          text: "The ask appears with the exercise. The reasoning loads from the saved prescription decision. If it cannot load, the line shows a retry control.",
         },
         {
           kind: "para",
           text: [
-            "Every number in either line is the program's. The lines are written from the recorded decision rather than composed freely, which is why the wording repeats between exercises — a held weight always reads the same way, so a run of them reads as ",
-            { strong: "one system" },
-            " rather than as several opinions.",
+            "Every number comes from the program. The explanation uses the saved decision, so the same type of decision uses the same wording across exercises.",
           ],
         },
       ],
@@ -116,7 +114,7 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "The ask line is underlined because it is a door. Tapping it opens Prescription details — the whole record behind that one exercise's numbers, in four parts. Most people never need it; it is there for the session where a number looks wrong and you want to see the working.",
+          text: "Tap the underlined ask to open Prescription details. Use this screen when a weight or rep count looks wrong and you want to inspect its source.",
         },
         {
           kind: "steps",
@@ -131,7 +129,7 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
             },
             {
               label: "Est. strength",
-              text: "The strength figures behind the load: what this prescription implies you can do, what it was aiming at, and the measured figure it was built from — named down to the set and the date it came from.",
+              text: "The implied strength, target strength, and measured source behind the load. The source names the exact set and date.",
             },
             {
               label: "Trace",
@@ -142,9 +140,9 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
         {
           kind: "para",
           text: [
-            "That third part is the one worth knowing about. The ",
+            "The ",
             { strong: "measured" },
-            " figure names the actual set behind it — a weight, its reps and the day you lifted it — so a prescription that looks surprising can always be traced to a session you can go and check.",
+            " figure names the exact set behind the prescription: its weight, reps, and date. Use it to trace a surprising prescription back to the source session.",
           ],
         },
       ],
@@ -157,8 +155,7 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
     {
       slug: "when-a-prescription-changes",
       title: "When a prescription changes",
-      summary:
-        "Two version stamps, and what it means when they differ.",
+      summary: "Two version stamps, and what it means when they differ.",
       keywords: [
         "version",
         "verified as of",
@@ -170,22 +167,22 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A prescription is worked out once and then kept, so the same numbers greet you every time you open the day. What keeps it honest is that the app re-checks it whenever something it depends on moves — a change to the block's effort ramp, to an exercise's weight jump, to your profile, or to the program's own settings.",
+          text: "A saved prescription stays the same each time you open the day. The app recalculates it when the effort ramp, load step, your profile, or a program setting changes.",
         },
         {
           kind: "para",
-          text: "The details sheet shows both halves of that as version stamps: the version the decision was worked out under, and the version it has since been checked against. Where the second is ahead of the first, the sheet says plainly that it was re-checked and the numbers did not move — which is a stronger statement than silence.",
+          text: "The details sheet shows the version that created the decision and the latest version that checked it. If a newer version checked the prescription without changing it, the sheet says so.",
         },
         {
           kind: "para",
           text: [
-            { strong: "Rechecking only ever touches what has yet to happen." },
-            " Sets you have logged are a record and stay exactly as you left them, whatever changes afterwards.",
+            { strong: "Rechecking only changes future work." },
+            " Logged sets remain exactly as you recorded them.",
           ],
         },
         {
           kind: "para",
-          text: "One case is called out rather than smoothed over: if the numbers on the row are no longer the numbers the recorded decision produced — because they were typed in directly — the sheet says so, and tells you that the record below describes the decision rather than what is on screen.",
+          text: "If someone manually edits the row after the decision was saved, the sheet marks the mismatch. The saved details explain the original decision; the row shows the current prescription.",
         },
       ],
       related: [
@@ -210,7 +207,7 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "One rule covers the whole strip: the program computes every weight, rep count, set count and effort target, and the words around them only ever describe what it computed. The ask and the reasoning are assembled from the recorded decision, which is why they can be checked against the details sheet line by line.",
+          text: "The program computes every weight, rep count, set count, and effort target. The ask and explanation describe the saved decision and can be checked against the details screen.",
         },
         {
           kind: "para",
@@ -224,7 +221,7 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
           kind: "callout",
           tone: "note",
           label: "The reasoning is the complete answer",
-          text: "A coaching line is additive by design: it appears where there is something worth adding and stays away otherwise, and the lines above it are a full explanation on their own. So a prescription that carries one and a prescription that does not are equally well explained — and either way, no line of prose has ever changed a number.",
+          text: "The ask and explanation are complete without a coaching line. When present, coaching adds advice but never changes the prescription.",
         },
         {
           kind: "para",

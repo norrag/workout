@@ -40,7 +40,8 @@ export const UG_GLOSSARY: ManualChapter = {
     {
       slug: "cycles",
       title: "Cycles and structure",
-      summary: "The four layers your training is organized into, largest first.",
+      summary:
+        "The four layers your training is organized into, largest first.",
       keywords: [
         "macrocycle",
         "mesocycle",
@@ -183,8 +184,7 @@ export const UG_GLOSSARY: ManualChapter = {
     {
       slug: "feedback-and-equipment",
       title: "Feedback and equipment",
-      summary:
-        "The two things the app asks you to rate after an exercise, and the size of a weight jump.",
+      summary: "Definitions for pump, soreness, and the size of a weight jump.",
       keywords: [
         "pump",
         "workload",

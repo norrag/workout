@@ -27,3 +27,4 @@ public/sw.js.map
 .DS_Store
 *.tsbuildinfo
 .vercel
+.env*

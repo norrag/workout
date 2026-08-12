@@ -106,8 +106,8 @@ behavior only*.
 Doc 22 §2.2 states: *"`engine_params` **v20** (earned-step progression) and
 **v23** (strength-rate band) shipped **inactive**, pending owner activation."*
 
-**Both were activated, and the chain has run four versions past them.** Read
-directly from `public.engine_params` on 2026-08-06:
+**Both were activated, and the chain has run seven versions past them.** Read
+directly from `public.engine_params`, most recently on 2026-08-12:
 
 | Version | Active? | What it carries |
 |---|---|---|
@@ -117,7 +117,15 @@ directly from `public.engine_params` on 2026-08-06:
 | 23 | superseded | two-component strength-rate model (doc 17 §2.7 / N43) — activated 2026-07-12 |
 | 24 | superseded | `rate_source` → `"plan"` over the corrected band — activated 2026-07-12 |
 | 25 | superseded | the doc 17 §7 / N36 self-gating **envelope loop** — active 2026-07-12 → 2026-08-10 |
-| **26** | **ACTIVE** | the doc 21 §6.1 **measuring band** (`e1rm.max_measuring_rir = 8`) — **activated 2026-08-10 18:05 UTC** |
+| 26 | superseded | the doc 21 §6.1 **measuring band** (`e1rm.max_measuring_rir = 8`) — active 2026-08-10 → 2026-08-12 |
+| **27** | **ACTIVE** | deload target **6 → 8** and measuring cutoff **8 → 5**, keeping standard past and future deload work out of strength anchors — **activated 2026-08-12** |
+
+> **Re-read 2026-08-12.** v27 is the active row — `params_hash f8dcfb51…`,
+> hash-verified. `get_engine_params(27, compare_to_version: 26)` returns exactly
+> two changes: `deload.target_rir` 6 → 8 and `e1rm.max_measuring_rir` 8 → 5.
+> Activation restamped stored e1RM values, so historical deload work prescribed
+> at 6 RIR and future standard deload work at 8 RIR are both above the cutoff
+> and do not enter strength anchors.
 
 > **Re-read 2026-08-10** (the v26 drift pass, ledger `D-21`). **v26 is now the
 > active row** — `params_hash 6dd02244…`, hash-verified, `e1rm.max_measuring_rir`
@@ -143,17 +151,17 @@ alone under-reports the live chain, and reading the repo is not sufficient.
 
 ### 4.1 What is NOT live
 
-Two things, since 2026-08-10. The manual documents neither.
+The retired first item is kept here because it explains the live boundary; the
+remaining two items are not live.
 
 **① ~~The measuring band~~ — RETIRED 2026-08-10: the band is LIVE.**
-`e1rm.max_measuring_rir` is `8` on the active v26 row, so `isMeasuringRir`
-returns `false` past it and a set at an assumed RIR **above 8** is priced,
+`e1rm.max_measuring_rir` is `5` on the active v27 row, so `isMeasuringRir`
+returns `false` past it and a set at an assumed RIR **above 5** is priced,
 performed and counted as volume while carrying no estimate (stamp `null`,
 rating `none`) and reaching neither the anchor nor any strength surface.
-**Ch. 8 and ch. 10 now carry it; every other chapter still must not**, because
-above 8 is reachable only through ch. 8's per-exercise lever — the week ramp
-stops at `5` and the deload at `6`. The two-rule distinction below stands and is
-the thing to keep straight; only the liveness column changed.
+**Ch. 8 and ch. 10 carry the general cutoff; ch. 9 carries its deload
+consequence.** The working-week ramp stops at the boundary (`5`), while the
+standard deload is now `8`. The two-rule distinction below still stands.
 
 > The original finding is kept verbatim below because it is still how the two
 > rules differ, and because ch. 8's §6.2 reassurance was written from it and
@@ -175,9 +183,8 @@ the thing to keep straight; only the liveness column changed.
 >
 > Both are on, and they are still **different rules**: a set can be inside the
 > band and backed off (measured, not comparable — the ordinary rehab case), or
-> past the band and backed off (not measured at all). The one combination the
-> data has never produced is past the band without a back-off, since only an
-> exercise-level assignment can put a slot above 8.
+> past the band and backed off (not measured at all). Since v27, a standard
+> deload is also past the band without needing an exercise-level assignment.
 >
 > The *reassurance the reader actually needs* — "a protected block does not read
 > as a decline" — is **§6.2, and it is live**: a slot run easier than its week is
@@ -211,8 +218,9 @@ line as conditional.
 
 ### 4.2 The active parameter values the manual may state
 
-Transcribed from the active row — v25 through 2026-08-10, **v26 since**, which
-moved no value in this table and added exactly one (`e1rm.max_measuring_rir`).
+Transcribed from the active row — v25 through 2026-08-10, v26 through
+2026-08-12, and **v27 since**, which changes the measuring cutoff and deload
+target together.
 Doc 22 §8.2 requires every numeric default the manual states to carry its
 `engine_params` path — this is the source table for those rows, and the **only**
 sanctioned set of numbers.
@@ -253,8 +261,8 @@ sanctioned set of numbers.
 | `e1rm.mod_max_eff_reps` / `mod_max_rir` | `12` / `3` | ch. 10 — moderate confidence |
 | `e1rm.anchor_method` | `"session_best"` | ch. 10 — the anchor |
 | `e1rm.recency_halflife_days` | `30` | ch. 10 — why old sessions fade |
-| `e1rm.max_measuring_rir` | **`8`** (live 2026-08-10) | **ch. 8 and ch. 10 only** — past this assumed RIR a set is priced but not measured. Elsewhere it is out of scope on seam grounds: nothing but ch. 8's lever reaches above 8 |
-| `deload.target_rir` | `6` | ch. 9 — the deload week's target RIR |
+| `e1rm.max_measuring_rir` | **`5`** (live v27, 2026-08-12) | ch. 8 and ch. 10 — past this assumed RIR a set is priced but not measured; ch. 9 owns the consequence for deloads |
+| `deload.target_rir` | **`8`** (live v27, 2026-08-12) | ch. 9 — the deload week's target RIR, above the measuring cutoff so standard deload work cannot enter the strength anchor |
 | `deload.load_pct` / `set_pct` | `0.55` / `0.5` | ch. 9 — **fallback path only** (see below) |
 | `deload_anchor_rir` | `true` | ch. 9 — with a confident anchor the deload load is chosen **the same way a working week's is** (window-centred reps at the higher deload RIR), not as a flat % of peak. `load_pct`/`set_pct` apply only when there is no usable anchor. `engine/index.ts:253` |
 | `rep_window.hypertrophy` | `6–15`, target `8–12` | ch. 10 — double progression |

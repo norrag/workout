@@ -61,19 +61,19 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Because each week's load is worked out afresh from your recent sessions rather than stepped along a fixed schedule. A lighter or shorter recent session moves ",
+            "Each week's load is recalculated from recent sessions. A lighter or shorter session can lower ",
             {
               to: "ug/how-your-weight-is-chosen#the-anchor",
-              text: "the figure it is priced off",
+              text: "the strength anchor",
             },
-            ", and the next ask follows. It is a re-read of where you are, not a penalty.",
+            ", which lowers the next prescription.",
           ],
         },
         { kind: "heading", text: "Why is it not adding weight every week?" },
         {
           kind: "para",
           text: [
-            "By design — the reps move first. Inside a block you work up the rep range at a load you have shown you can handle, and the load steps once the range is topped out. Meanwhile the effort target is stepping down, so a week at the same weight for one more rep is a harder week than the last one. ",
+            "The app increases reps before weight. It raises the weight after every set reaches the top of the rep range. A week at the same weight can still be harder when it adds a rep or lowers the target RIR. ",
             {
               to: "ug/how-your-weight-is-chosen#reps-first-then-weight",
               text: "Reps climb, then the weight steps",
@@ -84,7 +84,7 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         { kind: "heading", text: "The prescription changed mid-workout" },
         {
           kind: "para",
-          text: "That is current behavior and it follows from the same rule: sets you log feed the figure the app prices from, immediately. So logging a heavy first exercise can move what a later one asks for in the same session. The numbers you have already logged are untouched.",
+          text: "Logged sets update the strength anchor immediately. A heavy exercise early in the session can therefore change a later prescription that uses the same anchor. Sets already logged remain unchanged.",
         },
       ],
       related: [
@@ -108,22 +108,28 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         "where is my target",
       ],
       blocks: [
-        { kind: "heading", text: "My strength estimate fell after a good session" },
+        {
+          kind: "heading",
+          text: "My strength estimate fell after a good session",
+        },
         {
           kind: "para",
           text: [
-            "Usually one of two things. An estimate folds in how much you had left: at the same weight and reps, a set you stopped with two in reserve implies more strength than one taken to failure — so a session you pushed harder can score lower. Or you are comparing two different numbers: your ",
+            "Check the reported effort first. At the same weight and reps, a set with two reps in reserve produces a higher estimate than a set taken to failure. Next, confirm that you are comparing the same statistic. Your ",
             {
               to: "ug/reading-your-stats#reading-like-with-like",
               text: "stats show each estimate as recorded",
             },
-            ", while the figure behind your next prescription fades older sessions as they age.",
+            "; the strength anchor behind your next prescription gives less weight to older sessions.",
           ],
         },
-        { kind: "heading", text: "My best set was 115 for 11 and it shows 110" },
+        {
+          kind: "heading",
+          text: "My best set was 115 for 11 and it shows 110",
+        },
         {
           kind: "para",
-          text: "The same distinction. A lifetime best is the best single estimate you have produced; the figure your next weight is priced off is a recency-weighted read of a whole recent session, and it deliberately sits behind your best day.",
+          text: "A lifetime best is your highest single-set estimate. Your next weight uses a recency-weighted average from one recent session. That anchor will usually be lower than your best-ever set.",
         },
         { kind: "heading", text: "All my old numbers changed one day" },
         {
@@ -176,7 +182,7 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Sets are counted per muscle rather than per exercise: a full set toward the muscle a movement works directly, half toward each one it helps. Six sets of a compound lift can read as three for a muscle it only assists. ",
+            "Sets are counted by muscle. The primary muscle receives one set and each supporting muscle receives half. Six compound sets therefore count as three for an assisting muscle. ",
             {
               to: "ug/volume#why-a-set-can-count-as-half",
               text: "Why a set can count as half",
@@ -193,7 +199,7 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Within the block, yes — the extra set becomes the baseline the following weeks work from, which your ",
+            "Within the current block, an added set becomes the starting count for later weeks. Your ",
             {
               to: "ug/how-it-felt#what-your-answers-do",
               text: "feedback can then move again",
@@ -205,7 +211,7 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         {
           kind: "para",
           text: [
-            "They count as volume and can still set records, and they sit out the strength trend — a week meant to be light would otherwise read as a week you got weaker. ",
+            "Deload sets count toward volume and can set weight or volume records. They are excluded from the strength trend. ",
             {
               to: "ug/reading-your-stats#what-a-strength-read-leaves-out",
               text: "What a strength read leaves out",
@@ -252,7 +258,7 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Tucked behind a toggle on the Cycles tab that carries their count, so a long history stays out of the way of what you are training now. A finished block inside a running macrocycle stays visible, because it is that macrocycle's record.",
+            "The Cycles tab places completed standalone blocks under a toggle that shows their count. Finished blocks inside an active macrocycle remain visible with that macrocycle.",
           ],
         },
         { kind: "heading", text: "Which block am I in, if two are running?" },
@@ -317,9 +323,9 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         {
           kind: "para",
           text: [
-            "It is on your phone and it is queued. Logging records the set locally and advances the session straight away; sending it happens in the background and retries on its own. Where one is taking a while you get a ",
+            "The set is saved on your phone and queued for upload. The app retries in the background while you continue the session. If the upload is slow, tap ",
             { ui: "TRY AGAIN" },
-            " you can tap, and the session carries on either way. ",
+            ". ",
             {
               to: "ug/your-data#live-reads-and-queued-logging",
               text: "Live reads, queued logging",
@@ -330,12 +336,12 @@ export const UG_TROUBLESHOOTING: ManualChapter = {
         { kind: "heading", text: "A screen says there is no connection" },
         {
           kind: "para",
-          text: "Reading is live, so a page you open needs the network. Rather than showing yesterday's prescriptions as though they were today's, the app says the connection has dropped and offers a retry. Anything you logged before it dropped is safe on the phone and will send when you are back.",
+          text: "Pages need a network connection to load current prescriptions and stats. If the connection drops, the app shows a retry control. Sets already logged remain on your phone and upload when the connection returns.",
         },
         { kind: "heading", text: "Something else went wrong" },
         {
           kind: "para",
-          text: "Messages that end with a note about your connection mean exactly that — the action did not reach the server, so try it again. Anything else the app refuses, it refuses with a reason, and the reason is usually a rule protecting logged history.",
+          text: "A connection message means the action did not reach the server; retry it. Other refusals include the rule that blocked the action, often because it would change logged history.",
         },
       ],
       related: [
