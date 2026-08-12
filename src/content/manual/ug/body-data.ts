@@ -66,23 +66,19 @@ export const UG_BODY_DATA: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "The app keeps your bodyweight twice, on purpose. Your profile holds the one figure it works from — it is the load on a push-up, part of what a realistic goal looks like for you, and the number every screen shows with the date you last set it. Alongside it sits a dated series of measurements, which is what a long arc's mass result is read from.",
+          text: "The app keeps a current profile weight and a dated measurement history. The profile weight affects bodyweight exercises and goal estimates. The measurement history shows change over time and supplies a macrocycle's mass result.",
         },
         {
           kind: "table",
-          columns: ["Where you enter it", "Records a measurement", "Updates the profile figure"],
+          columns: [
+            "Where you enter it",
+            "Records a measurement",
+            "Updates the profile figure",
+          ],
           rows: [
             ["Your profile", "yes", "yes"],
-            [
-              ["The bodyweight chip in a session"],
-              "yes",
-              "yes",
-            ],
-            [
-              [{ ui: "Log bodyweight" }, " on the More tab"],
-              "yes",
-              "no",
-            ],
+            [["The bodyweight chip in a session"], "yes", "yes"],
+            [[{ ui: "Log bodyweight" }, " on the More tab"], "yes", "no"],
             ["A DEXA scan", "yes", "after you confirm it"],
           ],
         },
@@ -91,20 +87,17 @@ export const UG_BODY_DATA: ManualChapter = {
           text: [
             "So ",
             { ui: "Log bodyweight" },
-            " is for keeping the record: step on the scales, tap it in, and the series has the point. When you want the ",
+            " adds a dated measurement to your history. To change the weight the ",
             { strong: "app itself" },
-            " to work from a new figure — because you are three kilos up and your push-ups should reflect it — edit the bodyweight on your profile, which records the measurement as well.",
+            " uses for bodyweight exercises and goals, edit your profile. That also adds a dated measurement.",
           ],
         },
         {
           kind: "para",
-          text: "One point per day per source, so re-entering a day's weight replaces it rather than stacking a second reading. You can date a point in the past; a date in the future is refused, because a measurement is a record of something that happened.",
+          text: "Each source stores one bodyweight entry per day. Re-entering that day's weight replaces the earlier value. You can add a past date, but not a future date.",
         },
       ],
-      related: [
-        "ug/body-data#body-fat",
-        "ug/your-profile#body-and-age",
-      ],
+      related: ["ug/body-data#body-fat", "ug/your-profile#body-and-age"],
     },
     // -----------------------------------------------------------------------
     {
@@ -123,25 +116,25 @@ export const UG_BODY_DATA: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Body fat is the one profile field that arrives two ways, and the app labels which you have rather than merging them. A scan you have imported and applied gives you a measured value. Anything you enter yourself — a band you pick, or a figure you type — is recorded as an estimate.",
+          text: "Body fat can be measured or estimated. An imported scan supplies a measured value. A band or number you enter yourself is labelled as an estimate.",
         },
         {
           kind: "para",
           text: [
-            "The distinction is not cosmetic. It is what lets a macrocycle's closeout say ",
+            "A macrocycle uses measured scan data for its body-composition result. Without comparable scans, it reports ",
             { ui: "NOT MEASURED" },
-            " honestly instead of grading you against a guess you made a year ago, and it is why applying a scan is a decision you confirm rather than something a sync does to you.",
+            ". You choose whether to apply an imported scan to your profile.",
           ],
         },
         {
           kind: "para",
           text: [
-            "Leaving it blank is a reasonable choice. The ",
+            "If you leave body fat blank, the ",
             {
               to: "ug/macrocycle-goals#the-target-behind-it",
               text: "target model",
             },
-            " reads a representative figure for your height and weight instead, so completing the field later moves your targets by degrees rather than switching them to a different model. Its reach stops at the goal layer either way: the weight on the bar comes from your logged sets.",
+            " uses a representative value for your height and weight. Adding body fat later adjusts your goals. Your logged training still determines the weight on the bar.",
           ],
         },
         {
@@ -153,10 +146,7 @@ export const UG_BODY_DATA: ManualChapter = {
           ],
         },
       ],
-      related: [
-        "ug/body-data#importing-scans",
-        "ug/your-profile#body-and-age",
-      ],
+      related: ["ug/body-data#importing-scans", "ug/your-profile#body-and-age"],
     },
     // -----------------------------------------------------------------------
     {
@@ -180,7 +170,7 @@ export const UG_BODY_DATA: ManualChapter = {
             { ui: "More" },
             " → ",
             { ui: "BodySpec DEXA" },
-            " connects your BodySpec account and pulls in your scan history — lean mass, body fat, bone density and visceral fat, all measured rather than estimated. Where the connection has not been set up for the app you are running, the page says so instead of offering a button that would fail.",
+            " connects your account and imports lean mass, body fat, bone density, and visceral fat from your scans. If BodySpec is unavailable for this app installation, the page states that.",
           ],
         },
         {
@@ -203,9 +193,11 @@ export const UG_BODY_DATA: ManualChapter = {
         {
           kind: "para",
           text: [
-            "That third step is the rule the whole integration is built on: ",
-            { strong: "a measurement proposes and you decide" },
-            ". Importing a scan never changes your profile on its own, and either answer is final for that scan.",
+            {
+              strong:
+                "You decide whether an imported scan updates your profile.",
+            },
+            " Importing alone leaves the profile unchanged. Your choice is saved for that scan.",
           ],
         },
         {
@@ -264,7 +256,7 @@ export const UG_BODY_DATA: ManualChapter = {
           kind: "callout",
           tone: "honesty",
           label: "Scan quarterly, not monthly",
-          text: "Real lean-mass change accumulates slowly enough that a scan every three months or so is the first interval where the signal reliably clears the noise. Scanning more often mostly buys you differences you cannot act on.",
+          text: "Lean-mass changes are easier to distinguish from measurement error after about three months. More frequent scans often show differences too small to act on.",
         },
       ],
       related: [
@@ -289,18 +281,21 @@ export const UG_BODY_DATA: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Body data works at the macrocycle layer and stops there. It shapes what a realistic goal looks like for you, it is what a finished arc's mass and composition results are graded from, and on a cutting or gaining arc it gives you a measured resting metabolic rate for context.",
+          text: "Body data affects macrocycle goals and results. It helps set realistic targets, supplies the measurements used for mass and composition results, and adds measured resting metabolic rate to cutting or gaining plans.",
         },
         {
           kind: "para",
           text: [
-            { strong: "No weight you are asked to lift reads any of it." },
-            " Your next set comes from the sets you have already logged, which is a separate chain entirely — the one exception being movements where your bodyweight ",
+            {
+              strong:
+                "Your logged training sets determine the next weight you lift.",
+            },
+            " Body data only changes exercises where your bodyweight ",
             {
               to: "ug/exercises-and-templates#what-an-exercise-remembers",
               text: "is the load",
             },
-            ", and there it is the profile figure that counts.",
+            "; those exercises use your current profile weight.",
           ],
         },
         {
@@ -308,14 +303,14 @@ export const UG_BODY_DATA: ManualChapter = {
           text: [
             "The ",
             { ui: "MEASURED RMR" },
-            " figure is worked out from your lean mass and is there to be read, not acted on by the app. Your daily maintenance sits above it once you add the rest of your day, and it is context for the arc rather than an instruction.",
+            " figure is calculated from lean mass and shown for context. The app does not use it to set prescriptions or goals. Daily maintenance also includes energy used outside rest.",
           ],
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "The app watches training, not eating",
-          text: "Every goal figure assumes food and sleep are supporting the training, and the app has no way to check either. Treat a target as what the training could support, with the rest of it up to you.",
+          text: "Goal estimates assume that food and sleep support the training. The app does not monitor either, so actual results can differ.",
         },
       ],
       related: [

@@ -57,7 +57,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
           text: [
             "The ",
             { ui: "Exercises" },
-            " tab is every movement available to you — the stock library plus anything you have made or been sent. The same list is what the planner and the day screen pick from, so anything you find here can go into a plan.",
+            " tab contains the stock library, your custom exercises, and exercises shared with you. The planner and day screen use this same list.",
           ],
         },
         { kind: "heading", text: "Narrowing it" },
@@ -72,7 +72,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
             { ui: "back" },
             " and ",
             { ui: "cable" },
-            " and you get the movements that are both. The equipment row only ever offers what is actually left in the list you are looking at, so a filter can never leave you with nothing.",
+            " to show cable exercises for the back. The equipment choices update to match the current search and muscle filter.",
           ],
         },
         {
@@ -112,18 +112,18 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
           text: [
             "An exercise page has two tabs. ",
             { ui: "OVERVIEW" },
-            " is the summary — when you last did it, your best single set by weight, your best estimated one-rep max, your biggest set and biggest session by total weight moved, how many times you have trained it and since when. ",
+            " shows your latest session, best weight, best estimated one-rep max, highest-volume set and session, and training count. ",
             { ui: "HISTORY" },
-            " is the receipts.",
+            " lists every logged session.",
           ],
         },
         { kind: "heading", text: "The history tab" },
         {
           kind: "para",
           text: [
-            "Sessions are listed newest first and grouped under the block they belong to, each showing the sets as you logged them. Tapping the right-hand column flips it between the weight you lifted and what that session implies about your strength; ",
+            "Sessions appear newest first and are grouped by block. Tap the right column to switch between logged weight and estimated strength. ",
             { ui: "LOAD OLDER" },
-            " reaches further back.",
+            " retrieves earlier sessions.",
           ],
         },
         {
@@ -138,13 +138,13 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
               to: "ug/effort-rir#per-exercise",
               text: "set this exercise to run easier",
             },
-            " than the week asked. Both are there so a light week reads as a light week rather than as a decline.",
+            " than the week asked. These labels identify sessions that were deliberately easier than normal training.",
           ],
         },
         { kind: "heading", text: "Notes" },
         {
           kind: "para",
-          text: "A note you write during a session stays with that session in the history. A note you pin to the exercise itself sits at the top of the page on every visit — the right place for a setup detail like a seat height or a grip width you keep having to rediscover.",
+          text: "A session note stays with that session in the history. A pinned exercise note appears at the top of the exercise page every time. Use it for setup details you need repeatedly, such as seat height or grip width.",
         },
       ],
       related: [
@@ -183,7 +183,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
         { kind: "heading", text: "When to change it" },
         {
           kind: "para",
-          text: "The default follows the equipment, and mostly it is right. Set your own when the real thing behaves differently: a machine whose stack moves in fifteens, a lift where the smallest plates you own make a smaller step possible, or a movement where the standard jump is simply too much to hold form on.",
+          text: "The default load step comes from the equipment type. Change it when your equipment uses different increments or when the default jump is too large to maintain good form.",
         },
         {
           kind: "para",
@@ -270,7 +270,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
           kind: "callout",
           tone: "note",
           label: "DELETING ONE",
-          text: "An exercise you have logged sets on stays — logged history is never destroyed, and deleting the movement would take the sets with it. One a plan still uses stays too, until you take it out of the plan. In both cases the app says which of the two it is.",
+          text: "You can delete a custom exercise only when it has no logged sets and no current plan uses it. Otherwise, the app states which condition prevents deletion.",
         },
       ],
       related: [
@@ -283,7 +283,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
       slug: "templates",
       title: "Templates",
       summary:
-        "Saved splits — stock ones to start from, and your own, saved out of a block you have already shaped.",
+        "Start from a built-in weekly plan or save one of your own blocks for reuse.",
       keywords: [
         "template",
         "split",
@@ -297,7 +297,7 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A template is a week's structure with no history attached: days, muscle groups, exercises and a starting set count. It is the fastest way into a new block when you already know the shape you want.",
+          text: "A template stores days, muscle groups, exercises, and starting set counts. Use one to create a block without rebuilding its weekly structure.",
         },
         { kind: "heading", text: "Finding one" },
         {
@@ -360,13 +360,13 @@ export const UG_EXERCISES_AND_TEMPLATES: ManualChapter = {
         {
           kind: "para",
           text: [
-            { strong: "Their own copy, not a link to yours." },
-            " They can change it however they like and nothing reaches back to you; your later edits do not reach them either. A code is good for one redemption, so once someone has used it, sharing the same thing again gives you a fresh code for the next person.",
+            { strong: "The recipient receives an independent copy." },
+            " They can edit it without changing yours. Each code works once, so generate a new code for each additional recipient.",
           ],
         },
         {
           kind: "para",
-          text: "What travels is the structure, never your training. A shared block arrives as a plan for them to run, with its weights chosen from their own history when they start it — and it is captured the moment you hand the code over, so if you edit the block and share it again before anyone has used the code, the capture is brought up to date.",
+          text: "A share code sends the block's structure, not your training history. The recipient's weights come from their own history when they start. If you edit and reshare the block before the code is used, the code updates to the latest version.",
         },
         { kind: "heading", text: "Entering one" },
         {

@@ -66,9 +66,9 @@ export const UG_VOLUME: ManualChapter = {
         {
           kind: "para",
           text: [
-            "The count you see while building a block, the count on your stats, and the count the program consults before adding a set are the same arithmetic. A plan that reads ",
+            "Planning, stats, and weekly adjustments all use the same set count. If a plan shows ",
             { num: "14" },
-            " sets for back is a plan whose stats will read ",
+            " sets for back, completing it as written records ",
             { num: "14" },
             " when you have run it as written.",
           ],
@@ -86,7 +86,10 @@ export const UG_VOLUME: ManualChapter = {
                 "A logged set credits volume when it was not a warm-up and was taken reasonably close to failure — ",
                 { num: "4" },
                 " or fewer reps in reserve. A set with no reported effort counts too: the ask it was given stands unless you say otherwise, which is the same benefit of the doubt every other ",
-                { to: "ug/effort-rir#report-what-you-did", text: "unreported set" },
+                {
+                  to: "ug/effort-rir#report-what-you-did",
+                  text: "unreported set",
+                },
                 " gets.",
               ],
             },
@@ -97,10 +100,7 @@ export const UG_VOLUME: ManualChapter = {
           ],
         },
       ],
-      related: [
-        "ug/volume#why-a-set-can-count-as-half",
-        "ug/volume#the-band",
-      ],
+      related: ["ug/volume#why-a-set-can-count-as-half", "ug/volume#the-band"],
     },
     // -----------------------------------------------------------------------
     {
@@ -120,33 +120,36 @@ export const UG_VOLUME: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A row of pressing is chest work, and it is also triceps and shoulders work. Counting it once for chest and not at all for the others understates the week; counting it in full for all three overstates it badly.",
+          text: "A press trains the chest directly and also trains the triceps and shoulders. The app gives one full set to the primary muscle and half a set to each supporting muscle.",
         },
         { kind: "term", term: "fractional_sets" },
         { kind: "heading", text: "What it looks like on screen" },
         {
           kind: "para",
           text: [
-            "Half sets are why your counts carry decimals. Four sets of a press and three of dips, both chest-first with triceps alongside, give chest ",
+            "Four sets of a press and three sets of dips give the chest ",
             { num: "7" },
             " and triceps ",
             { num: "3.5" },
-            " — the triceps did real work, and it was not the work the chest did.",
+            ". The triceps receive half credit because they assist both movements.",
           ],
         },
         {
           kind: "para",
           text: [
-            "It is also why a day can look shorter than it felt. A leg day of squats, leg press and lunges is a big session, and quads may still read ",
+            "This is why a hard leg day can produce different totals for each muscle. Squats, leg press, and lunges may give your quads ",
             { num: "9" },
-            " while glutes and hamstrings pick up halves — the count is per muscle, and one hard day is not a week's work for any of them.",
+            " sets while your glutes and hamstrings receive fractional credit. The app counts each muscle separately across the full week.",
           ],
         },
         {
           kind: "para",
           text: [
             "Which muscles an exercise credits, and at which weight, comes from its ",
-            { to: "ug/exercises-and-templates#your-own-exercises", text: "primary and secondary muscles" },
+            {
+              to: "ug/exercises-and-templates#your-own-exercises",
+              text: "primary and secondary muscles",
+            },
             ". On a custom exercise that is your call to make.",
           ],
         },
@@ -175,7 +178,7 @@ export const UG_VOLUME: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Each muscle carries a range rather than a right answer: a floor worth clearing, a zone where the work pays, and a ceiling past which it is more than you are likely to recover from.",
+          text: "Each muscle has a weekly volume range: a minimum, a productive zone, and an upper limit that may be difficult to recover from.",
         },
         { kind: "term", term: "volume_landmarks" },
         {
@@ -183,13 +186,13 @@ export const UG_VOLUME: ManualChapter = {
           text: [
             "Between them sits a third mark, ",
             { strong: "MAV — maximum adaptive volume" },
-            " — the top of the productive zone. Under it, more sets generally buy more; between it and the ceiling the work still counts but fatigue climbs faster than the return.",
+            " — the top of the productive zone. Above it, additional sets still count, but fatigue increases faster than the likely benefit.",
           ],
         },
         { kind: "heading", text: "Why yours differs from someone else's" },
         {
           kind: "para",
-          text: "Every muscle has its own numbers — a back tolerates more weekly sets than a hamstring — and the whole band is then scaled by your training experience, so a beginner's range sits below an advanced lifter's on the same muscle.",
+          text: "Each muscle has its own volume range because muscles tolerate different amounts of work. The app then scales that range by training experience. A beginner therefore receives a lower range than an advanced lifter for the same muscle.",
         },
         {
           kind: "callout",
@@ -227,10 +230,7 @@ export const UG_VOLUME: ManualChapter = {
           ],
         },
       ],
-      related: [
-        "ug/volume#where-your-sets-show-up",
-        "ug/how-it-felt#workload",
-      ],
+      related: ["ug/volume#where-your-sets-show-up", "ug/how-it-felt#workload"],
     },
     // -----------------------------------------------------------------------
     {
@@ -252,7 +252,10 @@ export const UG_VOLUME: ManualChapter = {
           kind: "para",
           text: [
             "Two surfaces, doing different jobs. The planner board's ",
-            { to: "ug/planning-a-mesocycle#the-volume-check", text: "volume check" },
+            {
+              to: "ug/planning-a-mesocycle#the-volume-check",
+              text: "volume check",
+            },
             " judges a plan against the band before you run it — it is the one screen that calls a count high or low.",
           ],
         },
@@ -287,7 +290,7 @@ export const UG_VOLUME: ManualChapter = {
           kind: "para",
           text: [
             { ui: "BALANCE CHECK" },
-            " states two facts and stops there: your push-to-pull ratio, and which muscle carries the least. Both are worth a look when you next plan a block.",
+            " shows your push-to-pull ratio and the muscle with the fewest weekly sets. Use both when reviewing the balance of your next block.",
           ],
         },
         {
@@ -346,13 +349,16 @@ export const UG_VOLUME: ManualChapter = {
         { kind: "heading", text: "What it is good for" },
         {
           kind: "para",
-          text: "Within one exercise it is a fair read of a session's total work, and a rising figure across a block usually means the block was going well. Across exercises it is dominated by the heavy ones — a leg press session outweighs a lateral raise session several times over without meaning more was asked of you.",
+          text: "Within one exercise, total weight moved can compare the size of different sessions. It does not compare exercises fairly because heavy exercises dominate the total.",
         },
         {
           kind: "para",
           text: [
-            "So the two live side by side and answer different questions. Sets per muscle is the one the plan is built and judged on; pounds moved is a tally of the work behind it, and ",
-            { to: "ug/volume#the-band", text: "the band judges neither of them by weight" },
+            "Sets per muscle guide the plan and its volume range. Total weight moved describes how much load you handled. ",
+            {
+              to: "ug/volume#the-band",
+              text: "the volume range uses sets, not pounds",
+            },
             ".",
           ],
         },

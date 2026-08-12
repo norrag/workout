@@ -62,7 +62,7 @@ export const UG_HOW_IT_FELT: ManualChapter = {
         },
         {
           kind: "para",
-          text: "One set is the whole range of the move, and it lands on the same day of the following week — Tuesday's answers meet you next Tuesday, on the muscle they were about.",
+          text: "Feedback can change the prescription by one set. The change applies to the same muscle on the same day of the following week.",
         },
         { kind: "heading", text: "Every answer, and what it moves" },
         {
@@ -75,7 +75,7 @@ export const UG_HOW_IT_FELT: ManualChapter = {
             ],
             [
               "Workload",
-              "the main dial on set count — too much takes a set off, too easy can add one",
+              "the main input for set count — too much removes one set; too easy can add one",
             ],
             [
               "Pump",
@@ -95,7 +95,10 @@ export const UG_HOW_IT_FELT: ManualChapter = {
           kind: "para",
           text: [
             "Wherever an answer moved a number, the ",
-            { to: "ug/training-a-session#the-day-screen", text: "prescription strip" },
+            {
+              to: "ug/training-a-session#the-day-screen",
+              text: "prescription strip",
+            },
             " on that exercise says which one did it, in the same words you used to answer. The sections that follow are the reasoning behind each row.",
           ],
         },
@@ -104,7 +107,10 @@ export const UG_HOW_IT_FELT: ManualChapter = {
           tone: "note",
           text: [
             "Skipping the questions is a real option — an unanswered muscle simply holds where it is. The sheets themselves are in ",
-            { to: "ug/training-a-session#how-it-went", text: "the session chapter" },
+            {
+              to: "ug/training-a-session#how-it-went",
+              text: "the session chapter",
+            },
             ".",
           ],
         },
@@ -151,8 +157,11 @@ export const UG_HOW_IT_FELT: ManualChapter = {
         {
           kind: "para",
           text: [
-            "That is the whole of it: reporting pain is what makes the program ease off, and it does so on the exercise you reported it against rather than on your whole week. If you want to keep training the movement at a lower effort while it settles, that is what ",
-            { to: "ug/effort-rir#per-exercise", text: "an exercise's own effort target" },
+            "Reporting pain makes the program reduce work for that exercise. It does not change the rest of the week. To keep the movement at a lower effort while it settles, use ",
+            {
+              to: "ug/effort-rir#per-exercise",
+              text: "an exercise's own effort target",
+            },
             " is for.",
           ],
         },
@@ -194,15 +203,12 @@ export const UG_HOW_IT_FELT: ManualChapter = {
           ],
         },
       ],
-      related: [
-        "ug/how-it-felt#workload",
-        "ug/effort-rir#per-exercise",
-      ],
+      related: ["ug/how-it-felt#workload", "ug/effort-rir#per-exercise"],
     },
     // -----------------------------------------------------------------------
     {
       slug: "workload",
-      title: "Workload is the dial that moves sets",
+      title: "How workload changes sets",
       summary:
         "How much work that muscle got — the answer the set count is really built on.",
       keywords: [
@@ -241,7 +247,7 @@ export const UG_HOW_IT_FELT: ManualChapter = {
         },
         {
           kind: "para",
-          text: "Rating a session honestly hard is worth doing. Nothing is taken away as a penalty — the count comes back to an amount you can recover from and repeat, which is what keeps the work productive.",
+          text: "Report a session as too hard when the same workload would be difficult to recover from and repeat. The program removes one set the following week.",
         },
         {
           kind: "detail",
@@ -285,10 +291,7 @@ export const UG_HOW_IT_FELT: ManualChapter = {
           ],
         },
       ],
-      related: [
-        "ug/how-it-felt#pump-and-soreness",
-        "ug/volume#the-band",
-      ],
+      related: ["ug/how-it-felt#pump-and-soreness", "ug/volume#the-band"],
     },
     // -----------------------------------------------------------------------
     {
@@ -313,7 +316,7 @@ export const UG_HOW_IT_FELT: ManualChapter = {
         { kind: "term", term: "pump" },
         {
           kind: "para",
-          text: "A set is added only when an easy session came with a strong pump — evidence that the muscle was reached and simply was not given enough of it. A light session with nothing much happening is a reason to look at the exercise, not to do more of it, and that is what the program suggests when it sees one.",
+          text: "An easy session adds a set only when you also report a strong pump. If the session felt easy but produced little pump, the app suggests reviewing the exercise instead.",
         },
         {
           kind: "para",
@@ -322,13 +325,13 @@ export const UG_HOW_IT_FELT: ManualChapter = {
         { kind: "heading", text: "Soreness" },
         {
           kind: "para",
-          text: "The soreness question is about the last time you trained that muscle, and it is kept with the session as part of your record — yours to read back, and a connected AI's to reason about across a block. Set counts are decided from workload, pump and pain.",
+          text: "Soreness records how the muscle felt after you last trained it. It stays in your session history for you and a connected AI to review across the block. Workload, pump, and pain determine set-count changes.",
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "Neither one measures growth",
-          text: "A big pump and days of soreness feel like proof that a session worked. They are weak signals — they track novelty and damage as much as anything productive — which is why one only ever corroborates and the other is kept rather than acted on.",
+          text: "Pump and soreness are limited measures of training quality. Pump can support a set increase when workload was easy. Soreness is recorded for later review but does not change the prescription.",
         },
         {
           kind: "detail",
@@ -385,25 +388,25 @@ export const UG_HOW_IT_FELT: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "The three sliders on the completion sheet are about the day as a whole, and they act on the weight rather than on the work. A session that went badly holds next week's increase where it is.",
+          text: "The three completion sliders describe the whole session. Fatigue and performance can withhold next week's weight increase; they do not change the set count.",
         },
         {
           kind: "para",
           text: [
-            { strong: "It takes both signals." },
-            " A hard day you performed well on is a good session, and it is treated as one — the increase goes ahead. What holds the weight is being wiped out ",
-            { strong: "and" },
-            " having the day read as off. That combination is the one that says the rise would be built on a bad reading.",
+            {
+              strong: "High fatigue and poor performance must occur together.",
+            },
+            " High fatigue alone does not block an increase when performance was good.",
           ],
         },
         { kind: "heading", text: "What a hold is, and is not" },
         {
           kind: "para",
-          text: "A hold keeps the weight you already handled and re-derives the reps to match, so the ask stays internally consistent instead of becoming a heavier weight the day did not support. It never reaches backwards, and it never takes weight off.",
+          text: "A hold keeps the weight you already handled and recalculates the reps to match. It prevents an increase but does not reduce the weight.",
         },
         {
           kind: "para",
-          text: "Effort is kept with the session rather than fed into that decision — how hard a day felt is worth having on the record next to what you actually lifted, and it is there when you or a connected AI read the block back.",
+          text: "Effort records how hard the whole session felt. It stays beside what you lifted for you and a connected AI to review, but it does not decide the next weight.",
         },
         {
           kind: "detail",

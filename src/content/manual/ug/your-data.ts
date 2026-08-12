@@ -64,7 +64,7 @@ export const UG_YOUR_DATA: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Everything the app holds about you comes from something you entered. There is no tracking layer underneath it and no second copy of your training kept for other purposes.",
+          text: "The app stores the training, plans, profile, and body data you enter. It does not collect a separate background activity record.",
         },
         {
           kind: "list",
@@ -85,7 +85,7 @@ export const UG_YOUR_DATA: ManualChapter = {
         },
         {
           kind: "para",
-          text: "All of it is scoped to your account. Every read the app makes is filtered to the signed-in person by the database itself rather than by the screen asking, which is the layer that matters: a bug in a screen cannot reach past it.",
+          text: "The database restricts every read to the signed-in account. This protection applies before a page receives the data.",
         },
         {
           kind: "para",
@@ -94,12 +94,12 @@ export const UG_YOUR_DATA: ManualChapter = {
             { ui: "More" },
             " → ",
             { ui: "Account & data" },
-            ". It carries one logging preference — ",
+            ". It includes the logging preference for ",
             {
               to: "ug/training-a-session#logging-a-set",
               text: "matching a weight across an exercise's sets",
             },
-            " — and the two things this chapter is about: taking a copy, and deleting the lot.",
+            ", plus controls to export your data or delete your account.",
           ],
         },
       ],
@@ -127,7 +127,7 @@ export const UG_YOUR_DATA: ManualChapter = {
           kind: "para",
           text: [
             { ui: "Export training data" },
-            " gives you your whole logged history as a single spreadsheet file. One row per set, oldest first, and each row carries the context it needs — so a row makes sense without the rest of the file around it.",
+            " downloads one spreadsheet row for every logged set, oldest first. Each row includes its date, place in the plan, exercise, weight, reps, effort, set type, and note.",
           ],
         },
         {
@@ -139,13 +139,19 @@ export const UG_YOUR_DATA: ManualChapter = {
               "Where in the plan",
               "the block, the week, whether that week was a deload, the week's effort target, and the day",
             ],
-            ["What you did", "the exercise, the set number, the weight, the reps, and the effort you reported"],
-            ["Anything you added", "whether it was a warm-up, the kind of set, and your note"],
+            [
+              "What you did",
+              "the exercise, the set number, the weight, the reps, and the effort you reported",
+            ],
+            [
+              "Anything you added",
+              "whether it was a warm-up, the kind of set, and your note",
+            ],
           ],
         },
         {
           kind: "para",
-          text: "It is a plain spreadsheet file, so anything that opens a spreadsheet will read it. What it holds is what you logged; the estimates and trends the app builds on top are worked out from these same rows, so a copy of them is a copy of everything downstream.",
+          text: "The export is a CSV file that spreadsheet apps can open. It contains the logged sets used to calculate the app's stats and trends.",
         },
       ],
       related: [
@@ -175,25 +181,25 @@ export const UG_YOUR_DATA: ManualChapter = {
             { ui: "Account & data" },
             " → ",
             { ui: "Delete account" },
-            " removes your account and every piece of training data attached to it: macrocycles, blocks, logged workouts, your own exercises, notes and feedback. It is permanent, and the app says so before it asks for anything.",
+            " permanently removes your account, macrocycles, blocks, logged workouts, custom exercises, notes, and feedback.",
           ],
         },
         {
           kind: "para",
           text: [
-            "The screen points you at the export first, and that ordering is deliberate — ",
+            "Use ",
             {
               to: "ug/your-data#taking-a-copy",
-              text: "take the copy",
+              text: "the export",
             },
-            " while there is still something to copy. Then the confirmation: the button stays inert until you type ",
+            " before deletion if you want to keep a copy. To confirm deletion, type ",
             { ui: "DELETE" },
-            " into the field above it.",
+            " into the field; this enables the button.",
           ],
         },
         {
           kind: "para",
-          text: "Deletion runs in one step, from the account outward, so there is no partial state left behind and no window where some of it is gone and some of it is not.",
+          text: "Deletion removes the account and its attached data in one operation.",
         },
       ],
       related: [
@@ -224,25 +230,25 @@ export const UG_YOUR_DATA: ManualChapter = {
           kind: "para",
           text: [
             { strong: "Reading is live." },
-            " Prescriptions are worked out from your most recent sessions, so a page opens against the current state or it tells you it cannot. With no connection you get a short screen saying so, with a button to retry — rather than yesterday's numbers presented as today's.",
+            " Pages use the latest data from the server. Without a connection, the app shows a retry screen instead of displaying an older prescription as current.",
           ],
         },
         {
           kind: "para",
           text: [
             { strong: "Logging is queued." },
-            " Tapping a set records it on your phone and moves you straight on to the next one; sending it to the server happens in the background, retrying on its own until it lands. A dead spot mid-exercise costs you nothing and interrupts nothing.",
+            " Tapping a set records it on your phone immediately. The app sends it to the server in the background and retries until it succeeds, so you can continue logging through a weak connection.",
           ],
         },
         {
           kind: "para",
           text: [
-            "The session shows you when it is still catching up, and finishing a workout waits for the queue to drain — ",
+            "The session shows when sets are still waiting to upload. When you finish, ",
             {
               to: "ug/training-a-session#finishing-the-session",
               text: "the completion step",
             },
-            " tells you it is saving the last sets rather than closing over work that has yet to arrive.",
+            " waits until the remaining sets reach the server.",
           ],
         },
       ],
@@ -269,19 +275,19 @@ export const UG_YOUR_DATA: ManualChapter = {
         {
           kind: "para",
           text: [
-            "The foot of the More tab carries the version you are running and a link to ",
+            "The bottom of the More tab shows the installed version and links to ",
             { ui: "what's new" },
-            " — every release, newest first, with the ones that added something written out in full and the smaller fixes collapsed to a line you can open.",
+            ". The page lists every release newest first. Feature releases include full notes; fix releases appear as expandable one-line entries.",
           ],
         },
         {
           kind: "para",
-          text: "When a release adds something, a sheet tells you once, the next time you open the app. Dismissing it is what marks it as read, so closing the app mid-sheet brings it back rather than losing it. Come back after three such releases and you get one sheet covering all three.",
+          text: "After a feature release, a sheet appears the next time you open the app. Dismissing the sheet marks it as read. If you miss several releases, one sheet includes all of them.",
         },
         {
           kind: "para",
           text: [
-            "It stays out of your way while you train: it never appears over a workout you have started logging, and it waits until the last of your sets has been sent. The history page carries the same words for whenever you want to read them, so the sheet can afford to appear exactly once.",
+            "The sheet waits until you are outside an active workout and all sets have uploaded. The release history keeps the same notes for later.",
           ],
         },
       ],

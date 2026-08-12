@@ -65,11 +65,11 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "An AI assistant is good at reading a lot of numbers and saying something useful about them, and hopeless at it when the numbers are ones you had to type into a chat window. The connector closes that gap: you link a client such as Claude to your account once, and from then on it can read your training directly.",
+          text: "The connector lets an AI assistant such as Claude read your training data directly. You link the assistant to your account once, then ask questions without copying sessions into a chat.",
         },
         {
           kind: "para",
-          text: "What that buys you is answers about your actual training. Which lifts have moved this block and which have stalled. Whether a muscle has been under-trained across a whole macrocycle. What a sensible next block looks like given how the last one went — drafted into the app, ready for you to look over.",
+          text: "You can ask which lifts improved, whether a muscle received enough volume, or what the next block should contain. The assistant can draft that block in the app for you to review.",
         },
         {
           kind: "para",
@@ -85,10 +85,7 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
           label: "The AI manual — setup, capabilities, and worked examples",
         },
       ],
-      related: [
-        "ug/connecting-an-ai#setting-one-up",
-        "ai/what-it-is#the-idea",
-      ],
+      related: ["ug/connecting-an-ai#setting-one-up", "ai/what-it-is#the-idea"],
     },
     // -----------------------------------------------------------------------
     {
@@ -163,10 +160,6 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
       ],
       blocks: [
         {
-          kind: "para",
-          text: "Two kinds of work, and the second is the one people underrate.",
-        },
-        {
           kind: "table",
           columns: ["Ask it to", "Because"],
           rows: [
@@ -187,12 +180,12 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
         {
           kind: "para",
           text: [
-            "It reaches two things the app itself does not display: your macrocycle's ",
+            "A connected assistant can also read your macrocycle's ",
             {
               to: "ug/macrocycle-goals#the-target-behind-it",
               text: "target range",
             },
-            ", and a pair of per-exercise levers — a working-set cap and where in the rep range an exercise sits — which the app shows once they are set.",
+            ". It can set an exercise's working-set cap and its position within the rep range. The app shows those values after they are set.",
           ],
         },
         {
@@ -203,7 +196,7 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
               to: "ug/training-a-session#notes",
               text: "notes are legible to it too",
             },
-            ", which is what makes them worth writing: a note about a cranky elbow is the context an assistant needs to suggest something that works around it.",
+            ". A note about a painful elbow gives the assistant the context needed to suggest a suitable adjustment.",
           ],
         },
       ],
@@ -251,13 +244,13 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
         },
         {
           kind: "para",
-          text: "So when an assistant tells you it could not do something, read it as a rule rather than a fault. Deleting a block with logged sets, removing a stock exercise, dropping a block you are part-way through — each of those is refused on purpose, and the refusal comes back with the reason.",
+          text: "A refusal includes the rule that blocked the request. For example, an assistant cannot delete logged training, remove a stock exercise, or delete a block already in progress.",
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "It reads the numbers; it does not make them",
-          text: "Every weight, rep count and set count still comes from the program, and an assistant surfaces and interprets those rather than inventing its own. Where it offers an opinion about your training, treat it as an opinion — an informed one, worked from your real history, but not a measurement.",
+          text: "The program still sets every weight, rep count, and set count. An assistant can explain those numbers and offer advice based on your history. Treat that advice as an opinion, not a measurement.",
         },
       ],
       related: [

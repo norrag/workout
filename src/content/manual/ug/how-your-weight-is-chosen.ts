@@ -35,15 +35,15 @@
 // biases" rationale holds only inside the band. Ch. 6 states the rule in its
 // layer 3 (`C-e1rm-03`); this chapter states WHY.
 //
-// THE MEASURING BAND IS LIVE (ledger `D-21`, 2026-08-10): v26 activated
-// 2026-08-10 18:05 UTC, so `e1rm.max_measuring_rir` is 8 on the active row and
-// `isMeasuringRir` returns false past it — a set at an assumed RIR above 8 is
+// THE MEASURING BAND IS LIVE (ledger `D-21`, updated for v27 on 2026-08-12):
+// `e1rm.max_measuring_rir` is 5 on the active row and `isMeasuringRir` returns
+// false past it — a set at an assumed RIR above 5 is
 // stamped `none`, carries no estimate, and leaves the anchor and every strength
 // surface while volume keeps it. `GLOSSARY.e1rm_confidence` carries the
 // sentence again (`D-14`'s restore condition, 22b §8 **O-B**), so this chapter
-// renders it through the card and states the rule in its own ladder. Above 8 is
-// reachable only through ch. 8's per-exercise lever (the ramp stops at 5, the
-// deload at 6), which is why only these two chapters carry it.
+// renders it through the card and states the rule in its own ladder. A working
+// ramp can reach the boundary at 5; ch. 8 owns exercise-level targets past it,
+// and ch. 9 owns the standard deload at 8.
 //
 // RE-CHECK BEFORE EDITING: true only while `e1rm.max_measuring_rir` is on the
 // ACTIVE row (22b §4.2) — doc 22 **O3** forbids documenting an inactive one.
@@ -61,7 +61,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
   number: 10,
   title: "How your next weight is chosen",
   summary:
-    "The whole chain, in order: your sets become an estimate, the estimates become one anchor per exercise, the anchor becomes a weight, and a clean week earns one step on top of it.",
+    "Your recent sets establish a strength anchor, which sets the next weight; a completed session can earn one small increase.",
   sections: [
     // -----------------------------------------------------------------------
     {
@@ -81,25 +81,25 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Four steps, and every weight the app asks of you comes out of them. Each set you log becomes a strength estimate. The estimates for one exercise fold into a single anchor. The anchor picks a weight for the reps and effort this week asks. And a week you completed cleanly earns one step on top of that.",
+          text: "Each logged set produces a strength estimate. The app averages one recent session into an anchor for that exercise. It uses the anchor to choose this week's weight, then adds one small increase when the previous session qualified.",
         },
         { kind: "heading", text: "How the anchor is built" },
         {
           kind: "para",
-          text: "The anchor is not your best-ever set, and it is not an average of everything. The app finds your strongest recent session for that exercise, then takes that whole session — every working set in it — and averages them. One freak set cannot carry it, and one bad set cannot sink it.",
+          text: "The anchor is the average strength estimate from your best eligible recent session. Using every working set in that session reduces the effect of one unusually good or bad set.",
         },
         {
           kind: "para",
           text: [
-            { strong: "Age decides which session wins, not what it is worth." },
-            " Each candidate is discounted by half for every ",
+            { strong: "Recency helps select the session." },
+            " Each candidate's score is reduced by half for every ",
             { num: "30" },
-            " days since you did it, so a recent session outranks an older and slightly better one. Once a session has won, the anchor is that session's own average at full value — ageing picks the numbers, it never shrinks them.",
+            " days since you did it, so a recent session can outrank an older, slightly stronger one. After selection, the anchor uses the winning session's actual average without the recency discount.",
           ],
         },
         {
           kind: "para",
-          text: "So the anchor tracks your training: it climbs when you have been lifting more, and it holds rather than sliding when you have been away, because an old session that is still your best is still what gets used.",
+          text: "The anchor rises when your recent sessions improve. Time away does not lower it by itself. Until you log better work, the best eligible recent session remains the anchor.",
         },
         {
           kind: "detail",
@@ -131,7 +131,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       slug: "how-sharp-the-estimate-is",
       title: "How sharp the estimate is",
       summary:
-        "Two things blunt a strength estimate — a very long set, and a set stopped a long way from failure.",
+        "Long sets and sets stopped far from failure produce less reliable strength estimates.",
       estimate: true,
       keywords: [
         "confidence",
@@ -168,12 +168,15 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
                 " short",
               ],
             ],
-            [[{ strong: "Low" }], "longer than that, easier than that, or logged with no effort reported"],
+            [
+              [{ strong: "Low" }],
+              "longer than that, easier than that, or logged with no effort reported",
+            ],
             [
               [{ strong: "Not rated" }],
               [
                 "further than ",
-                { num: "8" },
+                { num: "5" },
                 " reps from failure — the set counts as work and as volume, and the app reads no strength from it",
               ],
             ],
@@ -182,13 +185,13 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
         { kind: "heading", text: "Why two formulas, and why only sometimes" },
         {
           kind: "para",
-          text: "Two standard formulas turn a set into an estimated max, and they disagree as sets get long. Over short heavy sets they sit close together, so the app averages them and the small errors partly cancel. Past about ten effective reps one of them starts running away upward, so above that point the app drops it and uses the steadier one alone.",
+          text: "The app calculates estimated strength with the Epley and Brzycki formulas. Their results are similar for short, heavy sets, so the app averages them through ten effective reps. Above ten, it uses only Epley because Brzycki rises too quickly.",
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "Lean on the band, not the digit",
-          text: "A low-confidence estimate is a rough read, and the app shows it rather than hiding it — a wrong number you can see is worth more than a gap. Judge a trend across sessions rather than a single figure.",
+          text: "Treat a low-confidence estimate as a rough reading. Judge the trend across several sessions instead of relying on one figure.",
         },
         {
           kind: "detail",
@@ -253,7 +256,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "The question the app answers each week is narrow: given what you can currently do, what weight would land the reps we are asking for, at the effort we are asking for? Everything else in this chapter is either the input to that question or a governor on the answer.",
+          text: "The app chooses the weight expected to place this week's reps at this week's effort target. Your strength anchor supplies the starting point, and the block goal supplies the allowed rep range.",
         },
         {
           kind: "para",
@@ -263,7 +266,11 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
           kind: "table",
           columns: ["Block goal", "Aims for", "Allowed to reach"],
           rows: [
-            ["growth, cutting, maintaining", [{ num: "8–12" }, " reps"], [{ num: "6–15" }]],
+            [
+              "growth, cutting, maintaining",
+              [{ num: "8–12" }, " reps"],
+              [{ num: "6–15" }],
+            ],
             ["strength", [{ num: "3–5" }, " reps"], [{ num: "2–6" }]],
           ],
         },
@@ -276,7 +283,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
               to: "ug/exercises-and-templates#the-load-step",
               text: "load step",
             },
-            " — and the reps are then worked out again from the rounded weight, so the weight, the reps and the effort target you are shown always agree with each other.",
+            ". The app then recalculates the reps from that rounded weight. The displayed weight, reps, and effort target therefore describe the same set.",
           ],
         },
         {
@@ -287,7 +294,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
               to: "ug/exercise-level-rir#why-one-exercise-differs",
               text: "exercise's own",
             },
-            " where one is set. A higher target buys a lighter weight for the same reps, which is the whole of how backing off works.",
+            " where one is set. For the same reps, a higher target produces a lighter weight.",
           ],
         },
       ],
@@ -313,7 +320,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Weight is the coarse dial and reps are the fine one, so the app moves the fine one first. Inside a block you work up the rep range at a load you have shown you can handle, and the load moves once the range is topped out.",
+          text: "The app increases reps before weight because one rep is usually a smaller change than one load step. You progress through the rep range at the same weight, then increase the weight after every set reaches the top.",
         },
         {
           kind: "steps",
@@ -336,9 +343,12 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
         {
           kind: "para",
           text: [
-            "The climb rides the effort ramp. A rep is added in the weeks the ",
-            { to: "ug/effort-rir#the-weeks-ramp", text: "target RIR steps down" },
-            ", because the extra rep is what offsets the extra effort and keeps the load steady. On a week where the ramp holds, the reps hold too.",
+            "The effort ramp also affects reps. The app adds a rep in weeks where ",
+            {
+              to: "ug/effort-rir#the-weeks-ramp",
+              text: "target RIR steps down",
+            },
+            ". When the effort target stays the same, the reps also stay the same.",
           ],
         },
         {
@@ -346,7 +356,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
           text: [
             "And the top-out is judged on your ",
             { strong: "lowest" },
-            " working set, not your best one. Every set has to reach the top of the range before the weight moves, which is what stops one strong first set from buying a load you cannot hold for the rest.",
+            " working set, not your best one. The weight increases only after every set reaches the top of the range.",
           ],
         },
       ],
@@ -373,31 +383,37 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "An anchor only ever describes what you have already done, so a program that asked for exactly the anchor would never ask for more. The step is what turns a measurement into a demand: the app asks for your anchor plus one small increment, and only when the last session says you earned it.",
+          text: "The anchor describes what you have already done. After a qualifying session, the app can prescribe one small increase above it.",
         },
         {
           kind: "para",
           text: [
-            { strong: "The step is the smallest honest one the exercise can express" },
+            {
+              strong:
+                "The step is the smallest honest one the exercise can express",
+            },
             " — either one turn of its load step or one extra rep at the same weight, whichever is the smaller move. On a lift that only goes up in tens, that means the reps move first.",
           ],
         },
         { kind: "heading", text: "What earns it" },
         {
           kind: "para",
-          text: "Every one of these has to hold for the session before: you did the sets you were asked for and none of them fell short of its own ask, you reported no joint pain, the session was not reported as a rough one, the workload was not past just right, it was recent enough to still describe you, the anchor behind it is a moderately confident one, and it was a working week rather than a deload.",
+          text: "A weight increase requires a recent working-week session with a moderately confident strength anchor. You must complete every prescribed set without missing its target. Joint pain, a rough session, or workload above just right blocks the increase.",
         },
         {
           kind: "callout",
           tone: "note",
           label: "It never stacks",
-          text: "A step that could not be expressed — a load jump too coarse for the lift, or a rep the range would not allow — is kept rather than banked. The next chance re-arms from the measured anchor again, at one step, so the demand can never drift a run of unearned increments ahead of what you have actually lifted.",
+          text: "If the load step or rep range cannot express an increase, the prescription stays at the anchor. The next eligible session can still add only one increase. Missed increases never accumulate.",
         },
         {
           kind: "para",
           text: [
             "Where a step is held back, the reason is written into the session's own reasoning. A held week still prescribes: it asks for the anchor as measured, which is the honest thing to ask when the last session ",
-            { to: "ug/effort-rir#missing-the-ask", text: "did not clear its own bar" },
+            {
+              to: "ug/effort-rir#missing-the-ask",
+              text: "did not clear its own bar",
+            },
             ".",
           ],
         },
@@ -426,7 +442,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Earning a step and being offered it are two questions. The first is about last session. The second is about pace — whether the weight you are being asked for has already been climbing fast enough for the kind of block you are in.",
+          text: "A qualifying session makes an increase available. The pacing rule then checks whether your prescribed weight has already been rising fast enough for the block's goal.",
         },
         {
           kind: "para",
@@ -435,7 +451,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
             { strong: "asked-for" },
             " weight has risen over the last month against a target rate for your goal, drawn from the same band your ",
             { to: "ug/cycle-model#the-four-layers", text: "macrocycle" },
-            " target comes from. Already at pace, and an earned step waits. Behind it, the step ships.",
+            " target comes from. If you are already at that pace, the increase waits. If you are behind it, the increase is applied.",
           ],
         },
         { kind: "heading", text: "Three other things can delay one" },
@@ -451,7 +467,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
           kind: "callout",
           tone: "honesty",
           label: "Your pace is yours",
-          text: "The rate is personal and it moves. It is fitted to your goal and your profile, and once you have a couple of completed blocks behind you it adjusts to how those blocks actually went — so two people on the same plan can be paced differently, and your own pace changes as your history builds.",
+          text: "The rate depends on your goal and profile. After you complete two blocks, it also reflects how often you earned and completed past increases. Two people on the same plan can therefore receive different pacing.",
         },
         {
           kind: "para",
@@ -474,7 +490,7 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
         },
         {
           kind: "para",
-          text: "None of these ever invents a step. They decide when an earned one is spent, and the only thing that mints one is a session you completed as asked.",
+          text: "These pacing rules only delay an available increase. A completed qualifying session is always required to create one.",
         },
       ],
       related: [

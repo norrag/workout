@@ -77,16 +77,24 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
           text: [
             "A ",
             { term: "macrocycle" },
-            " carries one goal for its whole run, and that goal is not a label. It picks the rep range your prescriptions work inside, and it decides whether the program leads the weight up at all.",
+            " uses one goal for its full duration. The goal sets the prescription's rep range and decides whether weight increases are available.",
           ],
         },
         {
           kind: "table",
           columns: ["Goal", "Reps it works in", "Does the weight climb?"],
           rows: [
-            [[{ ui: "HYPERTROPHY" }], [{ num: "8–12" }], "yes, at three quarters of the modelled rate"],
+            [
+              [{ ui: "HYPERTROPHY" }],
+              [{ num: "8–12" }],
+              "yes, at three quarters of the modelled rate",
+            ],
             [[{ ui: "STRENGTH" }], [{ num: "3–5" }], "yes, at the full rate"],
-            [[{ ui: "CUT" }], [{ num: "8–12" }], "no — the aim is to keep what you have"],
+            [
+              [{ ui: "CUT" }],
+              [{ num: "8–12" }],
+              "no — the aim is to keep what you have",
+            ],
             [[{ ui: "MAINTAIN" }], [{ num: "8–12" }], "no"],
           ],
         },
@@ -103,7 +111,7 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
         },
         {
           kind: "para",
-          text: "A block you start on its own, with no macrocycle over it, trains in the growth range and progresses like a growth block. Most blocks are growth blocks, so that is the default a standalone one gets.",
+          text: "A block you start on its own, with no macrocycle over it, trains in the hypertrophy range and progresses like a hypertrophy block. Most blocks are growth blocks, so that is the default a standalone one gets.",
         },
       ],
       related: [
@@ -116,7 +124,7 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
       slug: "setting-one-up",
       title: "Setting one up",
       summary:
-        "You choose four things; the engine works out how many blocks fit and what shape they take.",
+        "Choose the goal, timeframe, weekly schedule, and starting point; the app suggests the blocks.",
       keywords: [
         "create macrocycle",
         "new macrocycle",
@@ -141,7 +149,7 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
           steps: [
             {
               label: "Duration",
-              text: "Presets, or a custom number of months. It sets how far ahead the arc is drawn.",
+              text: "Choose a preset or enter a number of months. This sets the macrocycle's duration.",
             },
             {
               label: "Block length",
@@ -154,7 +162,7 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
           text: [
             "The ",
             { ui: "PLAN" },
-            " card underneath recalculates as you go: how many blocks fit into the months you picked, and a suggested phase for each — building volume early, sharpening in the middle, one peak at the end where there is room for one. Where you have finished a block already, ",
+            " card shows how many blocks fit in the selected time and suggests a phase for each. It places volume-building blocks first, sharpening blocks next, and one peak at the end when time allows. If you have completed a block, ",
             { ui: "LAST BLOCK MEASURED" },
             " shows the strength rate it actually produced.",
           ],
@@ -162,12 +170,12 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Creating it lays down empty slots rather than plans — one per block, each waiting for you to ",
+            "Creating a macrocycle adds one empty slot for each suggested block. ",
             {
               to: "ug/planning-a-mesocycle#starting-a-block",
-              text: "build it when you reach it",
+              text: "Build each block when you are ready to train it",
             },
-            ". You plan each block at the point you are about to train it, with the last one's results already in.",
+            ", using results from the previous block.",
           ],
         },
       ],
@@ -195,32 +203,32 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "When you create a macrocycle, the app works out what that goal plausibly means for you over that many months — a range, not a figure, and a per-month rate to go with it. It is built from your profile: sex, age, height, bodyweight, how long you have trained, and your body-fat reading where you have one.",
+          text: "The app estimates a target range and monthly rate for the selected goal and timeframe. It uses your sex, age, height, bodyweight, training history, and body-fat value when available.",
         },
         {
           kind: "para",
           text: [
             "That range is ",
             { strong: "kept as the block's contract" },
-            " and it does two jobs quietly, in the background: it sets how fast the app is willing to lead your weights up, and it is what the arc is graded against when it finishes.",
+            ". It sets the maximum pace of weight increases and provides the target used to grade the finished macrocycle.",
           ],
         },
         {
           kind: "para",
           text: [
-            "The create screen therefore stays quiet about the number. To read it, ask an assistant you have ",
+            "To read the target range, ask an assistant you have ",
             {
               to: "ug/what-workout-is#the-five-tabs",
               text: "connected to the app",
             },
-            " — it can give you the range, the per-month rate and the timeframe the model would recommend for that goal.",
+            ". It can report the range, monthly rate, and recommended timeframe.",
           ],
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "A conservative estimate, and a moving one",
-          text: "The range is a model of typical outcomes under good training, food and sleep — three things the app does not watch. Individual variation is wider than the model, so an assistant is instructed to quote you the cautious end of it. It is also recomputed from your profile as that profile changes, so the figure you are quoted in month four need not match month one.",
+          text: "The range assumes consistent training, food, and sleep, which the app does not monitor. Individual results vary more than the model shows, so an assistant quotes the cautious end. Profile changes can also change the range during the macrocycle.",
         },
       ],
       related: [
@@ -257,17 +265,17 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
         },
         {
           kind: "para",
-          text: "The app watches how fast the weight it has been asking for has actually climbed over the last month, and compares that against the rate your goal and profile make realistic. Climbing at pace already, and an earned increase waits for a week where it is needed. Behind pace, and it ships.",
+          text: "The app compares the last month's increase in prescribed weight with the target rate for your goal and profile. If you are already at that rate, an available increase waits. If you are behind it, the increase is applied.",
         },
         {
           kind: "para",
-          text: "That is what stops a good month compounding into a demand you cannot hold. The rate is the thing keeping the ask tethered to what a body of your age, training history and goal tends to be able to do.",
+          text: "The target rate limits how quickly prescriptions rise. It keeps increases consistent with the selected goal, your profile, and your training history.",
         },
         {
           kind: "callout",
           tone: "note",
           label: "It follows your own blocks",
-          text: "Once you have a couple of completed blocks behind you, the app moves your pace within that band based on how those blocks actually went — how often you earned increases and how often you met them. Two people with the same plan and the same profile can end up paced differently, and your own pace changes as your history builds.",
+          text: "After two completed blocks, the app adjusts your pace within the target range. It uses how often you earned increases and then completed them. Your pacing can therefore change as your training history grows.",
         },
       ],
       related: [
@@ -295,30 +303,45 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
         {
           kind: "para",
           text: [
-            "A macrocycle completes on its own once every block in it has finished or been abandoned — empty slots you never built do not hold it open. You can also close one early from the header menu with ",
+            "A macrocycle completes after every built block is finished or abandoned; unused empty slots are ignored. To close it early, choose ",
             { ui: "End macrocycle" },
-            ", which finishes any open blocks first.",
+            " from the header menu. This also finishes any open blocks.",
           ],
         },
         {
           kind: "para",
           text: [
-            "Once closed, the arc is a record: its goals are fixed and its Overview swaps ",
+            "When you close a macrocycle, its goals become fixed. Its Overview replaces ",
             { ui: "MACROCYCLE STATS · TO DATE" },
             " for ",
             { ui: "RETROSPECTIVE" },
-            ", graded against the target it was created under rather than against what the model would say about you today.",
+            ". The retrospective grades the macrocycle against its original target.",
           ],
         },
         {
           kind: "table",
           columns: ["Row", "What it grades"],
           rows: [
-            [[{ ui: "STRENGTH" }], "your strength trend against the contract band — informational where strength was never the promise"],
-            [[{ ui: "MASS" }], "measured bodyweight change, and only ever measured"],
-            [[{ ui: "COMPOSITION" }], "lean and fat change between scans that bracket the arc"],
-            [[{ ui: "PROGRESSION" }], "how many increases were earned, paced back, and held"],
-            [[{ ui: "BLOCKS" }], "how many blocks were completed, abandoned, or never built"],
+            [
+              [{ ui: "STRENGTH" }],
+              "your strength trend against the contract band — informational where strength was never the promise",
+            ],
+            [
+              [{ ui: "MASS" }],
+              "measured bodyweight change, and only ever measured",
+            ],
+            [
+              [{ ui: "COMPOSITION" }],
+              "lean and fat change between scans that bracket the arc",
+            ],
+            [
+              [{ ui: "PROGRESSION" }],
+              "how many increases were earned, paced back, and held",
+            ],
+            [
+              [{ ui: "BLOCKS" }],
+              "how many blocks were completed, abandoned, or never built",
+            ],
           ],
         },
         {
@@ -327,7 +350,7 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
             { ui: "NOT MEASURED" },
             " and ",
             { ui: "NOT COMPARABLE" },
-            " are answers here, not gaps. The first means the arc has no body data to grade against; the second means the scans it does have came from different machines. Both are the honest result, and the app prefers them to a number it would have to invent.",
+            " are explicit results. The first means the macrocycle lacks body data. The second means its scans came from different machines and cannot support a valid comparison.",
           ],
         },
       ],

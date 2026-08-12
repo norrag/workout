@@ -48,14 +48,14 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
   number: 13,
   title: "Reading your stats",
   summary:
-    "Three screens answer three different questions — how one lift is going, how a block went, and how the whole arc is going — and one definition of progress sits behind all of them.",
+    "Use the exercise page for one lift, the block tabs for one block, and the macrocycle Overview for the full training period.",
   sections: [
     // -----------------------------------------------------------------------
     {
       slug: "where-to-look",
       title: "Where to look",
       summary:
-        "Three surfaces, one question each: this lift, this block, this arc.",
+        "Choose the screen that matches the time and scope of your question.",
       keywords: [
         "stats",
         "where are my stats",
@@ -68,7 +68,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Your numbers live on three screens, and picking the right one is mostly a matter of how wide a question you are asking. Each screen is reached from the thing it describes: a lift's page from the lift, a block's tabs from the block, the arc's Overview from the macrocycle.",
+          text: "Open an exercise page to review one lift. Open a block's Balance or Performance tab to review that block. Open the macrocycle Overview to review the full macrocycle.",
         },
         {
           kind: "table",
@@ -91,11 +91,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
               "sets per muscle per week, the push / pull / legs split, this block's records, and each lift's trend",
             ],
             [
-              [
-                "A macrocycle's ",
-                { ui: "OVERVIEW" },
-                " tab",
-              ],
+              ["A macrocycle's ", { ui: "OVERVIEW" }, " tab"],
               "how is the whole arc going",
               "the block timeline, four headline figures, and body composition where you have scans",
             ],
@@ -104,9 +100,12 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
         {
           kind: "para",
           text: [
-            "The three agree with each other by construction. Sets are counted one way everywhere (",
-            { to: "ug/volume#why-a-set-can-count-as-half", text: "fractionally, by muscle" },
-            "), and strength is worked out one way everywhere, so a figure on the block tab and the same figure on the macrocycle Overview are the same calculation over a wider window.",
+            "All three screens use the same calculations. Sets are counted ",
+            {
+              to: "ug/volume#why-a-set-can-count-as-half",
+              text: "fractionally, by muscle",
+            },
+            " everywhere. The macrocycle Overview applies the same strength calculation as the block tab, but over a longer period.",
           ],
         },
       ],
@@ -134,38 +133,50 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Tap an exercise name anywhere in the app — a set row, a planner slot, the library — and you land on its page. Two tabs: what you have ever done with it, and every session in order.",
+          text: "Tap an exercise name from a set row, planner slot, or the library to open its page. Overview summarizes the exercise; History lists its sessions.",
         },
         { kind: "heading", text: "All-time bests" },
         {
           kind: "table",
           columns: ["Figure", "What it is"],
           rows: [
-            [[{ ui: "WEIGHT PR · LB" }], "the heaviest working set you have logged, with the reps you got"],
-            [[{ ui: "EST. 1RM" }], "the best single-set strength estimate the lift has produced"],
-            [[{ ui: "VOLUME PR" }], "the biggest single set by weight times reps"],
-            [[{ ui: "BEST SESSION VOL" }], "the biggest day's total for that lift"],
+            [
+              [{ ui: "WEIGHT PR · LB" }],
+              "the heaviest working set you have logged, with the reps you got",
+            ],
+            [
+              [{ ui: "EST. 1RM" }],
+              "the best single-set strength estimate the lift has produced",
+            ],
+            [
+              [{ ui: "VOLUME PR" }],
+              "the biggest single set by weight times reps",
+            ],
+            [
+              [{ ui: "BEST SESSION VOL" }],
+              "the biggest day's total for that lift",
+            ],
           ],
         },
         {
           kind: "para",
           text: [
-            "Below them, one bar per block of the macrocycle you are in, each carrying that block's peak estimate. The block you are training now is drawn in orange; a block where you have not trained this lift is drawn dashed. It is the shortest read of ",
-            { strong: "is this lift moving across the arc" },
-            " the app has.",
+            "Below them, one bar per block shows that block's peak estimate. Orange marks the current block; a dashed bar means the exercise was not trained in that block. Use the chart to answer ",
+            { strong: "is this lift improving across the macrocycle" },
+            ".",
           ],
         },
         { kind: "heading", text: "History" },
         {
           kind: "para",
           text: [
-            "One row per session, newest first, each with its week and day. Tap a row to flip between what you lifted and what it was worth as an estimate. Rows carry a ",
+            "History lists sessions newest first with their week and day. Tap a row to switch between logged weight and estimated strength. A ",
             { ui: "DELOAD" },
             " or ",
             { ui: "BACKED OFF" },
-            " tag where the session was one, session notes expand, and ",
+            " tag identifies deliberately lighter work. Session notes expand, and ",
             { ui: "LOAD OLDER" },
-            " walks back through the rest.",
+            " retrieves earlier rows.",
           ],
         },
       ],
@@ -196,7 +207,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
           text: [
             "A lift joins the list once it has ",
             { num: "3" },
-            " sessions the trend can use, which is the app's way of leaving out a movement you subbed in once. Under that it reads ",
+            " usable sessions. With fewer, it reads ",
             { ui: "Not enough data yet" },
             " rather than showing a figure built on two points.",
           ],
@@ -204,20 +215,20 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
         {
           kind: "para",
           text: [
-            "Because both ends are the ",
+            "Each end uses the ",
             { strong: "best" },
-            " of a few sessions rather than a single one, a light opening week costs you nothing on the read, and one heroic day does not become the bar every later session is measured against. Small movements in either direction are reported as holding rather than as a change.",
+            " of several sessions. This prevents one light opening week or one unusually strong day from controlling the result. Small differences are reported as holding.",
           ],
         },
         {
           kind: "para",
-          text: "Each lift's change then credits the muscles it trains — in full to the muscle it works directly, half to the ones it helps. The single headline figure on a macrocycle averages those muscle numbers, weighting each by how much work that muscle actually got, so a muscle you trained twice cannot swing it as hard as one you trained all block.",
+          text: "Each lift credits its strength change to the muscles it trains: full credit to the primary muscle and half credit to supporting muscles. The macrocycle headline averages those muscle results and weights them by training volume. Muscles trained more often have more influence.",
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "Estimate against estimate",
-          text: "Both ends of this comparison are worked out from sets, not tested. It is a good read on direction and a rough one on size — treat a few percent as noise and a sustained climb as real.",
+          text: "The trend estimates strength from logged sets. Use it to judge direction across several sessions; treat a change of only a few percent as noise.",
         },
         {
           kind: "detail",
@@ -269,7 +280,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
           text: [
             "A block's ",
             { ui: "PRS THIS MESO" },
-            " list compares your best set of each lift in the block against everything you had logged before it started. Two things can earn a place.",
+            " list compares your best set in the block with your earlier history. A higher weight or a better result at a weight you have used before earns a place.",
           ],
         },
         {
@@ -294,7 +305,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
           text: [
             "The exercise page's ",
             { ui: "ALL-TIME BESTS" },
-            " answer the same question over your whole history rather than one block, which is why a lift can show a lifetime best from a year ago and no record this block.",
+            " cover your full history. A lift can therefore show a lifetime best from a past block while showing no record in the current block.",
           ],
         },
       ],
@@ -308,7 +319,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
       slug: "what-a-strength-read-leaves-out",
       title: "What a strength read leaves out",
       summary:
-        "Three kinds of session sit out the strength numbers, and the app says so when they do.",
+        "Deload, backed-off, and clearly mis-logged sessions are excluded from strength comparisons.",
       estimate: true,
       keywords: [
         "missing sessions",
@@ -321,7 +332,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A strength number is a comparison, so it is only worth what the like-for-likeness of its two ends is worth. Three kinds of session are set aside before it is worked out.",
+          text: "A strength trend needs comparable sessions at both ends. The app excludes sessions that were deliberately easy or clearly mis-logged.",
         },
         {
           kind: "list",
@@ -329,13 +340,19 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
             [
               { strong: "Deload weeks" },
               " — a ",
-              { to: "ug/deloads#how-it-reads-afterwards", text: "week that is meant to be light" },
+              {
+                to: "ug/deloads#how-it-reads-afterwards",
+                text: "week that is meant to be light",
+              },
               " would otherwise read as a week you got weaker.",
             ],
             [
               { strong: "Backed-off sessions" },
               " — an exercise ",
-              { to: "ug/exercise-level-rir#what-it-does-to-your-numbers", text: "assigned an easier target than its week" },
+              {
+                to: "ug/exercise-level-rir#what-it-does-to-your-numbers",
+                text: "assigned an easier target than its week",
+              },
               " was deliberately not a strength test.",
             ],
             [
@@ -367,7 +384,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
       slug: "reading-like-with-like",
       title: "Reading like with like",
       summary:
-        "Most apparent regressions are comparisons between two things that were never comparable.",
+        "Compare the same goal, exercise slot, and statistic before treating a lower number as a regression.",
       estimate: true,
       keywords: [
         "why did my strength drop",
@@ -380,7 +397,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "When a figure looks alarming, the first thing to check is what it is being compared against. Three habits cover most of it.",
+          text: "When a figure looks wrong, first check what it is being compared with.",
         },
         {
           kind: "list",
@@ -394,7 +411,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
             "One session is a data point. Three in a row moving the same way is a trend.",
           ],
         },
-        { kind: "heading", text: "Two things that surprise people" },
+        { kind: "heading", text: "Current sessions and past estimates" },
         {
           kind: "para",
           text: "Sets you log in a session you have open count straight away. Volume, records and estimates all move while you are still in the gym, so a figure you check mid-workout is a figure with half a session in it.",
@@ -402,7 +419,7 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
         {
           kind: "para",
           text: [
-            "And your stats show each estimate as it was recorded, while the weight the app asks for next fades older sessions as they age. Same figures, two jobs — which is why a lifetime best from months ago can sit above what you are being asked to lift today. ",
+            "Stats preserve each estimate as recorded. The strength anchor gives older sessions less influence when choosing your next weight. A lifetime best from months ago can therefore remain above today's prescription. ",
             {
               to: "ug/how-your-weight-is-chosen#the-anchor",
               text: "How the prescription weighs recent work",

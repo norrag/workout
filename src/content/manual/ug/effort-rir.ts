@@ -11,13 +11,12 @@
 //     athlete's own report, and the prescribed target is the fallback:
 //     `assumedRir = rir_reported ?? target_rir` (`engine/predict.ts`)
 //   - every number below is from the active row via 22b §4.2, and carries its
-//     `engine_params` path per doc 22 §8.2. **v26 superseded v25 on 2026-08-10**
-//     and moved none of them: its only change is `e1rm.max_measuring_rir`
-//   - the measuring band IS live as of that activation (ledger `D-21`), and is
-//     still mentioned nowhere in this chapter — on SEAM grounds now rather than
-//     liveness: the week ramp this chapter owns stops at 5 RIR and the deload at
-//     6, so nothing here can reach a band that starts above 8. Ch. 8 owns the
-//     lever that can, and ch. 10 owns the estimate it stops
+//     `engine_params` path per doc 22 §8.2. **v27 superseded v26 on 2026-08-12**:
+//     `deload.target_rir` is 8 and `e1rm.max_measuring_rir` is 5
+//   - the measuring band is still left to ch. 8 and ch. 10. This chapter owns
+//     the ramp and states the deload target; ch. 9 owns the consequence that a
+//     standard deload is now above the measuring band and does not enter the
+//     strength anchor
 //   - claims are registered in `docs/22a-manual-claims.md`
 
 import type { ManualChapter } from "../types";
@@ -142,7 +141,7 @@ export const UG_EFFORT_RIR: ManualChapter = {
           kind: "para",
           text: [
             "When a block's final week is a deload, its target comes from the program rather than from the ramp — ",
-            { num: "6" },
+            { num: "8" },
             " reps in reserve, deliberately well short of failure. The week editor says as much: ",
             { ui: "W6 DELOAD — RIR SET BY THE ENGINE" },
             ".",
@@ -175,7 +174,7 @@ export const UG_EFFORT_RIR: ManualChapter = {
                 "A per-week schedule replaces that arithmetic outright — the values are used as written, in whatever order you set them. Either way the deload week is appended afterwards at ",
                 { code: "deload.target_rir" },
                 ", currently ",
-                { num: "6" },
+                { num: "8" },
                 ", so it is never part of the interpolation.",
               ],
             },

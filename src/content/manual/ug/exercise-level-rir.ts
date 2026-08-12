@@ -21,13 +21,12 @@
 //     jump straight back to full load. What holds the weight during a shallow
 //     back-off is the CONFIDENCE ladder — a set more than 3 RIR from failure is
 //     `low`, and `progression.min_confidence` is `moderate` (ledger `D-20`)
-//   - **the measuring band is LIVE** — v26 activated 2026-08-10 18:05 UTC
-//     (`params_hash 6dd02244…`, `e1rm.max_measuring_rir: 8`), so a set at an
-//     assumed RIR ABOVE 8 is priced and performed but not measured: stamp
+//   - **the measuring band is LIVE** — v27 activated 2026-08-12
+//     (`params_hash f8dcfb51…`, `e1rm.max_measuring_rir: 5`), so a set at an
+//     assumed RIR ABOVE 5 is priced and performed but not measured: stamp
 //     `none`, out of the anchor and every strength surface, kept in volume
-//     (doc 21 §6.1). Nine is reachable only through THIS chapter's lever — the
-//     week ramp tops out at 5 and the deload at 6 — which is why the band is
-//     written here and in ch. 10 and nowhere else (ledger `D-21`)
+//     (doc 21 §6.1). The working-week ramp tops out at the boundary; this
+//     chapter's lever can go past it, and the standard deload now sits at 8
 //   - the two rules are different questions and both are on: §6.1 asks *is this
 //     a measurement at all* (at the stamp), §6.2 asks *is it comparable* (at
 //     read time). A set can be inside the band and still backed off
@@ -58,7 +57,7 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
   number: 8,
   title: "Exercise-level RIR",
   summary:
-    "Running one exercise at its own effort — easier while you protect something, harder where the week's ramp is not the limit — and which values change what.",
+    "Set one exercise to run easier or harder than the week's effort target, and see how that changes its weight and stats.",
   sections: [
     // -----------------------------------------------------------------------
     {
@@ -78,14 +77,14 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A week's ramp asks one effort of every exercise in it. Give one exercise a target of its own and that target wins — whatever the week says — and the weight is repriced to meet it: lighter for a higher target, heavier for a lower one. Clear it and the exercise is back on the ramp.",
+          text: "The week's ramp sets the default effort for every exercise. An exercise-level target replaces that default for one exercise. A higher target lowers its weight; a lower target raises it. Clear the target to use the week's ramp again.",
         },
         {
           kind: "para",
           text: [
-            "The week's own ramp stops at ",
+            "The week's ramp stops at ",
             { num: "5" },
-            " reps in reserve; an exercise-level target has no ceiling. That is what lets one control cover a lift you are protecting for two weeks and a lift you want to push harder all block.",
+            " reps in reserve. You can set an exercise from 0 to 30 reps in reserve, so the same control can make one lift harder or much easier.",
           ],
         },
         { kind: "heading", text: "Which values change what" },
@@ -95,11 +94,11 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           rows: [
             [
               "above the week's target",
-              "the exercise is marked backed off: it leaves your strength trend and records, and the weight stops stepping up",
+              "the exercise is marked backed off, leaves your strength trend and records, and cannot earn a weight increase",
             ],
             [
               "at or below the week's target",
-              "the exercise keeps every claim it earns, and can still earn a step",
+              "the exercise stays in your strength results and can earn a weight increase",
             ],
             [
               [{ num: "3" }, " or fewer reps short of failure"],
@@ -151,7 +150,7 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "Use it when a movement needs to cost less for a while — a joint you are working around, a lift you are rebuilding, or one you want to hold steady while everything else advances. The exercise keeps its slot in the session at a weight chosen to leave the extra reps in the tank.",
+          text: "Raise the target when you need to protect a joint, rebuild a lift, or hold one exercise steady. The exercise stays in the session, and its weight drops enough to leave the requested reps in reserve.",
         },
         {
           kind: "para",
@@ -164,9 +163,9 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
             { num: "4" },
             " and ",
             { num: "8" },
-            " above the week's value, plus any number you type. One or two steps is being careful; ",
+            " above the week's value, plus any number you type. Use a small increase for a modest reduction in effort. Use ",
             { num: "8" },
-            " and beyond is keeping a movement in the session while it recovers.",
+            " or more to keep the movement very easy while it recovers.",
           ],
         },
         { kind: "heading", text: "Leave a reason" },
@@ -175,9 +174,12 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           text: [
             "The ",
             { ui: "REASON" },
-            " field travels with the assignment and appears wherever the assignment does — on the exercise, and in the reasoning under ",
-            { to: "ug/training-a-session#the-day-screen", text: "the day's ask" },
-            ". Three weeks later it is what separates a lift that stalled from one you parked on purpose.",
+            " field is saved with the assignment. It appears on the exercise and in the reasoning under ",
+            {
+              to: "ug/training-a-session#the-day-screen",
+              text: "the day's ask",
+            },
+            ". Write why you changed the effort so the lighter work is clearly intentional when you review it later.",
           ],
         },
         {
@@ -191,7 +193,7 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
         { kind: "heading", text: "Coming back" },
         {
           kind: "para",
-          text: "Clear the target and the ramp takes over from the next session. Step back in stages if you want to test it — the weight is priced off what you have been lifting lately, so a month of light work comes back at a weight that reflects it rather than at where you left off.",
+          text: "Clear the target and the ramp takes over at the next session. You can also lower the target in stages. The app prices each session from your recent work, so your return weight reflects what you have been lifting during the back-off.",
         },
       ],
       related: [
@@ -218,50 +220,59 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
       blocks: [
         {
           kind: "para",
-          text: "A month of deliberately light work is not a month of getting weaker, and the app is built so it cannot read as one.",
+          text: "The app records deliberately easier work without treating it as a loss of strength.",
         },
         {
           kind: "table",
-          columns: ["Number", "A backed-off set"],
+          columns: ["Number", "How a backed-off set reads"],
           rows: [
-            ["your strength trend, and your best estimated strength", "left out"],
-            ["records for the exercise and the block", "left out"],
-            ["weekly sets per muscle, volume, weight and session records", "counted — those are things you did"],
             [
-              "the anchor your next weight is priced from",
-              "counted while the target stays within reach of failure, and the reason is below",
+              "your strength trend, and your best estimated strength",
+              "left out",
+            ],
+            ["records for the exercise and the block", "left out"],
+            [
+              "weekly sets per muscle, volume, weight and session records",
+              "counted — those are things you did",
+            ],
+            [
+              "the strength anchor your next set is based on",
+              "counted through 5 RIR; left out above it",
             ],
           ],
         },
-        { kind: "heading", text: "Why easy sets still anchor" },
+        { kind: "heading", text: "Why some easy sets still anchor" },
         {
           kind: "para",
-          text: "The anchor keeps them on purpose. An estimate already accounts for the reps you left, so a light set priced at a high target lands near where a normal set would — and dropping those sets instead would freeze the anchor at your pre-backoff level, so the first session after you cleared the target would jump straight back to full load.",
+          text: "Through 5 RIR, backed-off sets still update the strength anchor. The estimate accounts for the reps you left, so it can compare a lighter set with your normal work. This keeps your return weight tied to recent training instead of jumping back to the weight you used before the back-off.",
         },
         {
           kind: "para",
           text: [
-            "What holds the weight steady is confidence, not exclusion. A set more than ",
+            "A set more than ",
             { num: "3" },
-            " reps short of failure is a rough read, and the program steps the weight up only off a session it can read well. So while you are backed off the weight holds, and it starts moving again once you put in a session at ",
+            " reps short of failure is a rough strength reading. It can update the anchor, but it cannot earn a weight increase. The weight can increase again after a session at ",
             { num: "3" },
             " or closer.",
           ],
         },
-        { kind: "heading", text: "Past a very easy target, nothing is measured" },
+        {
+          kind: "heading",
+          text: "Targets above 5 are not strength measurements",
+        },
         {
           kind: "para",
           text: [
             "Set a target further than ",
-            { num: "8" },
-            " reps from failure and the app treats those sets as work rather than as a reading: priced and performed as usual, counted in your volume, and left out of any strength estimate. Your anchor holds at the last session it genuinely measured, so you come back to the weight you last earned.",
+            { num: "5" },
+            " reps from failure and the app stops using those sets as strength measurements. They are prescribed and logged normally and still count toward volume. Your strength estimates and anchor stay at the last measurable session.",
           ],
         },
         {
           kind: "callout",
           tone: "honesty",
           label: "One direction only",
-          text: "An exercise run harder than its week keeps every claim it earns — those sets stay in your trend and can set records. Only the easier direction is set aside, because that is the one that would otherwise look like decline.",
+          text: "An exercise run harder than its week stays in your strength trend and can set records. The app only sets aside easier work, because that work was deliberately reduced.",
         },
         {
           kind: "detail",
@@ -289,7 +300,7 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
       slug: "pushing-an-exercise-harder",
       title: "Pushing an exercise harder",
       summary:
-        "Where the week's ramp is not the real limit, a lower target claims the stimulus it leaves behind.",
+        "Lower one exercise's target to run it closer to failure than the rest of the week.",
       keywords: [
         "harder",
         "push harder",
@@ -304,9 +315,9 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
         {
           kind: "para",
           text: [
-            "The ramp is set by what heavy compound work costs you. A lateral raise does not cost that, so a week sitting at ",
+            "The week's ramp must account for fatiguing compound lifts. A smaller isolation exercise may recover well at a harder effort. If the week is set to ",
             { num: "3" },
-            " reps in reserve leaves real stimulus unclaimed on the small stuff while it protects you on the squat. Give those exercises a lower target and they run closer to failure at a heavier weight.",
+            " reps in reserve, you can give that exercise a lower target. Its prescribed weight rises so it finishes closer to failure.",
           ],
         },
         {
@@ -314,15 +325,15 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           text: [
             "The exercise reads ",
             { ui: "PUSHED HARDER" },
-            " above its name, and those sets stay in your strength reads in full. It is the direction most people have room in.",
+            " above its name. Those sets remain in your strength results and can set records.",
           ],
         },
         {
           kind: "para",
           text: [
-            "The cost is recovery, out of the same budget the ramp was rationing. If the sessions start coming back ",
+            "Harder sets create more fatigue. If your session feedback starts coming back ",
             { to: "ug/how-it-felt#workload", text: "past just right" },
-            ", the program takes a set off that exercise — which is the signal you spent more than you had.",
+            ", the program removes a set from that exercise the following week.",
           ],
         },
         { kind: "heading", text: "The set cap" },
@@ -331,7 +342,7 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           text: [
             "An exercise can also carry a ceiling on its working sets, shown under ",
             { ui: "SET BY YOUR COACH" },
-            " and set through the AI connector. The program may prescribe fewer than the cap and never more, and a cap can go below the program's own floor — one hard set is a legitimate ask. Above every assignment sits a plain ceiling of ",
+            " and set through the AI connector. The program can prescribe fewer sets than the cap, but never more. A coach can cap an exercise at one working set. The overall maximum is ",
             { num: "6" },
             " working sets for one exercise.",
           ],
@@ -378,7 +389,7 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           kind: "para",
           text: [
             { ui: "APPLIES TO" },
-            " decides how much of the block an assignment covers. The three choices differ in one thing that is easy to miss, and it is the deload week.",
+            " decides which weeks use the assignment. Only one choice also changes the deload.",
           ],
         },
         {
@@ -406,9 +417,9 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           text: [
             "The board shows one block-wide value in its ",
             { ui: "RIR" },
-            " column, because it is a view of the block's shape rather than of one week. An exercise carrying week-by-week assignments reads ",
+            " column. If the value changes by week, the board reads ",
             { ui: "RIR BY WEEK" },
-            " there and keeps every one of them.",
+            " instead of showing one value.",
           ],
         },
         {

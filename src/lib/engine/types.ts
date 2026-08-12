@@ -57,7 +57,8 @@ export const prescriptionSchema = z.object({
   reps: z.number().int().min(1).nullable(),
   sets: z.number().int().min(1),
   // 0–30 (doc 21 §3/§4.3, widened from 0–8): working weeks ramp 0–3 and a deload
-  // prescribes a higher recovery RIR (≈6, engine_params.deload.target_rir), but
+  // prescribes a higher recovery RIR (currently 8,
+  // engine_params.deload.target_rir), but
   // an exercise-level assignment is UNBOUNDED upward so one lever spans deload →
   // rehab → deep back-off. What bounds the *measurement* is the §6.1 measuring
   // band, not this ceiling.
