@@ -47,6 +47,7 @@ export const UG_GLOSSARY: ManualChapter = {
         "mesocycle",
         "microcycle",
         "day slot",
+        "phase",
         "block",
         "week",
         "definitions",
@@ -67,6 +68,7 @@ export const UG_GLOSSARY: ManualChapter = {
         { kind: "term", term: "mesocycle" },
         { kind: "term", term: "microcycle" },
         { kind: "term", term: "day_slot" },
+        { kind: "term", term: "phase" },
       ],
       related: ["ug/cycle-model#the-four-layers", "ug/glossary#effort"],
     },
@@ -83,6 +85,7 @@ export const UG_GLOSSARY: ManualChapter = {
         "deload",
         "how hard",
         "failure",
+        "effort target",
         "definitions",
       ],
       blocks: [
@@ -100,6 +103,7 @@ export const UG_GLOSSARY: ManualChapter = {
         { kind: "term", term: "rir" },
         { kind: "term", term: "rir_ramp" },
         { kind: "term", term: "deload" },
+        { kind: "term", term: "exercise_target_rir" },
       ],
       related: ["ug/effort-rir#what-rir-means", "ug/deloads#what-a-deload-is"],
     },
@@ -116,6 +120,7 @@ export const UG_GLOSSARY: ManualChapter = {
         "estimate",
         "confidence",
         "how strong",
+        "anchor",
         "definitions",
       ],
       blocks: [
@@ -132,6 +137,7 @@ export const UG_GLOSSARY: ManualChapter = {
         },
         { kind: "term", term: "e1rm" },
         { kind: "term", term: "e1rm_confidence" },
+        { kind: "term", term: "strength_anchor" },
       ],
       related: [
         "ug/how-your-weight-is-chosen#how-sharp-the-estimate-is",
@@ -178,6 +184,46 @@ export const UG_GLOSSARY: ManualChapter = {
       related: [
         "ug/volume#the-band",
         "ug/reading-your-stats#the-strength-trend",
+      ],
+    },
+    // -----------------------------------------------------------------------
+    // N81 (doc 22 Phase 7): the words the app prints on training you have
+    // already done. They arrived together because they are the same kind of
+    // term — a mark or a figure on a row, meaningful only once you know what
+    // was counted — and `22c` §C2 had all three open.
+    {
+      slug: "reading-a-session",
+      title: "Reading a session",
+      summary:
+        "The marks and figures the app puts on sessions you have already trained.",
+      keywords: [
+        "backed off",
+        "eff load",
+        "effective load",
+        "adherence",
+        "history rows",
+        "tags",
+        "definitions",
+      ],
+      blocks: [
+        {
+          kind: "para",
+          text: [
+            "What a history row or a headline figure is telling you. ",
+            {
+              to: "ug/reading-your-stats#one-lift-at-a-time",
+              text: "Reading your stats",
+            },
+            " reads a whole screen of them.",
+          ],
+        },
+        { kind: "term", term: "backed_off" },
+        { kind: "term", term: "effective_load" },
+        { kind: "term", term: "adherence" },
+      ],
+      related: [
+        "ug/reading-your-stats#one-lift-at-a-time",
+        "ug/exercise-level-rir#what-it-does-to-your-numbers",
       ],
     },
     // -----------------------------------------------------------------------

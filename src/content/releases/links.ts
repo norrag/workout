@@ -179,6 +179,7 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/glossary#effort",
   "ug/glossary#strength-estimates",
   "ug/glossary#progress-and-volume",
+  "ug/glossary#reading-a-session",
   "ug/glossary#feedback-and-equipment",
   // ch. 21 — Troubleshooting & FAQ (Phase 3i)
   "ug/troubleshooting#the-weight-changed",

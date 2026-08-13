@@ -8,12 +8,14 @@
 > target, and a **decision**. The rule the whole document is written against:
 > **placement is earned, not sprayed.**
 >
-> **Status:** 7a complete · **wave 1 (7b) built 2026-08-15** · **wave 2 built
-> 2026-08-15 (session 2)**, the owner having accepted §5's recommendation ·
-> N81's inline affordance remains, per §6.
+> **Status:** **Phase 7 is complete.** 7a audited · **wave 1 (7b) built
+> 2026-08-15** · **wave 2 built 2026-08-15 (session 2)**, the owner having
+> accepted §5's recommendation · **N81's inline term built 2026-08-15
+> (session 3)**, which is [§6](#6-n81--the-inline-term-affordance-built).
 > **Design pass:** `09-changelog` **2026-08-15** — the grammar, the
 > primitive, and the two exclusions — amended by **2026-08-15 (session 2)**,
-> which rules how far the guard reaches. Read them first; this document
+> which rules how far the guard reaches, and **(session 3)**, which draws the
+> inline term and rules where it may go. Read them first; this document
 > applies them.
 
 ---
@@ -29,8 +31,9 @@ stays on the label, the link goes under the block.
 **② N81's inline underlined term is the third member, and it is term-level.**
 Ruled in the same design pass rather than separately (the backlog row scheduled
 it here for exactly that reason), specified in `09-changelog` §3, and built in
-its own wave — its real cost is a glossary-content pass over the ~22 terms
-[`22c`](./22c-app-inventory.md) §C2 found undefined, not a component.
+its own wave — its real cost was the glossary-content pass
+[`22c`](./22c-app-inventory.md) §C2 called for, not the component. [§6](#6-n81--the-inline-term-affordance-built)
+is what shipped.
 
 **③ Links carry a section ID string, never an imported module.** doc 22 D3
 guard 1. The table below lives in `src/lib/guide-links.ts` as literals,
@@ -53,6 +56,12 @@ test it failed, rather than quietly dropped.
 
 And one budget: **at most one `GuideLink` visible per screen state.** Tabs count
 as separate states; a sheet counts as its own surface.
+
+> **The budget is the mechanism link's, not the grammar's.** A term-level mark
+> is not a navigation and costs a dotted rule rather than a line of chrome, so
+> it has its own rules — in a sentence, first use only, once per term per screen
+> ([§6.2](#62-the-placements); `09-changelog` 2026-08-15 session 3 §2). E5 binds
+> all three members alike.
 
 > **E4 after wave 2.** The test is unchanged and still binding — it is the
 > reason nothing here is placed by eye. What changed is the surfaces: the ones
@@ -240,6 +249,12 @@ adoption) · 8 recommended and waiting, every one of them held on **budget or a
 weak E2** rather than on a mechanism · 16 declined with a reason. Nothing in
 this table is waiting on a decision.
 
+**After N81 (§6.2):** eight further placements, five of them inline marks and
+three `InfoDot`s. They are listed in §6.2 rather than in the table above because
+this table is the **mechanism-level** sweep — a term mark answers a different
+question and does not spend the one-link budget. The eight unbuilt `W2` rows are
+unaffected: not one of them was held on the absence of a definition.
+
 ---
 
 ## 5. What unblocked the E4 group — **decided, and built**
@@ -304,23 +319,85 @@ against a seven-row estimate.
 
 ---
 
-## 6. N81 — the inline term affordance *(the remaining wave)*
+## 6. N81 — the inline term affordance *(built)*
 
-> **Status after wave 2:** this is the only part of Phase 7 still unbuilt, and
-> nothing in wave 2 changed its sequencing. It is a **content** pass first.
+> **Status:** built 2026-08-15 (session 3), in the order §6 planned — **glossary
+> entries first, then the primitive, then the prose sites.** Design:
+> `09-changelog` **2026-08-15 §3** (the ruling) and **session 3 §1–4** (the
+> build and its placement rules).
 
-Ruled here (§1 ②), designed in `09-changelog` 2026-08-15 §3, and
-**built in its own wave** for one reason worth stating plainly: the component is
-a morning's work and the **content** is not. `22c` §C2 lists ~22 rendered terms
-with no definition anywhere, and the affordance is useless until each has a
-glossary entry — which is a copy pass under doc 22 §8.1's single-source rule
-(the manual and the card must say the same words), not a placement pass.
+The reason this was a wave of its own is worth keeping: the component is a
+morning's work and the **content** is not. An affordance that opens a card is
+useless where no card exists, and `22c` §C2 counted the gap.
 
-Sequenced as: glossary entries first (with `22a` ledger rows), then the
-primitive, then the prose sites. Until then doc 22 §8.4c rule 2's stopgap holds
-— the manual renders a term's definition at first use.
+### 6.1 The content pass — six new terms
 
----
+`22c` §C2's **recommendation column is now closed.** Six terms it marked *add to
+glossary* landed here, each verified against code rather than against a spec
+([`22b`](./22b-source-map.md) §9.2) and each filed into chapter 20:
+
+| Term | Where the app already printed it, undefined | Owning section |
+|---|---|---|
+| `strength_anchor` | Prescription details — `MEASURED ANCHOR` | `ug/how-your-weight-is-chosen#the-anchor` |
+| `exercise_target_rir` | Effort target sheet — `TARGET RIR` | `ug/exercise-level-rir#why-one-exercise-differs` |
+| `backed_off` | history rows + the day view eyebrow — `BACKED OFF` | `ug/exercise-level-rir#backing-an-exercise-off` |
+| `effective_load` | history rows on a bodyweight lift — `EFF LOAD` | `ug/reading-your-stats#one-lift-at-a-time` |
+| `adherence` | macrocycle Overview — `ADHERENCE` | `ug/reading-your-stats#where-to-look` |
+| `phase` | the macro timeline, the Cycles list, the create form | `ug/macrocycle-goals#setting-one-up` |
+
+Chapter 20 gained a **sixth group**, `ug/glossary#reading-a-session`, for the
+three that describe training already done; the other three joined existing
+groups. Ledger rows: `C-gloss-07`/`08`, `C-perex-27b`, `C-wt-25`,
+`C-stat-26`/`27`, `C-macro-22`.
+
+**One §C2 recommendation was declined**, and for the reason §C2 itself gives:
+`model band` / `REALISTIC TARGET` is hidden on every screen that would print it
+(**`D-15`**, N54), so a card for it would be the §C1-a defect the table exists to
+shrink — a definition with no screen behind it, exactly as `KEY LIFTS` was.
+Revisit when the cards return with N43/v23.
+
+### 6.2 The placements
+
+Two affordances, split by the rule in §1 ① — a term inside a **sentence** is
+marked; a term that **is a label** takes the dot.
+
+| # | Surface | The sentence, or the label | Term | Affordance |
+|---|---|---|---|---|
+| **20** | `/workout` — first-run empty state | *"Set up a macrocycle…"* | `macrocycle` | inline |
+| **21** | `/cycles` — first-run empty state | *"A macrocycle sets the long-term direction… and the mesocycles that build toward it"* | `macrocycle`, `mesocycle` | inline |
+| **22** | `/cycles/new` — the standfirst | *"A long-term arc that gives your mesocycles a shared direction"* | `mesocycle` | inline |
+| **23** | `/cycles/new` — the `PLAN` card | *"We've spaced suggested phases…"* | `phase` | inline |
+| **24** | `/more/profile` — the `SEX` note | *"Calibrates the realistic muscle-gain target on your macrocycles"* | `macrocycle` | inline |
+| **25** | Prescription details | `MEASURED ANCHOR` | `strength_anchor` | `InfoDot` |
+| **26** | Effort target sheet | `TARGET RIR` | `exercise_target_rir` | `InfoDot` |
+| **27** | Macro `OVERVIEW` | `ADHERENCE` | `adherence` | `InfoDot` |
+
+Plus the manual's own `{ term }` runs, which now render through the primitive
+(`09-changelog` session 3 §3) rather than as a bare semibold span.
+
+**What that fixes, beyond the new terms.** `22c` §C1-a's oldest finding was that
+`macrocycle` / `mesocycle` / `microcycle` are the app's core vocabulary and had
+**no trigger anywhere** — defined in `glossary.ts`, reachable from nothing. Two
+of the three now answer where a first-time reader meets them, which is the
+screen they are read on rather than a chapter they have not opened.
+
+### 6.3 What deliberately got no mark
+
+- **`microcycle`.** No screen says the word — the app says *week*. A mark cannot
+  go where the term does not appear, and inventing a sentence to hold one would
+  be the §C1-a defect in reverse.
+- **`backed_off` and `effective_load` have cards but no in-app trigger.** Both
+  render **only inside repeating history rows** (and `BACKED OFF` also on the day
+  view's eyebrow, which is the N82 hot path). A trigger per row is exactly the
+  per-card cost N82 removed, and the row is already a tap target for the
+  weight/estimate flip, so a nested button would be a second meaning for the same
+  tap. They are defined in the app's own words, reachable from chapter 20 and
+  from the sections that print them, and they wait for a single-instance
+  surface — a legend or a header — rather than being sprayed down a list.
+- **Generated prose.** The prescription strip's *why*, the comparability
+  sentence and the effort disclosures are composed as strings in pure modules;
+  marking a term inside one needs a run model, and doc 19 keeps the engine the
+  author of those words (`09-changelog` session 3 §2).
 
 ## 7. Maintenance
 
@@ -333,6 +410,18 @@ primitive, then the prose sites. Until then doc 22 §8.4c rule 2's stopgap holds
   at the site. The test is what keeps the ID honest — and since wave 2 it also
   fails on a row **no call site renders**, so the table cannot quietly drift
   ahead of the app.
+- **A new term mark adds nothing but the mark**, because there is no table to
+  keep: the term IS the key. What holds it honest is
+  `inline-term.test.ts`, which reads the call sites and fails when the marked
+  words are not the term's own, when one file marks a term twice, when a second
+  file draws the card, or when the gate leaves the primitive. Adding a term to
+  `glossary.ts` still owes chapter 20 a home and [`22a`](./22a-manual-claims.md)
+  a row — `contracts.test.ts` fails otherwise.
+- **Choosing between the three members is one question: what is the reader
+  asking, and is the term a label or a word in a sentence?** *What does this mean*
+  + label ⇒ `InfoDot`; *what does this mean* + mid-sentence ⇒ `InlineTerm`; *why
+  is this number what it is* ⇒ a Guide link, which navigates and therefore takes
+  the E-tests below.
 - **Choosing the affordance at a new site is E4, mechanically.** Read-only or
   already-guarded surface → `GuideLink`. A surface holding its own unsaved
   input → `GuardedGuideLink` with a `dirty` expression and the sentence naming

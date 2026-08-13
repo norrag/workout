@@ -83,6 +83,10 @@ export const UG_HOW_YOUR_WEIGHT_IS_CHOSEN: ManualChapter = {
           kind: "para",
           text: "Each logged set produces a strength estimate. The app averages one recent session into an anchor for that exercise. It uses the anchor to choose this week's weight, then adds one small increase when the previous session qualified.",
         },
+        // N81 — the card the Prescription details sheet now opens from
+        // `MEASURED ANCHOR`. §8.1: the sheet and this chapter say it in one set
+        // of words, and this is where the reader who wants more keeps reading.
+        { kind: "term", term: "strength_anchor" },
         { kind: "heading", text: "How the anchor is built" },
         {
           kind: "para",

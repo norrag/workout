@@ -1616,7 +1616,7 @@ contracts green.
 Manual's four use cases are demonstrated with exchanges that were run. Owner
 review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 
-### Phase 7 — Link placement *(deliverable C)* — 🔨 **7a + 7b + 7c BUILT 2026-08-15**
+### Phase 7 — Link placement *(deliverable C)* — ✅ **DONE 2026-08-15** (7a + 7b + 7c, incl. N81)
 
 | Phase | Scope | Size |
 |---|---|---|
@@ -1648,9 +1648,27 @@ review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 >   writes on every tap and the planner's exercise sheet stages into an
 >   already-guarded board; neither was ever a form. That is why the wave is ten
 >   placements against §5's seven-row estimate.
-> - **What remains of Phase 7 is N81**, and it is a content pass first —
->   `22c` §C2's ~22 undefined terms need glossary entries under §8.1 before the
->   affordance can point at anything.
+> - **N81 closed Phase 7 (session 3).** The inline term is built, in the order
+>   its own plan set: **six glossary entries, then the primitive, then the prose
+>   sites**. `22c` §C2's **recommendation column is closed** — the strength
+>   anchor, an exercise's own effort target, backed off, effective load,
+>   adherence and a block's phase are now defined in the app's words, verified
+>   against code, and filed into chapter 20 (which gained a sixth group,
+>   `#reading-a-session`). One recommendation was declined for §C2's own reason:
+>   `model band` is hidden on every screen that would print it (**`D-15`**), so a
+>   card for it would be a definition with no screen behind it.
+>   - **Eight placements**, split by the grammar rather than by taste: five
+>     **inline marks** in sentences (`/workout` and `/cycles` first-run copy,
+>     `/cycles/new` ×2, `/more/profile`) and three **`InfoDot`s** on labels
+>     (`MEASURED ANCHOR`, `TARGET RIR`, `ADHERENCE`). The manual's own `{ term }`
+>     runs adopt the primitive, which is what §8.4c rule 2 wanted and the format
+>     could not previously do.
+>   - **It also closes `22c` §C1-a's oldest finding**: `macrocycle` and
+>     `mesocycle` had no trigger anywhere, and now answer where a first-time
+>     reader meets them. `microcycle` still has none, because no screen says the
+>     word — the app says *week*.
+>   - Design: 09-changelog **2026-08-15 (session 3)**; placements
+>     [`22e`](./22e-link-placement-audit.md) §6.
 
 > **Landed — the audit is [`22e`](./22e-link-placement-audit.md), and it is the
 > thing to read.** The design pass first (hard rule 8): 09-changelog
@@ -1689,7 +1707,8 @@ review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 > uses), but it is a **behavior change**, which §1.2 puts outside this doc's
 > scope. Recommended as its own PR at 7c.
 >
-> **N81 is ruled, specified, and deliberately unbuilt.** The backlog scheduled
+> **N81 was ruled and specified here, and built in session 3** (see the note
+> above; what follows is the reasoning that put it in its own wave). The backlog scheduled
 > the inline-underlined-term affordance into 7a precisely so all three members
 > were decided together, and they were (design pass §3: dotted underline,
 > distinguishable without colour since rule 7 reserves orange and a solid

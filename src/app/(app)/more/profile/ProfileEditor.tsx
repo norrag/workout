@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { GuideLink } from "@/components/ui/GuideLink";
+import { InlineTerm } from "@/components/ui/InlineTerm";
 import { GUIDE_LINKS } from "@/lib/guide-links";
 import type { ProfileRow } from "@/lib/types/database";
 import type { ExclusionWithExercise } from "@/lib/queries/exercises";
@@ -276,7 +277,8 @@ export function ProfileEditor({
         ))}
       </div>
       <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
-        Calibrates the realistic muscle-gain target on your macrocycles.
+        Calibrates the realistic muscle-gain target on your{" "}
+        <InlineTerm term="macrocycle">macrocycles</InlineTerm>.
       </p>
 
       {/* doc 22 Phase 7c, audit §3.3 — every row here carries a one-line

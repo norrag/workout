@@ -2,7 +2,81 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-15 (latest, session 3) — doc 22 Phase 7c: the guard travels with the link (N74)
+## 2026-08-15 (latest, session 4) — doc 22 Phase 7 closes: N81's inline term (N74 / N81)
+
+The last unbuilt part of Phase 7, and the affordance the owner asked for at
+review round 4: *"Advanced terms deserve definitions when used… identified with
+underline as an alternate to the circled i icon."* Ruled at 7a
+(**09-changelog 2026-08-15 §3**) and held back on a stated reason — the
+component is a morning's work and the **content** is not. Build pass:
+**09-changelog 2026-08-15 (session 3)**; placements
+[22e §6](22e-link-placement-audit.md).
+
+### The content came first, because an affordance with nothing to open is furniture
+
+[22c](22c-app-inventory.md) §C2's recommendation column had eight terms left.
+**Six landed** — `strength_anchor`, `exercise_target_rir`, `backed_off`,
+`effective_load`, `adherence`, `phase` — each verified against code rather than
+a spec ([22b](22b-source-map.md) §9.2), which is what kept two of them honest:
+
+- **A `phase` changes no prescription.** `spreadPhases` places them,
+  `phaseLabel` prints them, and nothing in `engine/index.ts` reads
+  `mesocycles.phase`. The card says *guidance for how you plan each block* —
+  which is what the word invites a reader to over-read.
+- **`adherence` has a denominator nobody would guess.** Decided days only, over
+  working weeks. The card leads with what is left out, because that is the part
+  that makes the number mean something.
+
+**One recommendation was declined**, by §C2's own logic: `model band` /
+`REALISTIC TARGET` is hidden on every screen that would print it (`D-15`, N54),
+so a card for it would be the §C1-a defect — a definition with no screen behind
+it. Chapter 20 gained a sixth group, `#reading-a-session`, for the three terms
+that describe a session already trained; ledger rows `C-gloss-07`/`08`,
+`C-perex-27b`, `C-wt-25`, `C-stat-26`/`27`, `C-macro-22`.
+
+### The primitive is small, and the card moved before either trigger used it
+
+`InlineTerm` is a `<button>` wearing `underline decoration-dotted
+decoration-from-font underline-offset-2` and **nothing else** — no size, colour
+or weight of its own, so the run reads as the sentence it sits in. Dotted
+because hard rule 7 reserves orange and a **solid** underline is already
+in-prose *navigation* (the prescription strip's ask line, N75).
+
+`useGlossaryCard` is `InfoDot`'s popover extracted **unchanged** — same box,
+placement, scrim, scroll lock, modal a11y. Two triggers, one drawing;
+`inline-term.test.ts` fails if a second drawing appears, if a call site draws
+its own underline, if a marked run is not the term's own word, or if one file
+marks a term twice.
+
+**The gate is the one real difference from `GuideLink`.** Closed, a link
+returns `null`, which is right for a trailing element. An inline mark cannot —
+dropping the run would delete a word out of the middle of a sentence — so it
+returns the words, unmarked. `InfoDot` gained a `staged` prop for the three new
+dots, which *can* return nothing.
+
+### Placement is split by the grammar, not by taste
+
+A term inside a sentence gets the mark; a term that **is** a label keeps the
+dot. Five inline (`/workout` and `/cycles` first-run copy, `/cycles/new` ×2, the
+profile's `SEX` note) and three dots (`MEASURED ANCHOR`, `TARGET RIR`,
+`ADHERENCE`). The manual's own `{ term }` runs now render through the primitive
+too — which is what doc 22 §8.4c rule 2 wanted and the block model could only do
+before by dropping a whole card into the paragraph.
+
+This also closes [22c](22c-app-inventory.md) §C1-a as far as it goes:
+`macrocycle` and `mesocycle` are core vocabulary that had **no trigger
+anywhere**, because an `InfoDot` only fits beside a label and they were never
+labels. `microcycle` still has none and cannot — no screen says the word.
+
+**Two cards ship with no in-app trigger, deliberately** (22e §6.3): `BACKED OFF`
+and `EFF LOAD` render only inside repeating history rows, where a trigger per
+row is the per-card cost N82 removed the same week, and where the row is already
+a tap target for the weight/estimate flip.
+
+**Phase 7 is complete.** What remains of doc 22 is Phase 4 (the owner's cold
+read) and Phase 8 (the maintenance rules).
+
+## 2026-08-15 (session 3) — doc 22 Phase 7c: the guard travels with the link (N74)
 
 The owner read [22e-link-placement-audit.md](22e-link-placement-audit.md) and
 **accepted §5's recommendation**, which is the one decision wave 1 had put back

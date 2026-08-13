@@ -599,9 +599,9 @@ in different words.
 | `fractional_sets` | HOW SETS ARE COUNTED | ✅ planner board, meso stats |
 | `pump` | PUMP | ✅ feedback sheet |
 | `workload` | WORKLOAD | ✅ feedback sheet |
-| `macrocycle` | MACROCYCLE | ❌ no `InfoDot` |
-| `mesocycle` | MESOCYCLE | ❌ no `InfoDot` |
-| `microcycle` | MICROCYCLE | ❌ no `InfoDot` |
+| `macrocycle` | MACROCYCLE | ✅ **inline term** ×3 (2026-08-15, N81) — `/workout` + `/cycles` first-run copy, the profile's `SEX` note |
+| `mesocycle` | MESOCYCLE | ✅ **inline term** ×2 (2026-08-15, N81) — `/cycles` first-run copy, the `/cycles/new` standfirst |
+| `microcycle` | MICROCYCLE | ❌ no trigger, and **none is possible**: no screen says the word — the app says *week*. A mark cannot go where the term does not appear |
 
 **Finding C1-a:** four terms are defined but never surfaced. Three of them
 (`macrocycle` / `mesocycle` / `microcycle`) are the app's core vocabulary, used
@@ -609,6 +609,15 @@ as headings on screens with no way to ask what they mean. `e1rm_confidence` is
 the caveat behind a number the app shows. These are strong Phase-7 link/`InfoDot`
 placement candidates, and ch. 3 / ch. 10 should not assume the reader has met
 them.
+
+> **Largely closed 2026-08-15 (N81, doc 22 Phase 7 — [`22e`](./22e-link-placement-audit.md) §6.2).**
+> `macrocycle` and `mesocycle` now answer *in the sentences that use them*,
+> which is the affordance this finding was waiting on: an `InfoDot` only fits
+> beside a label, and these three were never labels. Two remain and both are
+> deliberate — `microcycle` has no rendered word to mark, and
+> `e1rm_confidence` is still unsurfaced (its natural home is a per-row rating
+> on the exercise page, which is the repeating-row problem
+> [`22e`](./22e-link-placement-audit.md) §6.3 holds `backed_off` out for).
 
 ## C2 · Jargon the app renders with **no** definition anywhere
 
@@ -618,23 +627,23 @@ defined only in the manual. Recommendation in the last column.
 
 | Term (as rendered) | Where | Ch. | Recommend |
 |---|---|---|---|
-| **`MEASURED ANCHOR`** / the strength anchor | Prescription details | 10 | **add to glossary** — ch. 10's headline concept |
+| **`MEASURED ANCHOR`** / the strength anchor | Prescription details | 10 | **add to glossary** — ch. 10's headline concept — ✅ added 2026-08-15 (`strength_anchor`, Phase 7 / N81), with an `InfoDot` on the row |
 | **`PRESCRIBED IMPLIES`** | Prescription details | 10, 17 | manual-only (sheet-specific) |
 | **`COMPUTED UNDER`** / `VERIFIED AS OF` | Prescription details | 17 | manual-only |
 | **`TRACE`** | Prescription details | 17 | manual-only |
 | **`SEED`** / **`ADVANCE`** (decision kind) | Prescription details | 10, 17 | manual-only |
-| **`BACKED OFF`** | history rows, stats disclosures | 8, 13 | **add to glossary** — doc 21 §6.2, live, and easy to misread |
-| **`EFF LOAD`** (effective load) | history rows | 13 | **add to glossary** |
+| **`BACKED OFF`** | history rows, stats disclosures | 8, 13 | **add to glossary** — doc 21 §6.2, live, and easy to misread — ✅ added 2026-08-15 (`backed_off`). **Card only, no in-app trigger**: it renders solely in repeating rows ([`22e`](./22e-link-placement-audit.md) §6.3) |
+| **`EFF LOAD`** (effective load) | history rows | 13 | **add to glossary** — ✅ added 2026-08-15 (`effective_load`). Card only, same repeating-row reason |
 | **`Load step`** | exercise ⋮, custom-exercise form | 15 | **add to glossary** — ✅ added 2026-08-10 (Phase 3b, ch. 15) |
-| **`TARGET RIR`** (per exercise) vs the week's | Effort sheet, planner | 6, 8 | covered by an extended `rir` / new key |
+| **`TARGET RIR`** (per exercise) vs the week's | Effort sheet, planner | 6, 8 | covered by an extended `rir` / new key — ✅ **its own key** 2026-08-15 (`exercise_target_rir`), with an `InfoDot` on the sheet's `TARGET RIR` label: the week's ramp and one exercise's override are two things a reader sees on one screen |
 | **`RIR BY WEEK`** | planner board | 8 | manual-only |
 | **`Working-set cap`** / **`Priced at`** | Effort sheet (read-only) | 8 | manual-only — see [B7](#b7-two-levers-the-app-shows-but-cannot-set) |
-| **Phases**: `ACCUMULATE` / `INTENSIFY` / `PEAK` | create macro, meso details | 14 | **add to glossary** |
-| **`ADHERENCE`** | meso + macro stats | 13 | **add to glossary** |
+| **Phases**: `ACCUMULATE` / `INTENSIFY` / `PEAK` | create macro, meso details | 14 | **add to glossary** — ✅ added 2026-08-15 (`phase`), marked inline on the create form's *"suggested phases"* |
+| **`ADHERENCE`** | meso + macro stats | 13 | **add to glossary** — ✅ added 2026-08-15 (`adherence`), with an `InfoDot` on the macro Overview tile. (Only the macro page renders the label; no meso surface does) |
 | **`BALANCE CHECK`**, `PUSH` / `PULL` / `LEGS` | meso Balance | 13 | manual-only; **advisory only** per doc 10 §9 |
 | ~~**`KEY LIFTS`**~~ | **Closed 2026-08-11 (Phase 3g).** Nothing renders the term. The grid went with N10; `key_lifts.n` / `selection` remain on the live row with **no consumer in the repo** — schema plus two removal comments ([`22a`](./22a-manual-claims.md) `D-16`) | — | **no glossary entry.** A card for a term no screen shows is the [`22c`](./22c-app-inventory.md) §C1-a defect this table exists to shrink. Revisit if a key-lifts surface returns |
 | **`VOLUME PR`** / `BEST SESSION VOL` | exercise Overview | 13 | manual-only |
-| **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | **add to glossary** |
+| **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | ~~add to glossary~~ — **declined 2026-08-15** for this table's own reason: every screen that would print it is hidden (**`D-15`**, N54), so the card would be the §C1-a defect. Revisit with N43/v23 |
 | **`MEASURED RMR`** (`KCAL/DAY`) | macro Overview | 16 | manual-only |
 | **`NOT COMPARABLE`** | macro/DEXA surfaces | 13, 16 | manual-only — teach it as an answer |
 | **`day slot`** | not rendered, but the model behind "the same exercise on the same day" | 3, 13 | **add to glossary** — ✅ added 2026-08-08 (Phase 3a, ch. 3) |
@@ -650,6 +659,15 @@ term the app also shows in different words.
 > needs it, so its definition is authored by the pass that verifies the behavior
 > behind it. `day slot` landed with ch. 3; **`Load step` landed with ch. 15
 > (Phase 3b, 2026-08-10)**. Eight to go.
+>
+> **Closed 2026-08-15 (N81, doc 22 Phase 7).** The remaining eight resolved as
+> **six added** — `strength_anchor`, `exercise_target_rir`, `backed_off`,
+> `effective_load`, `adherence`, `phase` — **one declined** (`model band`, hidden
+> by `D-15`) and **one already closed** (`KEY LIFTS`, nothing renders it). Each
+> new card was verified against code, not spec ([`22b`](./22b-source-map.md)
+> §9.2), and each is filed into chapter 20, which gained a sixth group
+> (`#reading-a-session`) for the three that describe a session already trained.
+> The `manual-only` rows of this table are unchanged: they are prose, not cards.
 
 ## C3 · The vocabulary the app has already chosen
 

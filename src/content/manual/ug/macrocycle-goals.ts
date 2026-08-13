@@ -167,6 +167,9 @@ export const UG_MACROCYCLE_GOALS: ManualChapter = {
             " shows the strength rate it actually produced.",
           ],
         },
+        // N81 — the create form marks the word `phases` inline and this is the
+        // card behind it; the timeline prints one beside every block.
+        { kind: "term", term: "phase" },
         {
           kind: "para",
           text: [

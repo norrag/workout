@@ -388,9 +388,13 @@ export default async function MacroOverviewPage({
           />
           <Stat value={fmtVolume(stats.totalVolume)} label="TOTAL VOLUME · LB" />
           <Stat value={String(stats.sessionsLogged)} label="SESSIONS LOGGED" />
+          {/* N81 — a percentage whose denominator is not what a reader
+              assumes: decided days only, working weeks only (`22c` §C2). */}
           <Stat
             value={stats.adherencePct == null ? "—" : `${stats.adherencePct}%`}
             label="ADHERENCE"
+            info="adherence"
+            infoStaged
           />
         </div>
         <div className="mb-6 mt-[9px] text-[10px] leading-normal text-ink/55">
@@ -658,10 +662,13 @@ function Stat({
   value,
   label,
   info,
+  infoStaged = false,
 }: {
   value: string;
   label: string;
   info?: GlossaryKey;
+  /** doc 23 §9.2 — the term is new in the staged release; hold the dot back */
+  infoStaged?: boolean;
 }) {
   return (
     <div className="bg-bg-base px-3 py-[11px]">
@@ -670,7 +677,7 @@ function Stat({
       </div>
       <div className="mt-0.5 flex items-center gap-1 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
         {label}
-        {info && <InfoDot term={info} small />}
+        {info && <InfoDot term={info} small staged={infoStaged} />}
       </div>
     </div>
   );

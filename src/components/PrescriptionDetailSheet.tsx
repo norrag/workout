@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { GuideLink } from "@/components/ui/GuideLink";
+import { InfoDot } from "@/components/ui/InfoDot";
+import type { GlossaryKey } from "@/lib/glossary";
 import { GUIDE_LINKS } from "@/lib/guide-links";
 import {
   prescriptionMatchesDecision,
@@ -48,11 +50,21 @@ const KIND_LABEL: Record<PrescriptionAudit["kind"], string> = {
   advance: "ADVANCE",
 };
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({
+  label,
+  info,
+  children,
+}: {
+  label: string;
+  /** N25 — the term-level card for this row's label, where one exists */
+  info?: GlossaryKey;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-ink/10 py-2">
-      <span className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+      <span className="flex items-center gap-1.5 text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
         {label}
+        {info && <InfoDot term={info} small staged />}
       </span>
       <span className="text-right text-[12px] font-medium text-ink/80">{children}</span>
     </div>
@@ -231,8 +243,12 @@ export function PrescriptionDetailSheet({
                     <span className="numeral">{target.targetAnchor} LB</span>
                   </FieldRow>
                 )}
+                {/* N81 — the sheet prices every figure above off this row and
+                    never said what an anchor is (`22c` §C2). Term-level, so it
+                    sits ON the label; the mechanism-level link at the foot of
+                    the sheet is the other question and both stay (`22e` §1 ①). */}
                 {target.measuredAnchor != null && (
-                  <FieldRow label="MEASURED ANCHOR">
+                  <FieldRow label="MEASURED ANCHOR" info="strength_anchor">
                     <span className="numeral">{target.measuredAnchor} LB</span>
                     {target.anchorSource && (
                       <span className="ml-1.5 text-[10px] text-ink/45">

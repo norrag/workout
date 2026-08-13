@@ -11,6 +11,7 @@ import { getActiveEngineParams } from "@/lib/queries/generation";
 import { getMesoStats } from "@/lib/queries/stats";
 import { createServiceClient } from "@/lib/supabase/service";
 import { VolumeView } from "@/components/stats/MesoStatsViews";
+import { InlineTerm } from "@/components/ui/InlineTerm";
 import { DayView } from "../log/[workoutId]/DayView";
 
 /**
@@ -139,9 +140,13 @@ export default async function WorkoutPage() {
 
       {!state.mesocycle && (
         <div className="mt-6">
+          {/* N81 — the app's own vocabulary, on the screen a first-time reader
+              meets it. `22c` §C1-a: `macrocycle` is defined in glossary.ts and
+              has never had a trigger anywhere. */}
           <p className="text-sm leading-relaxed text-ink/70">
-            Training runs in cycles. Set up a macrocycle — or a standalone
-            meso — and plan your first block.
+            Training runs in cycles. Set up a{" "}
+            <InlineTerm term="macrocycle">macrocycle</InlineTerm> — or a
+            standalone meso — and plan your first block.
           </p>
           <Link
             href="/cycles"

@@ -4,6 +4,70 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-15 — Session 123: N81's inline term, and the six words it needed (N74 Phase 7, N81)
+
+> **On the date:** doc-side, like sessions 114–122.
+
+**Owner:** *"Begin doc 22 phase 7's remaining N81's inline term piece."* The one
+part of Phase 7 left unbuilt, ruled at 7a and held back for a stated reason: the
+component is a morning's work and the **content** is not.
+
+**So the content came first, and it was most of the session.** `22c` §C2's
+recommendation column had eight terms open. Six landed — `strength_anchor`,
+`exercise_target_rir`, `backed_off`, `effective_load`, `adherence`, `phase` —
+each read off code rather than a spec (`22b` §9.2), which is what stopped two of
+them from being wrong:
+
+- **`phase` does nothing to a prescription.** `spreadPhases` places them and
+  `phaseLabel` prints them; nothing in `engine/index.ts` reads
+  `mesocycles.phase`, and its only other consumer is the coaching context. So
+  the card says *guidance for how you plan each block*, not "it changes how the
+  block runs" — which is what the word invites you to assume.
+- **`adherence` has a denominator a reader would guess wrong.** Decided days
+  only (`completed`/`skipped`), working weeks only. The card leads with what is
+  *left out*, because that is the part that makes the number make sense.
+
+**One recommendation was declined**, and by the table's own logic: `model band` /
+`REALISTIC TARGET` is hidden on every screen that would print it (`D-15`, N54),
+so a card for it would be the §C1-a defect — a definition with no screen behind
+it, exactly as `KEY LIFTS` was.
+
+**Then the primitive, which is small on purpose.** `InlineTerm` is a `<button>`
+wearing a dotted underline and nothing else — no size, no colour, no weight, so
+the run reads as the sentence it sits in. The card it opens is `InfoDot`'s
+popover **extracted unchanged** into `useGlossaryCard`: two triggers, one
+drawing. A test fails if a second drawing appears, if a call site draws its own
+underline, or if the gate leaves the primitive.
+
+**The gate is the interesting difference.** `GuideLink` returns `null` when the
+release is closed, which is right for a trailing element. An inline mark cannot
+do that — dropping the run would delete a word out of the middle of a sentence —
+so closed it returns the words, unmarked. `InfoDot` gained a `staged` prop for
+the three new dots, which *can* return nothing.
+
+**Placement, split by grammar rather than by taste.** A term inside a sentence
+gets the mark; a term that IS a label keeps the dot. Five inline (the `/workout`
+and `/cycles` first-run copy, `/cycles/new` twice, the profile's `SEX` note) and
+three dots (`MEASURED ANCHOR`, `TARGET RIR`, `ADHERENCE`). Plus the manual's own
+`{ term }` runs, which now render through the primitive — which is what §8.4c
+rule 2 asked for and the block model could not previously do without dropping a
+whole card into the paragraph.
+
+**It closes `22c` §C1-a's oldest finding as far as it can go.** `macrocycle` and
+`mesocycle` are the app's core vocabulary and had **no trigger anywhere**,
+because an `InfoDot` only fits beside a label and they were never labels. They
+answer now, on the screens a first-time reader meets them on. `microcycle`
+still has none and cannot: no screen says the word — the app says *week*.
+
+**Two cards deliberately have no in-app trigger.** `BACKED OFF` and `EFF LOAD`
+render **only inside repeating history rows**, where a trigger per row is the
+per-card cost N82 removed a week ago, and where the row is already a tap target
+for the weight/estimate flip. Written down in `22e` §6.3 rather than quietly
+skipped — they are defined, reachable from the Guide, and waiting for a
+single-instance surface.
+
+- **Index sync:** N81 → `done (PR #TBD)`; N74's Phase 7 row closed out.
+
 ## 2026-08-15 — Session 122: the guard travels with the link (N74 Phase 7c)
 
 > **On the date:** doc-side, like sessions 114–121.
