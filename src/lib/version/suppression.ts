@@ -1,5 +1,5 @@
 /**
- * doc 23 §6.4 — when the What's New sheet may appear.
+ * doc 23 §6.4 — when the What's New modal may appear.
  *
  * T5: "the modal must never interrupt a session, and session is not a route."
  * The Workout tab does not lead to a session — it *is* the session

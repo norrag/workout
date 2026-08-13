@@ -1,5 +1,6 @@
 import { compare } from "@/lib/version/semver";
 import { RELEASE_1_0_0 } from "./1.0.0";
+import { RELEASE_1_1_0 } from "./1.1.0";
 import type { Release } from "./types";
 
 export type {
@@ -20,7 +21,9 @@ export { CONTENT_LIMITS } from "./types";
  * is no path from that file to this array.
  */
 export const RELEASES: readonly Release[] = Object.freeze(
-  [RELEASE_1_0_0].sort((a, b) => compare(a.version, b.version)),
+  [RELEASE_1_0_0, RELEASE_1_1_0].sort((a, b) =>
+    compare(a.version, b.version),
+  ),
 );
 
 /** Newest first — the version history's render order (§8). */

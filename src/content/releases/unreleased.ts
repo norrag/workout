@@ -3,108 +3,14 @@ import type { ReleaseEntry } from "./types";
 /**
  * doc 23 §9.2/§9.3 — the staged manifest.
  *
- * An ordinary PR that changes something a user would notice appends its entry
- * here. Nothing in this file is part of `RELEASES`, so the version history
- * **structurally cannot** show it — that property falls out of the data model
- * rather than being enforced by a rule.
- *
- * The release PR moves these entries into `<version>.ts`, edits them so a
- * block written one PR at a time reads as one release, and leaves this array
- * empty again. That merge is also what flips every `releaseActive("<version>")`
- * gate on: the release PR *is* the switch.
+ * Ordinary PRs append user-visible changes here. A release PR moves the
+ * completed block into `<version>.ts`, then leaves this array empty and moves
+ * `UNRELEASED_VERSION` to the next feature version.
  */
-export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
-  {
-    // doc 22 Phase 1 (N74) — the manual renders the glossary's own words
-    // (§8.1), which is what surfaced the inverted clause. Ledger row D-01 in
-    // `docs/22a-manual-claims.md`.
-    id: "glossary-e1rm-rir-direction",
-    title: "What reps in reserve do to a strength estimate",
-    body: "The card explaining your estimated one-rep max spells the term out, and says which way reps in reserve push it: at the same weight and reps, a set with reps to spare implies more strength than one taken to failure.",
-    area: "training",
-  },
-  {
-    // doc 22 Phase 2 (N74) — the reading surface. The chapters themselves land
-    // over Phase 3; this entry is what 1.1.0 announces, so it describes the
-    // guide rather than any one chapter.
-    id: "user-guide",
-    title: "A guide to the app, built into it",
-    body: "More → Guide explains what each screen does and how the numbers are worked out, in short sections you can read one at a time. Search it, or open a chapter and read straight through.",
-    area: "app",
-    link: {
-      label: "Open the guide",
-      target: { kind: "app", href: "/more/guide" },
-    },
-  },
-  {
-    // The former AI Manual is now a single Guide chapter, with setup kept on
-    // the connector page where the reader needs it.
-    id: "ai-manual",
-    title: "A complete guide to training with AI",
-    body: "The Guide now shows how a connected Claude or ChatGPT can understand your full training history, analyze progress, build plans in the app, and turn coaching decisions into changes you control.",
-    area: "connector",
-    link: {
-      label: "Explore the AI guide",
-      target: { kind: "guide", section: "ug/connecting-an-ai#what-it-opens-up" },
-    },
-  },
-  {
-    // N82 — the day-view focus pass. A layout change with no new capability,
-    // which is exactly the case doc 23 §4.2 says still owes an entry: the
-    // controls a returning user reaches for have moved.
-    id: "day-view-focus-pass",
-    title: "A quieter workout screen",
-    body: "Tap an exercise's name to open the program's reasoning — the button that used to do it is gone, and its card is calmer for it. Notes read as one block, and the exercise menu is grouped into shorter lists.",
-    area: "training",
-    link: {
-      label: "Open your workout",
-      target: { kind: "app", href: "/workout" },
-    },
-  },
-  {
-    // doc 22 Phase 7 (N74) — deliverable C. Twenty placements across two waves;
-    // audit in `docs/22e`, wave 2 in its §3.3.
-    id: "guide-links-in-the-app",
-    title: "The guide, where the question comes up",
-    body: "Screens that print a worked-out number, or ask you for one, carry a quiet line to the section explaining it — prescription details, the volume check, the strength tabs, the feedback and effort sheets. The back link returns you.",
-    area: "app",
-  },
-  {
-    // doc 22 Phase 7c (N74) — the guard the links needed, which is a
-    // user-visible behavior change in its own right (doc 23 §4.2): these forms
-    // used to discard silently.
-    id: "asks-before-discarding",
-    title: "Nothing is dropped without asking",
-    body: "Leaving a screen with unsaved work on it — a half-filled new macrocycle, a custom exercise, feedback you haven't saved — now asks first instead of dropping it quietly. Answer the question and you carry on where you were.",
-    area: "app",
-  },
-  {
-    // doc 22 Phase 7 / N81 — the inline term. Grouped with the six new
-    // glossary entries it exists to reach, because to a reader they are one
-    // change: words that can now be asked about.
-    id: "tap-a-term-to-define-it",
-    title: "Tap an underlined word for what it means",
-    body: "A word with a dotted underline opens its definition where you are. Six more terms are defined this way: the strength anchor, a block's phase, an exercise's own effort target, backed off, effective load, and adherence.",
-    area: "app",
-  },
-  {
-    // doc 22 Phase 5 (N74) — the connector's retrieval surface. `22d` §10
-    // called this out in advance as a user-visible capability that owes an
-    // entry: an AI that can read the guide answers differently.
-    id: "connector-reads-the-guide",
-    title: "Your AI can read the guide",
-    body: "A connected AI can search the guide and read a section back, so an answer about how the app works comes from the guide's own words — and it can tell you which section to open.",
-    area: "connector",
-    link: {
-      label: "Connector settings",
-      target: { kind: "app", href: "/more/connector" },
-    },
-  },
-];
+export const UNRELEASED_ENTRIES: ReleaseEntry[] = [];
 
-/**
- * The version these staged entries are slated for — the string used by
- * `releaseActive(...)` at the gated call sites. Kept next to the entries so the
- * release PR has one place to look.
- */
-export const UNRELEASED_VERSION = "1.1.0";
+/** The next feature release under construction. */
+export const UNRELEASED_VERSION = "1.2.0";
+
+/** Set when the staged block has a release-level headline. */
+export const UNRELEASED_HEADLINE: string | undefined = undefined;

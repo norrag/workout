@@ -1,9 +1,9 @@
 # 23 — Versioning & Releases (build spec + phased plan)
 
-**Status:** **phases 0–6 built** (2026-08-06, PR for N80) — the framework is
-live and 1.0.0 is cut. Deep links carry the `app` half only; the `guide` half
-waits on doc 22 Phase 2, which is a dependency rather than a blocker
-([§7.2](#72-guide-targets)). Per-phase state in [§11](#11-the-phased-plan);
+**Status:** **phases 0–6 built** (2026-08-06, PR #230) — the framework is
+live, 1.0.0 is cut, and the 1.1.0 release registry now ships the completed Guide
+block. Both `app` and `guide` release targets resolve through the shared
+validators ([§7.2](#72-guide-targets)). Per-phase state in [§11](#11-the-phased-plan);
 **all eight decisions answered** in [§12](#12-decisions).
 **Revised 2026-08-06 after owner review round 1** — five corrections, three of
 them defects the owner caught: **"live workout" was undefined and the rule as
@@ -271,7 +271,11 @@ which this framework makes cheap by design.
 3. **No hype** (hard rule 7) — no exclamation marks, no "we're excited", no superlatives. Tested.
 4. **Honesty guardrails** (doc 10 §9) — a release note may not claim precision the engine doesn't have. e1RM stays an estimate in a release note exactly as it does in the app.
 5. **Glossary identity** — a term defined in `src/lib/glossary.ts` is used with that meaning, and a note that introduces jargon links to its guide section instead of redefining it.
-6. **Length budget** — headline ≤ 60 chars, entry title ≤ 60, body ≤ 240. A feature release has 1–6 entries; more than that means the block should have shipped as two releases.
+6. **Length budget** — headline ≤ 60 chars, entry title ≤ 60, body ≤ 240. A
+   feature release marks **1–3 entries as `highlight`** for the modal; every
+   highlight has an onward link and appears before the supporting notes. The
+   full history may carry additional smaller or technical changes—the modal is
+   an overview, while More → What's new is the complete record.
 
 ### 5.3 Registry invariants (tested)
 
@@ -444,9 +448,12 @@ screens is extra surface for little gain ([§12](#12-decisions) O4).
 Route: `/more/whats-new`. The hardcoded `WORKOUT 0.1 — PRE-RELEASE` footer
 becomes `WORKOUT {CURRENT_VERSION}` and links here.
 
-- Newest first. Feature and major releases render their entries in full, with the same links.
+- Newest first. Feature and major releases render every entry in full, with the same links.
 - Fix releases collapse to a version, date, and one line each — expandable. They prove the app is maintained without competing with feature releases for attention.
-- **One renderer, two surfaces** (doc 22 D4): the modal and the history page share `ReleaseEntryList`. The modal is that list plus a headline and a dismiss; nothing about an entry renders differently in the two places.
+- **One renderer, two selections:** the modal and history share
+  `ReleaseEntryList`, so an entry itself never changes wording or destination.
+  The modal selects only the 1–3 `highlight` entries; history selects all
+  entries. The modal ends with an explicit link to this complete record.
 - The page is the durable copy of the modal — a user who dismissed it or wants to re-explore comes here. That is what lets the modal stay strictly once-only.
 
 Both surfaces need the Phase 0 design pass (T6).
@@ -524,7 +531,13 @@ rather than being enforced by a rule.
 
 1. **A gated feature carries both code paths** until the release lands, and a cleanup PR removes the dead branch afterwards. This is the real price of the model, and it argues for **time-boxing a block to weeks, not months**, and for gating only what genuinely must not appear early. A new settings row nobody will notice does not need a gate; a redesigned Workout tab does.
 2. **Migrations cannot be gated this way** — a migration applies at deploy. Additive schema (a column nothing reads yet) is invisible and ships ungated; anything that changes existing behavior must ship in the release itself. Worth checking at release-PR time.
-3. **Previewing a staged block needs an override.** The owner will want to see 1.1.0 before flipping it. `NEXT_PUBLIC_RELEASE_OVERRIDE`, honored **only** when `VERCEL_ENV !== "production"`, makes any Vercel preview deploy render the staged release. Env-gated rather than user-gated, so there is no auth surface and no way to reach it in production.
+3. **Previewing a staged block needs an override.** The owner will want to see
+   1.1.0 before flipping it. `NEXT_PUBLIC_RELEASE_OVERRIDE`, honored **only**
+   when `VERCEL_ENV !== "production"`, makes any Vercel preview deploy render
+   the staged features, synthesize the staged manifest into the real modal and
+   version-history surfaces, and acknowledge the previewed version normally.
+   Env-gated rather than user-gated, so there is no auth surface and no way to
+   reach it in production.
 4. **Cleanup is part of the release, not after it.** The release PR opens a follow-up to strip that version's gates; left undone, the codebase accumulates permanent `releaseActive("1.1.0")` checks that are dead but never obviously dead.
 
 ### 9.3 The two PR shapes
@@ -637,9 +650,9 @@ reason to have one.
 ### Phase 0 — Design pass *(gates everything)* — **DONE** (2026-08-06)
 
 Hard rule 8: there is no mockup for either surface. Transcribe the house system
-(08 §5 / 09) into a What's New sheet and a version-history list — square corners,
-dashed borders for the collapsed fix rows, orange only for current position and
-selection, tracked all-caps labels — and record the decision in
+(08 §5 / 09) into a floating What's New modal and a version-history list —
+square corners, the menu-card shadow, dashed borders for collapsed fix rows, a
+single orange new-version marker, tracked all-caps labels — and record the decision in
 `docs/09-design-changelog.md` **before** any markup. Owner sees it. **S**
 
 ### Phase 1 — Identity and registry — **DONE** (2026-08-06)
@@ -707,7 +720,7 @@ regardless — they replace a hardcoded string with a CI-enforced identity. Phas
 | # | Question | Decision |
 |---|---|---|
 | **O1** | Does 1.0.0 itself announce? | ✅ **No.** Backfill every existing account to `1.0.0`; the first modal anyone sees is 1.1.0 ([§4.3](#43-what-100-is)) |
-| **O2** | Blocking sheet, or a dismissible banner on Today? | ✅ **Sheet requiring an explicit dismiss**, once. A banner is easy to ignore, which defeats the point; a sheet is honest about interrupting, and [§6.4](#64-where-and-when-it-appears) guarantees it only ever does so between sessions |
+| **O2** | Blocking modal, or a dismissible banner on Today? | ✅ **Floating modal requiring an explicit dismiss**, once. Owner review of the rendered 1.1.0 preview replaced the original bottom sheet with a centered, shadowed modal; a banner remains too easy to ignore, and [§6.4](#64-where-and-when-it-appears) guarantees the interruption only lands between sessions |
 | **O3** | Do fix releases appear in the history? | ✅ **Yes, collapsed** — visible maintenance, no competition for attention |
 | **O4** | A "from What's New" marker when landing on an app route? | ✅ **Not in v1** — guide sections get doc 22's marker; app routes navigate plainly |
 | **O5** | Git tags + GitHub releases? | ✅ **Yes, generated from the registry after merge.** The registry stays the source of truth; the tag is an artifact |

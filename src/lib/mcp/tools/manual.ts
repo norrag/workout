@@ -9,7 +9,6 @@ import {
   SEARCH_LIMIT_MAX,
 } from "@/content/manual/retrieval";
 import { parseSectionId } from "@/content/manual";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 import { releaseActive } from "@/lib/version";
 import { toolResult } from "../envelope";
 
@@ -42,7 +41,7 @@ export const MANUAL_TOOL_NAMES: ReadonlySet<string> = new Set([
 
 /** doc 23 §9.2 — whether the manual (and therefore its retrieval surface) is live. */
 export function manualRetrievalActive(): boolean {
-  return releaseActive(UNRELEASED_VERSION);
+  return releaseActive("1.1.0");
 }
 
 /**

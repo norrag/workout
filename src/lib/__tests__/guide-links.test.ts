@@ -125,7 +125,7 @@ describe("the release gate lives in the primitive, once", () => {
     const link = SOURCES.find(
       (s) => s.rel === "src/components/ui/GuideLink.tsx",
     )!;
-    expect(link.text).toMatch(/releaseActive\(UNRELEASED_VERSION\)/);
+    expect(link.text).toMatch(/releaseActive\("1\.1\.0"\)/);
   });
 
   it("gates the guarded variant through the same primitive", () => {

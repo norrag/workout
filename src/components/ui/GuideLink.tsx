@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { GuideLinkTarget } from "@/lib/guide-links";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * doc 22 Phase 7 — the mechanism-level link into the Guide
@@ -64,7 +63,7 @@ export function GuideLink({
   /** spacing for the call site — margins only; the type is the primitive's */
   className?: string;
 }) {
-  if (!releaseActive(UNRELEASED_VERSION)) return null;
+  if (!releaseActive("1.1.0")) return null;
   const href = guideHref(to, from);
   const link = (
     <Link

@@ -125,7 +125,7 @@ renumbering).
 | 2.5 | Planner board — view/edit meso (`PLAN \| STATS`, lock) | 4.4 | More — profile card + settings |
 | 2.6 | Day setup · groups & counts | 4.5 | Profile |
 | 2.6b | Add muscle group | 4.6 | Version history (More → What's new) † |
-| | | 4.7 | What's New sheet † |
+| | | 4.7 | What's New modal † |
 | | | 4.8 | Guide map (More → Guide) ‡ |
 | | | 4.9 | Guide — chapter contents ‡ |
 | | | 4.10 | Guide — a section ‡ |

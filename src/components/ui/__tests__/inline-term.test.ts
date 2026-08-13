@@ -127,7 +127,7 @@ describe("one card, one gate", () => {
 
   it("gates the affordance in the primitive", () => {
     const primitive = SOURCES.find((s) => s.rel === PRIMITIVE)!;
-    expect(primitive.text).toMatch(/releaseActive\(UNRELEASED_VERSION\)/);
+    expect(primitive.text).toMatch(/releaseActive\("1\.1\.0"\)/);
     // closed, the words still render — a gate that dropped the run would
     // delete a word out of the middle of a sentence
     expect(primitive.text).toMatch(/return <>\{children\}<\/>/);

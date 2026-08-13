@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 import { GuideLink } from "@/components/ui/GuideLink";
 import { GUIDE_LINKS } from "@/lib/guide-links";
 import { CopyField } from "./CopyField";
@@ -40,7 +39,7 @@ export default async function ConnectorPage() {
 
   const origin = resolveConnectorOrigin(process.env.NEXT_PUBLIC_APP_URL);
   const endpoint = `${origin}/api/mcp`;
-  const manualLive = releaseActive(UNRELEASED_VERSION);
+  const manualLive = releaseActive("1.1.0");
 
   return (
     <div>

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { Release, ReleaseEntry } from "@/content/releases/types";
+import { guideSectionRoute } from "@/content/releases/links";
 
 /**
- * doc 23 §8 — **one renderer, two surfaces**. The What's New sheet is this list
- * plus a headline and a dismiss; nothing about an entry renders differently in
- * the two places, so the history page really is the durable copy of the modal
- * and the modal can stay strictly once-only.
+ * doc 23 §8 — **one renderer, two selections**. The modal passes only entries
+ * marked as highlights; the history passes every entry. A selected entry keeps
+ * identical wording and destination in both places, so history remains the
+ * complete durable record and the modal can stay strictly once-only.
  *
  * House system (08 §1 / hard rule 7): square corners, hairline rules between
  * rows, tracked all-caps for the area label and the link, no accent colour —
@@ -17,9 +18,8 @@ function EntryLink({ link }: { link: NonNullable<ReleaseEntry["link"]> }) {
   const href =
     link.target.kind === "app"
       ? link.target.href
-      : // §7.2 — guide targets resolve against doc 22's section IDs; until that
-        // phase lands the registry test rejects them, so this branch is unreachable
-        `/guide/${link.target.section}`;
+      : guideSectionRoute(link.target.section);
+  if (!href) return null;
   return (
     <Link
       href={href}

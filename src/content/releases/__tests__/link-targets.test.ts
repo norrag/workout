@@ -1,9 +1,12 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { GUIDE_SECTION_IDS } from "../links";
-import { LINKABLE_ROUTES } from "../links";
-import { allSectionIds, resolveSection } from "@/content/manual";
+import {
+  GUIDE_SECTION_IDS,
+  LINKABLE_ROUTES,
+  guideSectionRoute,
+} from "../links";
+import { allSectionIds, resolveSection, sectionRoute } from "@/content/manual";
 
 /**
  * doc 23 §7.1 — the allowlist is asserted against the App Router's route files,
@@ -63,8 +66,10 @@ describe("GUIDE_SECTION_IDS", () => {
   });
 
   it("resolves every ID through the manual registry", () => {
-    for (const id of GUIDE_SECTION_IDS)
+    for (const id of GUIDE_SECTION_IDS) {
       expect(resolveSection(id), `${id} does not resolve`).toBeDefined();
+      expect(guideSectionRoute(id), `${id} route drift`).toBe(sectionRoute(id));
+    }
   });
 
   it("lists each ID once, and none that the manual has dropped", () => {

@@ -42,7 +42,7 @@ export function isLinkableRoute(href: string): href is LinkableRoute {
  * `resolveSection`): one validator, two consumers (T11).
  *
  * **Literal strings, deliberately.** This module is imported by the release
- * surfaces, which the What's New sheet mounts into the app shell — so importing
+ * surfaces, which the What's New modal mounts into the app shell — so importing
  * `@/content/manual` here would pull the whole manual into every page's payload
  * and break doc 22 D3's first guard on its first use. The coupling is enforced
  * the other way instead: `link-targets.test.ts` resolves every ID below through
@@ -191,4 +191,14 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
 
 export function isGuideSectionId(id: string): boolean {
   return GUIDE_SECTION_IDS.includes(id);
+}
+
+/**
+ * Turn a validated guide section ID (`ug/<chapter>#<section>`) into its reader
+ * route without importing the manual registry into the release surfaces.
+ */
+export function guideSectionRoute(id: string): string | null {
+  if (!isGuideSectionId(id)) return null;
+  const match = /^ug\/([^#]+)#(.+)$/.exec(id);
+  return match ? `/more/guide/${match[1]}/${match[2]}` : null;
 }

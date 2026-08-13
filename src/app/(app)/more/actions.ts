@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/queries/profiles";
 import { appendBodyweightPoint } from "@/lib/queries/bodyweight";
 import { setLastSeenVersion } from "@/lib/queries/releases";
-import { CURRENT_VERSION } from "@/content/releases";
+import { displayVersion } from "@/lib/version";
 import { localDayIso } from "@/lib/dates";
 
 export async function setAutoMatchWeights(enabled: boolean): Promise<void> {
@@ -66,8 +66,8 @@ export async function logBodyweightAction(input: {
 
 /**
  * doc 23 §6.3 — acknowledgment is an explicit action, never a render side
- * effect. Dismissing the What's New sheet, or tapping one of its links, calls
- * this; a user who force-quits over an unacknowledged sheet sees it again,
+ * effect. Dismissing the What's New modal, or tapping one of its links, calls
+ * this; a user who force-quits over an unacknowledged modal sees it again,
  * which is the correct failure direction.
  *
  * The same action primes a `null` last-seen (§6.2 belt and braces): an account
@@ -82,7 +82,9 @@ export async function acknowledgeReleases(): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  // CURRENT_VERSION, not the highest pending release: a user who skipped 1.1
-  // and 1.2 clears both. Monotonic — `setLastSeenVersion` never lowers it.
-  await setLastSeenVersion(supabase, user.id, CURRENT_VERSION);
+  // The displayed version, not the highest pending release: a user who skipped
+  // 1.1 and 1.2 clears both. Off production this includes the explicit preview
+  // override, so dismissal can be tested without registering an unreleased
+  // block. Monotonic — `setLastSeenVersion` never lowers it.
+  await setLastSeenVersion(supabase, user.id, displayVersion());
 }

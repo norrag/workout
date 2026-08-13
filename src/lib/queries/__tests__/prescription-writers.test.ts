@@ -47,11 +47,19 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe("prescription writers (N33 S3 invariant)", () => {
-  it("only allowlisted modules build prescribed_* write payloads", () => {
-    const offenders = walk(SRC)
-      .filter((p) => readFileSync(p, "utf8").includes("prescribed_weight:"))
-      .map((p) => relative(SRC, p))
-      .filter((p) => !ALLOWED.has(p));
-    expect(offenders).toEqual([]);
-  });
+  it(
+    "only allowlisted modules build prescribed_* write payloads",
+    () => {
+      const offenders = walk(SRC)
+        .filter((p) => readFileSync(p, "utf8").includes("prescribed_weight:"))
+        // Keep the source-level allowlist stable across POSIX CI and Windows.
+        .map((p) => relative(SRC, p).replaceAll("\\", "/"))
+        .filter((p) => !ALLOWED.has(p));
+      expect(offenders).toEqual([]);
+    },
+    // Box-backed Windows workspaces can make this whole-tree source scan
+    // exceed Vitest's 5 s default while the rest of the suite is competing
+    // for I/O. The assertion itself remains synchronous and deterministic.
+    15_000,
+  );
 });

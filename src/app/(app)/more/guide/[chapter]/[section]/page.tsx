@@ -7,7 +7,6 @@ import {
 } from "@/components/manual/ManualBlocks";
 import { ManualSectionHeader } from "@/components/manual/ManualSectionHeader";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * Guide — one section (fig 4.10; 09-changelog 2026-08-07 §1, extended
@@ -31,7 +30,7 @@ export default async function GuideSectionPage({
   params: Promise<{ chapter: string; section: string }>;
   searchParams: Promise<{ from?: string }>;
 }) {
-  if (!releaseActive(UNRELEASED_VERSION)) notFound();
+  if (!releaseActive("1.1.0")) notFound();
   const { chapter: chapterSlug, section: sectionSlug } = await params;
   const { from } = await searchParams;
   const id = sectionId("ug", chapterSlug, sectionSlug);
