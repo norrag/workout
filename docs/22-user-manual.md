@@ -22,13 +22,15 @@ chapters, 106 sections** — **Phase 5 with them** (2026-08-12): the connector c
 search and read it. **Phase 6 is built** (2026-08-13): the AI Manual is complete
 at **12 chapters, 48 sections**, its reader is mounted under `/more/connector`,
 and every chapter 5–8 example was run against the live connector as
-[§7.1](#71-worked-examples-are-the-deliverable) requires. **Phase 7a + 7b are
-built** (2026-08-15): the placement audit is
+[§7.1](#71-worked-examples-are-the-deliverable) requires. **Phase 7 is built** (2026-08-15,
+in two waves): the placement audit is
 [`22e`](./22e-link-placement-audit.md), the definition grammar is ruled for all
 three affordances (09-changelog 2026-08-15, closing **N81**'s design
-question), and nine wave-1 placements ship behind the same 1.1.0 gate as the
-routes. **Phase 4, the owner's cold read, is in progress**; **7c** is next and
-[`22e`](./22e-link-placement-audit.md) §5 puts one decision back with the owner.
+question), and **20 placements** ship behind the same 1.1.0 gate as the routes.
+The owner accepted [`22e`](./22e-link-placement-audit.md) §5, so wave 2 also
+guards the surfaces that hold unsaved input rather than declining them.
+**Phase 4, the owner's cold read, is in progress**; **N81's affordance** is the
+only piece of Phase 7 left, and it is gated on a glossary-content pass.
 **O7 is answered** by the 3d-r research pass
 ([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
@@ -73,7 +75,7 @@ editing question answered ([§14](#14-could-an-admin-mcp-tool-edit-the-manual)).
 - **No admin content in either manual** (owner, 2026-08-06). The 17 admin-gated MCP tools, engine-parameter tuning, replay/simulation, and the LLM-explanation tooling are not user features and get **no** coverage — not a chapter, not a paragraph, not a "these exist" note. The inventory in [§7.2](#72-the-tool-surface) exists so Phase 0d knows what to *exclude*.
 - **No sign-up / authentication walkthrough** (owner, 2026-08-06). A reader of the manual is already signed in; documenting the step they necessarily completed to get here is wasted words. Account *management* a user does later (data export, deletion) stays.
 - **Describe what the app is, not what it is not** (owner, 2026-08-06). No "WORKOUT doesn't track nutrition/cardio" framing, no feature-absence lists, no defensive comparisons. Where a limit genuinely affects how a reader should act, state the positive rule instead ("estimates are shown as a band" rather than "we don't give exact maxes"). This is a copy contract ([§8.4](#84-positive-framing)), not just guidance.
-- **No behavior changes.** Documentation only. Two small app changes are in scope as *carriers*: the manual routes themselves, and Phase 7's links.
+- **No behavior changes.** Documentation only. Two small app changes are in scope as *carriers*: the manual routes themselves, and Phase 7's links. **Amended 2026-08-15 (session 2):** a third, and only because the owner ruled on it explicitly — Phase 7c guards the surfaces a link would otherwise navigate out of ([`22e`](./22e-link-placement-audit.md) §5). It is bounded to that: a discard-confirm on surfaces that were losing unsaved input already, no change to what any control does.
 - **MEASURE (doc 20) is excluded** — it is not built; the manual documents what ships.
 
 ---
@@ -1614,13 +1616,41 @@ contracts green.
 Manual's four use cases are demonstrated with exchanges that were run. Owner
 review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 
-### Phase 7 — Link placement *(deliverable C)* — 🔨 **7a + 7b BUILT 2026-08-15**
+### Phase 7 — Link placement *(deliverable C)* — 🔨 **7a + 7b + 7c BUILT 2026-08-15**
 
 | Phase | Scope | Size |
 |---|---|---|
 | **7a** | **Placement audit.** Every screen, candidate insertion points, the exact section ID each targets, and a justification. Decide the grammar: `InfoDot` stays term-level; a manual link is mechanism-level and is a distinct affordance. Placement is earned, not sprayed. Links pass a section **ID**, never an imported module (D3 guard). Owner reviews the list before any code | M |
 | **7b** | Implement approved wave-1 placements | M |
 | **7c** | Remainder / follow-up wave after the owner has used wave 1 | S–M |
+
+> **7c landed (session 2), except N81.** The owner accepted
+> [`22e`](./22e-link-placement-audit.md) §5's recommendation, so the
+> unguarded-form exclusion was **lifted rather than waived** and the ten
+> placements that failed only that test now ship: the Feedback, Workout
+> Complete, Effort target, Load step and meso Edit-details sheets, the planner's
+> exercise sheet, the two macrocycle forms, the create-exercise form and the
+> profile. Design pass: 09-changelog **2026-08-15 (session 2)**; the placements
+> are [`22e`](./22e-link-placement-audit.md) §3.3.
+>
+> - **The guard's reach follows the surface's exits.** Pages arm
+>   `useNavigationGuard` (which also closes a real gap — `/cycles/new`,
+>   `/cycles/macro/[id]/edit` and `/exercises/new` have been discarding unsaved
+>   input on a tab tap since they were written). Sheets guard the link itself,
+>   because the scrim already makes it their only exit and arming the hook would
+>   plant a history sentinel on the day view's hot path. §1.2's "no behavior
+>   changes" is bent exactly this far and no further, and the owner's acceptance
+>   is what allows it.
+> - **One discard-confirm.** `LeaveConfirm` is the planner board's sheet,
+>   extracted unchanged; only the sentence naming what is unsaved varies, and a
+>   test fails if `Discard changes?` is written anywhere else.
+> - **Two audit rows were wrong and are corrected in place.** `/more/profile`
+>   writes on every tap and the planner's exercise sheet stages into an
+>   already-guarded board; neither was ever a form. That is why the wave is ten
+>   placements against §5's seven-row estimate.
+> - **What remains of Phase 7 is N81**, and it is a content pass first —
+>   `22c` §C2's ~22 undefined terms need glossary entries under §8.1 before the
+>   affordance can point at anything.
 
 > **Landed — the audit is [`22e`](./22e-link-placement-audit.md), and it is the
 > thing to read.** The design pass first (hard rule 8): 09-changelog
@@ -1804,6 +1834,6 @@ carrying an authoring system nobody uses.
 - **Doc 09** is authoritative for screen structure; chapters 4, 5, 13, 15 report it.
 - **Doc 05** is authoritative for the connector surface; the AI Manual reports it. When they disagree, doc 05 is right and the manual is a bug.
 - **N25** (archived) is the predecessor: `InfoDot` + glossary is the term-level layer; this manual is the mechanism-level layer above it. They share one glossary. Phase 7a made that relationship explicit as one grammar with three members ([`22e`](./22e-link-placement-audit.md) §1, 09-changelog 2026-08-15).
-- **N81** (the inline underlined term) is the third member; ruled at Phase 7a, built at Phase 7c.
+- **N81** (the inline underlined term) is the third member; ruled at Phase 7a, and the one part of Phase 7 still unbuilt after 7c — it is gated on the glossary-content pass, not on the component.
 - **[`22e`](./22e-link-placement-audit.md)** is Phase 7a's deliverable and is binding on every placement: a new in-app link adds a row there and a row in `src/lib/guide-links.ts`, or it is a spray.
 - Workstream **M** ("In-app help & education") is this work's home in `docs/notes/`.

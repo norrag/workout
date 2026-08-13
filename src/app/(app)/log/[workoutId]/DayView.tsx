@@ -22,6 +22,8 @@ import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
 import { FetchRetry } from "@/components/ui/FetchRetry";
 import { FilterBar } from "@/components/ui/FilterBar";
+import { GuardedGuideLink } from "@/components/ui/GuardedGuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import dynamic from "next/dynamic";
 
 // Secondary reveal surfaces (WS-J): both render null until opened, so their
@@ -3016,6 +3018,23 @@ function FeedbackSheet({
   if (!we) return null;
   const mg = we.muscle_group || "Session";
 
+  // doc 22 Phase 7c — whether a navigation out of here would cost the reader
+  // answers they haven't saved. Compared against the same seeds the state was
+  // initialised from, so returning a slider to where it started disarms the
+  // guard rather than leaving it armed for the rest of the sheet's life.
+  const initialPain = groupPain ?? existing?.joint_pain ?? null;
+  const initialPainIds = groupExercises
+    .filter((e) => (e.joint_pain ?? 0) > 0)
+    .map((e) => e.id);
+  const dirty =
+    pain !== initialPain ||
+    pump !== (existing?.pump ?? 5) ||
+    workload !== (existing?.workload ?? 5) ||
+    soreness !== (existing?.soreness ?? 3) ||
+    sorenessDays !== (existing?.soreness_days ?? null) ||
+    painIds.size !== initialPainIds.length ||
+    initialPainIds.some((id) => !painIds.has(id));
+
   // show a section when its role applies OR the row already carries that data.
   // The group section (joint pain + pump + workload) belongs to the group-
   // closing exercise; pump/workload gate its appearance, NOT joint pain, so a
@@ -3201,6 +3220,18 @@ function FeedbackSheet({
         </>
       )}
 
+      {/* doc 22 Phase 7c, audit §3.3 — the sheet asks for three numbers and
+          never says what they move. E4 clears through the guard: while an
+          answer is unsaved, this asks before it leaves. */}
+      <GuardedGuideLink
+        rule
+        className="mt-5"
+        to={GUIDE_LINKS.feedbackAnswers}
+        from={`/log/${workoutId}`}
+        dirty={dirty}
+        body="Your answers haven't been saved. Discard them and leave?"
+      />
+
       <div className="mt-6 flex items-center justify-end gap-2.5">
         <button
           type="button"
@@ -3298,6 +3329,12 @@ function CompleteSheet({
   if (!render) return null;
 
   const { workout, microcycle, exercises } = detail;
+  // doc 22 Phase 7c — the sliders start at the midpoint and the notes empty, so
+  // "touched" is exactly "differs from that". A reader who deliberately sets 5
+  // is indistinguishable from one who never moved it; that costs a confirm
+  // nobody needed, never an answer.
+  const sessionDirty =
+    notes.trim() !== "" || fatigue !== 5 || effort !== 5 || performance !== 5;
   const loggedExercises = exercises.filter((we) => we.sets.length > 0);
   // same skipped-slot-excluded math as the header progress bar (day-rules.ts) —
   // the sheet once said "2 / 4" under a header reading 100% (R19)
@@ -3394,6 +3431,17 @@ function CompleteSheet({
             </div>
           ))}
         </div>
+
+        {/* doc 22 Phase 7c, audit §3.3 — "FEEDS NEXT WEEK'S TARGETS" states
+            that these three do something without saying what, and this is the
+            one sheet where the reader is done training and has a moment. */}
+        <GuardedGuideLink
+          className="mt-3"
+          to={GUIDE_LINKS.sessionQuestions}
+          from={`/log/${workout.id}`}
+          dirty={sessionDirty}
+          body="Your session feedback and notes haven't been saved. Discard them and leave?"
+        />
 
         <div className="mt-4">
           <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">

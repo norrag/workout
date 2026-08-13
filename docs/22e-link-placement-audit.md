@@ -8,10 +8,13 @@
 > target, and a **decision**. The rule the whole document is written against:
 > **placement is earned, not sprayed.**
 >
-> **Status:** 7a complete · **wave 1 (7b) built 2026-08-15** · wave 2 and N81's
-> inline affordance await the owner's read of §5 / §6.
+> **Status:** 7a complete · **wave 1 (7b) built 2026-08-15** · **wave 2 built
+> 2026-08-15 (session 2)**, the owner having accepted §5's recommendation ·
+> N81's inline affordance remains, per §6.
 > **Design pass:** `09-changelog` **2026-08-15** — the grammar, the
-> primitive, and the two exclusions. Read it first; this document applies it.
+> primitive, and the two exclusions — amended by **2026-08-15 (session 2)**,
+> which rules how far the guard reaches. Read them first; this document
+> applies them.
 
 ---
 
@@ -30,7 +33,7 @@ its own wave — its real cost is a glossary-content pass over the ~22 terms
 [`22c`](./22c-app-inventory.md) §C2 found undefined, not a component.
 
 **③ Links carry a section ID string, never an imported module.** doc 22 D3
-guard 1. The wave-1 table below lives in `src/lib/guide-links.ts` as literals,
+guard 1. The table below lives in `src/lib/guide-links.ts` as literals,
 and `guide-links.test.ts` resolves every one through the manual registry — the
 same one-validator-two-consumers shape doc 23 §7.2 and Phase 6e's
 `manual-links.ts` already use. A renamed section breaks CI, not a reader's tap.
@@ -50,6 +53,12 @@ test it failed, rather than quietly dropped.
 
 And one budget: **at most one `GuideLink` visible per screen state.** Tabs count
 as separate states; a sheet counts as its own surface.
+
+> **E4 after wave 2.** The test is unchanged and still binding — it is the
+> reason nothing here is placed by eye. What changed is the surfaces: the ones
+> §5 identified are now intercepted, so they pass it rather than being excused
+> from it. [§3.3](#33-wave-2--built-7c) records which mechanism each uses, and
+> the design pass (`09-changelog` 2026-08-15 session 2 §1) rules the choice.
 
 ---
 
@@ -128,13 +137,56 @@ title (`STAYING IN CONTROL ›`).
 - **`/more`.** The `Guide` row **is** the manual's front door; a second link
   next to it would be a link to the thing it is standing on.
 
+### 3.3 Wave 2 — built (7c)
+
+Ten placements, all of them the E4 group: surfaces that passed every test but
+the unguarded-form one, and now pass that too. The **Mechanism** column is the
+whole of what §5 bought — see `09-changelog` 2026-08-15 session 2 §1 for why a
+sheet and a page are guarded differently.
+
+| # | Surface | Sits under | Target section | Renders as | Mechanism |
+|---|---|---|---|---|---|
+| **10** | `/log/[id]` — **Exercise feedback** sheet | the asks, above the actions | `ug/how-it-felt#what-your-answers-do` | `WHAT YOUR ANSWERS DO ›` | guarded link |
+| **11** | `/log/[id]` — **Workout Complete** | `SESSION — FEEDS NEXT WEEK'S TARGETS` | `ug/how-it-felt#the-session-questions` | `THE THREE QUESTIONS AT THE END ›` | guarded link |
+| **12** | `/log/[id]` — **Effort target** sheet | the pricing line | `ug/exercise-level-rir#why-one-exercise-differs` | `WHAT IT DOES ›` | guarded link |
+| **13** | `/exercises/[id]` — **Load step** sheet | the chips + `USE DEFAULT` | `ug/exercises-and-templates#the-load-step` | `THE WEIGHT JUMP FOR ONE LIFT ›` | guarded link |
+| **14** | `/cycles/meso/[id]` — **Edit details** sheet | the ramp controls | `ug/choosing-your-ramp#why-a-ramp` | `WHY A BLOCK RAMPS INSTEAD OF PICKING ONE EFFORT ›` | guarded link |
+| **15** | `/cycles/meso/[id]/plan` — **exercise** sheet | the RIR block's note | `ug/planning-a-mesocycle#the-exercise-sheet` | `THE EXERCISE SHEET ›` | board's page guard |
+| **16** | `/cycles/new` | the `PLAN` card | `ug/macrocycle-goals#setting-one-up` | `SETTING ONE UP ›` | page guard (new) |
+| **17** | `/cycles/macro/[id]/edit` | the `PLAN` card | `ug/macrocycle-goals#the-four-goals` | `THE FOUR GOALS ›` | page guard (new) |
+| **18** | `/exercises/new` | the `EQUIPMENT` block's load hint | `ug/exercises-and-templates#your-own-exercises` | `MAKING YOUR OWN EXERCISE ›` | page guard (new) |
+| **19** | `/more/profile` | the `Calibrates…` line | `ug/your-profile#what-it-is-for` | `WHAT THE PROFILE IS FOR ›` | none needed |
+
+**Two rows this wave corrected.** Both were filed under E4 on the assumption
+that a screen with controls is a form:
+
+- **`/more/profile`** writes each change as it is made — experience, sex,
+  equipment and body fat each fire their action on tap. The page holds no
+  unsaved state at all, so #19 needed no mechanism; the audit had simply been
+  wrong about it.
+- **The planner's exercise sheet** stages through to the board's working copy,
+  which `useNavigationGuard` has intercepted since R16. #15 was already covered
+  by the guard the audit was asking for.
+
+**What #12 also settles.** The `SET BY YOUR COACH` row in §4 was declined on
+budget rather than on merit; #12 sits on the same sheet and its section covers
+the same ground, so that candidate is closed rather than pending.
+
+**Still declined, and for the same reason as before:** `/exercises/[id]`'s
+`HISTORY` tab, the macro `BODY COMPOSITION` tab, `/more/bodyspec`, the day
+view's History sheet, `/workout`'s two states, `/cycles/meso/[id]`'s `OVERVIEW`
+tab and `/templates/[id]`. None of them fails E4 — they are held on **budget**
+or on a weak E2, which is a judgement about density, and wave 2 changed nothing
+about it. They stay `W2` in §4.
+
 ---
 
 ## 4. Full screen sweep
 
 Every user-reachable surface, including the ones with nothing to place. Screens
-are [`22c`](./22c-app-inventory.md)'s inventory; **W1** = built, **W2** =
-recommended, waiting on the owner, **—** = no placement, with the test it fails.
+are [`22c`](./22c-app-inventory.md)'s inventory; **W1** = wave 1 (§3),
+**W2 #n** = wave 2 (§3.3), **W2** = recommended and still unbuilt, **—** = no
+placement, with the test it fails.
 
 | Screen / surface | Candidate | Target | Decision |
 |---|---|---|---|
@@ -143,27 +195,27 @@ recommended, waiting on the owner, **—** = no placement, with the test it fail
 | `/workout` — `SET UP CYCLES` empty | first-run orientation | `ug/cycle-model#the-four-layers` | **W2** — the strongest *new-user* candidate in the app |
 | `/log/[id]` — exercise card / set grid | — | — | **—** E5 |
 | `/log/[id]` — **Prescription details** | ✔ | `ug/how-your-weight-is-chosen#the-anchor` | **W1 #1** |
-| `/log/[id]` — **Exercise feedback** sheet | the pump / workload / pain asks | `ug/how-it-felt#what-your-answers-do` | **W2** — E4 fails today (§5) |
-| `/log/[id]` — **Effort target** sheet | scope semantics + the pricing line | `ug/exercise-level-rir#why-one-exercise-differs` | **W2** — E4 fails today (§5) |
-| `/log/[id]` — `SET BY YOUR COACH` block | read-only cap + rep position | `ug/exercise-level-rir#how-far-it-reaches` | **W2** — E4 (inside the same sheet) |
-| `/log/[id]` — **Workout Complete** | `SESSION — FEEDS NEXT WEEK'S TARGETS` | `ug/how-it-felt#the-session-questions` | **W2** — E4 fails today (§5) |
+| `/log/[id]` — **Exercise feedback** sheet | ✔ | `ug/how-it-felt#what-your-answers-do` | **W2 #10** |
+| `/log/[id]` — **Effort target** sheet | ✔ | `ug/exercise-level-rir#why-one-exercise-differs` | **W2 #12** |
+| `/log/[id]` — `SET BY YOUR COACH` block | read-only cap + rep position | `ug/exercise-level-rir#how-far-it-reaches` | **—** budget: #12 owns the sheet |
+| `/log/[id]` — **Workout Complete** | ✔ | `ug/how-it-felt#the-session-questions` | **W2 #11** |
 | `/log/[id]` — **History** sheet | `EFF LOAD` / `E1RM` toggles | `ug/reading-your-stats#one-lift-at-a-time` | **W2** — read-only, passes; held on budget |
 | `/log/[id]` — **Notes** sheet | pinned vs session | `ug/training-a-session#notes` | **—** E1: the sheet's own copy already says it |
 | `/log/[id]` — set-log queue banner | — | `ug/your-data#live-reads-and-queued-logging` | **—** E2: an error banner is not a reading moment |
 | `/cycles` | — | — | **—** E1 |
-| `/cycles/new` | the create-engine `PLAN` card + phase strip | `ug/macrocycle-goals#setting-one-up` | **W2** — E4: unguarded create form |
+| `/cycles/new` | ✔ | `ug/macrocycle-goals#setting-one-up` | **W2 #16** |
 | `/cycles/macro/[id]` — `OVERVIEW` | ✔ | `ug/macrocycle-goals#the-target-behind-it` | **W1 #5** |
 | `/cycles/macro/[id]` — `BALANCE` | — | `ug/volume#where-your-sets-show-up` | **—** budget: #3 owns it |
 | `/cycles/macro/[id]` — `PERFORMANCE` | ✔ | `ug/reading-your-stats#reading-like-with-like` | **W1 #6** |
 | `/cycles/macro/[id]` — `BODY COMPOSITION` | `DIFFERENT SCANNERS — NOT COMPARABLE` | `ug/body-data#comparing-two-scans` | **W2** — budget: shares the `OVERVIEW` tab with #5 |
-| `/cycles/macro/[id]/edit` | goal / duration | `ug/macrocycle-goals#the-four-goals` | **W2** — E4: unguarded form |
+| `/cycles/macro/[id]/edit` | ✔ | `ug/macrocycle-goals#the-four-goals` | **W2 #17** |
 | `/cycles/meso/[id]` — `OVERVIEW` | the plan view | `ug/cycle-model#day-slots` | **W2** — weakest of the three tabs on E1 |
 | `/cycles/meso/[id]` — `BALANCE` | ✔ | `ug/volume#where-your-sets-show-up` | **W1 #3** |
 | `/cycles/meso/[id]` — `PERFORMANCE` | ✔ | `ug/reading-your-stats#the-strength-trend` | **W1 #4** |
 | `/cycles/meso/[id]` — header RIR ramp | the ramp strip | `ug/effort-rir#the-weeks-ramp` | **—** E3: the `rir_ramp` `InfoDot` is the right grain here |
-| `/cycles/meso/[id]` — `Edit details` sheet | `RAMP LOCKED ONCE STARTED` | `ug/choosing-your-ramp#why-a-ramp` | **W2** — E4: unguarded form |
+| `/cycles/meso/[id]` — `Edit details` sheet | ✔ | `ug/choosing-your-ramp#why-a-ramp` | **W2 #14** |
 | `/cycles/meso/[id]/plan` — volume preview | ✔ | `ug/volume#the-band` | **W1 #2** |
-| `/cycles/meso/[id]/plan` — exercise sheet | `STARTING SETS` week-1 note | `ug/planning-a-mesocycle#the-exercise-sheet` | **W2** — E4: form inside a guarded board |
+| `/cycles/meso/[id]/plan` — exercise sheet | ✔ | `ug/planning-a-mesocycle#the-exercise-sheet` | **W2 #15** — the board's guard already covered it |
 | `/cycles/meso/[id]/planned/[w]/[d]` | `NOT PLANNED YET` | `ug/cycle-model#one-block-at-a-time` | **—** E1 |
 | `/cycles/plan` | ✔ | `ug/planning-a-mesocycle#starting-a-block` | **W1 #9** |
 | `/cycles/plan/copy` · `/template` | pickers | — | **—** E1 |
@@ -171,10 +223,10 @@ recommended, waiting on the owner, **—** = no placement, with the test it fail
 | `/exercises` | — | — | **—** E1 |
 | `/exercises/[id]` — `OVERVIEW` | ✔ | `ug/exercises-and-templates#what-an-exercise-remembers` | **W1 #7** |
 | `/exercises/[id]` — `HISTORY` | `DELOAD` / `BACKED OFF` tags | `ug/exercise-level-rir#what-it-does-to-your-numbers` | **W2** — budget: shares the screen with #7 |
-| `/exercises/[id]` — **Load step** sheet | the N67 index-off-last-entered rule | `ug/exercises-and-templates#the-load-step` | **W2** — E4: unguarded form. Strong otherwise |
-| `/exercises/new` | the three bodyweight load meanings | `ug/exercises-and-templates#your-own-exercises` | **W2** — E4: unguarded form |
+| `/exercises/[id]` — **Load step** sheet | ✔ | `ug/exercises-and-templates#the-load-step` | **W2 #13** |
+| `/exercises/new` | ✔ | `ug/exercises-and-templates#your-own-exercises` | **W2 #18** |
 | `/more` | — | — | **—** §3.2 |
-| `/more/profile` | `Drives…` / `Calibrates…` | `ug/your-profile#what-it-is-for` | **W2** — E4: unguarded form. Strong otherwise |
+| `/more/profile` | ✔ | `ug/your-profile#what-it-is-for` | **W2 #19** — never was a form (§3.3) |
 | `/more/account` | ✔ | `ug/your-data#what-is-stored` | **W1 #8** |
 | `/more/delete-account` | — | `ug/your-data#deleting-your-account` | **—** E2: a confirm page must not offer a way out that is not the decision |
 | `/more/connector` | ✔ (adoption) | `ug/connecting-an-ai#staying-in-control` | **W1** — Phase 6e's line, now the primitive |
@@ -183,18 +235,26 @@ recommended, waiting on the owner, **—** = no placement, with the test it fail
 | What's New sheet | — | — | **—** doc 23 §7.2 already gives entries their own `guide` targets |
 | `/~offline`, auth, onboarding, `/share` | — | — | **—** E2 |
 
-**Counts:** 9 built · 19 recommended and waiting · 14 declined with a reason.
+**Counts after wave 2:** **20 built** (19 numbered + `/more/connector`'s
+adoption) · 8 recommended and waiting, every one of them held on **budget or a
+weak E2** rather than on a mechanism · 16 declined with a reason. Nothing in
+this table is waiting on a decision.
 
 ---
 
-## 5. What would unblock the E4 group (owner decision)
+## 5. What unblocked the E4 group — **decided, and built**
 
-Seven of the nineteen recommendations fail only **E4** — they are on forms with
-unsaved local state and no interception. Between them they include the three
-placements this audit rates highest on E1/E2 in the whole app: the **Exercise
-feedback** sheet, the **Effort target** sheet, and the **Load step** sheet. The
-reader is being asked for an input, or is changing a number that reprices their
-training, and *that* is when they want to know what it does.
+> **Owner, 2026-08-15: recommendation accepted.** The section below is kept as
+> the record of what was asked and why; §3.3 is what was built. The one
+> substantive departure from the wording of option (1) is stated at the end,
+> and it is a narrowing, not a widening.
+
+The recommendations that failed only **E4** were on forms with unsaved local
+state and no interception. Between them they included the three placements this
+audit rates highest on E1/E2 in the whole app: the **Exercise feedback** sheet,
+the **Effort target** sheet, and the **Load step** sheet. The reader is being
+asked for an input, or is changing a number that reprices their training, and
+*that* is when they want to know what it does.
 
 Three ways out, in ascending cost:
 
@@ -212,9 +272,42 @@ Three ways out, in ascending cost:
 **Recommendation: (1)**, as its own small PR after wave 1 has been used, which
 is what doc 22 Phase 7c is for.
 
+### 5.1 How (1) was built, and where it was narrowed
+
+The hook went where the hook belongs — the three **pages** that were genuinely
+unguarded (`/cycles/new`, `/cycles/macro/[id]/edit`, `/exercises/new`), which
+also closes a gap that predates this audit: those forms have been discarding
+unsaved input on any tab-bar tap since they were written.
+
+The **sheets** got something narrower than the wording of (1), on purpose. A
+sheet's scrim covers the page, so the Guide link is the only navigation the
+surface offers, and intercepting that one anchor is exactly sufficient —
+whereas arming the hook plants a **history sentinel**, and the sheets in
+question are the Feedback and Effort target sheets on the day view. Changing
+what the back button does mid-workout is a larger behavior change than this
+audit asked the owner to approve, and it is not needed to lift E4. So:
+`GuardedGuideLink` for sheets, `useNavigationGuard` for pages, one shared
+discard-confirm for both (`09-changelog` 2026-08-15 session 2 §1–2).
+
+Cost, for the record: two new components totalling ~130 lines, one extracted
+from the planner board unchanged, plus a `dirty` expression per surface. No
+sheet gained or lost a control.
+
+### 5.2 What the E4 group turned out not to include
+
+Two rows in §4 were filed against E4 on the assumption that a screen carrying
+controls is a form; reading the code corrected both. **`/more/profile`** writes
+every change as it is made and holds no unsaved state; **the planner's exercise
+sheet** stages into the board's working copy, which has been guarded since R16.
+Neither needed anything built. They are the reason this wave is ten placements
+against a seven-row estimate.
+
 ---
 
-## 6. N81 — the inline term affordance
+## 6. N81 — the inline term affordance *(the remaining wave)*
+
+> **Status after wave 2:** this is the only part of Phase 7 still unbuilt, and
+> nothing in wave 2 changed its sequencing. It is a **content** pass first.
 
 Ruled here (§1 ②), designed in `09-changelog` 2026-08-15 §3, and
 **built in its own wave** for one reason worth stating plainly: the component is
@@ -237,7 +330,17 @@ primitive, then the prose sites. Until then doc 22 §8.4c rule 2's stopgap holds
   together or the gate is decorative.
 
 - A new placement adds one row to `src/lib/guide-links.ts` and one `GuideLink`
-  at the site. The test is what keeps the ID honest.
+  at the site. The test is what keeps the ID honest — and since wave 2 it also
+  fails on a row **no call site renders**, so the table cannot quietly drift
+  ahead of the app.
+- **Choosing the affordance at a new site is E4, mechanically.** Read-only or
+  already-guarded surface → `GuideLink`. A surface holding its own unsaved
+  input → `GuardedGuideLink` with a `dirty` expression and the sentence naming
+  what is at stake. A page that holds unsaved input and has other exits →
+  `useNavigationGuard` + `LeaveConfirm`, and then the plain link.
+- **There is one discard-confirm** (`LeaveConfirm`) and a test asserts nobody
+  re-draws it; a second copy is how two surfaces end up asking the same
+  question in two voices.
 - **A renamed section** breaks `guide-links.test.ts` before it breaks a reader,
   and doc 22 §9.4.2 already calls a section ID an API: rename ⇒ redirect entry.
 - **A retitled section** breaks the same test, because the label *is* the title.

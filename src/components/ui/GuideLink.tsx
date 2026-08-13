@@ -28,6 +28,15 @@ import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
  * Server-safe by construction — no hooks, no client boundary — so it costs a
  * client component nothing to render one.
  */
+/**
+ * The reader route for a target, carrying the N27 origin when there is one.
+ * Shared with `GuardedGuideLink`, which has to push the same address the link
+ * would have opened — two spellings of it would be one refactor from drifting.
+ */
+export function guideHref(to: GuideLinkTarget, from?: string): string {
+  return from ? `${to.href}?from=${encodeURIComponent(from)}` : to.href;
+}
+
 export function GuideLink({
   to,
   from,
@@ -56,7 +65,7 @@ export function GuideLink({
   className?: string;
 }) {
   if (!releaseActive(UNRELEASED_VERSION)) return null;
-  const href = from ? `${to.href}?from=${encodeURIComponent(from)}` : to.href;
+  const href = guideHref(to, from);
   const link = (
     <Link
       href={href}

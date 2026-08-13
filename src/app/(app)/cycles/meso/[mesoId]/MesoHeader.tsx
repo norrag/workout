@@ -13,6 +13,8 @@ import { AnchoredMenu, MenuRow } from "@/components/ui/AnchoredMenu";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { InfoDot } from "@/components/ui/InfoDot";
+import { GuardedGuideLink } from "@/components/ui/GuardedGuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { ShareRow } from "@/components/ShareRow";
 import { RirScheduleEditor } from "./RirScheduleEditor";
 import {
@@ -567,6 +569,23 @@ function EditDetailsSheet({
   // shape (length/ramp/deload) is editable only before the meso starts
   const shapeLocked = status !== "planned";
 
+  // doc 22 Phase 7c — what the Guide link must ask about before it navigates.
+  // The name field is uncontrolled (it posts through the form), so it reports
+  // itself as touched rather than being compared.
+  const [nameTouched, setNameTouched] = useState(false);
+  const sameSchedule =
+    schedule == null || initialSchedule == null
+      ? schedule === initialSchedule
+      : schedule.length === initialSchedule.length &&
+        schedule.every((r, i) => r === initialSchedule[i]);
+  const dirty =
+    nameTouched ||
+    weeks !== initialWeeks ||
+    rirStart !== initialRirStart ||
+    rirEnd !== initialRirEnd ||
+    deload !== initialDeload ||
+    !sameSchedule;
+
   useEffect(() => {
     if (state.saved) onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -593,6 +612,7 @@ function EditDetailsSheet({
           required
           maxLength={80}
           defaultValue={mesoName}
+          onInput={() => setNameTouched(true)}
           className="mt-2 h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink placeholder:text-ink/40 focus:outline-none"
         />
 
@@ -712,6 +732,18 @@ function EditDetailsSheet({
         )}
 
         {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}
+
+        {/* doc 22 Phase 7c, audit §3.3 — this is where the ramp is set, and
+            where `RAMP LOCKED ONCE STARTED` tells the reader the choice is
+            about to become permanent without saying what it is for. */}
+        <GuardedGuideLink
+          rule
+          className="mt-5"
+          to={GUIDE_LINKS.whyARamp}
+          from={`/cycles/meso/${mesoId}`}
+          dirty={dirty}
+          body="Your changes to this block haven't been saved. Discard them and leave?"
+        />
 
         <div className="mt-6 flex items-center justify-end gap-2.5">
           <button

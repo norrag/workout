@@ -4,6 +4,68 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-15 — Session 122: the guard travels with the link (N74 Phase 7c)
+
+> **On the date:** doc-side, like sessions 114–121.
+
+**Owner:** *"docs/22e-link-placement-audit.md has been reviewed… Your
+recommendations are accepted. Please proceed."* The one decision session 121
+put back to them was `22e` §5 — the E4 group — and the recommendation there was
+option (1), extend the guard, as its own PR at Phase 7c. That is this session.
+
+**The framing that mattered.** The exclusion wave 1 wrote is *not on an
+unguarded form*, and the temptation on being told "accepted" is to treat the
+rule as waived. It isn't: it holds exactly as written, and what changed is the
+surfaces. Ten of them now satisfy it, which is why the audit's §2 table is
+untouched and only §3.3/§4 moved.
+
+**Where the pass departed from the wording of (1), and why it is a narrowing.**
+§5 said "extend `useNavigationGuard` to sheets". For a **page** that is right,
+and it went there — `/cycles/new`, `/cycles/macro/[id]/edit` and
+`/exercises/new` have been discarding unsaved input on a tab-bar tap since they
+were written, so the hook closes a gap older than the audit. For a **sheet** it
+is the wrong tool: the scrim already makes the Guide link the only navigation on
+offer, so intercepting that one anchor is exactly sufficient, while arming the
+hook plants a **history sentinel** — and the sheets in question are the Feedback
+and Effort target sheets *on the day view*, the hot path, mid-workout, the
+surface N82 had just been asked to calm. Changing what back does there is a
+larger behavior change than the owner was asked to approve. `GuardedGuideLink`
+for sheets, `useNavigationGuard` for pages, one shared confirm for both; the
+departure is written down in `22e` §5.1 rather than left as a silent
+implementation choice.
+
+**Reading the code corrected the audit twice.** `/more/profile` writes every
+change as it is made — experience, sex, equipment, body fat each fire on tap —
+so it holds no unsaved state and never was a form. The planner's exercise sheet
+stages into the board's working copy, guarded since R16. Both had been filed
+under E4 on the assumption that a screen carrying controls is a form. Neither
+needed anything built, which is why the wave is **ten placements against §5's
+seven-row estimate**, and both rows are corrected in place rather than in a
+footnote.
+
+**One discard-confirm.** `LeaveConfirm` is the planner board's sheet moved out
+unchanged; only the sentence naming what is unsaved varies. A test fails if
+`Discard changes?` is written anywhere else, and a second fails if a surface
+arms the guard without rendering the confirm — the same
+assert-it-rather-than-remember-it discipline as wave 1's label contract.
+
+**One more thing the link table can now catch:** a `GUIDE_LINKS` row that no
+call site renders fails CI. The audit is meant to *be* the placement list; before
+this, a forgotten row would have passed every assertion above it forever.
+
+**Release notes.** The existing `guide-links-in-the-app` entry widened to cover
+the input surfaces, and a second entry was added — the discard-confirm is a
+user-visible behavior change in its own right (doc 23 §4.2), since these forms
+used to drop work silently.
+
+**Left standing, deliberately:** N81's inline term. Nothing this session changed
+its sequencing — `22c` §C2's ~22 undefined terms need glossary entries under
+§8.1 before the affordance can point at one, and that is a copy pass, not a
+placement pass. It is now the only unbuilt part of Phase 7.
+
+- **Index sync:** N74's row carries 7c (PR #PRNUM); N81's status reworded to
+  name it as the one Phase 7 wave still unbuilt and what it is gated on.
+
 ## 2026-08-15 — Session 121: the Guide reaches into the app (N74 Phase 7a+7b, N81 ruled)
 
 > **On the date:** doc-side, like sessions 114–118. Session 119's note on the

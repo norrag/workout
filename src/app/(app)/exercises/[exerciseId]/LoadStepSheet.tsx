@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { GuardedGuideLink } from "@/components/ui/GuardedGuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { setIncrementOverrideAction } from "@/app/(app)/exercises/actions";
 
 /** lb plate-math jumps; the union with the engine default + any current
@@ -175,6 +177,19 @@ export function LoadStepSheet({
       >
         {!custom && selected === null ? "■ " : ""}USE DEFAULT (+{fmt(defaultStep)} lb)
       </button>
+
+      {/* doc 22 Phase 7c, audit §3.3 — the paragraph above states the
+          step-off-the-last-entered-weight rule (N67) in two sentences; the
+          section is where the rest of it lives. Guarded: a chosen-but-unsaved
+          step is exactly the state a navigation would drop. */}
+      <GuardedGuideLink
+        rule
+        className="mt-5"
+        to={GUIDE_LINKS.loadStep}
+        from={`/exercises/${exerciseId}`}
+        dirty={dirty}
+        body="Your load step hasn't been saved. Discard it and leave?"
+      />
 
       <div className="mt-5 flex items-center justify-end gap-2.5">
         <button

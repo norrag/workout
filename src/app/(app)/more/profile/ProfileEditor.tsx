@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import type { ProfileRow } from "@/lib/types/database";
 import type { ExclusionWithExercise } from "@/lib/queries/exercises";
 import {
@@ -276,6 +278,17 @@ export function ProfileEditor({
       <p className="mt-[7px] text-[11px] font-medium leading-normal text-ink/60">
         Calibrates the realistic muscle-gain target on your macrocycles.
       </p>
+
+      {/* doc 22 Phase 7c, audit §3.3 — every row here carries a one-line
+          `Drives…` / `Calibrates…` note and none of them says which of the
+          three jobs it is doing. Plain, not guarded: this screen writes each
+          change as it is made, so there is no unsaved state to lose (the audit
+          filed it under E4 on the assumption it was a form — it isn't). */}
+      <GuideLink
+        className="mt-3"
+        to={GUIDE_LINKS.profilePurpose}
+        from="/more/profile"
+      />
 
       {/* body fat — measured (DEXA) while connected, else estimate bands +
           custom value (5c; 09-changelog 2026-07-11 Phase-5c entry) */}
