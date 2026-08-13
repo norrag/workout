@@ -443,9 +443,7 @@ describe("§8.4 — positive framing", () => {
 
 describe("§8.5 — plain-language vocabulary", () => {
   /**
-   * O4: start from zero and use the words a reader already has. The AI Manual
-   * is where this bites; it is enforced from now so Phase 6 inherits it rather
-   * than being retrofitted.
+   * O4: start from zero and use the words a reader already has.
    */
   const JARGON: readonly { readonly pattern: RegExp; readonly say: string }[] = [
     { pattern: /\bLLMs?\b/, say: "Claude or ChatGPT" },
@@ -455,20 +453,9 @@ describe("§8.5 — plain-language vocabulary", () => {
     { pattern: /\bAPI\b/, say: "(drop it)" },
   ];
 
-  /**
-   * §8.5's one allowance: `MCP` may appear where the reader has to find that
-   * word in their own AI client's interface. Phase 3i takes it for the first
-   * time — ch. 18's setup section, where the app's own field reads
-   * `ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR` and a reader who has not been
-   * told the word cannot complete the step. Phase 6 adds the AI Manual's own
-   * setup section for the same reason and on the same evidence — those two
-   * sections are the entire allowance, and both quote the app's label rather
-   * than teaching the abbreviation as vocabulary.
-   */
-  const MAY_SAY_MCP: readonly string[] = [
-    "ug/connecting-an-ai#setting-one-up",
-    "ai/setup#connecting",
-  ];
+  // Setup now lives on the connector page, so Guide prose never needs the
+  // implementation label a client may use for the connector.
+  const MAY_SAY_MCP: readonly string[] = [];
 
   it("uses the reader's words, not the build's", () => {
     for (const entry of everySection) {

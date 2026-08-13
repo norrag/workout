@@ -33,3 +33,17 @@ export function resolveOrigin(configured: string | undefined): string {
   if (host.endsWith(".vercel.app")) return CANONICAL_APP_URL;
   return value;
 }
+
+/**
+ * Resolve the remote MCP endpoint origin shown to a user. A connector saved in
+ * Claude or ChatGPT must point at a publicly reachable, durable URL, so a
+ * local development override is never appropriate here. Keep `resolveOrigin`
+ * for flows such as local OAuth callbacks that genuinely need localhost.
+ */
+export function resolveConnectorOrigin(configured: string | undefined): string {
+  const origin = resolveOrigin(configured);
+  const host = new URL(origin).hostname;
+  return host === "localhost" || host === "127.0.0.1"
+    ? CANONICAL_APP_URL
+    : origin;
+}

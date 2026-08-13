@@ -66,8 +66,8 @@ export function ManualSearch() {
           type="search"
           value={query}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search the manuals"
-          aria-label="Search the manuals"
+          placeholder="Search the guide"
+          aria-label="Search the guide"
           className="w-full bg-transparent px-4 py-3.5 text-sm outline-none placeholder:text-ink/35"
         />
       </div>
@@ -84,7 +84,7 @@ export function ManualSearch() {
         </p>
       ) : hits.length === 0 ? (
         <p className="mt-4 text-[13px] leading-[1.5] text-ink/55">
-          Nothing matched that. Try a word the manuals would use — a screen name,
+          Nothing matched that. Try a word the guide would use — a screen name,
           a term from the app, or what you are trying to do.
         </p>
       ) : (
@@ -101,9 +101,8 @@ export function ManualSearch() {
               href={doc.route}
               className="block border-b border-ink/15 py-3.5"
             >
-              {/* the manual label leads, always: chapter numbers restart per
-                  manual, so `CH 4` alone names two different chapters once the
-                  AI Manual lands (09-changelog 2026-08-13 §2) */}
+              {/* Keep the Guide label visible when a result is handed back by
+                  the connector retrieval surface. */}
               <span className="label-caps block text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
                 {MANUAL_LABEL[doc.manual]} · CH{" "}
                 <span className="numeral">{doc.chapterNumber}</span> ·{" "}

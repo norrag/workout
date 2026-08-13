@@ -27,17 +27,18 @@
 //     change; deltas under it sit inside measurement noise. Cross-scanner
 //     brackets refuse a delta outright ("different scanners — deltas not
 //     comparable"), and `BRACKET_TOLERANCE_DAYS` is 14
-//   - the page's own promise: scans "inform your macrocycle targets and outcome
-//     verdicts; they never change a workout prescription" — and the macro
-//     Overview's `MEASURED RMR` is display-only ("PRESCRIPTIONS AND TARGETS
-//     NEVER READ IT")
+//   - a scan has no direct path into a prescription, but a reader-confirmed
+//     scan updates profile weight/body fat. That profile drives the macro target
+//     and the plan-strength rate which paces earned increases; the macro
+//     Overview's `MEASURED RMR` remains display-only ("PRESCRIPTIONS AND
+//     TARGETS NEVER READ IT")
 //   - disconnect destroys the stored tokens; imported scans stay unless the
 //     reader ticks the purge box
 //
-// SEAMS: ch. 2 owns which profile fields feed the model and the body-fat
-// fallback chain (`C-prof-10`); ch. 13 owns the stats surfaces; ch. 14 owns the
-// macrocycle target and the retrospective's `NOT COMPARABLE`. Claims:
-// `C-body-01` onward.
+// SEAMS: ch. 2 introduces which profile fields feed the model; this chapter
+// owns their body-data provenance and FFMI path. Ch. 13 owns the stats surfaces;
+// ch. 14 owns the macrocycle target and retrospective's `NOT COMPARABLE`.
+// Claims: `C-body-01` onward.
 
 import type { ManualChapter } from "../types";
 
@@ -134,7 +135,7 @@ export const UG_BODY_DATA: ManualChapter = {
               to: "ug/macrocycle-goals#the-target-behind-it",
               text: "target model",
             },
-            " uses a representative value for your height and weight. Adding body fat later adjusts your goals. Your logged training still determines the weight on the bar.",
+            " uses a representative value for your height and weight. Adding body fat later adjusts your goals and, for strength or hypertrophy, their progression pace.",
           ],
         },
         {
@@ -269,33 +270,83 @@ export const UG_BODY_DATA: ManualChapter = {
       slug: "what-body-data-changes",
       title: "What body data changes",
       summary:
-        "It shapes your goals and grades your outcomes; the weight on the bar comes from your sets.",
+        "It prices bodyweight exercises, helps pace progression, and supplies the measurements used to judge a goal.",
       estimate: true,
       keywords: [
         "does body fat change my workout",
         "rmr",
         "metabolic rate",
+        "ffmi",
+        "fat-free mass",
+        "genetic potential",
+        "why am i progressing slowly",
         "what is it used for",
         "prescription",
       ],
       blocks: [
         {
           kind: "para",
-          text: "Body data affects macrocycle goals and results. It helps set realistic targets, supplies the measurements used for mass and composition results, and adds measured resting metabolic rate to cutting or gaining plans.",
+          text: [
+            "Your current profile weight is the load on an exercise where bodyweight ",
+            {
+              to: "ug/exercises-and-templates#what-an-exercise-remembers",
+              text: "is part of the load",
+            },
+            ". Height, weight and body fat help set your goals and progression pace. Dated weights and DEXA scans supply the mass and composition results at the end of a macrocycle.",
+          ],
         },
         {
           kind: "para",
           text: [
             {
               strong:
-                "Your logged training sets determine the next weight you lift.",
+                "Your sets earn an increase; your goal and profile pace it.",
             },
-            " Body data only changes exercises where your bodyweight ",
+            " On a strength or hypertrophy goal, the app compares the last month's rise in prescribed weight with your target rate. If that rate were ",
+            { num: "2%" },
+            " a month, an exercise already up ",
+            { num: "2%" },
+            " would wait; one below it could take the earned step.",
+          ],
+        },
+        {
+          kind: "para",
+          text: "That rate starts with your estimated muscular development. Less lean mass for your height usually means more room to grow and a faster pace. As that room narrows, the pace slows. After two completed blocks, your record of earning and completing increases moves the pace within its range.",
+        },
+        {
+          kind: "detail",
+          blocks: [
             {
-              to: "ug/exercises-and-templates#what-an-exercise-remembers",
-              text: "is the load",
+              kind: "para",
+              text: [
+                "Fat-free mass is bodyweight without fat: bodyweight × (1 − body-fat percentage ÷ 100). Fat-free mass index (FFMI) = fat-free mass in kilograms ÷ height in metres². Height-adjusted FFMI = FFMI + ",
+                { num: "6.1" },
+                " × (",
+                { num: "1.83" },
+                " − height in metres).",
+              ],
             },
-            "; those exercises use your current profile weight.",
+            {
+              kind: "para",
+              text: [
+                "The app places that value between ",
+                { code: "macro_target.ffmi_untrained" },
+                " and ",
+                { code: "macro_target.ffmi_ceiling" },
+                " for your sex. Growth rate = floor + (base − floor) × (1 − position), using ",
+                { code: "macro_target.hypertrophy_floor_pct_bw_month" },
+                " and ",
+                { code: "macro_target.hypertrophy_base_pct_bw_month" },
+                ".",
+              ],
+            },
+            {
+              kind: "para",
+              text: [
+                { code: "macro_target.strength_model" },
+                " combines that growth term with training history to produce the strength-rate band used by the progression pacer. Profile body fat may come from a DEXA scan you applied, a value you enter, or the representative value for your height-and-weight band. When the body-composition calculation is unavailable, training history supplies the rate instead.",
+              ],
+            },
           ],
         },
         {
@@ -303,19 +354,13 @@ export const UG_BODY_DATA: ManualChapter = {
           text: [
             "The ",
             { ui: "MEASURED RMR" },
-            " figure is calculated from lean mass and shown for context. The app does not use it to set prescriptions or goals. Daily maintenance also includes energy used outside rest.",
+            " figure shows resting energy calculated from lean mass. It is context for a cutting or gaining plan; daily maintenance also includes energy used outside rest.",
           ],
-        },
-        {
-          kind: "callout",
-          tone: "honesty",
-          label: "The app watches training, not eating",
-          text: "Goal estimates assume that food and sleep support the training. The app does not monitor either, so actual results can differ.",
         },
       ],
       related: [
         "ug/macrocycle-goals#the-target-behind-it",
-        "ug/how-your-weight-is-chosen#the-anchor",
+        "ug/how-your-weight-is-chosen#how-often-a-step-comes",
       ],
     },
   ],

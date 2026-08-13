@@ -90,9 +90,20 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
             "Every number comes from the program. The explanation uses the saved decision, so the same type of decision uses the same wording across exercises.",
           ],
         },
+        {
+          kind: "para",
+          text: [
+            "Sometimes a short coaching line appears beneath the reasoning. It offers advice alongside the prescription, but never changes what the program is asking you to do. ",
+            {
+              to: "ug/prescription-details#who-writes-the-numbers",
+              text: "Read how coaching and program decisions differ.",
+            },
+          ],
+        },
       ],
       related: [
         "ug/prescription-details#opening-the-details",
+        "ug/prescription-details#who-writes-the-numbers",
         "ug/training-a-session#the-day-screen",
       ],
     },

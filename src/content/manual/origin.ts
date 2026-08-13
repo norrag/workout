@@ -30,9 +30,6 @@ const ORIGINS: readonly { readonly prefix: string; readonly label: string }[] = 
   { prefix: "/cycles", label: "CYCLES" },
   { prefix: "/exercises", label: "EXERCISES" },
   { prefix: "/templates", label: "TEMPLATES" },
-  // both manuals' readers, so the one search screen can send a reader back to
-  // whichever one they searched from (09-changelog 2026-08-13 §2)
-  { prefix: "/more/connector/guide", label: "AI MANUAL" },
   { prefix: "/more/connector", label: "AI CONNECTOR" },
   { prefix: "/more/guide", label: "GUIDE" },
   { prefix: "/more/profile", label: "PROFILE" },

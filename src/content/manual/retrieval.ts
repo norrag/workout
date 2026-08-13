@@ -91,14 +91,14 @@ export interface GuideIndex {
 }
 
 const HOW_TO_USE =
-  "The contents tree for the app's built-in manuals. A section is the unit: " +
+  "The contents tree for the app's built-in Guide. A section is the unit: " +
   "one screen, one ID, one link. Browse this map, or call search_manual for a " +
   "ranked lookup, then get_manual_section to read one. Hand the user app_route " +
   "when they should see the section in the app themselves.";
 
 /** Every manual that has at least one chapter, in reading order. */
 function indexedManuals(): IndexedManual[] {
-  const ids: ManualId[] = ["ug", "ai"];
+  const ids: ManualId[] = ["ug"];
   return ids
     .map((manual) => ({
       manual,

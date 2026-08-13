@@ -144,8 +144,8 @@ export const FIGURE_ROOT = "/manual/";
 // Sections and chapters
 // ---------------------------------------------------------------------------
 
-/** Which manual a chapter belongs to. Both share this model (doc 22 D4). */
-export type ManualId = "ug" | "ai";
+/** The built-in Guide. The former AI Manual now lives in chapter 18. */
+export type ManualId = "ug";
 
 export interface ManualSection {
   /** stable slug, unique within its chapter; renaming one is a breaking change */

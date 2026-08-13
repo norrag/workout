@@ -6,16 +6,13 @@ import { releaseActive } from "@/lib/version";
 import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
- * Search — one field over both manuals (fig 4.11; 09-changelog 2026-08-08 §2,
- * amended 2026-08-13 §2).
+ * Search — one field over the Guide (fig 4.11; 09-changelog 2026-08-08 §2).
  *
  * A static segment, so it wins over `[chapter]` in the App Router's ordering;
  * the registry test keeps a chapter from ever claiming this slug.
  *
- * doc 22 §9.4.3 asks for one field over both manuals, so there is one search
- * route rather than one per manual — and the **back link follows the reader in**
- * through the same `?from=` allowlist the section screen uses. Someone who
- * searched from the AI Manual returns to the AI Manual.
+ * The **back link follows the reader in** through the same `?from=` allowlist
+ * the section screen uses.
  *
  * The screen itself is a header and a field. Everything else — the index, the
  * ranking, the results — is the client component, and the index is not part of

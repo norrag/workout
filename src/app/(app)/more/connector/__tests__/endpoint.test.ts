@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { CANONICAL_APP_URL, resolveOrigin } from "../endpoint";
+import {
+  CANONICAL_APP_URL,
+  resolveConnectorOrigin,
+  resolveOrigin,
+} from "../endpoint";
 
 describe("resolveOrigin", () => {
   it("falls back to the canonical domain when unset or empty", () => {
@@ -33,6 +37,21 @@ describe("resolveOrigin", () => {
   it("honors localhost (dev) overrides", () => {
     expect(resolveOrigin("http://localhost:3000")).toBe(
       "http://localhost:3000",
+    );
+  });
+
+  it("never shows a local development address as the remote connector", () => {
+    expect(resolveConnectorOrigin("http://localhost:3000")).toBe(
+      CANONICAL_APP_URL,
+    );
+    expect(resolveConnectorOrigin("http://127.0.0.1:3000")).toBe(
+      CANONICAL_APP_URL,
+    );
+  });
+
+  it("keeps a configured custom domain for the remote connector", () => {
+    expect(resolveConnectorOrigin("https://workout.example.com")).toBe(
+      "https://workout.example.com",
     );
   });
 

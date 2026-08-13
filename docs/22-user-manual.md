@@ -1,6 +1,16 @@
-# 22 — User Manual & AI Manual (build spec + phased plan)
+# 22 — User Guide (build spec + phased plan)
 
-**Status:** building — Phases 0–3, 5 and 6 are done. Phases in [§11](#11-the-phased-plan).
+> **Owner amendment — 2026-08-13 (authoritative).** The dedicated AI Manual
+> was the wrong information architecture and has been retired. Its useful
+> material is now consolidated into User Guide chapter 18, **Training with AI**,
+> in eight task-shaped sections. Connection instructions stay on
+> `More → AI connector`, which links attractively into that chapter. The former
+> `/more/connector/guide/**` routes permanently redirect to the corresponding
+> Guide section. Any two-manual language below records the superseded build
+> history; this amendment wins.
+
+**Status:** building — the Guide and connector retrieval are built; the link
+placement pass remains. Phases in [§11](#11-the-phased-plan).
 **Owner ask (2026-08-05):** review the repository, the app's real functionality,
 and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
@@ -39,7 +49,7 @@ editing question answered ([§14](#14-could-an-admin-mcp-tool-edit-the-manual)).
 | # | Deliverable | Audience | Home |
 |---|---|---|---|
 | **A** | **User Guide** — what the app is, how to use it, what its terms mean, and (plain-language) how the parts that produce numbers actually work | Any athlete using WORKOUT | In-app, reachable from More and from context-specific entry points throughout the app |
-| **B** | **AI Manual** — setup, concept, capabilities, and worked use cases for the AI connector | Users connecting an AI client | In-app, under `/more/connector` |
+| **B** | **Training with AI** — a comprehensive Guide chapter covering context, analysis, planning, coaching, good use, interpretation, and control | Users connecting Claude or ChatGPT | User Guide chapter 18; setup remains under `/more/connector` |
 | **C** | **Link placement pass** — deep links from dense app surfaces into the exact manual section that explains them | Owner's follow-on, deliberately sequenced last so placements are chosen against real sections |
 
 ### 1.1 Objectives as acceptance criteria
@@ -49,7 +59,7 @@ editing question answered ([§14](#14-could-an-admin-mcp-tool-edit-the-manual)).
 - **Explains how it functions, prioritizing understandability.** Named by the owner: how the strength anchor is derived, which methods compute e1RM (the Epley/Brzycki average over effective reps), and what role e1RM plays. Delivered through the three-layer depth model (D5).
 - **Explains reasoning in plain language.** Every mechanism section carries a *why this way* paragraph.
 - **Indexed, searchable, easy to navigate — in bite-sized pieces.** Requirements in [§9](#9-navigation--search). This was escalated in owner review: the manual must not read as one untraversable document.
-- **Covers the AI connector.** A short User Guide chapter hands off; the AI Manual carries the depth.
+- **Covers the AI connector.** User Guide chapter 18 carries the full depth in eight independently addressable sections; the connector page carries setup.
 - **Demonstrates the four named connector use cases.** Macrocycle creation/management, mesocycle creation/management, performance analysis, coaching — each as a worked example.
 
 ### 1.2 Scope boundaries
