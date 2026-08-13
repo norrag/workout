@@ -63,7 +63,7 @@ its sequencing — `22c` §C2's ~22 undefined terms need glossary entries under
 §8.1 before the affordance can point at one, and that is a copy pass, not a
 placement pass. It is now the only unbuilt part of Phase 7.
 
-- **Index sync:** N74's row carries 7c (PR #PRNUM); N81's status reworded to
+- **Index sync:** N74's row carries 7c (PR #245); N81's status reworded to
   name it as the one Phase 7 wave still unbuilt and what it is gated on.
 
 ## 2026-08-15 — Session 121: the Guide reaches into the app (N74 Phase 7a+7b, N81 ruled)
