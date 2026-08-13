@@ -84,7 +84,11 @@ test("quick entry appends a manual point; same-day re-entry replaces it", async 
   // ---- a profile bodyweight edit appends a 'profile' point too, and the
   // series resolves the day to the LATEST entry across sources ----
   await page.goto("/more/profile");
-  await page.getByRole("button", { name: /BODYWEIGHT/ }).click();
+  // the ledger ROW, not the `BODYWEIGHT` equipment chip further down the same
+  // screen — /BODYWEIGHT/ alone is a strict-mode violation, since the row's
+  // accessible name is `BODYWEIGHT <n> LB AS OF <date>` and the chip's is just
+  // `BODYWEIGHT`. The value is what tells them apart.
+  await page.getByRole("button", { name: /^BODYWEIGHT \d/ }).click();
   const sheet = page.getByRole("dialog", { name: "bodyweight" });
   await sheet.locator("input").fill("204");
   await sheet.getByRole("button", { name: "SAVE" }).click();
