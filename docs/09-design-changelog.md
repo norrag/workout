@@ -70,6 +70,82 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## Entries
 
+## 2026-08-15 (session 2) — Wave 2: the guard travels with the link (doc 22 Phase 7c, N74)
+
+The owner accepted [`22e`](22e-link-placement-audit.md) §5's recommendation —
+option (1), *extend the guard* — so the exclusion the session-1 pass wrote
+("**not on an unguarded form**", §2 above) is **lifted rather than waived**. It
+still holds as written: a `GuideLink` may only sit on a surface that is
+read-only or whose dirty state is intercepted. What changes is that nine more
+surfaces are now the second kind.
+
+This pass draws **nothing new**. Every element it uses — the link, the
+discard-confirm sheet, the guard hook — already exists and already has a
+figure or a precedent. What it decides is *where the guard reaches* and *who
+owns the confirm*.
+
+### 1. The guard's reach is decided by the surface's own exits (`RETROFIT`)
+
+- **Change.** Two mechanisms, chosen by what the surface can be left through,
+  not by what kind of component it is:
+  - **A sheet** — the scrim covers the page, so the Guide link is the **only**
+    navigation on offer. The link guards itself (`GuardedGuideLink`): while the
+    surface is dirty, the tap opens the confirm and only `DISCARD` leaves.
+  - **A page** — the tab bar, the header and the back button are all live, so
+    the page arms `useNavigationGuard`, exactly as the planner board has since
+    R16. The link then needs no wrapper: it is one more anchor the page's own
+    guard already covers.
+- **Rationale.** §5 named `useNavigationGuard` because it was the tool that
+  existed, and for a page it is the right one — it also closes a real gap,
+  since `/cycles/new`, `/cycles/macro/[id]/edit` and `/exercises/new` have
+  been discarding unsaved input on a tab tap all along. Inside a sheet it would
+  be the wrong one: arming it plants a **history sentinel**, and the sheets in
+  question are the Feedback and Effort target sheets on the day view — the hot
+  path, mid-workout, the surface N82 had just been asked to calm. Guarding one
+  anchor is exactly sufficient there and costs the back button nothing.
+- **What "dirty" means, and it is deliberately conservative.** A surface is
+  dirty when its controls differ from what it opened with — not when it has
+  been touched. Returning a slider to where it started disarms the guard.
+  Where a field is uncontrolled (a name, a note) the form reports it as
+  touched instead, because there is nothing to compare against; that costs a
+  confirm nobody needed, never an answer.
+- **Affected figures** — none. No sheet gains or loses a control.
+- **Impact** — `RETROFIT` on three create/edit pages (they gain the confirm the
+  planner board already had) + `NET-NEW` wrapper component.
+
+### 2. One discard-confirm, and it is the planner board's (`TOKENS`)
+
+- **Change.** `LeaveConfirm` — the sheet the board has shown since R16, moved
+  out of `PlannerBoard.tsx` unchanged: title `Discard changes?`, subtitle
+  `UNSAVED EDITS WILL BE LOST`, `Keep editing` quiet on the left, `DISCARD` in
+  the accent outline on the right. **Only one thing varies per surface** — the
+  sentence naming what is unsaved ("Your answers haven't been saved…").
+- **Rationale.** Nine surfaces asking the same question is nine chances to ask
+  it in nine voices. This is §8.1's single-source rule applied to an
+  interaction rather than to a definition, and it is asserted the same way: a
+  test fails if `Discard changes?` appears anywhere but the component.
+- **Impact** — `TOKENS`; no visual change anywhere it already appeared.
+
+### 3. Two of the audit's rows were wrong, and are corrected here (`NO-CODE`)
+
+Both were filed under the unguarded-form test on the assumption that a screen
+with controls on it is a form. Reading the code says otherwise:
+
+- **`/more/profile` writes on every tap.** Experience, sex, equipment and body
+  fat each fire their action immediately; the page holds no unsaved state, and
+  the edit sheets that do are behind their own scrim. It takes a **plain**
+  link.
+- **The planner's exercise sheet writes through to the board.** Its four
+  controls stage into the board's working copy, which `useNavigationGuard`
+  already intercepts. Also a plain link — the guard was already there.
+
+That leaves the wrapper for the five surfaces that genuinely hold their own
+unsaved input: Feedback, Workout Complete, Effort target, Load step, and the
+meso's Edit details sheet.
+
+- **Impact** — `NO-CODE`; [`22e`](22e-link-placement-audit.md) §4's rows are
+  amended in place.
+
 ## 2026-08-15 — The definition grammar: three affordances, one system (doc 22 Phase 7a, N74 / N81)
 
 The design pass hard rule 8 owes before Phase 7 places a single link. Two

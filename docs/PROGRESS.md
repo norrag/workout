@@ -2,7 +2,98 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-15 (latest, session 2) — doc 22 Phase 7a + 7b: the Guide reaches into the app (N74 / N81)
+## 2026-08-15 (latest, session 3) — doc 22 Phase 7c: the guard travels with the link (N74)
+
+The owner read [22e-link-placement-audit.md](22e-link-placement-audit.md) and
+**accepted §5's recommendation**, which is the one decision wave 1 had put back
+to them. So the exclusion that wave 1 wrote — *nothing on an unguarded form* —
+is **lifted rather than waived**: it still holds exactly as written, and ten
+more surfaces now satisfy it.
+
+Design pass first (hard rule 8): **09-changelog 2026-08-15 (session 2)**. It
+draws nothing new. Every element used already exists; what it decides is how far
+the guard reaches and who owns the confirm.
+
+### The guard's reach follows the surface's own exits
+
+Two mechanisms, chosen by what a surface can be left *through* rather than by
+what kind of component it is:
+
+- **A sheet** — the scrim covers the page, so the Guide link is the only
+  navigation on offer. The link guards itself (`GuardedGuideLink`): while the
+  surface is dirty, the tap opens the confirm, and only `DISCARD` leaves.
+- **A page** — the tab bar, the header and back are all live, so the page arms
+  `useNavigationGuard` exactly as the planner board has since R16, and the link
+  needs no wrapper.
+
+§5's wording said "extend `useNavigationGuard` to sheets", and this is a
+deliberate narrowing of it, recorded in 22e §5.1: arming the hook plants a
+**history sentinel**, and the sheets in question are the Feedback and Effort
+target sheets *on the day view* — the hot path, mid-workout, the surface N82
+had just been asked to calm. Guarding one anchor is exactly sufficient there and
+costs the back button nothing. The hook went where it belongs: the three pages
+that were genuinely unguarded, which also closes a gap older than this audit —
+`/cycles/new`, `/cycles/macro/[id]/edit` and `/exercises/new` have been
+discarding unsaved input on a tab tap since they were written.
+
+**Dirty means "differs from what it opened with"**, not "has been touched", so
+returning a slider to its starting value disarms the guard. Uncontrolled fields
+(a name, a note) report themselves as touched instead, because there is nothing
+to compare against — that costs a confirm nobody needed, never an answer.
+
+### One discard-confirm, and it is the planner board's
+
+`LeaveConfirm` is that sheet moved out of `PlannerBoard.tsx` unchanged — title,
+subtitle, both actions, both weights. Only the sentence naming what is unsaved
+varies per surface. Nine surfaces asking the same question is nine chances to
+ask it in nine voices, so a test fails if `Discard changes?` appears anywhere
+but the component, and a second one fails if a surface arms the guard without
+rendering the confirm.
+
+### Ten placements, and two rows the audit had wrong
+
+Wave 2 (22e §3.3): the **Feedback**, **Workout Complete**, **Effort target**,
+**Load step** and meso **Edit details** sheets · the planner's **exercise
+sheet** · **`/cycles/new`** · **`/cycles/macro/[id]/edit`** ·
+**`/exercises/new`** · **`/more/profile`**.
+
+Two of them needed no mechanism at all, and finding that out is why the wave is
+ten placements against §5's seven-row estimate. **`/more/profile`** writes every
+change as it is made — it holds no unsaved state and never was a form. **The
+planner's exercise sheet** stages into the board's working copy, which
+`useNavigationGuard` has intercepted since R16. Both rows were filed under E4 on
+the assumption that a screen carrying controls is a form; the code says
+otherwise, and 22e §4 is corrected in place.
+
+The `SET BY YOUR COACH` candidate closes too: it shares the Effort target
+sheet with #12, whose section covers the same ground, so the budget rule settles
+it rather than leaving it pending. What remains in 22e §4 is eight rows, every
+one held on **budget or a weak E2** — a judgement about density, not a
+mechanism. Nothing in that table is waiting on a decision now.
+
+### The table is now testable in one more way
+
+`guide-links.test.ts` gains a row-without-a-placement check: a `GUIDE_LINKS`
+entry that no call site renders fails CI. The audit is meant to be the list of
+placements and the table its expression in code; before this, a forgotten row
+would have passed every assertion above it forever.
+
+### What is left of Phase 7
+
+**N81's inline term, and it is a content pass first.** `22c` §C2's ~22 rendered
+terms with no definition need glossary entries under §8.1 before the affordance
+can point at one. The design has been settled since wave 1; nothing here changed
+its sequencing.
+
+### Deviations recorded (hard rule 8)
+
+- **No mockup figure covers any of this** — the manual postdates the mockup
+  round, and the discard-confirm is the planner board's shipped sheet reused
+  verbatim. Written down in the changelog before being transcribed.
+- **Not verified on device.** `npm run build`, `lint`, `typecheck` and all 2008
+  tests pass.
+
+## 2026-08-15 (session 2) — doc 22 Phase 7a + 7b: the Guide reaches into the app (N74 / N81)
 
 Deliverable **C** — *"place links to [the manual] at the points in the app where
 they help most"* — audited first, then built. The audit is

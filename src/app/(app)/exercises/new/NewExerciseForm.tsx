@@ -1,11 +1,16 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { MuscleGroupRow } from "@/lib/types/database";
 import {
   customExerciseEquipment as EQUIPMENT,
   type CustomExerciseEquipment,
 } from "@/lib/types/equipment";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
+import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { createCustomExerciseAction, type FormState } from "../actions";
 
 /** lb plate-math jumps offered for the load step — same vocabulary as the
@@ -53,6 +58,21 @@ export function NewExerciseForm({
   const [customStep, setCustomStep] = useState(false);
   const [customText, setCustomText] = useState("");
 
+  // doc 22 Phase 7c — R16 reaches the create form: none of this exists
+  // server-side until CREATE, so every exit asks first. The three text fields
+  // are uncontrolled and report themselves through the form's `onInput`.
+  const router = useRouter();
+  const [touched, setTouched] = useState(false);
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  const dirty =
+    touched ||
+    equipment !== "machine" ||
+    primaryId !== null ||
+    secondaryIds.length > 0 ||
+    step !== null ||
+    customStep;
+  useNavigationGuard(dirty, (href) => setLeaveTo(href ?? "/exercises"));
+
   const toggleSecondary = (id: string) =>
     setSecondaryIds((cur) =>
       cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(0, 4),
@@ -83,7 +103,11 @@ export function NewExerciseForm({
     }`;
 
   return (
-    <form action={formAction} className="mt-5">
+    <form
+      action={formAction}
+      onInput={() => setTouched(true)}
+      className="mt-5"
+    >
       <input type="hidden" name="equipment_type" value={equipment} />
       <input type="hidden" name="primary_muscle_group_id" value={primaryId ?? ""} />
       <input type="hidden" name="secondary" value={JSON.stringify(secondaryIds)} />
@@ -122,6 +146,14 @@ export function NewExerciseForm({
             {LOAD_HINTS[equipment]}
           </p>
         )}
+        {/* doc 22 Phase 7c, audit §3.3 — an entered weight means three
+            different things across these equipment kinds (R12), and the hint
+            above can only carry one sentence of that. */}
+        <GuideLink
+          className="mt-2.5"
+          to={GUIDE_LINKS.customExercise}
+          from="/exercises/new"
+        />
       </div>
 
       <div className={section}>
@@ -270,6 +302,13 @@ export function NewExerciseForm({
         Custom exercises are visible only to you — share them from the
         exercise page.
       </p>
+
+      <LeaveConfirm
+        open={leaveTo != null}
+        body="This exercise hasn't been created yet. Discard it and leave?"
+        onKeepEditing={() => setLeaveTo(null)}
+        onDiscard={() => leaveTo != null && router.push(leaveTo)}
+      />
     </form>
   );
 }

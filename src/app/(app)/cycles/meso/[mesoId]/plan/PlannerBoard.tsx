@@ -8,6 +8,7 @@ import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { InfoDot } from "@/components/ui/InfoDot";
 import { GuideLink } from "@/components/ui/GuideLink";
+import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
 import { GUIDE_LINKS } from "@/lib/guide-links";
 import { RirScheduleEditor, rirSummary } from "../RirScheduleEditor";
 import { useToast } from "@/components/ui/Toast";
@@ -1260,6 +1261,7 @@ export function PlannerBoard({
             }
             rampLine={rirSummary(meso.rir_schedule, meso.rir_start, meso.rir_end)}
             includesDeload={meso.includes_deload}
+            planHref={planHref}
             onSets={(sets) => setFillSets(fill.id, sets)}
             onRir={(rir) => setFillRir(fill.id, rir)}
             onReplace={() => {
@@ -1341,36 +1343,15 @@ export function PlannerBoard({
         </BottomSheet>
       )}
 
-      {/* discard confirm — CANCEL button or any intercepted navigation (R16) */}
-      {leaveTo != null && (
-        <BottomSheet
-          open
-          onClose={() => setLeaveTo(null)}
-          title="Discard changes?"
-          subtitle="UNSAVED EDITS WILL BE LOST"
-        >
-          <p className="text-[12.5px] leading-[1.5] text-ink/75">
-            Your changes to this plan haven&apos;t been saved. Discard them and
-            leave?
-          </p>
-          <div className="mt-6 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => setLeaveTo(null)}
-              className="px-4 py-3 text-[13px] font-semibold text-ink/60"
-            >
-              Keep editing
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(leaveTo)}
-              className="border-[1.5px] border-accent px-8 py-3 text-[13px] font-bold tracking-[0.08em] text-accent"
-            >
-              DISCARD
-            </button>
-          </div>
-        </BottomSheet>
-      )}
+      {/* discard confirm — CANCEL button or any intercepted navigation (R16).
+          The sheet this board wrote first is now the shared primitive every
+          guarded surface uses (09-changelog 2026-08-15 session 2 §2). */}
+      <LeaveConfirm
+        open={leaveTo != null}
+        body="Your changes to this plan haven't been saved. Discard them and leave?"
+        onKeepEditing={() => setLeaveTo(null)}
+        onDiscard={() => leaveTo != null && router.push(leaveTo)}
+      />
     </div>
   );
 }
@@ -1624,6 +1605,7 @@ function ExerciseSheet({
   equipment,
   rampLine,
   includesDeload,
+  planHref,
   onSets,
   onRir,
   onReplace,
@@ -1637,6 +1619,8 @@ function ExerciseSheet({
    *  departs from (doc 21 §4.1: never show an assignment without its default) */
   rampLine: string;
   includesDeload: boolean;
+  /** N27 origin for the sheet's Guide link */
+  planHref: string;
   onSets: (sets: number) => void;
   onRir: (rir: number | null) => void;
   onReplace: () => void;
@@ -1775,6 +1759,17 @@ function ExerciseSheet({
           </span>
         </button>
       </div>
+
+      {/* doc 22 Phase 7c, audit §3.3 — four levers on one exercise, three of
+          which change how the block runs. A plain link: this sheet writes
+          through to the board's staged copy, which `useNavigationGuard`
+          already intercepts, so E4's second clause holds without a wrapper. */}
+      <GuideLink
+        rule
+        className="mt-5"
+        to={GUIDE_LINKS.plannedExercise}
+        from={planHref}
+      />
 
       <div className="mt-5 flex justify-end">
         <button

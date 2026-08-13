@@ -62,11 +62,20 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     },
   },
   {
-    // doc 22 Phase 7 (N74) — deliverable C. Nine wave-1 placements plus the
-    // connector page's adoption of the primitive; audit in `docs/22e`.
+    // doc 22 Phase 7 (N74) — deliverable C. Twenty placements across two waves;
+    // audit in `docs/22e`, wave 2 in its §3.3.
     id: "guide-links-in-the-app",
     title: "The guide, where the question comes up",
-    body: "Screens that print a worked-out number now carry a quiet line to the section that explains it — under the prescription details, the volume check, the strength tabs, and a few others. The back link returns you to where you were reading.",
+    body: "Screens that print a worked-out number, or ask you for one, carry a quiet line to the section explaining it — prescription details, the volume check, the strength tabs, the feedback and effort sheets. The back link returns you.",
+    area: "app",
+  },
+  {
+    // doc 22 Phase 7c (N74) — the guard the links needed, which is a
+    // user-visible behavior change in its own right (doc 23 §4.2): these forms
+    // used to discard silently.
+    id: "asks-before-discarding",
+    title: "Nothing is dropped without asking",
+    body: "Leaving a screen with unsaved work on it — a half-filled new macrocycle, a custom exercise, feedback you haven't saved — now asks first instead of dropping it quietly. Answer the question and you carry on where you were.",
     area: "app",
   },
   {

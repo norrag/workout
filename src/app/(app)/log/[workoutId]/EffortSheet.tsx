@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { GuardedGuideLink } from "@/components/ui/GuardedGuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { setSlotEffortAction } from "@/app/(app)/log/actions";
 import type { LoggedExercise } from "@/lib/queries/logging";
 import {
@@ -393,6 +395,19 @@ export function EffortSheet({
           ))}
         </div>
       )}
+
+      {/* doc 22 Phase 7c, audit §3.3 — one slot off the week's ramp reprices
+          the load, and no line on this sheet says so. The budget rule sends the
+          `SET BY YOUR COACH` block's candidate here too: one link per surface,
+          and this is the section that covers the whole sheet. */}
+      <GuardedGuideLink
+        rule
+        className="mt-5"
+        to={GUIDE_LINKS.effortTarget}
+        from={`/log/${we.workout_id}`}
+        dirty={dirty}
+        body="Your effort target hasn't been saved. Discard it and leave?"
+      />
 
       <div className="mt-5 flex items-center justify-end gap-2.5">
         <button

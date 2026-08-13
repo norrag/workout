@@ -104,6 +104,74 @@ export const GUIDE_LINKS = {
     href: "/more/guide/connecting-an-ai/staying-in-control",
     label: "Staying in control",
   },
+
+  // -------------------------------------------------------------------------
+  // Wave 2 (audit §3.3) — the surfaces that earned a link on every test but
+  // E4, now that their dirty state is intercepted. These are the placements the
+  // audit rated highest on "the reader is asking right now": each one is a
+  // screen that takes an input, or changes a number that reprices training.
+  // -------------------------------------------------------------------------
+
+  /** Feedback sheet — what the three asks actually move. */
+  feedbackAnswers: {
+    section: "ug/how-it-felt#what-your-answers-do",
+    href: "/more/guide/how-it-felt/what-your-answers-do",
+    label: "What your answers do",
+  },
+  /** Workout Complete — the session block, which is a different lever again. */
+  sessionQuestions: {
+    section: "ug/how-it-felt#the-session-questions",
+    href: "/more/guide/how-it-felt/the-session-questions",
+    label: "The three questions at the end",
+  },
+  /** Effort target sheet — one slot off the week's ramp, and the repricing. */
+  effortTarget: {
+    section: "ug/exercise-level-rir#why-one-exercise-differs",
+    href: "/more/guide/exercise-level-rir/why-one-exercise-differs",
+    label: "What it does",
+  },
+  /** Load-step sheet — the N67 step-off-the-last-entered-weight rule. */
+  loadStep: {
+    section: "ug/exercises-and-templates#the-load-step",
+    href: "/more/guide/exercises-and-templates/the-load-step",
+    label: "The weight jump for one lift",
+  },
+  /** Meso Edit details — why the block ramps at all, before the ramp locks. */
+  whyARamp: {
+    section: "ug/choosing-your-ramp#why-a-ramp",
+    href: "/more/guide/choosing-your-ramp/why-a-ramp",
+    label: "Why a block ramps instead of picking one effort",
+  },
+  /** Planner exercise sheet — everything one planned exercise can be (N78). */
+  plannedExercise: {
+    section: "ug/planning-a-mesocycle#the-exercise-sheet",
+    href: "/more/guide/planning-a-mesocycle/the-exercise-sheet",
+    label: "The exercise sheet",
+  },
+  /** Create macrocycle — what the create engine is deciding on your behalf. */
+  macroSetup: {
+    section: "ug/macrocycle-goals#setting-one-up",
+    href: "/more/guide/macrocycle-goals/setting-one-up",
+    label: "Setting one up",
+  },
+  /** Edit macrocycle — the goal is the field with consequences downstream. */
+  macroGoals: {
+    section: "ug/macrocycle-goals#the-four-goals",
+    href: "/more/guide/macrocycle-goals/the-four-goals",
+    label: "The four goals",
+  },
+  /** New custom exercise — the three meanings of an entered weight (R12). */
+  customExercise: {
+    section: "ug/exercises-and-templates#your-own-exercises",
+    href: "/more/guide/exercises-and-templates/your-own-exercises",
+    label: "Making your own exercise",
+  },
+  /** Profile — what the six facts are read for, under the `Drives…` lines. */
+  profilePurpose: {
+    section: "ug/your-profile#what-it-is-for",
+    href: "/more/guide/your-profile/what-it-is-for",
+    label: "What the profile is for",
+  },
 } as const satisfies Record<string, GuideLinkTarget>;
 
 export type GuideLinkKey = keyof typeof GUIDE_LINKS;

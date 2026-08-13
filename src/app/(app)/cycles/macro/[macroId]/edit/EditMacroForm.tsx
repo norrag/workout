@@ -13,6 +13,10 @@ import {
 } from "@/lib/engine/macro";
 import type { EngineParams } from "@/lib/engine/params";
 import type { MacroGoalType } from "@/lib/types/database";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
+import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { editMacrocycleAction, type FormState } from "../../../actions";
 import type { MacroEditImpact } from "@/lib/queries/macro";
 
@@ -68,6 +72,19 @@ export function EditMacroForm({
   const [mesoTouched, setMesoTouched] = useState(true);
 
   const durationMonths = duration === "custom" ? customMonths : duration;
+  // doc 22 Phase 7c — R16 reaches the edit form: an unsaved goal change is a
+  // re-plan of every open slot, and until SAVE none of it exists. The two
+  // uncontrolled fields (name, goal notes) report through the form's `onInput`.
+  const [touched, setTouched] = useState(false);
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  const dirty =
+    touched ||
+    goal !== initial.goal_type ||
+    durationMonths !== (initial.duration_months ?? 6) ||
+    mesoLength !== initial.meso_length_weeks;
+  useNavigationGuard(dirty, (href) =>
+    setLeaveTo(href ?? `/cycles/macro/${macroId}`),
+  );
 
   useEffect(() => {
     if (!mesoTouched) setMesoLength(suggestMesoLength(durationMonths));
@@ -103,7 +120,7 @@ export function EditMacroForm({
   })();
 
   return (
-    <form action={formAction}>
+    <form action={formAction} onInput={() => setTouched(true)}>
       <input type="hidden" name="macro_id" value={macroId} />
       <input type="hidden" name="goal_type" value={goal} />
       <input type="hidden" name="meso_length_weeks" value={mesoLength} />
@@ -265,6 +282,15 @@ export function EditMacroForm({
         </div>
       </div>
 
+      {/* doc 22 Phase 7c, audit §3.3 — GOAL is the field with consequences
+          downstream (it re-plans every open slot and moves the target the arc
+          is graded against), and the chips can only name the four. */}
+      <GuideLink
+        className="mt-2.5"
+        to={GUIDE_LINKS.macroGoals}
+        from={`/cycles/macro/${macroId}/edit`}
+      />
+
       {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}
 
       <div className="mt-[18px] mb-6 flex items-center gap-2.5">
@@ -287,6 +313,13 @@ export function EditMacroForm({
       <div className="mb-4 text-[10px] leading-normal text-ink/50">
         {plan.rationale}
       </div>
+
+      <LeaveConfirm
+        open={leaveTo != null}
+        body="Your changes to this macrocycle haven't been saved. Discard them and leave?"
+        onKeepEditing={() => setLeaveTo(null)}
+        onDiscard={() => leaveTo != null && router.push(leaveTo)}
+      />
     </form>
   );
 }

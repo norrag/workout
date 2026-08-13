@@ -14,6 +14,10 @@ import {
 import type { EngineParams } from "@/lib/engine/params";
 // type-only: erased at compile time, so the client chunk stays engine-free
 import type { PriorBlockRate } from "@/lib/queries/macro";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
+import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { createMacrocycleAction, type FormState } from "../actions";
 
 const initialState: FormState = { error: null };
@@ -62,6 +66,15 @@ export function CreateMacroForm({
   const [mesoTouched, setMesoTouched] = useState(false);
 
   const durationMonths = duration === "custom" ? customMonthsNum : duration;
+  // doc 22 Phase 7c — R16 reaches the create form. Everything on this screen is
+  // unsaved until CREATE, so any navigation off it (the tab bar, the header,
+  // back, and now the Guide link at the foot of the PLAN card) has to ask
+  // first. `nameTouched` covers the uncontrolled field; the rest compare.
+  const [nameTouched, setNameTouched] = useState(false);
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  const dirty =
+    nameTouched || goal !== "hypertrophy" || duration !== 6 || mesoTouched;
+  useNavigationGuard(dirty, (href) => setLeaveTo(href ?? "/cycles"));
 
   useEffect(() => {
     if (!mesoTouched) setMesoLength(suggestMesoLength(durationMonths));
@@ -99,6 +112,7 @@ export function CreateMacroForm({
         name="name"
         required
         maxLength={80}
+        onInput={() => setNameTouched(true)}
         className="mt-[7px] h-11 w-full border-[1.5px] border-ink bg-paper px-[13px] text-[14px] font-semibold text-ink placeholder:text-ink/40 focus:outline-none"
         placeholder="e.g. 26-2 · Off-Season"
       />
@@ -255,6 +269,15 @@ export function CreateMacroForm({
         )}
       </div>
 
+      {/* doc 22 Phase 7c, audit §3.3 — the card above states what the engine
+          decided (block count, phase spacing) without saying how, and the
+          target band it is all pointed at is on no screen at all (N54). */}
+      <GuideLink
+        className="mt-2.5"
+        to={GUIDE_LINKS.macroSetup}
+        from="/cycles/new"
+      />
+
       {state.error && <p className="mt-3 text-sm text-accent">{state.error}</p>}
 
       <div className="mt-[18px] mb-6 flex items-center gap-2.5">
@@ -273,6 +296,15 @@ export function CreateMacroForm({
           {pending ? "CREATING" : "CREATE MACROCYCLE"}
         </button>
       </div>
+
+      {/* R16, extended here by doc 22 Phase 7c: nothing on this screen exists
+          server-side yet, so every way off it routes through one confirm. */}
+      <LeaveConfirm
+        open={leaveTo != null}
+        body="This macrocycle hasn't been created yet. Discard it and leave?"
+        onKeepEditing={() => setLeaveTo(null)}
+        onDiscard={() => leaveTo != null && router.push(leaveTo)}
+      />
     </form>
   );
 }

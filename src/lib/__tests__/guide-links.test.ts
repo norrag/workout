@@ -40,6 +40,22 @@ describe("every in-app Guide link resolves", () => {
     expect(target.label).toBe(resolveSection(target.section)!.section.title);
   });
 
+  it("has no row without a placement", () => {
+    // The audit is the list of *placements*; this table is supposed to be the
+    // same list in code. A key nothing renders is a row someone added and
+    // forgot, and it would keep passing every test above it forever.
+    const unused = ENTRIES.map(([key]) => key).filter(
+      (key) =>
+        !SOURCES.some(
+          ({ rel, text }) =>
+            !isTest(rel) &&
+            rel !== "src/lib/guide-links.ts" &&
+            text.includes(`GUIDE_LINKS.${key}`),
+        ),
+    );
+    expect(unused).toEqual([]);
+  });
+
   it("never points two links at the same section", () => {
     const sections = ENTRIES.map(([, t]) => t.section);
     expect(new Set(sections).size).toBe(sections.length);
@@ -84,15 +100,21 @@ describe("the link table stays a table of strings", () => {
   });
 });
 
+/** the two shared components; everything else importing them is a call site */
+const PRIMITIVES = [
+  "src/components/ui/GuideLink.tsx",
+  "src/components/ui/GuardedGuideLink.tsx",
+];
+
 describe("the release gate lives in the primitive, once", () => {
   const CALLERS = SOURCES.filter(
     ({ rel, text }) =>
       !isTest(rel) &&
-      rel !== "src/components/ui/GuideLink.tsx" &&
-      /from\s+["']@\/components\/ui\/GuideLink["']/.test(text),
+      !PRIMITIVES.includes(rel) &&
+      /from\s+["']@\/components\/ui\/(?:Guide|GuardedGuide)Link["']/.test(text),
   );
 
-  it("finds the wave-1 call sites (guards the matcher)", () => {
+  it("finds the call sites (guards the matcher)", () => {
     expect(CALLERS.length).toBeGreaterThanOrEqual(8);
   });
 
@@ -104,6 +126,21 @@ describe("the release gate lives in the primitive, once", () => {
       (s) => s.rel === "src/components/ui/GuideLink.tsx",
     )!;
     expect(link.text).toMatch(/releaseActive\(UNRELEASED_VERSION\)/);
+  });
+
+  it("gates the guarded variant through the same primitive", () => {
+    // wave 2 (doc 22 Phase 7c): the guarded link must *delegate* rather than
+    // draw its own anchor, or the gate, the label and the `?from=` grammar
+    // would each have a second implementation to keep in step.
+    const guarded = SOURCES.find(
+      (s) => s.rel === "src/components/ui/GuardedGuideLink.tsx",
+    )!;
+    expect(guarded.text).toMatch(/<GuideLink\b/);
+    expect(guarded.text).not.toMatch(/releaseActive/);
+    // and it pushes the address the link would have opened, via the shared
+    // helper rather than a second spelling of the query grammar
+    expect(guarded.text).toMatch(/guideHref\(to, from\)/);
+    expect(guarded.text).not.toMatch(/\?from=/);
   });
 
   it("keeps every call site on the shared table", () => {
