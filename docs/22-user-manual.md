@@ -9,8 +9,9 @@
 > Guide section. Any two-manual language below records the superseded build
 > history; this amendment wins.
 
-**Status:** building — the Guide and connector retrieval are built; the link
-placement pass remains. Phases in [§11](#11-the-phased-plan).
+**Status:** building — the Guide, connector retrieval and **wave 1 of the link
+placement pass** are built; Phase 4 (the owner's cold read), 7c and Phase 8
+remain. Phases in [§11](#11-the-phased-plan).
 **Owner ask (2026-08-05):** review the repository, the app's real functionality,
 and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
@@ -21,9 +22,14 @@ chapters, 106 sections** — **Phase 5 with them** (2026-08-12): the connector c
 search and read it. **Phase 6 is built** (2026-08-13): the AI Manual is complete
 at **12 chapters, 48 sections**, its reader is mounted under `/more/connector`,
 and every chapter 5–8 example was run against the live connector as
-[§7.1](#71-worked-examples-are-the-deliverable) requires. **Phase 4, the owner's
-cold read, is in progress** and now covers both manuals; **Phase 7** (link
-placement) is next. **O7 is answered** by the 3d-r research pass
+[§7.1](#71-worked-examples-are-the-deliverable) requires. **Phase 7a + 7b are
+built** (2026-08-15): the placement audit is
+[`22e`](./22e-link-placement-audit.md), the definition grammar is ruled for all
+three affordances (09-changelog 2026-08-15, closing **N81**'s design
+question), and nine wave-1 placements ship behind the same 1.1.0 gate as the
+routes. **Phase 4, the owner's cold read, is in progress**; **7c** is next and
+[`22e`](./22e-link-placement-audit.md) §5 puts one decision back with the owner.
+**O7 is answered** by the 3d-r research pass
 ([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
 the reasoning in [§4](#d3--offline-availability-accepted-conditionally).
@@ -1608,13 +1614,59 @@ contracts green.
 Manual's four use cases are demonstrated with exchanges that were run. Owner
 review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 
-### Phase 7 — Link placement *(deliverable C)*
+### Phase 7 — Link placement *(deliverable C)* — 🔨 **7a + 7b BUILT 2026-08-15**
 
 | Phase | Scope | Size |
 |---|---|---|
 | **7a** | **Placement audit.** Every screen, candidate insertion points, the exact section ID each targets, and a justification. Decide the grammar: `InfoDot` stays term-level; a manual link is mechanism-level and is a distinct affordance. Placement is earned, not sprayed. Links pass a section **ID**, never an imported module (D3 guard). Owner reviews the list before any code | M |
 | **7b** | Implement approved wave-1 placements | M |
 | **7c** | Remainder / follow-up wave after the owner has used wave 1 | S–M |
+
+> **Landed — the audit is [`22e`](./22e-link-placement-audit.md), and it is the
+> thing to read.** The design pass first (hard rule 8): 09-changelog
+> **2026-08-15**, whose governing decision is that there is **one
+> definition grammar with three members**, not three affordances. `InfoDot` and
+> N81's inline term are **term-level** and resolve *in place* — you were mid-task.
+> A Guide link is **mechanism-level** and **navigates**, because the answer does
+> not fit in a card and the reader who wants it has stopped to ask. That is also
+> why they never substitute: an `InfoDot` on `EST. STRENGTH` says what an
+> estimate is, and no amount of it says why yesterday's weight went up.
+>
+> - **The primitive is not new drawing.** `GuideLink` is the app's existing quiet
+>   forward-link idiom (`READ ›` / `SET UP ›` / `CSV ›`) at the foot of a block —
+>   literally the line Phase 6e improvised on `/more/connector`, which now
+>   **adopts** the component rather than being a second copy of it. **No new
+>   figure number is claimed** and no figure's structure changes.
+> - **The label is the destination's own title, by test.** Not a hand-written
+>   invitation: `guide-links.test.ts` asserts label ≡ section title, so a
+>   *retitled* section fails CI the way a renamed one already did. It is the
+>   §8.1 single-source discipline applied to links.
+> - **Nine placements, and the exclusions are the substance.** [`22e`](./22e-link-placement-audit.md)
+>   §2's five earn tests; 14 candidates declined with the test each failed.
+>   Two exclusions are load-bearing: **nothing on the day view's card or set
+>   grid** (N82 removed an icon per card the same week — this must not spend that
+>   back), and **nothing on an unguarded form**, because a `GuideLink` navigates
+>   and navigating out of a sheet holding unsaved sliders discards them.
+> - **One gate, in the primitive.** Guide routes 404 before 1.1.0 (doc 23 §9.2),
+>   so the release gate lives inside `GuideLink` rather than at nine call sites,
+>   and a test asserts no call site carries its own copy.
+>
+> **The audit's own finding, and it is a decision for the owner
+> ([`22e`](./22e-link-placement-audit.md) §5):** the three placements rated
+> highest on "the reader is asking right now" — the **Exercise feedback**, **Effort
+> target** and **Load step** sheets — fail only the unguarded-form test. The fix
+> is small and already exists (`useNavigationGuard`, which the planner board
+> uses), but it is a **behavior change**, which §1.2 puts outside this doc's
+> scope. Recommended as its own PR at 7c.
+>
+> **N81 is ruled, specified, and deliberately unbuilt.** The backlog scheduled
+> the inline-underlined-term affordance into 7a precisely so all three members
+> were decided together, and they were (design pass §3: dotted underline,
+> distinguishable without colour since rule 7 reserves orange and a solid
+> underline is already in-prose navigation). It builds in its own wave because
+> its real cost is a **content** pass — [`22c`](./22c-app-inventory.md) §C2's ~22
+> undefined terms need glossary entries before anything can link to one, and
+> that is a copy pass under §8.1, not a placement pass.
 
 ### Phase 8 — Maintenance rules
 
@@ -1751,5 +1803,7 @@ carrying an authoring system nobody uses.
 - **Docs 16 / 17 / 19 / 21** are authoritative for progression, macro goals, explanations, and exercise-level RIR; chapters 8, 9, 10, 14, 17 report them.
 - **Doc 09** is authoritative for screen structure; chapters 4, 5, 13, 15 report it.
 - **Doc 05** is authoritative for the connector surface; the AI Manual reports it. When they disagree, doc 05 is right and the manual is a bug.
-- **N25** (archived) is the predecessor: `InfoDot` + glossary is the term-level layer; this manual is the mechanism-level layer above it. They share one glossary.
+- **N25** (archived) is the predecessor: `InfoDot` + glossary is the term-level layer; this manual is the mechanism-level layer above it. They share one glossary. Phase 7a made that relationship explicit as one grammar with three members ([`22e`](./22e-link-placement-audit.md) §1, 09-changelog 2026-08-15).
+- **N81** (the inline underlined term) is the third member; ruled at Phase 7a, built at Phase 7c.
+- **[`22e`](./22e-link-placement-audit.md)** is Phase 7a's deliverable and is binding on every placement: a new in-app link adds a row there and a row in `src/lib/guide-links.ts`, or it is a spray.
 - Workstream **M** ("In-app help & education") is this work's home in `docs/notes/`.

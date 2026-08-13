@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import {
   prescriptionMatchesDecision,
   type PrescriptionAudit,
@@ -74,9 +76,12 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
  */
 export function PrescriptionDetailSheet({
   target,
+  from,
   onClose,
 }: {
   target: PrescriptionDetailTarget | null;
+  /** the day view's own path, so the Guide's back link returns here (N27) */
+  from?: string;
   onClose: () => void;
 }) {
   const [audit, setAudit] = useState<PrescriptionAudit | null>(null);
@@ -281,6 +286,16 @@ export function PrescriptionDetailSheet({
               stamped on the next reconcile.
             </p>
           )}
+
+          {/* doc 22 Phase 7, audit §3 #1 — the panel is priced off the anchor
+              and never says what one is. Read-only surface, opened
+              deliberately (N75), so it clears E2/E4. */}
+          <GuideLink
+            rule
+            className="mt-4"
+            to={GUIDE_LINKS.strengthAnchor}
+            from={from}
+          />
         </div>
       )}
     </BottomSheet>

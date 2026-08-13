@@ -9,6 +9,8 @@ import {
 import { planMacroPlacement, type SlotMeso } from "@/lib/queries/macro";
 import { getMesoStats } from "@/lib/queries/stats";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import {
   BalanceView,
   PerformanceView,
@@ -397,13 +399,31 @@ export default async function MesoDetailPage({
         initial={view === "performance" ? 2 : view === "balance" ? 1 : 0}
         panels={[
           overviewPanel,
-          <BalanceView key="balance" balance={stats.balance} />,
-          <PerformanceView
-            key="performance"
-            stats={stats}
-            // N15: exercise rows drill into this meso's scoped history
-            historyScope={{ mesoIds: [meso.id], label: "THIS MESO" }}
-          />,
+          // doc 22 Phase 7, audit §3 #3/#4 — one link per tab, so the budget of
+          // one per screen *state* holds. Both tabs are read-only (E4), and the
+          // `?view=` origin returns the reader to the tab they left.
+          <div key="balance">
+            <BalanceView balance={stats.balance} />
+            <GuideLink
+              rule
+              className="mt-4"
+              to={GUIDE_LINKS.setsCounted}
+              from={`/cycles/meso/${meso.id}?view=balance`}
+            />
+          </div>,
+          <div key="performance">
+            <PerformanceView
+              stats={stats}
+              // N15: exercise rows drill into this meso's scoped history
+              historyScope={{ mesoIds: [meso.id], label: "THIS MESO" }}
+            />
+            <GuideLink
+              rule
+              className="mt-4"
+              to={GUIDE_LINKS.strengthTrend}
+              from={`/cycles/meso/${meso.id}?view=performance`}
+            />
+          </div>,
         ]}
       />
     </div>

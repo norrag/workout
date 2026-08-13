@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/queries/profiles";
 import { AutoMatchToggle } from "../AutoMatchToggle";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 
 /** Account & data (PH26): match-weight preference, export, delete — moved off the
  *  main More list into a dedicated sub-page. */
@@ -60,6 +62,15 @@ export default async function AccountPage() {
           DELETE ›
         </div>
       </Link>
+      {/* doc 22 Phase 7, audit §3 #8 — both rows above raise "what is in
+          there?", and the answer is a list rather than a definition. The one
+          placement whose value is highest *before* the reader acts, which is
+          also why the confirm page itself gets nothing. */}
+      <GuideLink
+        className="mt-3.5"
+        to={GUIDE_LINKS.dataStored}
+        from="/more/account"
+      />
     </div>
   );
 }

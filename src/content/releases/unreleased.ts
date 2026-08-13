@@ -62,6 +62,14 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     },
   },
   {
+    // doc 22 Phase 7 (N74) — deliverable C. Nine wave-1 placements plus the
+    // connector page's adoption of the primitive; audit in `docs/22e`.
+    id: "guide-links-in-the-app",
+    title: "The guide, where the question comes up",
+    body: "Screens that print a worked-out number now carry a quiet line to the section that explains it — under the prescription details, the volume check, the strength tabs, and a few others. The back link returns you to where you were reading.",
+    area: "app",
+  },
+  {
     // doc 22 Phase 5 (N74) — the connector's retrieval surface. `22d` §10
     // called this out in advance as a user-visible capability that owes an
     // entry: an AI that can read the guide answers differently.

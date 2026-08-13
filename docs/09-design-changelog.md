@@ -70,6 +70,107 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## Entries
 
+## 2026-08-15 — The definition grammar: three affordances, one system (doc 22 Phase 7a, N74 / N81)
+
+The design pass hard rule 8 owes before Phase 7 places a single link. Two
+questions arrived together and doc 22 Phase 7a says they are answered together
+rather than separately: **what shape is an in-app link into the Guide**, and
+**what is the third affordance N81 asked for** (an underlined term inside
+prose). Deciding them apart is how an app ends up with three ways to say
+"there is more about this" that look like each other.
+
+**The ruling: one grammar, three members, split by what the reader is asking.**
+
+| The reader's question | Affordance | Where it can go | What it opens |
+|---|---|---|---|
+| *"What does this word mean?"* | **`InfoDot`** — trailing circled `i` (N25) | beside a **label** | the glossary card, in place |
+| *"What does this word mean?"* — but the word is **inside a sentence** | **inline term** (N81, spec'd below, **not built here**) | inside prose | the same glossary card, in place |
+| *"Why is this number what it is?"* | **`GuideLink`** — tracked-caps text link, trailing `›` | under the **block** that printed the number | the Guide section that explains it — a navigation |
+
+The split that matters is the third row against the first two. The first two are
+**term-level** and resolve **in place**: you stay where you are, because you were
+mid-task. The third is **mechanism-level** and **navigates**, because the answer
+does not fit in a card and the reader who wants it has stopped to ask. That is
+also why they never substitute for each other: an `InfoDot` on `EST. STRENGTH`
+tells you what an estimate is, and no amount of it tells you why yesterday's
+weight went up.
+
+### 1. `GuideLink` — the manual-link affordance (`NET-NEW` primitive, `RETROFIT` at one site)
+
+- **Change.** A new shared primitive, `src/components/ui/GuideLink.tsx`:
+  tracked caps at `9.5px`, `font-semibold`, `tracking-[0.1em]`, `text-ink/55`,
+  trailing ` ›`, on its own line under the block it explains. No border, no
+  chevron box, no icon, no accent.
+- **It is not new drawing.** This is the app's existing quiet-forward-link
+  idiom — the `READ ›` / `SET UP ›` / `CSV ›` row-ends on More, and literally
+  the `How you stay in control ›` line Phase 6e improvised on
+  `/more/connector`. Phase 7 **names** it and that site adopts the primitive,
+  so there is one implementation rather than a pattern and a copy of it.
+- **The label is the destination's own title.** Not a hand-written invitation.
+  A link that reads `THE STRENGTH ANCHOR ›` promises exactly the heading the
+  reader lands on, and the promise is a **test**, not a habit
+  (`guide-links.test.ts` asserts label ≡ section title). This is the same
+  discipline §8.1 already applies to the glossary: one set of words, one source.
+- **Rationale for the weight.** It has to be findable by someone looking for it
+  and invisible to someone who is not — the day view had just been decluttered
+  the same week (N82). Tracked caps at `ink/55` is the lightest thing the design
+  system can say and still be read as a control; anything bordered would compete
+  with the ledger rules that structure every one of these screens.
+- **Placement rule (hard, and it is the reason the primitive can be quiet):**
+  a `GuideLink` sits **under a block, never inside a row**, and never in the set
+  grid. Per screen the cap is **one visible at a time**.
+- **Its separator is a prop, not a wrapper.** Where the link needs the ledger's
+  hairline above it, that rule is drawn *inside* the component (`rule`), because
+  the whole affordance is release-gated: a `border-t` wrapper at the call site
+  would paint a stray rule under the block for every user until 1.1.0 ships.
+  Chrome and gate have to vanish together.
+- **Affected figures** — none redrawn. Figs 1.1, 2.2, 2.3, 3.1a, 4.1–4.3, 4.4
+  gain one line each at the foot of an existing block; no figure's structure,
+  spacing rhythm or control set changes. **No new figure number is claimed.**
+- **Impact** — `NET-NEW` primitive + `TOKENS` (shared component); nine wave-1
+  sites listed in [`docs/22e-link-placement-audit.md`](22e-link-placement-audit.md).
+
+### 2. Where a `GuideLink` may **not** go (`NO-CODE`, but it is binding)
+
+Two exclusions, both earned rather than stylistic:
+
+- **Not on the day view's exercise card.** N82 removed one icon per card from
+  that surface days ago; adding a link back to it would spend the same budget on
+  the opposite of what the owner asked for. The day view reaches the Guide from
+  **inside sheets** — surfaces opened deliberately, by someone who has already
+  stopped.
+- **Not on an unguarded form.** A `GuideLink` navigates, and a navigation out of
+  a sheet holding unsaved slider values or unsaved text discards them. So the
+  affordance is allowed on a **read-only** surface, or on one whose dirty state
+  is already intercepted (`useNavigationGuard`, the planner board) — never on a
+  form that would silently lose input. This is what holds the Feedback, Effort
+  target, Workout Complete and Load step sheets out of wave 1 despite being
+  where the question is most often asked; the audit's §5 says what would unblock
+  them.
+
+### 3. N81's inline term — the design, ruled and specified, **not built in this pass**
+
+- **Change (specified, for its own build pass).** An underlined run inside
+  prose that opens the **same** glossary card `InfoDot` opens, from the **same**
+  `src/lib/glossary.ts` entry. Trigger styling:
+  `underline decoration-dotted decoration-from-font underline-offset-2`,
+  inheriting the surrounding type size and color, `aria-expanded` on a
+  `<button>` exactly as `InfoDot` does.
+- **Why dotted.** Hard rule 7 reserves orange for position and selection, so the
+  affordance cannot be colored, and a **solid** underline is already what the
+  app's in-prose navigation wears (the prescription strip's ask line, N75). A
+  **dotted** rule is the standard "definition, not destination" convention, it
+  is distinguishable without color, and it survives dark mode and high-contrast
+  because it borrows the text's own color.
+- **Why it is not built here.** It is a new interaction pattern whose real cost
+  is a **content** pass, not a component: `22c` §C2 counts ~22 rendered terms
+  with no definition anywhere, and several need a glossary entry written before
+  anything can link to one. Bundling that into the link-placement PR would put
+  an unreviewed copy pass inside a placement pass. It gets its own wave
+  (doc 22 Phase 7c), with the grammar above already settled so that wave is
+  execution rather than design.
+- **Impact** — `NO-CODE` in this pass; `NET-NEW` when N81's wave builds.
+
 ## 2026-08-14 — Day View: the focus pass (fig 1.1 / 1.2, N82, staged for 1.1.0)
 
 **Revised through owner review round 1, same day.** The first pass over-cut; §6

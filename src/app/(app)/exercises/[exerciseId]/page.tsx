@@ -12,6 +12,8 @@ import { toEngineEquipment, coerceLoadType } from "@/lib/engine";
 import { formatWeight } from "@/lib/units";
 import { ExerciseHistoryList } from "@/components/ExerciseHistoryList";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { InfoDot } from "@/components/ui/InfoDot";
 import type { GlossaryKey } from "@/lib/glossary";
 import { ExercisePinnedNote } from "./ExercisePinnedNote";
@@ -298,6 +300,15 @@ export default async function ExerciseDetailPage({
           <ExercisePinnedNote
             exerciseId={exercise.id}
             initial={pinned?.body ?? null}
+          />
+          {/* doc 22 Phase 7, audit §3 #7 — the `e1rm` InfoDot on ALL-TIME BESTS
+              stays (it is term-level); this answers the other question the tab
+              raises, which is what the record is made of */}
+          <GuideLink
+            rule
+            className="mt-5"
+            to={GUIDE_LINKS.exerciseRecord}
+            from={`/exercises/${exercise.id}`}
           />
           </div>,
           <div key="history" className="mt-5">

@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { releaseActive } from "@/lib/version";
 import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { CopyField } from "./CopyField";
-import { MANUAL_HOME, RULES_HREF } from "./manual-links";
+import { MANUAL_HOME } from "./manual-links";
 import { resolveConnectorOrigin } from "./endpoint";
 
 /**
@@ -23,9 +25,11 @@ import { resolveConnectorOrigin } from "./endpoint";
  * The manual row is gated with the manual's release; the endpoint and the
  * steps are not, so a connector user loses nothing before 1.1.0 ships.
  *
- * **The two manual destinations are literal strings** in `manual-links.ts`,
- * outside this file because a route module may only export what Next reserves.
- * The reason they are literals at all is doc 22 D3 guard 1 — see that module.
+ * **Manual destinations are literal strings** — the chapter row's in
+ * `manual-links.ts` (outside this file because a route module may only export
+ * what Next reserves), the section-level hand-off's in `src/lib/guide-links.ts`
+ * with the rest of doc 22 Phase 7's placements. The reason they are literals at
+ * all is doc 22 D3 guard 1 — see either module.
  */
 export default async function ConnectorPage() {
   const supabase = await createClient();
@@ -112,14 +116,14 @@ export default async function ConnectorPage() {
         a connection, remove the WORKOUT connector from the AI client, or revoke
         its authorization from your account&apos;s connected apps.
       </p>
-      {manualLive && (
-        <Link
-          href={`${RULES_HREF}?from=%2Fmore%2Fconnector`}
-          className="label-caps mt-3 inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
-        >
-          How you stay in control ›
-        </Link>
-      )}
+      {/* doc 22 Phase 7 — an adoption, not an addition. Phase 6e wrote this
+          line by hand before the primitive existed; it now shares the component
+          and the label contract, so its copy tracks the section title. */}
+      <GuideLink
+        className="mt-3"
+        to={GUIDE_LINKS.connectorControl}
+        from="/more/connector"
+      />
     </div>
   );
 }

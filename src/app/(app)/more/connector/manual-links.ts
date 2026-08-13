@@ -13,12 +13,13 @@
  * consumers, the same shape doc 23 §7.2 already uses.
  */
 
-/** Chapter 18's contents page. */
+/**
+ * Chapter 18's contents page — the bordered promoted row near the top.
+ *
+ * A *chapter* target, which is why it stays here rather than moving into
+ * `src/lib/guide-links.ts`: that table is the section-level affordance
+ * (doc 22 Phase 7). The `ACCESS & REVOCATION` hand-off, which *was* a pair of
+ * constants here, is now `GUIDE_LINKS.connectorControl` — Phase 6e improvised
+ * the line before the primitive existed.
+ */
 export const MANUAL_HOME = "/more/guide/connecting-an-ai";
-
-/** The section the `ACCESS & REVOCATION` block hands off to. */
-export const RULES_SECTION = "ug/connecting-an-ai#staying-in-control";
-
-/** That section's route — `sectionRoute(RULES_SECTION)`. */
-export const RULES_HREF =
-  "/more/guide/connecting-an-ai/staying-in-control";
