@@ -567,6 +567,8 @@ export function DayView({
               })()
             : null
         }
+        // N27: the sheet's Guide link returns the reader to this workout
+        from={`/log/${workout.id}`}
         onClose={() => setAuditFor(null)}
       />
       <FeedbackSheet

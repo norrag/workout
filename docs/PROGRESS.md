@@ -2,7 +2,121 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-15 (latest) — doc 22 owner review round 6: effort over caution (N74)
+## 2026-08-15 (latest, session 2) — doc 22 Phase 7a + 7b: the Guide reaches into the app (N74 / N81)
+
+Deliverable **C** — *"place links to [the manual] at the points in the app where
+they help most"* — audited first, then built. The audit is
+[22e-link-placement-audit.md](22e-link-placement-audit.md) and it is the
+document to read; this is what it decided and what shipped.
+
+### One grammar, three members, and that is the whole ruling
+
+Phase 7a owed two answers that arrived together — what shape an in-app Guide
+link takes, and what **N81**'s inline underlined term is — and the backlog
+scheduled them into the same pass for a reason: decide them apart and the app
+ends up with three ways to say *"there is more about this"* that look like each
+other. Design pass: **09-changelog 2026-08-15**.
+
+The split is not by appearance, it is by **what the reader is asking**:
+
+- *"What does this word mean?"* → **term-level**, resolves **in place**, because
+  the reader is mid-task. `InfoDot` (beside a label) and N81's inline term
+  (inside a sentence) are the same answer at two grains, from one glossary.
+- *"Why is this number what it is?"* → **mechanism-level**, and it **navigates**,
+  because the answer does not fit in a card and whoever wants it has stopped to
+  ask.
+
+They never substitute. An `InfoDot` on `EST. STRENGTH` says what an estimate is;
+no amount of it says why yesterday's weight went up.
+
+### The primitive is not new drawing
+
+`GuideLink` (`src/components/ui/GuideLink.tsx`) is the app's existing quiet
+forward-link idiom — `READ ›`, `SET UP ›`, `CSV ›` — at the foot of a block:
+tracked caps, `9.5px`, `ink/55`, trailing `›`, no border and no accent. It is
+literally the line Phase 6e improvised on `/more/connector`, which **adopts the
+component** in this PR rather than remaining a second copy of it. **No figure is
+redrawn and no new figure number is claimed** (hard rule 8): nine figures gain
+one line at the foot of an existing block, and nothing else moves.
+
+Two contracts hold it honest, both tested rather than remembered:
+
+- **The label is the destination section's own title.** Not a hand-written
+  invitation. `guide-links.test.ts` asserts label ≡ title, so a *retitled*
+  section now fails CI the way a renamed one already did — the §8.1
+  single-source discipline, applied to links.
+- **One release gate, inside the primitive.** Guide routes 404 before 1.1.0
+  (doc 23 §9.2), so an ungated link hands out addresses the reader cannot open.
+  Putting the gate in `GuideLink` rather than at nine call sites makes
+  forgetting it structurally impossible; a test asserts no call site carries its
+  own copy, and another that no call site hand-writes an href.
+
+Links carry a section **ID string**, never an imported module — doc 22 D3
+guard 1, and these call sites (day view, planner board, stats screens) are
+exactly the bundles that guard exists for. `src/lib/guide-links.ts` holds
+literals; the test does the resolving.
+
+### The exclusions are the substance
+
+Nine placements shipped. Fourteen candidates were declined, each with the earn
+test it failed (22e §2, §4) — and the two rules that did the most work are worth
+restating here:
+
+- **Nothing on the day view's exercise card or set grid.** N82 removed an icon
+  per card days earlier at the owner's direction; adding a link back to that
+  surface would spend the same budget on the opposite of what was asked. The day
+  view reaches the Guide only from **inside a sheet** — opened deliberately, by
+  someone who has already stopped.
+- **Nothing on an unguarded form.** A `GuideLink` navigates, and navigating out
+  of a sheet holding unsaved sliders or unsaved text discards them. Allowed on a
+  read-only surface, or on one whose dirty state is already intercepted
+  (`useNavigationGuard` — which is why the planner board qualifies).
+
+Wave 1: the **Prescription details** sheet → the strength anchor · the planner
+board's **weekly-sets** preview → the volume band · the meso page's **BALANCE**
+and **PERFORMANCE** tabs · the macro page's **OVERVIEW** stats and
+**PERFORMANCE** tab · the exercise page's **OVERVIEW** · **Account & data** ·
+**Plan a meso**. Plus `/more/connector`'s adoption. One per screen *state*, tabs
+counted separately.
+
+### The audit's own finding, and it is the owner's call
+
+The three placements rated highest on *the reader is asking right now* — the
+**Exercise feedback**, **Effort target** and **Load step** sheets — fail only
+the unguarded-form test. The fix is small and already exists (`useNavigationGuard`
+does this on the planner board today), but it is a **behavior change**, which
+doc 22 §1.2 puts outside the manual's scope. Recommended as its own PR at Phase
+7c; 22e §5 has the three options and why the cheap one (open in a new tab) is
+the wrong one.
+
+### N81 is ruled and specified, deliberately not built
+
+The inline term's design is settled — dotted underline, inheriting type size and
+colour, opening the same glossary card from the same entry; dotted because hard
+rule 7 reserves orange and a **solid** underline is already what in-prose
+navigation wears (the prescription strip's ask line, N75). It builds in its own
+wave because its real cost is a **content** pass, not a component: `22c` §C2
+counts ~22 rendered terms with no definition anywhere, and each needs a glossary
+entry written under §8.1 before anything can link to one. Bundling that into a
+placement PR would have put an unreviewed copy pass inside it.
+
+### Deviations recorded (hard rule 8)
+
+- **No mockup figure covers a manual link**, because the manual postdates the
+  mockup round. Composed from shipped patterns and written down in the changelog
+  before being transcribed — the same deviation the Phase-1 and connector-page
+  builds already recorded.
+- **Not verified on device.** The markup is character-for-character the
+  connector page's existing line, which is the strongest evidence available
+  without a backend; `npm run build`, `lint`, `typecheck` and all 1978 tests pass.
+
+### Housekeeping
+
+`RULES_SECTION` / `RULES_HREF` left `more/connector/manual-links.ts` — one table,
+not two — and its test narrowed to the chapter row it still owns. `unreleased.ts`
+gains `guide-links-in-the-app`. CLAUDE.md's doc index gains `22e`.
+
+## 2026-08-15 — doc 22 owner review round 6: effort over caution (N74)
 
 Notes across the Phase-3d and Phase-3f chapters, folded in and generalized as
 **doc 22 §8.4e** (six rules, binding on every later chapter). Two of them are

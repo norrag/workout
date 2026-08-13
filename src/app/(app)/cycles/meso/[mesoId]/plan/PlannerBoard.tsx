@@ -7,6 +7,8 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { InfoDot } from "@/components/ui/InfoDot";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { RirScheduleEditor, rirSummary } from "../RirScheduleEditor";
 import { useToast } from "@/components/ui/Toast";
 import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
@@ -298,6 +300,8 @@ export function PlannerBoard({
   const commit: Commit = (fn) => startTransition(fn);
 
   const detailHref = `/cycles/meso/${meso.id}`;
+  /** N27 origin for the volume block's Guide link (doc 22 Phase 7) */
+  const planHref = `${detailHref}/plan`;
   // R16: while edits are staged, any navigation (BottomNav tap, header link,
   // browser back, tab close) must confirm before the working copy is dropped
   useNavigationGuard(editing && dirty, (href) => setLeaveTo(href ?? detailHref));
@@ -1122,6 +1126,16 @@ export function PlannerBoard({
               );
             })}
           </div>
+          {/* doc 22 Phase 7, audit §3 #2 — the two InfoDots above define
+              *volume landmarks* and *fractional sets*; neither says how the
+              band was chosen for this lifter. E4 clears on the second clause:
+              the board's dirty state is already intercepted, so a tap here
+              asks before it discards a draft. */}
+          <GuideLink
+            className="mt-2.5"
+            to={GUIDE_LINKS.volumeBand}
+            from={planHref}
+          />
         </div>
       )}
 

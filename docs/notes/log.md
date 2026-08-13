@@ -4,6 +4,66 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-15 — Session 121: the Guide reaches into the app (N74 Phase 7a+7b, N81 ruled)
+
+> **On the date:** doc-side, like sessions 114–118. Session 119's note on the
+> two clocks still applies and is left as found.
+
+**Task: doc 22 Phase 7 — deliverable C**, the link-placement pass the owner
+asked for on 2026-08-05 and the plan deliberately sequenced last so placements
+could be chosen against real sections.
+
+**What the pass actually had to decide.** Phase 7a owed a grammar ruling, and
+**N81** — the owner's inline-underlined-term proposal from review round 4 — had
+been scheduled into the same phase on the argument that three affordances
+decided separately become three ways to say *"there is more about this"* that
+look like each other. That argument held. The ruling is **one grammar, three
+members, split by what the reader is asking**: *"what does this word mean"* is
+**term-level** and resolves **in place**, because the reader is mid-task
+(`InfoDot` beside a label, N81's term inside a sentence — one glossary, two
+grains); *"why is this number what it is"* is **mechanism-level** and
+**navigates**, because the answer does not fit in a card and whoever wants it
+has stopped to ask. Design pass: 09-changelog **2026-08-15**.
+
+**The audit is the deliverable, not the code.**
+[`docs/22e-link-placement-audit.md`](../22e-link-placement-audit.md): five earn
+tests, every user-reachable surface swept, **nine placements built and fourteen
+declined with the test each failed**. The two exclusions that did the most work
+are the ones worth carrying forward — **nothing on the day view's card or set
+grid**, because N82 had just removed an icon per card at the owner's direction
+and this must not spend that back; and **nothing on an unguarded form**, because
+a link navigates and navigating out of a sheet holding unsaved sliders discards
+them.
+
+**That second rule cost the audit its three best placements, and the finding
+goes back to the owner rather than being quietly absorbed.** The Feedback,
+Effort target and Load step sheets rate highest on *the reader is asking right
+now* and fail **only** the unguarded-form test. The fix already exists —
+`useNavigationGuard` does exactly this on the planner board — but it is a
+**behavior change**, which doc 22 §1.2 puts outside the manual's scope.
+Recommended as its own PR at 7c (`22e` §5, with the cheap alternative and why it
+is wrong).
+
+**Two contracts, tested rather than remembered.** A link's **label is the
+destination section's own title**, so a *retitled* section now fails CI the way a
+renamed one already did — the §8.1 single-source discipline applied to links.
+And the **release gate lives inside the primitive**, once, because guide routes
+404 before 1.1.0 and nine call sites can each forget a gate.
+
+**No new drawing.** `GuideLink` is the app's existing `READ ›` / `SET UP ›` /
+`CSV ›` idiom — literally the line Phase 6e improvised on `/more/connector`,
+which now **adopts** the component instead of remaining a second copy. No figure
+redrawn, no new figure number claimed.
+
+**N81 is ruled and specified but deliberately unbuilt**, and the reason is worth
+recording: the component is small and the **content** is not. `22c` §C2 counts
+~22 rendered terms with no definition anywhere; each needs a glossary entry
+written under §8.1 before anything can link to one. Putting that copy pass
+inside a placement PR would have hidden it. Its row moves to **Phase 7c** with
+the design settled, so that wave is execution.
+
+**Rows touched:** `N74` (Phase 7a+7b done), `N81` (design ruled → Phase 7c).
+
 ## 2026-08-10 — Session 119: the v26 drift pass (N70 activation → N74 prose)
 
 > **On the date:** this entry sits above entries dated 2026-08-11 → 15 because it

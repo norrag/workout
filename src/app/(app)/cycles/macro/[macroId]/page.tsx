@@ -15,6 +15,8 @@ import { BRACKET_TOLERANCE_DAYS } from "@/lib/queries/bodyweight";
 import { dateAtLocalNoon, localDayIso, shortDate } from "@/lib/dates";
 import { formatMeasuredLb } from "@/lib/units";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 import { InfoDot } from "@/components/ui/InfoDot";
 import type { GlossaryKey } from "@/lib/glossary";
 import { BalanceView } from "@/components/stats/MesoStatsViews";
@@ -401,6 +403,19 @@ export default async function MacroOverviewPage({
           Per-meso detail on each meso&apos;s{" "}
           <strong className="text-ink">BALANCE · PERFORMANCE</strong> tabs.
         </div>
+        {/* doc 22 Phase 7, audit §3 #5 — the band this arc is graded against
+            is not printed on any screen (N54 / `22a` D-15), so the section is
+            where a reader learns what the grading is even about. Sits under the
+            stats block rather than at the foot of the tab, so it reads as an
+            answer to these numbers. */}
+        {/* -mt-3 eats half the paragraph's mb-6 so the link reads as attached
+            to it; the following block carries its own top margin, so the gated
+            state above 1.1.0 and below it are spaced the same */}
+        <GuideLink
+          className="-mt-3"
+          to={GUIDE_LINKS.macroTarget}
+          from={`/cycles/macro/${macro.id}`}
+        />
       </div>
 
       {/* 5b (doc 15 §3.2; 09 2026-07-11 5b §3): the composition trend —
@@ -491,6 +506,15 @@ export default async function MacroOverviewPage({
                 mesoIds: mesos.map((m) => m.id),
                 label: "THIS MACROCYCLE",
               }}
+            />
+            {/* doc 22 Phase 7, audit §3 #6 — macro scope is where a cut block
+                sits next to a bulk block, so comparability is the question this
+                screen actually invites */}
+            <GuideLink
+              rule
+              className="mt-4"
+              to={GUIDE_LINKS.comparability}
+              from={`/cycles/macro/${macro.id}?view=performance`}
             />
           </div>,
         ]}

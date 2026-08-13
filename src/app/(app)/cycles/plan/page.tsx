@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDraftMeso } from "@/lib/queries/cycles";
 import { discardDraftAction, startScratchDraftAction } from "../actions";
+import { GuideLink } from "@/components/ui/GuideLink";
+import { GUIDE_LINKS } from "@/lib/guide-links";
 
 /** Plan-a-meso entry (fig 2.4). Every path opens the planner as a draft. */
 export default async function PlanMesoPage() {
@@ -128,6 +130,13 @@ export default async function PlanMesoPage() {
           );
         })}
       </div>
+      {/* doc 22 Phase 7, audit §3 #9 — the three live paths seed loads
+          differently, and this screen exists to be deliberated over (E2) */}
+      <GuideLink
+        className="mt-4"
+        to={GUIDE_LINKS.blockOrigins}
+        from="/cycles/plan"
+      />
     </div>
   );
 }
