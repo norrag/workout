@@ -66,6 +66,18 @@ placement pass. It is now the only unbuilt part of Phase 7.
 - **Index sync:** N74's row carries 7c (PR #245); N81's status reworded to
   name it as the one Phase 7 wave still unbuilt and what it is gated on.
 
+**CI, and it is worth writing down.** Fixing the lock file turned out to lift a
+rock. All three jobs had been dying at `npm ci` (`@emnapi/*` drift from a
+floating transitive), which means **the e2e suite had not run at all** for
+however long that has been true — `main` has been reporting red without anyone
+seeing what was underneath it. Resynced, and two things came out: a strict-mode
+violation in `bodyweight-quick-entry` that has stood since #214 (`/BODYWEIGHT/`
+matches the ledger row *and* the equipment chip), fixed here; and an
+intermittent navigation timeout on the BodySpec scan-detail route, which is not
+this PR's — those routes are untouched and the links this PR adds render
+nothing before 1.1.0. Tracked as **N84** rather than absorbed, because proving
+it needs the local stack this session cannot run (no Docker daemon).
+
 ## 2026-08-15 — Session 121: the Guide reaches into the app (N74 Phase 7a+7b, N81 ruled)
 
 > **On the date:** doc-side, like sessions 114–118. Session 119's note on the
