@@ -73,7 +73,7 @@ describe("GUIDE_SECTION_IDS", () => {
     for (const id of GUIDE_SECTION_IDS) expect(live.has(id), id).toBe(true);
   });
 
-  it("covers every section both manuals publish (doc 22 Phase 6)", () => {
+  it("covers every section the Guide publishes", () => {
     // The list was complete in practice from Phase 3 onward and nothing said
     // so. Asserting it means a new section is a linkable target the moment it
     // exists, rather than the moment someone remembers this file — the same

@@ -17,14 +17,8 @@ import { ManualChapterNav } from "./ManualBlocks";
  * The two browse screens — the map (fig 4.8) and a chapter's contents (fig 4.9)
  * — as components rather than as route files (09-changelog 2026-08-13 §1).
  *
- * Phase 6 mounts both manuals' readers, and D4 says they are one system with
- * two surfaces. The section screen was already parameterized on `ManualId`
- * (`ManualSectionHeader`, `ManualBlocks`); these two were not, only because
- * Phase 1 had one manual to render. Lifting them here is what keeps the AI
- * Manual from becoming a copy of the guide that drifts a row at a time.
- *
- * Everything that varies between the manuals is *data* the screens already
- * read: the label, the title, and the screen each one hangs off.
+ * The screens stay parameterized on `ManualId` so the content model, renderer,
+ * and retrieval surface keep one shared vocabulary.
  */
 
 function ChapterRow({
@@ -65,8 +59,7 @@ function ChapterRow({
  *
  * Search is what keeps the second tap from mattering: it is the 1-tap path for
  * a reader who knows what they want, and this list is for one who does not. It
- * carries `?from=` so the search screen can send the reader back to whichever
- * manual they left (09-changelog 2026-08-13 §2).
+ * carries `?from=` so the search screen returns the reader to the Guide map.
  */
 export function ManualMap({ manual }: { manual: ManualId }) {
   const chapters = chaptersFor(manual);
@@ -99,7 +92,7 @@ export function ManualMap({ manual }: { manual: ManualId }) {
         href={searchHref}
         className="mt-5 flex items-center justify-between border-[1.5px] border-ink px-4 py-3.5"
       >
-        <span className="text-sm font-semibold">Search the manuals</span>
+        <span className="text-sm font-semibold">Search the guide</span>
         <span className="label-caps text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
           Search ›
         </span>

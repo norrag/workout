@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveSection, sectionRoute, MANUAL_ROOT } from "@/content/manual";
+import { chapterRoute, resolveSection, sectionRoute } from "@/content/manual";
 import { MANUAL_HOME, RULES_HREF, RULES_SECTION } from "../manual-links";
 
 /**
- * doc 22 Phase 6e — the connector page's two links into the AI Manual.
+ * The connector page's two links into the Guide's AI chapter.
  *
  * The page holds them as **literal strings**, because it sits outside doc 22
  * D3's import allowlist and pulling the registry in for a route would put the
@@ -12,8 +12,8 @@ import { MANUAL_HOME, RULES_HREF, RULES_SECTION } from "../manual-links";
  * does the resolving, so a renamed section fails CI rather than a reader's tap.
  */
 describe("the connector page's manual links", () => {
-  it("points at the AI Manual's own root", () => {
-    expect(MANUAL_HOME).toBe(MANUAL_ROOT.ai);
+  it("points at chapter 18 in the main Guide", () => {
+    expect(MANUAL_HOME).toBe(chapterRoute("ug", "connecting-an-ai"));
   });
 
   it("names a section that exists", () => {

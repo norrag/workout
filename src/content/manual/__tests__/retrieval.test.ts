@@ -55,12 +55,8 @@ describe("workout://user-guide-index — the map", () => {
     }
   });
 
-  it("carries both manuals, in reading order, and no empty branch", () => {
-    // Phase 6 landed the AI Manual, so the map now has two branches. The
-    // property under test is unchanged and still the one that matters: a
-    // manual appears when it has chapters, so a client is never pointed at a
-    // surface it would then find empty.
-    expect(index.manuals.map((m) => m.manual)).toEqual(["ug", "ai"]);
+  it("carries the Guide and no empty branch", () => {
+    expect(index.manuals.map((m) => m.manual)).toEqual(["ug"]);
     for (const manual of index.manuals) {
       expect(manual.chapters.length, manual.manual).toBeGreaterThan(0);
     }
@@ -168,7 +164,7 @@ describe("get_manual_section — the read step", () => {
       const payload = sectionPayload(entry.id);
       expect(payload, entry.id).not.toBeNull();
       expect(payload!.markdown.length, entry.id).toBeGreaterThan(80);
-      expect(payload!.app_route, entry.id).toMatch(/^\/more\/(guide|connector)\//);
+      expect(payload!.app_route, entry.id).toMatch(/^\/more\/guide\//);
     }
   });
 });

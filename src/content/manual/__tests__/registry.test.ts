@@ -21,12 +21,9 @@ import { blockRuns, everySection, flatten, REPO_ROOT } from "./helpers";
 import type { ManualId } from "../types";
 
 /**
- * Both manuals, everywhere the property is per-manual. Phase 6 landed the AI
- * Manual, and every assertion below that once read `"ug"` was a property of
- * *a* manual rather than of the guide — a suite that keeps testing only the
- * first one is how the second acquires a reading order that skips a chapter.
+ * Every registered manual. The AI material is now chapter 18 of the Guide.
  */
-const MANUALS: readonly ManualId[] = ["ug", "ai"];
+const MANUALS: readonly ManualId[] = ["ug"];
 
 // ---------------------------------------------------------------------------
 
@@ -55,20 +52,18 @@ describe("section IDs (doc 22 §9.4.2)", () => {
     }
   });
 
-  it("maps each manual to its own reader root (doc 22 D1)", () => {
+  it("maps Guide sections to the Guide reader", () => {
     expect(sectionRoute("ug/effort-rir#per-exercise")).toBe(
       "/more/guide/effort-rir/per-exercise",
     );
-    expect(sectionRoute("ai/setup#connecting")).toBe(
-      "/more/connector/guide/setup/connecting",
-    );
+    expect(sectionRoute("ai/setup#connecting")).toBeNull();
     expect(sectionRoute("nope")).toBeNull();
   });
 });
 
 describe("the registry", () => {
   it("has unique chapter slugs and numbers per manual", () => {
-    for (const manual of ["ug", "ai"] as const) {
+    for (const manual of MANUALS) {
       const chapters = chaptersFor(manual);
       expect(new Set(chapters.map((c) => c.slug)).size).toBe(chapters.length);
       expect(new Set(chapters.map((c) => c.number)).size).toBe(chapters.length);
@@ -155,7 +150,7 @@ describe.each(MANUALS)("reading order and adjacency — %s", (manual) => {
     }
   });
 
-  it("never runs one manual into the other (D4 — separate reads)", () => {
+  it("stays within the Guide", () => {
     for (const id of readingOrder(manual)) {
       const { prev, next } = adjacentSections(id);
       expect(prev?.chapter.manual ?? manual).toBe(manual);

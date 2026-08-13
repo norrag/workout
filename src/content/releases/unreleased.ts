@@ -37,17 +37,15 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     },
   },
   {
-    // doc 22 Phase 6 (N74) — the AI Manual, and the connector page becoming its
-    // front door. Its own entry rather than a line in `user-guide`: a reader who
-    // has never opened the connector settings has no use for it, and a reader
-    // who has is the whole audience.
+    // The former AI Manual is now a single Guide chapter, with setup kept on
+    // the connector page where the reader needs it.
     id: "ai-manual",
-    title: "A manual for the AI connector",
-    body: "More → AI connector carries its own manual: how to connect a client, what it is allowed to do, and worked examples of planning a macrocycle, drafting a block, and checking whether a lift is really moving.",
+    title: "A complete guide to training with AI",
+    body: "The Guide now shows how a connected Claude or ChatGPT can understand your full training history, analyze progress, build plans in the app, and turn coaching decisions into changes you control.",
     area: "connector",
     link: {
-      label: "Open the AI manual",
-      target: { kind: "app", href: "/more/connector/guide" },
+      label: "Explore the AI guide",
+      target: { kind: "guide", section: "ug/connecting-an-ai#what-it-opens-up" },
     },
   },
   {

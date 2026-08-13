@@ -11,7 +11,7 @@
 //   └┬┘ └───┬───┘ └────┬─────┘
 //    │      │          └─ section slug, unique within its chapter
 //    │      └─ chapter slug, unique within its manual
-//    └─ which manual (doc 22 D4: two surfaces, one system)
+//    └─ the built-in User Guide
 
 import type { ManualId } from "./types";
 
@@ -24,7 +24,7 @@ export interface ParsedSectionId {
 }
 
 export function isManualId(value: string): value is ManualId {
-  return value === "ug" || value === "ai";
+  return value === "ug";
 }
 
 export function isSlug(value: string): boolean {
@@ -59,13 +59,10 @@ export function parseSectionId(id: string): ParsedSectionId | null {
 }
 
 /**
- * Where each manual's reader lives (doc 22 D1). The AI Manual hangs off the
- * connector page it documents, so a reader who went looking for the connector
- * finds its manual without leaving the settings branch.
+ * Where the Guide reader lives.
  */
 export const MANUAL_ROOT: Record<ManualId, string> = {
   ug: "/more/guide",
-  ai: "/more/connector/guide",
 };
 
 export function chapterRoute(manual: ManualId, chapter: string): string {
@@ -81,39 +78,29 @@ export function sectionRoute(id: string): string | null {
 /** Human-readable label for the manual itself — the meta line's first field. */
 export const MANUAL_LABEL: Record<ManualId, string> = {
   ug: "USER GUIDE",
-  ai: "AI MANUAL",
 };
 
 /** The lowercase logotype-style `h1` each manual's map screen carries. */
 export const MANUAL_TITLE: Record<ManualId, string> = {
   ug: "guide",
-  ai: "ai manual",
 };
 
 /** Sentence case, for a back link or a row that names the manual in prose. */
 export const MANUAL_NAME: Record<ManualId, string> = {
   ug: "Guide",
-  ai: "AI manual",
 };
 
 /**
- * The screen a manual hangs off, and therefore where its map's back link goes
- * (doc 22 D1). The User Guide is a More-tab child; the AI Manual hangs off the
- * connector page it documents, so a reader who went looking for the connector
- * finds its manual without leaving the settings branch.
+ * The screen the Guide hangs off, and therefore where its map's back link goes.
  */
 export const MANUAL_HOME: Record<
   ManualId,
   { readonly href: string; readonly label: string }
 > = {
   ug: { href: "/more", label: "More" },
-  ai: { href: "/more/connector", label: "AI connector" },
 };
 
 /**
- * One search screen, over both manuals (doc 22 §9.4.3). It lives on the User
- * Guide's branch because that is where the More tab's door is; the AI Manual's
- * map links to it with its own `?from=`, so the way back is the way in
- * (09-changelog 2026-08-13 §2).
+ * The Guide's search screen.
  */
 export const MANUAL_SEARCH_ROUTE = "/more/guide/search";

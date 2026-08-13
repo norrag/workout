@@ -1,8 +1,7 @@
 // The manual registry — doc 22 D2/D4.
 //
 // One artifact behind every consumer: the reader, the (Phase 2) search index
-// and anchor map, and the (Phase 5) connector retrieval surface. Both manuals
-// live in the same registry because they are one system with two surfaces (D4).
+// and anchor map, and the (Phase 5) connector retrieval surface.
 //
 // **Import discipline (doc 22 D3, guard 1).** Nothing outside
 // `src/content/manual/**`, `src/components/manual/**` and the guide routes may
@@ -11,18 +10,6 @@
 // Workout tab's first load. Phase 2 turns the rule into an import-guard test in
 // the WS-J style; until then it is this comment and code review.
 
-import { AI_ANALYSIS } from "./ai/analysis";
-import { AI_COACHING } from "./ai/coaching";
-import { AI_GETTING_GOOD_ANSWERS } from "./ai/getting-good-answers";
-import { AI_MACROCYCLES } from "./ai/macrocycles";
-import { AI_MESOCYCLES } from "./ai/mesocycles";
-import { AI_NOTES_AND_PREFERENCES } from "./ai/notes-and-preferences";
-import { AI_READING_ANSWERS } from "./ai/reading-answers";
-import { AI_SETUP } from "./ai/setup";
-import { AI_THE_RULES } from "./ai/the-rules";
-import { AI_WHAT_IT_CAN_DO } from "./ai/what-it-can-do";
-import { AI_WHAT_IT_IS } from "./ai/what-it-is";
-import { AI_WHEN_IT_GETS_IT_WRONG } from "./ai/when-it-gets-it-wrong";
 import { UG_BODY_DATA } from "./ug/body-data";
 import { UG_CHOOSING_YOUR_RAMP } from "./ug/choosing-your-ramp";
 import { UG_CONNECTING_AN_AI } from "./ug/connecting-an-ai";
@@ -87,11 +74,9 @@ export { FIGURE_ROOT } from "./types";
 /**
  * Every chapter, in reading order within each manual.
  *
- * Phase 1 shipped one: chapter 6, the exemplar. Phase 3 filled the User Guide
- * and Phase 6 fills the AI Manual, each appending here. Order in this array
- * does not matter — `chaptersFor` sorts on `number`, so a chapter written out
- * of sequence still reads in its place, and the two manuals are separate reads
- * (D4) however they are interleaved here.
+ * Order in this array does not matter — `chaptersFor` sorts on `number`, so a
+ * chapter written out of sequence still reads in its place. The former AI
+ * Manual was consolidated into User Guide chapter 18 in August 2026.
  */
 export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_WHAT_WORKOUT_IS, // 1
@@ -111,24 +96,10 @@ export const CHAPTERS: readonly ManualChapter[] = Object.freeze([
   UG_EXERCISES_AND_TEMPLATES, // 15
   UG_BODY_DATA, // 16
   UG_PRESCRIPTION_DETAILS, // 17
-  UG_CONNECTING_AN_AI, // 18
+  UG_CONNECTING_AN_AI, // 18 — Training with AI
   UG_YOUR_DATA, // 19
   UG_GLOSSARY, // 20
   UG_TROUBLESHOOTING, // 21
-
-  // AI Manual (doc 22 §7) — its own reading order, its own root (D4)
-  AI_WHAT_IT_IS, // 1
-  AI_SETUP, // 2
-  AI_THE_RULES, // 3
-  AI_WHAT_IT_CAN_DO, // 4
-  AI_MACROCYCLES, // 5
-  AI_MESOCYCLES, // 6
-  AI_ANALYSIS, // 7
-  AI_COACHING, // 8
-  AI_GETTING_GOOD_ANSWERS, // 9
-  AI_READING_ANSWERS, // 10
-  AI_NOTES_AND_PREFERENCES, // 11
-  AI_WHEN_IT_GETS_IT_WRONG, // 12
 ]);
 
 export function chaptersFor(manual: ManualId): readonly ManualChapter[] {
@@ -184,9 +155,7 @@ export function allSectionIds(): string[] {
  * cover to cover stays "next, next, next" and an adjacent section never costs a
  * trip up to the chapter page and back down (owner review round 2).
  *
- * Reading order is chapter number, then section order, within one manual: the
- * User Guide and the AI Manual are separate reads (D4), so neither ever runs
- * into the other.
+ * Reading order is chapter number, then section order, within the Guide.
  */
 export function readingOrder(manual: ManualId): string[] {
   return chaptersFor(manual).flatMap((chapter) =>

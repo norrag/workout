@@ -29,8 +29,7 @@
 // OWNER REVIEW ROUND 4 (2026-08-11) — three notes, generalized as doc 22 §8.4c:
 //   - §1 gained the **connector** as a planning route. The owner's point is that
 //     it is the best one, not a footnote, so it gets a heading and two
-//     paragraphs. It names the route and hands off; ch. 18 and the AI Manual
-//     own how to use it, and the typed cross-link is owed once they exist
+//     paragraphs. It names the route and hands off; ch. 18 owns how to use it
 //     (`create_mesocycle` lands `planned`; `activate_mesocycle` is
 //     confirm-gated and told to prefer in-app activation — `C-plan-01a`)
 //   - §4 now **renders `volume_landmarks`** instead of deferring MEV/MRV to

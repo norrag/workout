@@ -21,8 +21,7 @@ import {
  * just sent to" is exactly that. It is gone the moment the reader moves on,
  * because the next section carries no origin.
  *
- * Shared by both manuals (doc 22 D4), which is why the manual label and the
- * chapter route are read rather than written in.
+ * The manual label and chapter route come from the shared content model.
  */
 export function ManualSectionHeader({
   resolved,

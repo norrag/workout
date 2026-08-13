@@ -33,6 +33,34 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-08-13 — The AI Manual folds into the Guide (N74 owner amendment)
+
+The dedicated AI Manual proved to be a second information hierarchy for one
+part of the product. The owner reversed that choice: AI is now one substantial
+chapter in the main Guide, while connection remains a task on its setup page.
+
+### 1. `/more/connector` links to Guide chapter 18 (`RETROFIT`)
+
+- **Change** — retain the existing bordered manual-link pattern, but point it at
+  `/more/guide/connecting-an-ai`. The row reads **Explore training with AI**
+  with the supporting line **Analysis, planning, coaching, and control**.
+- **Rationale** — the setup screen should reveal the connector's breadth without
+  becoming the explanation itself.
+- **Affected figures** — fig 4.4's connector row and the unnumbered connector
+  detail composition recorded in the 2026-08-13 entry below.
+- **Impact** — `RETROFIT`; no new primitive or figure is introduced.
+
+### 2. The second reader becomes a redirect surface (`RETROFIT`)
+
+- **Change** — `/more/connector/guide/**` permanently redirects into the new
+  chapter, with topic-aware destinations for planning, analysis, coaching,
+  interpretation, and control. Former setup sections return to
+  `/more/connector`.
+- **Rationale** — preserves bookmarks while leaving one Guide map, one search,
+  and one reading order.
+- **Affected figures** — figs 4.8–4.11 return to a single Guide instance.
+- **Impact** — `RETROFIT`; the reader components remain unchanged.
+
 > **Build context as of 2026-06-13:** Phase 3 (logging flow) is **not yet implemented**
 > (see PROGRESS.md → "Not done yet"). Everything in the 2026-06-13 entry below therefore
 > lands as `NET-NEW` against the logging UI — there is no existing Day View code to retrofit.

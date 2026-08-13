@@ -1,5 +1,5 @@
 /**
- * doc 22 Phase 6e — where the connector page points into the AI Manual.
+ * The connector page points into the AI chapter of the main Guide.
  *
  * **Literal strings, deliberately**, for the reason `content/releases/links.ts`
  * holds literals: this page sits outside doc 22 D3's import allowlist, so
@@ -13,11 +13,12 @@
  * consumers, the same shape doc 23 §7.2 already uses.
  */
 
-/** The AI Manual's map — `MANUAL_ROOT.ai`. */
-export const MANUAL_HOME = "/more/connector/guide";
+/** Chapter 18's contents page. */
+export const MANUAL_HOME = "/more/guide/connecting-an-ai";
 
 /** The section the `ACCESS & REVOCATION` block hands off to. */
-export const RULES_SECTION = "ai/the-rules#it-acts-as-you";
+export const RULES_SECTION = "ug/connecting-an-ai#staying-in-control";
 
 /** That section's route — `sectionRoute(RULES_SECTION)`. */
-export const RULES_HREF = "/more/connector/guide/the-rules/it-acts-as-you";
+export const RULES_HREF =
+  "/more/guide/connecting-an-ai/staying-in-control";
