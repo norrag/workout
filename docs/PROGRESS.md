@@ -2,7 +2,7 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
-## 2026-08-13 — Release 1.1.0 production cut (N74 / N80 / N82)
+## 2026-08-13 — Release 1.1.0 production cut (N74 / N80 / N82, PR #247)
 
 The staged Guide block is frozen into `src/content/releases/1.1.0.ts` and added
 to the shipped registry. The package identity is 1.1.0, the next staged feature

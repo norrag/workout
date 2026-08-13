@@ -4,7 +4,7 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
-## 2026-08-13 — Release 1.1.0: the Guide block goes live (N74 / N80 / N82)
+## 2026-08-13 — Release 1.1.0: the Guide block goes live (N74 / N80 / N82, PR #247)
 
 The owner approved the staged notes and the rendered notification, then asked
 for the production cut. The release registry now contains a frozen `1.1.0`
