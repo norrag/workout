@@ -66,7 +66,7 @@ for the weight/estimate flip. Written down in `22e` §6.3 rather than quietly
 skipped — they are defined, reachable from the Guide, and waiting for a
 single-instance surface.
 
-- **Index sync:** N81 → `done (PR #TBD)`; N74's Phase 7 row closed out.
+- **Index sync:** N81 → `done (PR #246)`; N74's Phase 7 row closed out.
 
 ## 2026-08-15 — Session 122: the guard travels with the link (N74 Phase 7c)
 
