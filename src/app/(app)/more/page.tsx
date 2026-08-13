@@ -11,7 +11,6 @@ import { LogBodyweightRow } from "./LogBodyweightRow";
 import { formatHeight } from "@/lib/units";
 import { shortDate } from "@/lib/dates";
 import { displayVersion, releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /** More tab (fig 4.4): profile card + inline settings. */
 export default async function MorePage() {
@@ -95,7 +94,7 @@ export default async function MorePage() {
       {/* doc 22 O2 — the User Guide's entry point, first because finding it is
           the whole point of having one. Gated with the routes it opens (doc 23
           §9.2): one gate at the route boundary, one here at the door. */}
-      {releaseActive(UNRELEASED_VERSION) && (
+      {releaseActive("1.1.0") && (
         <Link
           href="/more/guide"
           className="flex items-center justify-between border-b border-ink/15 py-3.5"

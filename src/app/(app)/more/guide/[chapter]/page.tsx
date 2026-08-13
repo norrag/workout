@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { chaptersFor, resolveChapter } from "@/content/manual";
 import { ManualChapterContents } from "@/components/manual/ManualScreens";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * Guide — chapter contents (fig 4.9; 09-changelog 2026-08-07 §2, amended
@@ -17,7 +16,7 @@ import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 export function generateStaticParams() {
   // nothing to prerender while the release is dark — the gate below is what
   // makes it a 404, this just keeps the build from emitting them
-  if (!releaseActive(UNRELEASED_VERSION)) return [];
+  if (!releaseActive("1.1.0")) return [];
   return chaptersFor("ug").map((c) => ({ chapter: c.slug }));
 }
 
@@ -26,7 +25,7 @@ export default async function GuideChapterPage({
 }: {
   params: Promise<{ chapter: string }>;
 }) {
-  if (!releaseActive(UNRELEASED_VERSION)) notFound();
+  if (!releaseActive("1.1.0")) notFound();
   const { chapter: slug } = await params;
   const chapter = resolveChapter("ug", slug);
   if (!chapter) notFound();

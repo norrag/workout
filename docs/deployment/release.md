@@ -51,8 +51,16 @@ Nothing changes about how PRs are made, plus:
       `src/content/releases/unreleased.ts` (id unique forever, title ≤ 60,
       body ≤ 240, no hype, no jargon, positive framing — the tests enforce all
       of it).
-- [ ] If it must not appear before the release, gate it on
-      `releaseActive(UNRELEASED_VERSION)` and note the call sites in the PR body.
+- [ ] Keep the announcement hierarchy current as the block grows: mark only
+      the **1–3 most impactful entries** `highlight: true`, put them first, and
+      give each an onward link. Smaller and technical changes still belong in
+      the manifest; they appear in full under More → What's new rather than in
+      the release modal.
+- [ ] If it must not appear before the release, gate it on the **literal slated
+      version** (for example, `releaseActive("1.2.0")`) and note the call sites
+      in the PR body. Do not import the moving `UNRELEASED_VERSION` constant at
+      a feature call site: the release PR advances that constant to the next
+      block, which would otherwise re-hide the feature being released.
 - [ ] Update the `docs/notes/backlog.md` row and `docs/notes/log.md`, as
       CLAUDE.md already requires.
 
@@ -75,7 +83,9 @@ The only PR that touches version identity.
 4. [ ] **Edit pass over the accumulated entries** — they were written one PR at
        a time and have to read as one release. Check them against doc 23 §5.2:
        plain language, positive framing, no hype, honesty guardrails, glossary
-       identity, the length budget.
+       identity, the length budget. Re-rank the 1–3 modal highlights by user
+       impact, confirm each links to the feature it describes, and leave the
+       complete supporting notes for the What's New page.
 5. [ ] Confirm every `releaseActive("1.1.0")` call site is intended to flip:
        `rg 'releaseActive\("1\.1\.0"\)'`.
 6. [ ] Confirm **no ungated migration in the block changes existing behavior**.
@@ -122,10 +132,14 @@ step — no new workflow, no new job, no measurable minutes.
 ## Previewing a staged release
 
 `NEXT_PUBLIC_RELEASE_OVERRIDE=1.1.0` raises the effective version so a preview
-deploy renders the staged block. It is honored **only** when the environment is
-not production (`VERCEL_ENV`/`NEXT_PUBLIC_VERCEL_ENV`), so there is no auth
-surface and no way to reach it in production. Set it on Vercel's **Preview**
-environment only — see `manual-operations.md`.
+deploy renders the staged block, synthesizes it into the once-only release
+modal, and includes it on More → What's new. Dismissal records the previewed
+version, so set the test profile's `last_seen_version` back to the shipped
+version when another first-view review is needed. The override is honored
+**only** when the environment is not production
+(`VERCEL_ENV`/`NEXT_PUBLIC_VERCEL_ENV`), so there is no auth surface and no way
+to reach it in production. Set it on Vercel's **Preview** environment only —
+see `manual-operations.md`.
 
 ---
 

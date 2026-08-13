@@ -2,6 +2,27 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+## 2026-08-13 — Release 1.1.0 production cut (N74 / N80 / N82)
+
+The staged Guide block is frozen into `src/content/releases/1.1.0.ts` and added
+to the shipped registry. The package identity is 1.1.0, the next staged feature
+version is 1.2.0, and all 1.1.0 visibility gates are pinned to their release
+literal so advancing the manifest cannot turn released work off.
+
+The first notified feature release opens in the new centered What's New modal:
+three linked highlights, a clear new-version header, a restrained orange marker,
+and a link to the complete eight-entry history under More. The registry,
+presentation seam, link targets, suppression behavior, acknowledgement path,
+and end-to-end modal flow carry the release coverage. The release runbook now
+requires literal feature gates and a final editorial hierarchy pass.
+
+Verification: lint, typecheck, the 153-test focused release/Guide suite, and the
+full 137-file unit suite are green (2,032 passed, 1 skipped). The source-scan
+invariant now normalizes Windows separators and tolerates Box-backed I/O. A
+clean local production build is blocked outside the changed surface by Next's
+Windows/Box `readlink` call on the regular client-error route; Linux CI is the
+authoritative build check for the PR.
+
 ## 2026-08-15 (latest, session 4) — doc 22 Phase 7 closes: N81's inline term (N74 / N81)
 
 The last unbuilt part of Phase 7, and the affordance the owner asked for at

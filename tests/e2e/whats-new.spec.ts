@@ -2,13 +2,13 @@
  * What's New (doc 23 §10 e2e). Three assertions, because §6.4's rule is the one
  * piece of this framework that cannot be checked by a unit test alone:
  *
- *   1. a returning user with a pending release sees the sheet once, and it does
+ *   1. a returning user with a pending release sees the modal once, and it does
  *      not come back after dismissal;
  *   2. it is ABSENT on the Workout tab once a set has been logged — the tab
  *      renders the day view inline, so the suppression signal is the workout's
  *      status, not its route (T5);
  *   3. it APPEARS on another tab in that same state — the release valve that
- *      makes a stale `in_progress` session unable to block the sheet forever.
+ *      makes a stale `in_progress` session unable to block the modal forever.
  *
  * The fixture drives `profiles.last_seen_version` directly (a self-write the
  * RLS policy allows) to put the account behind the deployed version; the
@@ -35,7 +35,7 @@ const supabase = createClient(SUPABASE_URL, ANON_KEY, {
 let userId: string;
 let mesoId: string;
 
-/** The sheet's dismiss control — stable across whatever the current copy is. */
+/** The modal's dismiss control — stable across whatever the current copy is. */
 const dismissButton = (page: Page) =>
   page.getByRole("button", { name: "GOT IT" });
 
@@ -73,7 +73,7 @@ test.beforeAll(async () => {
       experience_level: "intermediate",
       bodyweight: 180,
       onboarded_at: new Date().toISOString(),
-      // caught up to start with: the fixture setup must not trip the sheet
+      // caught up to start with: the fixture setup must not trip the modal
       last_seen_version: "9.9.9",
     })
     .eq("id", userId);
@@ -141,7 +141,7 @@ test.beforeAll(async () => {
 test("shows once for a returning user and does not reappear after dismissal", async ({
   page,
 }) => {
-  // start the block first, still caught up, so the sheet can't interfere
+  // start the block first, still caught up, so the modal can't interfere
   await signIn(page);
   await page.goto(`/cycles/meso/${mesoId}`);
   await page.getByRole("button", { name: "START MESOCYCLE" }).click();
@@ -198,7 +198,7 @@ test("appears on another tab in that same mid-session state", async ({
   page,
 }) => {
   // same `in_progress` workout, same pending release, different surface: the
-  // sheet waits for the user to navigate off the Workout tab rather than being
+  // modal waits for the user to navigate off the Workout tab rather than being
   // blocked forever by a session left open
   await signIn(page);
   await expect(dismissButton(page)).toBeHidden();

@@ -15,11 +15,7 @@ export type ReleaseTarget =
   | { kind: "guide"; section: string }; // §7.2 — doc 22 §9.4 section IDs
 
 export type ReleaseArea =
-  | "training"
-  | "planning"
-  | "stats"
-  | "connector"
-  | "app";
+  "training" | "planning" | "stats" | "connector" | "app";
 
 export interface ReleaseEntry {
   /** stable, unique across all releases; never reused */
@@ -30,6 +26,11 @@ export interface ReleaseEntry {
   body: string;
   /** where "explore" goes; omit when there is nothing to open */
   link?: { label: string; target: ReleaseTarget };
+  /**
+   * One of the 1–3 headline changes shown in the once-only release modal.
+   * Every release entry remains visible in full under More → What's new.
+   */
+  highlight?: boolean;
   area?: ReleaseArea;
 }
 
@@ -52,5 +53,5 @@ export const CONTENT_LIMITS = {
   title: 60,
   body: 240,
   linkLabel: 32,
-  maxEntries: 6,
+  maxHighlights: 3,
 } as const;

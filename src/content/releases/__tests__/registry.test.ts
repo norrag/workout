@@ -9,9 +9,10 @@ import { isGuideSectionId, isLinkableRoute } from "../links";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
-const allEntries: { release: Release; entry: ReleaseEntry }[] = RELEASES.flatMap(
-  (release) => release.entries.map((entry) => ({ release, entry })),
-);
+const allEntries: { release: Release; entry: ReleaseEntry }[] =
+  RELEASES.flatMap((release) =>
+    release.entries.map((entry) => ({ release, entry })),
+  );
 
 // ---------------------------------------------------------------------------
 // §9.4 — three-way version identity
@@ -94,7 +95,9 @@ describe("registry invariants (§5.3)", () => {
         expect(r.headline, `${r.version} is a fix release`).toBeUndefined();
       } else {
         expect(r.headline, `${r.version} needs a headline`).toBeTruthy();
-        expect(r.entries.length, `${r.version} needs entries`).toBeGreaterThan(0);
+        expect(r.entries.length, `${r.version} needs entries`).toBeGreaterThan(
+          0,
+        );
       }
     }
   });
@@ -167,9 +170,10 @@ describe("content contracts (§5.2)", () => {
   it("says MCP only where the reader must find that word in their own client", () => {
     for (const { where, text, entry } of copy)
       if (/\bMCP\b/.test(text))
-        expect(entry?.area, `${where} may say MCP only under area "connector"`).toBe(
-          "connector",
-        );
+        expect(
+          entry?.area,
+          `${where} may say MCP only under area "connector"`,
+        ).toBe("connector");
   });
 
   it("keeps the honesty guardrails — no claimed precision the engine lacks (doc 10 §9)", () => {
@@ -180,9 +184,10 @@ describe("content contracts (§5.2)", () => {
     // an estimate is named as one wherever it appears
     for (const { where, text } of copy)
       if (/\b(1RM|one[- ]rep max)\b/i.test(text))
-        expect(/estimat/i.test(text), `${where} must say it is an estimate`).toBe(
-          true,
-        );
+        expect(
+          /estimat/i.test(text),
+          `${where} must say it is an estimate`,
+        ).toBe(true);
   });
 
   it("respects the length budget (§5.2.6)", () => {
@@ -191,10 +196,52 @@ describe("content contracts (§5.2)", () => {
         expect(r.headline.length, `${r.version} headline`).toBeLessThanOrEqual(
           CONTENT_LIMITS.headline,
         );
-      if (r.kind !== "fix")
-        expect(r.entries.length, `${r.version} entry count`).toBeLessThanOrEqual(
-          CONTENT_LIMITS.maxEntries,
-        );
+      const highlights = r.entries.filter((entry) => entry.highlight);
+      if (r.kind === "fix") {
+        expect(highlights, `${r.version} fix highlights`).toHaveLength(0);
+      } else if (r.version !== "1.0.0") {
+        expect(
+          highlights.length,
+          `${r.version} highlight count`,
+        ).toBeGreaterThan(0);
+        expect(
+          highlights.length,
+          `${r.version} highlight count`,
+        ).toBeLessThanOrEqual(CONTENT_LIMITS.maxHighlights);
+      }
+      for (const entry of highlights)
+        expect(
+          entry.link,
+          `${r.version} / ${entry.id} highlight needs a link`,
+        ).toBeDefined();
+      const firstSupporting = r.entries.findIndex((entry) => !entry.highlight);
+      if (firstSupporting >= 0)
+        expect(
+          r.entries.slice(firstSupporting).some((entry) => entry.highlight),
+          `${r.version} highlights must precede supporting notes`,
+        ).toBe(false);
+    }
+    if (UNRELEASED_ENTRIES.length > 0) {
+      const highlights = UNRELEASED_ENTRIES.filter((entry) => entry.highlight);
+      expect(highlights.length, "unreleased highlight count").toBeGreaterThan(
+        0,
+      );
+      expect(
+        highlights.length,
+        "unreleased highlight count",
+      ).toBeLessThanOrEqual(CONTENT_LIMITS.maxHighlights);
+      for (const entry of highlights)
+        expect(entry.link, `${entry.id} highlight needs a link`).toBeDefined();
+      const firstSupporting = UNRELEASED_ENTRIES.findIndex(
+        (entry) => !entry.highlight,
+      );
+      if (firstSupporting >= 0)
+        expect(
+          UNRELEASED_ENTRIES.slice(firstSupporting).some(
+            (entry) => entry.highlight,
+          ),
+          "unreleased highlights must precede supporting notes",
+        ).toBe(false);
     }
     for (const entry of [
       ...allEntries.map(({ entry }) => entry),
@@ -238,9 +285,10 @@ describe("deep-link targets (§7)", () => {
     ]) {
       const target = entry.link?.target;
       if (target?.kind === "app")
-        expect(isLinkableRoute(target.href), `${entry.id} → ${target.href}`).toBe(
-          true,
-        );
+        expect(
+          isLinkableRoute(target.href),
+          `${entry.id} → ${target.href}`,
+        ).toBe(true);
       if (target?.kind === "guide")
         // doc 22 Phase 2 has not landed, so there are no valid guide sections
         // yet — assert that rather than silently accept an unresolvable link

@@ -140,7 +140,7 @@ own rules, and they are the ones that keep it from becoming decoration.
 ### 4. The gate, and why it is in the primitive (`NO-CODE`)
 
 The mark is part of the staged manual release (doc 23 §9.2), so `InlineTerm`
-carries `releaseActive(UNRELEASED_VERSION)` exactly as `GuideLink` does — but
+carries `releaseActive("1.1.0")` exactly as `GuideLink` does — but
 closed it returns **the words, unmarked**, because a gate that dropped the run
 would delete a word from the middle of a sentence. `InfoDot` gains a `staged`
 prop for the same reason and returns nothing, which is correct for a trailing
@@ -1016,6 +1016,36 @@ of which are design changes rather than copy fixes.
 - **Impact.** `RETROFIT` — every `InfoDot` for these terms, and the manual.
 
 ## 2026-08-06 — Two new surfaces: the What's New sheet and the version history (figs 4.6 / 4.7, N80 / doc 23 Phase 0)
+
+> **Owner-review amendment — 2026-08-13 (fig 4.7).** This supersedes the
+> bottom-sheet treatment and the shared-full-list rule in §§1 and 3 below.
+> The first rendered 1.1.0 preview showed that a release notice is neither an
+> in-task editor nor a document: the sheet read like another workflow surface,
+> and carrying every note made the announcement's hierarchy disappear.
+>
+> Fig 4.7 is now a **centered floating modal**, derived from the anchored-menu
+> card: 35% ink scrim, a bordered cream card clear of every viewport edge, and
+> the house `shadow-menu` offset shadow. It fades/scales into place rather than
+> rising from the tab edge. It retains the shared overlay contract—scroll lock,
+> focus entry/trap/return, Escape, scrim dismissal and a ≥44px close target.
+>
+> Its header is stable rather than release-authored: an orange `■ NEW VERSION`
+> marker and top rule, **What's new in WORKOUT**, then the version/date and the
+> release headline. This is one accent concern: orange identifies the newly
+> current release, and appears nowhere in the entry list or actions. The body
+> renders only **1–3 entries marked `highlight`**, in release order. Every
+> highlight has an onward link. A `VIEW ALL RELEASE NOTES ›` row opens
+> `/more/whats-new`, whose release section remains the complete durable record;
+> `GOT IT` remains the explicit acknowledgment. When releases accumulate, their
+> highlights concatenate newest-first under the version span.
+>
+> Release-entry rendering remains shared, but **selection is now intentionally
+> different**: the modal filters the same typed entries to their highlights;
+> history renders all of them. The former six-entry ceiling existed to keep a
+> full-list sheet from becoming a document, so it is replaced by the tested
+> 1–3-highlight budget. Full notes may be longer when the release warrants it;
+> the modal's job is orientation, and history's job is completeness.
+
 
 Hard rule 8 has no figure to point at here — the June mockup round predates the
 idea of a release, so **there is no mockup for either surface**. This entry is

@@ -112,7 +112,6 @@ import {
 } from "@/lib/prescription-narrative";
 import { effortEyebrowSuffix } from "@/lib/slot-effort-display";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * N82 — the day-view focus pass, staged behind 1.1.0 (doc 23 §9.2: the release
@@ -120,7 +119,7 @@ import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
  * rearrangement; no action, no write path, and no engine input moves.
  */
 function focusPass(): boolean {
-  return releaseActive(UNRELEASED_VERSION);
+  return releaseActive("1.1.0");
 }
 
 /**

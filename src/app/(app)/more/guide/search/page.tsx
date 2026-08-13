@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { MANUAL_ROOT, resolveOrigin } from "@/content/manual";
 import { ManualSearch } from "@/components/manual/ManualSearch";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * Search — one field over the Guide (fig 4.11; 09-changelog 2026-08-08 §2).
@@ -23,7 +22,7 @@ export default async function GuideSearchPage({
 }: {
   searchParams: Promise<{ from?: string }>;
 }) {
-  if (!releaseActive(UNRELEASED_VERSION)) notFound();
+  if (!releaseActive("1.1.0")) notFound();
   const { from } = await searchParams;
   const origin = resolveOrigin(from);
 

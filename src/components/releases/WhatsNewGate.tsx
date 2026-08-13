@@ -1,13 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { CURRENT_VERSION, RELEASES } from "@/content/releases";
 import { versionGate } from "@/lib/version";
+import { releasePresentation } from "@/lib/version/presentation";
 import {
   getActiveWorkoutStatus,
   getLastSeenVersion,
 } from "@/lib/queries/releases";
 import { PrimeVersion } from "./PrimeVersion";
-import { WhatsNewSheet } from "./WhatsNewSheet";
+import { WhatsNewModal } from "./WhatsNewModal";
 
 /**
  * doc 23 §6.3 — the gate, resolved on the **server**.
@@ -36,12 +36,26 @@ export async function WhatsNewGate({
   // against, and the next navigation will find it
   if (!profile) return null;
 
-  const gate = versionGate(profile.lastSeenVersion, RELEASES, CURRENT_VERSION);
+  const presentation = releasePresentation();
+  const gate = versionGate(
+    profile.lastSeenVersion,
+    presentation.releases,
+    presentation.current,
+  );
   if (gate.kind === "none") return null;
   if (gate.kind === "prime") return <PrimeVersion />;
 
   const workoutStatus = await getActiveWorkoutStatus(supabase, userId);
+  // The complete release stays on the server/history page; the client modal
+  // receives only its curated highlights (usually three small entry objects).
+  const highlightedReleases = gate.releases.map((release) => ({
+    ...release,
+    entries: release.entries.filter((entry) => entry.highlight),
+  }));
   return (
-    <WhatsNewSheet releases={gate.releases} workoutStatus={workoutStatus} />
+    <WhatsNewModal
+      releases={highlightedReleases}
+      workoutStatus={workoutStatus}
+    />
   );
 }

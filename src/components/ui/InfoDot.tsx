@@ -3,7 +3,6 @@
 import { type GlossaryKey } from "@/lib/glossary";
 import { useGlossaryCard } from "@/components/ui/useGlossaryCard";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * N25: the app-wide "what does this mean" affordance — the circled-"i"
@@ -37,7 +36,7 @@ export function InfoDot({
   className?: string;
 }) {
   const { entry, open, toggle, triggerRef, card } = useGlossaryCard(term);
-  if (staged && !releaseActive(UNRELEASED_VERSION)) return null;
+  if (staged && !releaseActive("1.1.0")) return null;
 
   return (
     <>

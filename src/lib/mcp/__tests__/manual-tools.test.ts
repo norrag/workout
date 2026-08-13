@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { allSectionIds } from "@/content/manual";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 import { registerResources } from "../resources";
 import { registerTools } from "../tools";
 import {
@@ -148,25 +147,16 @@ describe("the release gate (doc 23 §9.2)", () => {
   });
 
   it("opens at 1.1.0 — the release PR is the switch, and this proves it", () => {
-    // Without this, the whole surface would only ever be asserted in its *off*
-    // state and the release would be the first thing to find out whether the
-    // gate opens. `NEXT_PUBLIC_RELEASE_OVERRIDE` is the same staging lever doc
-    // 23 §9.2 gives a reviewer, and it is inert in production by construction.
-    vi.stubEnv("NEXT_PUBLIC_RELEASE_OVERRIDE", UNRELEASED_VERSION);
-    try {
-      expect(manualRetrievalActive()).toBe(true);
-      const capture = captureServer();
-      registerTools(capture.server);
-      registerResources(capture.server);
-      for (const name of MANUAL_TOOL_NAMES) {
-        expect(capture.tools.has(name), name).toBe(true);
-      }
-      expect(capture.resources.get("user-guide-index")?.uri).toBe(
-        "workout://user-guide-index",
-      );
-    } finally {
-      vi.unstubAllEnvs();
+    expect(manualRetrievalActive()).toBe(true);
+    const capture = captureServer();
+    registerTools(capture.server);
+    registerResources(capture.server);
+    for (const name of MANUAL_TOOL_NAMES) {
+      expect(capture.tools.has(name), name).toBe(true);
     }
+    expect(capture.resources.get("user-guide-index")?.uri).toBe(
+      "workout://user-guide-index",
+    );
   });
 
   it("names both tools for the inventory", () => {

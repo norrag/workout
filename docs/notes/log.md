@@ -4,6 +4,37 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+## 2026-08-13 — Release 1.1.0: the Guide block goes live (N74 / N80 / N82)
+
+The owner approved the staged notes and the rendered notification, then asked
+for the production cut. The release registry now contains a frozen `1.1.0`
+feature release dated 2026-08-13: three linked modal highlights (the App Guide,
+training with AI, and the workout-screen focus pass) followed by five supporting
+notes on the full What's New page. `package.json` and the lock file move to
+1.1.0; `unreleased.ts` is empty and points at 1.2.0.
+
+The release pass also fixed a gate-lifecycle trap exposed by the cut. Feature
+call sites now retain the literal version they ship behind; the moving
+`UNRELEASED_VERSION` constant is reserved for the staged manifest and preview.
+That lets the release PR advance staging to 1.2.0 without re-hiding the 1.1.0
+Guide, connector tools, glossary affordances, or day-view changes. The runbook
+records the rule. N80's stale placeholder was reconciled to its merged framework
+PR, #230.
+
+The What's New work in the same release replaces the bottom tray with the
+owner-approved centered floating modal, gives the release an explicit title,
+uses one restrained orange marker, limits the interruption to the 1–3 headline
+items, and links the complete record to More → What's New. Preview presentation
+is now a tested seam and remains inert in production.
+
+**Release verification:** lint and typecheck are clean; all 137 unit files pass
+(2,032 passed, 1 skipped), including the 153-test focused release/Guide suite.
+The prescription-writer source scan was made path-separator-safe and given a
+15-second budget for Box-backed Windows I/O. A clean local `next build` reaches
+Webpack but the Windows/Box filesystem makes Next call `readlink` on the regular
+`src/app/api/client-error/route.ts` file and returns `EISDIR`; the untouched file
+has no link/reparse attributes. The Linux CI build remains the production gate.
+
 ## 2026-08-15 — Session 123: N81's inline term, and the six words it needed (N74 Phase 7, N81)
 
 > **On the date:** doc-side, like sessions 114–122.

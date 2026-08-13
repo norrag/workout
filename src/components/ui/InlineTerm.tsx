@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { type GlossaryKey } from "@/lib/glossary";
 import { useGlossaryCard } from "@/components/ui/useGlossaryCard";
 import { releaseActive } from "@/lib/version";
-import { UNRELEASED_VERSION } from "@/content/releases/unreleased";
 
 /**
  * N81 — the definition grammar's third member, and its second **term-level**
@@ -45,7 +44,7 @@ export function InlineTerm({
   children: ReactNode;
 }) {
   const { entry, open, toggle, triggerRef, card } = useGlossaryCard(term);
-  if (!releaseActive(UNRELEASED_VERSION)) return <>{children}</>;
+  if (!releaseActive("1.1.0")) return <>{children}</>;
 
   return (
     <>
