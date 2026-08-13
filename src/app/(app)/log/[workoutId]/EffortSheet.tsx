@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { GuardedGuideLink } from "@/components/ui/GuardedGuideLink";
+import { InfoDot } from "@/components/ui/InfoDot";
 import { GUIDE_LINKS } from "@/lib/guide-links";
 import { setSlotEffortAction } from "@/app/(app)/log/actions";
 import type { LoggedExercise } from "@/lib/queries/logging";
@@ -212,7 +213,14 @@ export function EffortSheet({
         it and the week&apos;s ramp takes over again with nothing to unwind.
       </p>
 
-      <div className={`mt-5 ${label}`}>TARGET RIR</div>
+      {/* N81 — the lever this sheet exists to set. `22c` §C2 had it as
+          "covered by an extended rir / new key"; it took its own key,
+          because the week's ramp and one exercise's override are two
+          different things to a reader looking at both on this screen. */}
+      <div className={`mt-5 flex items-center gap-1.5 ${label}`}>
+        TARGET RIR
+        <InfoDot term="exercise_target_rir" small staged />
+      </div>
       <div className="mt-2 flex border-[1.5px] border-ink">
         {rirOptions(weekRir).map((abs, i) => {
           const active = !custom && value === abs;

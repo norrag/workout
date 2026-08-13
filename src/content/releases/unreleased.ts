@@ -79,6 +79,15 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     area: "app",
   },
   {
+    // doc 22 Phase 7 / N81 — the inline term. Grouped with the six new
+    // glossary entries it exists to reach, because to a reader they are one
+    // change: words that can now be asked about.
+    id: "tap-a-term-to-define-it",
+    title: "Tap an underlined word for what it means",
+    body: "A word with a dotted underline opens its definition where you are. Six more terms are defined this way: the strength anchor, a block's phase, an exercise's own effort target, backed off, effective load, and adherence.",
+    area: "app",
+  },
+  {
     // doc 22 Phase 5 (N74) — the connector's retrieval surface. `22d` §10
     // called this out in advance as a user-visible capability that owes an
     // entry: an AI that can read the guide answers differently.

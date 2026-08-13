@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GLOSSARY } from "@/lib/glossary";
 import { SET_MARKERS, type SetMarker } from "@/lib/set-markers";
+import { InlineTerm } from "@/components/ui/InlineTerm";
 import {
   adjacentChapters,
   adjacentSections,
@@ -44,9 +45,19 @@ function InlineSpan({ run }: { run: Inline }) {
     );
   }
   if ("term" in run) {
-    // the app's own label for the term — the definition itself only ever
-    // renders through a `term` block (doc 22 §8.1)
-    return <span className="font-semibold">{run.text ?? GLOSSARY[run.term].label}</span>;
+    // N81 — the same dotted-underlined run the app now uses in its own prose,
+    // opening the same card from `glossary.ts`. §8.4c rule 2 (define an
+    // advanced term where the reader meets it) had only one tool before this:
+    // drop the whole card into the flow. A named term mid-sentence can now
+    // answer in place, and the card stays for where the definition IS the
+    // point.
+    return (
+      <InlineTerm term={run.term}>
+        <span className="font-semibold">
+          {run.text ?? GLOSSARY[run.term].label}
+        </span>
+      </InlineTerm>
+    );
   }
   const href = sectionRoute(run.to);
   if (!href) return <>{run.text}</>;

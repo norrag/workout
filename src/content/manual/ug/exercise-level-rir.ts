@@ -79,6 +79,9 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
           kind: "para",
           text: "The week's ramp sets the default effort for every exercise. An exercise-level target replaces that default for one exercise. A higher target lowers its weight; a lower target raises it. Clear the target to use the week's ramp again.",
         },
+        // N81 — the card the Effort target sheet now opens from its own
+        // `TARGET RIR` label, so the sheet and this chapter are one wording.
+        { kind: "term", term: "exercise_target_rir" },
         {
           kind: "para",
           text: [
@@ -190,6 +193,9 @@ export const UG_EXERCISE_LEVEL_RIR: ManualChapter = {
             " above its name while the assignment is easier than its week, so the session shows what it is.",
           ],
         },
+        // N81 — the mark is met here, so the definition is here (§8.4c rule 2).
+        // The next section is what it costs you; this is what it says.
+        { kind: "term", term: "backed_off" },
         { kind: "heading", text: "Coming back" },
         {
           kind: "para",

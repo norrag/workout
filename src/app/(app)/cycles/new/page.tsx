@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries/macro";
 import { getProfile } from "@/lib/queries/profiles";
 import { shortDate } from "@/lib/dates";
+import { InlineTerm } from "@/components/ui/InlineTerm";
 import { CreateMacroForm } from "./CreateMacroForm";
 
 const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
@@ -65,7 +66,8 @@ export default async function NewMacroPage() {
       </div>
       <h1 className="title-display mt-2.5 text-[30px]">new macrocycle</h1>
       <p className="mt-[5px] text-[11px] leading-relaxed text-ink/60">
-        A long-term arc that gives your mesocycles a shared direction.
+        A long-term arc that gives your{" "}
+        <InlineTerm term="mesocycle">mesocycles</InlineTerm> a shared direction.
       </p>
       {chips.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

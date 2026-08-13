@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCyclesOverview, getDraftMeso } from "@/lib/queries/cycles";
 import { phaseLabel } from "@/lib/queries/macro";
 import type { MesocycleRow } from "@/lib/types/database";
+import { InlineTerm } from "@/components/ui/InlineTerm";
 import { NewCycleButton } from "./NewCycleButton";
 import { planMesoAction } from "./actions";
 
@@ -224,10 +225,15 @@ export default async function CyclesPage({
 
       {empty && (
         <div className="mt-6">
+          {/* N81 — the two words this paragraph is built out of, marked at
+              first use. Second and later uses stay plain: one mark per term per
+              screen (09-changelog 2026-08-15 session 3 §2). */}
           <p className="text-sm leading-relaxed text-ink/70">
-            A macrocycle sets the long-term direction — one goal
-            (hypertrophy, strength, cut, maintain) and the mesocycles that
-            build toward it. Or run a single mesocycle on its own.
+            A <InlineTerm term="macrocycle">macrocycle</InlineTerm> sets the
+            long-term direction — one goal (hypertrophy, strength, cut,
+            maintain) and the{" "}
+            <InlineTerm term="mesocycle">mesocycles</InlineTerm> that build
+            toward it. Or run a single mesocycle on its own.
           </p>
           <Link
             href="/cycles/new"

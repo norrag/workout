@@ -10,6 +10,7 @@ export type GlossaryKey =
   | "e1rm"
   | "e1rm_confidence"
   | "est_strength"
+  | "strength_anchor"
   | "volume_landmarks"
   | "fractional_sets"
   | "pump"
@@ -18,7 +19,12 @@ export type GlossaryKey =
   | "mesocycle"
   | "microcycle"
   | "day_slot"
-  | "load_step";
+  | "phase"
+  | "load_step"
+  | "exercise_target_rir"
+  | "backed_off"
+  | "effective_load"
+  | "adherence";
 
 export interface GlossaryEntry {
   /** tracked all-caps card heading */
@@ -74,6 +80,16 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     label: "EST. STRENGTH",
     body: "One read on how your strength is trending. For each exercise we compare the best estimated one-rep max of your most recent few sessions against the best of your earliest few in the block — a rolling window, so a single light day (like the opening session of a fresh mesocycle, which is meant to be easy) can't drag the number down. Each exercise's change rolls up into the muscles it trains, and the headline averages those muscle numbers, weighted by how much work each muscle actually got. It's an estimate of the trend, not a tested max.",
   },
+  // 2026-08-15 (doc 22 Phase 7, N81): the headline concept of the Prescription
+  // details sheet, which prints MEASURED ANCHOR and prices the whole panel off
+  // it while never saying what one is (`22c` §C2). Verified against
+  // `queries/anchors.ts::getExerciseE1rmAnchors` → `engine/predict.ts`
+  // (`recencyWeightedE1rm`): the best eligible recent session wins on a recency
+  // discount, and the anchor is that session's own average, undiscounted.
+  strength_anchor: {
+    label: "STRENGTH ANCHOR",
+    body: "The strength figure your next weight is priced from — the average estimated one-rep max of your best recent session on that exercise, with newer sessions favored over older ones. It moves when your logged work moves, not on a schedule.",
+  },
   volume_landmarks: {
     label: "MEV / MRV",
     body: "The weekly set band per muscle. MEV — minimum effective volume — is the floor: the least that still progresses you. MRV — maximum recoverable volume — is the ceiling: the most you can recover from. Sets steer between them off your workload, pump, and joint-pain feedback.",
@@ -111,6 +127,18 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     label: "DAY SLOT",
     body: "A position in your training week — day 2 of this block, every week it runs. Progress is read slot against slot, so the same lift trained twice a week is compared with its own day rather than pooled with the other one, where alternating loads would look like a sawtooth.",
   },
+  // 2026-08-15 (doc 22 Phase 7, N81): the macro timeline and the cycles list
+  // both print a phase beside every block (`MESO 2 · INTENSIFICATION`) and the
+  // create form spaces three of them across the arc. Verified against
+  // `engine/macro.ts::spreadPhases` (a leading run of accumulation, then
+  // intensification, a single peak once there are ≥3 blocks) and
+  // `queries/macro.ts::phaseLabel`. Honest about its reach: no prescription
+  // reads the phase — it is a plan for how you build the block, and context the
+  // connector's coaching is given (`llm/coaching.ts`).
+  phase: {
+    label: "PHASE",
+    body: "The job a block is meant to do inside a macrocycle: accumulation to build work up, intensification to push it harder, then a single peak block near the end of a longer arc. The app spaces them when it plans the arc, as guidance for how you plan each block.",
+  },
   // 2026-08-10 (doc 22 Phase 3b): the sheet and the custom-exercise form both
   // say "load step" and neither says what it is. 22c §C2 recommended it for the
   // glossary and chapter 15 is the pass that needed it, so it lands here rather
@@ -118,5 +146,35 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   load_step: {
     label: "LOAD STEP",
     body: "The size of one weight jump on an exercise — what gets added when you meet what was asked. It follows what the equipment can actually do, so a barbell steps up in bigger jumps than a cable stack. Steps count from the last weight you entered, so an odd weight keeps its own ladder.",
+  },
+  // 2026-08-15 (doc 22 Phase 7, N81) — the four terms `22c` §C2 still had open,
+  // each rendered on a live screen with no definition anywhere.
+  //
+  // Verified against `engine/index.ts` (the assignment substitutes for the
+  // week's value at pricing time) and doc 21 §4: absolute semantics, so a set
+  // target wins and an unset one yields to the ramp.
+  exercise_target_rir: {
+    label: "TARGET RIR",
+    body: "The effort one exercise runs at for a week, set on its own instead of following the week's ramp. Where one is set it wins; where none is, the ramp decides. The weight is re-priced to meet whatever is asked, so an easier target comes with a lighter weight.",
+  },
+  // Verified against `slot-effort-display.ts` (`backedOff` = assigned RIR above
+  // the week's) and migration `20260804000001_backed_off_stats_policy.sql`: the
+  // sets stay in volume and adherence, and leave `best_e1rm` and the trend.
+  backed_off: {
+    label: "BACKED OFF",
+    body: "A session run easier than its week asked, because the exercise was set to a lighter effort on purpose. The sets still count toward your volume, and they are left out of the strength trend and out of records — easier work is not a like-with-like read.",
+  },
+  // Verified against `engine/load.ts::effectiveLoad`. Surfaces as the `EFF LOAD`
+  // flip on a bodyweight exercise's history rows, where `E1RM` sits otherwise.
+  effective_load: {
+    label: "EFFECTIVE LOAD",
+    body: "What a rep actually loaded on an exercise where your own bodyweight is part of the work: your bodyweight by itself, plus anything you added, or minus the assistance a machine gave you. The strength math reads this rather than the number you entered.",
+  },
+  // Verified against migration `20260616000004_adherence_rule.sql` and
+  // `queries/macro.ts` (`sessions_attended / sessions_due`): decided days only,
+  // working weeks only.
+  adherence: {
+    label: "ADHERENCE",
+    body: "How much of your due training you did. A day counts once it is settled — done or skipped — so days still ahead of you are left out, as are deload weeks. A block you are partway through is never marked down for sessions that have not come up yet.",
   },
 };

@@ -15,6 +15,7 @@ import type { EngineParams } from "@/lib/engine/params";
 // type-only: erased at compile time, so the client chunk stays engine-free
 import type { PriorBlockRate } from "@/lib/queries/macro";
 import { GuideLink } from "@/components/ui/GuideLink";
+import { InlineTerm } from "@/components/ui/InlineTerm";
 import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
 import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { GUIDE_LINKS } from "@/lib/guide-links";
@@ -229,8 +230,11 @@ export function CreateMacroForm({
           <strong className="text-ink">
             {plan.mesoCount} mesocycle{plan.mesoCount === 1 ? "" : "s"}
           </strong>
-          . We&apos;ve spaced suggested phases — you&apos;ll plan each as you
-          reach it.
+          . We&apos;ve spaced suggested{" "}
+          {/* N81 — the strip below prints ACCUMULATE · INTENSIFY · PEAK and
+              this sentence is the only place the word is explained-able. */}
+          <InlineTerm term="phase">phases</InlineTerm> — you&apos;ll plan each as
+          you reach it.
         </div>
         <div className="mt-3 flex gap-1">
           {plan.phases.map((_, i) => (

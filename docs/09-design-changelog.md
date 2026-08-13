@@ -70,6 +70,84 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## Entries
 
+## 2026-08-15 (session 3) — N81's inline term, built (doc 22 Phase 7, N81)
+
+The last of Phase 7, and the affordance the owner asked for at review round 4:
+*"Advanced terms deserve definitions when used… identified with underline as an
+alternate to the circled i icon."* The **design was ruled in session 1** (§3
+below) and deliberately not built there, because its real cost is a content
+pass. This entry is the build, plus the two placement rules the build had to
+settle. Placements: [`22e`](22e-link-placement-audit.md) §6.
+
+### 1. `InlineTerm` — the third member, drawn (`NET-NEW` primitive, `TOKENS`)
+
+- **Change.** `src/components/ui/InlineTerm.tsx`: a `<button>` around a run of
+  prose wearing `underline decoration-dotted decoration-from-font
+  underline-offset-2` and **nothing else** — no size, no colour, no weight of
+  its own. It opens the same glossary card `InfoDot` opens, from the same
+  `src/lib/glossary.ts` entry, anchored the same way and dismissed the same way.
+- **The card moved before either trigger used it.** `useGlossaryCard` is
+  `InfoDot`'s popover extracted **unchanged**: same 264px box, same
+  below-then-flip placement, same scrim, same scroll lock and modal a11y. Two
+  triggers, one drawing — a second copy is how one term ends up explained in two
+  shapes, and `inline-term.test.ts` fails if a second one appears.
+- **Rationale for dotted, restated because it is the whole design.** Hard rule 7
+  reserves orange for position and selection, so the mark cannot be coloured; a
+  **solid** underline is already in-prose *navigation* (the prescription strip's
+  ask line, N75). Dotted is the standard "definition, not destination"
+  convention, reads without colour, and borrows the text's own colour.
+- **Affected figures** — none redrawn. Five existing sentences gain a mark; no
+  layout, control, or copy changes anywhere.
+- **Impact** — `NET-NEW` primitive + `TOKENS`; `RETROFIT` at the five prose
+  sites and at the manual renderer (§3).
+
+### 2. Where an inline term may go, and how often (`NO-CODE`, binding)
+
+The mechanism link's budget (one per screen) does not transfer: a mark is not a
+navigation and costs a dotted rule rather than a line of chrome. It needs its
+own rules, and they are the ones that keep it from becoming decoration.
+
+- **It goes in a sentence.** Where the term is a **label**, the affordance is
+  `InfoDot` — that is the whole distinction between the two term-level members,
+  and a mark on a label would be a second way to say the same thing.
+- **First use only, once per term per screen.** A screen that marks the same
+  word three times has stopped pointing at anything. Asserted per file by test.
+- **The marked run is the term itself**, inflected as the sentence says it
+  (`macrocycles`, `phases`) — never a phrase around it, and never re-worded. A
+  mark over a paraphrase opens a card about something the reader did not tap.
+  Asserted against the glossary label by test.
+- **Not in the set grid, and not on the day view's exercise card.** The N82
+  exclusion is about that surface's budget, not about which affordance spends
+  it. The day view reaches a definition from inside a sheet, exactly as it
+  reaches the Guide.
+- **Not inside generated copy.** The prescription strip's *why*, the
+  comparability sentence and the effort disclosures are composed as strings in
+  pure modules (`prescription-narrative.ts`, `slot-effort-display.ts`,
+  `queries/stats.ts`), and doc 19 keeps the engine the author of those words.
+  Marking a term inside one would mean giving generated prose a run model, which
+  is a larger change than this affordance is worth.
+
+### 3. The manual's inline term runs adopt it (`RETROFIT`)
+
+- **Change.** `ManualBlocks`'s `{ term }` inline run renders through
+  `InlineTerm` instead of a bare semibold span. The `term` **block** — the full
+  card in the flow — is unchanged and stays where a definition is the point.
+- **Rationale.** doc 22 §8.4c rule 2 (*define an advanced term where the reader
+  meets it*) had exactly one tool: drop a whole card into the paragraph. A named
+  term mid-sentence can now answer in place, which is what the rule wanted and
+  the format could not yet do.
+
+### 4. The gate, and why it is in the primitive (`NO-CODE`)
+
+The mark is part of the staged manual release (doc 23 §9.2), so `InlineTerm`
+carries `releaseActive(UNRELEASED_VERSION)` exactly as `GuideLink` does — but
+closed it returns **the words, unmarked**, because a gate that dropped the run
+would delete a word from the middle of a sentence. `InfoDot` gains a `staged`
+prop for the same reason and returns nothing, which is correct for a trailing
+glyph. Both are asserted by test; no call site carries a check.
+
+---
+
 ## 2026-08-15 (session 2) — Wave 2: the guard travels with the link (doc 22 Phase 7c, N74)
 
 The owner accepted [`22e`](22e-link-placement-audit.md) §5's recommendation —

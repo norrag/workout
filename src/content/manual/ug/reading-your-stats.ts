@@ -108,6 +108,9 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
             " everywhere. The macrocycle Overview applies the same strength calculation as the block tab, but over a longer period.",
           ],
         },
+        // N81 — one of those four headline figures, and the one whose
+        // denominator a reader will otherwise guess at (`22c` §C2).
+        { kind: "term", term: "adherence" },
       ],
       related: [
         "ug/reading-your-stats#one-lift-at-a-time",
@@ -176,9 +179,13 @@ export const UG_READING_YOUR_STATS: ManualChapter = {
             { ui: "BACKED OFF" },
             " tag identifies deliberately lighter work. Session notes expand, and ",
             { ui: "LOAD OLDER" },
-            " retrieves earlier rows.",
+            " retrieves earlier rows. On a lift where your own bodyweight is part of the load, that flip reads ",
+            { ui: "EFF LOAD" },
+            " rather than a strength estimate.",
           ],
         },
+        // N81 — `EFF LOAD` is on the row and defined nowhere (`22c` §C2).
+        { kind: "term", term: "effective_load" },
       ],
       related: [
         "ug/reading-your-stats#what-a-strength-read-leaves-out",
