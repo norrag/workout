@@ -50,7 +50,7 @@ cannot assert; enforcement is the ledger's greppability, Phase 4, and review.
 *"still dark today"* — session 126 applied that migration, so the example is
 re-dated rather than dropped: dark for eight days, applied 2026-08-14.
 
-- **Index sync:** `N74` — Phase 8 done; the row **stays live for Phase 4 alone**,
+- **Index sync:** `N74` — Phase 8 done (PR #250); the row **stays live for Phase 4 alone**,
   because a review gate closes when the owner reads, not when the build ships.
   Workstream **M**'s roster line updated to match.
 
