@@ -15,6 +15,33 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-14 — Session 129: doc 22 Phase 4 — the owner's cold read closes N74
+
+**Owner:** *"I have cold-read all docs, and they are live now. So Phase 4 is
+complete. Mark it as such and update all docs appropriately."*
+
+Phase 4 was doc 22's own review gate: a cold read of the Guide end to end for
+coherence, duplication and vocabulary drift across chapters written in eleven
+separate build phases, plus a re-validation of every
+[`22a`](../22a-manual-claims.md) claims-ledger row against the live code —
+exactly the check [§2.4](../22-user-manual.md#2-why-this-is-harder-than-it-looks-read-before-phase-0)
+named after Batch 32 moved four documented surfaces in a day. The owner ran it
+and confirmed everything holds.
+
+**Doc 22 updated to close it out.** The top-of-doc status line now reads
+*complete* rather than naming Phase 4 as the one thing left; the Phase 4 table
+row gets its own `✅ DONE 2026-08-14` marker and a landed note; the Phase 8
+section's *"N74 is not closed"* caveat is corrected to record that Phase 4
+closed it.
+
+**`N74` is archived, not just marked done.** With every phase (0–8, incl. 0a–0d
+and 3a–3i) built, reviewed and released, there is nothing left for the row to
+track — it moves to `archive.md` per the consolidation policy, verbatim source
+staying in the backlog appendix. Workstream **M**'s roster line now reads
+*"nothing open"*.
+
+- **Index sync:** `N74` swept live → `archive.md`.
+
 ## 2026-08-14 — Session 128: doc 22 Phase 8 — the rule that keeps the manual honest (N74)
 
 **Owner:** *"please review docs/22-user-manual.md and execute phase 8."* Three

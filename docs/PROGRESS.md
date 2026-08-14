@@ -24,6 +24,20 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-08-14 — doc 22 Phase 4: the owner's cold read closes N74
+
+Docs only. The last open piece of the User Guide build was not code — it was
+the owner reading the finished Guide end to end and re-checking every
+[`22a`](22a-manual-claims.md) claims-ledger row against the live codebase, the
+review gate doc 22 Phase 4 names explicitly. The owner ran it and confirmed
+everything holds: nothing stale, nothing incoherent across chapters written in
+eleven separate build phases and many sessions.
+
+Doc 22's status line, its Phase 4 table entry, and the Phase 8 section's note
+about `N74` staying open are all updated to record that. With Phase 4 done,
+**every phase of doc 22 is built, reviewed and released** — `N74` is closed and
+swept from `notes/backlog.md`'s live index into `archive.md`.
+
 ## 2026-08-14 — doc 22 Phase 8: the rule that keeps the manual honest (N74)
 
 Docs only. The last build phase of the User Guide is the one that keeps it true

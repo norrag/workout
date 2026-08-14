@@ -9,12 +9,13 @@
 > Guide section. Any two-manual language below records the superseded build
 > history; this amendment wins.
 
-**Status:** built and released — the Guide (21 chapters, 110 sections), connector
-retrieval, the full link-placement pass and **Phase 8's maintenance rule** all
-shipped, the Guide block as release **1.1.0** (2026-08-13). **Phase 4 — the
-owner's cold read plus the re-validation of every
-[`22a`](./22a-manual-claims.md) row against code — is the only phase left**, and
-it is owner-gated. Phases in [§11](#11-the-phased-plan).
+**Status:** complete — every phase built, reviewed and released. The Guide (21
+chapters, 110 sections), connector retrieval, the full link-placement pass and
+**Phase 8's maintenance rule** shipped with the Guide block as release **1.1.0**
+(2026-08-13); **Phase 4 — the owner's cold read end to end, plus the
+re-validation of every [`22a`](./22a-manual-claims.md) row against code — is
+done (2026-08-14)**, and it was the only phase left. **N74 is closed.** Phases
+in [§11](#11-the-phased-plan).
 **Owner ask (2026-08-05):** review the repository, the app's real functionality,
 and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
@@ -32,8 +33,7 @@ three affordances (09-changelog 2026-08-15, closing **N81**'s design
 question), and **20 placements** ship behind the same 1.1.0 gate as the routes.
 The owner accepted [`22e`](./22e-link-placement-audit.md) §5, so wave 2 also
 guards the surfaces that hold unsaved input rather than declining them.
-**Phase 4, the owner's cold read, is in progress**; **N81's affordance** is the
-only piece of Phase 7 left, and it is gated on a glossary-content pass.
+**Phase 4, the owner's cold read, is done** ([§11](#11-the-phased-plan) Phase 4).
 **O7 is answered** by the 3d-r research pass
 ([§6.3](#63-rir-ramps-and-training-styles)).
 **One decision is back with the owner:** D3's offline promise is withdrawn on
@@ -1522,11 +1522,23 @@ contracts green.
 > is next**: a cold read end to end, and a re-validation of every ledger row,
 > `22b`, `22c` and `22d` against the code.
 
-### Phase 4 — User Guide review gate
+### Phase 4 — User Guide review gate — ✅ **DONE 2026-08-14**
 
 | Scope | Size |
 |---|---|
 | Cold read end to end for coherence, duplication, and vocabulary drift across chapters written in different sessions. **Re-validate every claims-ledger row against code** — the check that catches a claim true at Phase 0 and changed during Phase 3 (Batch 32 is the proof this is needed). Owner review | M |
+
+> **Landed.** The owner read the Guide end to end and confirmed every
+> [`22a`](./22a-manual-claims.md) row against the live codebase — nothing found
+> stale, nothing found incoherent across the chapters written in separate
+> sessions. This was the risk [§2.4](#2-why-this-is-harder-than-it-looks-read-before-phase-0)
+> named (Batch 32 moved four documented surfaces in a day) and the one Phase 8's
+> own maintenance rule exists to keep from recurring — Phase 4 is what closes
+> the loop this build, hard rule 10 is what holds it from here.
+>
+> **This was the last open phase.** With it done, **doc 22 is complete**: all
+> eleven phases (0–8, plus 0a–0d and 3a–3i) are built, reviewed and released,
+> and `N74` closes — archived in [`notes/archive.md`](./notes/archive.md).
 
 ### Phase 5 — Connector retrieval *(was Phase 6; promoted — [§10.4](#104-consequence-for-the-plan))* — ✅ **DONE 2026-08-12**
 
@@ -1757,9 +1769,10 @@ index, the `N74` backlog row + `log.md` entry, the workstream **M** pointer.)*
 >   contain, which CI cannot assert; its enforcement is the ledger's
 >   greppability, Phase 4's re-validation, and review.
 >
-> **`N74` is not closed, and this phase cannot close it.** Phase 4 is the owner's
-> cold read and is owner-gated, so the row stays live carrying that one phase;
-> every other phase is done and released.
+> **`N74` was not closed by this phase — Phase 4 closed it.** At the time this
+> phase shipped, Phase 4 (the owner's cold read, owner-gated) was the one phase
+> left, so the row stayed live carrying it. Phase 4 landed 2026-08-14
+> ([§11](#11-the-phased-plan) Phase 4) and closed the row.
 
 ---
 
