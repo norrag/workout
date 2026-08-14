@@ -11,6 +11,67 @@ for the purge policy.
 
 ---
 
+## Swept 2026-08-14 — cleanup pass: 12 sweeps' worth of merged work, plus the answered-question backlog (N34, N36, N43, N47, N56, N57, N59, N67–N70, N73, N75–N78, N80–N82, S1–S8, PH39, T-N60a, T-A4)
+
+The largest sweep this area has run, and the reason it was needed is worth
+recording: **no reconciliation sweep had run since 2026-08-02**, across twelve
+merged build PRs (#215 → #247, including the 1.1.0 release cut). The live index
+had grown to 48 rows of which 28 were terminal.
+
+Two classes came out together:
+
+1. **Done-and-merged**, every PR confirmed merged against the GitHub API — the
+   ordinary backlog of the sweep.
+2. **The `answered` question rows** (S1–S3, S6–S8, PH39), which had sat live
+   since the original June triage. `answered` is terminal under the lifecycle:
+   the substance lives in [`A-engine-metrics.md`](./A-engine-metrics.md) and the
+   tasks they spawned are tracked as their own `T-A*` rows, so the question row
+   itself has nothing left to move.
+
+**Deliberately kept live** and *not* swept, each for a stated reason: **N52**
+(its unblocking condition was met on 2026-07-12 and the work never happened —
+see the correction in `backlog.md`), **N79** (code merged, **hosted migration
+never applied** — the feature is dark), **N74** (Phases 4 and 8 are open),
+**N38** / **N39** / **N46** / **N60** / **N66** / **N72** / **N83** / **N84**
+(open by their own terms), and **N1** (in progress).
+
+**Residual owner checks** that had been holding five otherwise-terminal rows
+open (N34, N47, N56, N57, N59) are consolidated into the single live **O-2**
+row rather than each keeping a full row alive — the item is *"the owner looks at
+five things on a device"*, not five items.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N35 | Prescribed e1RM progression — earned-step overload + macro-rate pacing | F | P | **done — closed by its own stated criterion.** The row read *"stays live only until v20 is activated + the deferred rows are picked up"*. Phases 1–4 merged (#158–#161), Phase R prepared (#162), and **v20's behavior has been live since v21 activated 2026-07-11** — v21 is "otherwise identical to v20" and the chain runs unbroken to the active **v27**. The deferred spine was filed as N36 (done, v25), N37 (done, v24), N38 (reduced — capture shipped in #216, periodic check deferred) and N39 (deferred on demand); N38/N39 stay live as their own rows. Spec: [doc 16](../16-prescribed-progression.md). |
+| N70 | Exercise-level RIR — temporary per-exercise effort/load management | F | P | **done — all six phases merged.** Phase 1 (#216), Phases 2+2b (#218), Phase 3 (#219), Phase 4 (#221), Phase 5 (#223), Phase 6 (#224). The §6.1 measuring band was **armed 2026-08-10** (`engine_params` v26, `release_impact: fix`) and verified a no-op on the data — 0 of 11,834 working sets above the band. Doc-side fallout handled in the N74 drift pass (#243, ledger `D-21`); the band's cutoff then moved again with **v27** (2026-08-12, `max_measuring_rir` 8→5, deload target RIR 6→8). Spec: [doc 21](../21-exercise-level-rir.md). |
+| N81 | An inline underlined term as a second definition affordance | F | M | **done (PR #246, merged 2026-08-13).** `InlineTerm` + `useGlossaryCard` — two triggers, one drawing; six new glossary entries read off code (`strength_anchor`, `exercise_target_rir`, `backed_off`, `effective_load`, `adherence`, `phase`); five inline sites + three dots. Released in 1.1.0 (#247). One recommendation declined by the table's own logic (`model band` has no screen behind it — `D-15`/`D-20`). |
+| N82 | Day-view focus pass | F | E | **done (PR #240, merged 2026-08-08).** One control per card, one voice per rule; staged behind `releaseActive("1.1.0")` and **released in 1.1.0** (#247) with the frozen note `day-view-focus-pass`. |
+| N80 | Versioning & release framework | F | V | **done (PR #230, merged 2026-08-06).** All seven doc-23 phases in one PR: `src/lib/version/` + `src/content/releases/` with five CI gates, `/more/whats-new`, `20260806000002_last_seen_version` (applied + backfilled 2026-08-06), the `WhatsNewGate` suppression predicate, `LINKABLE_ROUTES`, `docs/deployment/release.md`, and `release_impact` + the `announced_in` guard on both `engine_params` MCP tools. **v1.0.0 cut in the same PR; v1.1.0 cut 2026-08-13** (#247) — the first notified feature release. |
+| N75 | Exercise menu: "Engine audit" → "Prescription details", onto the card | UX | H | **done (PR #226, merged 2026-08-06).** Batch 32. |
+| N76 | Cycles page: show/hide completed cycles | UX | G | **done (PR #226, merged 2026-08-06).** Batch 32. |
+| N77 | History e1RM view: drop effective reps and the `~` on RIR | UX | H | **done (PR #226, merged 2026-08-06).** Batch 32. |
+| N78 | Edit an in-progress mesocycle from the planner board + exercise-level RIR on the board | F | G | **done (PR #226, merged 2026-08-06).** Batch 32. |
+| N73 | Set-logging queue ping-pong + discarded RIR edits | B | J | **done (PR #220, merged 2026-08-02).** The echo rule: a queued set retires on the render that contains it. |
+| N67 | An exercise increment should index off the last weight the lifter ENTERED | B→F | G | **done (PR #215, merged 2026-07-31).** ⚠️ **ID collision:** the still-open PR #212 (admin MCP notes tools) also claims `N67`; that work is renumbered **N86** in the live index. |
+| N68 | Background/offline set-logging queue — stale set-logging hang-ups | B→F | E | **done (PR #215, merged 2026-07-31).** The durable client-side queue (`src/lib/logging/queue.ts`), now hard rule 9. Offline **reads** stay open as **T-N68a**. |
+| N69 | Sliders should only move when dragged from the orange tab | B/UX | E | **done (PR #215, merged 2026-07-31).** |
+| N59 | Stored `logged_sets.e1rm` never restamped past v11 | B | P | **done (PR #198, merged 2026-07-21).** Prod backfilled + verified the same day. Owner's post-deploy eyeball moved to **O-2**. |
+| N57 | Prescription presentation split: quick-read + Engine audit | F | G | **done (PR #194, merged 2026-07-20).** Owner's on-device copy read moved to **O-2**. |
+| N56 | W2·D4 deadlift prescription "does not match what is shown on screen" | B | P | **done (PR #193, merged 2026-07-19).** Root cause fixed (set rows price the graded ask) + MCP freshness parity. Owner device check moved to **O-2**; the step-cadence design question was not carried forward — reopen it as a new item if it recurs. |
+| N47 | Tab bar detaches from the bottom on scroll and goes dead | B | G | **done (PR #186, merged 2026-07-12).** Overlay scroll lock reworked off `body position:fixed`. Owner repro re-check moved to **O-2**. |
+| N43 | Strength-rate band still buckets by calendar training years | D→F | C | **done (PR #182, merged 2026-07-12); activated (PR #183, 2026-07-12).** Two-component `strength_model` in `strengthRateBand`; `engine_params` **v23 activated + v24 `rate_source:"plan"` flip**, both carried forward into the live v27. ⚠️ The **N52/N54 copy + target-card re-enable that were told to "ride the v23 activation" never shipped** — that remainder stays live under **N52**. |
+| N36 | Envelope loop — demand-side outcomes, self-gating on data sufficiency | F | P | **done (PR #184, merged 2026-07-12); activated in `engine_params` v25** (2026-07-12) and carried forward into the live v27. Refitting the thresholds from field data was the stated follow-up and remains available as new work, not an open row. |
+| N34 | BodySpec DEXA integration | F | C | **done — 5a (#173), 5b (#174), OAuth field fix (#175), 5c (#176), all merged 2026-07-11.** The owner's connect re-run + the doc 15 §8.3 first-login write-up moved to **O-2**. |
+| T-N60a | Effort-reporting adoption | F | H | **superseded → N71 / [doc 21 Phase 1](../21-exercise-level-rir.md).** Owner decision A1 made per-set `rir_reported` capture a build phase; shipped in #216. Marked "archive at next sweep" on 2026-07-31 — this is that sweep. |
+| T-A4 | Decide whether a hard big-miss back-off belongs in rep_window mode | D | A | **decided 2026-06-25: anchor-only, no back-off; `regression_pct` retired.** Realized via WS-I / T-I4, merged PR #82. Terminal since June; never swept. |
+| S1 | How is estimated strength (e1RM) calculated? | Q | A | **answered** — [`A-engine-metrics.md`](./A-engine-metrics.md). Now also user-facing in the Guide (ch. 10). |
+| S2 | How is strength increase calculated? (Est. Strength / Key Lifts) | Q | A | **answered** — [`A-engine-metrics.md`](./A-engine-metrics.md). |
+| S3 | How are deload weeks handled in stats? | Q | A | **answered**; spawned **T-A2** (closed separately). |
+| S6 | Does adding a set manually transfer to future plans? | Q | A | **answered** — [`A-engine-metrics.md`](./A-engine-metrics.md). |
+| S7 | How is the number of sets planned? | Q | A | **answered**; spawned **T-A5**, which stays live (deferred graded MEV→MAV→MRV ramp). |
+| S8 | When/why/how does the engine add or remove sets/reps? | Q | A | **answered** (see S7 + S4). |
+| PH39 | How fast does e1RM recency decay? | Q | A | **answered**; spawned **T-A1** (closed separately). |
+
 ## Swept 2026-08-02 — doc 21 Phase 1 merged (N71)
 
 PR #216 merged (`a84c090`), which closes **N71** by construction — the row is

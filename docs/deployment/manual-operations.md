@@ -10,6 +10,29 @@ Keep this file current: when a new manual step is discovered, add it.
 
 ---
 
+## ⚠️ Outstanding right now (reconciled against the live database 2026-08-14)
+
+One section below is **overdue**, and it is the only one that leaves shipped code
+broken. The rest of this list is either done (struck through), superseded, or
+waiting on something external.
+
+| Priority | Step | Evidence |
+|---|---|---|
+| **① OVERDUE** | [Apply the concurrent-mesocycles migration (N79)](#apply-the-concurrent-mesocycles-migration-n79) — `20260806000001_concurrent_mesocycles` | **Verified missing.** `list_migrations` on hosted jumps `20260804213026` → `20260806210701`; `pg_indexes` still shows `mesocycles_one_active_per_user` and has no `mesocycles_one_active_per_macrocycle`. The N79 code merged in PR #226 on 2026-08-06 and **shipped inside release 1.1.0**, so the feature is live in the app and refused by the database — activating a second standalone meso raises 23505. One statement; **cannot fail on data** (the replacement index is strictly weaker than the one it drops). |
+| ② when convenient | [CI as required status checks](#make-the-ci-jobs-required-status-checks-github-repo-settings) | Still not enforced. Related: the e2e suite is red on `main` (backlog **N84**), so turning this on today would block every PR — fix N84 first. |
+| ③ conditional | [`NEXT_PUBLIC_RELEASE_OVERRIDE`](#next_public_release_override-vercel-preview-only) | Only needed while a staged release block is being previewed. 1.2.0 is currently empty. |
+| ④ conditional | `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets | Required by the migration-drift guard in **PR #222**, which is **still open** — nothing to set until it merges. Item ① is exactly the drift that guard would have caught. |
+| ⑤ conditional | `NOTES_REPO_TOKEN` (fine-grained PAT, Contents read+write, this repo only) | Required by the admin notes MCP tools in **PR #212**, also **still open**. |
+| ⑥ external | [Adopt CIMD](#adopt-cimd-once-supabase-supports-it-mcp-2026-07-28-dcr-deprecation) | Waits on Supabase's authorization server. Re-check before **July 2027**. |
+
+> **Live state at reconciliation.** Active `engine_params`: **v27** (2026-08-12 —
+> deload `target_rir` 6→8, `e1rm.max_measuring_rir` 8→5). Every activation
+> section below through v26 is therefore satisfied or superseded; they are struck
+> through rather than deleted so the sequence stays readable. Latest applied
+> hosted migration: `20260806210701 / 20260806000002_last_seen_version`.
+
+---
+
 ## Why these can't be automated here
 
 The session's MCP tool surface is **read + targeted-write**, not full account
@@ -118,7 +141,7 @@ spending limit blocking overage).
 | Check Actions usage / raise the spending limit | Personal Settings → Billing and plans → Plans and usage → Actions; spending limit under Billing → Spending limits → Actions | If included minutes are exhausted, either raise the Actions spending limit or wait for the monthly reset. Also check https://www.githubstatus.com in case it's a platform incident. |
 | Re-run the dead runs once restored | Each run page → "Re-run all jobs" (or push any commit) | Runs that failed with the no-runner signature never executed — re-running is safe and is the only way to get a real verdict on those commits. |
 
-### Apply `20260620000006_exercise_param_overrides` to hosted (doc 14 phase 3)
+### ~~Apply `20260620000006_exercise_param_overrides` to hosted (doc 14 phase 3)~~ (DONE — applied as `20260620230102 / exercise_param_overrides`; confirmed 2026-08-14)
 
 The phase-3 migration that creates `public.exercise_param_overrides` was **not
 applied to the hosted DB from the Claude session that wrote it** (the remote
@@ -131,7 +154,7 @@ called on the workout/generation/exercise paths) query this table, so they will
 |---|---|
 | Apply the override-table migration to hosted | Run `supabase/migrations/20260620000006_exercise_param_overrides.sql` against the hosted project (CLI `supabase db push`, dashboard SQL editor, or MCP `apply_migration`). Additive (new table + owner-only RLS + index + `set_updated_at` trigger); no existing data touched. |
 
-### Apply + activate engine_params **v11** (standalone-prescription fixes)
+### ~~Apply + activate engine_params **v11** (standalone-prescription fixes)~~ (SUPERSEDED — applied as `20260624194838`; v11's behavior is carried by the active v27)
 
 `20260624000002_engine_params_v11_standalone_fixes.sql` ships v11 **inactive** —
 it changes the live prescription calculator and grading (S1 anchor seed, S3 e1RM
@@ -147,7 +170,7 @@ row; v10 stays active).
 | **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v11** on Madeline (`0af27789-…`) + a couple of other users; confirm week-1 seeds land in the 6–15 window, e1RM anchors are tamed (no ~555 leg-curl), and gated holds read as honest `weight × reps @ RIR` triples (doc 13 §6). |
 | **Activate v11** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 11;` (single-active invariant). Open prescriptions then refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v10. |
 
-### Activate engine_params **v12** (rep-window round 2)
+### ~~Activate engine_params **v12** (rep-window round 2)~~ (SUPERSEDED — applied as `20260624231050`; carried by the active v27)
 
 `20260624000004_engine_params_v12_rep_window_round2.sql` ships v12 **inactive** —
 two more rep-window changes to the live calculator: `climb_on_performed_reps` (the
@@ -166,7 +189,7 @@ running reps to 13–15). Same discipline as v11.
 > planned row's `params_version` advances to 12 on its next reconcile (one-time
 > catch-up), so "accurate as of Vx" stays truthful without a new decision row.
 
-### Apply + activate engine_params **v14** (retire the prior-peak meso seed — T-I5)
+### ~~Apply + activate engine_params **v14** (retire the prior-peak meso seed — T-I5)~~ (SUPERSEDED — applied as `20260625194454`; carried by the active v27)
 
 `20260625000001_engine_params_v14_retire_prior_peak_seed.sql` ships v14 **inactive**.
 It sets `retire_prior_peak_seed = true`: the legacy `priorPeak × meso_seed_backoff_pct`
@@ -192,7 +215,7 @@ starting weight). Otherwise byte-identical to v12. Same gating discipline as v11
 > manual-seed deferral the owner asked for; the engine now produces it, the surface
 > should invite it.
 
-### Apply + activate engine_params **v15** (anchor-based deload)
+### ~~Apply + activate engine_params **v15** (anchor-based deload)~~ (SUPERSEDED — applied as `20260625212828`; carried by the active v27, whose deload `target_rir` is now 8)
 
 `20260625000003_engine_params_v15_anchor_deload.sql` ships v15 **inactive**, paired
 with `20260625000002_widen_target_rir_for_deload.sql` (widens the `target_rir` CHECK
@@ -247,7 +270,7 @@ visible on cut/maintain blocks.
 | **Replay before activating** | Run admin MCP `replay_decisions` / `simulate_prescriptions` for **v19**. Expect diffs ONLY on ramp-hold weeks (e.g. the default 3→2→2→1 ramp's week 2→3): held `weight × reps` where the legacy path emitted a lighter load at +1 rep. Stepped weeks, top-outs, deloads, and seeds must be byte-identical. |
 | **Activate v19** | After the diff looks right: `update public.engine_params set is_active = false where is_active = true; update public.engine_params set is_active = true where version = 19;` (single-active invariant). Open prescriptions refresh lazily through the read-path freshness reconcile — no data rewrite, logged history untouched (hard rule #5). Roll back by re-activating v18. |
 
-### Activate engine_params **v20** (prescribed progression — doc 16 Phase R)
+### ~~Activate engine_params **v20** (prescribed progression — doc 16 Phase R)~~ (DONE — live since v21 activated 2026-07-11, which is "otherwise identical to v20"; carried unbroken to the active v27)
 
 `20260709000001_engine_params_v20_prescribed_progression.sql` ships v20
 **inactive**. It adds one `.optional()` `progression` block over v19 —
@@ -465,7 +488,7 @@ opposite direction from the R3 tightening, and the point of N43.
 | **④ Re-flip `rate_source` to `"plan"`** | After v23 is active + reviewed, propose a micro-bump over v23 with `progression.rate_source: "plan"` (the R3 flip, now reading the corrected band) and run its own replay diff — the paced/stepped mix shifts on earned working weeks (now toward *more* headroom for the undermuscled case), no entitlement change. Roll back by re-activating v23 (source `"band"`). |
 | **⑤ Monitor** | `get_progression_history` (earn/paced mix, `rate_pacer` firings) — the same instruments as the v20/R3 monitor rows; this also feeds the Phase-6 envelope fit, which **must** run on the corrected band (N36 is blocked-by N43). |
 
-### Activate the envelope loop (doc 17 §7 / Phase 6, N36 — self-gating per user)
+### ~~Activate the envelope loop (doc 17 §7 / Phase 6, N36 — self-gating per user)~~ (DONE 2026-07-12 — activated as `engine_params` v25; carried by the active v27. Refitting the thresholds from field data remains available as new work, not a pending step)
 
 The doc 17 §7 mechanism ships fully coded and OFF: `band_position` becomes a
 per-user derived input (`EngineInputs.bandPosition` — a pure, clockless fold
@@ -602,6 +625,23 @@ screen shows `NOT AVAILABLE IN THIS ENVIRONMENT` and nothing else changes.
 ### Apply the concurrent-mesocycles migration (N79)
 
 One migration lands with PR #226: `20260806000001_concurrent_mesocycles`.
+
+> **⚠️ OVERDUE — this is the one outstanding item on the list.** PR #226 merged
+> **2026-08-06** and the feature then **shipped to users inside release 1.1.0**,
+> but the migration was never applied. Verified 2026-08-14: the hosted
+> `schema_migrations` chain jumps `20260804213026` → `20260806210701` with no
+> `concurrent_mesocycles` in it, and `pg_indexes` on `public.mesocycles` still
+> returns `mesocycles_one_active_per_user` with no
+> `mesocycles_one_active_per_macrocycle`.
+>
+> **What a user sees today:** the app offers concurrent mesocycles and the
+> database refuses them — activating a second standalone block hits the old
+> per-user unique index and raises 23505 on a path the code expects to succeed.
+>
+> This is the same shape as the 2026-08-02 `slot_rep_position` incident (code
+> merged ahead of its migration, degrading into a calm wrong answer rather than
+> an error) — the incident that PR #222's `migration-drift` CI job was written to
+> prevent, and that PR is still open. Backlog rows **N79** and **N85**.
 
 | Step | What / why |
 |---|---|
