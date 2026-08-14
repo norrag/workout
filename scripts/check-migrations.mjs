@@ -32,8 +32,13 @@
  */
 
 import { readdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+
+const liveParams = createRequire(import.meta.url)(
+  "../src/lib/engine/live-params.json",
+);
 
 const MIGRATIONS_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -80,7 +85,7 @@ export function diffMigrations(repoFiles, appliedNames) {
   };
 }
 
-async function fetchAppliedNames(projectRef, token) {
+async function runQuery(projectRef, token, query) {
   const res = await fetch(
     `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
     {
@@ -89,10 +94,7 @@ async function fetchAppliedNames(projectRef, token) {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        query:
-          "select name from supabase_migrations.schema_migrations order by version",
-      }),
+      body: JSON.stringify({ query }),
     },
   );
   if (!res.ok) {
@@ -100,10 +102,88 @@ async function fetchAppliedNames(projectRef, token) {
       `Supabase Management API returned ${res.status}: ${await res.text()}`,
     );
   }
-  const rows = await res.json();
+  return res.json();
+}
+
+async function fetchAppliedNames(projectRef, token) {
+  const rows = await runQuery(
+    projectRef,
+    token,
+    "select name from supabase_migrations.schema_migrations order by version",
+  );
   // a migration applied before the `name` column was populated reads as null;
   // fall back to the version so it still matches a full-basename repo file
   return rows.map((r) => r.name ?? r.version ?? "").filter(Boolean);
+}
+
+/** The version and hash of the hosted ACTIVE `engine_params` row. */
+async function fetchActiveParams(projectRef, token) {
+  const rows = await runQuery(
+    projectRef,
+    token,
+    "select version, params_hash from public.engine_params where is_active limit 1",
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Pure: does the repo's declared live params version agree with hosted?
+ *
+ * Deliberately a WARNING and never a failure, and the asymmetry is the whole
+ * design. An unapplied migration means deployed code reads a column that is not
+ * there — production is broken, so that fails the build. A stale params fixture
+ * means the *test suite* is weaker than it looks: production is fine, and
+ * nobody should be blocked from merging an unrelated PR because a parameter
+ * version was activated out-of-band an hour ago.
+ *
+ * Out-of-band is the normal case, not an accident: `propose_engine_params` →
+ * `replay_decisions` → `activate_engine_params` runs from an MCP client with no
+ * PR anywhere in the loop, so the repo can only ever find out afterwards. This
+ * is how it finds out. Exported for unit tests.
+ */
+export function diffLiveParams(declared, hosted) {
+  if (!hosted) return { ok: true, reason: "no active row" };
+  if (declared.version !== hosted.version) {
+    return {
+      ok: false,
+      reason: `repo declares v${declared.version}, hosted runs v${hosted.version}`,
+    };
+  }
+  if (declared.hash !== hosted.params_hash) {
+    return {
+      ok: false,
+      reason: `both say v${declared.version}, but the params_hash differs (repo ${declared.hash.slice(0, 8)}…, hosted ${String(hosted.params_hash).slice(0, 8)}…)`,
+    };
+  }
+  return { ok: true, reason: `v${declared.version} matches` };
+}
+
+async function reportParamsDrift(projectRef, token) {
+  let hosted;
+  try {
+    hosted = await fetchActiveParams(projectRef, token);
+  } catch (error) {
+    // never let this half break the migration gate, which is the real one
+    console.warn(`[db:check] params check skipped — ${error.message}`);
+    return;
+  }
+  const declared = { version: liveParams.version, hash: liveParams.hash };
+  const { ok, reason } = diffLiveParams(declared, hosted);
+  if (ok) {
+    console.log(`[db:check] engine_params OK — ${reason}.`);
+    return;
+  }
+  console.warn(
+    `\n[db:check] engine_params LADDER STALE (warning, not a failure) — ${reason}.\n\n` +
+      "           Production is fine; the TEST SUITE is what is weakened. Every engine\n" +
+      "           test takes an explicit params object from the ladder in\n" +
+      "           src/lib/engine/__tests__/helpers.ts, so while this is stale those\n" +
+      "           ~2,050 tests are asserting behavior nobody is running.\n\n" +
+      "           To clear it: add the new V<n>_PARAMS rung, bump LIVE_PARAMS_VERSION\n" +
+      "           and LIVE_PARAMS_HASH (the hash is `params_hash` from\n" +
+      "           get_engine_params), and re-run. live-params.test.ts proves the new\n" +
+      "           fixture is byte-identical to the stored row.",
+  );
 }
 
 async function main() {
@@ -139,6 +219,10 @@ async function main() {
         unknown.map((n) => `             ${n}`).join("\n"),
     );
   }
+
+  // The params check runs regardless of the migration verdict — it is a
+  // different question and its answer is useful either way.
+  await reportParamsDrift(projectRef, token);
 
   if (missing.length === 0) {
     console.log("[db:check] OK — no drift.");

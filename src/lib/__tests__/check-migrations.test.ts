@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 // the drift guard is a bare-node script (no build step, runs on `npm ci` alone
 // in CI), so its pure helpers are imported straight from the .mjs
-import { diffMigrations, migrationStem } from "../../../scripts/check-migrations.mjs";
+import {
+  diffLiveParams,
+  diffMigrations,
+  migrationStem,
+} from "../../../scripts/check-migrations.mjs";
 
 describe("migrationStem", () => {
   it("strips a leading timestamp and the .sql extension", () => {
@@ -80,5 +84,52 @@ describe("diffMigrations", () => {
       [],
     );
     expect(missing).toEqual(["20260802000004_slot_rep_position.sql"]);
+  });
+});
+
+/**
+ * The params half of the guard (N87). Its whole design point is that it WARNS
+ * rather than fails: an unapplied migration breaks production, a stale fixture
+ * only weakens the test suite, and blocking an unrelated PR on the second is
+ * the kind of friction that gets a guard switched off.
+ */
+describe("diffLiveParams — the engine_params ladder check", () => {
+  const DECLARED = { version: 27, hash: "f8dcfb51".padEnd(64, "0") };
+
+  it("agrees when version and hash both match", () => {
+    const { ok } = diffLiveParams(DECLARED, {
+      version: 27,
+      params_hash: DECLARED.hash,
+    });
+    expect(ok).toBe(true);
+  });
+
+  it("flags a version the repo has never heard of", () => {
+    const { ok, reason } = diffLiveParams(DECLARED, {
+      version: 28,
+      params_hash: "whatever",
+    });
+    expect(ok).toBe(false);
+    expect(reason).toContain("v27");
+    expect(reason).toContain("v28");
+  });
+
+  /**
+   * The subtle one. `engine_params` rows are immutable, so a matching version
+   * with a different hash cannot happen by ordinary means — it means the
+   * fixture was hand-edited into something no stored row has ever been, which
+   * is exactly how the old V26 rung drifted.
+   */
+  it("flags a matching version whose hash disagrees", () => {
+    const { ok, reason } = diffLiveParams(DECLARED, {
+      version: 27,
+      params_hash: "deadbeef".padEnd(64, "0"),
+    });
+    expect(ok).toBe(false);
+    expect(reason).toContain("params_hash differs");
+  });
+
+  it("says nothing when hosted has no active row", () => {
+    expect(diffLiveParams(DECLARED, null).ok).toBe(true);
   });
 });

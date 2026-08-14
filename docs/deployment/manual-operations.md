@@ -24,7 +24,7 @@ waiting on something external.
 | ~~④~~ **DONE 2026-08-14** | ~~`SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets~~ — set by the owner when **PR #222 merged**, so the `migration-drift` job is now a **real gate** rather than a warning. Was: required by the migration-drift guard in #222. Until both are set the guard no-ops with a warning and is not a gate. Item ① was exactly the drift it would have caught, so setting these is what stops the next one. The comparison was run by hand on 2026-08-14 and is **clean**: 89 repo migrations, 87 hosted, 2 baselined, zero drift. |
 | ⑤ conditional | `NOTES_REPO_TOKEN` (fine-grained PAT, Contents read+write, this repo only) | Required by the admin notes MCP tools in **PR #212**, also **still open**. |
 | ⑥ external | [Adopt CIMD](#adopt-cimd-once-supabase-supports-it-mcp-2026-07-28-dcr-deprecation) | Waits on Supabase's authorization server. Re-check before **July 2027**. |
-| **⑦ NEW — process, not a toggle** | **An activation must add its fixture.** | Backlog **N87**, re-scoped. Activating through the MCP tools is the **right** workflow and stays — replay first, then activate. What is missing is the other half: the engine's ~2,050 unit/golden tests take an explicit params object from the ladder in `src/lib/engine/__tests__/helpers.ts`, and that ladder stops at **v20/v26** while live is **v27** — so `golden-meso-live.test.ts` pins v18, and live's `max_measuring_rir: 5` / `deload.target_rir: 8` pair has no test at all. **When you activate a version, add its `V<n>_PARAMS` fixture and point the live golden at it** — that is the durable half, and it costs one small object. No per-PR check against hosted is proposed. |
+| ~~⑦~~ **BUILT 2026-08-14** | ~~`engine_params` activations never reach the tests~~ — the ladder is caught up and the loop is closed. See **[Activating an `engine_params` version](#activating-an-engine_params-version)** below for the two-minute follow-up each activation now needs. |
 
 > **Live state at reconciliation.** Active `engine_params`: **v27** (2026-08-12 —
 > deload `target_rir` 6→8, `e1rm.max_measuring_rir` 8→5). Every activation
@@ -707,6 +707,39 @@ One migration lands with the doc 23 phases 0–6 PR:
 | Operation | Where | Notes |
 |---|---|---|
 | Set `NEXT_PUBLIC_RELEASE_OVERRIDE` | Vercel → Project → Settings → Environment Variables, **Preview** scope only | doc 23 §9.2 — raises the effective version on a preview deploy so a staged release block can be reviewed before it is flipped on. The code ignores it when the environment is production, so a mistaken Production entry is inert; still, do not set it there. Unset it once the block ships. |
+
+### Activating an `engine_params` version
+
+**The activation itself does not change** — `propose_engine_params` →
+`replay_decisions` → `activate_engine_params`, from whichever MCP client is
+cheapest to run. That loop is correct and stays. What follows is the two-minute
+repo-side follow-up it now needs, and **it is deliberately not a gate**.
+
+> **Why there is a follow-up at all.** Every engine test takes an *explicit*
+> params object — the ~2,050 unit and golden tests never read the database. So
+> the suite is only as accurate as the fixture ladder in
+> `src/lib/engine/__tests__/helpers.ts`. On 2026-08-14 that ladder stopped at
+> v20/v26 while production ran v27, which meant the file whose stated purpose
+> was pinning production behavior was pinning **v18**, and live's
+> `max_measuring_rir: 5` / `deload.target_rir: 8` coupling — the entire reason
+> v27 exists — had no test at all (**N87**).
+
+> **Why it can't be enforced at activation time.** There is no PR when you
+> activate; there is no commit anywhere in the loop. The repo cannot find out on
+> its own, so it has to be *told* — and until it is, the only cost is weaker
+> tests. Production is unaffected either way, which is why `db:check` **warns**
+> here and **fails** for an unapplied migration.
+
+| Step | What / why |
+|---|---|
+| **① Activate as usual** | No change. Replay first, read the diff, then activate. |
+| **② Add the rung** | In `helpers.ts`, `export const V<n>_PARAMS` spread off the version below it, carrying only what changed. Keep it minimal — a spread plus the delta is what makes the ladder readable as a history. |
+| **③ Update `src/lib/engine/live-params.json`** | `version`, `hash` (the `params_hash` from `get_engine_params`), `activatedAt`, and a one-line `note`. Both the TypeScript ladder and the `db:check` script read this one file. |
+| **④ Add it to `LADDER` in `live-params.test.ts`** | With its `params_hash`. The test recomputes the digest from your fixture, so **a wrong value anywhere at any depth fails** — this is what makes a hand-written rung provably the stored row rather than approximately it. |
+| **⑤ `npm run test` and `npm run db:check`** | The first proves the fixture; the second confirms the warning has cleared. |
+
+If ④ fails, the **fixture** is wrong, not the hash — a stored row is immutable.
+Diff your object against the live one and fix it until the digest agrees.
 
 ### Announce, then activate — `engine_params` (doc 23 §9.5)
 

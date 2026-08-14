@@ -1,5 +1,19 @@
 /**
- * Golden test under the LIVE production params shape (R21): the v18 row —
+ * Golden test under the **v18** params shape (R21): the v18 row —
+ *
+ * > **The name is historical, and the header used to lie (N87, 2026-08-14).**
+ * > This said "the LIVE production params shape", which was true when it was
+ * > written on 2026-07-02 and false from 2026-07-11, when v21 activated. It has
+ * > pinned v18 the whole time. **The numbers below are deliberately unchanged**:
+ * > they are hand-derivable under v18 and re-pinning them to v27 in a cleanup
+ * > pass is exactly the silent re-pin the last paragraph of this header forbids.
+ * > What v18 pins here — the anchored week-to-week interaction — is orthogonal
+ * > to everything v21–v27 changed (macro targets, rate source, the envelope,
+ * > the measuring band), so the coverage is real; it is only the *claim about
+ * > production* that was wrong. Live values are asserted in
+ * > `live-params.test.ts`, and a full golden at v27 is worth writing when
+ * > somebody has the budget to derive it by hand.
+ *
  * v10 defaults + every gated behavior on (`seed_from_anchor`,
  * `hold_rep_consistent`, `climb_on_performed_reps`, `bound_to_target_window`,
  * `deload_anchor_rir`, `bodyweight_model`, `pain_cut_gate`, I14 dampen
