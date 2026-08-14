@@ -15,6 +15,45 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-14 — Session 128: doc 22 Phase 8 — the rule that keeps the manual honest (N74)
+
+**Owner:** *"please review docs/22-user-manual.md and execute phase 8."* Three
+items: the CLAUDE.md maintenance rule, the README, and this row.
+
+**The rule is hard rule 10, not a `Conventions` bullet.** Rules 1–9 all describe
+things a reviewer can see in a diff — an RLS policy missing, a service key in a
+client bundle, an improvised layout. A chapter going stale is the one failure
+that appears in **no** diff, which is exactly why it needs the strongest
+placement in the file rather than the tidiest one.
+
+**It names the lookup, not just the obligation.** *"Update the manual"* is
+unactionable against 110 sections, so the rule points at `22a`'s *source of
+truth* column as the index **from code back to prose**: grep it for the file,
+symbol or parameter path you touched, and every row that comes back is prose to
+re-verify. It also names the case with no diff at all — an `engine_params`
+activation — which is doc 22 §2.2's own failure mode and the one an author is
+least likely to file under "documentation". Link placements keep their two rows
+(`22e` + `guide-links.ts`), which was already written down in the doc index.
+
+**The README was two releases stale**, still reading *"Planning complete —
+implementation not yet started"* with a doc table that stopped at `07`. It now
+leads with the Guide as the app's user-facing documentation (More → Guide),
+carries the later authoritative specs, and points at `PROGRESS.md` and this
+backlog for live state — which is where *"shipped but not live"* is tracked, so
+the README never has to make that claim itself.
+
+**No release entry, no test.** Docs-only, so nothing a user notices (doc 23
+§9.3). And the rule is a claim about what a diff **fails** to contain, which CI
+cannot assert; enforcement is the ledger's greppability, Phase 4, and review.
+
+**One correction in passing.** The backlog's own standing warning cited N79 as
+*"still dark today"* — session 126 applied that migration, so the example is
+re-dated rather than dropped: dark for eight days, applied 2026-08-14.
+
+- **Index sync:** `N74` — Phase 8 done; the row **stays live for Phase 4 alone**,
+  because a review gate closes when the owner reads, not when the build ships.
+  Workstream **M**'s roster line updated to match.
+
 ## 2026-08-14 — Session 127: the ladder tells the truth again (N87 built)
 
 **Owner:** *"do the whole thing as a PR"* — plus one correction that changed the

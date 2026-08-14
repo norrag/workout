@@ -12,13 +12,56 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > 21-chapter User Guide with connector retrieval, the versioning/What's-New
 > framework, the day-view focus pass, exercise-level RIR end to end. Live engine
 > params: **v27** (active 2026-08-12). Three things are true but not visible from
-> the entries below, so they are stated here: **(1)** PRs
-> [#222](https://github.com/norrag/workout/pull/222) and
-> [#212](https://github.com/norrag/workout/pull/212) are fully built and **not
-> merged**, so nothing in them is in this tree; **(2)** N79's concurrent-meso
-> migration was **never applied to hosted**, so that released feature is dark;
-> **(3)** the e2e suite is red on `main` (N84). All three are tracked in
-> [`notes/backlog.md`](notes/backlog.md).
+> the entries below, so they are stated here — **two of the three closed later
+> the same day and are left in place as the record**: **(1)** PR
+> [#222](https://github.com/norrag/workout/pull/222) sat built and unmerged for
+> ten days and is now **merged** (session 126's rebase), while
+> [#212](https://github.com/norrag/workout/pull/212) is still built and **not
+> merged**, so nothing in it is in this tree; **(2)** N79's concurrent-meso
+> migration went unapplied to hosted for eight days and was **applied
+> 2026-08-14**, so that released feature is live at last; **(3)** the e2e suite
+> is **still** red on `main` (N84), re-diagnosed 2026-08-14 — the original
+> failure is gone and three others stand, varying between runs. All three are
+> tracked in [`notes/backlog.md`](notes/backlog.md).
+
+## 2026-08-14 — doc 22 Phase 8: the rule that keeps the manual honest (N74)
+
+Docs only. The last build phase of the User Guide is the one that keeps it true
+after the sessions that wrote it are over.
+
+**CLAUDE.md gains hard rule 10.** A PR that changes what a user sees updates the
+chapter that documents it **and** that chapter's rows in
+[`22a-manual-claims.md`](22a-manual-claims.md), in the same PR. It sits with the
+hard rules rather than in `Conventions` for a specific reason: rules 1–9 all
+describe something a reviewer can see in a diff, and a chapter going stale is the
+one failure that appears in none.
+
+Two details the rule carries beyond the obligation itself:
+
+- **The lookup.** *"Update the manual"* is unactionable against 110 sections, so
+  the rule points at the ledger's *source of truth* column as the index **from
+  code back to prose** — grep it for the file, symbol or parameter path you
+  touched, and every row that comes back is prose to re-verify.
+- **The invisible case.** An `engine_params` activation moves user-visible
+  behavior with no code diff at all, which is doc 22 §2.2's own failure mode and
+  the one an author is least likely to file under "documentation". Named
+  explicitly.
+
+**The README is off *"Planning complete — implementation not yet started"***,
+which had been wrong for the whole build and two releases. It now leads with the
+Guide as the app's user-facing documentation (More → Guide), extends its doc
+table past `07` to the later authoritative specs, and points at this file and
+the backlog for live state — so the README never has to make a "shipped but not
+live" claim of its own.
+
+**No release-note entry and no test.** Docs-only, so nothing a user notices
+(doc 23 §9.3); and the rule is a claim about what a diff *fails* to contain,
+which CI cannot assert. Enforcement is the ledger's greppability, Phase 4's
+re-validation, and review.
+
+**`N74` stays open on Phase 4 alone** — the owner's cold read plus the
+re-validation of every ledger row against code. A review gate closes when the
+owner reads, so no build phase could close that row.
 
 ## 2026-08-14 — Schema drift took out week generation, and the week-boundary + skip gaps it exposed (N85, authored 2026-08-04 as PR #222)
 
