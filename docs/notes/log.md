@@ -20,6 +20,14 @@ Append a dated entry whenever a session moves work. Newest first.
 > **Renumbered twice.** The branch wrote *Session 98* (taken by doc 21 Phase 5, same
 > day) under item *N74* (taken by the User Guide). This is the work of 2026-08-04
 > landing on 2026-08-14, so it is numbered as the session that merged it.
+>
+> **Rebased and re-verified 2026-08-14.** 51 commits behind; the two doc files were
+> the only conflicts and all 20 code files merged clean. On the new base: typecheck,
+> lint and a production build are green and **138 test files / 2052 tests pass**. The
+> drift guard's comparison was run by hand against the live hosted migration list —
+> **zero drift**, which it should be, because **N79's missing migration was applied
+> earlier the same day**. That is this PR's own argument, demonstrated: the drift it
+> guards against was sitting in production while it waited to merge.
 
 Reported as an out-of-order-workouts bug. It wasn't one. Two users were stuck
 behind an unapplied migration, and the app's own safety nets are what made it
