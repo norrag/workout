@@ -253,8 +253,9 @@ supplies it, the `LAST BLOCK MEASURED` priming row (`+n%/MO EST. STRENGTH`).
 > goals as three (`CUT` was missing), and described the card as showing
 > `EST. STRENGTH` and *"a model band"*. **It shows neither.** The `YOUR TARGET`
 > range, the per-month rate, the rationale line and the model band are hidden
-> by **N54** (owner, 2026-07-11 — rolled back until N43's v23 band is
-> trustworthy) on all three surfaces that would print them:
+> by **N54** (owner, 2026-07-11; the v23 band it was rolled back to wait for
+> went live 2026-07-12, and the re-enable was **declined 2026-08-14**, so the
+> hiding is permanent) on all three surfaces that would print them:
 > `CreateMacroForm.tsx:204`, `EditMacroForm.tsx:234`, and this macro's own
 > Overview (`macro/[macroId]/page.tsx:79`, `:178` — the `REALISTIC TARGET`
 > card). `EST. STRENGTH` on this screen is only the suffix on the
@@ -643,7 +644,7 @@ defined only in the manual. Recommendation in the last column.
 | **`BALANCE CHECK`**, `PUSH` / `PULL` / `LEGS` | meso Balance | 13 | manual-only; **advisory only** per doc 10 §9 |
 | ~~**`KEY LIFTS`**~~ | **Closed 2026-08-11 (Phase 3g).** Nothing renders the term. The grid went with N10; `key_lifts.n` / `selection` remain on the live row with **no consumer in the repo** — schema plus two removal comments ([`22a`](./22a-manual-claims.md) `D-16`) | — | **no glossary entry.** A card for a term no screen shows is the [`22c`](./22c-app-inventory.md) §C1-a defect this table exists to shrink. Revisit if a key-lifts surface returns |
 | **`VOLUME PR`** / `BEST SESSION VOL` | exercise Overview | 13 | manual-only |
-| **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | ~~add to glossary~~ — **declined 2026-08-15** for this table's own reason: every screen that would print it is hidden (**`D-15`**, N54), so the card would be the §C1-a defect. Revisit with N43/v23 |
+| **`model band`** / `REALISTIC TARGET` | create macro, macro Overview | 14 | ~~add to glossary~~ — **declined 2026-08-15** for this table's own reason: every screen that would print it is hidden (**`D-15`**, N54), so the card would be the §C1-a defect. **Closed 2026-08-14** — the owner declined the re-enable, so there will never be a screen behind it |
 | **`MEASURED RMR`** (`KCAL/DAY`) | macro Overview | 16 | manual-only |
 | **`NOT COMPARABLE`** | macro/DEXA surfaces | 13, 16 | manual-only — teach it as an answer |
 | **`day slot`** | not rendered, but the model behind "the same exercise on the same day" | 3, 13 | **add to glossary** — ✅ added 2026-08-08 (Phase 3a, ch. 3) |

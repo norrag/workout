@@ -15,6 +15,82 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-14 — Session 126: the migration lands, #222 is rebased, and the e2e diagnosis was wrong (N79, N85, N84, N87, N52)
+
+> Session 125 is the rebased PR #222 branch's own entry; it arrives with that
+> merge.
+
+**Owner, going to bed:** *"you're cleared on the first task… rebase and update
+222 for merge, and address the e2e suite. I do not want to flip #4."*
+
+**N79 first, because it was the only thing actively broken.** The
+concurrent-mesocycles migration is applied — hosted `20260814014300`, pre-check
+0 rows, and afterwards `pg_indexes` shows `mesocycles_one_active_per_macrocycle`
+with `mesocycles_one_active_per_user` gone. Advisors clean, no new findings. The
+feature had been dark for eight days: merged in #226, released inside 1.1.0,
+refused by the database the whole time.
+
+**#222 rebased and re-verified.** The clone was **shallow**, which is why the
+first attempt produced add/add conflicts on every file in the repo — there was
+no common ancestor to diff against. After `--unshallow` the real picture: 51
+commits behind, and **all 20 code files merged clean**; the only conflicts were
+four doc files, each a both-added-at-the-top. Two ID collisions the branch
+carried are fixed rather than replayed — its backlog row said `N74` (the User
+Guide holds it) and its log entry said `Session 98` (doc 21 Phase 5, same day) —
+and the bookkeeping commit that wrote them was dropped. On the new base:
+typecheck, lint, production build green, **138 test files / 2052 tests pass**.
+The drift guard's own comparison, run by hand against hosted: **zero drift** —
+because N79 had been applied an hour earlier. The guard was written for exactly
+that failure and spent eight days unmerged while an instance of it sat in
+production.
+
+**Then the e2e suite, where the interesting thing is that N84 was wrong.**
+Diagnosed from run 31761203458 and its downloaded Playwright report rather than
+from the row. **`bodyspec-integration.spec.ts:106` — the deterministic
+`waitForURL` hang the whole row was built around — now passes in 3.6 s.** It
+died with the lock file and came back with it; `v_body_comp_history` was never
+implicated. The failing set has changed twice in three runs, which is itself a
+finding.
+
+What actually fails now:
+
+- **`bodyspec:159`** — after `KEEP CURRENT` the card never clears. The page
+  snapshot is what makes this diagnosable: **both buttons render `[disabled]`**,
+  so `useTransition`'s `pending` never returns. The action itself is correct
+  (`resolveScanProposal` + `revalidatePath`); it is the transition round trip
+  that hangs. Left open — not reproducible here.
+- **`prescribed-progression:205`** — reps stay at 11 when the weight drops.
+  Probably **N87**, below.
+- **`bodyweight-quick-entry:60`** — strict mode, two identical profile sublines,
+  passed on retry. Both copies carry the right text, so this is an App Router
+  transition with both trees mounted. **Fixed** by scoping the assertion to the
+  profile card, which is what it was ever about.
+
+**N87 is the real catch of the session, and it came out of chasing that middle
+one.** `grep 'set is_active = true where version' supabase/migrations/` returns
+**one hit: version 18**. Every version after that is inserted inactive and
+activated by a human through the MCP tools, which write to hosted and leave
+nothing in the repo. **v22, v24, v25 and v27 — the live one — have no migration
+at all.** So a fresh local stack, which is precisely what CI builds on, runs
+**v18** while production runs **v27**: no earned-step progression, no
+`rate_source:"plan"`, no envelope loop, no strength model, no measuring band.
+Every DB-backed test has been validating an engine that stopped being production
+behavior on 2026-07-11. Unit and golden tests pass explicit fixtures and are
+unaffected. **And #222's guard structurally cannot catch this** — it compares
+migrations, and an activation is not one. Same class of drift, one level up, in
+the blind spot of the fix for it.
+
+**N52/N54 declined, and the decline is written into the code.** Every
+*"re-enable rides N43/v23"* comment now reads as settled rather than pending —
+the condition was met on 2026-07-12 and will never be acted on. No Guide chapter
+needed touching: Phase 3g had already written ch. 14 positively (the band is the
+block's contract, it paces and grades in the background, a connected assistant
+is where you read it), so the prose was true and is now simply permanent.
+
+- **Index sync:** N79 → done (archive at next sweep); N52 → `wontfix`; N84
+  re-diagnosed against real evidence; **N87 opened**; N85 → `done (PR #222)` on
+  that branch.
+
 ## 2026-08-14 — Session 125: production schema drift (N85) — and the ordering model it was blamed on
 
 > **Renumbered twice.** The branch wrote *Session 98* (taken by doc 21 Phase 5, same

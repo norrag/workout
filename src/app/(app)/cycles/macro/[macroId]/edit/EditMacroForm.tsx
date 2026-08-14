@@ -250,7 +250,8 @@ export function EditMacroForm({
 
       {/* engine plan shape (recomputed live). The YOUR TARGET range + rate are
           hidden (N54, owner 2026-07-11 — same re-hide as the overview and
-          create cards; re-enable rides N43/v23) — `planMacrocycle` still runs
+          create cards; the owner DECLINED re-enabling on 2026-08-14 — N52/N54
+          wontfix) — `planMacrocycle` still runs
           for the block math. */}
       <div className="mt-[18px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
         <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">

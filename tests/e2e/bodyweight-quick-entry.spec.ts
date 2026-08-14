@@ -57,7 +57,14 @@ test("quick entry appends a manual point; same-day re-entry replaces it", async 
   await page.goto("/more");
 
   // the profile card wears the freshness label (09 2026-07-11 §2)…
-  await expect(page.getByText(/200 LB · AS OF/)).toBeVisible();
+  // Scoped to the profile card rather than the page: during an App Router
+  // transition the outgoing and incoming trees can both be mounted, and an
+  // unscoped getByText then resolves to two identical sublines and fails
+  // strict mode (N84 — it passed on retry, so both copies carry the same
+  // correct text). The card is what this assertion is actually about.
+  await expect(
+    page.getByRole("link", { name: /BW Tester/ }).first(),
+  ).toContainText(/200 LB · AS OF/);
   // …and the quick-entry row starts empty: the profile scalar is not a point
   const row = page.getByRole("button", { name: /Log bodyweight/ });
   await expect(row).toContainText("—");

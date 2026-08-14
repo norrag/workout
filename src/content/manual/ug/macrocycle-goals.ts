@@ -15,7 +15,9 @@
 //     the phase spread. The reader chooses name, goal, duration, block length
 //   - **THE FINDING (`D-15`).** The `YOUR TARGET` / rate / rationale / model-band
 //     cards are HIDDEN on both the create and edit forms — N54, owner
-//     2026-07-11, rolled back until the N43 v23 band is trustworthy
+//     2026-07-11; re-enable declined by the owner 2026-08-14 (N52/N54
+//     wontfix), so the band is permanently a background/connector-only
+//     quantity and this chapter's positive framing is the settled truth
 //     (`CreateMacroForm.tsx:204`, `EditMacroForm.tsx:234`,
 //     `macro/[macroId]/page.tsx:79`). `planMacrocycle` still runs for the block
 //     math, and `LAST BLOCK MEASURED` stays because it is measured. So the band

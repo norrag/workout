@@ -218,7 +218,8 @@ export function CreateMacroForm({
 
       {/* engine plan shape (recomputed live). The YOUR TARGET range + rate +
           rationale + MODEL BAND priming row are hidden again (N54, owner
-          2026-07-11 — the Phase-R2 restore is rolled back until N43's v23 band
+          2026-07-11; re-enable DECLINED by the owner 2026-08-14, so this is settled
+          rather than pending — the v23 band it waited on went live 2026-07-12
           makes the numbers trustworthy) — `planMacrocycle` still runs for the
           block math; LAST BLOCK MEASURED stays (it's measured, not modeled). */}
       <div className="mt-[18px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
@@ -258,7 +259,7 @@ export function CreateMacroForm({
         {/* prior-block priming (doc 17 §5, 09-changelog 2026-07-11 §3):
             display-only measured rate — never blended into the target. The
             "model band" half of the copy returns with the target cards (N54
-            re-hide; re-enable rides N43/v23). */}
+            re-hide; re-enable declined 2026-08-14 — N52/N54 wontfix). */}
         {priorBlock && (
           <div className="mt-3 flex items-baseline justify-between border-t border-ink/[0.18] pt-2.5">
             <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/50">
