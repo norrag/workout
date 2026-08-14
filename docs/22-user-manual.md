@@ -9,9 +9,12 @@
 > Guide section. Any two-manual language below records the superseded build
 > history; this amendment wins.
 
-**Status:** building — the Guide, connector retrieval and **wave 1 of the link
-placement pass** are built; Phase 4 (the owner's cold read), 7c and Phase 8
-remain. Phases in [§11](#11-the-phased-plan).
+**Status:** built and released — the Guide (21 chapters, 110 sections), connector
+retrieval, the full link-placement pass and **Phase 8's maintenance rule** all
+shipped, the Guide block as release **1.1.0** (2026-08-13). **Phase 4 — the
+owner's cold read plus the re-validation of every
+[`22a`](./22a-manual-claims.md) row against code — is the only phase left**, and
+it is owner-gated. Phases in [§11](#11-the-phased-plan).
 **Owner ask (2026-08-05):** review the repository, the app's real functionality,
 and every note/doc produced so far, then produce two user-facing manuals — a
 **User Guide** and a dedicated **AI/MCP Manual** that lives under the AI
@@ -159,8 +162,8 @@ manual reader, so the house-style transcription must be recorded in
 search index, any manual-maintenance rule. Those are net-new — hence Phases 1–2.
 Phase 1 landed the block model, the section-ID scheme, the length budget, the
 house-styled renderer, and the section/chapter routes; **Phase 2 landed the map,
-search, deep-link entry, the five content contracts and the three D3 guards**.
-Only the maintenance rule remains outstanding (Phase 8).
+search, deep-link entry, the five content contracts and the three D3 guards**;
+**Phase 8 landed the maintenance rule** as CLAUDE.md hard rule 10.
 
 ---
 
@@ -1717,7 +1720,7 @@ review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 > undefined terms need glossary entries before anything can link to one, and
 > that is a copy pass under §8.1, not a placement pass.
 
-### Phase 8 — Maintenance rules
+### Phase 8 — Maintenance rules — ✅ **DONE 2026-08-14**
 
 | Scope | Size |
 |---|---|
@@ -1725,6 +1728,38 @@ review of the AI Manual folds into **Phase 4**, which now covers both manuals.
 
 *(Already done when this plan was written: the doc-22 entry in the CLAUDE.md doc
 index, the `N74` backlog row + `log.md` entry, the workstream **M** pointer.)*
+
+> **Landed.** The rule is **CLAUDE.md hard rule 10**, not a `Conventions`
+> bullet, because the failure it prevents is silent: rules 1–9 are all things a
+> reviewer can see in a diff, and a chapter going stale is the one thing that
+> never appears in one.
+>
+> - **The rule names the lookup, not just the obligation.** "Update the manual"
+>   is unactionable if the author has to guess which of 110 sections is affected,
+>   so the rule points at [`22a`](./22a-manual-claims.md)'s *source of truth*
+>   column as the index **from code back to prose**: grep it for the file, symbol
+>   or parameter path you touched, and every row that comes back is prose to
+>   re-verify. It also names the case with no diff at all — an `engine_params`
+>   activation — which is [§2.2](#2-why-this-is-harder-than-it-looks-read-before-phase-0)'s
+>   own failure mode, and the one an author is least likely to think of as a
+>   documentation change. New links keep their two rows
+>   ([`22e`](./22e-link-placement-audit.md) and `src/lib/guide-links.ts`).
+> - **The `22a` index entry now points at the rule** rather than at a phase that
+>   had not happened yet.
+> - **The README was two releases out of date**, still reading *"Planning
+>   complete — implementation not yet started"* and stopping its doc table at
+>   `07`. It now leads with the Guide as the app's user-facing documentation
+>   (More → Guide), carries the later authoritative specs, and states the real
+>   status with `PROGRESS.md` and the backlog as the live detail — which is where
+>   *"shipped but not live"* is tracked, so the README never has to claim it.
+> - **No release-note entry and no test.** Docs-only, so nothing a user notices
+>   (doc 23 §9.3). And the rule is a claim about what a diff **fails** to
+>   contain, which CI cannot assert; its enforcement is the ledger's
+>   greppability, Phase 4's re-validation, and review.
+>
+> **`N74` is not closed, and this phase cannot close it.** Phase 4 is the owner's
+> cold read and is owner-gated, so the row stays live carrying that one phase;
+> every other phase is done and released.
 
 ---
 

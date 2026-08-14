@@ -16,6 +16,7 @@ WORKOUT is a production-quality, PWA-first web application for scientifically tr
 - **Exercise & template library** — Stock exercises for everyone, custom exercises per user, and shareable templates (workout splits grouped by emphasis, days/week, etc.).
 - **Deep insights** — Progress scoring and trend analysis across exercises, muscle groups, and cycles.
 - **MCP connector** — Connect your training data to the LLM of your choice for tailored analysis, mesocycle planning, template creation, and recommendations grounded in your actual data.
+- **In-app User Guide** — 21 chapters covering every screen, every term, and plain-language explanations of the machinery that produces the numbers. Reachable from **More → Guide**, searchable, and readable by a connected assistant through the same section index.
 - **Multi-user** — Full auth, per-user data isolation, and controlled sharing of custom content.
 
 ## Tech stack
@@ -30,7 +31,14 @@ WORKOUT is a production-quality, PWA-first web application for scientifically tr
 
 ## Documentation
 
-The build is fully specified before code is written. Start here:
+Two audiences, two places.
+
+**Using the app** — the **User Guide**, in the app itself under **More → Guide**:
+21 chapters split into short, independently addressable sections, with a search
+over all of them. Chapter 18 (*Training with AI*) covers the connector, and
+`docs/22-user-manual.md` is the spec behind it.
+
+**Building the app** — the build is specified before code is written:
 
 | Doc | Purpose |
 |---|---|
@@ -41,8 +49,17 @@ The build is fully specified before code is written. Start here:
 | [docs/05-mcp-connector.md](docs/05-mcp-connector.md) | MCP server design: tools, resources, auth |
 | [docs/06-design-system.md](docs/06-design-system.md) | Visual language, tokens, components |
 | [docs/07-implementation-plan.md](docs/07-implementation-plan.md) | Phased build plan with milestones and acceptance criteria |
+| [docs/08-design-decisions.md](docs/08-design-decisions.md) · [docs/09-design-changelog.md](docs/09-design-changelog.md) | The design baseline and its dated amendments — 09 wins over 08 and 06 |
+| [docs/10-metrics-spec.md](docs/10-metrics-spec.md) | Authoritative for every metric definition and the default engine parameters |
+| [docs/16-prescribed-progression.md](docs/16-prescribed-progression.md) · [docs/17-macrocycle-goals.md](docs/17-macrocycle-goals.md) | Progression internals; the macrocycle goal layer |
+| [docs/19-prescription-explanation-v3.md](docs/19-prescription-explanation-v3.md) · [docs/21-exercise-level-rir.md](docs/21-exercise-level-rir.md) | How a prescription is explained; exercise-level RIR |
+| [docs/22-user-manual.md](docs/22-user-manual.md) · [docs/22a-manual-claims.md](docs/22a-manual-claims.md) | The User Guide's spec, and the claims ledger tying every sentence to the code that makes it true |
+| [docs/23-versioning-releases.md](docs/23-versioning-releases.md) | Versioned releases, release notes, and the What's New gate |
 
-## Getting started (once scaffolded)
+[CLAUDE.md](CLAUDE.md) carries the full annotated index (including the docs not
+listed here) and the hard rules every change is held to.
+
+## Getting started
 
 ```bash
 npm install
@@ -54,4 +71,13 @@ Local Supabase development uses the Supabase CLI (`supabase start`, migrations i
 
 ## Status
 
-🏗️ **Planning complete — implementation not yet started.** Follow [docs/07-implementation-plan.md](docs/07-implementation-plan.md) for the build sequence.
+**Built and in use — released at v1.1.0** (the User Guide block, 2026-08-13;
+v1.0.0 was cut a week earlier). Releases are versioned `MAJOR.FEATURE.FIX` per
+[docs/23-versioning-releases.md](docs/23-versioning-releases.md), and the
+registry in `src/content/releases/` is the record of what each one shipped.
+
+For where the build actually stands — including anything shipped but not yet
+live — read [docs/PROGRESS.md](docs/PROGRESS.md) and the live index in
+[docs/notes/backlog.md](docs/notes/backlog.md);
+[docs/07-implementation-plan.md](docs/07-implementation-plan.md) is the original
+build sequence.
