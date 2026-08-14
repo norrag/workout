@@ -60,7 +60,8 @@ What actually fails now:
   (`resolveScanProposal` + `revalidatePath`); it is the transition round trip
   that hangs. Left open — not reproducible here.
 - **`prescribed-progression:205`** — reps stay at 11 when the weight drops.
-  Probably **N87**, below.
+  Looked like **N87** for an hour. It is not: the test **passed** on PR #222's
+  run against the same v18 database.
 - **`bodyweight-quick-entry:60`** — strict mode, two identical profile sublines,
   passed on retry. Both copies carry the right text, so this is an App Router
   transition with both trees mounted. **Fixed** by scoping the assertion to the
@@ -79,6 +80,17 @@ behavior on 2026-07-11. Unit and golden tests pass explicit fixtures and are
 unaffected. **And #222's guard structurally cannot catch this** — it compares
 migrations, and an activation is not one. Same class of drift, one level up, in
 the blind spot of the fix for it.
+
+**Then #222's own CI run arrived and reframed all of it.** A *different* set
+failed again: `:106` failed, `:159` was flaky, and `prescribed-progression`
+passed — and the run took **3.5 minutes against `main`'s 53.5 seconds for the
+same nine tests**. Three runs, three failing sets, a 4× runtime spread, every
+failure from the same bodyspec/progression cluster. That is **runner-speed
+flakiness in a timing-sensitive cluster, not three product defects**, and it
+means the next step is one local repro rather than three fixes. The single datum
+that survives every run is `:159`'s snapshot — both buttons `[disabled]` — so a
+`useTransition` really does fail to settle, at least some of the time. N87 loses
+its supporting failure and stands on its own, which it comfortably does.
 
 **N52/N54 declined, and the decline is written into the code.** Every
 *"re-enable rides N43/v23"* comment now reads as settled rather than pending —
