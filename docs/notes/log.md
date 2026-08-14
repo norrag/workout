@@ -4,7 +4,85 @@ Append a dated entry whenever a session moves work. Newest first.
 (Formerly "Triage log" — the area was rebranded to an ongoing notes system on
 2026-06-26; see the entry below.)
 
+> **Dates in this log are not a reliable sort key; the order is.** Entries run
+> **newest session first**, and where a session number is given that is the
+> authoritative sequence. The dates come from each session's own clock, which
+> has drifted from real time more than once — sessions 114–123 all carry
+> doc-side dates that run ahead of the merge dates their own PRs are stamped
+> with (session 119, dated 2026-08-10 from a `mcp_write_audit` row, sits below
+> entries dated 2026-08-15 whose PRs merged on 2026-08-13). Earlier sessions
+> left this as found rather than renumbering, and so does this one: **when a
+> date matters, take it from the PR's merge timestamp or a DB row, not from the
+> heading.** Sessions are numbered from 93 onward; **120 was never used.**
+
+## 2026-08-14 — Session 124: the cleanup pass — 28 rows swept, two abandoned PRs found, one feature dark
+
+**Owner:** *"Do a clean up and organization pass of the docs and notes sections.
+Make sure everything up to date, what done is archived, notes are organized."*
+
+**The sweep itself was overdue and the size says so.** No reconciliation had run
+since 2026-08-02, across twelve merged PRs (#215 → #247, including the 1.1.0
+cut). 48 live rows, **28 of them terminal** — every PR confirmed merged against
+the GitHub API before archiving. Included in that: the `answered` question rows
+S1–S3/S6–S8/PH39, live since the June triage, which are terminal by the
+lifecycle's own definition (the substance is in `A-engine-metrics.md`; the tasks
+they spawned are their own `T-A*` rows). **N35** closed on its own stated
+criterion — *"stays live only until v20 is activated"* — which was met on
+2026-07-11 when v21, "otherwise identical to v20", went active.
+
+**But the sweep was not the finding. Three things the index could not see were.**
+
+**1. Two fully built PRs had been abandoned in plain sight.** PR **#222**
+(2026-08-04) and PR **#212** (2026-07-30) are both complete, both reviewed-ready,
+and **neither is on `main`** — #222's `db:check`, `skipWorkout` and `isWeekLocked`
+are absent from the tree today. Each wrote its backlog row *on its own branch*,
+so `main`'s index never learned they existed, and **no sweep over merged PRs can
+find a PR that never merged.** They also collided: #222 claimed `N74` (taken by
+the User Guide) and #212 claimed `N67` (taken by #215 the same week). Filed here
+as **N85** and **N86**, and the gap is closed structurally — `backlog.md` gains
+an [open-PR register](./backlog.md#open-pull-requests) and `CLAUDE.md` gains
+**rule 4**, which makes reconciling open PRs part of the session-start sweep.
+
+**2. A released feature is dark, and the runbook step was never struck.**
+**N79** (concurrent mesocycles) merged in PR #226 and shipped inside 1.1.0, but
+`20260806000001_concurrent_mesocycles` **is not in the hosted migration list** —
+the applied chain jumps `20260804213026` → `20260806210701`. `pg_indexes`
+confirms it: `mesocycles_one_active_per_user` is still there and
+`mesocycles_one_active_per_macrocycle` was never created, so the database still
+enforces one active meso per *user* and a second standalone block raises 23505
+against code that expects success. This is **the same failure class #222 was
+written to guard against** — which is the argument for merging #222, made by the
+repo rather than by the PR. `CLAUDE.md` **rule 5** now requires checking hosted
+migrations and the active `engine_params` row before archiving a `done` row.
+
+**3. N52/N54's remainder was silently dropped a month ago.** Both were told to
+*"ride the v23 activation"*. v23 and the v24 `rate_source:"plan"` flip went live
+2026-07-12 (PR #183). Neither shipped: `cycles/macro/[macroId]/page.tsx` still
+carries both N54 comments and the `REALISTIC TARGET` card is still hidden. Doc 22
+found the same hole from the other side and logged it as ledger `D-15` → `D-20`
+— *a chapter describing a band the reader cannot see*. The re-enable is a pure
+view change; the row is corrected to `ready` and needs one owner yes.
+
+**Also done.** `README.md`'s workstream roster rebuilt against reality (it still
+listed N71 as open in **A** and N53 as open in **J**, both long shipped);
+workstreams **R** and **S** declared — **S** was already in use by N83/N84
+without ever being in the roster. **N83** moved to `ready` (its blocker, Phase
+7a's affordance ruling, shipped in #244). Five owner device-checks that were
+holding otherwise-terminal rows open (N34, N47, N56, N57, N59) consolidated into
+one **O-2** row. Doc-side: `PROGRESS.md`'s duplicate empty Phase-3f heading
+removed and the misfiled 2026-08-09 MCP entry moved out of the June section;
+`manual-operations.md` reconciled against the live `engine_params` row (**v27**
+active since 2026-08-12) and the hosted migration list; root `CLAUDE.md`'s doc
+index corrected (it still advertised *"v25 active, v26 inactive"*).
+
+- **Index sync:** 28 rows → `archive.md`; N52/N74/N79/N83 corrected in place;
+  N85, N86, O-2 opened. Live index 48 → 23.
+
 ## 2026-08-13 — Release 1.1.0: the Guide block goes live (N74 / N80 / N82, PR #247)
+
+> Unnumbered: the release cut ran as its own pass after session 123, and PR #247
+> merged at 2026-08-13T21:25Z — after #246 (18:35Z), which is why it sits above
+> the entries dated 2026-08-15.
 
 The owner approved the staged notes and the rendered notification, then asked
 for the production cut. The release registry now contains a frozen `1.1.0`

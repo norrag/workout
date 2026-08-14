@@ -2,6 +2,24 @@
 
 Running log of implementation state against [07-implementation-plan.md](07-implementation-plan.md). Update this file in any PR that moves a phase forward.
 
+> **Ordering.** Newest first. Entry dates come from each session's own clock and
+> have drifted from real merge dates (see `docs/notes/log.md`'s date note) — when
+> a date matters, take it from the PR. Reconciled 2026-08-14: a duplicate empty
+> Phase-3f heading was removed and the 2026-08-09 MCP-connector entry was moved
+> up out of the June block it had been appended to.
+
+> **Where things stand (2026-08-14).** Shipped and released: **v1.1.0** — the
+> 21-chapter User Guide with connector retrieval, the versioning/What's-New
+> framework, the day-view focus pass, exercise-level RIR end to end. Live engine
+> params: **v27** (active 2026-08-12). Three things are true but not visible from
+> the entries below, so they are stated here: **(1)** PRs
+> [#222](https://github.com/norrag/workout/pull/222) and
+> [#212](https://github.com/norrag/workout/pull/212) are fully built and **not
+> merged**, so nothing in them is in this tree; **(2)** N79's concurrent-meso
+> migration was **never applied to hosted**, so that released feature is dark;
+> **(3)** the e2e suite is red on `main` (N84). All three are tracked in
+> [`notes/backlog.md`](notes/backlog.md).
+
 ## 2026-08-13 — Release 1.1.0 production cut (N74 / N80 / N82, PR #247)
 
 The staged Guide block is frozen into `src/content/releases/1.1.0.ts` and added
@@ -23,7 +41,70 @@ clean local production build is blocked outside the changed surface by Next's
 Windows/Box `readlink` call on the regular client-error route; Linux CI is the
 authoritative build check for the PR.
 
-## 2026-08-15 (latest, session 4) — doc 22 Phase 7 closes: N81's inline term (N74 / N81)
+## 2026-08-09 — MCP connector on the stateless spec (2026-07-28) + SDK v2
+
+The MCP spec turned the protocol from a bidirectional stateful one into
+stateless request/response. The connector now speaks it.
+
+**Dependencies.** `@modelcontextprotocol/sdk@1.26.0` → `@modelcontextprotocol/server@^2.0.0`
+(the v2 SDK is split into per-role packages), `mcp-handler@^1.1.0` → `^2.1.0`,
+and `zod@^3.25.0` → `^4.2.0` (the v2 SDK requires zod 4). The Redis dependency
+the old SSE transport needed is gone from the tree with it.
+
+**Protocol.** No `initialize` handshake and no `Mcp-Session-Id`: a fresh server
+is built per request, so identity now resolves from `ctx.http.authInfo` rather
+than a top-level `extra.authInfo`. Client version/info/capabilities arrive in
+each request's reserved `_meta` envelope, with `server/discover` as the optional
+negotiation that replaces the handshake. `Mcp-Method`/`Mcp-Name` headers make
+the call routable without parsing the body — and a header/body disagreement is a
+400. GET/DELETE (the 2025 session operations) answer 405. **2025-era clients are
+still served from the same handler** through the SDK's stateless legacy
+fallback, so existing connectors keep working.
+
+**Cacheable results** are new in this revision. `tools/list` is filtered per
+principal (PH33 admin visibility) and the user-scoped resources are per-user, so
+both are pinned `private` / `ttlMs: 0` — a shared cache would serve one caller's
+view to another. The two resources that carry no user data
+(`workout://coaching-guide`, `workout://user-guide-index`) are `public` for an
+hour, which stops a large static body being re-sent on every connection.
+
+**API migration.** `registerTool`/`registerResource` were already the v2 shape,
+and raw-shape `inputSchema`s are still auto-wrapped, so the 58 tool
+registrations needed no edits. `visibility.ts` moved to the string-method
+`setRequestHandler("tools/list", …)` (the request-schema overload is no longer
+public API) and now types against the SDK's real `ListToolsResult` instead of a
+hand-rolled `{ name }` placeholder.
+
+**zod 4 fallout**, all outside the MCP layer:
+- `required_error` is removed → an `error` customizer narrowed on
+  `input === undefined` (`src/lib/env.ts`), preserving the old wording.
+- An enum-keyed `z.record` is now **exhaustive**; zod 3 accepted a subset. The
+  three affected `engine_params` fields moved to `z.partialRecord` to preserve
+  runtime semantics exactly — an exhaustive schema would fail any historical row
+  missing a key and flip its `is_replayable` / `params_hash`. Every reader
+  already falls back on a missing key (`params.rounding[eq] ?? step`), so the
+  now-`Partial` type needed no code changes.
+- `z.record(v)` requires an explicit key type (`src/lib/bodyspec/schemas.ts`).
+- `.uuid()` now enforces the RFC 9562 version/variant nibbles. Real IDs are
+  Postgres v4 UUIDs and pass; one synthetic test placeholder was not well-formed
+  and was corrected. This is a genuine (and welcome) tightening at the tool
+  boundary.
+
+**New:** `src/lib/mcp/__tests__/protocol.test.ts` — conformance against the
+**real** handler (every tool and resource registered) over genuine requests of
+both protocol eras, rather than the stubbed server the per-tool suites use. It
+covers the stateless listing, `server/discover`, the header/body agreement rule,
+cache scopes, admin-tool hiding, hard rule #5 (no `user_id` on any tool), the
+405s, and the legacy fallback. It is what will catch the next SDK upgrade that
+type-checks but no longer serves.
+
+Typecheck, lint, production build clean; suite green at 1935 (+12).
+
+**Remaining / external:** adopting **CIMD** (this revision deprecates DCR, with a
+twelve-month window) waits on Supabase's authorization server advertising it —
+no code change here, tracked in `deployment/manual-operations.md`.
+
+## 2026-08-15 (session 4) — doc 22 Phase 7 closes: N81's inline term (N74 / N81)
 
 The last unbuilt part of Phase 7, and the affordance the owner asked for at
 review round 4: *"Advanced terms deserve definitions when used… identified with
@@ -394,8 +475,6 @@ manuals — most of which landed in the Phases 3g–3i/5/6 that merged onto `mai
 while this round sat unreconciled. Reconciled onto that state (see the
 `docs/notes/log.md` entry for the mechanics); two number collisions resolved —
 `D-15` → `D-20`, `N82` → `N83`. All suites green; typecheck and lint clean.
-
-## 2026-08-11 — doc 22 Phase 3f: how your next weight is chosen (N74)
 
 ## 2026-08-14 — Day View: the focus pass (N82, staged for 1.1.0)
 
@@ -9760,66 +9839,3 @@ Full suite green (563, +3), typecheck + lint + production build clean.
   dashboard-only setting, tracked in `manual-operations.md`).
 
 No application code changed (view columns unchanged → no type regeneration).
-
-## 2026-08-09 — MCP connector on the stateless spec (2026-07-28) + SDK v2
-
-The MCP spec turned the protocol from a bidirectional stateful one into
-stateless request/response. The connector now speaks it.
-
-**Dependencies.** `@modelcontextprotocol/sdk@1.26.0` → `@modelcontextprotocol/server@^2.0.0`
-(the v2 SDK is split into per-role packages), `mcp-handler@^1.1.0` → `^2.1.0`,
-and `zod@^3.25.0` → `^4.2.0` (the v2 SDK requires zod 4). The Redis dependency
-the old SSE transport needed is gone from the tree with it.
-
-**Protocol.** No `initialize` handshake and no `Mcp-Session-Id`: a fresh server
-is built per request, so identity now resolves from `ctx.http.authInfo` rather
-than a top-level `extra.authInfo`. Client version/info/capabilities arrive in
-each request's reserved `_meta` envelope, with `server/discover` as the optional
-negotiation that replaces the handshake. `Mcp-Method`/`Mcp-Name` headers make
-the call routable without parsing the body — and a header/body disagreement is a
-400. GET/DELETE (the 2025 session operations) answer 405. **2025-era clients are
-still served from the same handler** through the SDK's stateless legacy
-fallback, so existing connectors keep working.
-
-**Cacheable results** are new in this revision. `tools/list` is filtered per
-principal (PH33 admin visibility) and the user-scoped resources are per-user, so
-both are pinned `private` / `ttlMs: 0` — a shared cache would serve one caller's
-view to another. The two resources that carry no user data
-(`workout://coaching-guide`, `workout://user-guide-index`) are `public` for an
-hour, which stops a large static body being re-sent on every connection.
-
-**API migration.** `registerTool`/`registerResource` were already the v2 shape,
-and raw-shape `inputSchema`s are still auto-wrapped, so the 58 tool
-registrations needed no edits. `visibility.ts` moved to the string-method
-`setRequestHandler("tools/list", …)` (the request-schema overload is no longer
-public API) and now types against the SDK's real `ListToolsResult` instead of a
-hand-rolled `{ name }` placeholder.
-
-**zod 4 fallout**, all outside the MCP layer:
-- `required_error` is removed → an `error` customizer narrowed on
-  `input === undefined` (`src/lib/env.ts`), preserving the old wording.
-- An enum-keyed `z.record` is now **exhaustive**; zod 3 accepted a subset. The
-  three affected `engine_params` fields moved to `z.partialRecord` to preserve
-  runtime semantics exactly — an exhaustive schema would fail any historical row
-  missing a key and flip its `is_replayable` / `params_hash`. Every reader
-  already falls back on a missing key (`params.rounding[eq] ?? step`), so the
-  now-`Partial` type needed no code changes.
-- `z.record(v)` requires an explicit key type (`src/lib/bodyspec/schemas.ts`).
-- `.uuid()` now enforces the RFC 9562 version/variant nibbles. Real IDs are
-  Postgres v4 UUIDs and pass; one synthetic test placeholder was not well-formed
-  and was corrected. This is a genuine (and welcome) tightening at the tool
-  boundary.
-
-**New:** `src/lib/mcp/__tests__/protocol.test.ts` — conformance against the
-**real** handler (every tool and resource registered) over genuine requests of
-both protocol eras, rather than the stubbed server the per-tool suites use. It
-covers the stateless listing, `server/discover`, the header/body agreement rule,
-cache scopes, admin-tool hiding, hard rule #5 (no `user_id` on any tool), the
-405s, and the legacy fallback. It is what will catch the next SDK upgrade that
-type-checks but no longer serves.
-
-Typecheck, lint, production build clean; suite green at 1935 (+12).
-
-**Remaining / external:** adopting **CIMD** (this revision deprecates DCR, with a
-twelve-month window) waits on Supabase's authorization server advertising it —
-no code change here, tracked in `deployment/manual-operations.md`.

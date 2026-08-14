@@ -133,6 +133,25 @@ work. Two rules, and the resume sweep that backstops them:
    **merged** (git log / list merged PRs). If merged, sweep the row to `archive.md`
    with its PR link and a one-line resolution, per the purge policy. This is what
    makes the system self-correct even when a prior session forgot rule 1.
+4. **Also sweep the *open* PRs, and keep the register truthful** — list every
+   open PR on the repo and confirm each maps to a live row in
+   [`backlog.md`](./backlog.md#open-pull-requests). Rules 1–3 only look at work
+   that merged, which is exactly why they missed **#212** (2026-07-30) and
+   **#222** (2026-08-04): both were fully built, both wrote their backlog row
+   *on the branch*, so `main`'s index never learned they existed and no sweep
+   over merged PRs could ever find them. They sat for weeks while `main` moved
+   tens of PRs past them. A branch-local row is invisible; the register on
+   `main` is the only place an open PR can be seen from a cold start.
+5. **`done (PR #n)` ≠ live.** A merged PR can still be waiting on something no
+   code review can see — a migration applied only to the repo, or an
+   `engine_params` version shipped INACTIVE. Before archiving a row whose PR
+   touched `supabase/migrations/` or shipped a parameter version, check the real
+   thing: `mcp__Supabase__list_migrations` against the hosted project, and
+   `mcp__workout__get_engine_params` for the active row. **N79** is the standing
+   example — merged in #226, released in 1.1.0, and still dark on 2026-08-14
+   because its migration was never applied. Anything found un-applied belongs in
+   [`../deployment/manual-operations.md`](../deployment/manual-operations.md)
+   *and* stays live here until it is done.
 
 ## Consolidation & purge policy (keeping the live index lean)
 
@@ -175,7 +194,12 @@ An ongoing system rots if every closed item stays in the live table forever. So:
    for every `done` / `done (PR #<n>)` / "PR pending" row, confirm whether its PR
    has merged, and archive the merged ones **before** doing anything else. Do this
    every session, not only when something looks stale — it's the backstop for any
-   row a prior session left un-swept.
+   row a prior session left un-swept. Then run rules 4 and 5 in the same pass —
+   reconcile the [open-PR register](./backlog.md#open-pull-requests), and check
+   hosted migrations + the active `engine_params` row against anything recently
+   marked done. The 2026-08-14 cleanup found 28 terminal rows, two abandoned
+   PRs and one dark feature in a single sitting because none of the three had
+   been run since 2026-08-02.
 4. If the owner handed over notes, run the **intake protocol** above.
 5. Otherwise pick the next item by priority + `ready`-ness, respecting
    `blocked on` dependencies.
