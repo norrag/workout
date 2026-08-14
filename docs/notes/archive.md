@@ -11,6 +11,18 @@ for the purge policy.
 
 ---
 
+## Swept 2026-08-14 (later still) — the owner's cold read closes N74
+
+Phase 4 was the one phase doc 22 had left, and it isn't a PR — it's the owner
+reading the finished Guide end to end and re-checking [`22a`](../22a-manual-claims.md)'s
+claims against the live code. The owner did that and confirmed everything holds:
+nothing stale, nothing incoherent across the eleven build phases and many
+sessions that wrote it.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N74 | User Manual + AI Manual (consolidated into the single User Guide, 2026-08-13) | F | M | **done — all phases (0–8, incl. 0a–0d and 3a–3i) built, reviewed and released.** Phases 0–3, 5, 6, 7 shipped and released in 1.1.0 (PR #247); Phase 8 (the CLAUDE.md maintenance rule — hard rule 10 — plus the README pointer) in PR #250; **Phase 4 (the owner's cold read + full `22a` re-validation) closed 2026-08-14 on the owner's own read**, with no defects reported. Spec: [`docs/22-user-manual.md`](../22-user-manual.md); ledger: [`22a-manual-claims.md`](../22a-manual-claims.md). |
+
 ## Swept 2026-08-14 (later) — the migration landed and #222 merged (N79, N85)
 
 Both closed the same night the cleanup pass opened them, which is the point:

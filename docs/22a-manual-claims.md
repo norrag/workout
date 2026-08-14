@@ -10,8 +10,9 @@
 > changes user-visible behavior greps this file.
 >
 > Given doc 22 §2.4 (Batch 32 moved four documented surfaces in a single day),
-> this ledger is the difference between a manual and a snapshot. **Every row is
-> re-validated at Phase 4.**
+> this ledger is the difference between a manual and a snapshot. **Every row was
+> re-validated at Phase 4** (owner cold read, 2026-08-14 — nothing found stale)
+> and stays current from here under CLAUDE.md **hard rule 10**.
 
 ## How to read a row
 
