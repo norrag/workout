@@ -18,12 +18,13 @@ waiting on something external.
 
 | Priority | Step | Evidence |
 |---|---|---|
-| **① OVERDUE** | [Apply the concurrent-mesocycles migration (N79)](#apply-the-concurrent-mesocycles-migration-n79) — `20260806000001_concurrent_mesocycles` | **Verified missing.** `list_migrations` on hosted jumps `20260804213026` → `20260806210701`; `pg_indexes` still shows `mesocycles_one_active_per_user` and has no `mesocycles_one_active_per_macrocycle`. The N79 code merged in PR #226 on 2026-08-06 and **shipped inside release 1.1.0**, so the feature is live in the app and refused by the database — activating a second standalone meso raises 23505. One statement; **cannot fail on data** (the replacement index is strictly weaker than the one it drops). |
+| ~~**① OVERDUE**~~ **DONE 2026-08-14** | ~~[Apply the concurrent-mesocycles migration (N79)](#apply-the-concurrent-mesocycles-migration-n79)~~ — applied as `20260814014300 / concurrent_mesocycles`; index flip and advisors verified. Was: **verified missing.** `list_migrations` on hosted jumps `20260804213026` → `20260806210701`; `pg_indexes` still shows `mesocycles_one_active_per_user` and has no `mesocycles_one_active_per_macrocycle`. The N79 code merged in PR #226 on 2026-08-06 and **shipped inside release 1.1.0**, so the feature is live in the app and refused by the database — activating a second standalone meso raises 23505. One statement; **cannot fail on data** (the replacement index is strictly weaker than the one it drops). |
 | ② when convenient | [CI as required status checks](#make-the-ci-jobs-required-status-checks-github-repo-settings) | Still not enforced. Related: the e2e suite is red on `main` (backlog **N84**), so turning this on today would block every PR — fix N84 first. |
 | ③ conditional | [`NEXT_PUBLIC_RELEASE_OVERRIDE`](#next_public_release_override-vercel-preview-only) | Only needed while a staged release block is being previewed. 1.2.0 is currently empty. |
-| ④ conditional | `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets | Required by the migration-drift guard in **PR #222**, which is **still open** — nothing to set until it merges. Item ① is exactly the drift that guard would have caught. |
+| **④ NEXT** | `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets | Required by the migration-drift guard in **PR #222**, now **rebased, verified and ready to merge**. Until both are set the guard no-ops with a warning and is not a gate. Item ① was exactly the drift it would have caught, so setting these is what stops the next one. The comparison was run by hand on 2026-08-14 and is **clean**: 89 repo migrations, 87 hosted, 2 baselined, zero drift. |
 | ⑤ conditional | `NOTES_REPO_TOKEN` (fine-grained PAT, Contents read+write, this repo only) | Required by the admin notes MCP tools in **PR #212**, also **still open**. |
 | ⑥ external | [Adopt CIMD](#adopt-cimd-once-supabase-supports-it-mcp-2026-07-28-dcr-deprecation) | Waits on Supabase's authorization server. Re-check before **July 2027**. |
+| **⑦ NEW — decision** | `engine_params` activations never enter the repo | Backlog **N87**. The last migration to flip `is_active` sets **v18**; hosted runs **v27**; v22/v24/v25/v27 have no migration at all. So every CI job that reads the database tests a nine-version-old engine, and `db:check` cannot see it (an activation is not a migration). Three options are written up in the N87 row — needs an owner call, not a dashboard toggle. |
 
 > **Live state at reconciliation.** Active `engine_params`: **v27** (2026-08-12 —
 > deload `target_rir` 6→8, `e1rm.max_measuring_rir` 8→5). Every activation
@@ -650,11 +651,18 @@ screen shows `NOT AVAILABLE IN THIS ENVIRONMENT` and nothing else changes.
 > not in a session transcript or CI log.
 
 
-### Apply the concurrent-mesocycles migration (N79)
+### ~~Apply the concurrent-mesocycles migration (N79)~~ (DONE 2026-08-14)
 
 One migration lands with PR #226: `20260806000001_concurrent_mesocycles`.
 
-> **⚠️ OVERDUE — this is the one outstanding item on the list.** PR #226 merged
+> **✅ APPLIED 2026-08-14** as hosted version `20260814014300 / concurrent_mesocycles`.
+> Pre-check returned 0 rows; after the apply, `pg_indexes` shows
+> `mesocycles_one_active_per_macrocycle` and no `mesocycles_one_active_per_user`,
+> and `get_advisors(security)` returned no new findings. **It had been dark for
+> eight days** — the history below is kept because it is the case for the drift
+> guard in PR #222.
+>
+> **Was OVERDUE.** PR #226 merged
 > **2026-08-06** and the feature then **shipped to users inside release 1.1.0**,
 > but the migration was never applied. Verified 2026-08-14: the hosted
 > `schema_migrations` chain jumps `20260804213026` → `20260806210701` with no

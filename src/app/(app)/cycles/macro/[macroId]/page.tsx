@@ -79,9 +79,12 @@ type View = (typeof VIEWS)[number];
  * the macro-scope muscle-volume view and the est-strength trends (I11/PH37).
  * No mockup exists for the two stats tabs (owner-approved rule-8 deviation);
  * they reuse the meso stats views. The REALISTIC TARGET card is hidden again
- * (N54, owner 2026-07-11 — the Phase-R2 restore is rolled back until N43's v23
- * band makes the numbers trustworthy) — `planMacrocycle` and the persisted
- * target columns stay, so re-enabling is a pure view change.
+ * (N54, owner 2026-07-11). The v23 band it was waiting on went live
+ * 2026-07-12, and on 2026-08-14 the owner declined to bring the card back —
+ * so this is the settled state, not a pending restore (N52/N54 wontfix).
+ * `planMacrocycle` and the persisted target columns stay: the band still
+ * paces prescriptions and grades the closeout, and the connector still
+ * returns it (`formatMacroSummary.target`). It simply has no screen.
  */
 export default async function MacroOverviewPage({
   params,
@@ -178,7 +181,7 @@ export default async function MacroOverviewPage({
         panels={[
           <div key="overview">
       {/* mesocycle timeline (the REALISTIC TARGET card that led here is
-          hidden again — N54, re-enable rides N43/v23) */}
+          hidden — N54, and the owner declined the re-enable 2026-08-14) */}
       <div className="mt-4 border-t-[1.5px] border-ink pt-[13px]">
         <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
           MESOCYCLE TIMELINE
