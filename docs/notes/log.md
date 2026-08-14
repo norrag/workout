@@ -92,6 +92,24 @@ that survives every run is `:159`'s snapshot — both buttons `[disabled]` — s
 `useTransition` really does fail to settle, at least some of the time. N87 loses
 its supporting failure and stands on its own, which it comfortably does.
 
+**N87 re-scoped the next morning, and the first writeup had aimed at the wrong
+target.** The owner pushed back on the obvious remedy — *"adding a CI check for
+every little thing makes PRs cumbersome"*, and the MCP activation loop exists so
+params can be replayed and verified cheaply from a ChatGPT sub. That objection is
+correct, and following it led to the actual hole. CI's database running v18 is
+**nearly harmless**: the DB-backed tests are 9 e2e smoke tests plus write-pipeline
+and RLS, none of which assert engine numbers. The engine is tested by ~2,050
+unit/golden tests that take an **explicit params object** — and that ladder, in
+`engine/__tests__/helpers.ts`, runs `V11 → … → V20 → V26` with **no V21, V22,
+V23, V24, V25 or V27**. So `golden-meso-live.test.ts`, whose header still says
+*"the LIVE production params shape: the v18 row"*, pins v18; `measuring-band`
+pins `max_measuring_rir: 8` where live is **5**; `deload.target_rir` is 6 across
+the ladder and 4 in the defaults where live is **8**. Those last two are exactly
+the pair v27 changed, and v27 exists *because they interact*. **Nothing tests
+that interaction at the values it runs at.** The remedy is therefore one fixture
+per activation, not a gate on hosted state — the activation workflow is right and
+stays.
+
 **N52/N54 declined, and the decline is written into the code.** Every
 *"re-enable rides N43/v23"* comment now reads as settled rather than pending —
 the condition was met on 2026-07-12 and will never be acted on. No Guide chapter
