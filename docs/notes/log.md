@@ -15,6 +15,61 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-14 — Session 127: the ladder tells the truth again (N87 built)
+
+**Owner:** *"do the whole thing as a PR"* — plus one correction that changed the
+design: *"there is no PR created when you activate a version via MCP, so resolve
+that in your work."* Exactly right, and the rule I had written (*"activating a
+version adds its fixture in the same PR"*) was incoherent on its face. There is
+no commit anywhere in the activation loop, so the repo **cannot** be told at
+activation time. It can only be told afterwards — which means the mechanism has
+to be a *warning that persists* rather than a gate that fires once.
+
+**The ladder is caught up, and building it found the old rung was wrong.**
+`V21`–`V25` and `V27` added; `V22` marked as the rolled-back branch it actually
+is, since `V23` builds on `V21` rather than on it. The pre-existing **`V26` was
+wrong**: spread off `V20` with a note claiming v21–v25 were orthogonal to the
+band. They are not — the real v26 row carries the macro-target correction, the
+strength model, `rate_source: "plan"` and the envelope block, so that fixture
+hashed to something **no stored row has ever had**.
+
+**Which is the point of the mechanism that replaced eyeballing.** `params_hash`
+is sha256 over the canonical sorted-key JSON of the stored row, so recomputing
+it from a hand-written fixture proves the fixture **is** the row. All **16 rungs
+now match their stored hash**, v11 through v27 — verified, not asserted. That
+also quietly guards `replay_decisions`, which re-runs an old decision under the
+version it was recorded against: a rung that had drifted would have made a
+replay silently wrong.
+
+**The live coupling has tests for the first time.** `measuring-band.test.ts`
+pins the cutoff at 8 (v26) and `deload.test.ts` runs `target_rir` 6 (v15) — both
+right for the versions they name, neither what production does. v27 moved the
+cutoff to **5** and the deload target to **8** *in the same version*, precisely
+so they would cross. Now asserted through the real functions: 6/7/8 RIR no
+longer measure, an ordinary deload set stamps `e1rm: null` / `none`, and
+working-week effort still measures.
+
+**`golden-meso-live.test.ts` kept its numbers.** Its header claimed to pin "the
+LIVE production params shape" and pinned v18 — true on 2026-07-02, false from
+2026-07-11. The claim is corrected; the expectations are **deliberately
+untouched**, because re-pinning them to v27 in a cleanup pass is the exact
+silent re-pin its own last paragraph forbids. What it covers is orthogonal to
+everything v21–v27 changed, so the coverage was always real — only the label was
+wrong. A full v27 golden is worth writing when someone can derive it by hand.
+
+**The asymmetry in `db:check` is the whole design.** An unapplied migration
+means deployed code reads a column that isn't there — production is broken, so
+it **fails**. A stale ladder means the test suite is weaker than it looks —
+production is fine, so it **warns**, every run, until someone clears it. Nobody
+gets blocked from merging an unrelated PR because a parameter version was
+activated an hour ago, which is the friction that gets guards switched off.
+
+`src/lib/engine/live-params.json` is the one declaration both readers use — the
+TypeScript ladder and the plain-ESM script, which cannot import TS. The runbook
+gained a five-step follow-up in place of the impossible rule.
+
+- **Index sync:** N87 → `done (PR #249)`. Suite 139 files / 2066 tests green.
+
 ## 2026-08-14 — Session 126: the migration lands, #222 is rebased, and the e2e diagnosis was wrong (N79, N85, N84, N87, N52)
 
 > Session 125 is the rebased PR #222 branch's own entry; it arrives with that

@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "The engine_params version this repository believes production is running.",
+    "",
+    "It lives in JSON, alone, because two very different readers need it: the",
+    "TypeScript fixture ladder (src/lib/engine/__tests__/helpers.ts) and the",
+    "plain-ESM drift script (scripts/check-migrations.mjs), which cannot import",
+    "TypeScript. One declaration, no duplication, no build step.",
+    "",
+    "Activations happen outside the repo — propose_engine_params →",
+    "replay_decisions → activate_engine_params, run from an MCP client, with no",
+    "PR and no commit in the loop. So nothing here updates itself. After",
+    "activating a version: add its V<n>_PARAMS rung to the ladder, update the",
+    "two fields below, and run `npm run db:check`.",
+    "",
+    "hash is the stored params_hash — sha256 over the canonical sorted-key JSON",
+    "of the row — which live-params.test.ts recomputes from the fixture. That",
+    "makes a hand-written rung provably the row rather than approximately it.",
+    "N87 exists because the old V26 fixture was only approximately right."
+  ],
+  "version": 27,
+  "hash": "f8dcfb51489c799218e332ecfdc9e92b6cb45e191cd80f4e582611b15a85603d",
+  "activatedAt": "2026-08-12",
+  "note": "v27 — deload target_rir 6→8 and e1rm.max_measuring_rir 8→5, so deload work sits above the measuring cutoff and cannot enter a strength anchor."
+}
