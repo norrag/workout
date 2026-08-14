@@ -11,6 +11,17 @@ for the purge policy.
 
 ---
 
+## Swept 2026-08-14 (later) — the migration landed and #222 merged (N79, N85)
+
+Both closed the same night the cleanup pass opened them, which is the point:
+neither was new work, both were work that had already been done and was sitting
+un-landed.
+
+| ID | Title | Type | WS | Resolution |
+|----|-------|------|----|------------|
+| N79 | Concurrent mesocycles | F | G | **done — code merged in PR #226 (2026-08-06), migration applied to hosted 2026-08-14** as `20260814014300 / concurrent_mesocycles`. Pre-check 0 rows; after, `pg_indexes` carries `mesocycles_one_active_per_macrocycle` and `mesocycles_one_active_per_user` is gone; `get_advisors(security)` no new findings. **The feature was dark for eight days** — released inside 1.1.0 while the database still raised 23505 on a second active block. The gap between "merged" and "live" is why `CLAUDE.md` rule 5 now exists. |
+| N85 | The week-generation outage, the missing skip-a-day state, and the week-boundary gate | B | G | **done (PR #222, merged 2026-08-14)** — built 2026-08-04 and open for ten days. Ships the `migration-drift` CI job + `npm run db:check` (name-stem comparison against **hosted**, which no other job can see), `isSchemaDriftError` off the retry channel, the stalled-week panel + `retryWeekGenerationAction`, **`skipWorkout`** (the terminal state an untrained day never had — its absence left a week un-closable by ordinary use), and the week-boundary gate enforced in `logSet`. Rebased onto a `main` 51 commits ahead: all 20 code files clean, two ID collisions fixed (`N74`→N85, `Session 98` renumbered). Repo secrets set on merge, so the guard is a real gate. **N79 was a live instance of the drift it catches, found while it waited.** |
+
 ## Swept 2026-08-14 — cleanup pass: 12 sweeps' worth of merged work, plus the answered-question backlog (N34, N36, N43, N47, N56, N57, N59, N67–N70, N73, N75–N78, N80–N82, S1–S8, PH39, T-N60a, T-A4)
 
 The largest sweep this area has run, and the reason it was needed is worth
