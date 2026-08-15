@@ -19,6 +19,7 @@ waiting on something external.
 | Priority | Step | Evidence |
 |---|---|---|
 | ~~**① OVERDUE**~~ **DONE 2026-08-14** | ~~[Apply the concurrent-mesocycles migration (N79)](#apply-the-concurrent-mesocycles-migration-n79)~~ — applied as `20260814014300 / concurrent_mesocycles`; index flip and advisors verified. Was: **verified missing.** `list_migrations` on hosted jumps `20260804213026` → `20260806210701`; `pg_indexes` still shows `mesocycles_one_active_per_user` and has no `mesocycles_one_active_per_macrocycle`. The N79 code merged in PR #226 on 2026-08-06 and **shipped inside release 1.1.0**, so the feature is live in the app and refused by the database — activating a second standalone meso raises 23505. One statement; **cannot fail on data** (the replacement index is strictly weaker than the one it drops). |
+| ~~**①**~~ **VIEW APPLIED 2026-08-15 — one step still open** | [Apply the anchor-candidate view migration (N88)](#apply-the-anchor-candidate-view-migration-n88) | Migration applied as `anchor_candidate_sets`; view verified (Kneeling Hamstring Curl now ranks at 1 with 40 rows inside the cap, where the old global query gave it zero) and `get_advisors` clean — no new findings, no `security_definer_view`. **Step ③ (re-seeding the blanked prescription) is still open and must wait for the deploy**, because the MCP connector runs deployed code: recomputing before PR #251 ships would re-derive the anchor through the old global-limit query and write another null. |
 | ② when convenient | [CI as required status checks](#make-the-ci-jobs-required-status-checks-github-repo-settings) | Still not enforced. Related: the e2e suite is red on `main` (backlog **N84**), so turning this on today would block every PR — fix N84 first. |
 | ③ conditional | [`NEXT_PUBLIC_RELEASE_OVERRIDE`](#next_public_release_override-vercel-preview-only) | Only needed while a staged release block is being previewed. 1.2.0 is currently empty. |
 | ~~④~~ **DONE 2026-08-14** | ~~`SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets~~ — set by the owner when **PR #222 merged**, so the `migration-drift` job is now a **real gate** rather than a warning. Was: required by the migration-drift guard in #222. Until both are set the guard no-ops with a warning and is not a gate. Item ① was exactly the drift it would have caught, so setting these is what stops the next one. The comparison was run by hand on 2026-08-14 and is **clean**: 89 repo migrations, 87 hosted, 2 baselined, zero drift. |
@@ -701,6 +702,26 @@ One migration lands with the doc 23 phases 0–6 PR:
 |---|---|
 | ~~**① Apply `20260806000002` to hosted**~~ **(done 2026-08-06)** | Adds `profiles.last_seen_version text` (nullable) and backfills every existing row to `'1.0.0'`. Additive and idempotent (`add column if not exists`, `update ... where last_seen_version is null`); no RLS change — `profiles_update_own` already covers every column except `role` (doc 23 §6.1). Applied via Supabase MCP `apply_migration`. |
 | ~~**② Confirm the backfill**~~ **(done 2026-08-06)** | `select count(*) from public.profiles where last_seen_version is null;` returned 0 (5/5 rows at `1.0.0`) immediately after. A row that is null later is a **new signup**, which is correct: the app primes it to `CURRENT_VERSION` and shows nothing. `get_advisors` re-checked clean — no new findings from this migration. |
+
+### Apply the anchor-candidate view migration (N88)
+
+One migration lands with the N88 fix: `20260815000001_anchor_candidate_sets`.
+It creates `public.v_anchor_candidate_sets`, the per-(user, exercise) recency
+ranking that replaces the global `.limit(600)` in
+`queries/anchors.ts::getExerciseE1rmAnchors`.
+
+**This one cannot wait for convenience.** Unlike an `engine_params` activation
+(behavior moves, nothing breaks), the code in the same PR *reads the view*. If
+it deploys without the view, every anchor read raises 42P01 — meso seeding, the
+live reps predictor, next-week generation and the freshness reconcile all call
+through this one function. That is the PR #221 pattern the drift guard was
+built for.
+
+| Step | What / why |
+|---|---|
+| ~~**① Apply `20260815000001` to hosted**~~ **(done 2026-08-15)** | Applied via Supabase MCP `apply_migration` as `anchor_candidate_sets`. Creates one `security_invoker` view over `logged_sets ⋈ workouts`. Additive — no table, column, policy or data touched. Reversible with `drop view public.v_anchor_candidate_sets;`. |
+| ~~**② Confirm the view answers**~~ **(done 2026-08-15)** | `set_rank <= 40` returns 2,733 rows for the owner; Kneeling Hamstring Curl has **40 rows inside the cap and its best rank is 1** (`performed_at` 2026-04-08) — the history the old global cap evicted entirely. `get_advisors` re-run: no new findings and **no `security_definer_view`**, confirming the invoker setting took. |
+| **③ Re-seed what the bug already blanked — AFTER the deploy** | The fix is forward-looking: prescriptions already written with `strengthAnchor: null` stay blank until recomputed. **Ordering is load-bearing and the reverse of step ①.** The MCP connector runs *deployed* code, so calling `recompute_prescriptions` before PR #251 ships would re-derive the anchor through the old global-`.limit(600)` query and write another null decision. Once the PR is merged and Vercel has deployed: run `recompute_prescriptions` for **Kneeling Hamstring Curl** (Barbell Hip Thrust self-healed when it was re-seeded alone on 08-12), then verify with `explain_prescription` — the trace should read "seeded from strength anchor" rather than "no confident data to seed". |
 
 ### `NEXT_PUBLIC_RELEASE_OVERRIDE` (Vercel, Preview only)
 

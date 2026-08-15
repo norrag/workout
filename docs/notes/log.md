@@ -15,6 +15,64 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-15 — Session 130: N88 — the strength anchor was starving on batch width
+
+**Owner:** *"Kneeling Hamstring Curl has plenty of logged history, but when the
+current mesocycle was created, the prescription engine incorrectly treated it
+like a brand-new exercise with no history… This is not because the history is
+too old… the mesocycle seeding process failed to retrieve the existing history
+for this exercise."*
+
+Confirmed, and the owner's diagnosis was right down to the exclusion. It was a
+retrieval failure, not an age rule.
+
+**What it was.** `getExerciseE1rmAnchors` bounded egress with a global
+`.limit(600)` over one recency-ordered read spanning the entire batch of
+exercises. That is a per-**call** cap, not a per-**exercise** one, so the rows
+it returned were the batch's 600 most recent — and an exercise trained on a
+longer rotation than its batch-mates had its whole history pushed past the
+cutoff by *other* exercises' recent sets. It then read as "no history" and
+seeded a blank starting weight. Batch width, not age, is the variable, which is
+exactly why the meso seed (one call, every exercise in the plan) was where it
+showed and why re-seeding one exercise alone made it disappear.
+
+**The evidence was unambiguous.** Replaying the 2026-08-10 seed of *August '26 -
+Bulk* (23 exercises) against live data: 815 eligible sets sat newer than
+Kneeling Hamstring Curl's most recent set, so all 66 of its rows fell outside
+the cap (best rank 755), as did all 52 of Barbell Hip Thrust's (best rank 2860).
+Those two, and only those two, recorded `strengthAnchor: null` in
+`engine_decisions` — no false positives, no false negatives. The three other
+`null` seeds in the same window belong to a different user. Hip Thrust is the
+"other exercise earlier this week" the owner remembered; it was re-seeded alone
+on 08-12 and immediately anchored at 286.7 lb off history nobody had touched.
+
+**Worth recording because the comment predicted it.** The module argued
+deliberately *against* a `performed_at` recency floor — ~56% of (user, exercise)
+pairs are more than four half-lives stale, and a floor would force cold-start
+where real data exists — and then closed with "egress is already bounded by the
+`.limit(600)` below". A global LIMIT over a recency-ordered union *is* that
+floor, wearing a different hat, with a cutoff that moves with how many other
+exercises happen to be in the plan. The reasoning was right and the
+implementation quietly contradicted it.
+
+**The fix** makes the bound per-exercise: a new `v_anchor_candidate_sets` view
+ranks each user's candidates within an exercise, and the caller filters
+`set_rank <= 40`. Postgres applies that as a WindowAgg `Run Condition`, so it
+stops early per partition — bounded egress with no global cutoff — and the
+existing `logged_sets_user_exercise_idx` matches the partition and order exactly
+(EXPLAIN: index-cond pushdown, 0.8 ms). Eligibility moved into the view
+(non-warmup, rep-bearing, N3 completed-only) so a rank slot is never spent on a
+row the caller would discard; that also dropped a round-trip.
+
+**Two things the code change does not do,** both carried in the runbook: the
+migration has to reach hosted before the deploy — unlike an `engine_params`
+activation, the code in the same PR *reads* the view — and prescriptions already
+written blank stay blank until `recompute_prescriptions` is run for them.
+
+Also re-dated manual claim `C-wt-04` ("a lift you last trained months ago still
+has an anchor"), which the defect had silently falsified on the seed route. The
+prose was already correct; it just wasn't true yet.
+
 ## 2026-08-14 — Session 129: doc 22 Phase 4 — the owner's cold read closes N74
 
 **Owner:** *"I have cold-read all docs, and they are live now. So Phase 4 is

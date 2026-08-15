@@ -24,6 +24,79 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-08-15 — The strength anchor stopped starving on batch width (N88, PR #250)
+
+**The report.** The owner's meso seed left Kneeling Hamstring Curl with a blank
+starting weight and no strength anchor, on a lift with 41 logged sessions —
+and correctly ruled out the obvious explanation: the history is old, but old
+history is supposed to work.
+
+**The defect.** `getExerciseE1rmAnchors` (`queries/anchors.ts`) fetched anchor
+candidates for every exercise in one recency-ordered read bounded by a global
+`.limit(600)`. That is a per-**call** cap, not a per-**exercise** one: the rows
+returned are the *batch's* 600 most recent, so an exercise trained on a longer
+rotation than its batch-mates can have its entire history evicted by other
+exercises' recent sets, come back empty, and seed blank. **Batch width is the
+variable, not age** — which is why it struck the meso seed (one call, every
+exercise in the plan), spared the single-exercise paths, and why re-seeding one
+exercise alone made it vanish.
+
+The module's own comment had already reasoned its way to the right rule and then
+undercut it: it argued *against* a `performed_at` recency floor (~56% of (user,
+exercise) pairs are >4 half-lives stale; a floor would force cold-start where
+real data exists) and closed with "egress is already bounded by the `.limit(600)`
+below". A global LIMIT over a recency-ordered union **is** that floor, at a
+cutoff that moves with batch size.
+
+**Diagnosis against live data.** Replaying the 2026-08-10 seed of *August '26 -
+Bulk* (23 exercises): 815 eligible sets sat newer than Kneeling Hamstring Curl's
+most recent set, so all 66 of its rows fell outside the cap (best rank 755), as
+did all 52 of Barbell Hip Thrust's (best rank 2860). Those two, and only those
+two, recorded `strengthAnchor: null` — no false positives, no false negatives.
+Hip Thrust self-healed on 08-12 when it was re-seeded alone, in a batch small
+enough for the cap not to bite.
+
+**The fix.**
+- **`v_anchor_candidate_sets`** (migration `20260815000001`) — ranks each user's
+  candidates *within* an exercise (`row_number() partition by user_id,
+  exercise_id order by performed_at desc, id desc`). Callers ask for `set_rank
+  <= N`; Postgres applies it as a WindowAgg **Run Condition** and stops early per
+  partition, so egress is bounded without a global cutoff. The existing
+  `logged_sets_user_exercise_idx (user_id, exercise_id, performed_at desc)`
+  serves the partition + order exactly — EXPLAIN confirms index-cond pushdown
+  through the window, 0.8 ms.
+- **Eligibility moved into the view** — non-warmup, rep-bearing, and the N3
+  completed-workouts-only rule — so a rank slot is never spent on a row the
+  caller would discard (the same starvation in miniature), and the live
+  session's sets can't consume slots either. Drops a round-trip from
+  `anchors.ts`.
+- **`id desc` tiebreak.** Imported history shares one `performed_at` across a
+  whole session; an unstable sort at the boundary would truncate a session
+  mid-way and hand the engine a partial `session_best`.
+- **`ANCHOR_SETS_PER_EXERCISE = 40`** — ~10–20 sessions per exercise. At a 30-day
+  half-life a set outside that window would need an implausible multiple of the
+  best in-window e1RM to win selection, and it is already far more per-exercise
+  depth than the old global cap left anyone (max observed inside the 600: 47
+  rows; typical: 25–30).
+
+**Test.** `tests/integration/anchor-batching.test.ts` — an *integration* test on
+purpose. The defect lived in the SQL semantics of the fetch, not in any TS
+branch; a fake client would have to reimplement the ranking and would then be
+asserting against itself. The fixture is the owner's seed in miniature: one hot
+exercise with 700 recent sets, one cold exercise whose good-but-older history
+sits entirely behind them.
+
+**Deviations / carried work.** Two things the code change deliberately does not
+do, both in `docs/deployment/manual-operations.md`: (1) the migration must reach
+hosted **before** the deploy — unlike an `engine_params` activation, the code in
+this PR *reads* the view, so this is the PR #221 pattern the drift guard exists
+to catch; (2) prescriptions already written with a null anchor stay blank until
+`recompute_prescriptions` is run for them.
+
+Manual claim **`C-wt-04`** ("a lift you last trained months ago still yields an
+anchor") re-dated — the defect had silently falsified it on the seed route. The
+prose was already right; it just wasn't true yet.
+
 ## 2026-08-14 — doc 22 Phase 4: the owner's cold read closes N74
 
 Docs only. The last open piece of the User Guide build was not code — it was

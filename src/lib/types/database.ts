@@ -621,6 +621,25 @@ export type VMesoWeekMuscleSetsRow = {
   logged_backed_off_sets: number;
 }
 
+/** N88 — anchor candidates ranked per (user, exercise) by recency, so a caller
+ *  can bound egress PER EXERCISE (`set_rank <= N`). A global LIMIT over a
+ *  recency-ordered batch lets one lift's rotation evict another's entire
+ *  history, which read as "no history" and seeded a blank starting weight.
+ *  Pre-filtered to completed, non-warmup, rep-bearing sets so the rank window
+ *  matches eligibility; zero-weight rows are kept for the bodyweight model. */
+export type VAnchorCandidateSetRow = {
+  user_id: string;
+  exercise_id: string;
+  workout_exercise_id: string;
+  workout_id: string;
+  weight: number;
+  reps: number;
+  rir_reported: number | null;
+  performed_at: string;
+  bodyweight: number | null;
+  set_rank: number;
+}
+
 export type VExercisePrsRow = {
   user_id: string;
   exercise_id: string;
@@ -877,6 +896,7 @@ export type Database = {
       v_macro_summary: { Row: VMacroSummaryRow; Relationships: [] };
       v_exercise_overview: { Row: VExerciseOverviewRow; Relationships: [] };
       v_body_comp_history: { Row: VBodyCompHistoryRow; Relationships: [] };
+      v_anchor_candidate_sets: { Row: VAnchorCandidateSetRow; Relationships: [] };
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };

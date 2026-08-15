@@ -22,7 +22,17 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 // predictor uses. A live-data check showed ~56% of (user, exercise) pairs were last
 // trained >4 half-lives ago — a floor would drop their anchor entirely, forcing
 // cold-start where real data exists (against the "use real data when available"
-// ruling). Egress is already bounded by the .limit(600) below.
+// ruling).
+//
+// N88: egress used to be bounded by a global `.limit(600)` on a recency-ordered
+// read across the WHOLE batch — which reintroduced that very floor by the back
+// door, at a cutoff that moved with batch width. An exercise on a longer rotation
+// could have its entire history evicted by its batch-mates' recent sets, read as
+// "no history", and seed a blank starting weight (owner's 2026-08-10 meso seed:
+// Kneeling Hamstring Curl's newest set ranked 755th of the batch, so all 66 of its
+// rows fell outside the cap). The bound is now PER EXERCISE, via the ranked view —
+// one lift's rotation can no longer starve another's.
+const ANCHOR_SETS_PER_EXERCISE = 40;
 
 /**
  * Recency-weighted strength anchor (e1RM) per exercise (doc 11), powering the
@@ -53,40 +63,47 @@ export async function getExerciseE1rmAnchors(
   // per set below and the junk (effective ≤ 0) is dropped in JS. Off ⇒ exactly the
   // prior query (filter weight > 0, raw weight). `bodyweight` is always selected
   // (a real column post-migration); it is simply unused when the flag is off.
+  //
+  // N88: reads `v_anchor_candidate_sets`, which ranks each user's candidates
+  // WITHIN an exercise, so `set_rank <= N` bounds egress per exercise instead of
+  // per call. The view also carries the eligibility filters that used to live
+  // here — non-warmup, rep-bearing, and (N3) COMPLETED workouts only — so a rank
+  // slot is never spent on a row this function would discard.
   const bwModel = params.bodyweight_model ?? false;
   let query = supabase
-    .from("logged_sets")
+    .from("v_anchor_candidate_sets")
     .select(
-      "exercise_id, workout_exercise_id, workout_id, weight, reps, rir_reported, performed_at, bodyweight",
+      "exercise_id, workout_exercise_id, weight, reps, rir_reported, performed_at, bodyweight",
     )
     .eq("user_id", userId)
     .in("exercise_id", exerciseIds)
-    .eq("is_warmup", false)
-    .gt("reps", 0);
+    .lte("set_rank", ANCHOR_SETS_PER_EXERCISE);
   if (!bwModel) query = query.gt("weight", 0);
-  const { data: sets, error } = await query
-    .order("performed_at", { ascending: false })
-    .limit(600);
+  // `set_rank` ascends as `performed_at` descends within an exercise, so this is
+  // the same newest-first scan the old `.order("performed_at", desc)` gave —
+  // which `performedAtBySession` below relies on to resolve a session's date to
+  // its newest set rather than to whichever row the planner happened to emit.
+  const { data: sets, error } = await query.order("set_rank");
   if (error) throw error;
   if (!sets || sets.length === 0) return out;
 
-  // #4: the completed-workout filter, the target-RIR lookup, and (under the
-  // bodyweight model) the load-type lookup are independent of each other, so fetch
-  // them in one Promise.all instead of three serial round-trips. `target_rir` is
-  // resolved for ALL fetched sets' workout_exercises (a harmless superset) so it
-  // no longer has to wait on the completed-workout filter.
-  const workoutIds = [...new Set(sets.map((s) => s.workout_id))];
+  // #4: the target-RIR lookup and (under the bodyweight model) the load-type
+  // lookup are independent of each other, so fetch them in one Promise.all
+  // rather than serially. `target_rir` is resolved for ALL fetched sets'
+  // workout_exercises.
+  //
+  // N3 (resolves T-A7/T-A8) used to be enforced here by a third read that
+  // filtered the fetched sets down to completed workouts. N88 moved that filter
+  // INTO `v_anchor_candidate_sets`: prescriptions and predictions still read
+  // PREVIOUS COMPLETED workouts only — the in-progress workout's sets post to
+  // history live as they're logged, but must NOT feed the anchor, or the first
+  // set of the current exercise, if it's the recency-weighted best, makes the
+  // session average (one set logged ⇒ that set IS the average) snap every
+  // remaining prescription onto it. Enforcing it in the view additionally keeps
+  // the live session's sets from consuming per-exercise rank slots, and drops a
+  // round-trip here.
   const allWeIds = [...new Set(sets.map((s) => s.workout_exercise_id))];
-  const [
-    { data: completedWorkouts, error: cwError },
-    { data: wes, error: weError },
-    exResult,
-  ] = await Promise.all([
-    supabase
-      .from("workouts")
-      .select("id")
-      .in("id", workoutIds)
-      .eq("status", "completed"),
+  const [{ data: wes, error: weError }, exResult] = await Promise.all([
     supabase.from("workout_exercises").select("id, target_rir").in("id", allWeIds),
     bwModel
       ? supabase
@@ -98,20 +115,8 @@ export async function getExerciseE1rmAnchors(
           error: null,
         }),
   ]);
-  if (cwError) throw cwError;
   if (weError) throw weError;
   if (exResult.error) throw exResult.error;
-
-  // N3 (resolves T-A7/T-A8): prescriptions and predictions read PREVIOUS
-  // COMPLETED workouts only. The in-progress workout's sets post to history live
-  // as they're logged, but must NOT feed the anchor — otherwise the first set of
-  // the current exercise, if it's the recency-weighted best, makes the session
-  // average (one set logged ⇒ that set IS the average) snap every remaining
-  // prescription onto it. A workout becomes canonical for the engine only once
-  // it is marked complete (with feedback ⇒ status 'completed').
-  const completedIds = new Set((completedWorkouts ?? []).map((w) => w.id));
-  const completedSets = sets.filter((s) => completedIds.has(s.workout_id));
-  if (completedSets.length === 0) return out;
 
   // the fallback half of `assumedRir` (doc 21 §2): the parent prescription's
   // target RIR, used where the set carried no reported RIR of its own
@@ -131,7 +136,7 @@ export async function getExerciseE1rmAnchors(
 
   const now = Date.now();
   const byExercise = new Map<string, E1rmSample[]>();
-  for (const s of completedSets) {
+  for (const s of sets) {
     // effective load: raw entered weight (external / flag off), or bodyweight ±
     // entered under the bodyweight model. Skip sets with no usable load (effective
     // ≤ 0 — e.g. a bodyweight lift with no captured bodyweight, or junk 0 entries).
@@ -178,7 +183,7 @@ export async function getExerciseE1rmAnchors(
   // sessionKey is the workout_exercise_id, and every set in a session shares a
   // day, so the session's newest performed_at is the coordinate's date.
   const performedAtBySession = new Map<string, string>();
-  for (const s of completedSets) {
+  for (const s of sets) {
     if (!performedAtBySession.has(s.workout_exercise_id)) {
       performedAtBySession.set(s.workout_exercise_id, s.performed_at);
     }
