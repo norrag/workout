@@ -19,6 +19,7 @@ waiting on something external.
 | Priority | Step | Evidence |
 |---|---|---|
 | ~~**① OVERDUE**~~ **DONE 2026-08-14** | ~~[Apply the concurrent-mesocycles migration (N79)](#apply-the-concurrent-mesocycles-migration-n79)~~ — applied as `20260814014300 / concurrent_mesocycles`; index flip and advisors verified. Was: **verified missing.** `list_migrations` on hosted jumps `20260804213026` → `20260806210701`; `pg_indexes` still shows `mesocycles_one_active_per_user` and has no `mesocycles_one_active_per_macrocycle`. The N79 code merged in PR #226 on 2026-08-06 and **shipped inside release 1.1.0**, so the feature is live in the app and refused by the database — activating a second standalone meso raises 23505. One statement; **cannot fail on data** (the replacement index is strictly weaker than the one it drops). |
+| **① OPEN (2026-08-15)** | [Apply the anchor-candidate view migration (N88)](#apply-the-anchor-candidate-view-migration-n88) | Ships with the N88 fix. `queries/anchors.ts` reads `v_anchor_candidate_sets`; until the view exists on hosted, **every** anchor read raises 42P01 — the seed, the live reps predictor, week generation and the freshness reconcile all go through it. This is the PR #221 failure mode exactly, which is what the `migration-drift` job (now a real gate) will flag. Additive, reversible (`drop view`), touches no data. |
 | ② when convenient | [CI as required status checks](#make-the-ci-jobs-required-status-checks-github-repo-settings) | Still not enforced. Related: the e2e suite is red on `main` (backlog **N84**), so turning this on today would block every PR — fix N84 first. |
 | ③ conditional | [`NEXT_PUBLIC_RELEASE_OVERRIDE`](#next_public_release_override-vercel-preview-only) | Only needed while a staged release block is being previewed. 1.2.0 is currently empty. |
 | ~~④~~ **DONE 2026-08-14** | ~~`SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets~~ — set by the owner when **PR #222 merged**, so the `migration-drift` job is now a **real gate** rather than a warning. Was: required by the migration-drift guard in #222. Until both are set the guard no-ops with a warning and is not a gate. Item ① was exactly the drift it would have caught, so setting these is what stops the next one. The comparison was run by hand on 2026-08-14 and is **clean**: 89 repo migrations, 87 hosted, 2 baselined, zero drift. |
@@ -701,6 +702,26 @@ One migration lands with the doc 23 phases 0–6 PR:
 |---|---|
 | ~~**① Apply `20260806000002` to hosted**~~ **(done 2026-08-06)** | Adds `profiles.last_seen_version text` (nullable) and backfills every existing row to `'1.0.0'`. Additive and idempotent (`add column if not exists`, `update ... where last_seen_version is null`); no RLS change — `profiles_update_own` already covers every column except `role` (doc 23 §6.1). Applied via Supabase MCP `apply_migration`. |
 | ~~**② Confirm the backfill**~~ **(done 2026-08-06)** | `select count(*) from public.profiles where last_seen_version is null;` returned 0 (5/5 rows at `1.0.0`) immediately after. A row that is null later is a **new signup**, which is correct: the app primes it to `CURRENT_VERSION` and shows nothing. `get_advisors` re-checked clean — no new findings from this migration. |
+
+### Apply the anchor-candidate view migration (N88)
+
+One migration lands with the N88 fix: `20260815000001_anchor_candidate_sets`.
+It creates `public.v_anchor_candidate_sets`, the per-(user, exercise) recency
+ranking that replaces the global `.limit(600)` in
+`queries/anchors.ts::getExerciseE1rmAnchors`.
+
+**This one cannot wait for convenience.** Unlike an `engine_params` activation
+(behavior moves, nothing breaks), the code in the same PR *reads the view*. If
+it deploys without the view, every anchor read raises 42P01 — meso seeding, the
+live reps predictor, next-week generation and the freshness reconcile all call
+through this one function. That is the PR #221 pattern the drift guard was
+built for.
+
+| Step | What / why |
+|---|---|
+| **① Apply `20260815000001` to hosted** | Creates one `security_invoker` view over `logged_sets ⋈ workouts`. Additive — no table, column, policy or data is touched, and nothing else reads it yet. Reversible with `drop view public.v_anchor_candidate_sets;`. Apply via Supabase MCP `apply_migration`, `supabase db push`, or the dashboard SQL editor. **Order matters: apply before (or with) the deploy, not after.** |
+| **② Confirm the view answers** | `select count(*) from public.v_anchor_candidate_sets where set_rank <= 40;` should return a positive number, and `select set_rank from public.v_anchor_candidate_sets where exercise_id = '190a666e-149a-434d-bcf4-2e720f717153' order by set_rank limit 1;` should return `1` — the Kneeling Hamstring Curl history that the old global cap evicted. Re-run `get_advisors`; a `security_invoker` view over owner-scoped tables should add no findings. |
+| **③ Re-seed what the bug already blanked** | The fix is forward-looking: prescriptions already written with `strengthAnchor: null` stay blank until recomputed. Use the `recompute_prescriptions` MCP tool for the affected exercises (2026-08-10 seed: **Kneeling Hamstring Curl**; Barbell Hip Thrust self-healed when it was re-seeded alone on 08-12). Verify with `explain_prescription` — the trace should read "seeded from strength anchor" rather than "no confident data to seed". |
 
 ### `NEXT_PUBLIC_RELEASE_OVERRIDE` (Vercel, Preview only)
 
