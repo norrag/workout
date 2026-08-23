@@ -198,11 +198,24 @@ export interface FactsDecision {
     sets: number | null;
     targetRir: number | null;
   };
+  /** the previous PRESCRIPTION — the program's own axes (effort target, sets),
+   *  and the source session's identity. Never `previous_work`: see below. */
   previous: {
     weight: number | null;
     reps: number | null;
     sets: number | null;
     targetRir: number | null;
+  } | null;
+  /** N89 — what the lifter actually DID in that session (`inputs.actualSets`
+   *  reduced to the best working set, the engine's own baseline). `previous`
+   *  was being labelled `previous_work` and handed to the model as if it were
+   *  performance, so a session loaded heavier than asked reached the coaching
+   *  layer as a load increase that never happened. Null ⇒ fall back to the
+   *  prescription, which is all a pre-actuals decision can support. */
+  performed?: {
+    weight: number | null;
+    reps: number | null;
+    sets: number | null;
   } | null;
   trace: AuditTraceStep[];
 }
@@ -316,20 +329,23 @@ function hasFeedbackPainCap(trace: AuditTraceStep[]): boolean {
 export function projectChange(decision: FactsDecision): PrescriptionChange {
   if (decision.isDeload) return "deload";
   if (decision.kind === "seed") return "seed";
-  const { ask, previous } = decision;
-  if (!previous) return "hold";
+  const { ask, previous, performed } = decision;
+  if (!previous && !performed) return "hold";
   const moved = (a: number | null, b: number | null): number =>
     a != null && b != null ? a - b : 0;
-  const dLoad = moved(ask.weight, previous.weight);
+  // N89 — the same two-baseline split the quick-read uses: the work axes move
+  // relative to what was PERFORMED, the set count relative to what was asked.
+  const base = performed ?? previous;
+  const dLoad = moved(ask.weight, base?.weight ?? null);
   if (dLoad > 0) return "load_increased";
   if (dLoad < 0) return "load_decreased";
-  const dSets = moved(ask.sets, previous.sets);
+  const dSets = moved(ask.sets, previous?.sets ?? null);
   if (dSets > 0) return "sets_increased";
   if (dSets < 0) return "sets_decreased";
-  const dReps = moved(ask.reps, previous.reps);
+  const dReps = moved(ask.reps, base?.reps ?? null);
   if (dReps > 0) return "reps_increased";
   if (dReps < 0) return "reps_decreased";
-  const dRir = moved(ask.targetRir, previous.targetRir);
+  const dRir = moved(ask.targetRir, previous?.targetRir ?? null);
   if (dRir < 0) return "rir_decreased"; // closer to failure ⇒ harder
   if (dRir > 0) return "rir_increased";
   return "hold";
@@ -648,8 +664,11 @@ export function buildExplanationFacts(
         }
       : undefined;
 
-  const previousWork = decision.previous
-    ? formatWork(decision.loadType, decision.previous)
+  // N89 — `previous_work` is WORK: what the lifter did, not what was asked of
+  // them. The prescription is only the fallback for a decision with no actuals.
+  const previousBaseline = decision.performed ?? decision.previous;
+  const previousWork = previousBaseline
+    ? formatWork(decision.loadType, previousBaseline)
     : null;
   const nextWork = formatWork(decision.loadType, decision.ask);
   const loadReason = projectLoadReason(decision);

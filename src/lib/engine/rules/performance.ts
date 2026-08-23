@@ -1,4 +1,5 @@
 import type { EngineInputs, LoggedSetInput } from "../types";
+import { bestSet } from "../best-set";
 import type { EngineParams } from "../params";
 import { impliedRirAtReps } from "../reps";
 
@@ -39,10 +40,9 @@ export function assessPerformance(
     };
   }
 
-  const best = working.reduce<LoggedSetInput>(
-    (a, b) => (b.weight > a.weight || (b.weight === a.weight && b.reps > a.reps) ? b : a),
-    working[0],
-  );
+  // N89: the ONE definition of the set that counts, shared with every layer
+  // that has to say what changed "versus last session" (`engine/best-set.ts`).
+  const best = bestSet<LoggedSetInput>(working)!;
 
   const prescribedReps = inputs.previous.reps;
   const targetRir = inputs.previous.targetRir;

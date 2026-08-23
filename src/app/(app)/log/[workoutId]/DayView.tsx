@@ -1269,6 +1269,10 @@ const ExerciseBlock = memo(function ExerciseBlock({
       kind: rxAudit?.kind ?? null,
       trace: rxAudit?.trace ?? [],
       previous: rxAudit?.previous ?? null,
+      // N89 — what was actually logged last session. The delta's weight/reps
+      // read from here so the strip can never disagree with the trace or the
+      // history sheet; `previous` keeps the program axes.
+      performed: rxAudit?.performed ?? null,
       outOfBand: rxOutOfBand,
       decisionOutput: rxAudit?.output ?? null,
       // doc 21 §8 — the authored effort level leads the why and prices the

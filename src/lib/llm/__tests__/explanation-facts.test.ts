@@ -609,3 +609,63 @@ describe("projectEffortAssignment", () => {
     expect(facts?.rep_position).toBe("top");
   });
 });
+
+/**
+ * N89 — `previous_work` is WORK. The field was fed `decision.previous`, the
+ * previous prescription, so a session the lifter loaded heavier than asked
+ * reached the coaching model as a load increase that never happened — the same
+ * root cause as the day-view strip's "up 10 lb" over a "hold 40 lb" trace.
+ */
+describe("N89 — the facts' baseline is what was performed", () => {
+  const curl: FactsDecision = {
+    kind: "advance",
+    isDeload: false,
+    loadType: "external",
+    ask: { weight: 40, reps: 10, sets: 3, targetRir: 1 },
+    previous: { weight: 30, reps: 7, sets: 3, targetRir: 2 },
+    performed: { weight: 40, reps: 8, sets: 3 },
+    trace: [
+      { rule: "load", detail: "hold 40 lb, reps to 10 of 8–12" },
+      { rule: "progression", detail: "earned overload", status: "stepped" },
+    ],
+  };
+  const context: FactsContext = {
+    exerciseName: "Kneeling Hamstring Curl",
+    muscleGroup: "hamstrings",
+    weekNumber: 2,
+    mesoWeeks: 5,
+  };
+
+  it("reports the work that was logged, never the target it ignored", () => {
+    expect(buildExplanationFacts(curl, context).previous_work).toBe(
+      "40 lb × 8 × 3",
+    );
+  });
+
+  it("classifies the change by the axis that actually moved", () => {
+    expect(projectChange(curl)).toBe("reps_increased");
+    // and the trace agrees: the load rule held the weight
+    expect(projectChange({ ...curl, ask: { ...curl.ask, weight: 45 } })).toBe(
+      "load_increased",
+    );
+  });
+
+  it("still reads the set count off the PROGRAM's axis, not the count logged", () => {
+    // two of three sets finished is not the program dropping a set
+    expect(
+      projectChange({
+        ...curl,
+        ask: { ...curl.ask, reps: 8, targetRir: 2 },
+        performed: { weight: 40, reps: 8, sets: 2 },
+      }),
+    ).toBe("hold");
+  });
+
+  it("falls back to the prescription when no actuals were recorded", () => {
+    const preActuals: FactsDecision = { ...curl, performed: null };
+    expect(buildExplanationFacts(preActuals, context).previous_work).toBe(
+      "30 lb × 7 × 3",
+    );
+    expect(projectChange(preActuals)).toBe("load_increased");
+  });
+});

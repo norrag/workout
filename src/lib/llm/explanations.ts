@@ -20,6 +20,7 @@ import {
   type ExplanationContext,
   type PayloadTrend,
 } from "./prescription-explainer";
+import { readPerformedWork } from "@/lib/queries/audit";
 import {
   buildExplanationFacts,
   type ExplanationFacts,
@@ -1157,6 +1158,14 @@ export function toFactsInputs(
           targetRir: fNum(previous.targetRir),
         }
       : null,
+    // N89 — what the source session actually produced, read the way the engine
+    // reads it. `previous` above is the TARGET it was given.
+    performed: (() => {
+      const done = readPerformedWork(inputs);
+      return done
+        ? { weight: done.weight, reps: done.reps, sets: done.sets }
+        : null;
+    })(),
     trace,
   };
 

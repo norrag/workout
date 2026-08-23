@@ -3,8 +3,11 @@ import {
   prescriptionMatchesDecision,
   readEffortObserved,
   readOutputNumbers,
+  readPerformedWork,
   readTrace,
 } from "../audit";
+import { assessPerformance } from "@/lib/engine/rules/performance";
+import type { EngineInputs, LoggedSetInput } from "@/lib/engine/types";
 
 describe("readTrace", () => {
   it("reads well-formed trace steps from the stored output jsonb", () => {
@@ -155,5 +158,72 @@ describe("prescriptionMatchesDecision (N33 S4 tripwire)", () => {
         decision,
       ),
     ).toBe(false);
+  });
+});
+
+describe("readPerformedWork (N89 — what 'last session' actually was)", () => {
+  const set = (
+    weight: number,
+    reps: number,
+    over: Partial<Record<string, unknown>> = {},
+  ) => ({ weight, reps, isWarmup: false, setNumber: 1, ...over });
+
+  it("reduces the source session to its best working set", () => {
+    // the owner's field case: prescribed 30 x 7, LOADED 40 and did 8, 8, 8
+    expect(
+      readPerformedWork({ actualSets: [set(40, 8), set(40, 8), set(40, 8)] }),
+    ).toEqual({ weight: 40, reps: 8, sets: 3, uniformReps: true });
+  });
+
+  it("breaks a weight tie on reps, and a heavier set always wins", () => {
+    expect(readPerformedWork({ actualSets: [set(40, 8), set(40, 10)] })?.reps).toBe(10);
+    expect(
+      readPerformedWork({ actualSets: [set(45, 5), set(40, 12)] })?.weight,
+    ).toBe(45);
+  });
+
+  it("flags a ragged session so no line may claim a per-set delta", () => {
+    expect(readPerformedWork({ actualSets: [set(40, 8), set(40, 6)] })).toEqual({
+      weight: 40,
+      reps: 8,
+      sets: 2,
+      uniformReps: false,
+    });
+  });
+
+  it("ignores warmups and counts only working sets", () => {
+    expect(
+      readPerformedWork({
+        actualSets: [set(20, 10, { isWarmup: true }), set(40, 8), set(40, 8)],
+      }),
+    ).toEqual({ weight: 40, reps: 8, sets: 2, uniformReps: true });
+  });
+
+  it("is null without usable actualSets — a seed, or pre-actuals inputs", () => {
+    expect(readPerformedWork(null)).toBeNull();
+    expect(readPerformedWork({})).toBeNull();
+    expect(readPerformedWork({ actualSets: "nope" })).toBeNull();
+    expect(readPerformedWork({ actualSets: [] })).toBeNull();
+    expect(readPerformedWork({ actualSets: [{ isWarmup: true }] })).toBeNull();
+  });
+
+  it("picks the SAME set the engine prices from — the two must never drift", () => {
+    // the whole point of the fix: if this reader and `assessPerformance`
+    // disagreed, the explanation would contradict the trace all over again.
+    const actualSets: LoggedSetInput[] = [
+      { weight: 40, reps: 8, isWarmup: false, setNumber: 1, rirReported: 2 },
+      { weight: 45, reps: 6, isWarmup: false, setNumber: 2, rirReported: 1 },
+      { weight: 45, reps: 7, isWarmup: false, setNumber: 3, rirReported: 1 },
+      { weight: 20, reps: 12, isWarmup: true, setNumber: 0, rirReported: null },
+    ];
+    const perf = assessPerformance(
+      {
+        actualSets,
+        previous: { weight: 40, reps: 8, sets: 3, targetRir: 2 },
+      } as unknown as EngineInputs,
+      2,
+    );
+    const read = readPerformedWork({ actualSets });
+    expect([read?.weight, read?.reps]).toEqual([perf.bestWeight, perf.bestReps]);
   });
 });
