@@ -79,7 +79,8 @@ decision with no recorded actuals keeps the old target-to-target reading, which
 is all it can support.
 
 Guide: `ug/prescription-details#the-strip` now states what "last session" means,
-with ledger rows `C-rx-03a/b/c`.
+with ledger rows `C-rx-03a/b/c`. Shipped in **PR #254** as fix release **1.1.1**
+(doc 23 §4.1 — a copy correction; no number moves, so no modal).
 
 ## 2026-08-15 — Session 130: N88 — the strength anchor was starving on batch width
 
