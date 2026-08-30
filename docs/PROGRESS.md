@@ -86,9 +86,17 @@ own toggle overrides. Reasoning and the recording's own spec:
 The clip was recorded against the **real components** in a production build —
 the day view's own `AnchoredMenu` and the built `PlateSheet`, real fonts, real
 tokens, real touch events — with the CSS timeline slowed 4× so a 280 ms
-transition yields enough frames to resample back to true speed. It shows the
-owner's own upcoming Barbell Hip Thrust at **287.5 lb**, a number the rack
-cannot reach, so it ends on the honest answer rather than a tidy one.
+transition yields enough frames to resample cleanly. It shows the owner's own
+upcoming Barbell Hip Thrust at **287.5 lb**, a number the rack cannot reach, so
+it ends on the honest answer rather than a tidy one.
+
+**It plays at a quarter speed** (owner review, same day: *"the point was to make
+it slower so the user could actually see what any of it was"*). A demonstration
+is not a replay: it is sampled every 33 ms of recorded motion with each frame
+held 132 ms — a true 4× stretch rather than a lower frame rate — with the dead
+beats trimmed at both ends and identical frames collapsed into a single longer
+delay. ~14.5 s, 1.15 MB; `CONTENT_LIMITS.mediaBytes` moved to 1.5 MB to fit it,
+because a clip slow enough to follow is a bigger clip.
 
 **Also in the PR** (hard rule 10): ch. 5 `#adjusting-as-you-go` gains *Loading
 the bar* with claims `C-plate-01`…`05`; ch. 19 `#seeing-what-changed` gains the

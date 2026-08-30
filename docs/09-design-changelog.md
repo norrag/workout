@@ -217,17 +217,31 @@ and it needed rules before it needed an asset.
 
 ### 8. The 1.2.0 recording itself (`NO-CODE`, record)
 
-`public/releases/1.2.0/load-plates.gif` — 480×670, 63 frames, ~3.9 s at 16fps,
-812 KB. What it shows, and why each choice: the owner's own upcoming **Barbell
+`public/releases/1.2.0/load-plates.gif` — 480×670, 80 written frames, **~14.5 s**,
+1.15 MB. What it shows, and why each choice: the owner's own upcoming **Barbell
 Hip Thrust at 287.5 lb**, an odd number that a 45 lb bar and 2.5 lb plates
 **cannot** reach, so the clip ends on the honest answer (285 lb, 2.5 lb short,
 and the offer to record it) rather than on a tidy one.
 
+**It runs at a quarter of real speed, and that is the whole point.** The first
+cut played the interaction back at the speed it happened — 3.9 s — and the owner
+was blunt about the result: *"The point was to make it slower so the user could
+actually see what any of it was."* A demonstration is not a replay. It is
+sampled every 33 ms of recorded motion and each frame is held for 132 ms, which
+is a real 4× stretch rather than a lower frame rate; the dead beats at both ends
+are trimmed. **A slowed clip is a bigger clip** — that is the trade, and it is
+why `CONTENT_LIMITS.mediaBytes` moved to 1.5 MB.
+
+Runs of identical frames are collapsed into one frame carrying the summed delay,
+so the dwells and the end holds cost nothing extra. Sampling finer than 33 ms
+does not help: the recording holds only ~109 distinct frames across this range,
+so past that the file grows and the motion does not.
+
 The camera is a **vertical pan at full app width**, following the sheet's own
 top edge with a ~150 ms lag so it reads as a move rather than a cut — no
-invented zoom. It holds ~0.7 s on the card before the first tap and ~1.9 s on
-the finished plan, so the loop does not snap. A ring marks each tap and each
-drag; it is drawn by the recording rig, never by the app.
+invented zoom. It holds 0.6 s on the card before the first tap and 1.6 s on the
+finished plan, so the loop does not snap. A ring marks each tap and each drag;
+it is drawn by the recording rig, never by the app.
 
 Recorded against the **real components** — the day view's own `AnchoredMenu`
 and the built `PlateSheet`, in a production build with the real fonts and

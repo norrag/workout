@@ -85,11 +85,30 @@ fetching a second copy under an explicit `data-theme` toggle.
 The clip itself was recorded against the **real components** — a production
 build, the day view's own `AnchoredMenu`, the built `PlateSheet`, real fonts and
 tokens, real touch events through CDP — with the CSS timeline slowed 4× so a
-280 ms transition yields enough frames to resample back to true speed. It is a
-recording of the app, not a re-drawing of it, which is the only basis on which
-an announcement may show one. The example is the owner's own upcoming Barbell
-Hip Thrust at 287.5 lb: a number the rack cannot reach, so the clip ends on 285
-and the 2.5 lb it is short by rather than on something tidier. Guide updated in the same PR (hard rule 10):
+280 ms transition yields enough frames to resample cleanly. It is a recording of
+the app, not a re-drawing of it, which is the only basis on which an
+announcement may show one. The example is the owner's own upcoming Barbell Hip
+Thrust at 287.5 lb: a number the rack cannot reach, so the clip ends on 285 and
+the 2.5 lb it is short by rather than on something tidier.
+
+**Round 3 — the clip plays at a quarter speed.** The first cut played the
+interaction back at the speed it happened (3.9 s) and the owner was blunt about
+it: *"The point was to make it slower so the user could actually see what any of
+it was."* Right, and worth writing down as a rule rather than a fix: **a
+demonstration is not a replay.** Re-cut from the same source frames — sampled
+every 33 ms of recorded motion, each frame held 132 ms, dead beats trimmed at
+both ends — so it is a true 4× stretch rather than a lower frame rate, and the
+motion stays smooth instead of turning into a slideshow. Runs of identical
+frames collapse into one frame carrying the summed delay, so the dwells cost
+nothing; sampling finer than 33 ms buys nothing either, since the recording only
+holds ~109 distinct frames across the range. ~14.5 s, 1.15 MB, which moved
+`CONTENT_LIMITS.mediaBytes` to 1.5 MB — a clip slow enough to follow is a bigger
+clip, and the gate is there to stop something wildly heavy, not to force one too
+fast to read.
+
+The owner's own edited file never reached this session: attached twice, it
+arrived both times flattened to a single still, so the re-cut was made from the
+source frames to their description rather than from their file. Guide updated in the same PR (hard rule 10):
 ch. 5 `#adjusting-as-you-go` gains *Loading the bar*, with claims
 `C-plate-01`…`05` and the `22c` §B1.2 menu inventory corrected.
 
