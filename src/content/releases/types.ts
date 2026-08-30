@@ -27,6 +27,29 @@ export interface ReleaseEntry {
   /** where "explore" goes; omit when there is nothing to open */
   link?: { label: string; target: ReleaseTarget };
   /**
+   * A short screen recording of the feature, shown under the body in both
+   * release surfaces (09-changelog 2026-08-30 §7).
+   *
+   * Deliberately narrow: one optional asset per entry, a path under
+   * `public/releases/<version>/`, and its own pixel size so the row reserves
+   * the space before the file lands. The path is **version-scoped and
+   * immutable** — a release's media is as frozen as its prose (§5.1), and the
+   * service worker caches it on that assumption.
+   *
+   * `alt` is not decoration: the recording carries the entry's whole
+   * demonstration, so a reader who cannot see it is owed the same account in
+   * words. It goes through the §5.2 content contracts with the title and body.
+   */
+  media?: {
+    /** `/releases/<version>/<name>.<ext>`, under `public/` */
+    src: string;
+    /** what the recording shows, in a sentence */
+    alt: string;
+    /** the asset's own pixels, so the row never reflows when it loads */
+    width: number;
+    height: number;
+  };
+  /**
    * One of the 1–3 headline changes shown in the once-only release modal.
    * Every release entry remains visible in full under More → What's new.
    */
@@ -54,4 +77,8 @@ export const CONTENT_LIMITS = {
   body: 240,
   linkLabel: 32,
   maxHighlights: 3,
+  /** a recording is a demonstration, not a film — one per entry, kept short */
+  mediaAlt: 240,
+  /** bytes; a release note is read on a phone, often on mobile data */
+  mediaBytes: 1_200_000,
 } as const;

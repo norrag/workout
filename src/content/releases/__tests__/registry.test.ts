@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { compare, step } from "@/lib/version/semver";
@@ -142,8 +142,26 @@ const copy: { where: string; text: string; entry?: ReleaseEntry }[] = [
     ...(entry.link
       ? [{ where: `${where} link`, text: entry.link.label, entry }]
       : []),
+    ...(entry.media
+      ? [{ where: `${where} media alt`, text: entry.media.alt, entry }]
+      : []),
   ]),
 ];
+
+/** Every entry that ships a recording, staged entries included. */
+const allMedia: { where: string; media: NonNullable<ReleaseEntry["media"]> }[] =
+  [
+    ...allEntries.map(({ release, entry }) => ({
+      where: `${release.version} / ${entry.id}`,
+      entry,
+    })),
+    ...UNRELEASED_ENTRIES.map((entry) => ({
+      where: `unreleased / ${entry.id}`,
+      entry,
+    })),
+  ].flatMap(({ where, entry }) =>
+    entry.media ? [{ where, media: entry.media }] : [],
+  );
 
 describe("content contracts (§5.2)", () => {
   it("has no hype — no exclamation marks, no superlatives (hard rule 7)", () => {
@@ -188,6 +206,38 @@ describe("content contracts (§5.2)", () => {
           /estimat/i.test(text),
           `${where} must say it is an estimate`,
         ).toBe(true);
+  });
+
+  it("describes every recording in words", () => {
+    // the recording carries the entry's whole demonstration; a reader who
+    // cannot see it is owed the same account
+    for (const { where, media } of allMedia) {
+      expect(media.alt.trim().length, `${where} needs alt text`).toBeGreaterThan(
+        20,
+      );
+      expect(media.alt.length, `${where} alt`).toBeLessThanOrEqual(
+        CONTENT_LIMITS.mediaAlt,
+      );
+    }
+  });
+
+  it("ships every recording it points at, version-scoped and inside budget", () => {
+    for (const { where, media } of allMedia) {
+      expect(media.src, `${where} media path`).toMatch(
+        /^\/releases\/\d+\.\d+\.\d+\/[a-z0-9-]+\.(gif|png|webp)$/,
+      );
+      const file = path.join(REPO_ROOT, "public", media.src);
+      expect(existsSync(file), `${where}: ${media.src} is not in public/`).toBe(
+        true,
+      );
+      // a release note is read on a phone, often on mobile data
+      expect(
+        statSync(file).size,
+        `${where}: ${media.src} is over the size budget`,
+      ).toBeLessThanOrEqual(CONTENT_LIMITS.mediaBytes);
+      expect(media.width, `${where} width`).toBeGreaterThan(0);
+      expect(media.height, `${where} height`).toBeGreaterThan(0);
+    }
   });
 
   it("respects the length budget (§5.2.6)", () => {

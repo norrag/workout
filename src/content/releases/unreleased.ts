@@ -11,9 +11,15 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
   {
     id: "plate-loader",
     title: "Work out what goes on the bar",
-    body: "An exercise's menu now offers Load plates. It opens on that set's weight, asks what the bare bar or machine weighs and how many ends you load, then shows the plates to hang on each side.",
+    body: "If you are not sure which plates add up to your target weight, this works it out for you. Open Load plates from an exercise's menu, and it shows you what to put on each side.",
     area: "training",
     highlight: true,
+    media: {
+      src: "/releases/1.2.0/load-plates.gif",
+      alt: "On a Barbell Hip Thrust set, the exercise menu opens and Load plates is tapped. A tray rises carrying the set's 287.5 lb; swiping past a 45 lb bar loaded at both ends reaches the answer — two 45s, a 25 and a 5 a side, making 285 lb.",
+      width: 480,
+      height: 670,
+    },
     link: {
       label: "Open your workout",
       target: { kind: "app", href: "/workout" },

@@ -178,6 +178,64 @@ bid that one visit replaces. The plate sizes themselves are a parameter of
 decision rather than a rewrite — but **no UI offers one yet**, and the tray
 states the rack it used.
 
+### 7. A release note can carry a recording (`NET-NEW`, `TOKENS`)
+
+Added the same day, at the owner's request: *"a quick, cropped gif that briefly
+shows how to pull it up and quickly shows it swiping through the load screens."*
+The release surfaces had no media of any kind, so this is a new rendered pattern
+and it needed rules before it needed an asset.
+
+- **Change.** `ReleaseEntry` gains an optional `media` — a path, a sentence of
+  alt text, and the asset's own pixel size — rendered by `ReleaseEntryList`
+  under the body and above the link, so the once-only modal and the What's New
+  history show it identically (§8's one-renderer rule holds).
+- **It is framed, and it is capped at 260px.** The 1.5px ink rule is the house
+  marker for something *captured* rather than drawn — which matters more than
+  usual here, because a recording is a raster and carries its own theme with it
+  (see below). The width cap is not taste: a phone recording is portrait, and at
+  the entry's full width one of them is taller than the modal's entire scroll
+  area, so the note would open on a picture with its own prose pushed off
+  screen. At 260px the entry reads as one unit — title, body, demonstration.
+- **One theme, stated.** The manual's figures are single-colour masks precisely
+  so they follow `data-theme`; a screen recording cannot be. Shipping both
+  themes would mean two assets, and `display:none` does not stop a browser
+  fetching the hidden one — `<picture>` can only switch on
+  `prefers-color-scheme`, which the app's explicit toggle overrides. So the
+  recording is **light**, the app's primary system, and the ink frame is what
+  makes it read as a photograph of the app in either theme rather than as a
+  panel of the page.
+- **Alt text is not decoration.** The recording carries the entry's whole
+  demonstration, so it goes through the §5.2 content contracts with the title
+  and the body, and CI requires it.
+- **Impact** — `NET-NEW` in `ReleaseEntryList`; `TOKENS` only in reusing the
+  existing rule weight. New CI gates in `registry.test.ts`: the asset exists
+  under `public/releases/<version>/`, the path is version-scoped, it is inside a
+  1.2 MB budget, and the alt text passes the copy contracts. New service-worker
+  route in `sw.ts` — release media gets its own small cache, for the reason the
+  manual figures got theirs: the app-chrome cache is capped at 64 entries and
+  one recording read once would evict app chrome.
+
+### 8. The 1.2.0 recording itself (`NO-CODE`, record)
+
+`public/releases/1.2.0/load-plates.gif` — 480×670, 63 frames, ~3.9 s at 16fps,
+812 KB. What it shows, and why each choice: the owner's own upcoming **Barbell
+Hip Thrust at 287.5 lb**, an odd number that a 45 lb bar and 2.5 lb plates
+**cannot** reach, so the clip ends on the honest answer (285 lb, 2.5 lb short,
+and the offer to record it) rather than on a tidy one.
+
+The camera is a **vertical pan at full app width**, following the sheet's own
+top edge with a ~150 ms lag so it reads as a move rather than a cut — no
+invented zoom. It holds ~0.7 s on the card before the first tap and ~1.9 s on
+the finished plan, so the loop does not snap. A ring marks each tap and each
+drag; it is drawn by the recording rig, never by the app.
+
+Recorded against the **real components** — the day view's own `AnchoredMenu`
+and the built `PlateSheet`, in a production build with the real fonts and
+tokens — driven by real touch events, with the CSS timeline slowed 4× so a
+280 ms transition yields enough frames to resample cleanly back to real speed.
+It is a recording of the app, not a re-drawing of it, which is the only basis on
+which an announcement may show one.
+
 ---
 
 ## 2026-08-15 (session 3) — N81's inline term, built (doc 22 Phase 7, N81)
