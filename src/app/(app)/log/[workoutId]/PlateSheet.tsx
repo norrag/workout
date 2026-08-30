@@ -545,7 +545,7 @@ export function PlateSheet({
                         out to the end. The tail is what keeps this reading as a
                         loaded bar rather than as a slider track. */}
                     <div className="mt-4 overflow-x-auto">
-                      <div className="relative flex h-[60px] min-w-max items-center pr-8">
+                      <div className="relative flex h-[60px] w-max items-center pr-8">
                         <div className="absolute inset-x-0 top-1/2 h-[4px] -translate-y-1/2 bg-ink/25" />
                         <div className="relative h-[26px] w-[4px] bg-ink/60" />
                         <div className="relative ml-[3px] flex items-center gap-[2px]">

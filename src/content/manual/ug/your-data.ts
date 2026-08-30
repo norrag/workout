@@ -282,7 +282,7 @@ export const UG_YOUR_DATA: ManualChapter = {
         },
         {
           kind: "para",
-          text: "After a feature release, a sheet appears the next time you open the app. Dismissing the sheet marks it as read. If you miss several releases, one sheet includes all of them.",
+          text: "After a feature release, a sheet appears the next time you open the app. Dismissing the sheet marks it as read. If you miss several releases, one sheet includes all of them. A note sometimes carries a short recording of the feature it describes.",
         },
         {
           kind: "para",

@@ -64,7 +64,32 @@ override table and would have been the wrong home. And the menu row goes
 row at the index a returning thumb already knows.
 
 Staged behind `releaseActive("1.2.0")` per the owner's closing line, with the
-release note in `unreleased.ts`. PR [#255](https://github.com/norrag/workout/pull/255). Guide updated in the same PR (hard rule 10):
+release note in `unreleased.ts`. PR [#255](https://github.com/norrag/workout/pull/255).
+
+**Round 2, same session — the note itself.** The owner read the staged entry and
+asked for two things: plainer copy (*"just tell the user what the tool is in a
+basic way"*) and *"a quick, cropped gif"* demonstrating it. The copy is now the
+owner's own sentence, tidied. The recording needed a **pattern** first: release
+entries had no media at all, so `ReleaseEntry` gained an optional `media`,
+rendered identically in the once-only modal and the What's New history (§8's
+one-renderer rule), with CI gates on the asset's existence, path, size budget
+and alt text, and its own service-worker cache so one recording cannot evict app
+chrome. Two calls are worth reading in
+[`09-changelog`](../09-design-changelog.md) 2026-08-30 §7: the media is **capped
+at 260px** (a portrait phone recording at full entry width is taller than the
+modal's whole scroll area — the note would open on a picture with its prose
+pushed off screen), and it ships in **one theme**, because a raster cannot be a
+theme-following mask and neither `display:none` nor `<picture>` can avoid
+fetching a second copy under an explicit `data-theme` toggle.
+
+The clip itself was recorded against the **real components** — a production
+build, the day view's own `AnchoredMenu`, the built `PlateSheet`, real fonts and
+tokens, real touch events through CDP — with the CSS timeline slowed 4× so a
+280 ms transition yields enough frames to resample back to true speed. It is a
+recording of the app, not a re-drawing of it, which is the only basis on which
+an announcement may show one. The example is the owner's own upcoming Barbell
+Hip Thrust at 287.5 lb: a number the rack cannot reach, so the clip ends on 285
+and the 2.5 lb it is short by rather than on something tidier. Guide updated in the same PR (hard rule 10):
 ch. 5 `#adjusting-as-you-go` gains *Loading the bar*, with claims
 `C-plate-01`…`05` and the `22c` §B1.2 menu inventory corrected.
 

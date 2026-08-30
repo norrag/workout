@@ -30,6 +30,36 @@ function EntryLink({ link }: { link: NonNullable<ReleaseEntry["link"]> }) {
   );
 }
 
+/**
+ * A feature's own screen recording (09-changelog 2026-08-30 §7). Framed in the
+ * ink rule the house uses for anything captured rather than drawn, so in either
+ * theme it reads as *a picture of the app* rather than as a panel of the page —
+ * which matters, because a recording is a raster and carries its own theme with
+ * it. `width`/`height` come from the asset so the row never reflows around it.
+ *
+ * Capped at 260px rather than run to the entry's full width. A phone recording
+ * is portrait, and at full width one of them is taller than the modal's whole
+ * scroll area — the note would open on a picture with its own prose pushed off
+ * screen. At this size the entry reads as a unit: title, body, demonstration.
+ *
+ * A plain `<img>`, not `next/image`: an animated GIF put through the optimizer
+ * comes back as a still.
+ */
+function EntryMedia({ media }: { media: NonNullable<ReleaseEntry["media"]> }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={media.src}
+      alt={media.alt}
+      width={media.width}
+      height={media.height}
+      loading="lazy"
+      decoding="async"
+      className="mt-3 block h-auto w-full max-w-[260px] border-[1.5px] border-ink"
+    />
+  );
+}
+
 export function ReleaseEntryList({ entries }: { entries: ReleaseEntry[] }) {
   return (
     <ul>
@@ -46,6 +76,7 @@ export function ReleaseEntryList({ entries }: { entries: ReleaseEntry[] }) {
           <p className="mt-1 text-sm leading-relaxed text-ink/70">
             {entry.body}
           </p>
+          {entry.media && <EntryMedia media={entry.media} />}
           {entry.link && <EntryLink link={entry.link} />}
         </li>
       ))}

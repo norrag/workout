@@ -67,9 +67,33 @@ accent-for-current-position idiom). Two calls worth restating here:
   that leaves every existing row at the index a returning thumb already knows.
   Absent on a bodyweight-only movement, which has nothing to load.
 
+**The release note carries a recording** (owner, same day). Release entries had
+no media of any kind, so `ReleaseEntry` gains an optional `media` and
+`ReleaseEntryList` renders it in both surfaces — framed in the house's ink rule
+and **capped at 260px**, because a portrait phone recording at the entry's full
+width is taller than the modal's entire scroll area and would push the note's
+own prose off screen. Alt text goes through the §5.2 copy contracts with the
+title and body; CI additionally asserts the asset exists under
+`public/releases/<version>/`, is version-scoped, and is inside a 1.2 MB budget.
+`sw.ts` gains a small dedicated cache for it, for the reason the manual figures
+got theirs — the 64-entry app-chrome cache must not be evicted by one
+recording. **One theme, deliberately**: a recording is a raster and cannot be a
+theme-following mask, `display:none` does not stop the browser fetching a second
+copy, and `<picture>` can only switch on `prefers-color-scheme`, which the app's
+own toggle overrides. Reasoning and the recording's own spec:
+[`09-design-changelog.md`](09-design-changelog.md) 2026-08-30 §7–§8.
+
+The clip was recorded against the **real components** in a production build —
+the day view's own `AnchoredMenu` and the built `PlateSheet`, real fonts, real
+tokens, real touch events — with the CSS timeline slowed 4× so a 280 ms
+transition yields enough frames to resample back to true speed. It shows the
+owner's own upcoming Barbell Hip Thrust at **287.5 lb**, a number the rack
+cannot reach, so it ends on the honest answer rather than a tidy one.
+
 **Also in the PR** (hard rule 10): ch. 5 `#adjusting-as-you-go` gains *Loading
-the bar* with claims `C-plate-01`…`05`, [`22c`](22c-app-inventory.md) §B1.2's
-menu inventory is corrected, and the release note is staged in
+the bar* with claims `C-plate-01`…`05`; ch. 19 `#seeing-what-changed` gains the
+recording clause with `C-data-16a`; [`22c`](22c-app-inventory.md) §B1.2's menu
+inventory is corrected, and the release note is staged in
 `src/content/releases/unreleased.ts`.
 
 ## 2026-08-15 — The strength anchor stopped starving on batch width (N88, PR #250)

@@ -60,6 +60,28 @@ const staticAssetCaching: RuntimeCaching[] = [
     }),
   },
   {
+    // Release-note media (09-changelog 2026-08-30 §7) — the same argument the
+    // manual figures make, for the same reason. A feature's screen recording is
+    // the largest single asset the app serves, and the app-chrome cache below
+    // is capped at 64 entries shared with the icons and splash screens: one
+    // release note read once would evict app chrome. Its own small cache
+    // instead. The paths are version-scoped and frozen with the release, so
+    // cache-first is exact rather than optimistic; never precached
+    // (next.config.ts drops the public glob).
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith("/releases/"),
+    handler: new CacheFirst({
+      cacheName: "release-media",
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 8,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          maxAgeFrom: "last-used",
+        }),
+      ],
+    }),
+  },
+  {
     // Same-origin static images (app icons, iOS splash screens).
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && /\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i.test(url.pathname),
