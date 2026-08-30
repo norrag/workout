@@ -15,6 +15,59 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-30 — Session 131: the plate loader comes in from the shortcut (N89)
+
+**Owner:** *"I have an apple shortcut that does this… place it the exercise
+drop down menu as a tool for loading plates… brought up in a bottom tray, and
+then execute its quick multi-stage workflow in pages which advance right to
+left… The weight should be autofilled from the weight of the active set of
+exercise it was selected from, but allow the user to change it (changing it from
+load plates would update the set too)… This should be staged as a feature update
+fyi."* Attached: the shortcut's own implementation spec.
+
+**The math was the easy half and is a faithful port.** `src/lib/plates.ts` —
+subtract the unloaded implement, split across one or two sides, spend
+`[45, 25, 10, 5, 2.5]` greedily largest-first, never exceed the ask, report the
+achievable total. Two departures from a literal transcription, both small: it
+runs in **integer quarter-pounds**, because a floating-point descent that
+subtracts 2.5 four or five times accumulates enough dust for `floor` to drop a
+plate the lifter can actually load; and the rack is a **parameter** rather than
+a constant, which is the spec's own closing note honored as far as it goes
+without inventing a settings screen nobody asked for.
+
+**The coupling is the half that justifies building it here at all.** A plate
+calculator that does not know the set makes you type the weight twice and lets
+the two disagree. So the tray opens on the **active** set's weight — the first
+not logged or skipped, resolved exactly as the weight cell resolves it — and a
+change written there goes back to that set through the same queued
+`plan_weight` op a weight-cell blur uses, which means `Match weight across sets`
+governs its fan-out with no new rule and no new op kind. On a completed or
+locked session it stays a calculator and says so.
+
+**Hard rule 8 had nothing to transcribe.** There is no mockup for this, so the
+pass was discharged as a design entry written before the build (09-changelog
+2026-08-30): four pages on a horizontal track, `touch-action: pan-y` so the
+swipe axis is ours and the sheet still scrolls, a step rail whose current
+segment is the one thing rule 7 lets the accent mark, and a result that reads as
+a ledger first and a drawn sleeve second. An unreachable ask is **stated** —
+closest total under it, how far short, and an offer to record that number —
+rather than silently rounded, which is doc 10 §9 applied to a number the app
+made up rather than one it measured.
+
+**Two calls worth restating.** The bar weight and loading points live in
+**device storage** per exercise, not on the account: they describe the rack you
+are standing at, they have to work with no connection, and the equipment
+defaults are only an opening bid one visit replaces — no migration, and nothing
+entangled with the `exercise_param_overrides` fingerprint, which is an *engine*
+override table and would have been the wrong home. And the menu row goes
+**second in N82's first group**, the only insertion that leaves every existing
+row at the index a returning thumb already knows.
+
+Staged behind `releaseActive("1.2.0")` per the owner's closing line, with the
+release note in `unreleased.ts`. Guide updated in the same PR (hard rule 10):
+ch. 5 `#adjusting-as-you-go` gains *Loading the bar*, with claims
+`C-plate-01`…`05` and the `22c` §B1.2 menu inventory corrected.
+
 ## 2026-08-15 — Session 130: N88 — the strength anchor was starving on batch width
 
 **Owner:** *"Kneeling Hamstring Curl has plenty of logged history, but when the

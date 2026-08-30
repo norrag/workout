@@ -42,6 +42,11 @@ const PrescriptionDetailSheet = dynamic(() =>
 const EffortSheet = dynamic(() =>
   import("./EffortSheet").then((m) => m.EffortSheet),
 );
+// N89 — the plate tray. Same treatment again: a rack tool nobody opens on a
+// dumbbell day has no business in the day view's first-load JS.
+const PlateSheet = dynamic(() =>
+  import("./PlateSheet").then((m) => m.PlateSheet),
+);
 import type {
   LoggedExercise,
   NavWeek,
@@ -123,6 +128,15 @@ import { releaseActive } from "@/lib/version";
  */
 function focusPass(): boolean {
   return releaseActive("1.1.0");
+}
+
+/**
+ * N89 — the **Load plates** tray, staged behind 1.2.0 (doc 23 §9.2: the release
+ * PR is the switch). It gates the menu row only; the tray, its math, and its
+ * tests ride along inert until the row can be reached.
+ */
+function plateLoader(): boolean {
+  return releaseActive("1.2.0");
 }
 
 /**
@@ -293,6 +307,12 @@ export function DayView({
   const [replaceFor, setReplaceFor] = useState<LoggedExercise | null>(null);
   /** doc 21 §8 — the effort-target sheet (the assignment editor) */
   const [effortFor, setEffortFor] = useState<LoggedExercise | null>(null);
+  /** N89 — the plate tray, carrying the set it opened on so a weight typed
+   *  there writes back to the row the lifter is actually about to do */
+  const [plateFor, setPlateFor] = useState<{
+    we: LoggedExercise;
+    setNumber: number | null;
+  } | null>(null);
   const [noteSheet, setNoteSheet] = useState<{
     we: LoggedExercise;
     origin: NoteOrigin;
@@ -415,6 +435,11 @@ export function DayView({
     [],
   );
   const openEffort = useCallback((we: LoggedExercise) => setEffortFor(we), []);
+  const openPlates = useCallback(
+    (we: LoggedExercise, setNumber: number | null) =>
+      setPlateFor({ we, setNumber }),
+    [],
+  );
   const openNote = useCallback(
     (we: LoggedExercise, origin: NoteOrigin) => setNoteSheet({ we, origin }),
     [],
@@ -509,6 +534,7 @@ export function DayView({
           onAudit={openAudit}
           onReplace={openReplace}
           onEffort={openEffort}
+          onPlates={openPlates}
           onNote={openNote}
           onFeedback={openFeedback}
           onToggleDrop={toggleDrop}
@@ -547,6 +573,18 @@ export function DayView({
         onClose={() => setReplaceFor(null)}
         commit={commit}
       />
+      {/* mounted only while open: the tray is the day view's one `useLayoutEffect`
+          (it measures the page it is showing), and the chunk a `dynamic()` sheet
+          is in loads on first RENDER, not on first open */}
+      {plateFor && (
+        <PlateSheet
+          key={plateFor.we.id}
+          we={plateFor.we}
+          activeSetNumber={plateFor.setNumber}
+          readOnly={readOnly}
+          onClose={() => setPlateFor(null)}
+        />
+      )}
       <EffortSheet
         we={effortFor}
         mesocycleId={mesocycle.id}
@@ -1155,6 +1193,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onAudit,
   onReplace,
   onEffort,
+  onPlates,
   onNote,
   onFeedback,
   onToggleDrop,
@@ -1188,6 +1227,9 @@ const ExerciseBlock = memo(function ExerciseBlock({
   onAudit: (we: LoggedExercise) => void;
   onReplace: (we: LoggedExercise) => void;
   onEffort: (we: LoggedExercise) => void;
+  /** N89 — open the plate tray on this exercise's active set (null when every
+   *  set is in, and a weight typed there has nothing left to write to) */
+  onPlates: (we: LoggedExercise, activeSetNumber: number | null) => void;
   onNote: (we: LoggedExercise, origin: NoteOrigin) => void;
   onFeedback: (we: LoggedExercise) => void;
   onToggleDrop: (weId: string) => void;
@@ -1652,6 +1694,22 @@ const ExerciseBlock = memo(function ExerciseBlock({
               );
             }}
           />
+          {/* N89 — the rack tool. It sits in the look-it-up group, second, so
+              the rows a returning thumb already knows do not move (the N82
+              rule), and it is absent on a bodyweight-only movement, which has
+              nothing to load. */}
+          {plateLoader() &&
+            coerceLoadType(we.load_type, we.equipment_type) !==
+              "bodyweight_only" && (
+              <MenuRow
+                label="Load plates"
+                trailing="›"
+                onClick={() => {
+                  onCloseMenu();
+                  onPlates(we, nextSetNumber === 0 ? null : nextSetNumber);
+                }}
+              />
+            )}
         </MenuGroup>
         <MenuGroup ruled={focused}>
           {/* doc 21 §8 — the effort assignment for THIS slot, this week. The
