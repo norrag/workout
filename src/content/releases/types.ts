@@ -79,6 +79,12 @@ export const CONTENT_LIMITS = {
   maxHighlights: 3,
   /** a recording is a demonstration, not a film — one per entry, kept short */
   mediaAlt: 240,
-  /** bytes; a release note is read on a phone, often on mobile data */
-  mediaBytes: 1_200_000,
+  /**
+   * bytes; a release note is read on a phone, often on mobile data.
+   *
+   * Raised from 1.2 MB at owner review (2026-08-30): a demonstration slowed
+   * enough to be *followed* costs frames, and the gate exists to stop something
+   * wildly heavy rather than to force a clip too fast to read.
+   */
+  mediaBytes: 1_500_000,
 } as const;
