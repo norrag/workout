@@ -24,7 +24,7 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
-## 2026-08-30 — The plate tray: the Load Weights shortcut comes into the app (N89)
+## 2026-08-30 — The plate tray: the Load Weights shortcut comes into the app (N89, PR #255)
 
 **The ask.** The owner has been running an Apple Shortcut called *Load Weights*
 beside the app: total weight in, bar weight in, one side or two, plates out. It

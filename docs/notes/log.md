@@ -64,7 +64,7 @@ override table and would have been the wrong home. And the menu row goes
 row at the index a returning thumb already knows.
 
 Staged behind `releaseActive("1.2.0")` per the owner's closing line, with the
-release note in `unreleased.ts`. Guide updated in the same PR (hard rule 10):
+release note in `unreleased.ts`. PR [#255](https://github.com/norrag/workout/pull/255). Guide updated in the same PR (hard rule 10):
 ch. 5 `#adjusting-as-you-go` gains *Loading the bar*, with claims
 `C-plate-01`…`05` and the `22c` §B1.2 menu inventory corrected.
 
