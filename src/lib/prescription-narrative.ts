@@ -41,6 +41,7 @@ import type { LoadType } from "@/lib/engine/load";
 import type {
   AuditTraceStep,
   DecisionOutputNumbers,
+  PerformedWork,
 } from "@/lib/queries/audit";
 import {
   composeEffortLines,
@@ -61,8 +62,22 @@ export interface PrescriptionNarrativeInput {
   /** the recorded decision, when loaded; null = not yet fetched / none */
   kind: "seed" | "advance" | null;
   trace: AuditTraceStep[];
-  /** the previous session's prescription the decision advanced from */
+  /** the previous session's PRESCRIPTION — what the program asked for. It owns
+   *  the program's own axes below (the effort target, the set count), never the
+   *  work axes: see `performed`. */
   previous: DecisionOutputNumbers | null;
+  /**
+   * N90 — what the lifter actually DID in that session, reduced to the same
+   * best working set the load rule prices from. The delta's weight and reps
+   * read from here.
+   *
+   * The bug this closes: the delta read `previous`, so a session loaded heavier
+   * than prescribed produced "Versus last session: up 10 lb" on a row whose own
+   * trace said "hold 40 lb" and whose history sheet, one tap away, showed the
+   * 40 lb the lifter had actually done. Absent/null ⇒ the old target-to-target
+   * comparison, which is all a pre-actuals decision can support.
+   */
+  performed?: PerformedWork | null;
   /** live row ≠ decision numbers (N33 S4) — numbers were set by hand */
   outOfBand: boolean;
   /** the decision's own numbers, named when `outOfBand` */
@@ -162,16 +177,71 @@ function weightDelta(cur: number | null, prev: number | null): string | null {
 }
 
 /** "1 more rep per set" / "2 fewer reps per set" — digits throughout, matching
- *  the ask (the ledger sets numerals in the numeral face). */
-function repsDelta(cur: number | null, prev: number | null): string | null {
+ *  the ask (the ledger sets numerals in the numeral face).
+ *
+ *  `scope` keeps the phrase honest when the baseline is a real session rather
+ *  than a target: "per set" is only true if every working set carried the same
+ *  reps. A ragged session (8, 8, 6) is compared against its best set and says
+ *  so, rather than quietly claiming a per-set delta that holds for two of the
+ *  three sets. */
+function repsDelta(
+  cur: number | null,
+  prev: number | null,
+  scope: "per_set" | "best_set" = "per_set",
+): string | null {
   if (cur == null || prev == null || cur === prev) return null;
   const d = Math.abs(cur - prev);
   const noun = d === 1 ? "rep" : "reps";
-  return `${d} ${cur > prev ? "more" : "fewer"} ${noun} per set`;
+  const per = scope === "best_set" ? "than your best set" : "per set";
+  return `${d} ${cur > prev ? "more" : "fewer"} ${noun} ${per}`;
+}
+
+/** Which way the prescribed load moved off the baseline the ENGINE priced from
+ *  — the previous session's best working set, the same number the load trace's
+ *  `hold N lb` / `+N lb` is measured against. `unknown` when no baseline is
+ *  recorded, which is the only case any line may fall back to guessing. */
+export type LoadMove = "up" | "hold" | "down" | "unknown";
+
+/** The baseline "last session" means: the work axes come from what was
+ *  performed, the program axes from what was prescribed. */
+function deltaBaseline(
+  input: Pick<PrescriptionNarrativeInput, "previous" | "performed">,
+): { weight: number | null; reps: number | null; fromBestSet: boolean } {
+  const performed = input.performed ?? null;
+  if (performed) {
+    return {
+      weight: performed.weight,
+      reps: performed.reps,
+      fromBestSet: !performed.uniformReps,
+    };
+  }
+  return {
+    weight: input.previous?.weight ?? null,
+    reps: input.previous?.reps ?? null,
+    fromBestSet: false,
+  };
+}
+
+export function loadMoveFor(
+  input: Pick<PrescriptionNarrativeInput, "weight" | "previous" | "performed">,
+): LoadMove {
+  const base = deltaBaseline(input).weight;
+  if (input.weight == null || base == null) return "unknown";
+  if (Math.abs(input.weight - base) < 1e-9) return "hold";
+  return input.weight > base ? "up" : "down";
 }
 
 /**
  * The delta-vs-last-session sentence for an advance. Null when incomparable.
+ *
+ * Two baselines, deliberately (N90). The **work** axes — weight and reps —
+ * compare against what the lifter actually DID (`performed`), because that is
+ * what "last session" means to the person reading it, and because it is the
+ * same best-working-set baseline the load rule prices from: the delta then
+ * cannot contradict the trace's "hold 40 lb" or the measured anchor printed
+ * beside it. The **program** axes — the set count and the effort target —
+ * compare target to target, because those are the program's own moves and a
+ * missed set is not the program dropping one.
  *
  * The RIR ramp is the line's real work: when the weight and reps are unchanged
  * and the target moves closer to failure, the numbers look identical and the
@@ -182,13 +252,24 @@ function repsDelta(cur: number | null, prev: number | null): string | null {
 export function composeDelta(
   input: Pick<
     PrescriptionNarrativeInput,
-    "weight" | "reps" | "sets" | "targetRir" | "previous" | "effort"
+    | "weight"
+    | "reps"
+    | "sets"
+    | "targetRir"
+    | "previous"
+    | "performed"
+    | "effort"
   >,
 ): string | null {
   const prev = input.previous;
-  if (!prev) return null;
-  const dW = weightDelta(input.weight, prev.weight);
-  const dR = repsDelta(input.reps, prev.reps);
+  if (!prev && !input.performed) return null;
+  const base = deltaBaseline(input);
+  const dW = weightDelta(input.weight, base.weight);
+  const dR = repsDelta(
+    input.reps,
+    base.reps,
+    base.fromBestSet ? "best_set" : "per_set",
+  );
   // RIR moving DOWN week to week is the ramp: same numbers get harder.
   // doc 21 §8: when an ASSIGNMENT is in control of this week's RIR, the move
   // isn't the ramp's and the assignment line above has already named it — so
@@ -197,7 +278,7 @@ export function composeDelta(
   const rampSteps =
     input.effort?.assignedRir == null &&
     input.targetRir != null &&
-    prev.targetRir != null
+    prev?.targetRir != null
       ? prev.targetRir - input.targetRir
       : 0;
   const closer =
@@ -206,7 +287,7 @@ export function composeDelta(
       : null;
   const easier = rampSteps < 0 ? "an easier effort target" : null;
   const setsChanged =
-    input.sets != null && prev.sets != null && input.sets !== prev.sets
+    input.sets != null && prev?.sets != null && input.sets !== prev.sets
       ? `${input.sets > prev.sets ? "a set added" : "a set dropped"} (${prev.sets} to ${input.sets})`
       : null;
 
@@ -292,11 +373,23 @@ function composeGradeLine(
  */
 export function composeProgressionLine(
   trace: AuditTraceStep[],
+  loadMove: LoadMove = "unknown",
 ): string | null {
   const step = trace.find((s) => s.rule === "progression");
   if (!step) return null;
   switch (step.status) {
     case "stepped":
+      // N90 — an earned step is a target *strength* (doc 16 §3.3), and the load
+      // rule is free to deliver it through reps at a held weight; the trace
+      // then reads "hold 40 lb, reps to 10". The old copy said "the weight goes
+      // up" for every stepped decision, which on those weeks contradicted the
+      // ask directly above it, the trace below it, and the history sheet. Say
+      // what actually moved — and when it held, borrow the `paced` line's
+      // construction, because the lifter is being told the same thing.
+      if (loadMove === "hold")
+        return "You completed last session's target in full, so the session gets harder through reps and effort rather than more weight.";
+      if (loadMove === "down")
+        return "You completed last session's target in full, and the program builds on it this session.";
       return "The weight goes up because you completed last session's target in full.";
     case "vanished":
       return "An increase came due, but it is smaller than this movement's smallest weight change, so it carries over to next session.";
@@ -385,6 +478,7 @@ export function composeProgramContextLine(
  */
 export function composeWhyLines(
   input: Pick<PrescriptionNarrativeInput, "trace" | "effortStatus">,
+  loadMove: LoadMove = "unknown",
 ): string[] {
   const lines: string[] = [];
   const feedbackSteps = input.trace.filter((s) => s.rule === "feedback");
@@ -393,7 +487,7 @@ export function composeWhyLines(
   }
 
   const progressionStep = input.trace.find((s) => s.rule === "progression");
-  const progression = composeProgressionLine(input.trace);
+  const progression = composeProgressionLine(input.trace, loadMove);
   const feedbackAlreadySaidIt =
     progressionStep?.status === "not_earned" &&
     ["pain", "workload", "dampener"].includes(progressionStep.predicate ?? "") &&
@@ -486,7 +580,7 @@ export function composePrescriptionNarrative(
   } else if (input.kind === "advance") {
     const delta = composeDelta(input);
     if (delta) lines.push(delta);
-    lines.push(...composeWhyLines(input));
+    lines.push(...composeWhyLines(input, loadMoveFor(input)));
   }
 
   if (

@@ -186,6 +186,24 @@ describe("composeProgressionLine — program-language, no engine vocab (§4.2)",
     ).toBe(
       "The weight goes up because you completed last session's target in full.",
     );
+    // N90 — an earned step is a target STRENGTH, and the load rule may spend it
+    // on reps at a held weight. Each move gets its own true sentence; `unknown`
+    // (no baseline recorded) keeps the wording it always had, above.
+    const stepped = (loadMove: "up" | "hold" | "down") =>
+      composeProgressionLine(
+        [{ rule: "progression", detail: "", status: "stepped" }],
+        loadMove,
+      );
+    expect(stepped("up")).toContain("The weight goes up because");
+    expect(stepped("hold")).toBe(
+      "You completed last session's target in full, so the session gets harder through reps and effort rather than more weight.",
+    );
+    expect(stepped("down")).toBe(
+      "You completed last session's target in full, and the program builds on it this session.",
+    );
+    for (const move of ["hold", "down"] as const) {
+      expect(stepped(move)).not.toContain("weight goes up");
+    }
     expect(
       composeProgressionLine([
         { rule: "progression", detail: "", status: "vanished" },
@@ -805,6 +823,132 @@ describe("doc 21 §8 — an effort assignment leads the why", () => {
     expect(composePrescriptionNarrative({ ...w2d4, effort: null })).toEqual(before);
     expect(composePrescriptionNarrative({ ...w2d4, effort: undefined })).toEqual(
       before,
+    );
+  });
+});
+
+/**
+ * N90 — the owner's field case, transcribed from the recorded decision
+ * (Kneeling Hamstring Curl, W2·D4 of *August '26 - Bulk*, decision
+ * 26755ebf…, params v27). The seed asked for 30 lb × 7; the lifter loaded 40
+ * and did 8, 8, 8; the engine anchored on that 40 × 8 and prescribed 40 × 10.
+ *
+ * On screen, three surfaces then disagreed at once: the strip said "up 10 lb,
+ * 3 more reps per set", the trace right below it said "hold 40 lb", and the
+ * history sheet one tap away said 40 lb × 8, 8, 8. Two of the three were the
+ * explanation layer reading the previous TARGET as if it were the previous
+ * SESSION.
+ */
+describe("N90 — 'versus last session' means what was performed", () => {
+  const hamstringCurl = {
+    weight: 40,
+    reps: 10,
+    sets: 3,
+    targetRir: 1,
+    loadType: "external" as const,
+    isDeload: false,
+    kind: "advance" as const,
+    trace: [
+      {
+        rule: "load",
+        detail: "hold 40 lb, reps to 10 of 8–12 (anchor e1RM 54.6 lb)",
+      },
+      { rule: "grade", detail: "on target at ~2 RIR" },
+      { rule: "rir", detail: "target RIR steps 2 to 1" },
+      {
+        rule: "progression",
+        detail: "earned overload: targeting e1RM 54.6 (measured 53.3 + 1.3)",
+        status: "stepped",
+      },
+    ],
+    previous: { weight: 30, reps: 7, sets: 3, targetRir: 2 },
+    performed: { weight: 40, reps: 8, sets: 3, uniformReps: true },
+    outOfBand: false,
+    decisionOutput: { weight: 40, reps: 10, sets: 3, targetRir: 1 },
+    weekNumber: 2,
+    mesoWeeks: 5,
+  };
+
+  it("reads the delta off the logged work, not the prescription it ignored", () => {
+    expect(composeDelta(hamstringCurl)).toBe(
+      "Versus last session: 2 more reps per set and 1 rep closer to failure.",
+    );
+  });
+
+  it("no longer announces a weight rise the row itself denies", () => {
+    const n = composePrescriptionNarrative(hamstringCurl);
+    expect(n.ask).toBe(
+      "3 sets of 10 at 40 lb, each stopped 1 rep short of failure.",
+    );
+    for (const line of n.lines) {
+      expect(line).not.toContain("up 10 lb");
+      expect(line).not.toContain("The weight goes up");
+    }
+    expect(n.lines).toContain(
+      "You completed last session's target in full, so the session gets harder through reps and effort rather than more weight.",
+    );
+  });
+
+  it("keeps the whole strip consistent with the trace's own load move", () => {
+    // the invariant the bug broke: a trace that says `hold` may not be
+    // narrated as a weight increase, in any line, ever.
+    const held = composePrescriptionNarrative(hamstringCurl).lines.join(" ");
+    expect(held).not.toMatch(/\bup \d+(\.\d+)? lb\b/);
+    expect(held).not.toMatch(/weight goes up/);
+    // and the mirror case still says so plainly when the weight really moves
+    const rose = composePrescriptionNarrative({
+      ...hamstringCurl,
+      weight: 45,
+      trace: hamstringCurl.trace.map((t) =>
+        t.rule === "load"
+          ? { ...t, detail: "+5 lb to 10 reps at 1 RIR (anchor e1RM 54.6 lb)" }
+          : t,
+      ),
+    }).lines.join(" ");
+    expect(rose).toContain("up 5 lb");
+    expect(rose).toContain(
+      "The weight goes up because you completed last session's target in full.",
+    );
+  });
+
+  it("compares against work even when last session fell SHORT of its target", () => {
+    // symmetric: prescribed 250 x 9, managed 250 x 7, asked for 250 x 9 again
+    const shortfall = composeDelta({
+      ...w2d4,
+      targetRir: 3,
+      previous: { weight: 250, reps: 9, sets: 3, targetRir: 3 },
+      performed: { weight: 250, reps: 7, sets: 3, uniformReps: true },
+    });
+    expect(shortfall).toBe("Versus last session: 2 more reps per set.");
+  });
+
+  it("drops 'per set' when the session's sets were not all the same", () => {
+    expect(
+      composeDelta({
+        ...hamstringCurl,
+        performed: { weight: 40, reps: 8, sets: 3, uniformReps: false },
+      }),
+    ).toBe(
+      "Versus last session: 2 more reps than your best set and 1 rep closer to failure.",
+    );
+  });
+
+  it("still reads the set count and the effort target off the PROGRAM's axes", () => {
+    // a set the lifter did not finish is not the program dropping one
+    expect(
+      composeDelta({
+        ...hamstringCurl,
+        reps: 8,
+        targetRir: 2,
+        performed: { weight: 40, reps: 8, sets: 2, uniformReps: true },
+      }),
+    ).toBe("The same work as last session, at the same effort target.");
+  });
+
+  it("falls back to the prescription for a decision with no logged actuals", () => {
+    // what a decision written before actuals were captured looks like
+    expect(composeDelta({ ...hamstringCurl, performed: null })).toBe(
+      "Versus last session: up 10 lb, 3 more reps per set, and 1 rep closer to failure.",
     );
   });
 });
