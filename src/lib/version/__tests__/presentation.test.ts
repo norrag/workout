@@ -25,21 +25,21 @@ describe("releasePresentation", () => {
       },
     ];
     const presentation = resolveReleasePresentation({
-      current: "1.2.0",
+      current: UNRELEASED_VERSION,
       deployed: CURRENT_VERSION,
       releases: RELEASES,
       staged: {
-        version: "1.2.0",
+        version: UNRELEASED_VERSION,
         headline: "What comes next",
         entries: stagedEntries,
       },
       previewDate: "2026-08-13",
     });
 
-    expect(presentation.current).toBe("1.2.0");
+    expect(presentation.current).toBe(UNRELEASED_VERSION);
     expect(presentation.releases).toHaveLength(RELEASES.length + 1);
     expect(presentation.releases.at(-1)).toMatchObject({
-      version: "1.2.0",
+      version: UNRELEASED_VERSION,
       kind: "feature",
       headline: "What comes next",
       entries: stagedEntries,
