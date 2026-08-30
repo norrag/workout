@@ -24,6 +24,19 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-08-30 — Release 1.2.0 production cut (N89)
+
+The staged plate-loader block is frozen into `src/content/releases/1.2.0.ts`
+and added to the shipped registry. The package identity is 1.2.0, the next
+staged feature version is 1.3.0, and the `releaseActive("1.2.0")` gate in
+`DayView.tsx` — the only call site pinned to this release — is now live in
+production: the `Load plates` row on the exercise `…` menu, the plate tray,
+and the write-back to the active set's weight through the queued
+`plan_weight` op.
+
+No migration rode with this release and no `engine_params` activation is
+involved, so there is nothing to sequence beyond the flip itself.
+
 ## 2026-08-30 — The plate tray: the Load Weights shortcut comes into the app (N89, PR #255)
 
 **The ask.** The owner has been running an Apple Shortcut called *Load Weights*

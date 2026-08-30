@@ -15,6 +15,17 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-30 — Session 132: 1.2.0 flipped live (N89)
+
+The release PR per `docs/deployment/release.md`: `unreleased.ts`'s plate-loader
+entry moved into `src/content/releases/1.2.0.ts`, registered in `RELEASES`,
+`package.json` bumped to 1.2.0, `UNRELEASED_VERSION` advanced to 1.3.0. The
+`releaseActive("1.2.0")` gate in `DayView.tsx` was the only staged call site
+and is now live — the `Load plates` menu row, tray, and weight write-back ship
+to production. No migration and no `engine_params` activation rides with this
+release. `docs/PROGRESS.md` and the N89 backlog row are updated to reflect the
+cut.
+
 ## 2026-08-30 — Session 131: the plate loader comes in from the shortcut (N89)
 
 **Owner:** *"I have an apple shortcut that does this… place it the exercise
