@@ -24,6 +24,24 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-08-30 — Release 1.2.1: "last session" means the session, not the ask (N90)
+
+A fix release (doc 23 §4.1): no headline, no highlights, no modal — the
+prescription strip's own reasoning is corrected, and no number the engine
+produced moves. The strip's delta line and its `stepped` why line read the
+previous **prescription** where the engine prices off the previous session's
+best working **set**, so a session logged off-prescription could read as a
+weight change that never happened, contradicting the trace, anchor and history
+printed one tap away.
+
+`src/lib/engine/best-set.ts` now holds the single definition of the set that
+counts, shared by `assessPerformance` and the new `readPerformedWork`; the
+delta splits its baselines by axis (work axes off what was performed, program
+axes off what was prescribed) and `stepped` branches on where the earned step
+actually landed. No stored prescription moves, no recompute, no migration and
+no `engine_params` activation. Filed as N89 on 2026-08-23 and renumbered N90
+when it was reconciled onto a `main` that had taken the number.
+
 ## 2026-08-30 — Release 1.2.0 production cut (N89)
 
 The staged plate-loader block is frozen into `src/content/releases/1.2.0.ts`

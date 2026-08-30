@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, EngineDecisionKind } from "@/lib/types/database";
 import { COACHING_SERVED_MIN_PROMPT_VERSION } from "@/lib/llm/coaching";
+import { bestSet } from "@/lib/engine/best-set";
 
 type Client = SupabaseClient<Database>;
 
@@ -47,9 +48,17 @@ export interface PrescriptionAudit {
    *  of being passed off as "re-verified" (N33 S4 tripwire) */
   output: DecisionOutputNumbers | null;
   /** the previous session's prescription the decision advanced from
-   *  (`inputs.previous`) — feeds the quick-read's plain-language delta; null on
-   *  seeds and cold rows */
+   *  (`inputs.previous`) — the previous TARGET: what the program asked for, not
+   *  what happened. It still carries the program's own axes (the effort target,
+   *  the set count); null on seeds and cold rows */
   previous: DecisionOutputNumbers | null;
+  /** N90 — what the lifter ACTUALLY did in that session (`inputs.actualSets`),
+   *  reduced to the same best working set the load rule priced off. This, never
+   *  `previous`, is what "versus last session" means to the person reading it:
+   *  the moment they load something other than what was asked the two diverge,
+   *  and only this one agrees with the trace, the measured anchor, and the
+   *  history sheet. Null when the decision recorded no working sets. */
+  performed: PerformedWork | null;
   /** doc 19 §3 — the stored LLM coaching line for THIS decision, fetched only
    *  when the caller says the feature is serving (`llmExplanationsServe`) AND
    *  the row is a v3 row (`prompt_version >= 3`; v1–v2 whole-blob rows stop
@@ -87,6 +96,51 @@ export function readOutputNumbers(output: unknown): DecisionOutputNumbers | null
   };
   return Object.values(numbers).every((v) => v == null) ? null : numbers;
 }
+
+/**
+ * N90 — the previous session's actual work, as the engine itself read it.
+ *
+ * `weight`/`reps` are the best working set (`engine/best-set.ts`, the same
+ * reduction `assessPerformance` runs), which is the `baseWeight` the load rule
+ * prices against — so a delta computed from this can never contradict the
+ * trace's own "hold 40 lb". `sets` is the working-set count.
+ */
+export interface PerformedWork {
+  weight: number | null;
+  reps: number | null;
+  sets: number;
+  /** every working set carried the same reps, so "per set" is a true phrase */
+  uniformReps: boolean;
+}
+
+/** Coerce a decision's `inputs.actualSets` jsonb into that summary. Pure and
+ *  defensive (the stored jsonb is untyped); null when no working set is
+ *  recorded — a seed, or a decision written before actuals were captured. */
+export function readPerformedWork(inputs: unknown): PerformedWork | null {
+  const raw = (inputs as { actualSets?: unknown } | null)?.actualSets;
+  if (!Array.isArray(raw)) return null;
+  const working = raw
+    .filter(
+      (s): s is Record<string, unknown> =>
+        !!s &&
+        typeof s === "object" &&
+        (s as Record<string, unknown>).isWarmup !== true,
+    )
+    .map((s) => ({
+      weight: typeof s.weight === "number" ? s.weight : 0,
+      reps: typeof s.reps === "number" ? s.reps : 0,
+    }));
+  if (working.length === 0) return null;
+  const best = bestSet(working)!;
+  const firstReps = working[0].reps;
+  return {
+    weight: best.weight,
+    reps: best.reps,
+    sets: working.length,
+    uniformReps: working.every((s) => s.reps === firstReps),
+  };
+}
+
 
 /** Pure (N33 S4): does the live row still carry the decision's numbers? Field
  *  null-mismatches count as divergence — the whole tuple is engine-written. */
@@ -202,6 +256,7 @@ export async function getPrescriptionAudit(
     previous: readOutputNumbers(
       (data.inputs as { previous?: unknown } | null)?.previous ?? null,
     ),
+    performed: readPerformedWork(data.inputs),
     explanation,
     effortObserved: readEffortObserved(data.inputs),
   };

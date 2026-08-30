@@ -557,3 +557,55 @@ causes, and the coach line renders — ruled off under a tracked-caps `COACH`
 label, the §8 design decision this doc asked for. This closes the strip half of
 §11 phase 4; the MCP `facts` field and the note-write regeneration hooks are
 still open.
+
+---
+
+## 14. 2026-08-23 amendment — "last session" means the session, not the ask (N90)
+
+The owner reported one row disagreeing with itself: the strip read *"Versus last
+session: up 10 lb, 3 more reps per set… The weight goes up because you completed
+last session's target in full"*, while the Prescription details sheet directly
+beneath it read `LOAD — hold 40 lb` with `MEASURED ANCHOR 53.3 lb · 40 × 8 on
+16 Aug`, and the History sheet read `40 lb × 8, 8, 8`. Every number the engine
+produced was correct; both disagreeing sentences were this doc's layers.
+
+### 14.1 The baseline rule (supersedes §4's silence on it)
+
+Layer 2 and the §5 facts both read `inputs.previous` — the previous
+**prescription** — as "last session". The engine never has: `assessPerformance`
+reduces `inputs.actualSets` to the best working set, and that set's weight is
+the `baseWeight` the load rule holds or moves off. The two agree only while the
+lifter does exactly what was asked; the moment they load something else, the
+explanation describes a week that did not happen.
+
+**The rule, now explicit and split by axis:**
+
+| Axis | Baseline | Why |
+|---|---|---|
+| weight, reps | what was **performed** (`inputs.actualSets` → best working set) | this is what "last session" means to the reader, and it is the number the load rule priced from — so the delta is structurally incapable of contradicting the trace |
+| set count, effort target | what was **prescribed** (`inputs.previous`) | these are the program's own moves; a set the lifter did not finish is not the program dropping one |
+
+One reduction serves both the engine and the explanation
+(`src/lib/engine/best-set.ts`), with a test asserting the two never drift. The
+facts layer takes the same split: `previous_work` is *work*, and
+`projectChange` classifies by the axis that actually moved. A decision with no
+recorded actuals keeps the old target-to-target reading, which is all it can
+support; a session whose working sets were not uniform drops the phrase "per
+set" and names the best set instead.
+
+### 14.2 An earned step is not a weight increase (amends §13.2's list)
+
+`composeProgressionLine`'s `stepped` branch was a constant, *"The weight goes
+up…"*. But an earned step is a target **strength** (doc 16 §3.3), and the load
+rule may spend it entirely on reps at a held weight — which is what it did here,
+8 → 10 reps at 40 lb. The branch now reads the load's actual move and, when the
+weight held, borrows the `paced` line's construction ("the added difficulty
+comes from reps and effort rather than more weight") so copy rule 5's parallel
+construction across held-weight causes still holds.
+
+### 14.3 The standing invariant
+
+A line may not describe a load move the trace denies. The trace's `hold N lb` /
+`±N lb` and the composer's delta are now measured against the same baseline, so
+this is a property of the data flow rather than a rule to remember — which is
+the form §4 wants every accuracy fix to take.

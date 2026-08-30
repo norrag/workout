@@ -15,6 +15,78 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-08-30 — Session 133: N90 — the strip disagreed with its own trace
+
+**Owner:** *"There appears to be an issue with disagreement / inaccuracy between
+the prescription, the prescription detail, and reality. I have noticed this
+before."* — with three screenshots of one row: Kneeling Hamstring Curl, W2·D4 of
+*August '26 - Bulk*.
+
+Confirmed, and narrower than it looked. **Every number the engine produced was
+already correct.** The two lines that disagreed were both written by the
+explanation layer, and they disagreed with the sheet printed directly beneath
+them:
+
+| On screen | Said |
+|---|---|
+| the strip's delta line | *"Versus last session: up 10 lb, 3 more reps per set"* |
+| the strip's why line | *"The weight goes up because you completed last session's target in full"* |
+| the details sheet's trace | `LOAD — hold 40 lb, reps to 10 of 8–12` |
+| the details sheet's anchor | `MEASURED ANCHOR 53.3 lb · 40 × 8 on 16 Aug` |
+| the History sheet | `40 lb × 8, 8, 8 — W1·D4, 16 Aug` |
+
+**Cause 1 — the baseline.** `composeDelta` treated `inputs.previous` (the
+previous *prescription*) as "last session". The engine never does:
+`assessPerformance` reduces `inputs.actualSets` to the best working set, and
+that set's weight is the `baseWeight` the load rule holds or moves off — which
+is why the trace said hold. Here the two differed because the seed had asked for
+30 × 7 (a leftover of **N88**, fixed in PR #250 after this prescription was
+written) and the owner had loaded 40 and done 8, 8, 8. The strip reported the
+gap between two prescriptions as though it were the lifter's own week. The
+trigger is general: **any** session loaded off-prescription reproduces it, which
+fits *"I have noticed this before"*.
+
+**Cause 2 — the copy.** `composeProgressionLine`'s `stepped` branch was a
+constant string, *"The weight goes up…"*. But an earned step is a target
+**strength** (doc 16 §3.3), and the load rule may spend it entirely on reps at a
+held weight — which is exactly what it did here, 8 → 10 reps at 40 lb. That line
+would have contradicted the ask above it even with the baseline fixed.
+
+**Same root, one layer over.** `llm/explanation-facts.ts` labelled the previous
+prescription `previous_work` and handed it to the coaching model as performance,
+and `projectChange` classified this decision `load_increased`. Unshipped in
+effect (coaching is not serving), but it was the identical mistake and is fixed
+with the identical split.
+
+**The fix — one baseline, shared.** New leaf `src/lib/engine/best-set.ts` holds
+the single definition of the set that counts; `assessPerformance` and the new
+`readPerformedWork` (`queries/audit.ts`, reading the decision's own
+`inputs.actualSets`) both call it, and a test asserts the two can never drift.
+The delta then splits its baselines deliberately:
+
+- the **work** axes — weight and reps — compare against what was *performed*, so
+  the strip is structurally incapable of contradicting the trace's `hold`;
+- the **program** axes — set count and effort target — still compare target to
+  target, because a set the lifter did not finish is not the program dropping
+  one.
+
+`stepped` now branches on where the step actually landed, borrowing the `paced`
+line's construction when the weight held ("the added difficulty comes from reps
+and effort rather than more weight") so the ledger of causes still reads as one
+system. A ragged session (8, 8, 6) drops the phrase "per set" and names the best
+set instead of claiming a per-set delta that holds for two sets of three. A
+decision with no recorded actuals keeps the old target-to-target reading, which
+is all it can support.
+
+Guide: `ug/prescription-details#the-strip` now states what "last session" means,
+with ledger rows `C-rx-03a/b/c`.
+
+*Filed 2026-08-23 as N89 and reconciled onto `main` on 2026-08-30, by which time
+that number had been taken by the plate loader (session 131). Renumbered **N90**
+throughout — row, appendix batch (now Batch 40), doc 19 §14 and the code
+comments — and the fix release renumbered with it: **1.2.1**, since 1.2.0 cut
+the same day.*
+
 ## 2026-08-30 — Session 132: 1.2.0 flipped live (N89)
 
 The release PR per `docs/deployment/release.md`: `unreleased.ts`'s plate-loader

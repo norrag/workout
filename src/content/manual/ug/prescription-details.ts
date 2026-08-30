@@ -82,6 +82,10 @@ export const UG_PRESCRIPTION_DETAILS: ManualChapter = {
         },
         {
           kind: "para",
+          text: "\u201cCompared with last session\u201d means compared with what you logged, not with what was asked of you. If you loaded something other than the prescription \u2014 heavier, lighter, more reps, fewer \u2014 the comparison is against the work you actually did, which is the same work the program prices this session from. The set count and the effort target are compared with what was asked, because those are the program's own choices rather than yours.",
+        },
+        {
+          kind: "para",
           text: "The ask appears with the exercise. The reasoning loads from the saved prescription decision. If it cannot load, the line shows a retry control.",
         },
         {
