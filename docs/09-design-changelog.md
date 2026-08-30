@@ -70,6 +70,116 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## Entries
 
+## 2026-08-30 — The plate tray (N89)
+
+The owner has been running an Apple Shortcut called **Load Weights** beside the
+app for as long as the app has existed: enter a total, enter what the bar
+already weighs, say one side or two, get the plates. It is the last thing the
+day view sent someone out of the app to do. This entry is the design pass that
+brings it in, and it exists because **there is no mockup for it** — hard rule 8
+has nothing to transcribe here, so the shapes below are drawn from the system's
+own primitives and recorded before they were built.
+
+Figures: none redrawn. The tray is an unnumbered composition inside the day
+view's existing sheet (figs 1.4/1.5). Build: `PlateSheet.tsx`, math in
+`src/lib/plates.ts`, staged behind `releaseActive("1.2.0")`.
+
+### 1. The tray is four pages that advance, not one form (`NET-NEW`)
+
+- **Change.** A bottom sheet carrying a horizontal track of four pages —
+  **total weight**, **starting weight**, **loading points**, **per side** — each
+  sliding in from the right as you advance and back out to the right as you
+  return. `Next` / `Back` at the foot, a horizontal swipe does the same, and
+  choosing a value on either middle page advances by itself.
+- **Rationale.** The alternative was one page with three fields and a result,
+  which is what the shortcut's own prompts are *not*: the shortcut is a sequence
+  because the answers are a sequence — you cannot say what to load until the
+  implement is described. One question per page also means one thing under the
+  thumb at a bar, and it lets the two remembered answers be a tap each rather
+  than a form to re-read.
+- **The pages hold their own height.** The track's height is the page you are
+  on, transitioned at the sheet's own 280 ms; the tray does not stand at the
+  height of its tallest page while showing its shortest.
+- **Impact** — `NET-NEW`. The one new gesture in the app that is not vertical;
+  the track declares `touch-action: pan-y`, so the browser keeps the vertical
+  axis and the sheet still scrolls normally.
+
+### 2. The step rail, and the one accent on it (`NET-NEW`, `TOKENS`)
+
+- **Change.** Four 3 px segments across the top of the tray: the current one in
+  **accent**, the ones behind it `ink/55`, the ones ahead `ink/15`. Under it,
+  the step's name in tracked caps on the left and `01 / 04` in tabular numerals
+  on the right.
+- **Rationale.** Hard rule 7 gives orange to *current position and selection*,
+  and a step rail's filled segment is the most literal reading of "current
+  position" in the app — the same job the day navigator's accent dot does. The
+  numerals are there because a rail alone does not say how many are left.
+- **Impact** — `NET-NEW`; no token changes, the rail is composed from existing
+  ink opacities.
+
+### 3. The result reads as a ledger, then as a sleeve (`NET-NEW`)
+
+- **Change.** The final page leads with the **achievable** total in 38 px
+  numerals, states the shortfall in prose when the ask cannot be built, then
+  lists the plates per side as ruled rows (`45 lb` · `×1`), then draws them:
+  square ink-bordered blocks butted against a sleeve rule, heights scaled to
+  plate size, the whole row scrolling horizontally when a side is deeply loaded.
+  A closing line spells the arithmetic out — `45 lb bare + 70 lb on each of 2
+  ends = 185 lb`.
+- **Rationale.** The list is the thing you read; the blocks are the thing you
+  *check* against the bar in front of you, which is a different act and worth
+  the 56 px. Squares, ink borders and no fill keep it inside the ledger system
+  rather than making it an illustration.
+- **Honesty (doc 10 §9).** The big number is what the plates actually come to,
+  never the ask. When they differ the page says so in words — *"You asked for
+  187 lb. These plates get within 2 lb without going over."* — and offers to
+  record the reachable number rather than silently rounding to it.
+- **Impact** — `NET-NEW`.
+
+### 4. It opens on the set's weight, and can change it (`RETROFIT`)
+
+- **Change.** The tray opens on the **active** set's weight (the first not
+  logged or skipped), resolved exactly as the weight cell resolves it. A weight
+  changed in the tray is written back to that set on every exit, through the
+  same queued `plan_weight` op a weight-cell blur uses — so `Match weight across
+  sets` governs its fan-out identically. On a completed or locked session the
+  tray still computes and writes nothing, and says so on page one.
+- **Rationale.** This is the whole reason it is in the app rather than in a
+  shortcut. A plate calculator that does not know what you are lifting makes you
+  type the number twice and lets the two disagree.
+- **Impact** — `RETROFIT` of the day view's write path in the sense that a
+  second surface now enqueues `plan_weight`; no new action and no new op kind.
+
+### 5. Where the row goes (`RETROFIT`, binding)
+
+- **Change.** `Load plates ›` becomes the **second row of the exercise `…`
+  menu's first group**, under `View exercise`. It is absent on a
+  bodyweight-only movement.
+- **Rationale.** N82's grouping rule was that its seams fall where the list
+  already had them and *nothing moves under a returning thumb*. Appending to the
+  first group is the only insertion that keeps every existing row at its current
+  index. The group is *look it up*, which is what this is: it answers a question
+  and changes nothing unless you ask it to.
+- **Not on the card, and no guide link inside the tray.** The card's icon row is
+  closed (N82) and `22e` §2 excludes both the card and the set grid; the same
+  audit excludes a `GuideLink` from any sheet holding unsaved input, which the
+  tray's weight field makes this one.
+- **Impact** — `RETROFIT`; one row, gated.
+
+### 6. What is remembered, and where (`NO-CODE`, binding)
+
+The bar weight and the number of loading points are kept **per exercise in
+device storage**, alongside the theme switch — not on the account and not in a
+row. They describe the rack you are standing at rather than your training, they
+have to survive with no connection, and `defaultPlateSetup` (barbell 45 lb ×2,
+smith 25 lb ×2, dumbbell 0 ×2, everything else 0 ×1) is only ever the opening
+bid that one visit replaces. The plate sizes themselves are a parameter of
+`planPlateLoad`, not a constant inside it, so a per-user rack is a later
+decision rather than a rewrite — but **no UI offers one yet**, and the tray
+states the rack it used.
+
+---
+
 ## 2026-08-15 (session 3) — N81's inline term, built (doc 22 Phase 7, N81)
 
 The last of Phase 7, and the affordance the owner asked for at review round 4:

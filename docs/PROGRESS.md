@@ -24,6 +24,54 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-08-30 — The plate tray: the Load Weights shortcut comes into the app (N89)
+
+**The ask.** The owner has been running an Apple Shortcut called *Load Weights*
+beside the app: total weight in, bar weight in, one side or two, plates out. It
+was the last thing the day view sent someone out of the app to do. Brought in as
+a bottom tray on the exercise `…` menu, staged behind `releaseActive("1.2.0")`.
+
+**The math is a faithful port**, in `src/lib/plates.ts` — pure, 21 tests
+including the shortcut spec's own 185 lb example. Two departures from a literal
+transcription, both deliberate: it computes in **integer quarter-pounds**,
+because a float descent that subtracts 2.5 repeatedly accumulates enough dust
+for `floor` to drop a plate that would actually fit; and the rack is a
+**parameter of `planPlateLoad`** rather than a constant inside it, which honors
+the spec's closing note ("the plate-size array should ideally be configurable")
+as far as it goes without inventing a settings screen nobody asked for. **No UI
+offers a custom rack yet**, and the tray states the one it used.
+
+**The coupling is why it belongs in the app.** The tray opens on the **active**
+set's weight — the first not logged or skipped, resolved exactly as the weight
+cell resolves it — and a weight changed there is written back on every exit
+through the same queued `plan_weight` op a weight-cell blur uses. So `Match
+weight across sets` governs its fan-out with no new rule, no new op kind, and no
+new server action. On a completed or locked session it computes and writes
+nothing, and page one says so.
+
+**Deviations recorded (hard rule 8).** *No mockup exists for this surface*, so
+rule 8 had nothing to transcribe. The pass was discharged as a design entry
+written before the build — [`09-design-changelog.md`](09-design-changelog.md)
+**2026-08-30**, six numbered decisions — and the shapes are composed from
+existing primitives (`BottomSheet`, `Chip`, the ink CTA bar, the header's own
+accent-for-current-position idiom). Two calls worth restating here:
+
+- **The rack setup lives in device storage**, per exercise, beside the theme
+  switch — not on the account. It describes the rack you are standing at rather
+  than your training, it has to work with no connection, and the equipment
+  defaults are an opening bid one visit replaces. Deliberately **not** a column
+  on `exercise_param_overrides`: that table is an *engine* override folded into
+  the doc 14 prescription fingerprint, and a bar weight has no business moving
+  a prescription's freshness.
+- **The menu row goes second, in N82's first group.** That is the only insertion
+  that leaves every existing row at the index a returning thumb already knows.
+  Absent on a bodyweight-only movement, which has nothing to load.
+
+**Also in the PR** (hard rule 10): ch. 5 `#adjusting-as-you-go` gains *Loading
+the bar* with claims `C-plate-01`…`05`, [`22c`](22c-app-inventory.md) §B1.2's
+menu inventory is corrected, and the release note is staged in
+`src/content/releases/unreleased.ts`.
+
 ## 2026-08-15 — The strength anchor stopped starving on batch width (N88, PR #250)
 
 **The report.** The owner's meso seed left Kneeling Hamstring Curl with a blank

@@ -7,7 +7,19 @@ import type { ReleaseEntry } from "./types";
  * completed block into `<version>.ts`, then leaves this array empty and moves
  * `UNRELEASED_VERSION` to the next feature version.
  */
-export const UNRELEASED_ENTRIES: ReleaseEntry[] = [];
+export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
+  {
+    id: "plate-loader",
+    title: "Work out what goes on the bar",
+    body: "An exercise's menu now offers Load plates. It opens on that set's weight, asks what the bare bar or machine weighs and how many ends you load, then shows the plates to hang on each side.",
+    area: "training",
+    highlight: true,
+    link: {
+      label: "Open your workout",
+      target: { kind: "app", href: "/workout" },
+    },
+  },
+];
 
 /** The next feature release under construction. */
 export const UNRELEASED_VERSION = "1.2.0";

@@ -166,10 +166,17 @@ authors. The program keeps the heavy rule; the lifter's notes sit under a
 lighter one.
 
 **Exercise `…` menu** (all rows, current code):
-`View exercise` · `Effort target` · `Notes` / `Add note` · `Replace exercise` ·
-`Move up` · `Move down` · `Add set` · `Edit feedback` / `Add feedback` ·
-`Skip remaining sets` · `Reset to prescription` · `Unskip all sets` ·
-`Remove exercise`.
+`View exercise` · **`Load plates`** · `Effort target` · `Notes` / `Add note` ·
+`Replace exercise` · `Move up` · `Move down` · `Add set` ·
+`Edit feedback` / `Add feedback` · `Skip remaining sets` ·
+`Reset to prescription` · `Unskip all sets` · `Remove exercise`.
+
+> **`Load plates` is N89, staged for 1.2.0** (`releaseActive("1.2.0")`, doc 23
+> §9.2) — so it is in the code but not on the screen until that release is cut.
+> It joins the N82 *look it up* group as its second row, which is the only place
+> a new row can go without moving one a returning thumb already knows, and it is
+> **absent on a bodyweight-only movement**, which has nothing to load. It opens
+> the four-page plate tray (design record: 09-changelog 2026-08-30).
 
 > **Correction for the manual:** there is **no `Engine audit` row.** Any source
 > that says there is predates 2026-08-06.

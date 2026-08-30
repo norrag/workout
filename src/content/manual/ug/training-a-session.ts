@@ -18,6 +18,12 @@
 //     counts as logged (`day-rules.ts::daySetTotals`)
 //   - the feedback prompt fires only on the first and group-closing exercises
 //     (`DayView.tsx::handleLogged`)
+//   - N89's plate tray is reached from the same exercise `…` menu, opens on the
+//     ACTIVE set's weight, and writes a changed weight back through the queue's
+//     `plan_weight` op — so `Match weight across sets` governs its fan-out too
+//     (`C-plate-*`). Its rack and its greedy do-not-exceed descent are
+//     `src/lib/plates.ts`, and the bar weight + loading points are remembered
+//     in device storage, never on the account
 //   - claims are registered in `docs/22a-manual-claims.md`
 //
 // SEAMS (doc 22 §8.4b rule 1 — depth follows reading order):
@@ -273,6 +279,11 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         "note",
         "pinned note",
         "cut it short",
+        "load plates",
+        "plate calculator",
+        "what goes on the bar",
+        "bar weight",
+        "plate math",
       ],
       blocks: [
         {
@@ -310,6 +321,41 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         {
           kind: "para",
           text: "Skipping is the honest way to cut something short: the sets stay on the record as planned and not done, and the day's progress reads against what you actually took on.",
+        },
+        { kind: "heading", text: "Loading the bar" },
+        {
+          kind: "para",
+          text: [
+            { ui: "Load plates" },
+            " in the same menu works out what to hang on each end. It opens on the weight that set is set to lift and asks two things about the implement: what the bare bar, carriage, or sled weighs before any plate, and whether you load one end or two. Both answers are kept for that exercise, on the phone you answered them on.",
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "It works from a standard rack — ",
+            { num: "45" },
+            ", ",
+            { num: "25" },
+            ", ",
+            { num: "10" },
+            ", ",
+            { num: "5" },
+            " and ",
+            { num: "2.5" },
+            " lb — spent largest first and never taken past what you asked for. Where a weight cannot be built out of those plates, the tray shows the closest total it can reach without going over, how far under that lands, and offers to record that number instead.",
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "A weight changed in the tray changes the set as well, ",
+            {
+              to: "ug/training-a-session#logging-a-set",
+              text: "exactly as typing in the weight cell does",
+            },
+            ". On a session that is already finished it stays a calculator and writes nothing.",
+          ],
         },
         {
           kind: "callout",
