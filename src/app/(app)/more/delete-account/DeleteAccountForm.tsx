@@ -19,7 +19,7 @@ export function DeleteAccountForm() {
     >
       <label
         htmlFor="confirm"
-        className="block text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="block text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         TYPE DELETE TO CONFIRM
       </label>

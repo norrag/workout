@@ -89,7 +89,7 @@ export function WhatsNewModal({
             type="button"
             onClick={acknowledge}
             aria-label="Close release notes"
-            className="-mr-3 -mt-2 flex min-h-11 min-w-11 items-center justify-center text-xl text-ink/50"
+            className="-mr-3 -mt-2 flex min-h-11 min-w-11 items-center justify-center text-xl text-ink-muted"
           >
             ×
           </button>

@@ -61,7 +61,7 @@ export default async function EditMacroPage({
     <div>
       <Link
         href={`/cycles/macro/${macroId}`}
-        className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ OVERVIEW
       </Link>

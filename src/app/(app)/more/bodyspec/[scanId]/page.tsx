@@ -38,7 +38,7 @@ export default async function ScanDetailPage(props: {
     <div>
       <Link
         href="/more/bodyspec"
-        className="text-[10px] font-semibold tracking-[0.12em] text-ink/55"
+        className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted"
       >
         ‹ BODYSPEC
       </Link>
@@ -46,7 +46,7 @@ export default async function ScanDetailPage(props: {
       <h1 className="title-display mt-3 text-[32px]">
         {shortDateWithYear(scan.scanned_at).toLowerCase()}
       </h1>
-      <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink/55">
+      <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink-muted">
         {[scan.scanner_model?.toUpperCase(), "DEXA · BODYSPEC"]
           .filter(Boolean)
           .join(" · ")}
@@ -84,7 +84,7 @@ export default async function ScanDetailPage(props: {
 
       {history?.prev_scanned_at != null && (
         <Section title="VS PREVIOUS SCAN">
-          <div className="mt-1.5 text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+          <div className="mt-1.5 text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
             {shortDateWithYear(history.prev_scanned_at)}
             {history.same_scanner_as_prev === false &&
               " · DIFFERENT SCANNER — DELTAS NOT COMPARABLE"}
@@ -245,7 +245,7 @@ function DeltaRow({
   const v = Number(delta);
   return (
     <div className="flex items-center justify-between gap-4 border-b border-ink/15 py-2.5">
-      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
         {label}
       </div>
       <div className={`numeral text-sm ${muted ? "text-ink/45" : ""}`}>
@@ -266,7 +266,7 @@ function DeltaRow({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-ink/15 py-2.5">
-      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
         {label}
       </div>
       <div className="numeral text-sm">{value}</div>
@@ -294,7 +294,7 @@ interface RegionDisplay {
 function RegionRow({ region }: { region: RegionDisplay }) {
   return (
     <>
-      <div className="border-b border-ink/15 py-2 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+      <div className="border-b border-ink/15 py-2 text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
         {region.name}
       </div>
       <div className="numeral border-b border-ink/15 py-2 text-right text-sm">

@@ -14,7 +14,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
   const look = selected
     ? "border-[1.5px] border-ink bg-ink font-bold text-bg-base"
     : dashed
-      ? "border border-dashed border-ink/40 font-medium text-ink/55"
+      ? "border border-dashed border-ink/40 font-medium text-ink-muted"
       : "border border-ink/40 font-medium text-ink";
   return (
     <button

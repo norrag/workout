@@ -94,13 +94,13 @@ export function BottomSheet({
             type="button"
             onClick={onClose}
             aria-label="close"
-            className="-mr-3 flex min-h-11 min-w-11 items-center justify-center text-ink/50"
+            className="-mr-3 flex min-h-11 min-w-11 items-center justify-center text-ink-muted"
           >
             ✕
           </button>
         </div>
         {subtitle && (
-          <p className="label-caps mt-1 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          <p className="label-caps mt-1 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             {subtitle}
           </p>
         )}

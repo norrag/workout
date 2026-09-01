@@ -48,7 +48,7 @@ export default async function PlanMesoPage() {
     <div>
       <Link
         href="/cycles"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ CYCLES
       </Link>

@@ -134,14 +134,14 @@ export default async function MesoPlanPage({
       <div className="flex items-center justify-between">
         <Link
           href="/cycles"
-          className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
+          className="text-[10px] font-medium tracking-[0.12em] text-ink-muted"
         >
           ‹ CYCLES
         </Link>
         <Link
           href={`/cycles/meso/${mesoId}`}
           aria-label="close planner"
-          className="text-[15px] text-ink/50"
+          className="text-[15px] text-ink-muted"
         >
           ✕
         </Link>
@@ -149,7 +149,7 @@ export default async function MesoPlanPage({
       <h1 className="title-display mt-2.5 text-[27px]">
         {plan.meso.status === "planned" ? "meso plan" : "edit plan"}
       </h1>
-      <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink/55">
+      <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink-muted">
         {plan.meso.name.toUpperCase()} ·{" "}
         <span className="numeral">{plan.meso.weeks}</span> WEEKS
       </div>

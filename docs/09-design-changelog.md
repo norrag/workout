@@ -70,6 +70,83 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## Entries
 
+## 2026-09-01 — The secondary tone clears AA; the cold-start weight cell; a readable disabled action (N91–N94)
+
+A pass over the built app driven by a real signed-in session (local stack, Pixel
+7 viewport, every signed-in route swept with axe in both themes) rather than by
+the mockups. Three design changes came out of it, plus one logging defect
+recorded under **N91** in the notes area.
+
+### 1. `--color-ink-muted` — one named secondary tone, above the AA line
+
+- **Change** — the app's secondary text tone stops being an opacity fade and
+  becomes a token. `text-ink/55` and `text-ink/50` — used interchangeably at
+  ~460 call sites across 81 files: the tracked all-caps labels, metadata lines,
+  column headers, the `‹ BACK` links, the tab bar's inactive labels — are now
+  `text-ink-muted`. Light: `#6b6861` (ink at 62% over cream), **4.9:1**, up from
+  3.92:1. Dark: `#8e8981`, which is **exactly what `/55` already resolved to**
+  there — the dark ledger was never the problem and does not change.
+- **Rationale** — an axe sweep of the fifteen signed-in screens flagged the same
+  tone on every one of them: 3.92:1 against cream, under WCAG AA's 4.5:1, at
+  9–10.5px, which is the smallest type the app ships and the type it ships most
+  of. An opacity fade over a light ground loses contrast fast, which is why the
+  light ledger failed and the dark one didn't. The tone is now named once per
+  theme, so there is a single value to check rather than 460 blends —
+  `src/styles/__tests__/contrast.test.ts` reads the real stylesheet and fails if
+  either theme's value drops under AA against `bg-base` or `paper`.
+- **Also raised** (same reasoning, individually): the **tab bar's inactive
+  labels** (`ink/45`, 2.9:1 — the app's primary navigation, on every screen, and
+  the worst contrast measured anywhere), the `/more` footer version link, and
+  the planner board's per-exercise `RIR` line and `MEV · MRV` band.
+- **Deliberately left as opacity fades** — the places where the dimness *is* the
+  message, which is doc 08's "dashed = planned/empty" convention in another
+  dimension: not-yet-planned blocks (`SUGGESTED · UNPLANNED`), skipped rows, the
+  untouched RIR pre-fill (doc 21 §6.1 — an assumption is never shown as an
+  observation), placeholder text, and `aria-hidden` glyphs and ordinals.
+- **Affected figures** — every figure, as a tone; none as a layout.
+- **Impact** — `TOKENS`. Done in this PR. Sweep is mechanical (`text-ink/{55,50}`
+  → `text-ink-muted`); no layout, weight, size or spacing changed.
+
+> **One contrast failure is left standing and is the owner's call.** The accent
+> `#C14B2A` as small bold text on cream measures **4.28:1** — a 5% shortfall,
+> on `TARGET n RIR`, the `CURRENT` / `ACTIVE` badges, `DELETE ›` and
+> `IN PROGRESS`. Clearing it means darkening the brand hex doc 08 §1 fixes
+> (~`#BB4828` measures 4.5:1), which is a change to the documented palette and
+> not one to make from an audit. The fill and border uses are fine either way —
+> non-text contrast only asks 3:1.
+
+### 2. The cold-start weight cell shows `—`, not `0`
+
+- **Change** — on a set with nothing on record to price it (no prescription, no
+  planned weight, no history — every slot on a movement's first session), the
+  `LB` cell is **empty with a `—` placeholder** instead of pre-filled `0`. `LOG`
+  refuses such a row and says which cell it needs.
+- **Rationale** — a bold `0` in the `LB` box reads as the program's own ask, and
+  it logged: the box was tappable and wrote a real 0 lb set. Future rows on the
+  same screen already render `—` for exactly this state, so the editable row was
+  the odd one out. Same for an emptied cell — `Number("")` is 0, not NaN.
+- **Affected figures** — 2.1 (day view set grid).
+- **Impact** — `RETROFIT`. Done in this PR; Guide ch. `training-a-session` and
+  its claims rows updated in the same commit (hard rule 10).
+
+### 3. A disabled action stays readable
+
+- **Change** — the planner board's save button, in its `NO CHANGES` state, is a
+  hollow outline (`border-ink/25`, muted label) rather than the filled button at
+  40% opacity.
+- **Rationale** — fading a filled button fades its label *with* the fill, which
+  put `NO CHANGES` at roughly 1.7:1 against its own background in both themes.
+  That label is the reason the action is off, so it has to be readable. In dark
+  it was worse than unreadable: the faded cream fill became the brightest block
+  on the screen, so the unavailable action outranked the available one beside
+  it. The hollow treatment recedes in both themes and matches the sibling
+  `CANCEL`, which already carries that border.
+- **Scope** — deliberately narrow. Most other `disabled:opacity-40` buttons in
+  the app are *pending* states during a submit, where a brief fade is the right
+  cue; only a standing "there is nothing to do here" state needs its label.
+- **Affected figures** — 3.3 (planner board footer).
+- **Impact** — `RETROFIT`. Done in this PR.
+
 ## 2026-08-30 — The plate tray (N89)
 
 The owner has been running an Apple Shortcut called **Load Weights** beside the

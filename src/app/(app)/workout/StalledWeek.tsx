@@ -46,7 +46,7 @@ export function StalledWeek({ mesoId }: { mesoId: string }) {
 
   return (
     <div className="mt-5 border-[1.5px] border-dashed border-ink/40 p-4">
-      <div className="text-[10px] font-bold tracking-[0.14em] text-ink/55">
+      <div className="text-[10px] font-bold tracking-[0.14em] text-ink-muted">
         NEXT WEEK NOT BUILT
       </div>
       <p className="mt-2.5 text-sm leading-relaxed text-ink/70">

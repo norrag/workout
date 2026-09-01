@@ -112,7 +112,7 @@ export function SnapSlider({
           <div className="h-7 w-5 bg-accent" />
         </div>
       </div>
-      <div className="label-caps flex justify-between text-[9px] font-semibold text-ink/55">
+      <div className="label-caps flex justify-between text-[9px] font-semibold text-ink-muted">
         <span>{leftLabel}</span>
         {centerLabel && <span className="font-bold text-ink">{centerLabel}</span>}
         <span>{rightLabel}</span>

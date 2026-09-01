@@ -36,12 +36,12 @@ export default async function PlanFromTemplatePage({
     <div>
       <Link
         href="/cycles/plan"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ BACK
       </Link>
       <h1 className="title-display mt-3 text-[27px]">pick a template</h1>
-      <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink/55">
+      <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink-muted">
         THE PLANNER BOARD OPENS PREFILLED
       </div>
 
@@ -65,7 +65,7 @@ export default async function PlanFromTemplatePage({
               className="flex w-full items-center justify-between border-b border-ink/[0.18] py-[15px] text-left"
             >
               <div>
-                <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink/50">
+                <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
                   {template.emphasis.replace(/_/g, " ").toUpperCase()}
                   {template.user_id !== null ? " · YOURS" : ""}
                 </div>

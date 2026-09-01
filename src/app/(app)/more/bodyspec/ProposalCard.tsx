@@ -69,7 +69,7 @@ export function ProposalCard({ proposal }: { proposal: ScanProfileProposal }) {
         </button>
       </div>
       {error && !pending && (
-        <p className="mt-2 text-[10px] font-medium tracking-[0.08em] text-ink/55">
+        <p className="mt-2 text-[10px] font-medium tracking-[0.08em] text-ink-muted">
           {error.toUpperCase()}
         </p>
       )}
@@ -88,7 +88,7 @@ function ProposalRow({
 }) {
   return (
     <div className="flex items-center justify-between border-b border-ink/15 py-2.5">
-      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
         {label}
       </div>
       <div className="numeral text-sm">

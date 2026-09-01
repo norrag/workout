@@ -31,7 +31,7 @@ export function SyncNowForm() {
         {pending ? "SYNCING…" : "SYNC NOW"}
       </button>
       {message && !pending && (
-        <p className="mt-2 text-[10px] font-medium tracking-[0.08em] text-ink/55">
+        <p className="mt-2 text-[10px] font-medium tracking-[0.08em] text-ink-muted">
           {message.toUpperCase()}
         </p>
       )}

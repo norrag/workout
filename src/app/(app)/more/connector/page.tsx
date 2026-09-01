@@ -45,7 +45,7 @@ export default async function ConnectorPage() {
     <div>
       <Link
         href="/more"
-        className="text-[10px] font-semibold tracking-[0.12em] text-ink/55"
+        className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted"
       >
         ‹ MORE
       </Link>
@@ -71,11 +71,11 @@ export default async function ConnectorPage() {
             <span className="block text-sm font-semibold">
               Explore training with AI
             </span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-ink/55">
+            <span className="mt-0.5 block text-[11px] leading-snug text-ink-muted">
               Analysis, planning, coaching, and control
             </span>
           </span>
-          <span className="label-caps text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+          <span className="label-caps text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
             Read ›
           </span>
         </Link>
@@ -84,7 +84,7 @@ export default async function ConnectorPage() {
       <div className="mt-7 border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em]">
         ENDPOINT
       </div>
-      <p className="mt-3 mb-2 text-[10px] font-medium tracking-[0.08em] text-ink/55">
+      <p className="mt-3 mb-2 text-[10px] font-medium tracking-[0.08em] text-ink-muted">
         ADD THIS AS A CUSTOM / REMOTE MCP CONNECTOR
       </p>
       <CopyField value={endpoint} />

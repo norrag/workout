@@ -15,7 +15,7 @@ export default async function DeleteAccountPage() {
     <div>
       <Link
         href="/more"
-        className="text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         ‹ MORE
       </Link>
@@ -28,7 +28,7 @@ export default async function DeleteAccountPage() {
           macrocycles, mesocycles, logged workouts, exercises, notes, and
           feedback. It cannot be undone.
         </p>
-        <p className="mt-3 text-[11px] font-medium tracking-[0.04em] text-ink/55">
+        <p className="mt-3 text-[11px] font-medium tracking-[0.04em] text-ink-muted">
           WANT A COPY FIRST? EXPORT YOUR DATA AS CSV FROM THE MORE TAB BEFORE
           DELETING.
         </p>

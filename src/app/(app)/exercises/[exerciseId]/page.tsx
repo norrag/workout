@@ -185,7 +185,7 @@ export default async function ExerciseDetailPage({
         panels={[
           <div key="overview">
           <div className="mt-3.5 flex items-baseline justify-between border-b-[1.5px] border-ink pb-2.5">
-            <span className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+            <span className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
               LAST PERFORMED
             </span>
             <span className="numeral text-[11px] font-bold tracking-[0.06em]">
@@ -195,7 +195,7 @@ export default async function ExerciseDetailPage({
             </span>
           </div>
 
-          <div className="mt-4 text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+          <div className="mt-4 text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
             ALL-TIME BESTS
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-px border-[1.5px] border-ink bg-ink">
@@ -228,7 +228,7 @@ export default async function ExerciseDetailPage({
 
           {overview.macroBars.length > 0 && (
             <>
-              <div className="mt-[18px] flex justify-between text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+              <div className="mt-[18px] flex justify-between text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                 <span>
                   EST. 1RM — ACROSS {overview.macroName?.toUpperCase() ?? "MACRO"}
                 </span>
@@ -267,7 +267,7 @@ export default async function ExerciseDetailPage({
                     </div>
                     <div
                       className={`text-center text-[8.5px] font-semibold tracking-[0.1em] ${
-                        bar.state === "current" ? "font-bold text-accent" : "text-ink/55"
+                        bar.state === "current" ? "font-bold text-accent" : "text-ink-muted"
                       }`}
                     >
                       {bar.label}
@@ -347,10 +347,10 @@ function BestCell({
       <div className="numeral text-[20px] font-extrabold tracking-[-0.01em]">
         {value}
         {suffix && (
-          <span className="ml-1 text-[12px] font-semibold text-ink/50">{suffix}</span>
+          <span className="ml-1 text-[12px] font-semibold text-ink-muted">{suffix}</span>
         )}
       </div>
-      <div className="mt-[3px] flex items-center gap-1.5 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+      <div className="mt-[3px] flex items-center gap-1.5 text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
         {label}
         {info && <InfoDot term={info} small />}
       </div>
@@ -370,7 +370,7 @@ function Stat({
   return (
     <div className={`flex-1 ${divider ? "border-l border-ink/20 pl-3.5" : ""}`}>
       <div className="numeral text-[18px] font-extrabold">{value}</div>
-      <div className="mt-0.5 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+      <div className="mt-0.5 text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
         {label}
       </div>
     </div>

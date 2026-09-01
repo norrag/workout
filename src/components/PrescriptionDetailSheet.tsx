@@ -62,7 +62,7 @@ function FieldRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-ink/10 py-2">
-      <span className="flex items-center gap-1.5 text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+      <span className="flex items-center gap-1.5 text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
         {label}
         {info && <InfoDot term={info} small staged />}
       </span>
@@ -163,7 +163,7 @@ export function PrescriptionDetailSheet({
         <div className="pb-2">
           {/* 1 — the numbers under audit */}
           <div>
-            <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+            <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
               PRESCRIPTION
             </div>
             <p className="numeral mt-1.5 text-[14px] font-bold leading-[1.4] tracking-[-0.01em] text-ink">
@@ -191,7 +191,7 @@ export function PrescriptionDetailSheet({
 
           {/* 2 — which decision produced them, under which params */}
           <div className="mt-4">
-            <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+            <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
               DECISION
             </div>
             <div className="mt-0.5">
@@ -213,7 +213,7 @@ export function PrescriptionDetailSheet({
               </FieldRow>
             </div>
             {reverified && (
-              <p className="mt-2 text-[11px] leading-[1.45] text-ink/55">
+              <p className="mt-2 text-[11px] leading-[1.45] text-ink-muted">
                 Re-verified under{" "}
                 <span className="numeral">{versionLabel(target.paramsVersion)}</span> —
                 numbers unchanged since{" "}
@@ -229,7 +229,7 @@ export function PrescriptionDetailSheet({
             target.targetAnchor != null ||
             target.measuredAnchor != null) && (
             <div className="mt-4">
-              <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+              <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
                 EST. STRENGTH (e1RM)
               </div>
               <div className="mt-0.5">
@@ -270,7 +270,7 @@ export function PrescriptionDetailSheet({
 
           {audit && audit.trace.length > 0 && (
             <div className="mt-4">
-              <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink/50">
+              <div className="text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
                 TRACE
               </div>
               <ul className="mt-1.5 space-y-1.5">
@@ -279,7 +279,7 @@ export function PrescriptionDetailSheet({
                     key={`${step.rule}-${i}`}
                     className="border-l-2 border-ink/25 pl-2.5 text-[11.5px] leading-[1.45] text-ink/70"
                   >
-                    <span className="font-semibold tracking-[0.08em] text-ink/55">
+                    <span className="font-semibold tracking-[0.08em] text-ink-muted">
                       {step.rule.toUpperCase()}
                       {/* doc 16 §3.6 status coding, structural since the
                           quick-read split — the governor/predicate names the
@@ -297,7 +297,7 @@ export function PrescriptionDetailSheet({
           )}
 
           {!audit && (
-            <p className="mt-3 text-[11.5px] leading-[1.5] text-ink/55">
+            <p className="mt-3 text-[11.5px] leading-[1.5] text-ink-muted">
               No recorded engine decision for this prescription yet. It will be
               stamped on the next reconcile.
             </p>

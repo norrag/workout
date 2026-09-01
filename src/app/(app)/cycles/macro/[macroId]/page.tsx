@@ -183,7 +183,7 @@ export default async function MacroOverviewPage({
       {/* mesocycle timeline (the REALISTIC TARGET card that led here is
           hidden — N54, and the owner declined the re-enable 2026-08-14) */}
       <div className="mt-4 border-t-[1.5px] border-ink pt-[13px]">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
           MESOCYCLE TIMELINE
         </div>
         <div className="mt-[11px] flex flex-col gap-2">
@@ -212,7 +212,7 @@ export default async function MacroOverviewPage({
                 <TimelineMark meso={meso} pos={pos} />
                 <div className="flex-1">
                   <div
-                    className={`text-[13px] font-bold ${muted ? "text-ink/50" : ""}`}
+                    className={`text-[13px] font-bold ${muted ? "text-ink-muted" : ""}`}
                   >
                     {isUnplanned ? `Mesocycle ${pos}` : meso.name}
                   </div>
@@ -224,7 +224,7 @@ export default async function MacroOverviewPage({
                           ? "text-ink/42"
                           : muted
                             ? "text-ink/45"
-                            : "text-ink/50"
+                            : "text-ink-muted"
                     }`}
                   >
                     {sub}
@@ -290,7 +290,7 @@ export default async function MacroOverviewPage({
           date" framing gives way to the retrospective, graded against the
           stored contract (09-changelog 2026-07-11) */}
       <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
           {retrospective ? "RETROSPECTIVE" : "MACROCYCLE STATS · TO DATE"}
         </div>
         {retrospective && (
@@ -299,7 +299,7 @@ export default async function MacroOverviewPage({
                 mass-goal macro (strength was never the promise) */}
             <RetroRow label="STRENGTH">
               {retrospective.strength.informational ? (
-                <span className="text-[11px] font-semibold text-ink/55">
+                <span className="text-[11px] font-semibold text-ink-muted">
                   EST. {fmtPct(retrospective.strength.estStrengthPct)} · NOT
                   THE PROMISE
                 </span>
@@ -308,7 +308,7 @@ export default async function MacroOverviewPage({
                   <span className="text-[11px] font-semibold">
                     {fmtPct(retrospective.strength.estStrengthPct)}
                     {retrospective.strength.band && (
-                      <span className="text-ink/55">
+                      <span className="text-ink-muted">
                         {" "}
                         · TARGET {fmtBandPct(retrospective.strength.band)}
                       </span>
@@ -400,7 +400,7 @@ export default async function MacroOverviewPage({
             infoStaged
           />
         </div>
-        <div className="mb-6 mt-[9px] text-[10px] leading-normal text-ink/55">
+        <div className="mb-6 mt-[9px] text-[10px] leading-normal text-ink-muted">
           {retrospective && (
             <>
               Strength is an estimate graded against the goal set when this
@@ -429,7 +429,7 @@ export default async function MacroOverviewPage({
           renders ONLY with ≥ 2 in-window scans (one scan is not a trend) */}
       {compRows.length >= 2 && (
         <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
-          <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+          <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
             BODY COMPOSITION
           </div>
           <div className="mt-[11px] grid grid-cols-[1fr_auto_auto_auto] gap-x-5 gap-y-0">
@@ -443,7 +443,7 @@ export default async function MacroOverviewPage({
           </div>
           {compChange && (
             <div className="mt-[9px] flex items-center justify-between gap-3 border-t-[1.5px] border-ink pt-[9px]">
-              <div className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+              <div className="text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
                 CHANGE
               </div>
               {compChange.sameScanner ? (
@@ -469,17 +469,17 @@ export default async function MacroOverviewPage({
           Display-only — nothing downstream reads it. */}
       {rmrKcal != null && rmrScan && (
         <div className="mt-[18px] border-t-[1.5px] border-ink pt-[13px]">
-          <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+          <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
             MEASURED RMR
           </div>
           <div className="mt-[11px] flex items-baseline justify-between">
             <div className="numeral text-[22px] font-extrabold tracking-[-0.01em]">
               {rmrKcal.toLocaleString("en-US")}{" "}
-              <span className="text-[11px] font-semibold tracking-[0.08em] text-ink/55">
+              <span className="text-[11px] font-semibold tracking-[0.08em] text-ink-muted">
                 KCAL/DAY
               </span>
             </div>
-            <div className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+            <div className="text-[9px] font-medium tracking-[0.1em] text-ink-muted">
               SCAN {shortDate(rmrScan.scanned_at)}
             </div>
           </div>
@@ -605,7 +605,7 @@ function CompScanRow({ row }: { row: VBodyCompHistoryRow }) {
   );
   return (
     <>
-      <div className="border-b border-ink/15 py-2 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+      <div className="border-b border-ink/15 py-2 text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
         {shortDate(row.scanned_at)}
       </div>
       {cell(
@@ -647,7 +647,7 @@ function RetroRow({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
           {label}
         </div>
         <div className="flex items-center gap-2">{children}</div>
@@ -678,7 +678,7 @@ function Stat({
       <div className="numeral text-[22px] font-extrabold tracking-[-0.01em]">
         {value}
       </div>
-      <div className="mt-0.5 flex items-center gap-1 text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+      <div className="mt-0.5 flex items-center gap-1 text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
         {label}
         {info && <InfoDot term={info} small staged={infoStaged} />}
       </div>

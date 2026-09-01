@@ -15,7 +15,7 @@ export default function OfflinePage() {
         workout
       </h1>
       <div className="mt-8 border-[1.5px] border-ink p-6">
-        <div className="text-[10px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[10px] font-bold tracking-[0.14em] text-ink-muted">
           OFFLINE
         </div>
         <p className="mt-3 text-sm leading-relaxed text-ink">

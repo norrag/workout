@@ -62,7 +62,7 @@ export function NewCycleButton() {
           it attached to the goal.
         </div>
 
-        <div className="mt-[18px] border-t border-ink/15 pt-3 text-[10px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="mt-[18px] border-t border-ink/15 pt-3 text-[10px] font-bold tracking-[0.14em] text-ink-muted">
           OR ADD FROM A CODE
         </div>
         <RedeemForm />

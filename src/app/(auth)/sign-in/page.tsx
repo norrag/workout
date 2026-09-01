@@ -22,9 +22,6 @@ export default function SignInPage() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <Suspense fallback={null}>
-        <RedirectField />
-      </Suspense>
       <Input
         label="Email"
         name="email"
@@ -39,11 +36,18 @@ export default function SignInPage() {
         autoComplete="current-password"
         required
       />
+      {/* Deliberately NOT the form's first child: React injects its own hidden
+          action field there during SSR, and a Suspense boundary in that slot
+          hydrates as a different node — a mismatch that made React discard and
+          re-render the whole form (and report a client error) on every visit. */}
+      <Suspense fallback={null}>
+        <RedirectField />
+      </Suspense>
       {state.error && <p className="text-sm text-accent">{state.error}</p>}
       <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Signing in" : "Sign in"}
       </Button>
-      <p className="text-center text-sm text-ink/55">
+      <p className="text-center text-sm text-ink-muted">
         No account?{" "}
         <Link href="/sign-up" className="text-ink underline">
           Create one

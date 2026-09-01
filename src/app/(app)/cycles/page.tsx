@@ -78,7 +78,7 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
     return (
       <div className="flex items-center justify-between border-b border-ink/[0.18] py-[11px] last:border-b-0">
         <div>
-          <div className="text-[15px] font-bold text-ink/50">
+          <div className="text-[15px] font-bold text-ink-muted">
             Mesocycle {meso.position ?? ""}
           </div>
           <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.08em] text-ink/45">
@@ -104,13 +104,13 @@ function MacroMesoRow({ meso }: { meso: MesocycleRow }) {
       className="block border-b border-ink/[0.18] py-[11px] last:border-b-0"
     >
       <div className="flex items-center justify-between">
-        <div className={`text-[15px] font-bold ${muted ? "text-ink/50" : ""}`}>
+        <div className={`text-[15px] font-bold ${muted ? "text-ink-muted" : ""}`}>
           {meso.name}
         </div>
         <StatusMark status={meso.status} />
       </div>
       <div
-        className={`mt-[3px] text-[9.5px] font-medium tracking-[0.08em] ${muted ? "text-ink/45" : "text-ink/55"}`}
+        className={`mt-[3px] text-[9.5px] font-medium tracking-[0.08em] ${muted ? "text-ink/45" : "text-ink-muted"}`}
       >
         <MesoSubline meso={meso} />
       </div>
@@ -127,11 +127,11 @@ function StandaloneRow({ meso }: { meso: MesocycleRow }) {
       className="flex items-center justify-between border-b border-ink/[0.15] py-[11px] last:border-b-0"
     >
       <div>
-        <div className={`text-[15px] font-bold ${muted ? "text-ink/50" : ""}`}>
+        <div className={`text-[15px] font-bold ${muted ? "text-ink-muted" : ""}`}>
           {meso.name}
         </div>
         <div
-          className={`mt-[3px] text-[9.5px] font-medium tracking-[0.08em] ${muted ? "text-ink/45" : "text-ink/55"}`}
+          className={`mt-[3px] text-[9.5px] font-medium tracking-[0.08em] ${muted ? "text-ink/45" : "text-ink-muted"}`}
         >
           {meso.weeks} WK · {meso.days_per_week} D/WK
         </div>
@@ -273,12 +273,12 @@ export default async function CyclesPage({
                   >
                     {macro.name.toUpperCase()}
                   </Link>
-                  <div className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+                  <div className="text-[9px] font-medium tracking-[0.1em] text-ink-muted">
                     {dateSpan(macro.start_date, macro.target_end_date)}
                   </div>
                 </div>
                 <div className="mt-[5px] flex items-center justify-between">
-                  <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+                  <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
                     {goalLine}
                   </div>
                   {!allComplete && (
@@ -303,7 +303,7 @@ export default async function CyclesPage({
 
       {standaloneMesos.length > 0 && (
         <div className="mt-4 border-t-[1.5px] border-ink">
-          <div className="pb-0.5 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink/50">
+          <div className="pb-0.5 pt-3 text-[9px] font-semibold tracking-[0.16em] text-ink-muted">
             STANDALONE — NO MACROCYCLE
           </div>
           {standaloneMesos.map((meso) => (

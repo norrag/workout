@@ -153,7 +153,7 @@ export function LoadStepSheet({
               aria-label="custom load step"
               className="numeral h-10 w-24 bg-transparent px-2 text-[15px] font-bold focus:outline-none"
             />
-            <span className="pr-3 text-[11px] font-medium tracking-[0.08em] text-ink/55">
+            <span className="pr-3 text-[11px] font-medium tracking-[0.08em] text-ink-muted">
               lb
             </span>
           </div>

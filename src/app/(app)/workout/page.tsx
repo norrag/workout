@@ -105,7 +105,7 @@ export default async function WorkoutPage() {
       <div className="flex items-baseline justify-between">
         <div className="logotype text-[13px] font-semibold">workout</div>
         {profile?.display_name && (
-          <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
+          <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink-muted">
             {profile.display_name.toUpperCase()}
           </div>
         )}
@@ -131,7 +131,7 @@ export default async function WorkoutPage() {
             </div>
             <Link
               href={`/cycles/meso/${restingSummary.mesocycle_id}?view=balance`}
-              className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
+              className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted"
             >
               ALL STATS ›
             </Link>

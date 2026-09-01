@@ -84,7 +84,7 @@ export function RirScheduleEditor({
               key={i}
               className={`flex items-center gap-2 ${i === 0 ? "" : "mt-1.5"}`}
             >
-              <span className="numeral w-[34px] flex-shrink-0 text-[11px] font-semibold text-ink/55">
+              <span className="numeral w-[34px] flex-shrink-0 text-[11px] font-semibold text-ink-muted">
                 W{i + 1}
               </span>
               <div className="flex flex-1 border-[1.5px] border-ink">

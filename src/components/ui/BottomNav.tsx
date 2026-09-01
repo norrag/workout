@@ -74,7 +74,10 @@ export function BottomNav() {
               >
                 <span
                   className={`label-caps flex min-h-12 items-center justify-center px-1 text-[9px] ${
-                    active ? "font-bold text-ink" : "font-medium text-ink/45"
+                    // an inactive tab is still a destination someone has to be
+                    // able to read: `ink/45` put the app's primary navigation
+                    // at 2.9:1 on cream, the worst contrast on any screen
+                    active ? "font-bold text-ink" : "font-medium text-ink-muted"
                   }`}
                 >
                   {active && <span aria-hidden>■&nbsp;</span>}

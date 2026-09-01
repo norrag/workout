@@ -36,12 +36,12 @@ export default async function NewExercisePage() {
     <div>
       <Link
         href="/exercises"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ EXERCISES
       </Link>
       <h1 className="title-display mt-3 text-[27px]">new exercise</h1>
-      <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink/55">
+      <div className="mt-1 text-[10px] font-medium tracking-[0.12em] text-ink-muted">
         CUSTOM — ONLY VISIBLE TO YOU
       </div>
       <NewExerciseForm muscleGroups={muscleGroups} defaultSteps={defaultSteps} />

@@ -30,7 +30,7 @@ export default async function GuideSearchPage({
     <div>
       <Link
         href={origin ? origin.href : MANUAL_ROOT.ug}
-        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         ‹ {origin ? origin.label : "Guide"}
       </Link>

@@ -202,6 +202,9 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
         "no signal",
         "offline",
         "didn't save",
+        "first time",
+        "starting weight",
+        "empty weight",
       ],
       blocks: [
         {
@@ -228,6 +231,18 @@ export const UG_TRAINING_A_SESSION: ManualChapter = {
             " box takes ",
             { to: "ug/effort-rir#report-what-you-did", text: "your report of how close to failure it was" },
             ".",
+          ],
+        },
+        {
+          kind: "para",
+          text: [
+            "The very first time you train a movement there is nothing to ask for yet — no session of yours to work from — so ",
+            { ui: "LB" },
+            " arrives empty, showing ",
+            { ui: "—" },
+            ". Put in the weight you are starting at. Until you do, the box in ",
+            { ui: "LOG" },
+            " will not take the set: an empty weight is not a light set, and recording one would put a set you never did into your history.",
           ],
         },
         { kind: "heading", text: "Changing the weight" },

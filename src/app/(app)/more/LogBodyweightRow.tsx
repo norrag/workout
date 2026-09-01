@@ -52,7 +52,7 @@ export function LogBodyweightRow({
         className="flex w-full items-center justify-between border-b border-ink/15 py-3.5 text-left"
       >
         <div className="text-sm font-semibold">Log bodyweight</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           {latest ? (
             <>
               <span className="numeral">{latest.weight}</span> LB ·{" "}

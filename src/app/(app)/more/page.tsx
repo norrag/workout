@@ -66,14 +66,14 @@ export default async function MorePage() {
               {profile?.display_name ?? "Set up your profile"}
             </div>
             {meta && (
-              <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink/55">
+              <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink-muted">
                 {meta}
               </div>
             )}
           </div>
-          <div className="text-base text-ink/50">›</div>
+          <div className="text-base text-ink-muted">›</div>
         </div>
-        <div className="mt-3 flex gap-2 border-t border-ink/[0.18] pt-3 text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="mt-3 flex gap-2 border-t border-ink/[0.18] pt-3 text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           {profile?.training_since && (
             <>
               <span>
@@ -100,7 +100,7 @@ export default async function MorePage() {
           className="flex items-center justify-between border-b border-ink/15 py-3.5"
         >
           <div className="text-sm font-semibold">Guide</div>
-          <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+          <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
             READ ›
           </div>
         </Link>
@@ -127,7 +127,7 @@ export default async function MorePage() {
         className="flex items-center justify-between border-b border-ink/15 py-3.5"
       >
         <div className="text-sm font-semibold">AI connector</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           SET UP ›
         </div>
       </Link>
@@ -138,7 +138,7 @@ export default async function MorePage() {
         className="flex items-center justify-between border-b border-ink/15 py-3.5"
       >
         <div className="text-sm font-semibold">BodySpec DEXA</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           {bodySpecStatus === "connected"
             ? "CONNECTED"
             : bodySpecStatus === "error"
@@ -151,7 +151,7 @@ export default async function MorePage() {
         className="flex items-center justify-between border-b border-ink/15 py-3.5"
       >
         <div className="text-sm font-semibold">Account &amp; data</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           ›
         </div>
       </Link>
@@ -170,7 +170,7 @@ export default async function MorePage() {
           CI asserts package.json, CURRENT_VERSION and max(RELEASES) agree) */}
       <Link
         href="/more/whats-new"
-        className="mt-6 block text-[9.5px] font-medium tracking-[0.12em] text-ink/45"
+        className="mt-6 block text-[9.5px] font-medium tracking-[0.12em] text-ink-muted"
       >
         WORKOUT <span className="numeral">{displayVersion()}</span> —
         WHAT&apos;S NEW ›

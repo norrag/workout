@@ -68,11 +68,11 @@ export function MacroHeader({
       <div className="flex items-center justify-between">
         <Link
           href="/cycles"
-          className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
+          className="text-[10px] font-medium tracking-[0.12em] text-ink-muted"
         >
           ‹ CYCLES
         </Link>
-        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
+        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink-muted">
           MACROCYCLE
         </div>
       </div>
@@ -95,7 +95,7 @@ export function MacroHeader({
 
       {/* meta + status */}
       <div className="mt-2 flex items-center justify-between">
-        <div className="text-[10.5px] font-medium tracking-[0.1em] text-ink/55">
+        <div className="text-[10.5px] font-medium tracking-[0.1em] text-ink-muted">
           {metaLine}
         </div>
         {status === "active" ? (
@@ -103,13 +103,13 @@ export function MacroHeader({
             ACTIVE
           </div>
         ) : (
-          <div className="shrink-0 border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink/55">
+          <div className="shrink-0 border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink-muted">
             {status === "completed" ? "COMPLETE" : "ARCHIVED"}
           </div>
         )}
       </div>
       {goalNotes && (
-        <div className="mt-1.5 text-[13px] font-semibold text-ink/55">
+        <div className="mt-1.5 text-[13px] font-semibold text-ink-muted">
           {goalNotes}
         </div>
       )}

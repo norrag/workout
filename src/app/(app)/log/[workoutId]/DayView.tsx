@@ -81,6 +81,7 @@ import {
   plannedSetCount,
   prescriptionBasisE1rm,
   reportedRirFromInput,
+  unloggableSetReason,
 } from "./day-rules";
 import {
   addSetAction,
@@ -192,7 +193,7 @@ function BodyweightChip({
 
   if (editing) {
     return (
-      <span className={`flex items-baseline gap-1 ${labelCls} text-ink/55`}>
+      <span className={`flex items-baseline gap-1 ${labelCls} text-ink-muted`}>
         {prefix}BW
         <input
           autoFocus
@@ -220,7 +221,7 @@ function BodyweightChip({
       type="button"
       aria-label="edit bodyweight"
       onClick={() => setEditing(true)}
-      className={`${labelCls} ${saving ? "text-ink/30" : "text-ink/50"}`}
+      className={`${labelCls} ${saving ? "text-ink/30" : "text-ink-muted"}`}
     >
       {prefix}BW {bodyweight != null ? `${formatWeight(bodyweight)} LB` : "— SET"}
     </button>
@@ -491,7 +492,7 @@ export function DayView({
           instead. Without this the day just silently refuses to log. */}
       {weekLocked && (
         <div className="mt-5 border-[1.5px] border-dashed border-ink/40 p-4">
-          <div className="text-[10px] font-bold tracking-[0.14em] text-ink/55">
+          <div className="text-[10px] font-bold tracking-[0.14em] text-ink-muted">
             WEEK {microcycle.week_number} NOT STARTED
           </div>
           <p className="mt-2.5 text-sm leading-relaxed text-ink/70">
@@ -557,7 +558,7 @@ export function DayView({
           would lock the session against its own outstanding writes, so say what
           is happening rather than offering a button that would lose a set. */}
       {!readOnly && !allDone && allDoneOptimistic && (
-        <div className="mt-6 w-full border-[1.5px] border-dashed border-ink/40 py-4 text-center text-[11px] font-semibold tracking-[0.12em] text-ink/55">
+        <div className="mt-6 w-full border-[1.5px] border-dashed border-ink/40 py-4 text-center text-[11px] font-semibold tracking-[0.12em] text-ink-muted">
           SAVING THE LAST SETS…
         </div>
       )}
@@ -772,7 +773,7 @@ function DayHeader({
             />
           </svg>
         </button>
-        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
+        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink-muted">
           {mesoName.toUpperCase()}
         </div>
       </div>
@@ -825,7 +826,7 @@ function DayHeader({
                   const cls = viewing
                     ? "border border-ink bg-ink font-bold text-bg-base"
                     : d.status === "completed"
-                      ? "border border-ink/[0.22] bg-ink/[0.07] font-semibold text-ink/55"
+                      ? "border border-ink/[0.22] bg-ink/[0.07] font-semibold text-ink-muted"
                       : "border border-ink/[0.22] font-medium text-ink/45";
                   const content = (
                     <>
@@ -1336,7 +1337,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
   return (
     <div className={`relative mt-5 ${skipped ? "opacity-40" : ""}`}>
       <div className="flex items-center justify-between">
-        <div className="text-[10px] font-semibold tracking-[0.16em] text-ink/55">
+        <div className="text-[10px] font-semibold tracking-[0.16em] text-ink-muted">
           <span className="numeral">{String(index + 1).padStart(2, "0")}</span>
           {" — "}
           {we.muscle_group.toUpperCase() || "OTHER"}
@@ -1455,7 +1456,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
           </div>
         )}
         <div className="flex flex-col items-end gap-0.5 text-right">
-          <div className="text-[9.5px] font-medium tracking-[0.12em] text-ink/50">
+          <div className="text-[9.5px] font-medium tracking-[0.12em] text-ink-muted">
             {we.equipment_type.toUpperCase()}
           </div>
           {isBodyweightLoad(coerceLoadType(we.load_type, we.equipment_type)) && (
@@ -1495,7 +1496,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
             <button
               type="button"
               onClick={fetchRxAudit}
-              className="mt-1 text-left text-ink/50 underline underline-offset-2"
+              className="mt-1 text-left text-ink-muted underline underline-offset-2"
             >
               Couldn&apos;t read the program&apos;s decision — tap to retry.
             </button>
@@ -1580,7 +1581,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
               type="button"
               aria-label="edit pinned note"
               onClick={() => onNote(we, "pinned")}
-              className="-my-1 shrink-0 px-1.5 py-1 text-ink/55"
+              className="-my-1 shrink-0 px-1.5 py-1 text-ink-muted"
             >
               <PencilGlyph />
             </button>
@@ -1597,7 +1598,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
         >
           <span>NOTE — {we.feedback.notes}</span>
           {!readOnly && (
-            <span aria-hidden className="shrink-0 px-1.5 text-ink/50">
+            <span aria-hidden className="shrink-0 px-1.5 text-ink-muted">
               <PencilGlyph />
             </span>
           )}
@@ -1607,7 +1608,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
       {!skipped && (
         <>
           {/* grid header (denser rows, 09 §5) */}
-          <div className="mt-2.5 grid grid-cols-[20px_1fr_1fr_44px_44px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink/50">
+          <div className="mt-2.5 grid grid-cols-[20px_1fr_1fr_44px_44px] gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold tracking-[0.14em] text-ink-muted">
             <div />
             <div className="text-center">LB</div>
             <div className="text-center">REPS</div>
@@ -1669,7 +1670,7 @@ const ExerciseBlock = memo(function ExerciseBlock({
         label={`${we.exercise_name} menu`}
         onClose={onCloseMenu}
       >
-        <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
+        <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
           EXERCISE — {we.exercise_name.toUpperCase()}
         </div>
         {/* N75: the "Engine audit" row is gone. It is now "Prescription
@@ -1965,6 +1966,11 @@ function SetRow({
     [isBw, loadType, bw, anchor, targetRir, e1rmCfg],
   );
 
+  // Null when nothing on record says what this set should weigh — a cold-start
+  // slot on an exercise with no prescription, no planned weight and no history.
+  // It stays null rather than collapsing to 0: an empty cell asks the lifter
+  // for the number, where a bold `0` reads as the app's own prescription and
+  // logs as a real 0 lb set (`unloggableSetReason` is the other half of this).
   const initialWeight =
     logged?.weight ??
     // N68: a queued set shows exactly what was logged, off the queue entry —
@@ -1976,13 +1982,15 @@ function SetRow({
     plannedWeight ??
     lastLogged?.weight ??
     prescribedWeight ??
-    0;
+    null;
   // unlogged rows start from the predicted reps for their weight; logged rows
   // show what was done; fall back to the prescription when there's no anchor
   const initialReps =
     logged?.reps ??
     pending?.reps ??
-    (state !== "logged" ? predictReps(initialWeight) : null) ??
+    (state !== "logged" && initialWeight != null
+      ? predictReps(initialWeight)
+      : null) ??
     prescribedReps ??
     lastLogged?.reps ??
     8;
@@ -2004,8 +2012,13 @@ function SetRow({
     pendingRir: pending?.rirReported,
     targetRir,
   });
-  // display weights snap to 0.5 (units.formatWeight); the engine keeps raw values
-  const [weight, setWeight] = useState(formatWeight(initialWeight));
+  // display weights snap to 0.5 (units.formatWeight); the engine keeps raw
+  // values. An unknown weight is the empty cell, never a formatted 0 — every
+  // re-sync below goes through this same text so a background revalidation
+  // can't put the old `0` back.
+  const initialWeightText =
+    initialWeight == null ? "" : formatWeight(initialWeight);
+  const [weight, setWeight] = useState(initialWeightText);
   const [reps, setReps] = useState(String(initialReps));
   const [rir, setRir] = useState(String(initialRir));
   const edited = useRef(false);
@@ -2076,7 +2089,7 @@ function SetRow({
   useEffect(() => {
     if (!adoptServerRowState("own-logged-set", edited.current, writeOutstanding))
       return;
-    setWeight(formatWeight(initialWeight));
+    setWeight(initialWeightText);
     setReps(String(initialReps));
     setRir(String(initialRir));
     edited.current = false;
@@ -2102,7 +2115,7 @@ function SetRow({
     prevPlannedWeight.current = plannedWeight;
     const change = cleared ? ("prescription-reset" as const) : ("planned-input" as const);
     if (!adoptServerRowState(change, edited.current, writeOutstanding)) return;
-    setWeight(formatWeight(initialWeight));
+    setWeight(initialWeightText);
     setReps(String(initialReps));
     repsManual.current = false;
     if (change === "prescription-reset") edited.current = false;
@@ -2141,9 +2154,21 @@ function SetRow({
     // N50: belt-and-suspenders with staticCells — never write against a
     // completed/skipped session (the completion-lock RLS would no-op it anyway)
     if (readOnly) return;
+    // An empty cell is not a measurement. `Number("")` is 0, so without this a
+    // blank (or cold-start) LB/REPS box wrote a real 0 lb / 0 rep set into the
+    // history — counted in the session, in the muscle's weekly volume, and in
+    // everything downstream that reads a logged set as something performed.
+    const missing = unloggableSetReason({ weight, reps, weightExempt: bwOnly });
+    if (missing) {
+      toast(
+        missing === "weight"
+          ? "Enter a weight before logging this set"
+          : "Enter the reps before logging this set",
+      );
+      return;
+    }
     const w = Number(weight);
     const r = Number(reps);
-    if (Number.isNaN(w) || Number.isNaN(r)) return;
     // doc 21 §2: an empty or out-of-range cell reports NOTHING rather than a
     // wrong number — the server then falls back to the slot's prescribed
     // target RIR, which is exactly what the pre-filled default would have said.
@@ -2253,7 +2278,7 @@ function SetRow({
     <span
       aria-label={SET_MARKERS[performance].label}
       title={SET_MARKERS[performance].label}
-      className={`pointer-events-none absolute -right-1 leading-none text-ink/50 ${
+      className={`pointer-events-none absolute -right-1 leading-none text-ink-muted ${
         performance === "over"
           ? "-top-1 text-[8px]"
           : performance === "met"
@@ -2327,7 +2352,7 @@ function SetRow({
               aria-label={`set ${setNumber} weight (bodyweight)`}
               className={
                 cell.replace("w-full", "") +
-                " flex items-center justify-center text-ink/55"
+                " flex items-center justify-center text-ink-muted"
               }
             >
               {weight !== "" && !Number.isNaN(Number(weight))
@@ -2340,6 +2365,9 @@ function SetRow({
               inputMode="decimal"
               aria-label={`set ${setNumber} weight`}
               value={weight}
+              // an em dash, matching what a future row with no planned weight
+              // shows: nothing on record says what this set weighs yet
+              placeholder="—"
               onChange={(e) => {
                 setWeight(e.target.value);
                 edited.current = true;
@@ -2351,7 +2379,9 @@ function SetRow({
                 // rows — a logged row's reps/weight are recorded actuals.
                 if (state === "next") {
                   const w = Number(weight);
-                  if (weight !== "" && !Number.isNaN(w)) {
+                  // a blank or non-positive box carries no plan to persist —
+                  // 0 is the absence of a weight, not a light one
+                  if (weight.trim() !== "" && Number.isFinite(w) && w > 0) {
                     if (edited.current) persistPlannedWeight(w);
                     if (!repsManual.current) {
                       const predicted = predictReps(w);
@@ -2362,7 +2392,7 @@ function SetRow({
                   save();
                 }
               }}
-              className={cell}
+              className={`${cell} placeholder:font-medium placeholder:text-ink/45`}
             />
           )}
           <div className="relative">
@@ -2471,7 +2501,7 @@ function SetRow({
         )}
       </div>
       {(state === "next" && dropPending) || logged?.set_type === "drop" ? (
-        <span className="absolute -top-1 left-6 text-[8px] font-bold tracking-[0.1em] text-ink/55">
+        <span className="absolute -top-1 left-6 text-[8px] font-bold tracking-[0.1em] text-ink-muted">
           DROP
         </span>
       ) : null}
@@ -2484,7 +2514,7 @@ function SetRow({
         label={`set ${setNumber} menu`}
         onClose={onCloseMenu}
       >
-        <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink/55">
+        <div className="border-b border-ink/25 px-4 pb-[9px] pt-3 text-[9.5px] font-semibold tracking-[0.16em] text-ink-muted">
           SET <span className="numeral">{setNumber}</span> —{" "}
           {we.exercise_name.toUpperCase()}
         </div>
@@ -2705,7 +2735,7 @@ function NoteSheet({
         </div>
         <div>
           <div className="text-[12.5px] font-semibold">Pin to this exercise</div>
-          <div className="mt-0.5 text-[11px] leading-[1.45] text-ink/55">
+          <div className="mt-0.5 text-[11px] leading-[1.45] text-ink-muted">
             {pinned
               ? "Stays on this exercise in every workout."
               : "Saved with just this session — a note on how it went today."}
@@ -2873,7 +2903,7 @@ function ReplaceSheet({
                 </div>
                 <div className="flex-1">
                   <div className="text-[15px] font-bold">{c.name}</div>
-                  <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                  <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
                     {c.equipment_type.toUpperCase()} ·{" "}
                     {c.last_performed_at
                       ? `LAST ${shortDate(c.last_performed_at)}`
@@ -3068,7 +3098,7 @@ function AddExerciseSheet({
                 </div>
                 <div className="flex-1">
                   <div className="text-[15px] font-bold">{e.name}</div>
-                  <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                  <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
                     {e.equipment_type.toUpperCase()} ·{" "}
                     {e.last_performed_at
                       ? `LAST ${shortDate(e.last_performed_at)}`
@@ -3242,7 +3272,7 @@ function FeedbackSheet({
         <div className={showGroup ? "mb-1" : ""}>
           <div className="text-[13px] font-bold">
             {mg} soreness{" "}
-            <span className="text-xs font-normal text-ink/55">
+            <span className="text-xs font-normal text-ink-muted">
               — from last {mg.toLowerCase()} session
             </span>
           </div>
@@ -3257,7 +3287,7 @@ function FeedbackSheet({
           </div>
           <div className="mt-4 text-[13px] font-bold">
             Days sore{" "}
-            <span className="text-xs font-normal text-ink/55">
+            <span className="text-xs font-normal text-ink-muted">
               — after that session
             </span>
           </div>
@@ -3285,7 +3315,7 @@ function FeedbackSheet({
         <div className={showSoreness ? "mt-5" : ""}>
           <div className="text-[13px] font-bold">
             Joint pain{" "}
-            <span className="text-xs font-normal text-ink/55">
+            <span className="text-xs font-normal text-ink-muted">
               —{" "}
               {groupExercises.length > 1
                 ? `today's ${mg.toLowerCase()} work`
@@ -3316,7 +3346,7 @@ function FeedbackSheet({
             <div className="mt-3">
               <div className="text-[13px] font-bold">
                 Which exercise caused it?{" "}
-                <span className="text-xs font-normal text-ink/55">
+                <span className="text-xs font-normal text-ink-muted">
                   — optional; defaults to all
                 </span>
               </div>
@@ -3358,7 +3388,7 @@ function FeedbackSheet({
             <div className="flex items-center gap-2">
               <div className="text-[13px] font-bold">
                 {mg} pump{" "}
-                <span className="text-xs font-normal text-ink/55">— today</span>
+                <span className="text-xs font-normal text-ink-muted">— today</span>
               </div>
               <InfoDot term="pump" />
             </div>
@@ -3377,7 +3407,7 @@ function FeedbackSheet({
             <div className="flex items-center gap-2">
               <div className="text-[13px] font-bold">
                 {mg} workload{" "}
-                <span className="text-xs font-normal text-ink/55">
+                <span className="text-xs font-normal text-ink-muted">
                   — whole session
                 </span>
               </div>
@@ -3563,7 +3593,7 @@ function CompleteSheet({
             type="button"
             onClick={onClose}
             aria-label="close"
-            className="-mr-2 flex min-h-11 min-w-11 items-center justify-center text-base text-ink/50"
+            className="-mr-2 flex min-h-11 min-w-11 items-center justify-center text-base text-ink-muted"
           >
             ✕
           </button>
@@ -3589,7 +3619,7 @@ function CompleteSheet({
         {/* session feedback — same slider UI as the per-exercise prompt (1.4);
             feeds the engine's session-level dampener (10 §3) */}
         <div className="mt-[18px]">
-          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             SESSION — FEEDS NEXT WEEK&apos;S TARGETS
           </div>
           {SESSION_SLIDERS.map((s) => (
@@ -3621,7 +3651,7 @@ function CompleteSheet({
         />
 
         <div className="mt-4">
-          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             WORKOUT NOTES — SAVED WITH SESSION
           </div>
           <textarea

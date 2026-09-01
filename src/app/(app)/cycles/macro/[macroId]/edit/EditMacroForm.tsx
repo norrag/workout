@@ -126,7 +126,7 @@ export function EditMacroForm({
       <input type="hidden" name="meso_length_weeks" value={mesoLength} />
       <input type="hidden" name="duration_months" value={durationMonths} />
 
-      <div className="mt-[18px] text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-[18px] text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         NAME
       </div>
       <input
@@ -138,7 +138,7 @@ export function EditMacroForm({
         placeholder="e.g. 26-2 · Off-Season"
       />
 
-      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         GOAL
       </div>
       <div className="mt-[7px] grid grid-cols-2 gap-1.5">
@@ -158,7 +158,7 @@ export function EditMacroForm({
         ))}
       </div>
 
-      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         DURATION
       </div>
       <div className="mt-[7px] flex gap-1.5">
@@ -182,7 +182,7 @@ export function EditMacroForm({
           className={`flex h-10 flex-1 items-center justify-center text-[11px] tracking-[0.06em] ${
             duration === "custom"
               ? "bg-ink font-bold text-bg-base"
-              : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink/55"
+              : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink-muted"
           }`}
         >
           CUSTOM
@@ -202,17 +202,17 @@ export function EditMacroForm({
             }
             className="numeral h-10 w-20 border-[1.5px] border-ink bg-paper px-3 text-center text-[15px] font-bold focus:outline-none"
           />
-          <span className="text-[11px] font-medium tracking-[0.08em] text-ink/55">
+          <span className="text-[11px] font-medium tracking-[0.08em] text-ink-muted">
             MONTHS
           </span>
         </div>
       )}
 
       <div className="mt-4 flex items-baseline justify-between">
-        <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
           MESOCYCLE LENGTH
         </div>
-        <div className="text-[9px] font-medium tracking-[0.06em] text-ink/50">
+        <div className="text-[9px] font-medium tracking-[0.06em] text-ink-muted">
           {mesoTouched ? "incl. deload" : "SUGGESTED · incl. deload"}
         </div>
       </div>
@@ -236,7 +236,7 @@ export function EditMacroForm({
         ))}
       </div>
 
-      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         GOAL NOTES <span className="text-ink/35">· OPTIONAL</span>
       </div>
       <textarea
@@ -254,7 +254,7 @@ export function EditMacroForm({
           wontfix) — `planMacrocycle` still runs
           for the block math. */}
       <div className="mt-[18px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
           PLAN
         </div>
         <div className="mt-[7px] text-[11px] leading-normal text-ink/65">
@@ -271,14 +271,14 @@ export function EditMacroForm({
               className={`flex h-[30px] flex-1 items-center justify-center text-[8px] font-bold tracking-[0.04em] ${
                 i < impact.lockedCount
                   ? "bg-ink text-bg-base"
-                  : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink/55"
+                  : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink-muted"
               }`}
             >
               M{i + 1}
             </div>
           ))}
         </div>
-        <div className="mt-2 text-[10px] leading-normal text-ink/55">
+        <div className="mt-2 text-[10px] leading-normal text-ink-muted">
           {replanNote}
         </div>
       </div>
@@ -311,7 +311,7 @@ export function EditMacroForm({
         </button>
       </div>
 
-      <div className="mb-4 text-[10px] leading-normal text-ink/50">
+      <div className="mb-4 text-[10px] leading-normal text-ink-muted">
         {plan.rationale}
       </div>
 

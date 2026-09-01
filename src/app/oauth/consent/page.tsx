@@ -67,7 +67,7 @@ export default async function ConsentPage({
 
   return (
     <ConsentShell>
-      <div className="text-[10px] font-bold tracking-[0.14em] text-ink/55">
+      <div className="text-[10px] font-bold tracking-[0.14em] text-ink-muted">
         AUTHORIZE CONNECTION
       </div>
       <h2 className="title-display mt-2 text-[26px]">{details.client.name}</h2>
@@ -148,7 +148,7 @@ function scopeLabel(scope: string): string {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-ink/15 py-2.5">
-      <dt className="text-[10px] font-bold tracking-[0.12em] text-ink/55">
+      <dt className="text-[10px] font-bold tracking-[0.12em] text-ink-muted">
         {label}
       </dt>
       <dd className="truncate text-sm">{value}</dd>

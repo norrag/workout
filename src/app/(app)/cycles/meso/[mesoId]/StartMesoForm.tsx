@@ -33,7 +33,7 @@ export function StartMesoForm({
         {pending ? "GENERATING W1" : "START MESOCYCLE"}
       </button>
       {blockReason != null && !state.error && (
-        <p className="mt-2 text-xs leading-normal text-ink/55">
+        <p className="mt-2 text-xs leading-normal text-ink-muted">
           {blockReason}
         </p>
       )}

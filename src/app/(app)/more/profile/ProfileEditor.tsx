@@ -160,7 +160,7 @@ export function ProfileEditor({
           {/* one freshness vocabulary across bodyweight displays (doc 17 §5,
               09-changelog 2026-07-11 §2) */}
           {profile.bodyweight_updated_at && (
-            <span className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+            <span className="text-[9px] font-medium tracking-[0.1em] text-ink-muted">
               AS OF {shortDate(profile.bodyweight_updated_at)}
             </span>
           )}
@@ -216,7 +216,7 @@ export function ProfileEditor({
             }}
             className="flex w-full items-baseline justify-between border-b border-ink/15 py-3 text-left"
           >
-            <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
               {FIELD_META[row.field].label}
             </div>
             <div className="text-[15px] font-bold">{row.value}</div>
@@ -225,7 +225,7 @@ export function ProfileEditor({
       </div>
 
       {/* experience */}
-      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
         TRAINING EXPERIENCE
       </div>
       <div className="mt-2 flex border-[1.5px] border-ink">
@@ -241,7 +241,7 @@ export function ProfileEditor({
             className={`flex-1 py-2.5 text-center text-[10px] tracking-[0.1em] ${
               experience === level
                 ? "bg-ink font-bold text-bg-base"
-                : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
+                : `font-medium text-ink-muted ${i > 0 ? "border-l border-ink/30" : ""}`
             }`}
           >
             {level.toUpperCase()}
@@ -253,7 +253,7 @@ export function ProfileEditor({
       </p>
 
       {/* sex — calibrates the macrocycle muscle-gain target */}
-      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
         SEX
       </div>
       <div className="mt-2 flex border-[1.5px] border-ink">
@@ -269,7 +269,7 @@ export function ProfileEditor({
             className={`flex-1 py-2.5 text-center text-[10px] tracking-[0.08em] ${
               gender === opt.value
                 ? "bg-ink font-bold text-bg-base"
-                : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
+                : `font-medium text-ink-muted ${i > 0 ? "border-l border-ink/30" : ""}`
             }`}
           >
             {opt.label}
@@ -295,7 +295,7 @@ export function ProfileEditor({
       {/* body fat — measured (DEXA) while connected, else estimate bands +
           custom value (5c; 09-changelog 2026-07-11 Phase-5c entry) */}
       <div className="mt-5 flex items-baseline justify-between">
-        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
           {bfMeasured ? "BODY FAT — MEASURED" : "BODY FAT — ESTIMATE"}
         </div>
         <div className="text-[9px] font-medium tracking-[0.1em] text-ink/45">
@@ -309,7 +309,7 @@ export function ProfileEditor({
               {bodyFat != null ? `${bodyFat}%` : "—"}
             </div>
             {dexaBodyFat?.scannedAt && (
-              <div className="text-[9px] font-medium tracking-[0.1em] text-ink/50">
+              <div className="text-[9px] font-medium tracking-[0.1em] text-ink-muted">
                 SCAN {shortDate(dexaBodyFat.scannedAt)}
               </div>
             )}
@@ -345,7 +345,7 @@ export function ProfileEditor({
                   className={`py-2 text-center text-[10px] tracking-[0.04em] ${
                     on
                       ? "bg-ink font-bold text-bg-base"
-                      : "border border-ink/35 font-medium text-ink/55"
+                      : "border border-ink/35 font-medium text-ink-muted"
                   }`}
                 >
                   {label}
@@ -369,7 +369,7 @@ export function ProfileEditor({
                 className={`mt-1.5 w-full py-2 text-center text-[10px] tracking-[0.06em] ${
                   custom
                     ? "bg-ink font-bold text-bg-base"
-                    : "border border-dashed border-ink/40 font-medium text-ink/55"
+                    : "border border-dashed border-ink/40 font-medium text-ink-muted"
                 }`}
               >
                 {custom ? `CUSTOM — ${bodyFat}%` : "CUSTOM VALUE"}
@@ -386,7 +386,7 @@ export function ProfileEditor({
       )}
 
       {/* equipment access */}
-      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
         EQUIPMENT ACCESS
       </div>
       <div className="mt-2.5 flex flex-wrap gap-2">
@@ -407,7 +407,7 @@ export function ProfileEditor({
               className={`px-3 py-2 text-[10px] tracking-[0.1em] ${
                 on
                   ? "bg-ink font-bold text-bg-base"
-                  : "border border-ink/35 font-medium text-ink/55"
+                  : "border border-ink/35 font-medium text-ink-muted"
               }`}
             >
               {value.toUpperCase()}
@@ -417,7 +417,7 @@ export function ProfileEditor({
       </div>
 
       {/* exclusions */}
-      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
         EXCLUDED EXERCISES
       </div>
       <div className="mt-1">
@@ -430,7 +430,7 @@ export function ProfileEditor({
             <button
               type="button"
               onClick={() => startTransition(() => removeExclusionAction(x.id))}
-              className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
+              className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted"
             >
               {x.reason ? `${x.reason.toUpperCase()} · ` : ""}✕
             </button>
@@ -496,7 +496,7 @@ export function ProfileEditor({
                       autoFocus
                       className={inputClass}
                     />
-                    <span className="text-[13px] font-semibold text-ink/55">
+                    <span className="text-[13px] font-semibold text-ink-muted">
                       ft
                     </span>
                   </div>
@@ -511,7 +511,7 @@ export function ProfileEditor({
                       aria-label="height inches"
                       className={inputClass}
                     />
-                    <span className="text-[13px] font-semibold text-ink/55">
+                    <span className="text-[13px] font-semibold text-ink-muted">
                       in
                     </span>
                   </div>

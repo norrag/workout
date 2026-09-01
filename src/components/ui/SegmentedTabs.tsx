@@ -43,7 +43,7 @@ export function SegmentedTabs({
               className={`flex-1 py-2.5 text-center text-[10px] tracking-[0.1em] transition-colors active:bg-ink/10 ${
                 isActive
                   ? "bg-ink font-bold text-bg-base"
-                  : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
+                  : `font-medium text-ink-muted ${i > 0 ? "border-l border-ink/30" : ""}`
               }`}
             >
               {label}

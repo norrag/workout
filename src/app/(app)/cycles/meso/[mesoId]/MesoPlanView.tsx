@@ -78,7 +78,7 @@ export function MesoPlanView({ days }: { days: PlanViewDay[] }) {
 
       {activeDay && (
         <>
-          <div className="mt-2 text-[9px] font-semibold tracking-[0.1em] text-ink/55">
+          <div className="mt-2 text-[9px] font-semibold tracking-[0.1em] text-ink-muted">
             {dayTabLabel(activeDay)}
             {activeDay.label ? ` "${activeDay.label.toUpperCase()}"` : ""} —{" "}
             <span className="numeral">{activeDay.fills.length}</span>{" "}
@@ -104,7 +104,7 @@ export function MesoPlanView({ days }: { days: PlanViewDay[] }) {
                     <div className="text-[15px] font-semibold">
                       {fill.exercise_name}
                     </div>
-                    <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                    <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                       {fill.muscle_group.toUpperCase()} ·{" "}
                       {fill.equipment.toUpperCase()} · START{" "}
                       <span className="numeral">{fill.initial_sets}</span> SETS
@@ -119,7 +119,7 @@ export function MesoPlanView({ days }: { days: PlanViewDay[] }) {
                   key={`${activeDay.id}-${slot.muscle_group}-open-${k}`}
                   className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5"
                 >
-                  <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-dashed border-ink/45 text-[9px] font-extrabold text-ink/55">
+                  <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-dashed border-ink/45 text-[9px] font-extrabold text-ink-muted">
                     {badge(slot.muscle_group)}
                   </div>
                   <div className="flex-1">

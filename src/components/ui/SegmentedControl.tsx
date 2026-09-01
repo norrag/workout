@@ -26,7 +26,7 @@ export function SegmentedControl<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(opt.value)}
             className={`label-caps min-h-11 flex-1 px-3 text-[10px] transition-colors duration-150 ${
-              active ? "bg-ink font-bold text-bg-base" : "font-medium text-ink/55"
+              active ? "bg-ink font-bold text-bg-base" : "font-medium text-ink-muted"
             } ${i > 0 ? "border-l border-ink/30" : ""}`}
           >
             {opt.label}
