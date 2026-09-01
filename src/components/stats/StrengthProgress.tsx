@@ -46,7 +46,7 @@ export function StrengthProgressSection({
   return (
     <>
       <div className="mt-4 border-t-[1.5px] border-ink">
-        <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+        <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
           EST. STRENGTH {scopeLabel} — ALL EXERCISES
           <InfoDot term="est_strength" small />
         </div>
@@ -55,7 +55,7 @@ export function StrengthProgressSection({
             <>
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold">{s.exercise_name}</div>
-                <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                   <span className="numeral">
                     {formatWeight(Math.round(s.baseline_e1rm ?? 0))}
                   </span>{" "}
@@ -120,7 +120,7 @@ export function StrengthProgressSection({
 
       {strength.muscles.length > 0 && (
         <div className="mt-4 border-t-[1.5px] border-ink pt-2.5">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
             STRENGTH BY MUSCLE GROUP
             <InfoDot term="est_strength" small />
           </div>

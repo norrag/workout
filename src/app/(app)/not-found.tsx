@@ -22,7 +22,7 @@ export default function AppNotFound() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="w-full max-w-sm border-[1.5px] border-ink p-6">
-        <div className="text-[10px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[10px] font-bold tracking-[0.14em] text-ink-muted">
           NOT FOUND
         </div>
         <p className="mt-3 text-sm leading-relaxed text-ink">

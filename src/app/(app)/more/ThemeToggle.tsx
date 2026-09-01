@@ -44,7 +44,7 @@ export function ThemeToggle() {
           className={`px-3 py-[7px] text-[10px] tracking-[0.1em] ${
             theme === opt.value
               ? "bg-ink font-bold text-bg-base"
-              : `font-medium text-ink/55 ${i > 0 ? "border-l border-ink/30" : ""}`
+              : `font-medium text-ink-muted ${i > 0 ? "border-l border-ink/30" : ""}`
           }`}
         >
           {opt.label}

@@ -134,12 +134,26 @@ test("sign in → start meso → log workout with feedback → complete → next
   // W1·D1 day view with the seeded exercise's 2-set grid
   await expect(page.getByText("W1·D1").first()).toBeVisible();
 
+  // ---- the cold-start slot asks for a weight instead of inventing one ----
+  // This exercise has no prescription and no history, so nothing on record says
+  // what set 1 weighs. The cell is empty (not a pre-filled 0 that would log as
+  // a real 0 lb set), and LOG is refused until a weight is entered.
+  const firstWeight = page.getByLabel("set 1 weight");
+  await expect(firstWeight).toHaveValue("");
+  await page.getByRole("button", { name: "log set 1" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: /ENTER A WEIGHT/i }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "uncheck set 1" }),
+  ).toHaveCount(0);
+
   // ---- log set 1 (deferred seed: enter a starting weight) ----
   // Blurring the weight field fires a background planned-weight persist,
   // during which the LOG checkbox is a "saving" status span (whose label
   // substring-matches getByLabel). Click via role=button so Playwright waits
   // for the real, actionable control to come back.
-  await page.getByLabel("set 1 weight").fill("100");
+  await firstWeight.fill("100");
   await page.getByLabel("set 1 reps").fill("8");
   await page.getByRole("button", { name: "log set 1" }).click();
   await expect(page.getByRole("button", { name: "uncheck set 1" })).toBeVisible();

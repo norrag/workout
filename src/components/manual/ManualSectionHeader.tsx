@@ -35,7 +35,7 @@ export function ManualSectionHeader({
   const origin = resolveOrigin(from);
   const chapterHref = chapterRoute(chapter.manual, chapter.slug);
   const crumb =
-    "label-caps text-[10px] font-bold tracking-[0.14em] text-ink/55";
+    "label-caps text-[10px] font-bold tracking-[0.14em] text-ink-muted";
 
   return (
     <div>

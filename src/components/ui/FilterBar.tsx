@@ -20,7 +20,7 @@ export interface FilterAxis {
 const chipBase =
   "min-h-8 px-2.5 py-1.5 text-[10.5px] tracking-[0.08em] whitespace-nowrap";
 const chipOn = `bg-ink text-bg-base font-bold flex items-center gap-2 ${chipBase}`;
-const chipOff = `border-[1.5px] border-ink/40 text-ink/55 font-medium ${chipBase}`;
+const chipOff = `border-[1.5px] border-ink/40 text-ink-muted font-medium ${chipBase}`;
 
 /**
  * Shared filter grammar (N29, generalizing the fig 3.1 two-axis idiom): each
@@ -60,7 +60,7 @@ export function FilterBar({
           key={axis.key}
           className={`flex items-center gap-2 ${i === 0 ? "" : "mt-2"}`}
         >
-          <span className="w-[52px] flex-shrink-0 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+          <span className="w-[52px] flex-shrink-0 text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
             {axis.label}
           </span>
           <div className="flex gap-1.5 overflow-x-auto">

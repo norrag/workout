@@ -165,11 +165,11 @@ export function MesoHeader({
       <div className="flex items-center justify-between">
         <Link
           href={backHref}
-          className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
+          className="text-[10px] font-medium tracking-[0.12em] text-ink-muted"
         >
           {backLabel}
         </Link>
-        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
+        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink-muted">
           {contextLabel.toUpperCase()}
         </div>
       </div>
@@ -248,7 +248,7 @@ export function MesoHeader({
 
       {/* meta + status */}
       <div className="mt-2 flex items-center justify-between pb-3">
-        <div className="text-[10.5px] font-medium tracking-[0.1em] text-ink/55">
+        <div className="text-[10.5px] font-medium tracking-[0.1em] text-ink-muted">
           {metaLine}
         </div>
         {status === "active" ? (
@@ -256,7 +256,7 @@ export function MesoHeader({
             CURRENT
           </div>
         ) : (
-          <div className="border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink/55">
+          <div className="border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink-muted">
             {status.toUpperCase()}
           </div>
         )}
@@ -274,7 +274,7 @@ export function MesoHeader({
         <div className="overflow-hidden">
           <div className="border-[1.5px] border-ink px-2.5 pb-2 pt-0.5">
             <div
-              className="grid items-center gap-1.5 pb-[5px] pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50"
+              className="grid items-center gap-1.5 pb-[5px] pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted"
               style={gridCols(nDays)}
             >
               <div>WK</div>
@@ -292,7 +292,7 @@ export function MesoHeader({
                 style={gridCols(nDays)}
               >
                 <div
-                  className={`text-[15px] font-bold ${week.isComplete || week.isCurrent ? "" : "text-ink/50"} ${week.isDeload ? "text-[13px] tracking-[0.06em]" : ""}`}
+                  className={`text-[15px] font-bold ${week.isComplete || week.isCurrent ? "" : "text-ink-muted"} ${week.isDeload ? "text-[13px] tracking-[0.06em]" : ""}`}
                 >
                   {week.isDeload ? "DL" : week.weekNumber}
                 </div>
@@ -314,7 +314,7 @@ export function MesoHeader({
                       : cell.state === "next"
                         ? "flex h-[38px] items-center justify-center border-2 border-accent text-[9.5px] font-bold tracking-[0.06em] text-accent"
                         : cell.state === "current"
-                          ? "flex h-[38px] items-center justify-center border border-ink/35 text-[9.5px] font-medium text-ink/50"
+                          ? "flex h-[38px] items-center justify-center border border-ink/35 text-[9.5px] font-medium text-ink-muted"
                           : `flex h-[38px] items-center justify-center text-[9px] font-medium tracking-[0.06em] text-ink/40 ${
                               week.isDeload || week.isUnbuilt
                                 ? "border border-dashed border-ink/35"
@@ -331,7 +331,7 @@ export function MesoHeader({
                 })}
               </div>
             ))}
-            <div className="mt-2 flex justify-between border-t-[1.5px] border-ink pt-2 text-[9.5px] font-medium tracking-[0.1em] text-ink/50">
+            <div className="mt-2 flex justify-between border-t-[1.5px] border-ink pt-2 text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
               <span className="flex items-center gap-1.5">
                 {rampLine}
                 <InfoDot term="rir_ramp" small />
@@ -604,7 +604,7 @@ function EditDetailsSheet({
       <form action={formAction}>
         <input type="hidden" name="meso_id" value={mesoId} />
 
-        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
           NAME
         </div>
         <input
@@ -628,7 +628,7 @@ function EditDetailsSheet({
               value={schedule ? schedule.join(",") : ""}
             />
 
-            <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
               WEEKS{deload ? " — INCLUDING DELOAD" : ""}
             </div>
             <div className="mt-2 flex border-[1.5px] border-ink">
@@ -654,7 +654,7 @@ function EditDetailsSheet({
             {!schedule && (
               <>
                 <div className="mt-5">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
                     START RIR
                     <InfoDot term="rir_ramp" small />
                   </div>
@@ -679,7 +679,7 @@ function EditDetailsSheet({
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                  <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
                     END RIR
                   </div>
                   <div className="mt-2 flex border-[1.5px] border-ink">
@@ -838,7 +838,7 @@ function PlaceSheet({
                 <span className="block truncate text-sm font-semibold">
                   {t.name}
                 </span>
-                <span className="label-caps mt-0.5 block text-[9.5px] font-medium tracking-[0.1em] text-ink/50">
+                <span className="label-caps mt-0.5 block text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
                   {t.goalType} · {t.blocks} BLOCK{t.blocks === 1 ? "" : "S"}
                 </span>
               </span>

@@ -35,7 +35,7 @@ export function AutoMatchToggle({ enabled }: { enabled: boolean }) {
           className={`px-4 py-[7px] text-[10px] tracking-[0.1em] ${
             on === value
               ? "bg-ink font-bold text-bg-base"
-              : "font-medium text-ink/55"
+              : "font-medium text-ink-muted"
           }`}
         >
           {value ? "ON" : "OFF"}

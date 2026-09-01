@@ -31,7 +31,7 @@ export default async function TemplateDetailPage({
     <div>
       <Link
         href="/templates"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ TEMPLATES
       </Link>
@@ -40,12 +40,12 @@ export default async function TemplateDetailPage({
           {template.name}
         </h1>
         {template.user_id !== null && (
-          <div className="border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink/55">
+          <div className="border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink-muted">
             YOURS
           </div>
         )}
       </div>
-      <div className="mt-2 text-[10.5px] font-medium tracking-[0.1em] text-ink/55">
+      <div className="mt-2 text-[10.5px] font-medium tracking-[0.1em] text-ink-muted">
         {template.emphasis.replace(/_/g, " ").toUpperCase()} ·{" "}
         <span className="numeral">{template.days_per_week}</span> DAYS/WK
       </div>
@@ -78,7 +78,7 @@ export default async function TemplateDetailPage({
                   <div className="text-sm font-semibold">
                     {fill.exercise_name}
                   </div>
-                  <div className="text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                  <div className="text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                     {fill.equipment_type.toUpperCase()} ·{" "}
                     <span className="numeral">{fill.default_sets}</span> SETS
                   </div>

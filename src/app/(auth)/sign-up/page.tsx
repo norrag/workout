@@ -32,7 +32,7 @@ export default function SignUpPage() {
       <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Creating account" : "Create account"}
       </Button>
-      <p className="text-center text-sm text-ink/55">
+      <p className="text-center text-sm text-ink-muted">
         Have an account?{" "}
         <Link href="/sign-in" className="text-ink underline">
           Sign in

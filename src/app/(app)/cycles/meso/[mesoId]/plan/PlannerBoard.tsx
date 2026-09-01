@@ -927,7 +927,7 @@ export function PlannerBoard({
 
       {activeDay && (
         <>
-          <div className="mt-2 flex items-center justify-between text-[9px] font-semibold tracking-[0.1em] text-ink/55">
+          <div className="mt-2 flex items-center justify-between text-[9px] font-semibold tracking-[0.1em] text-ink-muted">
             <span>
               {dayTabLabel(activeDay)}
               {activeDay.label ? ` "${activeDay.label.toUpperCase()}"` : ""} —{" "}
@@ -965,7 +965,7 @@ export function PlannerBoard({
                       aria-label={`move ${fill.exercise_name} up`}
                       disabled={idx <= 0}
                       onClick={() => moveDayExercise(activeDay.id, fill.id, -1)}
-                      className="flex h-6 w-6 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                      className="flex h-6 w-6 items-center justify-center text-[9px] leading-none text-ink-muted disabled:opacity-25"
                     >
                       ▲
                     </button>
@@ -974,7 +974,7 @@ export function PlannerBoard({
                       aria-label={`move ${fill.exercise_name} down`}
                       disabled={idx >= flat.length - 1}
                       onClick={() => moveDayExercise(activeDay.id, fill.id, 1)}
-                      className="flex h-6 w-6 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+                      className="flex h-6 w-6 items-center justify-center text-[9px] leading-none text-ink-muted disabled:opacity-25"
                     >
                       ▼
                     </button>
@@ -998,7 +998,7 @@ export function PlannerBoard({
                       <span className="block truncate text-[15px] font-semibold">
                         {fill.exercise_name}
                       </span>
-                      <span className="mt-[3px] block text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                      <span className="mt-[3px] block text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                         {group.muscle_group.toUpperCase()} ·{" "}
                         {exercises
                           .find((e) => e.id === fill.exercise_id)
@@ -1009,7 +1009,7 @@ export function PlannerBoard({
                       <span className="numeral block text-[9.5px] font-bold tracking-[0.1em] text-ink/70">
                         {fill.initial_sets} SET{fill.initial_sets === 1 ? "" : "S"}
                       </span>
-                      <span className="mt-[3px] block text-[8.5px] font-semibold tracking-[0.1em] text-ink/45">
+                      <span className="mt-[3px] block text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
                         {fillRirLabel(fill)}
                       </span>
                     </span>
@@ -1034,7 +1034,7 @@ export function PlannerBoard({
                   onClick={() => setPicker({ group, day: activeDay })}
                   className="mt-2 flex w-full items-center gap-3 border-[1.5px] border-dashed border-ink/50 px-2.5 py-2.5 text-left"
                 >
-                  <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-dashed border-ink/45 text-[9px] font-extrabold text-ink/55">
+                  <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-[1.5px] border-dashed border-ink/45 text-[9px] font-extrabold text-ink-muted">
                     {badge(group.muscle_group)}
                   </div>
                   <div className="flex-1">
@@ -1078,7 +1078,7 @@ export function PlannerBoard({
       {volumeRows && volumeRows.length > 0 && volumePreview && (
         <div className="mt-6">
           <div className="flex items-baseline justify-between">
-            <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+            <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
               WEEKLY SETS PER MUSCLE
               <InfoDot term="volume_landmarks" small />
             </div>
@@ -1112,7 +1112,7 @@ export function PlannerBoard({
                         className={`label-caps text-[8.5px] tracking-[0.08em] ${
                           under || over
                             ? "font-bold text-ink/80"
-                            : "font-medium text-ink/45"
+                            : "font-medium text-ink-muted"
                         }`}
                       >
                         {under
@@ -1166,7 +1166,7 @@ export function PlannerBoard({
             CREATE MESOCYCLE
           </button>
           {!hasExercise && (
-            <p className="mt-2 text-center text-[11px] text-ink/55">
+            <p className="mt-2 text-center text-[11px] text-ink-muted">
               Add at least one exercise to finish.
             </p>
           )}
@@ -1197,7 +1197,15 @@ export function PlannerBoard({
               type="button"
               disabled={!dirty}
               onClick={() => setSaving(true)}
-              className="flex-1 bg-ink py-3.5 text-center text-[12px] font-bold tracking-[0.1em] text-bg-base disabled:opacity-40"
+              // "NO CHANGES" is a standing state, not a moment — it says WHY
+              // the action is off, so it has to stay readable. Fading the
+              // filled button dropped its label to ~1.7:1 against its own
+              // fill; hollow it out instead, which recedes in both themes.
+              className={`flex-1 border-[1.5px] py-3.5 text-center text-[12px] font-bold tracking-[0.1em] ${
+                dirty
+                  ? "border-ink bg-ink text-bg-base"
+                  : "border-ink/25 text-ink-muted"
+              }`}
             >
               {dirty ? "SAVE CHANGES" : "NO CHANGES"}
             </button>
@@ -1417,7 +1425,7 @@ function FinalizeSheet({
         <input type="hidden" name="meso_id" value={mesoId} />
         <input type="hidden" name="weeks" value={weeks} />
 
-        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+        <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
           NAME
         </div>
         <input
@@ -1429,7 +1437,7 @@ function FinalizeSheet({
           className="mt-2 h-12 w-full border-[1.5px] border-ink bg-paper px-3.5 text-[15px] font-semibold text-ink placeholder:text-ink/40 focus:outline-none"
         />
 
-        <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+        <div className="mt-5 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
           WEEKS{ramp.deload ? " — INCLUDING DELOAD" : ""}
         </div>
         <div className="mt-2 flex border-[1.5px] border-ink">
@@ -1463,11 +1471,11 @@ function FinalizeSheet({
           onClick={() => setShowAdvanced((v) => !v)}
           className="mt-[7px] flex w-full items-center justify-between text-left"
         >
-          <span className="text-[10px] font-medium tracking-[0.08em] text-ink/50">
+          <span className="text-[10px] font-medium tracking-[0.08em] text-ink-muted">
             {rirSummary(ramp.schedule, ramp.start, ramp.end)}
             {ramp.deload ? ` · W${weeks} DELOAD AT 4 RIR` : ""}
           </span>
-          <span className="text-[9px] font-bold tracking-[0.12em] text-ink/55 underline underline-offset-2">
+          <span className="text-[9px] font-bold tracking-[0.12em] text-ink-muted underline underline-offset-2">
             {showAdvanced ? "DONE" : "EDIT"}
           </span>
         </button>
@@ -1480,7 +1488,7 @@ function FinalizeSheet({
             {!ramp.schedule && (
               <>
                 <div className="mt-4">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
                     START RIR
                     <InfoDot term="rir_ramp" small />
                   </div>
@@ -1508,7 +1516,7 @@ function FinalizeSheet({
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+                  <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
                     END RIR
                   </div>
                   <div className="mt-2 flex border-[1.5px] border-ink">
@@ -1629,7 +1637,7 @@ function ExerciseSheet({
 }) {
   const assigned = fill.target_rir;
 
-  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink/55";
+  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink-muted";
   const help = "mt-[7px] text-[11px] font-medium leading-normal text-ink/60";
   const stepBtn =
     "flex h-9 w-9 items-center justify-center border-[1.5px] border-ink text-[17px] font-semibold disabled:opacity-25";
@@ -1829,7 +1837,7 @@ function DaySetupSheet({
     >
       <div className="flex gap-2.5">
         <div className="flex-1">
-          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             LABEL
           </div>
           <input
@@ -1841,7 +1849,7 @@ function DaySetupSheet({
           />
         </div>
         <div className="w-[110px]">
-          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             WEEKDAY
           </div>
           <select
@@ -1869,7 +1877,7 @@ function DaySetupSheet({
         </button>
       </div>
 
-      <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-5 border-b-[1.5px] border-ink pb-[7px] text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
         MUSCLE GROUPS — EXERCISES PER GROUP
       </div>
       {day.groups.map((group, gi) => (
@@ -1883,7 +1891,7 @@ function DaySetupSheet({
               aria-label={`move ${group.muscle_group} up`}
               disabled={gi === 0}
               onClick={() => onMoveGroup(group.id, -1)}
-              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink-muted disabled:opacity-25"
             >
               ▲
             </button>
@@ -1892,7 +1900,7 @@ function DaySetupSheet({
               aria-label={`move ${group.muscle_group} down`}
               disabled={gi === day.groups.length - 1}
               onClick={() => onMoveGroup(group.id, 1)}
-              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink/50 disabled:opacity-25"
+              className="flex h-3.5 w-5 items-center justify-center text-[9px] leading-none text-ink-muted disabled:opacity-25"
             >
               ▼
             </button>
@@ -2035,7 +2043,7 @@ function AddGroupsSheet({
           if (rows.length === 0) return null;
           return (
             <div key={section.region} className="mt-4 first:mt-0">
-              <div className="border-b-[1.5px] border-ink pb-1.5 text-[9px] font-bold tracking-[0.16em] text-ink/50">
+              <div className="border-b-[1.5px] border-ink pb-1.5 text-[9px] font-bold tracking-[0.16em] text-ink-muted">
                 {section.region}
               </div>
               {rows.map((g) => {
@@ -2276,7 +2284,7 @@ function ExercisePicker({
                 className={`flex-1 text-left ${inGroupElsewhere ? "opacity-40" : ""}`}
               >
                 <div className="text-[15px] font-bold">{e.name}</div>
-                <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                <div className="mt-[3px] text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
                   {inGroupElsewhere
                     ? "ALREADY IN THIS GROUP"
                     : `${e.equipment_type.toUpperCase()} · ${

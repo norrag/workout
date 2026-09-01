@@ -73,7 +73,7 @@ export function ManualSearch() {
       </div>
 
       {!ready ? (
-        <p className="mt-4 text-[13px] leading-[1.5] text-ink/55">
+        <p className="mt-4 text-[13px] leading-[1.5] text-ink-muted">
           Type at least{" "}
           <span className="numeral">{MIN_QUERY}</span> characters. Results are
           sections — each one opens on its own screen.
@@ -83,7 +83,7 @@ export function ManualSearch() {
           Searching…
         </p>
       ) : hits.length === 0 ? (
-        <p className="mt-4 text-[13px] leading-[1.5] text-ink/55">
+        <p className="mt-4 text-[13px] leading-[1.5] text-ink-muted">
           Nothing matched that. Try a word the guide would use — a screen name,
           a term from the app, or what you are trying to do.
         </p>

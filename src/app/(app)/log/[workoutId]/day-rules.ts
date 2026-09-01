@@ -294,3 +294,39 @@ export function prescriptionBasisE1rm(args: {
     args.measuredAnchor
   );
 }
+
+/**
+ * What a set row's LB/REPS cells have to hold before the set can be written.
+ *
+ * The capture cells are free text (`inputMode="decimal"`), so both fields reach
+ * this as raw strings — and `Number("")` is **0**, not NaN, which is what let
+ * an empty cell through as a real measurement. A set logged at 0 lb or 0 reps
+ * is not a light set: it is a set that was never performed, and it lands in
+ * `logged_sets` indistinguishable from one that was. Downstream that is a
+ * session in the count, sets against the muscle's weekly volume, and a row the
+ * anchor query has to reason about — all from a tap the lifter meant as
+ * "record what I just did".
+ *
+ * Weight is exempt for bodyweight-only movements: there the load is the
+ * lifter's bodyweight, the cell is read-only, and a profile with no bodyweight
+ * set legitimately submits nothing for it (`assisted`/`loadable` variants still
+ * take a real number in the cell, so they are held to the same rule as
+ * external load).
+ *
+ * Returns the offending field, or null when the row is safe to write.
+ */
+export function unloggableSetReason(args: {
+  weight: string;
+  reps: string;
+  /** bodyweight_only rows carry no weight of their own */
+  weightExempt: boolean;
+}): "weight" | "reps" | null {
+  if (!args.weightExempt) {
+    const w = Number(args.weight.trim());
+    if (args.weight.trim() === "" || !Number.isFinite(w) || w <= 0)
+      return "weight";
+  }
+  const r = Number(args.reps.trim());
+  if (args.reps.trim() === "" || !Number.isFinite(r) || r <= 0) return "reps";
+  return null;
+}

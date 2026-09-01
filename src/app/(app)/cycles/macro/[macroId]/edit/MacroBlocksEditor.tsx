@@ -60,10 +60,10 @@ export function MacroBlocksEditor({
 
   return (
     <div className="mt-2 border-t-[1.5px] border-ink pt-5">
-      <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
         BLOCKS — REORDER · ADD · REMOVE
       </div>
-      <p className="mt-1.5 text-[10px] leading-normal text-ink/50">
+      <p className="mt-1.5 text-[10px] leading-normal text-ink-muted">
         Applies immediately. Started and completed blocks are fixed; only open
         slots can be removed.
       </p>
@@ -85,7 +85,7 @@ export function MacroBlocksEditor({
                 <span
                   className={`block truncate text-[13px] font-semibold ${
                     movable(b) ? "" : "text-ink/45"
-                  } ${b.status === "unplanned" ? "text-ink/55" : ""}`}
+                  } ${b.status === "unplanned" ? "text-ink-muted" : ""}`}
                 >
                   {b.name}
                 </span>

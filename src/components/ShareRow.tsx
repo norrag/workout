@@ -19,7 +19,7 @@ export function ShareRow({
     return (
       <div className="mt-2.5 border border-ink/35 px-4 py-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-[10px] font-semibold tracking-[0.14em] text-ink/55">
+          <span className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             SHARE CODE
           </span>
           <span className="numeral text-base font-extrabold tracking-[0.18em]">

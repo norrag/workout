@@ -89,7 +89,7 @@ export function NewExerciseForm({
     customStep && customText.trim() !== "" && parsedCustom === null;
   const stepValue = !stepApplies ? null : customStep ? parsedCustom : step;
 
-  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink/55";
+  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink-muted";
   const section = "mt-6 border-t border-ink/15 pt-5";
   const chip = (selected: boolean) =>
     `px-2.5 py-2 text-[10px] font-semibold tracking-[0.08em] ${
@@ -255,7 +255,7 @@ export function NewExerciseForm({
                   aria-label="custom load step"
                   className="numeral h-10 w-24 bg-transparent px-2 text-[15px] font-bold focus:outline-none"
                 />
-                <span className="pr-3 text-[11px] font-medium tracking-[0.08em] text-ink/55">
+                <span className="pr-3 text-[11px] font-medium tracking-[0.08em] text-ink-muted">
                   lb
                 </span>
               </div>

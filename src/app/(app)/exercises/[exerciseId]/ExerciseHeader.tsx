@@ -66,11 +66,11 @@ export function ExerciseHeader({
       <div className="flex items-center justify-between">
         <Link
           href={backHref}
-          className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
+          className="text-[10px] font-medium tracking-[0.12em] text-ink-muted"
         >
           {backLabel}
         </Link>
-        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink/55">
+        <div className="label-caps text-[10px] font-medium tracking-[0.1em] text-ink-muted">
           LIBRARY
         </div>
       </div>
@@ -121,11 +121,11 @@ export function ExerciseHeader({
 
       {/* meta + badge */}
       <div className="mt-2 flex items-center justify-between">
-        <div className="text-[10.5px] font-medium tracking-[0.12em] text-ink/55">
+        <div className="text-[10.5px] font-medium tracking-[0.12em] text-ink-muted">
           {metaLine}
         </div>
         {isCustom && (
-          <div className="shrink-0 border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink/55">
+          <div className="shrink-0 border border-ink/35 px-2 py-1 text-[9px] font-bold tracking-[0.12em] text-ink-muted">
             CUSTOM
           </div>
         )}

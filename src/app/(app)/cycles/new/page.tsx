@@ -59,7 +59,7 @@ export default async function NewMacroPage() {
       <div className="flex items-center justify-between">
         <Link
           href="/cycles"
-          className="text-[10px] font-medium tracking-[0.12em] text-ink/55"
+          className="text-[10px] font-medium tracking-[0.12em] text-ink-muted"
         >
           ‹ CYCLES
         </Link>

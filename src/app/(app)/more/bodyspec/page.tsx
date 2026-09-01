@@ -48,7 +48,7 @@ export default async function BodySpecPage(props: {
     <div>
       <Link
         href="/more"
-        className="text-[10px] font-semibold tracking-[0.12em] text-ink/55"
+        className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted"
       >
         ‹ MORE
       </Link>
@@ -77,7 +77,7 @@ export default async function BodySpecPage(props: {
             CONNECT BODYSPEC ACCOUNT
           </a>
         ) : (
-          <div className="mt-6 border border-dashed border-ink/40 p-4 text-center text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+          <div className="mt-6 border border-dashed border-ink/40 p-4 text-center text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
             NOT AVAILABLE IN THIS ENVIRONMENT
           </div>
         )
@@ -128,7 +128,7 @@ export default async function BodySpecPage(props: {
           </div>
           {scans.length === 0 ? (
             <div className="mt-3 border border-dashed border-ink/40 p-4 text-center">
-              <div className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+              <div className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
                 NO SCANS IMPORTED YET
               </div>
               <div className="mt-1 text-[9.5px] font-medium tracking-[0.1em] text-ink/45">
@@ -148,7 +148,7 @@ export default async function BodySpecPage(props: {
                       {shortDateWithYear(scan.scanned_at)}
                     </div>
                     {scan.scanner_model && (
-                      <div className="mt-0.5 text-[9.5px] font-medium tracking-[0.1em] text-ink/55">
+                      <div className="mt-0.5 text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
                         {scan.scanner_model.toUpperCase()}
                       </div>
                     )}
@@ -172,7 +172,7 @@ export default async function BodySpecPage(props: {
                         </div>
                       </div>
                     )}
-                    <div className="text-base text-ink/50">›</div>
+                    <div className="text-base text-ink-muted">›</div>
                   </div>
                 </Link>
               ))}
@@ -189,7 +189,7 @@ export default async function BodySpecPage(props: {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between border-b border-ink/15 py-3">
-      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+      <div className="text-[10px] font-semibold tracking-[0.12em] text-ink-muted">
         {label}
       </div>
       <div className="text-sm font-semibold">{children}</div>

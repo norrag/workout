@@ -106,7 +106,7 @@ export function CreateMacroForm({
       />
       <input type="hidden" name="start_date" value={today} />
 
-      <div className="mt-[18px] text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-[18px] text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         NAME
       </div>
       <input
@@ -118,7 +118,7 @@ export function CreateMacroForm({
         placeholder="e.g. 26-2 · Off-Season"
       />
 
-      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         GOAL
       </div>
       <div className="mt-[7px] grid grid-cols-2 gap-1.5">
@@ -138,7 +138,7 @@ export function CreateMacroForm({
         ))}
       </div>
 
-      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+      <div className="mt-4 text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
         DURATION
       </div>
       <div className="mt-[7px] flex gap-1.5">
@@ -162,7 +162,7 @@ export function CreateMacroForm({
           className={`flex h-10 flex-1 items-center justify-center text-[11px] tracking-[0.06em] ${
             duration === "custom"
               ? "bg-ink font-bold text-bg-base"
-              : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink/55"
+              : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink-muted"
           }`}
         >
           CUSTOM
@@ -182,17 +182,17 @@ export function CreateMacroForm({
             onBlur={() => setCustomMonths(String(customMonthsNum))}
             className="numeral h-10 w-20 border-[1.5px] border-ink bg-paper px-3 text-center text-[15px] font-bold focus:outline-none"
           />
-          <span className="text-[11px] font-medium tracking-[0.08em] text-ink/55">
+          <span className="text-[11px] font-medium tracking-[0.08em] text-ink-muted">
             MONTHS
           </span>
         </div>
       )}
 
       <div className="mt-4 flex items-baseline justify-between">
-        <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
           MESOCYCLE LENGTH
         </div>
-        <div className="text-[9px] font-medium tracking-[0.06em] text-ink/50">
+        <div className="text-[9px] font-medium tracking-[0.06em] text-ink-muted">
           {mesoTouched ? "incl. deload" : "SUGGESTED · incl. deload"}
         </div>
       </div>
@@ -223,7 +223,7 @@ export function CreateMacroForm({
           makes the numbers trustworthy) — `planMacrocycle` still runs for the
           block math; LAST BLOCK MEASURED stays (it's measured, not modeled). */}
       <div className="mt-[18px] border-[1.5px] border-ink bg-paper px-[15px] py-3.5">
-        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[9.5px] font-bold tracking-[0.14em] text-ink-muted">
           PLAN
         </div>
         <div className="mt-[7px] text-[11px] leading-normal text-ink/65">
@@ -244,14 +244,14 @@ export function CreateMacroForm({
               className={`flex h-[30px] flex-1 items-center justify-center text-[8px] font-bold tracking-[0.04em] ${
                 i === 0
                   ? "bg-ink text-bg-base"
-                  : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink/55"
+                  : "border-[1.5px] border-dashed border-ink/40 font-semibold text-ink-muted"
               }`}
             >
               M{i + 1}
             </div>
           ))}
         </div>
-        <div className="mt-1.5 flex justify-between text-[8px] font-semibold tracking-[0.06em] text-ink/50">
+        <div className="mt-1.5 flex justify-between text-[8px] font-semibold tracking-[0.06em] text-ink-muted">
           <span>ACCUMULATE</span>
           <span>INTENSIFY</span>
           <span>PEAK</span>
@@ -262,13 +262,13 @@ export function CreateMacroForm({
             re-hide; re-enable declined 2026-08-14 — N52/N54 wontfix). */}
         {priorBlock && (
           <div className="mt-3 flex items-baseline justify-between border-t border-ink/[0.18] pt-2.5">
-            <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink/50">
+            <span className="text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
               LAST BLOCK MEASURED
             </span>
             <span className="numeral text-[10.5px] font-bold">
               {priorBlock.ratePctMonth > 0 ? "+" : ""}
               {priorBlock.ratePctMonth}%/MO{" "}
-              <span className="font-semibold text-ink/55">EST. STRENGTH</span>
+              <span className="font-semibold text-ink-muted">EST. STRENGTH</span>
             </span>
           </div>
         )}

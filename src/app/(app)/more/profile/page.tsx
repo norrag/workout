@@ -42,7 +42,7 @@ export default async function ProfilePage() {
     <div>
       <Link
         href="/more"
-        className="block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="block text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ MORE
       </Link>

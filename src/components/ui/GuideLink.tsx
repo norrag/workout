@@ -68,7 +68,7 @@ export function GuideLink({
   const link = (
     <Link
       href={href}
-      className={`label-caps inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink/55 ${rule ? "" : className}`}
+      className={`label-caps inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted ${rule ? "" : className}`}
     >
       {to.label} ›
     </Link>

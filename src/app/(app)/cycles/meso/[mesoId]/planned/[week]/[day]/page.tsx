@@ -98,7 +98,7 @@ export default async function PlannedDayPage({
     <div>
       <Link
         href={`/cycles/meso/${mesoId}`}
-        className="mb-3 block text-[10px] font-medium tracking-[0.12em] text-ink/55"
+        className="mb-3 block text-[10px] font-medium tracking-[0.12em] text-ink-muted"
       >
         ‹ {meso.name.toUpperCase()}
       </Link>
@@ -106,7 +106,7 @@ export default async function PlannedDayPage({
       <h1 className="text-[27px] font-extrabold leading-none tracking-[-0.02em]">
         W{weekNumber}·D{dayNumber}
       </h1>
-      <div className="mt-2 flex items-center gap-2 text-[10px] font-medium tracking-[0.12em] text-ink/55">
+      <div className="mt-2 flex items-center gap-2 text-[10px] font-medium tracking-[0.12em] text-ink-muted">
         <span>{dayName}</span>
         <span>·</span>
         <span className={isDeload ? "font-bold text-accent" : "text-accent"}>
@@ -116,7 +116,7 @@ export default async function PlannedDayPage({
 
       {/* not-generated banner */}
       <div className="mt-4 border-[1.5px] border-dashed border-ink/45 bg-paper px-3.5 py-3">
-        <div className="text-[9px] font-bold tracking-[0.14em] text-ink/55">
+        <div className="text-[9px] font-bold tracking-[0.14em] text-ink-muted">
           NOT PLANNED YET
         </div>
         <p className="mt-1.5 text-[12.5px] leading-[1.5] text-ink/70">
@@ -126,7 +126,7 @@ export default async function PlannedDayPage({
         </p>
       </div>
 
-      <div className="mt-3 text-[9px] font-semibold tracking-[0.1em] text-ink/55">
+      <div className="mt-3 text-[9px] font-semibold tracking-[0.1em] text-ink-muted">
         <span className="numeral">{planDay.groups.length}</span>{" "}
         {planDay.groups.length === 1 ? "GROUP" : "GROUPS"} ·{" "}
         <span className="numeral">{totalSets}</span> PLANNED SETS
@@ -158,7 +158,7 @@ export default async function PlannedDayPage({
                 <div className="text-[15px] font-semibold">
                   {fill.exercise_name}
                 </div>
-                <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                <div className="mt-[3px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                   {group.muscle_group.toUpperCase()}
                 </div>
               </div>
@@ -169,7 +169,7 @@ export default async function PlannedDayPage({
                     ? Math.min(fill.initial_sets, effort.setCap)
                     : fill.initial_sets;
                 return (
-                  <div className="text-right text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                  <div className="text-right text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                     <span className="numeral">{sets}</span> SETS ·{" "}
                     {effortRirLabel(
                       effort?.rir ?? targetRir,
@@ -182,7 +182,7 @@ export default async function PlannedDayPage({
             </div>
           ))}
         {planDay.groups.every((g) => g.fills.length === 0) && (
-          <p className="py-4 text-sm text-ink/55">
+          <p className="py-4 text-sm text-ink-muted">
             {planDay.groups.length === 0
               ? "This day has no muscle groups planned yet."
               : "No exercises picked for this day yet."}

@@ -98,13 +98,13 @@ export default function OnboardingPage() {
       <input type="hidden" name="height_in" value={computedHeightIn} />
 
       <div className={step === 0 ? "flex flex-col gap-5" : "hidden"}>
-        <p className="text-sm text-ink/55">
+        <p className="text-sm text-ink-muted">
           A few details to calibrate your starting prescriptions.
         </p>
         <Input label="Name" name="display_name" required maxLength={60} />
         <Input label="Birthdate" name="birthdate" type="date" required />
         <div className="flex flex-col gap-1.5">
-          <span className="label-caps text-[10px] font-semibold text-ink/55">
+          <span className="label-caps text-[10px] font-semibold text-ink-muted">
             Sex — calibrates muscle-gain targets
           </span>
           <SegmentedControl
@@ -119,7 +119,7 @@ export default function OnboardingPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="label-caps text-[10px] font-semibold text-ink/55">
+          <span className="label-caps text-[10px] font-semibold text-ink-muted">
             Height — ft / in
           </span>
           <div className="flex gap-2">
@@ -161,7 +161,7 @@ export default function OnboardingPage() {
       </div>
 
       <div className={step === 1 ? "flex flex-col gap-5" : "hidden"}>
-        <p className="text-sm text-ink/55">
+        <p className="text-sm text-ink-muted">
           Experience sets your starting volumes and how aggressively loads
           ramp.
         </p>
@@ -174,7 +174,7 @@ export default function OnboardingPage() {
           value={experience}
           onChange={setExperience}
         />
-        <p className="text-sm text-ink/55">
+        <p className="text-sm text-ink-muted">
           {experience === "beginner"
             ? "Under two years of consistent lifting. Larger load jumps, conservative volume."
             : experience === "intermediate"
@@ -184,7 +184,7 @@ export default function OnboardingPage() {
       </div>
 
       <div className={step === 2 ? "flex flex-col gap-5" : "hidden"}>
-        <p className="text-sm text-ink/55">
+        <p className="text-sm text-ink-muted">
           What you train with. Pickers favor what you have access to.
         </p>
         <div className="grid grid-cols-2 gap-2">

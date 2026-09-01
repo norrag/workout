@@ -26,7 +26,7 @@ export default function WhatsNewPage() {
     <div>
       <Link
         href="/more"
-        className="text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         ‹ MORE
       </Link>

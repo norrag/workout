@@ -40,7 +40,7 @@ export function VolumeView({ stats }: { stats: MesoStats }) {
     <div>
       <div className="mt-[18px] border-t-[1.5px] border-ink">
         <div
-          className="grid gap-1.5 pb-[5px] pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50"
+          className="grid gap-1.5 pb-[5px] pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted"
           style={gridCols}
         >
           <div className="flex items-center gap-1.5">
@@ -97,7 +97,7 @@ export function VolumeView({ stats }: { stats: MesoStats }) {
           ))}
         </div>
       </div>
-      <div className="mt-2 flex justify-between text-[9.5px] font-medium tracking-[0.1em] text-ink/50">
+      <div className="mt-2 flex justify-between text-[9.5px] font-medium tracking-[0.1em] text-ink-muted">
         {volume.currentLogged != null && currentWeek != null ? (
           <span className="font-bold text-accent">
             ● W{currentWeek} — {volume.currentLogged} OF{" "}
@@ -141,13 +141,13 @@ export function BalanceView({ balance }: { balance: MesoStats["balance"] }) {
       <div className="mt-[18px] flex gap-2.5">
         {cards.map((card) => (
           <div key={card.label} className="flex-1 border border-ink/35 px-3 py-2.5">
-            <div className="text-[9px] font-semibold tracking-[0.14em] text-ink/55">
+            <div className="text-[9px] font-semibold tracking-[0.14em] text-ink-muted">
               {card.label}
             </div>
             <div className="numeral mt-1 text-2xl font-extrabold">
               {card.value}
             </div>
-            <div className="mt-0.5 text-[8.5px] font-medium tracking-[0.1em] text-ink/50">
+            <div className="mt-0.5 text-[8.5px] font-medium tracking-[0.1em] text-ink-muted">
               SETS / WK
             </div>
           </div>
@@ -155,7 +155,7 @@ export function BalanceView({ balance }: { balance: MesoStats["balance"] }) {
       </div>
 
       <div className="mt-[18px] border-t-[1.5px] border-ink pt-2.5">
-        <div className="mb-1.5 text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+        <div className="mb-1.5 text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
           AVG SETS / WEEK — PLANNED
         </div>
         {balance.bars.map((bar) => (
@@ -223,7 +223,7 @@ export function PerformanceView({
       />
 
       <div className="mt-4 border-t-[1.5px] border-ink">
-        <div className="pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+        <div className="pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
           PRS THIS MESO
         </div>
         {performance.prs.map((pr, i) => (
@@ -232,7 +232,7 @@ export function PerformanceView({
             className="flex items-baseline justify-between border-b border-ink/15 py-2.5 last:border-b-0"
           >
             <div className="numeral text-sm font-bold">{pr.label}</div>
-            <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+            <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
               {pr.coordinate} · {pr.kind}
             </div>
           </div>

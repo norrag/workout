@@ -7,7 +7,7 @@
 export function FetchRetry({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="py-4">
-      <p className="text-sm text-ink/55">
+      <p className="text-sm text-ink-muted">
         Couldn&apos;t load — check your connection.
       </p>
       <button

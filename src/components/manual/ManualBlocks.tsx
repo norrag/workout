@@ -233,7 +233,7 @@ function Block({ block }: { block: ManualBlock }) {
                 key={i}
                 className="flex items-start gap-3 border-b border-ink/10 py-2.5"
               >
-                <span className="flex w-[22px] flex-shrink-0 justify-center pt-[3px] text-[11px] leading-none text-ink/50">
+                <span className="flex w-[22px] flex-shrink-0 justify-center pt-[3px] text-[11px] leading-none text-ink-muted">
                   {glyph}
                 </span>
                 <span className="flex-1">
@@ -277,7 +277,7 @@ function Block({ block }: { block: ManualBlock }) {
             />
           </div>
           {block.caption && (
-            <figcaption className="mt-2 text-[11px] leading-[1.5] text-ink/55">
+            <figcaption className="mt-2 text-[11px] leading-[1.5] text-ink-muted">
               <Rich text={block.caption} />
             </figcaption>
           )}
@@ -290,7 +290,7 @@ function Block({ block }: { block: ManualBlock }) {
       return (
         <Link
           href={href}
-          className="label-caps block text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
+          className="label-caps block text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted"
         >
           {block.label} ›
         </Link>
@@ -302,7 +302,7 @@ function Block({ block }: { block: ManualBlock }) {
       // reader learns it once (09-changelog 2026-08-07 §4)
       return (
         <details className="group">
-          <summary className="label-caps cursor-pointer list-none text-[9.5px] font-semibold tracking-[0.1em] text-ink/55 [&::-webkit-details-marker]:hidden">
+          <summary className="label-caps cursor-pointer list-none text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted [&::-webkit-details-marker]:hidden">
             The exact rule <span className="group-open:hidden">›</span>
             <span className="hidden group-open:inline">⌄</span>
           </summary>
@@ -326,7 +326,7 @@ export function ManualSectionBody({ section }: { section: ManualSection }) {
         <Block key={i} block={block} />
       ))}
       {section.estimate && (
-        <p className="border-t border-ink/15 pt-3 text-[11px] leading-[1.5] text-ink/50">
+        <p className="border-t border-ink/15 pt-3 text-[11px] leading-[1.5] text-ink-muted">
           {ESTIMATE_CAVEAT}
         </p>
       )}
@@ -379,7 +379,7 @@ export function ManualRelated({
               {target.summary}
             </span>
           </span>
-          <span className="mt-[2px] text-base text-ink/50">›</span>
+          <span className="mt-[2px] text-base text-ink-muted">›</span>
         </Link>
       ))}
     </div>

@@ -13,6 +13,7 @@ import {
   plannedSetCount,
   prescriptionBasisE1rm,
   reportedRirFromInput,
+  unloggableSetReason,
   type SetProgressExercise,
 } from "../day-rules";
 
@@ -514,5 +515,50 @@ describe("captureRirDefault past the reportable range", () => {
     });
     expect(reportedRirFromInput(String(prefill))).toBeNull();
     expect(reportedRirFromInput("")).toBeNull();
+  });
+});
+
+describe("unloggableSetReason — an empty cell is not a measurement", () => {
+  const ok = { weight: "135", reps: "8", weightExempt: false };
+
+  it("passes a row with a real weight and real reps", () => {
+    expect(unloggableSetReason(ok)).toBeNull();
+    expect(unloggableSetReason({ ...ok, weight: "2.5" })).toBeNull();
+  });
+
+  it("blocks the cold-start row that used to pre-fill 0 lb", () => {
+    expect(unloggableSetReason({ ...ok, weight: "0" })).toBe("weight");
+  });
+
+  it("blocks an empty weight — Number('') is 0, not NaN", () => {
+    expect(unloggableSetReason({ ...ok, weight: "" })).toBe("weight");
+    expect(unloggableSetReason({ ...ok, weight: "   " })).toBe("weight");
+  });
+
+  it("blocks a negative or unparseable weight", () => {
+    expect(unloggableSetReason({ ...ok, weight: "-5" })).toBe("weight");
+    expect(unloggableSetReason({ ...ok, weight: "abc" })).toBe("weight");
+  });
+
+  it("blocks zero, empty and unparseable reps", () => {
+    expect(unloggableSetReason({ ...ok, reps: "0" })).toBe("reps");
+    expect(unloggableSetReason({ ...ok, reps: "" })).toBe("reps");
+    expect(unloggableSetReason({ ...ok, reps: "x" })).toBe("reps");
+  });
+
+  it("names the weight first when both cells are empty", () => {
+    expect(unloggableSetReason({ weight: "", reps: "", weightExempt: false })).toBe(
+      "weight",
+    );
+  });
+
+  it("exempts the weight cell on a bodyweight-only row, which has no load of its own", () => {
+    expect(
+      unloggableSetReason({ weight: "", reps: "10", weightExempt: true }),
+    ).toBeNull();
+    // reps are still required there — the exemption is the load, not the set
+    expect(
+      unloggableSetReason({ weight: "", reps: "0", weightExempt: true }),
+    ).toBe("reps");
   });
 });

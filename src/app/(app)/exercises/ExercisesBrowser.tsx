@@ -123,7 +123,7 @@ export function ExercisesBrowser({
             >
               <div>
                 <div className="text-base font-bold">{ex.name}</div>
-                <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink/55">
+                <div className="mt-1 text-[10px] font-medium tracking-[0.1em] text-ink-muted">
                   {sub}
                 </div>
               </div>

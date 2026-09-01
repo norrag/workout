@@ -44,7 +44,7 @@ export function ExercisePinnedNote({
               setNote(initial);
               setOpen(true);
             }}
-            className="-my-1 shrink-0 px-1.5 py-1 text-ink/55"
+            className="-my-1 shrink-0 px-1.5 py-1 text-ink-muted"
           >
             <PencilGlyph />
           </button>

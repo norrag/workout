@@ -183,13 +183,13 @@ export function EffortSheet({
   // predate that reading and the Load-step sheet already fills with accent.
   // What was wrong before this pass was only the SCALE: Load step's 13px bold
   // chips read a full size larger than every other choice control in the app.
-  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink/55";
+  const label = "text-[10px] font-semibold tracking-[0.14em] text-ink-muted";
   const help = "mt-[7px] text-[11px] font-medium leading-normal text-ink/60";
   const blockCell = "flex-1 py-2.5 text-center text-[10px] tracking-[0.1em]";
   const cellOn = "bg-accent font-bold text-bg-base";
-  const cellOff = "font-medium text-ink/55";
+  const cellOff = "font-medium text-ink-muted";
   const wideOff =
-    "border border-dashed border-ink/40 font-medium text-ink/55";
+    "border border-dashed border-ink/40 font-medium text-ink-muted";
 
   return (
     <BottomSheet
@@ -272,7 +272,7 @@ export function EffortSheet({
               aria-label="custom target RIR"
               className="numeral h-9 w-20 bg-transparent px-3 text-[15px] font-bold focus:outline-none"
             />
-            <span className="pr-3 text-[10px] font-medium tracking-[0.1em] text-ink/55">
+            <span className="pr-3 text-[10px] font-medium tracking-[0.1em] text-ink-muted">
               RIR
             </span>
           </div>
@@ -343,7 +343,7 @@ export function EffortSheet({
             {effort?.setCap != null && (
               <div className="flex items-baseline justify-between border-b border-ink/15 py-[11px]">
                 <div className="text-sm font-semibold">Working-set cap</div>
-                <div className="numeral text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+                <div className="numeral text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
                   {effort.setCap}
                 </div>
               </div>
@@ -351,7 +351,7 @@ export function EffortSheet({
             {effort?.repPosition != null && (
               <div className="flex items-baseline justify-between border-b border-ink/15 py-[11px]">
                 <div className="text-sm font-semibold">Priced at</div>
-                <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+                <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
                   {repPositionLabel(effort.repPosition)}
                 </div>
               </div>
@@ -390,7 +390,7 @@ export function EffortSheet({
       )}
       {warnings && warnings.length > 0 && (
         <div className="mt-4 border-l-2 border-ink/40 pl-2.5">
-          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink/50">
+          <div className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted">
             SAVED — NOTE
           </div>
           {warnings.map((w, i) => (

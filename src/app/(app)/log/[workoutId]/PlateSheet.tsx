@@ -460,7 +460,7 @@ export function PlateSheet({
                   </span>
                   <span
                     className={`mt-1.5 block text-[12px] leading-snug ${
-                      sides === n ? "text-bg-base/70" : "text-ink/55"
+                      sides === n ? "text-bg-base/70" : "text-ink-muted"
                     }`}
                   >
                     {n === 2
@@ -495,7 +495,7 @@ export function PlateSheet({
                   <span className="numeral text-[38px] font-extrabold leading-none tracking-[-0.02em]">
                     {formatWeight(load.closestMatch)}
                   </span>
-                  <span className="label-caps text-[11px] font-semibold text-ink/50">
+                  <span className="label-caps text-[11px] font-semibold text-ink-muted">
                     lb loaded
                   </span>
                 </div>
@@ -528,7 +528,7 @@ export function PlateSheet({
                         >
                           <span className="numeral text-[15px] font-semibold">
                             {formatWeight(p.weight)}{" "}
-                            <span className="label-caps text-[10px] font-semibold text-ink/50">
+                            <span className="label-caps text-[10px] font-semibold text-ink-muted">
                               lb
                             </span>
                           </span>
@@ -568,7 +568,7 @@ export function PlateSheet({
                   </>
                 )}
 
-                <p className="mt-3 text-[12px] leading-relaxed text-ink/55">
+                <p className="mt-3 text-[12px] leading-relaxed text-ink-muted">
                   <span className="numeral">{formatWeight(startWeight)}</span> lb
                   bare
                   {load.perSideWeight > 0 && (

@@ -21,7 +21,7 @@ export default async function AccountPage() {
     <div>
       <Link
         href="/more"
-        className="text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         ‹ MORE
       </Link>
@@ -33,7 +33,7 @@ export default async function AccountPage() {
       <div className="flex items-center justify-between border-b border-ink/15 py-[11px]">
         <div className="pr-3">
           <div className="text-sm font-semibold">Match weight across sets</div>
-          <div className="mt-0.5 text-[10px] font-medium tracking-[0.04em] text-ink/55">
+          <div className="mt-0.5 text-[10px] font-medium tracking-[0.04em] text-ink-muted">
             CHANGING A SET&apos;S WEIGHT UPDATES THE REST
           </div>
         </div>
@@ -49,7 +49,7 @@ export default async function AccountPage() {
         className="flex items-center justify-between border-b border-ink/15 py-3.5"
       >
         <div className="text-sm font-semibold">Export training data</div>
-        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           CSV ›
         </div>
       </a>

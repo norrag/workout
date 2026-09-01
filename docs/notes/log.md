@@ -15,6 +15,66 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-09-01 — Session 134: the built app, audited against itself (N91–N95)
+
+**No owner notes this session.** The ask was open — *"take a look at the PWA GUI
+and functionality and update it"* — so rather than work the backlog, this
+session stood the app up and drove it: local Supabase stack, production build, a
+seeded signed-in user with a macro, a planned 3-day block and a bodyweight
+series, and a Pixel 7 Chromium driving the real UI. Nothing below came from
+reading the specs; everything came from the running app disagreeing with them.
+
+Five items, four fixed here, one back to the owner.
+
+| | Found by | Outcome |
+|---|---|---|
+| **N91** | tapping `LOG` on a movement's first-ever set | 0 lb set written to `logged_sets`. **Fixed** |
+| **N92** | axe over all 15 signed-in routes, both themes | the secondary tone at 3.92:1 on every screen. **Fixed** |
+| **N93** | `pageerror` listener during sign-in | hydration mismatch, form re-rendered every visit. **Fixed** |
+| **N94** | dark-theme screenshot of the planner footer | disabled label at ~1.7:1, outranking the enabled button. **Fixed** |
+| **N95** | what N92 left standing | the accent at 4.28:1 as small text — **owner call**, it is the doc 08 §1 brand hex |
+
+**N91 is the one that mattered.** A slot with nothing on record to price it —
+which is every set of a movement's first session — pre-filled `LB` with a bold
+`0`, and the box was tappable. One tap wrote a real 0 lb set: counted in the
+session, in the muscle's weekly volume, and a row the anchor query has to reason
+about. Reproduced end to end against the DB. Two things made it worse than it
+looked: `Number("")` is **0, not NaN**, so `save()`'s NaN-only guard let an
+*emptied* cell through the same way on any exercise at any time; and the day
+view's own future rows already render `—` for exactly this state, so the
+editable row was the only one inventing a number. The fix is a pure rule
+(`unloggableSetReason`) with unit tests, a null-safe weight text that the two
+`useEffect` re-syncs also go through — they were putting the `0` back — and an
+e2e assertion in the smoke spec, which drives the real cold-start slot.
+
+**N92 is the one with reach.** `text-ink/55` (and `/50`, used interchangeably)
+is *the* secondary tone — ~460 nodes, 81 files — and it measures 3.92:1 on
+cream against AA's 4.5:1, at 9–10.5px. Light-ledger-only: the same opacity is
+5.4:1 on the dark ground, because an opacity fade loses contrast fastest over a
+light one. Named rather than blended now (`--color-ink-muted`), so there is one
+value per theme to check and `src/styles/__tests__/contrast.test.ts` reads the
+real stylesheet to check it. Dark is byte-identical to before. Light-mode
+violations across the sweep went from ~530 nodes to ~53, and every survivor is
+either N95 or a place where the dimness is deliberately the message.
+
+### Method note, for the next session
+
+The audit rig is worth rebuilding rather than remembering: `dockerd` +
+`npx supabase start` works in the sandbox (this is what N84 was told was not
+possible), Playwright must be pointed at `/opt/pw-browsers/chromium` because the
+pinned build is newer than the sandbox's, and `next dev` clobbers `.next` out
+from under a running `next start` — rebuild after.
+
+### N84, incidentally
+
+Reproduced, and the diagnosis holds. `bodyspec-integration.spec.ts:159` failed
+on **both** runs of the *unmodified base branch* here, while `:106` and
+`prescribed-progression:205` passed there and failed on the working branch, then
+swapped again. Three runs, three different failing sets, all drawn from the same
+cluster — the row's "runner-speed-dependent flakiness, not three product
+defects" reading is what the evidence looks like. Not chased further; this
+session's changes are not implicated.
+
 ## 2026-08-30 — Session 133: N90 — the strip disagreed with its own trace
 
 **Owner:** *"There appears to be an issue with disagreement / inaccuracy between

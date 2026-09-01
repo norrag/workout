@@ -111,7 +111,7 @@ export function ExerciseHistoryList({
       {groups.map((group, gi) => (
         <div key={gi} className={gi > 0 ? "mt-6" : ""}>
           <div
-            className={`border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em] ${gi > 0 ? "text-ink/55" : ""}`}
+            className={`border-b-[1.5px] border-ink pb-1.5 text-[10px] font-bold tracking-[0.14em] ${gi > 0 ? "text-ink-muted" : ""}`}
           >
             {group.meso.toUpperCase()}
           </div>
@@ -122,7 +122,7 @@ export function ExerciseHistoryList({
             return (
               <div
                 key={ri}
-                className={`border-b border-ink/15 ${gi > 0 ? "text-ink/55" : ""}`}
+                className={`border-b border-ink/15 ${gi > 0 ? "text-ink-muted" : ""}`}
               >
                 <div
                   role="button"
@@ -162,7 +162,7 @@ export function ExerciseHistoryList({
                       <>
                         {row.top_weight != null ? formatWeight(row.top_weight) : "—"}{" "}
                         lb{" "}
-                        <span className="text-[13px] font-normal text-ink/50">×</span>{" "}
+                        <span className="text-[13px] font-normal text-ink-muted">×</span>{" "}
                         {row.reps}
                       </>
                     )}
@@ -182,7 +182,7 @@ export function ExerciseHistoryList({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-baseline gap-1.5 text-right text-[10px] font-semibold tracking-[0.1em] text-ink/55">
+                  <div className="flex items-baseline gap-1.5 text-right text-[10px] font-semibold tracking-[0.1em] text-ink-muted">
                     {hasNote && (
                       <button
                         type="button"

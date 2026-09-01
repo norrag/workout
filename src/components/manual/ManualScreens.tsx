@@ -43,7 +43,7 @@ function ChapterRow({
           {chapter.summary}
         </span>
       </span>
-      <span className="mt-[2px] text-base text-ink/50">›</span>
+      <span className="mt-[2px] text-base text-ink-muted">›</span>
     </Link>
   );
 }
@@ -71,7 +71,7 @@ export function ManualMap({ manual }: { manual: ManualId }) {
     <div>
       <Link
         href={home.href}
-        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         ‹ {home.label}
       </Link>
@@ -93,7 +93,7 @@ export function ManualMap({ manual }: { manual: ManualId }) {
         className="mt-5 flex items-center justify-between border-[1.5px] border-ink px-4 py-3.5"
       >
         <span className="text-sm font-semibold">Search the guide</span>
-        <span className="label-caps text-[9.5px] font-semibold tracking-[0.1em] text-ink/55">
+        <span className="label-caps text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted">
           Search ›
         </span>
       </Link>
@@ -127,7 +127,7 @@ export function ManualChapterContents({ chapter }: { chapter: ManualChapter }) {
     <div>
       <Link
         href={root}
-        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink/55"
+        className="label-caps text-[10px] font-bold tracking-[0.14em] text-ink-muted"
       >
         ‹ {MANUAL_NAME[chapter.manual]}
       </Link>
@@ -160,7 +160,7 @@ export function ManualChapterContents({ chapter }: { chapter: ManualChapter }) {
               {section.summary}
             </span>
           </span>
-          <span className="mt-[2px] text-base text-ink/50">›</span>
+          <span className="mt-[2px] text-base text-ink-muted">›</span>
         </Link>
       ))}
 

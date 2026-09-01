@@ -58,7 +58,7 @@ export default async function TemplatesPage({
             className="flex items-center justify-between border-b border-ink/[0.18] py-[15px]"
           >
             <div>
-              <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink/50">
+              <div className="text-[9.5px] font-semibold tracking-[0.14em] text-ink-muted">
                 {template.emphasis.replace(/_/g, " ").toUpperCase()}
                 {template.user_id !== null ? " · YOURS" : ""}
               </div>

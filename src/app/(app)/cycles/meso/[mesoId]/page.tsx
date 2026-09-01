@@ -337,7 +337,7 @@ export default async function MesoDetailPage({
       <MesoPlanView days={planDays} />
 
       {deletion.hasHistory && (
-        <p className="mt-4 text-[11px] leading-normal text-ink/55">
+        <p className="mt-4 text-[11px] leading-normal text-ink-muted">
           This mesocycle has logged workouts, so its plan is locked here. Adjust
           exercises, order, or substitutions from the workout page — changes carry
           forward to the same day in future weeks.

@@ -23,7 +23,7 @@ function EntryLink({ link }: { link: NonNullable<ReleaseEntry["link"]> }) {
   return (
     <Link
       href={href}
-      className="mt-2.5 inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
+      className="mt-2.5 inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink-muted"
     >
       {link.label.toUpperCase()} ›
     </Link>
@@ -160,7 +160,7 @@ export function FixReleaseRow({
 }) {
   return (
     <details className="mt-2 border border-dashed border-ink/35 px-3 py-2.5">
-      <summary className="flex cursor-pointer items-baseline justify-between text-[10px] font-semibold tracking-[0.12em] text-ink/55 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer items-baseline justify-between text-[10px] font-semibold tracking-[0.12em] text-ink-muted [&::-webkit-details-marker]:hidden">
         <span className="flex items-baseline gap-1.5">
           {isCurrent && (
             <span className="text-accent" aria-label="current version">

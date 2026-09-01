@@ -7,6 +7,18 @@
   --color-ink: #17140f; /* text, rules, filled/active elements */
   --color-accent: #c14b2a; /* current position + selected states ONLY */
 
+  /* The one secondary text tone — the tracked all-caps labels, metadata lines
+     and column headers that carry most of the app's non-numeric content.
+     It used to be spelled `text-ink/55` (and, interchangeably, `/50`) at ~460
+     call sites, which blended to 3.92:1 on cream — under WCAG AA's 4.5:1, at
+     the smallest sizes the app ships (9–10px). This is that same tone lifted
+     just past the line: ink at 62% over cream, 4.9:1. The dark value is
+     unchanged from what `/55` already resolved to there (5.4:1) — the shortfall
+     was only ever on the light ledger, where an opacity fade loses contrast
+     fastest. Named rather than blended so there is ONE definition to check;
+     `globals.contrast.test.ts` is what keeps it honest. */
+  --color-ink-muted: #6b6861;
+
   --font-sans: var(--font-archivo), "Archivo", ui-sans-serif, system-ui,
     sans-serif;
 
@@ -35,6 +47,7 @@
   --color-paper: #211c14; /* active input / sheet surfaces */
   --color-ink: #f1ece0; /* text, rules, filled/active elements (cream) */
   --color-accent: #d76040; /* current position + selected states ONLY */
+  --color-ink-muted: #8e8981; /* exactly what `ink/55` resolved to here */
   --shadow-menu: 5px 5px 0 rgba(241, 236, 224, 0.16);
   color-scheme: dark;
 }
@@ -45,6 +58,7 @@
     --color-paper: #211c14;
     --color-ink: #f1ece0;
     --color-accent: #d76040;
+    --color-ink-muted: #8e8981;
     --shadow-menu: 5px 5px 0 rgba(241, 236, 224, 0.16);
     color-scheme: dark;
   }

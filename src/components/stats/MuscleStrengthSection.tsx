@@ -50,7 +50,7 @@ export function MuscleStrengthSection({
 
   return (
     <div className="mt-4 border-t-[1.5px] border-ink">
-      <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink/50">
+      <div className="flex items-center gap-1.5 pt-[9px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
         EST. STRENGTH {scopeLabel} — BY MUSCLE GROUP
         <InfoDot term="est_strength" small />
       </div>
@@ -73,7 +73,7 @@ export function MuscleStrengthSection({
                     {m.muscle_group.toUpperCase()}
                   </span>
                 </div>
-                <div className="mt-[3px] pl-[15px] text-[9px] font-semibold tracking-[0.12em] text-ink/55">
+                <div className="mt-[3px] pl-[15px] text-[9px] font-semibold tracking-[0.12em] text-ink-muted">
                   <span className="numeral">{m.lifts}</span>{" "}
                   {m.lifts === 1 ? "EXERCISE" : "EXERCISES"}
                 </div>
@@ -91,7 +91,7 @@ export function MuscleStrengthSection({
                         <div className="truncate text-xs font-bold">
                           {c.exercise_name}
                         </div>
-                        <div className="mt-[2px] text-[8.5px] font-semibold tracking-[0.1em] text-ink/55">
+                        <div className="mt-[2px] text-[8.5px] font-semibold tracking-[0.1em] text-ink-muted">
                           <span className="numeral">
                             {formatWeight(Math.round(c.baseline_e1rm ?? 0))}
                           </span>{" "}
