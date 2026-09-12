@@ -10,6 +10,8 @@ type Defaulted =
   | "id"
   | "created_at"
   | "updated_at"
+  // N91: mcp_client_catalog.first_seen_at has a DB default (now())
+  | "first_seen_at"
   // has a DB default ('{}'); only workout_exercises carries these keys
   | "skipped_set_numbers"
   | "set_weights"
@@ -581,6 +583,24 @@ export type McpWriteAuditRow = {
   created_at: string;
 }
 
+/** N91 — per (user, OAuth client) record of the MCP tool catalog last served,
+ *  so a client holding a frozen snapshot can be told to refresh. A null
+ *  `catalog_fingerprint` means the connection has never been observed fetching
+ *  a catalog (every connection predating the table), which reads as stale. */
+export type McpClientCatalogRow = {
+  user_id: string;
+  client_id: string;
+  catalog_fingerprint: string | null;
+  catalog_generation: number | null;
+  catalog_variant: string | null;
+  tool_count: number | null;
+  client_name: string | null;
+  listed_at: string | null;
+  notified_at: string | null;
+  first_seen_at: string;
+  updated_at: string;
+}
+
 export type VExerciseHistoryRow = {
   user_id: string;
   exercise_id: string;
@@ -887,6 +907,19 @@ export type Database = {
       decision_explanations: Table<DecisionExplanationRow>;
       llm_explanation_failures: Table<LlmExplanationFailureRow>;
       mcp_write_audit: Table<McpWriteAuditRow>;
+      mcp_client_catalog: Table<
+        McpClientCatalogRow,
+        // every catalog column is nullable and written by its own path: the
+        // notice stamp creates a row with no observed listing, and the
+        // tools/list record fills the rest in
+        | "catalog_fingerprint"
+        | "catalog_generation"
+        | "catalog_variant"
+        | "tool_count"
+        | "client_name"
+        | "listed_at"
+        | "notified_at"
+      >;
     };
     Views: {
       v_exercise_history: { Row: VExerciseHistoryRow; Relationships: [] };

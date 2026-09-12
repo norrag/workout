@@ -167,6 +167,7 @@ export const GUIDE_SECTION_IDS: readonly string[] = [
   "ug/connecting-an-ai#coaching-in-context",
   "ug/connecting-an-ai#working-with-it",
   "ug/connecting-an-ai#reading-the-answer",
+  "ug/connecting-an-ai#keeping-the-tools-current",
   "ug/connecting-an-ai#staying-in-control",
   // ch. 19 — Your data (Phase 3h)
   "ug/your-data#what-is-stored",

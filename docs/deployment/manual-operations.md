@@ -20,6 +20,7 @@ waiting on something external.
 |---|---|---|
 | ~~**① OVERDUE**~~ **DONE 2026-08-14** | ~~[Apply the concurrent-mesocycles migration (N79)](#apply-the-concurrent-mesocycles-migration-n79)~~ — applied as `20260814014300 / concurrent_mesocycles`; index flip and advisors verified. Was: **verified missing.** `list_migrations` on hosted jumps `20260804213026` → `20260806210701`; `pg_indexes` still shows `mesocycles_one_active_per_user` and has no `mesocycles_one_active_per_macrocycle`. The N79 code merged in PR #226 on 2026-08-06 and **shipped inside release 1.1.0**, so the feature is live in the app and refused by the database — activating a second standalone meso raises 23505. One statement; **cannot fail on data** (the replacement index is strictly weaker than the one it drops). |
 | ~~**①**~~ **VIEW APPLIED 2026-08-15 — one step still open** | [Apply the anchor-candidate view migration (N88)](#apply-the-anchor-candidate-view-migration-n88) | Migration applied as `anchor_candidate_sets`; view verified (Kneeling Hamstring Curl now ranks at 1 with 40 rows inside the cap, where the old global query gave it zero) and `get_advisors` clean — no new findings, no `security_definer_view`. **Step ③ (re-seeding the blanked prescription) is still open and must wait for the deploy**, because the MCP connector runs deployed code: recomputing before PR #251 ships would re-derive the anchor through the old global-limit query and write another null. |
+| ~~**①**~~ **MIGRATION APPLIED 2026-09-12 — steps ②–④ still open** | [Apply the MCP catalog-freshness migration (N91)](#apply-the-mcp-catalog-freshness-migration-n91) | Table created, RLS + policy + indexes verified, advisors clean. **Steps ②–④ wait for the deploy**: the MCP connector runs *deployed* code, so nothing writes a row until PR #261 ships. The owner's test loop (use → notice → Refresh → no notice) runs after that. |
 | ② when convenient | [CI as required status checks](#make-the-ci-jobs-required-status-checks-github-repo-settings) | Still not enforced. Related: the e2e suite is red on `main` (backlog **N84**), so turning this on today would block every PR — fix N84 first. |
 | ③ conditional | [`NEXT_PUBLIC_RELEASE_OVERRIDE`](#next_public_release_override-vercel-preview-only) | Only needed while a staged release block is being previewed. 1.2.0 is currently empty. |
 | ~~④~~ **DONE 2026-08-14** | ~~`SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` as Actions secrets~~ — set by the owner when **PR #222 merged**, so the `migration-drift` job is now a **real gate** rather than a warning. Was: required by the migration-drift guard in #222. Until both are set the guard no-ops with a warning and is not a gate. Item ① was exactly the drift it would have caught, so setting these is what stops the next one. The comparison was run by hand on 2026-08-14 and is **clean**: 89 repo migrations, 87 hosted, 2 baselined, zero drift. |
@@ -722,6 +723,28 @@ built for.
 | ~~**① Apply `20260815000001` to hosted**~~ **(done 2026-08-15)** | Applied via Supabase MCP `apply_migration` as `anchor_candidate_sets`. Creates one `security_invoker` view over `logged_sets ⋈ workouts`. Additive — no table, column, policy or data touched. Reversible with `drop view public.v_anchor_candidate_sets;`. |
 | ~~**② Confirm the view answers**~~ **(done 2026-08-15)** | `set_rank <= 40` returns 2,733 rows for the owner; Kneeling Hamstring Curl has **40 rows inside the cap and its best rank is 1** (`performed_at` 2026-04-08) — the history the old global cap evicted entirely. `get_advisors` re-run: no new findings and **no `security_definer_view`**, confirming the invoker setting took. |
 | **③ Re-seed what the bug already blanked — AFTER the deploy** | The fix is forward-looking: prescriptions already written with `strengthAnchor: null` stay blank until recomputed. **Ordering is load-bearing and the reverse of step ①.** The MCP connector runs *deployed* code, so calling `recompute_prescriptions` before PR #251 ships would re-derive the anchor through the old global-`.limit(600)` query and write another null decision. Once the PR is merged and Vercel has deployed: run `recompute_prescriptions` for **Kneeling Hamstring Curl** (Barbell Hip Thrust self-healed when it was re-seeded alone on 08-12), then verify with `explain_prescription` — the trace should read "seeded from strength anchor" rather than "no confident data to seed". |
+
+### ~~Apply the MCP catalog-freshness migration (N91)~~ (APPLIED 2026-09-12 — one step still open)
+
+One migration lands with the N91 connector work:
+`20260912000001_mcp_client_catalog`. It creates `public.mcp_client_catalog`, the
+per-(user, OAuth client) record of the tool catalog each connection was last
+served (doc 05 §Tool-catalog freshness).
+
+**Ordering is not load-bearing here, and that is by design.** The code fails
+open on an unreadable table: `queries/mcp-catalog.ts::getCatalogRecord`
+distinguishes "no row" (an untracked connection — stale) from "could not read"
+(say nothing), so deploying ahead of the migration degrades to the behavior that
+existed before the feature rather than warning every user forever. Apply it
+anyway, and promptly: until it exists, nobody is ever told to refresh, which is
+the whole point of the change.
+
+| Step | What / why |
+|---|---|
+| ~~**① Apply `20260912000001` to hosted**~~ **(done 2026-09-12)** | Applied via Supabase MCP `apply_migration` as `mcp_client_catalog`, off the back of the `migration-drift` check failing on PR #261 — the guard doing exactly its job. Verified: RLS enabled, one `select` policy (`mcp_client_catalog_select_own_or_admin`), two indexes (the `(user_id, client_id)` PK plus `mcp_client_catalog_user_idx`), zero rows. `get_advisors` re-run — **no new findings**; the four that remain (`external_connection_secrets` / `oauth_transactions` policy-less RLS, the two `is_admin` / `current_profile_role` SECURITY DEFINER warnings, leaked-password protection) all predate this table. Additive — no existing table, column, policy or row touched. Reversible with `drop table public.mcp_client_catalog;`. |
+| **② Confirm it is being written — AFTER the deploy** | After the deploy, open a connected assistant and ask it anything. `select * from public.mcp_client_catalog` should show one row per connection that has fetched a catalog since. A connection that has *not* refreshed will have no row until it is notified, then a row with a **null** `catalog_fingerprint` — that is the pre-tracking baseline, not a bug. |
+| **③ Walk the owner's test loop** | Use WORKOUT from the existing ChatGPT connection → the refresh notice should appear in the answer → ChatGPT web → `Settings` → `Plugins` → `Workout` → `Refresh` (control at the **bottom** of the tool list) → use WORKOUT again → the notice is gone, and the row now carries a fingerprint, `catalog_generation` 2 and `catalog_variant` `admin`. |
+| **④ Re-run `get_advisors`** | Confirm no `rls_disabled_in_public` or policy findings on the new table. |
 
 ### `NEXT_PUBLIC_RELEASE_OVERRIDE` (Vercel, Preview only)
 

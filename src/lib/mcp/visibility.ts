@@ -8,6 +8,8 @@ import type {
 import { getProfile } from "@/lib/queries/profiles";
 import { resolveSession, type McpExtra } from "./session";
 import { ADMIN_TOOL_NAMES } from "./tools/admin";
+import { recordServedCatalog } from "./catalog-notice";
+import type { ServedTool } from "./catalog";
 
 /**
  * PH33 (owner 2026-07-02): hide the admin/tuning tools from `tools/list` for
@@ -27,6 +29,12 @@ import { ADMIN_TOOL_NAMES } from "./tools/admin";
  * varies by principal, its cache hint must stay `cacheScope: "private"` — a
  * shared cache would serve one caller's listing to another. That hint is set
  * explicitly in `src/app/api/mcp/route.ts`; it is also the SDK default.
+ *
+ * N91: this is also the one place the server knows what catalog a given
+ * connection now holds, so the same wrapper records it. That the recording sits
+ * *after* the admin filter is the point — the fingerprint stored is the
+ * fingerprint of the listing this principal actually received, so a non-admin
+ * is never compared against a listing they were never sent.
  */
 type ListHandler = (
   request: ListToolsRequest,
@@ -46,11 +54,15 @@ export function scopeAdminToolVisibility(server: McpServer) {
   // overload took are no longer public API.
   server.server.setRequestHandler("tools/list", async (request, ctx) => {
     const result = await original(request, ctx);
-    if (await isAdminSession(ctx as McpExtra)) return result;
-    return {
-      ...result,
-      tools: result.tools.filter((t) => !ADMIN_TOOL_NAMES.has(t.name)),
-    };
+    const served = (await isAdminSession(ctx as McpExtra))
+      ? result
+      : {
+          ...result,
+          tools: result.tools.filter((t) => !ADMIN_TOOL_NAMES.has(t.name)),
+        };
+    // N91 — freshness bookkeeping; never allowed to fail the listing
+    await recordServedCatalog(ctx, served.tools as ServedTool[]);
+    return served;
   });
 }
 

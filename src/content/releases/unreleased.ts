@@ -7,7 +7,22 @@ import type { ReleaseEntry } from "./types";
  * completed block into `<version>.ts`, then leaves this array empty and moves
  * `UNRELEASED_VERSION` to the next feature version.
  */
-export const UNRELEASED_ENTRIES: ReleaseEntry[] = [];
+export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
+  {
+    id: "connector-tool-list-refresh-notice",
+    title: "WORKOUT flags an assistant's out-of-date tool list",
+    body: "An assistant caches what WORKOUT can do when you connect it and never refreshes on its own, so an older connection can be missing tools. WORKOUT now tells the connections that are behind — and only those — how to refresh.",
+    area: "connector",
+    highlight: true,
+    link: {
+      label: "How to refresh",
+      target: {
+        kind: "guide",
+        section: "ug/connecting-an-ai#keeping-the-tools-current",
+      },
+    },
+  },
+];
 
 /** The next feature release under construction. */
 export const UNRELEASED_VERSION = "1.3.0";
