@@ -61,6 +61,12 @@ receive the notice → Settings → Plugins → Workout → Refresh → use agai
 gone. The generation ships at 2 so an already-current connection exercises the
 stale path; `catalog-freshness.test.ts` runs that exact sequence.
 
+**Migration.** `20260912000001_mcp_client_catalog` was applied to hosted the same
+day, prompted by the `migration-drift` check failing on the PR — the guard N87
+turned into a real gate catching its own kind of drift on the first try. The
+table is empty until the deploy: the connector runs deployed code, so nothing
+writes a row before PR #261 ships.
+
 **What WORKOUT still cannot do:** trigger the refresh, reach it from the phone
 app, move it off the bottom of the tool list, or stop a model paraphrasing the
 notice away.
