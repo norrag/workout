@@ -27,7 +27,7 @@ we cannot touch it**, so the only thing WORKOUT can improve is the *accuracy* of
 who gets told. That turned the problem from a messaging one into a bookkeeping
 one — the server has to remember what it handed each connection.
 
-**What shipped (PR #251).**
+**What shipped (PR #261).**
 
 - **`mcp_client_catalog`**, keyed `(user_id, client_id)` rather than by user, so
   one person's ChatGPT and Claude connections go stale independently. Written
