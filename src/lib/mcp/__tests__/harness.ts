@@ -54,7 +54,10 @@ export function captureServer(): CaptureServer {
 }
 
 /** A validated-token AuthInfo carrying the user id, as `verifyMcpToken` emits. */
-export function fakeAuthInfo(userId: string, token = "test.jwt.token"): AuthInfo {
+export function fakeAuthInfo(
+  userId: string,
+  token = "test.jwt.token",
+): AuthInfo {
   return {
     token,
     clientId: "test-client",
@@ -71,4 +74,38 @@ export function fakeAuthInfo(userId: string, token = "test.jwt.token"): AuthInfo
  */
 export function fakeExtra(authInfo?: AuthInfo): McpExtra {
   return { http: { authInfo } } as unknown as McpExtra;
+}
+
+/**
+ * A context shaped for the `tools/call` REQUEST HANDLER rather than for a tool
+ * body. The SDK's dispatcher reads `ctx.mcpReq.requestState()` before it ever
+ * reaches a handler, so the minimal `{ http: { authInfo } }` above is enough to
+ * invoke a tool function directly but not to drive `tools/call` end to end
+ * (N91's catalog-notice wrapper sits on that handler, so its suite does).
+ *
+ * `clientInfo` rides the 2026-07-28 `_meta` envelope; it is optional in the
+ * spec, so it is optional here too.
+ */
+export function fakeCallExtra(
+  authInfo?: AuthInfo,
+  opts: { clientName?: string } = {},
+): McpExtra {
+  return {
+    http: { authInfo },
+    mcpReq: {
+      id: 1,
+      method: "tools/call",
+      requestState: () => undefined,
+      ...(opts.clientName
+        ? {
+            envelope: {
+              "io.modelcontextprotocol/clientInfo": {
+                name: opts.clientName,
+                version: "1.0.0",
+              },
+            },
+          }
+        : {}),
+    },
+  } as unknown as McpExtra;
 }

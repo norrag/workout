@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { MCP_INSTRUCTIONS, MCP_MANUAL_INSTRUCTIONS } from "../server";
+import {
+  MCP_CATALOG_GENERATION,
+  MCP_INSTRUCTIONS,
+  MCP_MANUAL_INSTRUCTIONS,
+  MCP_SERVER_VERSION,
+} from "../server";
+import { MCP_SCHEMA_VERSION } from "../envelope";
 import { manualRetrievalActive } from "../tools/manual";
+import { CURRENT_VERSION } from "@/content/releases";
 
 /**
  * The server instructions carry the always-on coaching paradigm + §9 honesty
@@ -61,5 +68,29 @@ describe("MCP_INSTRUCTIONS", () => {
     it("stays a paragraph — the depth is in the sections themselves", () => {
       expect(MCP_MANUAL_INSTRUCTIONS.length).toBeLessThan(700);
     });
+  });
+});
+
+/**
+ * N91 — the connector's version identities. `MCP_SERVER_VERSION` sat at
+ * "0.1.0" for the app's whole life because nothing depended on it being right;
+ * deriving it from the release registry means it cannot drift again.
+ */
+describe("connector version identity", () => {
+  it("reports the app's released version as serverInfo.version", () => {
+    expect(MCP_SERVER_VERSION).toBe(CURRENT_VERSION);
+    expect(MCP_SERVER_VERSION).not.toBe("0.1.0");
+  });
+
+  it("keeps the catalog generation separate from the server version", () => {
+    // the two answer different questions (version.ts): a release that does not
+    // touch the tool surface must not invalidate anyone's catalog, and a
+    // catalog bump is not a release
+    expect(typeof MCP_CATALOG_GENERATION).toBe("number");
+    expect(String(MCP_CATALOG_GENERATION)).not.toBe(MCP_SERVER_VERSION);
+  });
+
+  it("keeps the envelope's schema version separate from both", () => {
+    expect(typeof MCP_SCHEMA_VERSION).toBe("number");
   });
 });

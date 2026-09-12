@@ -181,6 +181,130 @@ the active session only, never edits of completed logged history.
 - `workout://profile`, `workout://current-cycle`, `workout://coaching-guide` — read-only documents for clients that prefer resources over tool calls.
 - A server-level instructions string teaching the LLM the domain (RIR, cycle hierarchy, units).
 
+## Tool-catalog freshness (N91, 2026-09-12)
+
+### The problem
+
+**ChatGPT keeps a frozen snapshot of a connector's tool catalog.** It fetches
+`tools/list` when the user connects and then serves from that copy until the
+user manually hits **Settings → Plugins → Workout → Refresh** (the control sits
+at the *bottom* of the tool list, which is the part people miss). Nothing in the
+protocol pushes a change to a client that is not asking: the connector's
+`tools/list` already carries `ttlMs: 0` / `cacheScope: "private"`, and that
+governs shared HTTP caches, not the client's own memory. So a user who connected
+months ago is missing every tool added since, and neither they nor the model can
+tell — from inside that conversation the connector simply *is* its old self.
+
+The one thing the server can do is notice, and say so — to the specific
+connections that are behind, never to everybody.
+
+### The design
+
+| Piece | Where |
+|---|---|
+| Fingerprint + freshness policy (pure) | `src/lib/mcp/catalog.ts` |
+| What this build would serve, memoized | `src/lib/mcp/catalog-snapshot.ts` |
+| The two protocol wires | `src/lib/mcp/catalog-notice.ts` |
+| Storage | `mcp_client_catalog`, via `src/lib/queries/mcp-catalog.ts` |
+| Generation counter + version identities | `src/lib/mcp/version.ts` |
+
+1. **On `tools/list`**, the existing admin-visibility wrapper (`visibility.ts`)
+   records the listing that principal actually received: a sha256 over the tool
+   definitions as served, keyed by `(user_id, client_id)`. Recording *after* the
+   admin filter is the point — a non-admin is never compared against a listing
+   they were never sent.
+2. **On `tools/call`**, a wrapper on the same dispatch point compares that record
+   against what this build would serve now, and appends a refresh notice when
+   they disagree.
+
+Both hang off the SDK's request handlers, not off individual tools — so a new
+tool inherits the behavior by existing, and there is no per-tool line anyone can
+forget. The notice is an extra `content` text block (what a model reliably reads
+and relays) plus a `_meta["workout/connector-update"]` entry (what a programmatic
+consumer can branch on). **`structuredContent` is untouched**, so no tool's data
+contract changes.
+
+### What makes a client stale, and what clears it
+
+- **Stale:** the recorded fingerprint is not the one this build serves for that
+  client's variant, or there is no record at all.
+- **Clear:** one `tools/list` — i.e. the user pressing Refresh. The write records
+  what was just served and resets `notified_at`, so the state is the truth rather
+  than a flag someone has to remember to reset.
+- **Quiet:** at most one notice per connection per hour
+  (`CATALOG_NOTICE_COOLDOWN_MS`), so a twenty-call conversation carries it once.
+- **Fail open, always:** if the current catalog cannot be computed, or the table
+  is unreachable, nobody is warned. A missed notice costs a user an old tool
+  list; a wrongly-broken `tools/call` costs them their session.
+
+Freshness and **auth are separate concepts** and must stay that way: nothing here
+expires a token, revokes a grant, or changes the connector URL. The notice says
+so in as many words, because "refresh" and "reconnect" are easy to conflate.
+
+### Per-principal catalogs
+
+`tools/list` is filtered per principal (admin tools are hidden from non-admins),
+so there is no single "the catalog". Two fingerprints are computed —
+`standard` and `admin` — and a record is compared against its own variant. The
+variant is read off the served listing rather than plumbed through, so it follows
+the filter automatically. A single-catalog implementation would mark every
+ordinary user permanently stale; `catalog-freshness.test.ts` asserts against that
+failure directly.
+
+### What a developer has to do when tools change
+
+**Nothing.** Adding, removing, renaming, re-describing or re-schema-ing a tool
+moves the fingerprint by construction, because the hash is taken over the
+definitions the SDK actually emits (plus the server instructions, which a client
+snapshots alongside them). Tool *ordering* deliberately does not count, and
+neither does JSON-Schema key order — both are incidental, and warning on them
+would train people to ignore the notice.
+
+`MCP_CATALOG_GENERATION` (`version.ts`) is the manual lever for the cases the
+served bytes cannot show — a semantic change behind an unchanged schema, or a
+deliberate re-baseline. It is folded into the hash, so raising it invalidates
+every recorded snapshot. **It is a lever, not the mechanism**; the pre-N91 design
+of "remember to increment an integer" fails silently in exactly the direction
+that matters.
+
+### The rollout
+
+There is no historical per-client tracking to migrate, and no honest way to
+guess what an existing connection holds — so **a connection with no record is
+treated as stale**. That population is precisely the one most likely to be
+missing tools, and the cost is one Refresh, paid once, after which the row is
+real. It is deliberately a one-time migration: once a connection has a record,
+it only ever goes stale again when the catalog actually moves.
+
+The feature ships at generation **2** (1 names the untracked era), so an existing
+connection is stale on two independent grounds until it refreshes — which is what
+makes the rollout testable end to end by an owner who is already up to date.
+
+### Version identities
+
+Three numbers, three questions — see `version.ts` for the full note:
+
+| Constant | Answers | Moves when |
+|---|---|---|
+| `MCP_SERVER_VERSION` | which build is answering | every release (derived from `src/content/releases/`, doc 23 §5.1) |
+| `MCP_CATALOG_GENERATION` | has the tool surface moved | a deliberate bump; folded into the fingerprint |
+| `MCP_SCHEMA_VERSION` | what shape is the payload | the response envelope's contract changes |
+
+`MCP_SERVER_VERSION` was pinned at `0.1.0` from the first slice until N91 because
+nothing depended on it. It is **not** usable as a staleness signal: under the
+stateless 2026-07-28 protocol there is no `initialize` handshake, `serverInfo`
+rides an optional `server/discover` most clients never call, and a client holding
+a frozen catalog is by definition not re-reading it.
+
+### What WORKOUT cannot fix
+
+The Refresh control is ChatGPT's UI. WORKOUT cannot trigger it, cannot reach it
+from the phone app (it is web-only), cannot move it off the bottom of the tool
+list, and cannot confirm the user pressed it except by observing the `tools/list`
+that follows. The model may also paraphrase or drop the notice — it is text in a
+tool result, not a UI element. All the connector can do is be accurate about who
+is behind, and say it in a form a model reliably relays.
+
 ## Failure contract (converged 2026-07-05, R25)
 
 One signal covers every failure: a tool result that did not do what was asked
@@ -206,11 +330,17 @@ MCP tools return the **same view-layer shapes** as the stats screens (`v_exercis
 
 ```
 mcp/
-├── server.ts        # server init, instructions, capability wiring
-├── auth.ts          # OAuth bridge to Supabase Auth
-├── tools/           # one file per tool: schema (zod) + handler
+├── server.ts            # server init + capability wiring (re-exports the two below)
+├── version.ts           # server version, catalog generation — the identities
+├── instructions.ts      # the server-level instructions string
+├── auth.ts              # OAuth bridge to Supabase Auth
+├── visibility.ts        # tools/list wrapper: admin filter + catalog recording
+├── catalog.ts           # pure: fingerprint, freshness policy, the notice text
+├── catalog-snapshot.ts  # what this build serves, memoized per process
+├── catalog-notice.ts    # tools/call wrapper: the stale-catalog notice
+├── tools/               # one file per tool: schema (zod) + handler
 ├── resources.ts
-└── __tests__/       # tool-handler tests with seeded fixture user
+└── __tests__/           # tool-handler tests with seeded fixture user
 ```
 
 ## Safeguards

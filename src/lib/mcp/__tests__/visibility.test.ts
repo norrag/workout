@@ -12,6 +12,15 @@ import { fakeAuthInfo, fakeExtra } from "./harness";
  * SDK upgrade moves `_requestHandlers`, this suite is what catches it.
  */
 
+// N91: the same wrapper now records the served catalog. That write is
+// service-role and irrelevant here, so it is stubbed out — otherwise this
+// suite fails a database write on every assertion and reports it.
+vi.mock("@/lib/queries/mcp-catalog", () => ({
+  getCatalogRecord: vi.fn(async () => ({ available: true, record: null })),
+  recordCatalogServed: vi.fn(async () => {}),
+  recordCatalogNotified: vi.fn(async () => {}),
+}));
+
 vi.mock("@/lib/queries/profiles", () => ({
   getProfile: vi.fn(async (_client: unknown, userId: string) => ({
     id: userId,

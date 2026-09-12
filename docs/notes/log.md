@@ -15,6 +15,56 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-09-12 — Session 134: N91 — the connector can tell who is holding a stale tool list
+
+**Owner:** *"ChatGPT appears to keep a frozen snapshot of an MCP connector's
+tool catalog until the user manually refreshes it. Some WORKOUT users connected
+months ago and are therefore likely missing tools that have since been added…
+I do not want to show a generic 'there may be new tools' message to everybody."*
+
+The constraint that shaped the build: **the refresh control is ChatGPT's UI and
+we cannot touch it**, so the only thing WORKOUT can improve is the *accuracy* of
+who gets told. That turned the problem from a messaging one into a bookkeeping
+one — the server has to remember what it handed each connection.
+
+**What shipped (PR #251).**
+
+- **`mcp_client_catalog`**, keyed `(user_id, client_id)` rather than by user, so
+  one person's ChatGPT and Claude connections go stale independently. Written
+  service-role from `/api/mcp` only; owner/admin read, no user write policy.
+- **A fingerprint, not a counter.** `catalog.ts` hashes the tool definitions *as
+  the SDK serves them*, plus the server instructions, plus a generation counter.
+  Adding or changing a tool moves it by construction — the "remember to bump an
+  integer" design fails silently in exactly the direction that matters. Tool
+  order and JSON-Schema key order deliberately do not count.
+- **Two wires, both on the SDK's request handlers**, so no tool carries a line
+  about this and a new tool inherits it by existing: `visibility.ts` records the
+  listing on `tools/list` (after the admin filter — the recorded hash is what
+  that principal actually received), and `catalog-notice.ts` wraps `tools/call`.
+- **Two catalogs, not one.** Admin and standard listings are fingerprinted
+  separately; a single-catalog implementation would have marked every ordinary
+  user permanently stale, and there is now a test that asserts against exactly
+  that.
+- **The notice** is an extra `content` block plus a `_meta` entry, once an hour
+  per connection. `structuredContent` is untouched, so no tool's contract moves.
+- **Unknown = stale**, deliberately: no historical tracking exists and there is
+  no honest way to guess, and the untracked population is the one most likely to
+  be missing tools. One Refresh establishes the baseline, once.
+- **`MCP_SERVER_VERSION` unpinned from `0.1.0`** — it now derives from the
+  release registry. It is explicitly *not* the staleness signal: the stateless
+  protocol has no handshake, and a client with a frozen catalog is not re-reading
+  `serverInfo` either. `version.ts` writes down which of the three version
+  numbers answers which question.
+
+**Owner test loop:** deploy → use WORKOUT from the existing ChatGPT connection →
+receive the notice → Settings → Plugins → Workout → Refresh → use again → notice
+gone. The generation ships at 2 so an already-current connection exercises the
+stale path; `catalog-freshness.test.ts` runs that exact sequence.
+
+**What WORKOUT still cannot do:** trigger the refresh, reach it from the phone
+app, move it off the bottom of the tool list, or stop a model paraphrasing the
+notice away.
+
 ## 2026-08-30 — Session 133: N90 — the strip disagreed with its own trace
 
 **Owner:** *"There appears to be an issue with disagreement / inaccuracy between

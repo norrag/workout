@@ -452,6 +452,68 @@ export const UG_CONNECTING_AN_AI: ManualChapter = {
     },
     // -----------------------------------------------------------------------
     {
+      slug: "keeping-the-tools-current",
+      title: "Keeping its tool list current",
+      summary:
+        "An assistant caches the list of things WORKOUT can do. When yours is out of date, WORKOUT says so and tells you how to refresh it.",
+      keywords: [
+        "refresh",
+        "out of date",
+        "missing tools",
+        "new tools",
+        "connector update",
+        "cached",
+        "tool list",
+        "reconnect",
+      ],
+      blocks: [
+        {
+          kind: "para",
+          text: "When you connect an assistant, it asks WORKOUT what it can do and remembers the answer. That list does not update on its own. WORKOUT keeps gaining capabilities, so a connection made months ago can be working from a shorter list than the one WORKOUT now offers — and the assistant has no way of knowing, because from where it sits nothing has changed.",
+        },
+        {
+          kind: "para",
+          text: [
+            "WORKOUT notices instead. It records what each of your connections was last told, so when yours falls behind it can say so in the middle of an ordinary answer: ",
+            { strong: "new WORKOUT connector tools are available" },
+            ", along with how to refresh. The message goes only to connections that are actually behind. If yours is current you will never see it.",
+          ],
+        },
+        {
+          kind: "steps",
+          steps: [
+            {
+              label: "Open ChatGPT on the web",
+              text: "The refresh control is on the website rather than in the phone app.",
+            },
+            {
+              label: "Go to Settings → Plugins → Workout",
+              text: "This opens the connection's own page, listing what WORKOUT has told it that it can do.",
+            },
+            {
+              label: "Press Refresh",
+              text: "The control is at the bottom of the tool list, below the last entry. Pressing it asks WORKOUT for the current list.",
+            },
+          ],
+        },
+        {
+          kind: "para",
+          text: "That is the whole fix. WORKOUT sees the new request, records what it sent, and stops mentioning it. You do not need to sign in again or reconnect, and nothing you could already ask for stops working in the meantime — the older list is a shorter menu, not a broken one.",
+        },
+        {
+          kind: "callout",
+          tone: "note",
+          label: "Each connection is separate",
+          text: "ChatGPT and Claude hold their own lists and fall behind independently, so refreshing one says nothing about the other. Other assistants each have their own way of refreshing a connector; the menu path above is ChatGPT's.",
+        },
+      ],
+      related: [
+        "ug/connecting-an-ai#working-with-it",
+        "ug/connecting-an-ai#staying-in-control",
+      ],
+    },
+    // -----------------------------------------------------------------------
+    {
       slug: "staying-in-control",
       title: "Staying in control",
       summary:

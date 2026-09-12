@@ -969,6 +969,47 @@ describe("design-pivot tables (0002)", () => {
     expect(writeError).not.toBeNull();
   });
 
+  it("users cannot write their own MCP catalog-freshness row (N91)", async () => {
+    // silencing your own refresh notice is the whole blast radius, but the
+    // table is service-role-written like the audit log and stays that way
+    const { error } = await alice.from("mcp_client_catalog").insert({
+      user_id: aliceId,
+      client_id: "forged-client",
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("MCP catalog-freshness rows are invisible to other users (N91)", async () => {
+    const service = createClient(URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: seedError } = await service.from("mcp_client_catalog").upsert(
+      {
+        user_id: aliceId,
+        client_id: "chatgpt",
+        catalog_fingerprint: "a".repeat(64),
+        catalog_generation: 2,
+        catalog_variant: "standard",
+        tool_count: 39,
+      },
+      { onConflict: "user_id,client_id" },
+    );
+    expect(seedError).toBeNull();
+
+    const { data: aliceView } = await alice
+      .from("mcp_client_catalog")
+      .select("client_id")
+      .eq("user_id", aliceId);
+    expect(aliceView?.map((r) => r.client_id)).toContain("chatgpt");
+
+    const { data: bobView, error: bobError } = await bob
+      .from("mcp_client_catalog")
+      .select("*")
+      .eq("user_id", aliceId);
+    expect(bobError).toBeNull();
+    expect(bobView).toEqual([]);
+  });
+
   it("users cannot write the MCP audit log directly", async () => {
     const { error } = await alice.from("mcp_write_audit").insert({
       user_id: aliceId,
