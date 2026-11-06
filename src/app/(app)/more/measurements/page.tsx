@@ -5,6 +5,9 @@ import { releaseActive } from "@/lib/version";
 import { getTapeSessions } from "@/lib/queries/measure/tape";
 import { Measurements } from "./Measurements";
 
+// Health records are live reads, including after consecutive server actions.
+export const dynamic = "force-dynamic";
+
 export default async function MeasurementsPage() {
   if (!releaseActive("1.3.0")) notFound();
   const client = await createClient();

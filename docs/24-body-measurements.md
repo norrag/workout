@@ -28,6 +28,12 @@ failed saves retain input. Closing dirty input asks to discard. A session can be
 corrected or explicitly deleted, with confirmation; body data is user-owned
 measurement substrate, like imported scans, rather than immutable training history.
 
+The save response carries the committed canonical session. The ledger keeps that
+confirmed result visible through a late render carrying the prior snapshot;
+fresh server data replaces it. This state is transient and starts only after the
+database acknowledgment. The route forces dynamic reads and stores nothing in
+browser storage.
+
 Latest compares two explicitly dated sessions. Only matched sites are subtracted;
 missing sites have no delta. History follows one site and side through dated raw
 readings, with the interval and count visible. No interpolated observations,
@@ -66,3 +72,8 @@ Verify pure unit/date/comparison rules, atomic replace/rollback, all RLS operati
 and both themes. Hosted has no Supabase development branch as of this inspection;
 Vercel Preview does not imply database isolation. Apply the additive migration only
 after local/CI policy tests pass and record its actual status in the runbook.
+
+The first Linux run of the measurement ownership/atomicity suite passed (all
+84 RLS tests, including the seven new tests). The hosted apply then requested a
+Supabase confirmation which expired; a structural read confirmed both new tables
+remain absent. Do not retry without renewed confirmation. The draft PR is #265.

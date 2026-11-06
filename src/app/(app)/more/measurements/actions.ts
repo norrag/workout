@@ -4,7 +4,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { releaseActive } from "@/lib/version";
-import { tapeSessionSchema, todayAtOffset } from "@/lib/measure/tape";
+import {
+  tapeSessionSchema,
+  todayAtOffset,
+  type TapeSession,
+} from "@/lib/measure/tape";
 import { deleteTapeSession, saveTapeSession } from "@/lib/queries/measure/tape";
 
 const saveSchema = z
@@ -16,7 +20,7 @@ const saveSchema = z
 
 export async function saveMeasurements(
   input: unknown,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; saved?: TapeSession }> {
   if (!releaseActive("1.3.0"))
     return { error: "Measurements are not available yet." };
   const parsed = saveSchema.safeParse(input);
@@ -53,7 +57,7 @@ export async function saveMeasurements(
     };
   }
   revalidatePath("/more/measurements");
-  return { error: null };
+  return { error: null, saved: parsed.data.session };
 }
 
 export async function removeMeasurements(

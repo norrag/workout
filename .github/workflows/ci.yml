@@ -67,7 +67,9 @@ jobs:
         with:
           version: latest
       - name: Start local Supabase (applies migrations + seed)
-        run: supabase start
+        # Email confirmations are disabled; the unused mail viewer was colliding
+        # on port 54324 before any database tests could run.
+        run: supabase start --exclude mailpit
       - name: RLS policy tests
         run: npm run test:rls
       - name: Write-pipeline integration tests
@@ -94,11 +96,13 @@ jobs:
         with:
           version: latest
       - name: Start local Supabase (applies migrations + seed)
-        run: supabase start
+        run: supabase start --exclude mailpit
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Build (against the local stack)
         run: npm run build
+      - name: Measurements E2E (staged release)
+        run: npx playwright test tests/e2e/measurements.spec.ts
       - name: E2E smoke
         run: npm run test:e2e
       - name: Upload Playwright traces on failure

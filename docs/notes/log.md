@@ -17,6 +17,9 @@ Append a dated entry whenever a session moves work. Newest first.
 
 ## 2026-11-06 — Session 135: N96, monthly tape inside WORKOUT
 
+Follow-up: draft PR #265; Linux unit/build checks pass and all 84 RLS tests pass. Hosted apply requested a separate Supabase confirmation, which expired; no schema mutation occurred and both tables remain absent. The first browser trace showed the second write acknowledged while the view retained the earlier snapshot; the save now returns the committed record and an acknowledgment overlay bridges stale renders. CI omits the unused mail viewer and freezes the anchor test clock; neither changes app engine behavior. Awaiting new targeted E2E results.
+
+
 - Reviewed AGENTS, product/architecture/data/design precedence, N66/doc 20, BodySpec and bodyweight paths, release runbook, Guide contracts, current code and recent history. Current owner request narrows the companion topology for this slice; doc 24 records that decision.
 - Phase 0 mockups and runtime captures use fictional data. More gets a quiet row below BodySpec; grouped tape capture, raw comparisons/history, correction/deletion and CSV follow the ledger system.
 - Three additive RLS tables and SECURITY INVOKER atomic save, authenticated query layer, boundary validation; no profile or engine writes.

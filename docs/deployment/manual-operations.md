@@ -854,3 +854,18 @@ not yet a verified functional preview. CI first run applied the migration to a
 fresh local DB successfully, but the RLS runner hit a mail-viewer port collision
 before tests, while Linux unit CI caught claim-ledger formatting, corrected in
 the follow-up. No hosted mutation was attempted.
+
+Later checkpoint: the second Linux run passed **all 84 RLS tests**, including
+the seven measurement cases (own/cross-user/anonymous, ownership forgery,
+rollback, same-day idempotency and deletion cascade). Hosted `apply_migration`
+was attempted **once** after those tests. It returned `status: expired` because
+the required confirmation expired; **it did not execute**. `to_regclass` for
+both new tables returned null afterward. A renewed Supabase confirmation is
+required; do not use raw SQL or another transport to bypass it.
+
+CI follow-up fixes only test infrastructure outside the tape slice: omit the
+unused mail viewer (confirmations are disabled locally), and freeze Date.now
+across the two anchor-equivalence reads so elapsed milliseconds do not fail
+the assertion. The measurement browser trace also exposed a confirmed write
+being hidden by a stale render; the save response now carries the canonical
+record and the ledger holds that acknowledged snapshot until fresh data arrives.

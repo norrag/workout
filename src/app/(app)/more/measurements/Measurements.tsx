@@ -62,7 +62,21 @@ function UnitToggle({
   );
 }
 
-export function Measurements({ sessions }: { sessions: TapeSession[] }) {
+export function Measurements({
+  sessions: serverSessions,
+}: {
+  sessions: TapeSession[];
+}) {
+  // A server-confirmed write remains visible through a late render carrying
+  // the previous snapshot. A genuinely new server snapshot replaces it.
+  // This is transient React state, never persisted or shown before the ack.
+  const source = JSON.stringify(serverSessions);
+  const [confirmed, setConfirmed] = useState<{
+    source: string;
+    sessions: TapeSession[];
+  } | null>(null);
+  const sessions =
+    confirmed?.source === source ? confirmed.sessions : serverSessions;
   const [tab, setTab] = useState<"latest" | "history">("latest");
   const [unit, setUnit] = useState<TapeUnit>(sessions[0]?.input_unit ?? "in");
   const [editing, setEditing] = useState<TapeSession | "new" | null>(null);
@@ -351,10 +365,19 @@ export function Measurements({ sessions }: { sessions: TapeSession[] }) {
           sessions={sessions}
           initialUnit={unit}
           onClose={() => setEditing(null)}
-          onSaved={(savedUnit, deleted) => {
+          onSaved={(savedUnit, change) => {
+            const next = change.saved
+              ? [
+                  ...sessions.filter((s) => s.id !== change.saved!.id),
+                  change.saved,
+                ].sort((a, b) => b.measured_on.localeCompare(a.measured_on))
+              : sessions.filter((s) => s.id !== change.deletedId);
+            setConfirmed({ source, sessions: next });
             setUnit(savedUnit);
             setEditing(null);
-            setStatus(deleted ? "SESSION DELETED" : "MEASUREMENTS SAVED");
+            setStatus(
+              change.deletedId ? "SESSION DELETED" : "MEASUREMENTS SAVED",
+            );
           }}
         />
       )}
@@ -373,7 +396,10 @@ function MeasurementForm({
   sessions: TapeSession[];
   initialUnit: TapeUnit;
   onClose: () => void;
-  onSaved: (unit: TapeUnit, deleted?: boolean) => void;
+  onSaved: (
+    unit: TapeUnit,
+    change: { saved?: TapeSession; deletedId?: string },
+  ) => void;
 }) {
   const router = useRouter();
   const [id] = useState(() => session?.id ?? crypto.randomUUID());
@@ -463,7 +489,7 @@ function MeasurementForm({
           timezoneOffset: new Date().getTimezoneOffset(),
         });
         if (result.error) setError(result.error);
-        else onSaved(unit);
+        else if (result.saved) onSaved(unit, { saved: result.saved });
       } catch {
         setError("Couldn't save. Your entries are still here. Try again.");
       }
@@ -606,7 +632,7 @@ function MeasurementForm({
                     try {
                       const result = await removeMeasurements(id);
                       if (result.error) setError(result.error);
-                      else onSaved(unit, true);
+                      else onSaved(unit, { deletedId: id });
                     } catch {
                       setError("Couldn't delete. Try again.");
                     }
