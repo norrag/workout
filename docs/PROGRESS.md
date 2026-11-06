@@ -28,9 +28,9 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 
 Design/build contract: [24-body-measurements.md](24-body-measurements.md), figures 4.12–4.15. More → Body measurements, paired tape logging, dated comparisons/history, edit/delete and CSV. Three additive owner-RLS tables + invoker atomic save; no engine/profile changes. Guide and claims update with the feature. Registry/package stay 1.2.1 and all entry/mutation surfaces are gated for 1.3.0.
 
-Validation: typecheck, lint, staged production build, 2,164 unit tests (one unrelated Windows import suite excluded); mobile fixture captures in both themes. Database and full E2E verification are pending CI. Temporary visual fixtures are removed before commit.
+Validation at code commit 0f8fc306694e2462d7781d4f026cf10169817f8e (CI run 42285038309): Linux checks (unit/lint/typecheck/build) pass; all 84 RLS and 18 write-pipeline integration tests pass; the targeted measurement E2E passes capture, unit conversion, keep/discard, consecutive saves, comparisons/history, edit and CSV. Local mobile captures cover both themes. Temporary fixtures are removed. The broader smoke run also passed the tape test, but finished with the existing N84 BodySpec navigation timeout (bodyspec-integration.spec.ts:141); three other legacy navigation cases passed on retry.
 
-Remaining / external: hosted migration pending policy tests; Vercel env API 403 and CLI unauthenticated, so no persistent override set. Preview deployment will use a deployment-specific build override if permitted. No merge or production promotion.
+Remaining / external: hosted migration requires renewed Supabase confirmation. The sole apply attempt expired without execution; both tables remain absent. READY frontend preview: https://workout-cmi5oguiq-garron-duprees-projects.vercel.app (0f8fc30, deployment dpl_9xBvn1YDzkamvmtsddUqT1ykdnGv), configured with a deployment-specific NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0. Project env remains unchanged. Production is still main at aed94ce, version 1.2.1. Draft PR #265 remains unmerged.
 
 ## 2026-08-30 — Release 1.2.1: "last session" means the session, not the ask (N90)
 
