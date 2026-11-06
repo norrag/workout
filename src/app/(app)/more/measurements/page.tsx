@@ -17,7 +17,7 @@ export default async function MeasurementsPage() {
   if (!user) redirect("/sign-in");
   const sessions = await getTapeSessions(client, user.id);
   return (
-    <div>
+    <div className="min-w-0 max-w-full">
       <Link
         href="/more"
         className="inline-flex min-h-11 items-center text-[10px] font-semibold tracking-[0.12em] text-ink/65"
@@ -25,7 +25,9 @@ export default async function MeasurementsPage() {
         &lt; MORE
       </Link>
       <div className="logotype mt-1 text-[13px] font-semibold">workout</div>
-      <h1 className="title-display mt-3 text-[32px]">measurements</h1>
+      <div className="mt-4 border-b-[1.5px] border-ink pb-3">
+        <h1 className="title-display text-4xl">measurements</h1>
+      </div>
       <p className="mt-4 text-sm leading-relaxed text-ink/70">
         A monthly tape record, between your workouts and scans.
       </p>

@@ -291,15 +291,19 @@ export const UG_BODY_DATA: ManualChapter = {
               { kind: "heading", text: "Taking body measurements" },
               {
                 kind: "para",
-                text: "More → Body measurements keeps a monthly tape record. Log chest, waist at the navel, relaxed left and right upper arms and thighs. Hips, calves, neck and forearms are optional. Each site has a placement cue. Use the same conditions each time; keep the tape snug without compressing the skin.",
+                text: "More → Body measurements records monthly tape readings: chest, navel waist, relaxed left/right upper arms and thighs, plus optional hips, calves, neck and forearms. Follow each site's placement cue under the same conditions. Keep the tape snug without compressing skin.",
               },
               {
                 kind: "para",
-                text: "Choose inches or centimetres, a date and any sites you measured, then save. Previous values are dated references, never filled in for you. There is one session per date; edit it to correct a reading or delete it to remove that session. Export measurements downloads the full tape history as CSV.",
+                text: "Choose inches or centimetres and a date; unit switches convert entered values. Previous readings are dated hints, never prefilled. Complete saves one session per date. Edit corrects readings; Delete removes the session. Export measurements downloads the full tape history as CSV.",
               },
               {
                 kind: "para",
-                text: "Latest compares two selected sessions, with dates and their interval shown. History follows one site and side. Missing readings stay missing. Small differences can reflect placement, breathing or hydration; size alone cannot distinguish muscle from fat. Tape records do not change your profile, goals or prescriptions. Workout progress and DEXA remain separate records for you to review alongside them.",
+                text: "Complete and Cancel stay below the scrolling fields. Keyboard Next moves to the next visible field. Cancel asks before discarding; Keep editing retains unsaved entries.",
+              },
+              {
+                kind: "para",
+                text: "Latest compares dated sessions and shows their interval; History follows one site and side. Skipped sites stay missing. Placement, breathing or hydration can affect small differences; size alone cannot distinguish muscle from fat. Tape never changes profile, goals or prescriptions. Review workout progress and DEXA alongside it.",
               },
             ] satisfies ManualBlock[])
           : []),

@@ -9,11 +9,13 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   className = "",
+  disabled = false,
 }: {
   options: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={`flex border-[1.5px] border-ink ${className}`}>
@@ -23,10 +25,13 @@ export function SegmentedControl<T extends string>({
           <button
             key={opt.value}
             type="button"
+            disabled={disabled}
             aria-pressed={active}
             onClick={() => onChange(opt.value)}
             className={`label-caps min-h-11 flex-1 px-3 text-[10px] transition-colors duration-150 ${
-              active ? "bg-ink font-bold text-bg-base" : "font-medium text-ink/55"
+              active
+                ? "bg-ink font-bold text-bg-base"
+                : "font-medium text-ink/55"
             } ${i > 0 ? "border-l border-ink/30" : ""}`}
           >
             {opt.label}

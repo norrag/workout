@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
 import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { GuideLink } from "@/components/ui/GuideLink";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { GUIDE_LINKS } from "@/lib/guide-links";
 import { localDayIso, shortDateWithYear } from "@/lib/dates";
 import {
@@ -26,7 +29,7 @@ import {
 } from "@/lib/measure/tape";
 import { removeMeasurements, saveMeasurements } from "./actions";
 
-const caps = "text-[10px] font-bold tracking-[0.12em]";
+const caps = "label-caps text-[10px] font-bold";
 const muted = "text-ink/70";
 const action =
   "min-h-11 border-[1.5px] border-ink px-4 py-3 text-xs font-bold tracking-[0.12em]";
@@ -41,24 +44,21 @@ function UnitToggle({
   disabled?: boolean;
 }) {
   return (
-    <div
-      className="flex border-[1.5px] border-ink"
-      role="group"
+    <fieldset
+      className="min-w-0 w-28 shrink-0"
       aria-label="Measurement units"
+      disabled={disabled}
     >
-      {(["in", "cm"] as const).map((u) => (
-        <button
-          key={u}
-          type="button"
-          disabled={disabled}
-          aria-pressed={unit === u}
-          className={`${caps} min-h-11 min-w-14 px-3 ${unit === u ? "bg-ink text-bg-base" : muted}`}
-          onClick={() => onChange(u)}
-        >
-          {u.toUpperCase()}
-        </button>
-      ))}
-    </div>
+      <SegmentedControl
+        options={[
+          { value: "in", label: "IN" },
+          { value: "cm", label: "CM" },
+        ]}
+        value={unit}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    </fieldset>
   );
 }
 
@@ -126,22 +126,15 @@ export function Measurements({
         </>
       ) : (
         <>
-          <div
-            className="mt-3 flex border-[1.5px] border-ink"
-            role="group"
-            aria-label="Measurement view"
-          >
-            {(["latest", "history"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={tab === t}
-                className={`${caps} min-h-11 flex-1 py-3 uppercase ${tab === t ? "bg-ink text-bg-base" : muted}`}
-                onClick={() => setTab(t)}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="mt-3" role="group" aria-label="Measurement view">
+            <SegmentedControl
+              options={[
+                { value: "latest", label: "latest" },
+                { value: "history", label: "history" },
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
             <span className={`${caps} ${muted}`}>DISPLAY UNITS</span>
@@ -176,7 +169,7 @@ export function Measurements({
                       aria-label="Comparison session"
                       value={baseline.id}
                       onChange={(e) => setBaselineId(e.target.value)}
-                      className="mt-2 min-h-11 w-full border border-ink/40 bg-bg-base px-3 text-sm font-semibold tracking-normal"
+                      className="mt-2 min-h-11 w-full min-w-0 max-w-full border border-ink/40 bg-bg-base px-3 text-base font-semibold tracking-normal"
                     >
                       {sessions.slice(1).map((s) => (
                         <option key={s.id} value={s.id}>
@@ -198,10 +191,10 @@ export function Measurements({
                   key={r.site_key}
                   className="flex items-center justify-between gap-3 border-b border-ink/15 py-3.5"
                 >
-                  <span className="text-sm font-semibold">
+                  <span className="min-w-0 flex-1 text-sm font-semibold">
                     {TAPE_SITES.find((s) => s.key === r.site_key)?.label}
                   </span>
-                  <div className="text-right">
+                  <div className="min-w-0 max-w-[65%] text-right">
                     <div className="numeral text-xl font-bold">
                       {tapeValue(r.value_in, unit)}{" "}
                       <span className={`${caps} ${muted}`}>
@@ -220,7 +213,7 @@ export function Measurements({
               ))}
               {latest.note && (
                 <p
-                  className={`mt-4 whitespace-pre-wrap text-sm leading-relaxed ${muted}`}
+                  className={`mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere] ${muted}`}
                 >
                   {latest.note}
                 </p>
@@ -243,7 +236,7 @@ export function Measurements({
                   aria-label="Measurement site"
                   value={site}
                   onChange={(e) => setSite(e.target.value as TapeSiteKey)}
-                  className="mt-2 min-h-11 w-full border border-ink/40 bg-bg-base px-3 text-sm font-semibold tracking-normal"
+                  className="mt-2 min-h-11 w-full min-w-0 max-w-full border border-ink/40 bg-bg-base px-3 text-base font-semibold tracking-normal"
                 >
                   {TAPE_SITES.map((s) => (
                     <option key={s.key} value={s.key}>
@@ -402,6 +395,7 @@ function MeasurementForm({
   ) => void;
 }) {
   const router = useRouter();
+  const formId = useId();
   const [id] = useState(() => session?.id ?? crypto.randomUUID());
   const [unit, setUnit] = useState<TapeUnit>(
     session?.input_unit ?? initialUnit,
@@ -506,7 +500,7 @@ function MeasurementForm({
         return (
           <fieldset
             key={group}
-            className="mt-5 border-t-[1.5px] border-ink pt-3"
+            className="mt-5 min-w-0 border-t-[1.5px] border-ink pt-3"
           >
             <legend className={`${caps} pr-2`}>{group}</legend>
             <p className={`text-xs leading-relaxed ${muted}`}>
@@ -523,15 +517,25 @@ function MeasurementForm({
                   site.key,
                 ).at(-1);
                 return (
-                  <label key={site.key} className="block min-w-0">
-                    <span className={`${caps} ${muted}`}>
-                      {"side" in site ? site.side.toUpperCase() : "VALUE"} ·{" "}
+                  <label
+                    key={site.key}
+                    className={
+                      sites.length === 2
+                        ? "block min-w-0"
+                        : "grid min-w-0 grid-cols-[minmax(0,1fr)_6rem] items-end gap-x-3"
+                    }
+                  >
+                    <span
+                      className={`${caps} ${muted} block text-center ${sites.length === 1 ? "col-start-2 row-start-1" : ""}`}
+                    >
+                      {"side" in site ? `${site.side.toUpperCase()} · ` : ""}
                       {unit.toUpperCase()}
                     </span>
                     <input
                       aria-label={`${site.label} (${unit})`}
                       type="text"
                       inputMode="decimal"
+                      enterKeyHint="next"
                       autoComplete="off"
                       placeholder="—"
                       value={values[site.key] ?? ""}
@@ -539,10 +543,26 @@ function MeasurementForm({
                       onChange={(e) =>
                         setValues((v) => ({ ...v, [site.key]: e.target.value }))
                       }
-                      className="numeral mt-1 min-h-12 w-full border border-ink/40 bg-paper px-3 text-right text-xl font-semibold focus:border-ink focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" || e.nativeEvent.isComposing)
+                          return;
+                        e.preventDefault();
+                        const fields = Array.from(
+                          e.currentTarget.form?.querySelectorAll<
+                            HTMLInputElement | HTMLTextAreaElement
+                          >('input[inputmode="decimal"], textarea') ?? [],
+                        ).filter(
+                          (field) =>
+                            !field.disabled &&
+                            !field.closest("details:not([open])") &&
+                            field.getClientRects().length > 0,
+                        );
+                        fields[fields.indexOf(e.currentTarget) + 1]?.focus();
+                      }}
+                      className={`numeral mt-1 min-h-11 w-full min-w-0 max-w-full border-[1.5px] border-ink bg-paper px-3 text-center text-base font-semibold focus:outline-none focus:ring-1 focus:ring-ink ${sites.length === 1 ? "col-start-2 row-start-2" : ""}`}
                     />
                     <span
-                      className={`mt-1 block text-[11px] leading-relaxed ${muted}`}
+                      className={`mt-1 block min-w-0 break-words text-[11px] leading-relaxed ${muted} ${sites.length === 1 ? "col-start-1 row-span-2 row-start-1" : ""}`}
                     >
                       {previous
                         ? `Previous ${tapeValue(previous.valueIn, unit)} ${unit.toUpperCase()} · ${shortDateWithYear(previous.date)}`
@@ -563,9 +583,48 @@ function MeasurementForm({
         onClose={close}
         title={session ? "edit measurements" : "log measurements"}
         fullHeight
+        footer={
+          <div role="group" aria-label="Measurement actions">
+            {error && (
+              <p
+                role="alert"
+                className="mb-3 max-h-16 overflow-y-auto border border-ink p-2 text-sm leading-relaxed"
+              >
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              form={formId}
+              variant="primary"
+              disabled={pending}
+              className="w-full py-4 text-[13px]"
+              aria-label="Complete measurements"
+            >
+              {pending ? "SAVING…" : "COMPLETE"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              className="min-h-11 w-full text-[11px]"
+              onClick={close}
+            >
+              CANCEL
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4">
+        <form
+          id={formId}
+          onSubmit={submit}
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
+        >
+          <div
+            role="region"
+            aria-label="Measurement fields"
+            className="min-h-0 min-w-0 flex-1 scroll-py-4 overflow-x-hidden overflow-y-auto overscroll-contain pb-4"
+          >
             <p className={`text-sm leading-relaxed ${muted}`}>
               Measure relaxed, before training. Keep the tape level and snug
               without compressing the skin. Leave any site blank to skip it.
@@ -578,9 +637,9 @@ function MeasurementForm({
                 disabled={pending}
               />
             </div>
-            <label className={`${caps} mt-4 block`}>
-              DATE
-              <input
+            <div className="mt-4 min-w-0">
+              <Input
+                label="DATE"
                 type="date"
                 required
                 min="1900-01-01"
@@ -588,9 +647,9 @@ function MeasurementForm({
                 value={date}
                 disabled={pending}
                 onChange={(e) => setDate(e.target.value)}
-                className="numeral mt-2 min-h-11 w-full border border-ink/40 bg-paper px-3 text-sm tracking-normal"
+                className="numeral w-full min-w-0 max-w-full appearance-none tracking-normal"
               />
-            </label>
+            </div>
             {groupFields(false)}
             <details
               className="mt-5 border-y border-ink/15 py-3"
@@ -605,17 +664,20 @@ function MeasurementForm({
               </summary>
               {groupFields(true)}
             </details>
-            <label className={`${caps} mt-5 block`}>
-              SESSION NOTE · OPTIONAL
+            <div className="mt-5 min-w-0">
+              <label htmlFor={`${formId}-note`} className={`${caps} block`}>
+                SESSION NOTE · OPTIONAL
+              </label>
               <textarea
+                id={`${formId}-note`}
                 rows={2}
                 maxLength={500}
                 value={note}
                 disabled={pending}
                 onChange={(e) => setNote(e.target.value)}
-                className="mt-2 w-full border border-ink/40 bg-paper p-3 text-sm font-normal tracking-normal"
+                className="mt-2 w-full min-w-0 max-w-full resize-y border border-ink/40 bg-paper p-3 text-base font-normal tracking-normal focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
               />
-            </label>
+            </div>
             {session && (
               <button
                 type="button"
@@ -642,31 +704,6 @@ function MeasurementForm({
                 DELETE SESSION
               </button>
             )}
-          </div>
-          <div className="shrink-0 border-t border-ink/15 pt-3">
-            {error && (
-              <p
-                role="alert"
-                className="mb-3 border border-ink p-3 text-sm leading-relaxed"
-              >
-                {error}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={pending}
-              className={`${action} w-full bg-ink text-bg-base disabled:opacity-60`}
-            >
-              {pending ? "SAVING…" : "SAVE MEASUREMENTS"}
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              className={`${caps} min-h-11 w-full`}
-              onClick={close}
-            >
-              CANCEL
-            </button>
           </div>
         </form>
       </BottomSheet>

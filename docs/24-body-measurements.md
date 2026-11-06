@@ -28,6 +28,18 @@ failed saves retain input. Closing dirty input asks to discard. A session can be
 corrected or explicitly deleted, with confirmation; body data is user-owned
 measurement substrate, like imported scans, rather than immutable training history.
 
+Owner mobile review amends capture to **Complete / Cancel** in a pinned footer
+(figures **4.13a–b**, `design/mockups/body-measurements-mobile.html`). The fields
+alone scroll vertically. `BottomSheet`'s optional footer mode follows the visible
+viewport above the keyboard, fits the app's 512px maximum width, and keeps focus
+in the scrolling middle on resize. It does not fix the body position (N47), and
+sheets without this footer retain their prior layout. Shared Button/Input/
+SegmentedControl primitives replace parallel local controls. Numeric cells are
+centered and tabular like set logging; all native controls use at least the
+standard 16px input size. Fieldsets/date controls have explicit width constraints,
+long notes wrap, and the existing app viewport/zoom policy is unchanged. Keyboard
+Next moves to the next visible entry, skipping the closed optional section.
+
 The save response carries the committed canonical session. The ledger keeps that
 confirmed result visible through a late render carrying the prior snapshot;
 fresh server data replaces it. This state is transient and starts only after the

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WORKOUT — measurement mobile refinement</title>
+  <style>
+    @font-face{font-family:Archivo;src:url('../../../src/app/fonts/archivo-latin-variable.woff2')}
+    *{box-sizing:border-box}body{margin:0;padding:32px;background:#e4dfd3;color:#17140f;font:14px Archivo,Arial,sans-serif}
+    h1{font-size:28px;font-weight:800;letter-spacing:-.02em}p{max-width:780px;line-height:1.55}.figures{display:flex;flex-wrap:wrap;align-items:flex-start;gap:32px}
+    .caption,.caps{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.caption{margin:20px 0 12px}
+    .phone{width:390px;height:760px;max-width:100%;border:1.5px solid;background:#f4f0e6;display:flex;flex-direction:column;padding:16px 20px;overflow:hidden}
+    .short{width:320px;height:390px}.header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+    h2{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin:0}.close{display:grid;place-items:center;min-width:44px;min-height:44px;font-size:20px;color:#6b6861}
+    .scroll{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:12px 0 16px}
+    .muted{color:#6b6861}.intro{font-size:13px;line-height:1.55;margin:0 0 16px}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .segments{display:flex;border:1.5px solid;width:112px;flex:none}.segments span{flex:1;min-height:44px;display:grid;place-items:center;font-size:10px;font-weight:700;letter-spacing:.12em}.selected{background:#17140f;color:#f4f0e6}
+    .date{display:block;width:100%;min-width:0;border:1px solid #17140f4d;background:#fcfaf4;font-size:16px;padding:11px 12px;margin-top:8px;font-variant-numeric:tabular-nums}
+    .group{border-top:1.5px solid;margin-top:20px;padding-top:10px}.guidance,.previous{font-size:11px;line-height:1.5;color:#6b6861;margin:6px 0}.numbers{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}.number{border:1.5px solid;background:#fcfaf4;height:44px;display:grid;place-items:center;text-align:center;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:6px}.single{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:8px}.single .value{width:96px;flex:none;text-align:center}
+    .footer{flex:none;border-top:1.5px solid;padding-top:12px;background:#f4f0e6}.button{min-height:48px;display:grid;place-items:center;background:#17140f;color:#f4f0e6;font-size:13px;font-weight:700;letter-spacing:.12em}.cancel{min-height:44px;display:grid;place-items:center;font-size:11px;font-weight:600;letter-spacing:.12em;color:#6b6861}
+    .note{font-size:16px;font-weight:400;border:1px solid #17140f4d;background:#fcfaf4;min-height:72px;padding:12px;margin-top:8px;overflow-wrap:anywhere}.optional{font-size:13px;font-weight:600;border-block:1px solid #17140f26;padding:16px 0;margin-top:20px}
+  </style>
+</head>
+<body>
+  <h1>body measurements — mobile refinement</h1>
+  <p>Owner review, 6 November 2026. Figures 4.13a–b amend 4.13 before implementation. Reuse WORKOUT's square ledger, 26px sheet title, shared segmented controls and ink completion action. Only the form body scrolls; Complete and Cancel stay in the footer. Numeric cells use the set logger's centered tabular style at a 16px mobile input size. Date and note controls use the app's standard 16px input size. The panel follows the visible viewport when the keyboard opens. Fictional data.</p>
+  <div class="figures">
+    <section>
+      <div class="caption">4.13a — core sites / pinned actions</div>
+      <div class="phone">
+        <header class="header"><h2>log measurements</h2><span class="close">×</span></header>
+        <div class="scroll">
+          <p class="intro muted">Measure relaxed, before training. Keep the tape level and snug without compressing the skin. Leave any site blank to skip it.</p>
+          <div class="row"><span class="caps muted">Entry units</span><div class="segments"><span class="selected">IN</span><span>CM</span></div></div>
+          <div class="caps muted" style="margin-top:16px">Date</div><div class="date">6 November 2026</div>
+          <div class="group"><div class="caps">Chest</div><p class="guidance">Around the fullest part, after a normal breath out.</p><div class="single"><p class="previous">Previous 41.50 IN · 6 OCT '26</p><div class="value"><span class="caps muted">IN</span><div class="number">42</div></div></div></div>
+          <div class="group"><div class="caps">Waist · navel</div><p class="guidance">Level with your navel, abdomen relaxed. Keep this landmark each time.</p><div class="single"><p class="previous">Previous 34.50 IN · 6 OCT '26</p><div class="value"><span class="caps muted">IN</span><div class="number">34.5</div></div></div></div>
+          <div class="group"><div class="caps">Upper arms · relaxed</div><p class="guidance">Midpoint between shoulder and elbow, arms hanging relaxed.</p><div class="numbers"><div><span class="caps muted">Left · IN</span><div class="number">14.75</div><p class="previous">Previous 14.50 IN · 6 OCT '26</p></div><div><span class="caps muted">Right · IN</span><div class="number">15</div><p class="previous">Previous 14.75 IN · 6 OCT '26</p></div></div></div>
+          <div class="group"><div class="caps">Thighs · relaxed</div><p class="guidance">Halfway between hip crease and top of kneecap. Measure standing.</p><div class="numbers"><div><span class="caps muted">Left · IN</span><div class="number">23.25</div></div><div><span class="caps muted">Right · IN</span><div class="number">23.5</div></div></div></div>
+          <div class="optional">Hips, calves, neck &amp; forearms ›</div>
+          <div class="caps muted" style="margin-top:20px">Session note · optional</div><div class="note">Morning, before training</div>
+        </div>
+        <footer class="footer"><div class="button">COMPLETE</div><div class="cancel">CANCEL</div></footer>
+      </div>
+    </section>
+    <section>
+      <div class="caption">4.13b — narrow / keyboard-reduced viewport</div>
+      <div class="phone short">
+        <header class="header"><h2>log measurements</h2><span class="close">×</span></header>
+        <div class="scroll">
+          <div class="group"><div class="caps">Forearms</div><p class="guidance">Around the widest part, arm relaxed and palm facing forward.</p><div class="numbers"><div><span class="caps muted">Left · CM</span><div class="number">29.5</div><p class="previous">No previous reading</p></div><div><span class="caps muted">Right · CM</span><div class="number">30</div><p class="previous">No previous reading</p></div></div></div>
+          <div class="caps muted" style="margin-top:20px">Session note · optional</div><div class="note">Morning, before training</div>
+        </div>
+        <footer class="footer"><div class="button">COMPLETE</div><div class="cancel">CANCEL</div></footer>
+      </div>
+      <p style="max-width:320px;font-size:12px">No horizontal scroll. The focused control stays in the scrolling middle; both actions remain above the keyboard. Decimal entry stays a string until completion, and changing units converts entered values.</p>
+    </section>
+  </div>
+</body>
+</html>

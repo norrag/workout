@@ -72,6 +72,19 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## 2026-11-06 — Monthly body measurements inside More (N96)
 
+**Owner mobile-review amendment (same day; `RETROFIT`, before code).** Figures
+**4.13a–b** in `design/mockups/body-measurements-mobile.html` amend the entry
+sheet: pinned **Complete / Cancel** footer, independent vertical form scroll,
+visible-viewport sizing above the keyboard, and the app's centered paper numeric
+cells. Reuse `BottomSheet`, `Button` and `SegmentedControl`. Keep all native
+form controls at least the standard 16px input size; contain fieldset/date/grid
+intrinsic widths and wrap long notes rather than widening the page. Preserve
+the existing root viewport and zoom policy. The panel follows the app's 512px
+maximum width. Core/optional site groups, unit conversion, dirty discard and
+save/error behavior remain the same. Numeric Next moves to the next visible
+field, rather than prematurely completing the session. Header and footer are
+outside the scrolling middle. No database or engine change.
+
 - **Change.** Add `Body measurements · LOG >` directly below BodySpec in More
   (4.4), opening the ledger in figures **4.12–4.15** of
   `docs/design/mockups/body-measurements.html`. The mockup pass preceded code.

@@ -150,3 +150,10 @@ renumbering).
 4.12 entry and empty state, 4.13 log/edit sheet, 4.14 latest/comparison, 4.15
 history in dark theme. See the dated 09 entry and doc 24 for the bounded
 WORKOUT slice, which leaves the larger MEASURE companion deferred.
+
+Owner mobile review adds **4.13a–b** in
+`docs/design/mockups/body-measurements-mobile.html`: pinned Complete/Cancel,
+separate form scrolling, compact centered numeric cells, and keyboard-visible
+actions. Runtime evidence: `body-measurements-mobile-form.png`,
+`body-measurements-mobile-dark.png`, and
+`body-measurements-mobile-keyboard-simulated.png` in `design/screenshots/`.

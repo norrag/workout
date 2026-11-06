@@ -885,6 +885,19 @@ fails the exact prescribed-progression line-220 wait on both attempts. No tape
 regression was found; N84's shared transition root cause remains unresolved.
 This supports feature attribution, not an all-green or release-ready claim.
 
+Owner mobile review adds a new preview revision (pinned Complete/Cancel,
+contained field scroll and width, standard inputs, visible-keyboard viewport).
+The earlier `d66b853` preview above does **not** include these refinements.
+Use the current URL and exact deployment commit in draft
+[PR #265](https://github.com/norrag/workout/pull/265) for review. It still uses
+the deployment-specific public 1.3.0 build override; no persistent project env,
+production frontend, database schema or engine change is part of this pass.
+Local mobile fixtures are fictional and the temporary entry page is restored.
+The CI measurement report is archived separately before full smoke replaces it.
+Real-device iOS keyboard/zoom behavior and hosted signed-in actions require
+separate evidence; browser-width tests and simulated keyboard geometry do not
+establish those outcomes.
+
 CI follow-up fixes only test infrastructure outside the tape slice: omit the
 unused mail viewer (confirmations are disabled locally), and freeze Date.now
 across the two anchor-equivalence reads so elapsed milliseconds do not fail

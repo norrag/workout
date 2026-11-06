@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
@@ -54,7 +54,7 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
   await page.getByLabel("DATE", { exact: true }).fill("2026-01-01");
   await page.getByLabel("Waist · navel (in)", { exact: true }).fill("34");
   await page
-    .getByRole("button", { name: "SAVE MEASUREMENTS", exact: true })
+    .getByRole("button", { name: "Complete measurements", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
@@ -77,7 +77,7 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     "40.5",
   );
   await page
-    .getByRole("button", { name: "SAVE MEASUREMENTS", exact: true })
+    .getByRole("button", { name: "Complete measurements", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
@@ -93,7 +93,7 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
   await page.getByRole("button").filter({ hasText: "1 FEB '26" }).click();
   await page.getByLabel("Chest (in)", { exact: true }).fill("41");
   await page
-    .getByRole("button", { name: "SAVE MEASUREMENTS", exact: true })
+    .getByRole("button", { name: "Complete measurements", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const [download] = await Promise.all([
@@ -127,4 +127,205 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     "background-color",
     "rgb(244, 240, 230)",
   );
+});
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const overflow = await page.evaluate(() => ({
+    document:
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+    body: document.body.scrollWidth - document.documentElement.clientWidth,
+    dialog: (() => {
+      const el = document.querySelector('[role="dialog"]');
+      return el ? el.scrollWidth - el.clientWidth : 0;
+    })(),
+  }));
+  expect(overflow.document).toBeLessThanOrEqual(1);
+  expect(overflow.body).toBeLessThanOrEqual(1);
+  expect(overflow.dialog).toBeLessThanOrEqual(1);
+}
+
+test("mobile measurement entry pins actions and contains scrolling and keyboard focus", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_RELEASE_OVERRIDE !== "1.3.0",
+    "Requires the staged build.",
+  );
+  const local = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const layoutEmail = `tape-layout-${Date.now()}@e2e.test`;
+  const { data, error } = await local.auth.signUp({
+    email: layoutEmail,
+    password,
+  });
+  if (error) throw error;
+  const profile = await local
+    .from("profiles")
+    .update({
+      display_name: "Mobile tester",
+      onboarded_at: new Date().toISOString(),
+      last_seen_version: "9.9.9",
+    })
+    .eq("id", data.user!.id);
+  if (profile.error) throw profile.error;
+  await page.goto("/sign-in");
+  await page.getByLabel("Email", { exact: true }).fill(layoutEmail);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL("**/workout");
+  await page.goto("/more/measurements");
+  await page
+    .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "log measurements",
+    exact: true,
+  });
+  const scroll = page.getByRole("region", { name: "Measurement fields" });
+  const complete = page.getByRole("button", {
+    name: "Complete measurements",
+    exact: true,
+  });
+  const cancel = dialog.getByRole("button", { name: "CANCEL", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect.poll(async () => (await dialog.boundingBox())!.y).toBe(0);
+
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 740 });
+    await expect
+      .poll(async () => (await dialog.boundingBox())!.height)
+      .toBe(740);
+    await expect(complete).toBeInViewport({ ratio: 1 });
+    await scroll.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await expectNoHorizontalOverflow(page);
+    await testInfo.attach(`measurement-${width}px-top`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+    const before = (await complete.boundingBox())!;
+    await scroll.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect
+      .poll(async () => (await complete.boundingBox())!.y)
+      .toBeCloseTo(before.y, 0);
+    const cancelBox = (await cancel.boundingBox())!;
+    expect(cancelBox.y + cancelBox.height).toBeLessThanOrEqual(740);
+    await expect(complete).toBeInViewport({ ratio: 1 });
+    await expect(cancel).toBeInViewport({ ratio: 1 });
+    await testInfo.attach(`measurement-${width}px`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+  }
+
+  await page.setViewportSize({ width: 768, height: 740 });
+  await expect.poll(async () => (await dialog.boundingBox())!.width).toBe(512);
+
+  await scroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
+  await page.getByRole("button", { name: "CM", exact: true }).click();
+  await expect(page.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
+    "102.87",
+  );
+  await page.getByRole("button", { name: "IN", exact: true }).click();
+  await page.getByLabel("Upper arm · left (in)", { exact: true }).fill("14.5");
+  await page
+    .getByLabel("Upper arm · left (in)", { exact: true })
+    .press("Enter");
+  await expect(
+    page.getByLabel("Upper arm · right (in)", { exact: true }),
+  ).toBeFocused();
+  await page.getByLabel("Thigh · right (in)", { exact: true }).press("Enter");
+  const note = page.getByLabel("SESSION NOTE · OPTIONAL", { exact: true });
+  await expect(note).toBeFocused();
+  await expect(dialog).toBeVisible();
+  await page
+    .getByText("Hips, calves, neck & forearms", { exact: true })
+    .click();
+  await page.getByLabel("Forearm · right (in)", { exact: true }).fill("11.5");
+  await note.fill("A".repeat(500));
+  await expectNoHorizontalOverflow(page);
+  const smallFonts = await dialog
+    .locator("input, textarea, select")
+    .evaluateAll((fields) =>
+      fields
+        .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16)
+        .map((el) => el.getAttribute("aria-label") ?? el.tagName),
+    );
+  expect(smallFonts).toEqual([]);
+
+  // Desktop emulation cannot open an iOS keyboard. Exercise its distinct
+  // visual-viewport resize/offset contract without changing the layout viewport.
+  await page.setViewportSize({ width: 320, height: 740 });
+  await note.focus();
+  await page.evaluate(() => {
+    const visible = window.visualViewport!;
+    Object.defineProperty(visible, "height", {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(visible, "offsetTop", {
+      configurable: true,
+      value: 24,
+    });
+    visible.dispatchEvent(new Event("resize"));
+  });
+  await expect
+    .poll(async () => {
+      const box = (await cancel.boundingBox())!;
+      return box.y + box.height;
+    })
+    .toBeLessThanOrEqual(384);
+  await expect
+    .poll(async () => {
+      const field = (await note.boundingBox())!;
+      const region = (await scroll.boundingBox())!;
+      return field.y + field.height - (region.y + region.height);
+    })
+    .toBeLessThanOrEqual(1);
+  await expectNoHorizontalOverflow(page);
+  await testInfo.attach("measurement-simulated-keyboard", {
+    body: await page.screenshot({
+      clip: { x: 0, y: 24, width: 320, height: 360 },
+    }),
+    contentType: "image/png",
+  });
+  await page.evaluate(() => {
+    const visible = window.visualViewport!;
+    Reflect.deleteProperty(visible, "height");
+    Reflect.deleteProperty(visible, "offsetTop");
+    visible.dispatchEvent(new Event("resize"));
+  });
+  await cancel.click();
+  await expect(
+    page.getByRole("dialog", { name: "Discard changes?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue(
+    "40.5",
+  );
+  await expect(
+    page.getByLabel("Forearm · right (in)", { exact: true }),
+  ).toHaveValue("11.5");
+  await complete.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("A".repeat(500), { exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await page
+    .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
+    .click();
+  await complete.click();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(complete).toBeInViewport({ ratio: 1 });
+  await expect(cancel).toBeInViewport({ ratio: 1 });
 });

@@ -36,6 +36,7 @@ export function BottomSheet({
   title,
   subtitle,
   fullHeight = false,
+  footer,
   children,
 }: {
   open: boolean;
@@ -50,22 +51,65 @@ export function BottomSheet({
    * Used for the planner exercise picker (better visibility).
    */
   fullHeight?: boolean;
+  /** Full-height entry flows: actions stay outside the scrolling children,
+   * within the visible viewport even while the software keyboard is open. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   const { render, shown } = useSheetTransition(open);
   const panelRef = useRef<HTMLDivElement>(null);
+  const pinned = fullHeight && Boolean(footer);
+  const [viewport, setViewport] = useState<{
+    top: number;
+    height: number;
+  } | null>(null);
+  useEffect(() => {
+    const visible = window.visualViewport;
+    if (!render || !pinned || !visible) return;
+    const update = () => {
+      const next = { top: visible.offsetTop, height: visible.height };
+      setViewport((old) =>
+        old?.top === next.top && old.height === next.height ? old : next,
+      );
+    };
+    update();
+    visible.addEventListener("resize", update);
+    visible.addEventListener("scroll", update);
+    return () => {
+      visible.removeEventListener("resize", update);
+      visible.removeEventListener("scroll", update);
+    };
+  }, [render, pinned]);
+  useEffect(() => {
+    if (!pinned || !viewport) return;
+    const focused = document.activeElement;
+    if (
+      focused instanceof HTMLElement &&
+      panelRef.current?.contains(focused) &&
+      focused.matches("input, textarea, select")
+    ) {
+      focused.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [pinned, viewport]);
   useScrollLock(render);
   // Escape closes, focus moves in on open / back to the opener on close, and
   // Tab stays inside while open (R18)
   useModalA11y(render, panelRef, onClose);
   if (!render) return null;
   // overscroll-contain: the panel's scroll must never chain to the page (N32)
-  const panelClass = fullHeight
-    ? "absolute inset-x-0 bottom-0 top-[max(1rem,env(safe-area-inset-top))] flex flex-col border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6"
-    : "absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6";
+  const panelClass = pinned
+    ? "absolute inset-0 mx-auto flex w-full min-w-0 max-w-lg flex-col overflow-hidden border-t-2 border-ink bg-bg-base px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4"
+    : fullHeight
+      ? "absolute inset-x-0 bottom-0 top-[max(1rem,env(safe-area-inset-top))] flex flex-col border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6"
+      : "absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain border-t-2 border-ink bg-bg-base px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6";
   return (
     <div
       className="fixed inset-0 z-50"
+      style={
+        pinned && viewport
+          ? { top: viewport.top, height: viewport.height, bottom: "auto" }
+          : undefined
+      }
       // N32: sheet gestures are the sheet's own — without this they bubble
       // (through the React tree) into page-level touch handlers like
       // PullToRefresh, which read them as page gestures
@@ -86,15 +130,23 @@ export function BottomSheet({
         tabIndex={-1}
         className={`${panelClass} focus:outline-none transition-transform duration-[280ms] ease-out ${shown ? "translate-y-0" : "translate-y-full"}`}
       >
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">
+        <div
+          className={
+            pinned
+              ? "flex min-w-0 shrink-0 items-baseline justify-between gap-3"
+              : "flex items-baseline justify-between"
+          }
+        >
+          <h2
+            className={`text-[26px] font-extrabold tracking-[-0.02em] ${pinned ? "min-w-0 leading-tight" : ""}`}
+          >
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="close"
-            className="-mr-3 flex min-h-11 min-w-11 items-center justify-center text-ink/50"
+            className={`-mr-3 flex min-h-11 min-w-11 items-center justify-center text-ink/50 ${pinned ? "shrink-0" : ""}`}
           >
             ✕
           </button>
@@ -104,9 +156,22 @@ export function BottomSheet({
             {subtitle}
           </p>
         )}
-        <div className={fullHeight ? "mt-5 flex min-h-0 flex-1 flex-col" : "mt-5"}>
+        <div
+          className={
+            pinned
+              ? "mt-3 flex min-h-0 min-w-0 flex-1 flex-col"
+              : fullHeight
+                ? "mt-5 flex min-h-0 flex-1 flex-col"
+                : "mt-5"
+          }
+        >
           {children}
         </div>
+        {footer && (
+          <div className="shrink-0 border-t-[1.5px] border-ink bg-bg-base pt-3">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -26,6 +26,19 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 
 ## 2026-11-06 — N96: monthly body measurements, staged for 1.3.0
 
+Owner preview refinement: figures 4.13a–b precede the mobile update. The form
+now uses the shared sheet's optional pinned footer and standard Button/Input/
+SegmentedControl primitives, centered numeric cells, and 16px native controls.
+Only fields scroll, with explicit minimum-width constraints and long-note
+wrapping. Complete saves; Cancel retains the existing discard guard. Keyboard
+Next advances through visible fields. The footer follows VisualViewport size/
+offset above the keyboard; no root viewport or body-position policy changes.
+Existing sheet layout is preserved when no footer is supplied. Local fictional
+fixture checks pass at 320/360/390/430px, with light/dark captures, independent
+scrolling, units, focus and simulated keyboard geometry (360px high, offset 24).
+These are not physical-iOS keyboard/zoom tests. Temporary fixture entry page
+was restored before commit. No schema, release identity or engine changes.
+
 Design/build contract: [24-body-measurements.md](24-body-measurements.md), figures 4.12–4.15. More → Body measurements, paired tape logging, dated comparisons/history, edit/delete and CSV. Three additive owner-RLS tables + invoker atomic save; no engine/profile changes. Guide and claims update with the feature. Registry/package stay 1.2.1 and all entry/mutation surfaces are gated for 1.3.0.
 
 Validation at code commit 0f8fc306694e2462d7781d4f026cf10169817f8e (CI run 42285038309): Linux checks (unit/lint/typecheck/build) pass; all 84 RLS and 18 write-pipeline integration tests pass; the targeted measurement E2E passes capture, unit conversion, keep/discard, consecutive saves, comparisons/history, edit and CSV. Local mobile captures cover both themes. Temporary fixtures are removed. The broader smoke run also passed the tape test, but finished with the existing N84 BodySpec navigation timeout (bodyspec-integration.spec.ts:141); three other legacy navigation cases passed on retry.
