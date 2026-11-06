@@ -1091,9 +1091,9 @@ All rows below document the gated prose in ug/body-data#what-body-data-changes, 
 
 | Claim | Section | Verified behavior | Source of truth | Checked |
 |---|---|---|---|---|
-| C-tape-01 | ug/body-data#what-body-data-changes | More below BodySpec opens monthly tape sessions; six core and six optional side-specific sites, landmark guidance and dated hints; blank means skipped | measure/tape.ts::TAPE_SITES; more/page.tsx; measurements/Measurements.tsx | 2026-11-06 |
-| C-tape-02 | same | Inches/cm, one session per date; atomic save, correction, deletion and full CSV; failure keeps input | tapeSessionSchema; queries/measure/tape.ts; save_measurement_session; measurements/actions.ts; export/route.ts | 2026-11-06 |
-| C-tape-03 | same | Latest compares two selected sessions; history follows same site/side, dates and interval; missing stays missing | compareTapeSessions; siteHistory; Measurements.tsx | 2026-11-06 |
-| C-tape-04 | same | Tape alone does not identify muscle/fat and never writes profile, goals or prescriptions | measurements/actions.ts → queries/measure/tape.ts; migration has no trigger into existing data | 2026-11-06 |
+| `C-tape-01` | `ug/body-data#what-body-data-changes` | More below BodySpec opens monthly tape sessions; six core and six optional side-specific sites, landmark guidance and dated hints; blank means skipped | `measure/tape.ts::TAPE_SITES`; `more/page.tsx`; `measurements/Measurements.tsx` | ✓ 2026-11-06 |
+| `C-tape-02` | `ug/body-data#what-body-data-changes` | Inches/cm, one session per date; atomic save, correction, deletion and full CSV; failure keeps input | `tapeSessionSchema`; `queries/measure/tape.ts`; `save_measurement_session`; `measurements/actions.ts`; `export/route.ts` | ✓ 2026-11-06 |
+| `C-tape-03` | `ug/body-data#what-body-data-changes` | Latest compares two selected sessions; history follows same site/side, dates and interval; missing stays missing | `compareTapeSessions`; `siteHistory`; `Measurements.tsx` | ✓ 2026-11-06 |
+| `C-tape-04` | `ug/body-data#what-body-data-changes` | Tape alone does not identify muscle/fat and never writes profile, goals or prescriptions | `measurements/actions.ts` → `queries/measure/tape.ts`; migration has no trigger into existing data | ✓ 2026-11-06 |
 
 Rechecked C-body-20/21: no profile/engine input path changed.

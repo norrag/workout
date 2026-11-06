@@ -143,3 +143,10 @@ renumbering).
 >
 > The Volume stats tab (old 4.1) was removed; Balance→4.1, Performance→4.2. There is no 4.3.
 > Old 2.2 "Meso detail — RIR ramp" is gone — the planner board (2.5) is the single meso surface.
+
+### Monthly tape figures (2026-11-06, doc 24)
+
+`docs/design/mockups/body-measurements.html` extends the More/profile ledger:
+4.12 entry and empty state, 4.13 log/edit sheet, 4.14 latest/comparison, 4.15
+history in dark theme. See the dated 09 entry and doc 24 for the bounded
+WORKOUT slice, which leaves the larger MEASURE companion deferred.

@@ -843,3 +843,14 @@ var or an un-toggled dashboard flag.
 - Hosted project workout (juqvbiymmdcggctdqoiq) has **no development branches**. A Vercel Preview must not be described as a separate database. New tables are owner-private; validation uses synthetic local test accounts, never the owner's health records.
 - Preview override is NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0, Preview only. Connector environment-list request returned 403 and CLI has no login. No persistent env update occurred. A deployment-specific build command can set the same public flag without altering project settings if deployment permission permits; otherwise a human must set the Preview variable and redeploy the feature branch.
 - Keep production registry/package 1.2.1. No release registry change, merge, production env update, alias promotion or production deploy is authorized in this review slice.
+
+Checkpoint: draft [PR #265](https://github.com/norrag/workout/pull/265).
+Deployment `dpl_9qFrN3wWq9wqmVnro6ZBSLpUKj8g` is READY at
+https://workout-hytwv8jta-garron-duprees-projects.vercel.app, pinned to commit
+`01112b425c6f03a5a2a94c75677f88f6dfc21239`. Its deployment-specific build
+command sets `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0` without changing project env
+or persistent build settings. Database migration is still pending; this URL is
+not yet a verified functional preview. CI first run applied the migration to a
+fresh local DB successfully, but the RLS runner hit a mail-viewer port collision
+before tests, while Linux unit CI caught claim-ledger formatting, corrected in
+the follow-up. No hosted mutation was attempted.
