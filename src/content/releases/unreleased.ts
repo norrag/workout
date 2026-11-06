@@ -9,6 +9,17 @@ import type { ReleaseEntry } from "./types";
  */
 export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
   {
+    id: "monthly-body-measurements",
+    title: "Keep a monthly record of body measurements",
+    body: "Log chest, waist, arms and legs in More. Compare the same sites across dates, review their history, and keep the measurements beside your training and DEXA records.",
+    area: "stats",
+    highlight: true,
+    link: {
+      label: "Body measurements",
+      target: { kind: "app", href: "/more/measurements" },
+    },
+  },
+  {
     id: "connector-tool-list-refresh-notice",
     title: "WORKOUT flags an assistant's out-of-date tool list",
     body: "An assistant caches what WORKOUT can do when you connect it and never refreshes on its own, so an older connection can be missing tools. WORKOUT now tells the connections that are behind — and only those — how to refresh.",

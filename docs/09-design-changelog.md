@@ -70,6 +70,33 @@ chapter in the main Guide, while connection remains a task on its setup page.
 
 ## Entries
 
+## 2026-11-06 — Monthly body measurements inside More (N96)
+
+- **Change.** Add `Body measurements · LOG >` directly below BodySpec in More
+  (4.4), opening the ledger in figures **4.12–4.15** of
+  `docs/design/mockups/body-measurements.html`. The mockup pass preceded code.
+  Defaults: chest, navel waist, relaxed arms/thighs; optional hips, calves,
+  neck/forearms. A date and any nonempty subset form one session.
+- **Rationale.** The owner's current request is an unobtrusive monthly tape
+  feature inside WORKOUT. Doc 24 narrows this slice; N66's separate MEASURE
+  shell and daily-scale/synthesis roadmap remain deferred.
+- **Structure.** Existing full-height `BottomSheet` supplies its 26px title,
+  close control, scroll region and focus trap. Input rows use paper, 1px rules,
+  square edges, paired left/right fields, decimal keypad and dated previous-value
+  hints; one ink Save. `LeaveConfirm` guards dirty dismissal/navigation.
+  Latest has explicit comparison-date and IN/CM controls. History contains a
+  site selector, raw dates/values/deltas, then editable sessions. Use the
+  shipped theme tokens in light, dark and system, without new accent uses.
+- **Honesty.** No inferred fat/muscle score, no interpolation, no threshold
+  pretending to know individual tape error. Every delta names its dates,
+  interval and paired readings; context links open existing cycles/DEXA.
+- **Affected figures.** 4.4, new 4.12–4.15. Mockup and rendered screenshot are
+  saved in `docs/design/`; doc 24 is the implementation contract.
+- **Impact.** `NET-NEW`, `DATA`. Three additive owner-RLS tables, one invoker
+  save transaction, user-owned correction/deletion and CSV export. Route,
+  More row and mutations are staged behind literal `releaseActive("1.3.0")`.
+
+
 ## 2026-08-30 — The plate tray (N89)
 
 The owner has been running an Apple Shortcut called **Load Weights** beside the

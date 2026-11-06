@@ -146,6 +146,17 @@ export default async function MorePage() {
               : "SET UP ›"}
         </div>
       </Link>
+      {releaseActive("1.3.0") && (
+        <Link
+          href="/more/measurements"
+          className="flex items-center justify-between border-b border-ink/15 py-3.5"
+        >
+          <div className="text-sm font-semibold">Body measurements</div>
+          <div className="text-[9.5px] font-semibold tracking-[0.1em] text-ink/65">
+            LOG &gt;
+          </div>
+        </Link>
+      )}
       <Link
         href="/more/account"
         className="flex items-center justify-between border-b border-ink/15 py-3.5"

@@ -437,3 +437,8 @@ screen they are read on rather than a chapter they have not opened.
   someone remembering to re-read it.
 - Placements themselves are re-validated with the rest of doc 22 at Phase 4 and
   under the Phase 8 rule.
+
+
+## 2026-11-06 — N96 tape ledger placement
+
+More → Body measurements renders one GuideLink, key tapeMeasurements, to ug/body-data#what-body-data-changes (label: What body data changes). E1/E2: the raw changes invite the question of how they relate to training and scans. E3: the caveat names uncertainty; the Guide explains capture and the profile/prescription boundary. E4: read-only page, no link in the form. E5: off the workout path. Literal string target; no content import. Entry is gated with the route for 1.3.0.

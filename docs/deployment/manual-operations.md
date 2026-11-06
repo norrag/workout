@@ -835,3 +835,11 @@ In PRs and PROGRESS entries, remaining human steps are listed under a
 **"Remaining / external"** heading with exact values. Cross-check this file if a
 deploy or feature "doesn't work" despite green CI — it's usually an unset env
 var or an un-toggled dashboard flag.
+
+
+### N96 — monthly tape preview (2026-11-06)
+
+- Migration 20261106191837_body_measurements.sql is append-only, additive and **not yet applied** at this checkpoint. Apply only after the local/CI RLS and atomicity tests pass; record hosted version, verify policies/FKs/grants, rerun advisors. No existing data or engine parameters change.
+- Hosted project workout (juqvbiymmdcggctdqoiq) has **no development branches**. A Vercel Preview must not be described as a separate database. New tables are owner-private; validation uses synthetic local test accounts, never the owner's health records.
+- Preview override is NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0, Preview only. Connector environment-list request returned 403 and CLI has no login. No persistent env update occurred. A deployment-specific build command can set the same public flag without altering project settings if deployment permission permits; otherwise a human must set the Preview variable and redeploy the feature branch.
+- Keep production registry/package 1.2.1. No release registry change, merge, production env update, alias promotion or production deploy is authorized in this review slice.

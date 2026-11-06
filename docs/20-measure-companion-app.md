@@ -32,6 +32,10 @@ connector — so each app can be shaped by what it is for.
 
 ---
 
+## 2026-11-06 amendment — bounded tape slice inside WORKOUT
+
+The owner now requests monthly tape capture under More below BodySpec. [Doc 24](24-body-measurements.md) is the build contract for that bounded slice, with figures 4.12–4.15 completed before code. It supersedes the separate-shell/phase-order requirements only for monthly tape inside WORKOUT. The broader companion remains a direction, not a build order. Its privacy, transparent raw facts and engine boundaries still bind.
+
 ## 1. Division of labour
 
 The split is by **fact ownership**, not by screen convenience. Each fact has

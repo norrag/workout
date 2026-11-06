@@ -40,6 +40,12 @@ export interface GuideLinkTarget {
  * stays true.
  */
 export const GUIDE_LINKS = {
+  /** Doc 24: read-only tape ledger, explains the boundary with strength/DEXA. */
+  tapeMeasurements: {
+    section: "ug/body-data#what-body-data-changes",
+    href: "/more/guide/body-data/what-body-data-changes",
+    label: "What body data changes",
+  },
   /** Prescription details sheet — what the whole panel is priced off. */
   strengthAnchor: {
     section: "ug/how-your-weight-is-chosen#the-anchor",

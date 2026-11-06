@@ -123,14 +123,14 @@ export type ProfileRow = {
   last_seen_version: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type MuscleGroupRow = {
   id: string;
   name: string;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type ExerciseRow = {
   id: string;
@@ -148,7 +148,7 @@ export type ExerciseRow = {
   source_exercise_id: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type ExcludedExerciseRow = {
   id: string;
@@ -157,7 +157,7 @@ export type ExcludedExerciseRow = {
   reason: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type ExerciseNoteRow = {
   id: string;
@@ -167,7 +167,7 @@ export type ExerciseNoteRow = {
   is_pinned: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
 /** Per-user × exercise engine override (doc 14 phase 3). First tunable: the
  *  editable weight increment, in pounds. */
@@ -178,7 +178,7 @@ export type ExerciseParamOverrideRow = {
   weight_increment: number;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type ExerciseMuscleGroupRow = {
   id: string;
@@ -187,7 +187,7 @@ export type ExerciseMuscleGroupRow = {
   role: "primary" | "secondary";
   created_at: string;
   updated_at: string;
-}
+};
 
 export type BodyweightLogRow = {
   id: string;
@@ -199,7 +199,7 @@ export type BodyweightLogRow = {
   /** doc 17 §5 — which explicit user action appended the point */
   source: "manual" | "profile" | "dexa";
   created_at: string;
-}
+};
 
 export type MacrocycleRow = {
   id: string;
@@ -226,7 +226,7 @@ export type MacrocycleRow = {
   status: "active" | "completed" | "archived";
   created_at: string;
   updated_at: string;
-}
+};
 
 export type MesocycleRow = {
   id: string;
@@ -245,19 +245,14 @@ export type MesocycleRow = {
   /** N18-B: explicit per-working-week RIR override; null = the rir_start→rir_end ramp */
   rir_schedule: number[] | null;
   status:
-    | "draft"
-    | "unplanned"
-    | "planned"
-    | "active"
-    | "completed"
-    | "abandoned";
+    "draft" | "unplanned" | "planned" | "active" | "completed" | "abandoned";
   template_id: string | null;
   start_date: string | null;
   /** read-path reconcile gate signature (WS-J #1); null until first reconcile */
   last_reconcile_sig: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type MesoDayRow = {
   id: string;
@@ -268,7 +263,7 @@ export type MesoDayRow = {
   weekday: number | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type MesoDayGroupRow = {
   id: string;
@@ -278,7 +273,7 @@ export type MesoDayGroupRow = {
   exercise_slots: number;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type MesoExerciseRow = {
   id: string;
@@ -309,7 +304,7 @@ export type MesoExerciseRow = {
   effort_reason: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type MicrocycleRow = {
   id: string;
@@ -322,7 +317,7 @@ export type MicrocycleRow = {
   status: "pending" | "active" | "completed";
   created_at: string;
   updated_at: string;
-}
+};
 
 export type WorkoutRow = {
   id: string;
@@ -335,7 +330,7 @@ export type WorkoutRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type WorkoutExerciseRow = {
   id: string;
@@ -366,7 +361,7 @@ export type WorkoutExerciseRow = {
   params_version: number | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type LoggedSetRow = {
   id: string;
@@ -400,7 +395,7 @@ export type LoggedSetRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type ExerciseFeedbackRow = {
   id: string;
@@ -415,7 +410,7 @@ export type ExerciseFeedbackRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type WorkoutFeedbackRow = {
   id: string;
@@ -427,7 +422,7 @@ export type WorkoutFeedbackRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type TemplateRow = {
   id: string;
@@ -440,7 +435,7 @@ export type TemplateRow = {
   source_template_id: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type TemplateDayRow = {
   id: string;
@@ -449,7 +444,7 @@ export type TemplateDayRow = {
   label: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type TemplateDayGroupRow = {
   id: string;
@@ -459,7 +454,7 @@ export type TemplateDayGroupRow = {
   exercise_slots: number;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type TemplateExerciseRow = {
   id: string;
@@ -472,7 +467,7 @@ export type TemplateExerciseRow = {
   default_rep_range: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type ShareRow = {
   id: string;
@@ -488,7 +483,7 @@ export type ShareRow = {
   payload: unknown | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export type EngineParamsRow = {
   id: string;
@@ -502,7 +497,7 @@ export type EngineParamsRow = {
   is_replayable: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
 /** doc 19 / N60 follow-up — an editable, versioned LLM coaching system prompt.
  *  Mirrors engine_params (append-only versions, one active row, admin-gated
@@ -516,7 +511,7 @@ export type CoachingPromptRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 /** which engine entry produced a decision (doc 14 §6.2): a week N→N+1 advance
  *  (prescribe) or a cold-start seed (seedMeso). */
@@ -538,7 +533,7 @@ export type DecisionExplanationRow = {
   /** doc 19 §6.1 — the triggers that routed this decision to the LLM call;
    *  null on pre-v3 rows */
   triggers: string[] | null;
-}
+};
 
 /** N58 follow-up — durable failure log for the LLM explanation pipeline: one
  *  row per failed generation attempt (API error, §4 post-check discard, or a
@@ -554,7 +549,7 @@ export type LlmExplanationFailureRow = {
   error: string;
   context: Record<string, unknown> | null;
   created_at: string;
-}
+};
 
 export type EngineDecisionRow = {
   id: string;
@@ -572,7 +567,7 @@ export type EngineDecisionRow = {
   provenance: Record<string, unknown> | null;
   kind: EngineDecisionKind;
   created_at: string;
-}
+};
 
 export type McpWriteAuditRow = {
   id: string;
@@ -581,7 +576,7 @@ export type McpWriteAuditRow = {
   args_hash: string;
   summary: string | null;
   created_at: string;
-}
+};
 
 /** N91 — per (user, OAuth client) record of the MCP tool catalog last served,
  *  so a client holding a frozen snapshot can be told to refresh. A null
@@ -599,7 +594,7 @@ export type McpClientCatalogRow = {
   notified_at: string | null;
   first_seen_at: string;
   updated_at: string;
-}
+};
 
 export type VExerciseHistoryRow = {
   user_id: string;
@@ -619,7 +614,7 @@ export type VExerciseHistoryRow = {
    *  deliberately easier session. Excluded from strength trends and PRs
    *  (like a deload), kept in volume, and still shown with its e1RM. */
   backed_off: boolean;
-}
+};
 
 /** R14: role-grain weekly-set facts for fractional volume counting (doc 10 §2).
  * Counts are UNWEIGHTED per role; apply engine/volume.ts::fractionalSetCount. */
@@ -639,7 +634,7 @@ export type VMesoWeekMuscleSetsRow = {
    *  week's RIR. Kept in the counts above (§9.1) — and NOT a subset of
    *  `logged_hard_sets`, which bakes the separate RIR ≤ 4 stimulus rule. */
   logged_backed_off_sets: number;
-}
+};
 
 /** N88 — anchor candidates ranked per (user, exercise) by recency, so a caller
  *  can bound egress PER EXERCISE (`set_rank <= N`). A global LIMIT over a
@@ -658,7 +653,7 @@ export type VAnchorCandidateSetRow = {
   performed_at: string;
   bodyweight: number | null;
   set_rank: number;
-}
+};
 
 export type VExercisePrsRow = {
   user_id: string;
@@ -668,7 +663,7 @@ export type VExercisePrsRow = {
   best_reps: number | null;
   best_e1rm: number | null;
   last_performed_at: string | null;
-}
+};
 
 export type VMesoSummaryRow = {
   user_id: string;
@@ -701,7 +696,7 @@ export type VMesoSummaryRow = {
    *  Excluded from `best_e1rm`, kept in volume/adherence — the comparability
    *  disclosure for cross-block reads. */
   backed_off_sets: number;
-}
+};
 
 export type VMacroSummaryRow = {
   user_id: string;
@@ -717,7 +712,7 @@ export type VMacroSummaryRow = {
   /** the logged span (doc 17 §5): first/last completed session; null unlogged */
   first_logged_at: string | null;
   last_logged_at: string | null;
-}
+};
 
 export type VExerciseOverviewRow = {
   user_id: string;
@@ -739,7 +734,7 @@ export type VExerciseOverviewRow = {
   best_session_volume: number | null;
   /** lifetime working sets excluded from `best_e1rm` as backed off (§6.2) */
   backed_off_sets: number;
-}
+};
 
 /** doc 15 §2.2 (N34): per-user link to an external data provider. Status and
  *  timestamps only — token material lives in `external_connection_secrets`
@@ -862,6 +857,22 @@ export type VBodyCompHistoryRow = {
 export type Database = {
   public: {
     Tables: {
+      measurement_sites: Table<{ key: string; display_order: number }>;
+      measurement_sessions: Table<{
+        id: string;
+        user_id: string;
+        measured_on: string;
+        input_unit: "in" | "cm";
+        note: string;
+        created_at: string;
+        updated_at: string;
+      }>;
+      measurements: Table<{
+        session_id: string;
+        user_id: string;
+        site_key: string;
+        value_in: number;
+      }>;
       profiles: Table<ProfileRow>;
       muscle_groups: Table<MuscleGroupRow>;
       exercises: Table<ExerciseRow>;
@@ -924,14 +935,30 @@ export type Database = {
     Views: {
       v_exercise_history: { Row: VExerciseHistoryRow; Relationships: [] };
       v_meso_summary: { Row: VMesoSummaryRow; Relationships: [] };
-      v_meso_week_muscle_sets: { Row: VMesoWeekMuscleSetsRow; Relationships: [] };
+      v_meso_week_muscle_sets: {
+        Row: VMesoWeekMuscleSetsRow;
+        Relationships: [];
+      };
       v_exercise_prs: { Row: VExercisePrsRow; Relationships: [] };
       v_macro_summary: { Row: VMacroSummaryRow; Relationships: [] };
       v_exercise_overview: { Row: VExerciseOverviewRow; Relationships: [] };
       v_body_comp_history: { Row: VBodyCompHistoryRow; Relationships: [] };
-      v_anchor_candidate_sets: { Row: VAnchorCandidateSetRow; Relationships: [] };
+      v_anchor_candidate_sets: {
+        Row: VAnchorCandidateSetRow;
+        Relationships: [];
+      };
     };
     Functions: {
+      save_measurement_session: {
+        Args: {
+          p_id: string;
+          p_measured_on: string;
+          p_input_unit: string;
+          p_note: string;
+          p_readings: unknown;
+        };
+        Returns: undefined;
+      };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       // R3 write integrity: atomic multi-statement writes live in the DB so a
       // mid-flight failure can never half-apply (20260702000005).

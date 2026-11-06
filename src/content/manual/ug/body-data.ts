@@ -41,6 +41,8 @@
 // Claims: `C-body-01` onward.
 
 import type { ManualChapter } from "../types";
+import { releaseActive } from "@/lib/version";
+import type { ManualBlock } from "../types";
 
 export const UG_BODY_DATA: ManualChapter = {
   manual: "ug",
@@ -284,6 +286,23 @@ export const UG_BODY_DATA: ManualChapter = {
         "prescription",
       ],
       blocks: [
+        ...(releaseActive("1.3.0")
+          ? ([
+              { kind: "heading", text: "Taking body measurements" },
+              {
+                kind: "para",
+                text: "More → Body measurements keeps a monthly tape record. Log chest, waist at the navel, relaxed left and right upper arms and thighs. Hips, calves, neck and forearms are optional. Each site has a placement cue. Use the same conditions each time; keep the tape snug without compressing the skin.",
+              },
+              {
+                kind: "para",
+                text: "Choose inches or centimetres, a date and any sites you measured, then save. Previous values are dated references, never filled in for you. There is one session per date; edit it to correct a reading or delete it to remove that session. Export measurements downloads the full tape history as CSV.",
+              },
+              {
+                kind: "para",
+                text: "Latest compares two selected sessions, with dates and their interval shown. History follows one site and side. Missing readings stay missing. Small differences can reflect placement, breathing or hydration; size alone cannot distinguish muscle from fat. Tape records do not change your profile, goals or prescriptions. Workout progress and DEXA remain separate records for you to review alongside them.",
+              },
+            ] satisfies ManualBlock[])
+          : []),
         {
           kind: "para",
           text: [

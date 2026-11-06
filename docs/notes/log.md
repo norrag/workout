@@ -15,6 +15,16 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-06 — Session 135: N96, monthly tape inside WORKOUT
+
+- Reviewed AGENTS, product/architecture/data/design precedence, N66/doc 20, BodySpec and bodyweight paths, release runbook, Guide contracts, current code and recent history. Current owner request narrows the companion topology for this slice; doc 24 records that decision.
+- Phase 0 mockups and runtime captures use fictional data. More gets a quiet row below BodySpec; grouped tape capture, raw comparisons/history, correction/deletion and CSV follow the ledger system.
+- Three additive RLS tables and SECURITY INVOKER atomic save, authenticated query layer, boundary validation; no profile or engine writes.
+- Literal 1.3.0 gates, staged release note (preserving the connector notice), gated Guide prose and claims. Shipped registry/package remain 1.2.1.
+- Reconciled merged rows N52/N87/N88/N89/N90 into archive and current open-PR register (#259/#212/#48). Hosted migration chain and active v27 checked; no training/health data read. N91 retains its runbook follow-ups.
+- Validation at this checkpoint: typecheck/lint/build pass; 2,164 unit tests pass excluding the unchanged migration-script suite whose import fails on Windows. Linux CI will check it. Local mobile fixture checks latest/form/keep-discard/history/light-dark, with no real user records. RLS and full E2E tests target only local Supabase.
+- Vercel env metadata read returns 403; CLI has no login. No persistent env change or production promotion. A deployment-specific preview build override will be attempted after the branch is ready. Hosted migration still pending database tests.
+
 ## 2026-09-12 — Session 134: N91 — the connector can tell who is holding a stale tool list
 
 **Owner:** *"ChatGPT appears to keep a frozen snapshot of an MCP connector's

@@ -24,6 +24,14 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-06 — N96: monthly body measurements, staged for 1.3.0
+
+Design/build contract: [24-body-measurements.md](24-body-measurements.md), figures 4.12–4.15. More → Body measurements, paired tape logging, dated comparisons/history, edit/delete and CSV. Three additive owner-RLS tables + invoker atomic save; no engine/profile changes. Guide and claims update with the feature. Registry/package stay 1.2.1 and all entry/mutation surfaces are gated for 1.3.0.
+
+Validation: typecheck, lint, staged production build, 2,164 unit tests (one unrelated Windows import suite excluded); mobile fixture captures in both themes. Database and full E2E verification are pending CI. Temporary visual fixtures are removed before commit.
+
+Remaining / external: hosted migration pending policy tests; Vercel env API 403 and CLI unauthenticated, so no persistent override set. Preview deployment will use a deployment-specific build override if permitted. No merge or production promotion.
+
 ## 2026-08-30 — Release 1.2.1: "last session" means the session, not the ask (N90)
 
 A fix release (doc 23 §4.1): no headline, no highlights, no modal — the

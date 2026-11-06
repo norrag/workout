@@ -76,6 +76,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     env:
+      # Exercise the staged block as well as shipped behavior. Production ignores it.
+      NEXT_PUBLIC_RELEASE_OVERRIDE: 1.3.0
       # the well-known static local-dev credentials (`supabase start`) — the
       # same public demo JWTs the RLS/integration suites default to
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
