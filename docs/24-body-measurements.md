@@ -90,3 +90,8 @@ because it could not verify the active browser URL to enforce access rules. No
 owner's health records or synthetic production readings were used. The local
 disposable-account E2E covers the complete write/read flow.
 The draft PR is #265; no merge or production frontend promotion occurred.
+
+Browser failure attribution is investigated in
+[the controlled main/feature comparison](reviews/2026-11-06-body-measurements-ci.md).
+It reproduces the shared fast-redirect/pending-UI failure on unchanged main;
+the measurement flow passes, while N84 remains a repository release blocker.

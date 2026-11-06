@@ -878,6 +878,13 @@ application commit passed checks, 84 RLS, 18 integration, targeted tape E2E and
 hosted drift. Full smoke passed tape but failed the pre-existing N84 BodySpec
 navigation wait at line 141 (seven passed, two flaky, one failed).
 
+Follow-up [controlled comparison](../reviews/2026-11-06-body-measurements-ci.md),
+run `42291048440`, reproduces the same fast-redirect/pending-UI failures on
+unchanged current main with **both shipped and staged settings**. Shipped main
+fails the exact prescribed-progression line-220 wait on both attempts. No tape
+regression was found; N84's shared transition root cause remains unresolved.
+This supports feature attribution, not an all-green or release-ready claim.
+
 CI follow-up fixes only test infrastructure outside the tape slice: omit the
 unused mail viewer (confirmations are disabled locally), and freeze Date.now
 across the two anchor-equivalence reads so elapsed milliseconds do not fail

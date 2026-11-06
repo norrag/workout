@@ -21,6 +21,8 @@ Follow-up: draft PR #265; the first hosted confirmation expired without executio
 
 The first browser trace showed the second write acknowledged while the view retained the earlier snapshot; the save now returns the committed record and an acknowledgment overlay bridges stale renders. CI omits the unused mail viewer and freezes the anchor test clock; neither changes app engine behavior.
 
+Failure attribution follow-up: [controlled comparison](../reviews/2026-11-06-body-measurements-ci.md), CI run 42291048440, explicitly checks out current main aed94ce with its own schema/seed. Both the shipped and staged baselines reproduce the pending UI independently of tape code/schema. Shipped main fails prescribed-progression line 220 on both attempts after fast HTTP 303 redirects; staged main has the same sign-in hang. Feature tape passes in isolation/full smoke and prescribed progression passes on the repeat. N84 remains unresolved; no timeout inflation, bypass or speculative application patch. Temporary baseline jobs are removed after collecting the evidence; the draft stays unmerged.
+
 
 - Reviewed AGENTS, product/architecture/data/design precedence, N66/doc 20, BodySpec and bodyweight paths, release runbook, Guide contracts, current code and recent history. Current owner request narrows the companion topology for this slice; doc 24 records that decision.
 - Phase 0 mockups and runtime captures use fictional data. More gets a quiet row below BodySpec; grouped tape capture, raw comparisons/history, correction/deletion and CSV follow the ledger system.
