@@ -22,7 +22,7 @@ waist **at the navel**, relaxed left/right upper arms and thighs. Hips, calves,
 neck and forearms are optional. No previous value is prefilled as a new reading.
 Previous readings are dated hints. Any nonempty subset can be saved.
 
-The form uses inline landmark cues, decimal keypads and a single Save. Unit
+The form uses inline landmark cues, decimal keypads and one completion action. Unit
 switches convert entered values rather than reinterpret them. Saving is atomic;
 failed saves retain input. Closing dirty input asks to discard. A session can be
 corrected or explicitly deleted, with confirmation; body data is user-owned

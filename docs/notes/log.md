@@ -29,7 +29,16 @@ Guide/claims and the design contract are updated. New CI geometry coverage
 also checks actual save/long-note rendering; targeted mobile reports are archived
 before full smoke can overwrite them. No database or engine change.
 
-Follow-up: draft PR #265; the first hosted confirmation expired without execution, then renewed native approval succeeded on 2026-11-06. Migration `body_measurements` is applied to the shared production database as version `20261106202459`; verified tables/sites/RLS/FKs/grants/invoker execution, with no new security advisor findings. Hosted drift now passes. At d66b853 / CI run 42286972237, Linux unit/build checks, 84 RLS, 18 integration and the isolated tape E2E pass. Full smoke passes tape again but retains N84's BodySpec navigation timeout at line 141 (seven passed, two flaky, one failed). READY review preview: https://workout-8wzfaqud5-garron-duprees-projects.vercel.app, pinned to d66b853 with a deployment-specific 1.3.0 override. Protected fetch reaches sign-in; hosted signed-in logging remains for owner review because browser navigation failed, then Computer Use stopped because it could not verify the active URL to enforce access rules. No production test identities/readings were created. Production frontend/package remain 1.2.1; no merge or promotion.
+Mobile verification: UI commit `91c4070`, READY preview
+https://workout-bexg3c51j-garron-duprees-projects.vercel.app. CI run
+`42306128963` passes both tape cases in isolation and full smoke without retries;
+checks, 84 RLS, 18 integration and hosted drift pass. Full smoke remains red on
+N84's BodySpec navigation wait (nine passed, one flaky, one failed). Actual
+preview HTTP reaches app sign-in; desktop interactive QA awaits GitHub/Vercel
+sign-in, and physical iOS keyboard/zoom is not verified. The preview stays pinned
+to the UI commit through later documentation-only commits.
+
+Earlier checkpoint: draft PR #265; the first hosted confirmation expired without execution, then renewed native approval succeeded on 2026-11-06. Migration `body_measurements` is applied to the shared production database as version `20261106202459`; verified tables/sites/RLS/FKs/grants/invoker execution, with no new security advisor findings. Hosted drift now passes. At d66b853 / CI run 42286972237, Linux unit/build checks, 84 RLS, 18 integration and the isolated tape E2E pass. Full smoke passes tape again but retains N84's BodySpec navigation timeout at line 141 (seven passed, two flaky, one failed). READY review preview: https://workout-8wzfaqud5-garron-duprees-projects.vercel.app, pinned to d66b853 with a deployment-specific 1.3.0 override. Protected fetch reaches sign-in; hosted signed-in logging remains for owner review because browser navigation failed, then Computer Use stopped because it could not verify the active URL to enforce access rules. No production test identities/readings were created. Production frontend/package remain 1.2.1; no merge or promotion.
 
 The first browser trace showed the second write acknowledged while the view retained the earlier snapshot; the save now returns the committed record and an acknowledgment overlay bridges stale renders. CI omits the unused mail viewer and freezes the anchor test clock; neither changes app engine behavior.
 

@@ -888,8 +888,12 @@ This supports feature attribution, not an all-green or release-ready claim.
 Owner mobile review adds a new preview revision (pinned Complete/Cancel,
 contained field scroll and width, standard inputs, visible-keyboard viewport).
 The earlier `d66b853` preview above does **not** include these refinements.
-Use the current URL and exact deployment commit in draft
-[PR #265](https://github.com/norrag/workout/pull/265) for review. It still uses
+READY mobile-review preview:
+https://workout-bexg3c51j-garron-duprees-projects.vercel.app,
+deployment `dpl_Gw8RrgeyamQ9zsmoEKbjuMnnh3Wm`, pinned to UI commit
+`91c4070b7ac764c5022dadc88b213e04511ad88a`. Later documentation-only commits do
+not change that UI. [PR #265](https://github.com/norrag/workout/pull/265) records
+current verification. It still uses
 the deployment-specific public 1.3.0 build override; no persistent project env,
 production frontend, database schema or engine change is part of this pass.
 Local mobile fixtures are fictional and the temporary entry page is restored.
@@ -897,6 +901,14 @@ The CI measurement report is archived separately before full smoke replaces it.
 Real-device iOS keyboard/zoom behavior and hosted signed-in actions require
 separate evidence; browser-width tests and simulated keyboard geometry do not
 establish those outcomes.
+
+Current hosted check: Vercel READY/Git SHA verified; protected HTTP fetch of
+`/more/measurements` returns app sign-in (200). Browser navigation now works but
+stops at GitHub/Vercel sign-in; the saved-login control did not open, so a user
+sign-in handoff is pending. No hosted measurement action was performed. CI run
+`42306128963` passes both measurement cases twice without retries (targeted and
+full smoke), checks/RLS/integration/drift. Overall CI remains red on N84's
+BodySpec line-141 wait; progression sign-in passed on retry.
 
 CI follow-up fixes only test infrastructure outside the tape slice: omit the
 unused mail viewer (confirmations are disabled locally), and freeze Date.now

@@ -39,15 +39,23 @@ scrolling, units, focus and simulated keyboard geometry (360px high, offset 24).
 These are not physical-iOS keyboard/zoom tests. Temporary fixture entry page
 was restored before commit. No schema, release identity or engine changes.
 
+Mobile verification at UI commit `91c4070b7ac764c5022dadc88b213e04511ad88a`,
+[CI run 42306128963](https://github.com/norrag/workout/actions/runs/42306128963):
+both measurement scenarios pass without retries in the targeted run (4.5/4.2s)
+and full smoke (4.2/3.8s), including actual long-note saving and mobile geometry.
+Checks, 84 RLS, 18 integration and hosted drift pass. Full smoke finishes with
+nine passed, one flaky (progression sign-in) and the existing N84 BodySpec
+line-141 navigation failure. The report/screenshots are archived separately.
+
 Design/build contract: [24-body-measurements.md](24-body-measurements.md), figures 4.12–4.15. More → Body measurements, paired tape logging, dated comparisons/history, edit/delete and CSV. Three additive owner-RLS tables + invoker atomic save; no engine/profile changes. Guide and claims update with the feature. Registry/package stay 1.2.1 and all entry/mutation surfaces are gated for 1.3.0.
 
 Validation at code commit 0f8fc306694e2462d7781d4f026cf10169817f8e (CI run 42285038309): Linux checks (unit/lint/typecheck/build) pass; all 84 RLS and 18 write-pipeline integration tests pass; the targeted measurement E2E passes capture, unit conversion, keep/discard, consecutive saves, comparisons/history, edit and CSV. Local mobile captures cover both themes. Temporary fixtures are removed. The broader smoke run also passed the tape test, but finished with the existing N84 BodySpec navigation timeout (bodyspec-integration.spec.ts:141); three other legacy navigation cases passed on retry.
 
-Latest verification at application commit d66b853 / CI run 42286972237: checks, all 84 RLS and 18 integration tests, and targeted tape E2E pass. Full smoke passes tape again but retains N84's BodySpec navigation wait at line 141 (seven passed, two flaky, one failed). After renewed native Supabase approval, the additive migration applied to the shared production database as version 20261106202459; all tables/sites/policies/FKs/grants and invoker execution verified, with no new security advisor findings. Hosted migration drift now passes.
+Earlier verification at application commit d66b853 / CI run 42286972237: checks, all 84 RLS and 18 integration tests, and targeted tape E2E pass. Full smoke passes tape again but retains N84's BodySpec navigation wait at line 141 (seven passed, two flaky, one failed). After renewed native Supabase approval, the additive migration applied to the shared production database as version 20261106202459; all tables/sites/policies/FKs/grants and invoker execution verified, with no new security advisor findings. Hosted migration drift now passes.
 
 Follow-up attribution: [controlled main/feature CI comparison](reviews/2026-11-06-body-measurements-ci.md), run 42291048440. Unchanged current main reproduces the issue with both the shipped 1.2.1 and staged 1.3.0 settings. The shipped baseline fails prescribed-progression line 220 on both attempts after a fast HTTP 303 redirect; the staged baseline has the same sign-in/pending-UI signature. Tape passes alone and in full smoke; prescribed progression passes on the feature repeat. No concrete tape regression found, but the shared action/RSC transition root cause is unresolved under N84; this is not an all-green or release-ready repository. Temporary baseline jobs are removed after evidence collection.
 
-Remaining / external: owner signed-in review of the READY preview, https://workout-8wzfaqud5-garron-duprees-projects.vercel.app (d66b853, deployment dpl_AYoizvtVugoM6ooTFWH77Guvd8an). Protected fetch reaches app sign-in; browser navigation failed, then Computer Use stopped because it could not verify the active URL to enforce access rules, so a hosted save was not exercised. Full local disposable-account E2E covers the flow; no fake hosted health records were created. Preview uses a deployment-specific NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0; project env is unchanged. Production frontend remains main at aed94ce, version 1.2.1. Draft PR #265 remains unmerged.
+Remaining / external: owner signed-in review of the READY mobile preview, https://workout-bexg3c51j-garron-duprees-projects.vercel.app (UI 91c4070, deployment dpl_Gw8RrgeyamQ9zsmoEKbjuMnnh3Wm). Protected fetch reaches app sign-in; interactive QA now awaits desktop GitHub/Vercel sign-in after the saved-login control did not open. Hosted saves and physical-iOS keyboard/zoom remain unverified. No fake hosted health records were created. Preview uses deployment-specific NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0; project env is unchanged. Production frontend remains main aed94ce, version 1.2.1. Draft PR #265 stays unmerged. Later documentation-only commits leave the preview UI unchanged.
 
 ## 2026-08-30 — Release 1.2.1: "last session" means the session, not the ask (N90)
 
