@@ -73,7 +73,20 @@ and both themes. Hosted has no Supabase development branch as of this inspection
 Vercel Preview does not imply database isolation. Apply the additive migration only
 after local/CI policy tests pass and record its actual status in the runbook.
 
-The first Linux run of the measurement ownership/atomicity suite passed (all
-84 RLS tests, including the seven new tests). The hosted apply then requested a
-Supabase confirmation which expired; a structural read confirmed both new tables
-remain absent. Do not retry without renewed confirmation. The draft PR is #265.
+Hosted migration applied after renewed Supabase confirmation on 2026-11-06,
+recorded as `20261106202459_body_measurements`. This is the existing production
+database, not a preview branch. Structural verification confirmed all three
+tables, 12 stock sites, RLS policies, ownership FKs, authenticated-only grants
+and SECURITY INVOKER execution. Security advisors added no measurement findings.
+
+At application commit `d66b853`, Linux CI run `42286972237` passed unit/build
+checks, all 84 RLS and 18 integration tests, and the targeted measurement E2E.
+The full smoke suite passed measurements again but retained N84's pre-existing
+BodySpec navigation timeout (line 141). Hosted migration drift passed after apply.
+The READY preview is pinned to that commit with the deployment-specific 1.3.0
+override. Its protected measurement URL reaches app sign-in; a hosted signed-in
+save has not been verified. Browser navigation failed, then Computer Use stopped
+because it could not verify the active browser URL to enforce access rules. No
+owner's health records or synthetic production readings were used. The local
+disposable-account E2E covers the complete write/read flow.
+The draft PR is #265; no merge or production frontend promotion occurred.

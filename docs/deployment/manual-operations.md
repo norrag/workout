@@ -839,7 +839,7 @@ var or an un-toggled dashboard flag.
 
 ### N96 — monthly tape preview (2026-11-06)
 
-- Migration 20261106191837_body_measurements.sql is append-only, additive and **not yet applied** at this checkpoint. Apply only after the local/CI RLS and atomicity tests pass; record hosted version, verify policies/FKs/grants, rerun advisors. No existing data or engine parameters change.
+- Migration `20261106191837_body_measurements.sql` is append-only and additive. **Applied after renewed Supabase confirmation on 2026-11-06**, hosted version `20261106202459`, name `body_measurements`. Verified three tables, 12 stock sites, RLS, ownership FKs, grants and invoker execution; security advisors added no measurement findings. Hosted migration drift now passes. No existing data or engine parameters changed.
 - Hosted project workout (juqvbiymmdcggctdqoiq) has **no development branches**. A Vercel Preview must not be described as a separate database. New tables are owner-private; validation uses synthetic local test accounts, never the owner's health records.
 - Preview override is NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0, Preview only. Connector environment-list request returned 403 and CLI has no login. No persistent env update occurred. A deployment-specific build command can set the same public flag without altering project settings if deployment permission permits; otherwise a human must set the Preview variable and redeploy the feature branch.
 - Keep production registry/package 1.2.1. No release registry change, merge, production env update, alias promotion or production deploy is authorized in this review slice.
@@ -862,6 +862,21 @@ was attempted **once** after those tests. It returned `status: expired` because
 the required confirmation expired; **it did not execute**. `to_regclass` for
 both new tables returned null afterward. A renewed Supabase confirmation is
 required; do not use raw SQL or another transport to bypass it.
+
+Final checkpoint: the renewed native Supabase confirmation succeeded; the
+migration is now applied to the **shared production database** as recorded above.
+No production frontend release occurred. The latest READY review deployment is
+`dpl_AYoizvtVugoM6ooTFWH77Guvd8an`, pinned to `d66b853c123b391e6a9feab220fe25d003de9990`:
+https://workout-8wzfaqud5-garron-duprees-projects.vercel.app.
+The public build override is still deployment-specific, not a project env change.
+Protected fetch of `/more/measurements` returns the app sign-in form (HTTP 200).
+Hosted signed-in logging remains an owner review check: browser navigation failed,
+then Computer Use stopped because it could not verify the active browser URL to
+enforce access rules. No fake production health readings or test identities were
+created. CI run `42286972237` at the deployed
+application commit passed checks, 84 RLS, 18 integration, targeted tape E2E and
+hosted drift. Full smoke passed tape but failed the pre-existing N84 BodySpec
+navigation wait at line 141 (seven passed, two flaky, one failed).
 
 CI follow-up fixes only test infrastructure outside the tape slice: omit the
 unused mail viewer (confirmations are disabled locally), and freeze Date.now
