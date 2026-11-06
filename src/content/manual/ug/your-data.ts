@@ -38,6 +38,8 @@
 // `C-data-01` onward.
 
 import type { ManualChapter } from "../types";
+import type { ManualBlock } from "../types";
+import { releaseActive } from "@/lib/version";
 
 export const UG_YOUR_DATA: ManualChapter = {
   manual: "ug",
@@ -66,6 +68,14 @@ export const UG_YOUR_DATA: ManualChapter = {
           kind: "para",
           text: "The app stores the training, plans, profile, and body data you enter. It does not collect a separate background activity record.",
         },
+        ...(releaseActive("1.3.0")
+          ? ([
+              {
+                kind: "para",
+                text: "Body measurements stores your dated tape sessions, their readings and any session notes. Its Export measurements control downloads a separate CSV of the full tape record. These measurements belong to your account and are removed when you delete it.",
+              },
+            ] satisfies ManualBlock[])
+          : []),
         {
           kind: "list",
           items: [

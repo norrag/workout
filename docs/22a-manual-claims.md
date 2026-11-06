@@ -1095,5 +1095,6 @@ All rows below document the gated prose in ug/body-data#what-body-data-changes, 
 | `C-tape-02` | `ug/body-data#what-body-data-changes` | Inches/cm, one session per date; atomic save, correction, deletion and full CSV; failure keeps input | `tapeSessionSchema`; `queries/measure/tape.ts`; `save_measurement_session`; `measurements/actions.ts`; `export/route.ts` | ✓ 2026-11-06 |
 | `C-tape-03` | `ug/body-data#what-body-data-changes` | Latest compares two selected sessions; history follows same site/side, dates and interval; missing stays missing | `compareTapeSessions`; `siteHistory`; `Measurements.tsx` | ✓ 2026-11-06 |
 | `C-tape-04` | `ug/body-data#what-body-data-changes` | Tape alone does not identify muscle/fat and never writes profile, goals or prescriptions | `measurements/actions.ts` → `queries/measure/tape.ts`; migration has no trigger into existing data | ✓ 2026-11-06 |
+| `C-tape-05` | `ug/your-data#what-is-stored` | Tape dates/readings/notes are account-owned; their dedicated CSV contains the full tape record; deleting the account cascades to this data | `queries/measure/tape.ts`; `measurements/export/route.ts`; owner policies and profile FKs in `20261106191837_body_measurements.sql`; `profiles.id` → `auth.users` cascade | ✓ 2026-11-06 |
 
 Rechecked C-body-20/21: no profile/engine input path changed.
