@@ -4,6 +4,9 @@ The owner rejected the prior mobile pass. This is a correction, not acceptance
 of figures 4.13a–b or preview `91c4070`. Figures 4.13c–d in
 `design/mockups/body-measurements-workout.html` precede this implementation.
 
+> Historical fixed-bar implementation, superseded for action placement by
+> [the page-flow clarification](2026-11-07-body-measurements-page-flow.md).
+
 ## Ground truth
 
 Reviewed the real `workout/page.tsx` → `DayView`, `SetRow`, `LogCheckbox`,

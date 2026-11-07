@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { FullScreenEntry } from "@/components/ui/FullScreenEntry";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
 import { loggingCellClass } from "@/components/ui/logging-styles";
 import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
@@ -54,11 +53,12 @@ function UnitToggle({
 }) {
   return (
     <fieldset
-      className="min-w-0 w-28 shrink-0"
+      className="min-w-0 w-22 shrink-0"
       aria-label="Measurement units"
       disabled={disabled}
     >
       <SegmentedControl
+        compact
         options={[
           { value: "in", label: "IN" },
           { value: "cm", label: "CM" },
@@ -92,6 +92,21 @@ export function Measurements({
   const [baselineId, setBaselineId] = useState(sessions[1]?.id ?? "");
   const [site, setSite] = useState<TapeSiteKey>("chest");
   const [status, setStatus] = useState("");
+  const logButtonRef = useRef<HTMLButtonElement>(null);
+  const ledgerScroll = useRef(0);
+  const returningToLedger = useRef(false);
+  useEffect(() => {
+    if (editing || !returningToLedger.current) return;
+    returningToLedger.current = false;
+    window.scrollTo(0, ledgerScroll.current);
+    logButtonRef.current?.focus({ preventScroll: true });
+  }, [editing]);
+  function beginEntry(next: TapeSession | "new") {
+    ledgerScroll.current = window.scrollY;
+    returningToLedger.current = true;
+    setStatus("");
+    setEditing(next);
+  }
   const latest = sessions[0];
   const baseline =
     sessions.slice(1).find((s) => s.id === baselineId) ?? sessions[1];
@@ -104,15 +119,52 @@ export function Measurements({
       )
     : [];
 
+  if (editing) {
+    return (
+      <MeasurementForm
+        key={typeof editing === "string" ? "new" : editing.id}
+        session={editing === "new" ? null : editing}
+        sessions={sessions}
+        initialUnit={unit}
+        onClose={() => setEditing(null)}
+        onSaved={(savedUnit, change) => {
+          const next = change.saved
+            ? [
+                ...sessions.filter((s) => s.id !== change.saved!.id),
+                change.saved,
+              ].sort((a, b) => b.measured_on.localeCompare(a.measured_on))
+            : sessions.filter((s) => s.id !== change.deletedId);
+          setConfirmed({ source, sessions: next });
+          setUnit(savedUnit);
+          setEditing(null);
+          setStatus(
+            change.deletedId ? "SESSION DELETED" : "MEASUREMENTS SAVED",
+          );
+        }}
+      />
+    );
+  }
+
   return (
     <>
+      <Link
+        href="/more"
+        className="inline-flex min-h-11 items-center text-[10px] font-semibold tracking-[0.12em] text-ink/65"
+      >
+        &lt; MORE
+      </Link>
+      <div className="logotype mt-1 text-[13px] font-semibold">workout</div>
+      <div className="mt-4 border-b-[1.5px] border-ink pb-3">
+        <h1 className="title-display text-4xl">measurements</h1>
+      </div>
+      <p className="mt-4 text-sm leading-relaxed text-ink/70">
+        A monthly tape record, between your workouts and scans.
+      </p>
       <button
         type="button"
         className={`${action} mt-5 w-full bg-ink text-bg-base`}
-        onClick={() => {
-          setStatus("");
-          setEditing("new");
-        }}
+        ref={logButtonRef}
+        onClick={() => beginEntry("new")}
       >
         + LOG MEASUREMENTS
       </button>
@@ -165,7 +217,7 @@ export function Measurements({
                 <button
                   type="button"
                   className={`${caps} min-h-11 px-3`}
-                  onClick={() => setEditing(latest)}
+                  onClick={() => beginEntry(latest)}
                 >
                   EDIT &gt;
                 </button>
@@ -295,7 +347,7 @@ export function Measurements({
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setEditing(s)}
+                  onClick={() => beginEntry(s)}
                   className="flex min-h-16 w-full items-center justify-between gap-3 border-b border-ink/15 py-3.5 text-left"
                 >
                   <div className="min-w-0">
@@ -360,29 +412,6 @@ export function Measurements({
           EXPORT MEASUREMENTS · CSV &gt;
         </a>
       )}
-      {editing && (
-        <MeasurementForm
-          key={typeof editing === "string" ? "new" : editing.id}
-          session={editing === "new" ? null : editing}
-          sessions={sessions}
-          initialUnit={unit}
-          onClose={() => setEditing(null)}
-          onSaved={(savedUnit, change) => {
-            const next = change.saved
-              ? [
-                  ...sessions.filter((s) => s.id !== change.saved!.id),
-                  change.saved,
-                ].sort((a, b) => b.measured_on.localeCompare(a.measured_on))
-              : sessions.filter((s) => s.id !== change.deletedId);
-            setConfirmed({ source, sessions: next });
-            setUnit(savedUnit);
-            setEditing(null);
-            setStatus(
-              change.deletedId ? "SESSION DELETED" : "MEASUREMENTS SAVED",
-            );
-          }}
-        />
-      )}
     </>
   );
 }
@@ -424,6 +453,17 @@ function MeasurementForm({
     JSON.stringify({ date, note, values, unit }),
   );
   const [error, setError] = useState("");
+  const [errorSite, setErrorSite] = useState<TapeSiteKey | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    headingRef.current?.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => {
+    if (error && !errorSite)
+      errorRef.current?.scrollIntoView({ block: "center" });
+  }, [error, errorSite]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [landmark, setLandmark] = useState<TapeSiteKey | null>(null);
   const [checked, setChecked] = useState<Partial<Record<TapeSiteKey, boolean>>>(
@@ -452,6 +492,7 @@ function MeasurementForm({
     }
     const entered = values[key]?.trim();
     if (!entered) {
+      setErrorSite(key);
       setError("Enter a measurement before checking this site.");
       document.getElementById(`${formId}-${key}`)?.focus();
       return;
@@ -461,6 +502,7 @@ function MeasurementForm({
       value_in: toInches(Number(entered), unit),
     });
     if (!reading.success) {
+      setErrorSite(key);
       setError(
         Number.isFinite(Number(entered))
           ? reading.error.issues[0].message
@@ -470,6 +512,7 @@ function MeasurementForm({
       return;
     }
     setError("");
+    setErrorSite(null);
     setChecked((current) => ({ ...current, [key]: true }));
   }
   function deleteSession() {
@@ -506,6 +549,7 @@ function MeasurementForm({
   }
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    setErrorSite(null);
     setError("");
     const readings = TAPE_SITES.flatMap((s) => {
       const value = values[s.key]?.trim();
@@ -567,10 +611,8 @@ function MeasurementForm({
   ];
   const checkedCount = Object.values(checked).filter(Boolean).length;
   return (
-    <FullScreenEntry
-      title={session ? "edit measurements" : "log measurements"}
-      onClose={close}
-      header={
+    <>
+      <header className="sticky top-0 z-20 -mx-4 bg-bg-base px-4 pb-3 pt-2 shadow-[0_8px_16px_-12px_rgba(23,20,15,0.55)]">
         <>
           <div className="flex min-h-[35px] items-center justify-between">
             <span className="logotype text-[13px] font-semibold">workout</span>
@@ -583,7 +625,13 @@ function MeasurementForm({
               ×
             </button>
           </div>
-          <h2 className="title-display mt-3 text-4xl">measurements</h2>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="title-display mt-3 text-4xl focus:outline-none"
+          >
+            measurements
+          </h1>
           <div className="mt-3 flex justify-between gap-2 border-t-[1.5px] border-ink pt-2.5 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
             <span aria-live="polite">
               {checkedCount} OF {TAPE_SITES.length} CHECKED
@@ -597,258 +645,275 @@ function MeasurementForm({
             />
           </div>
         </>
-      }
-      footer={
-        <div className="mx-auto w-full max-w-lg">
-          {error && (
+      </header>
+      <form
+        id={formId}
+        onSubmit={submit}
+        aria-label={session ? "edit measurements" : "log measurements"}
+        className="mt-4 min-w-0"
+      >
+        <div role="region" aria-label="Measurement fields" className="min-w-0">
+          <p className="text-xs leading-relaxed text-ink/70">
+            Check readings as you go. Complete saves every entered value; blank
+            sites are skipped.
+          </p>
+          <div className="mt-4 flex min-w-0 items-end justify-between gap-4">
+            <div className="w-40 min-w-0 max-w-full">
+              <Input
+                label="DATE"
+                compact
+                type="date"
+                required
+                min="1900-01-01"
+                max={localDayIso()}
+                value={date}
+                disabled={pending}
+                onChange={(e) => setDate(e.target.value)}
+                className="numeral w-full min-w-0 max-w-full appearance-none tracking-normal"
+              />
+            </div>
+            <UnitToggle unit={unit} onChange={changeUnit} disabled={pending} />
+          </div>
+          {sections.map((section, sectionIndex) => (
+            <section
+              key={section.title}
+              aria-label={section.title + " measurements"}
+              className="mt-5 min-w-0"
+            >
+              <div className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5">
+                <h3 className={caps}>
+                  {String(sectionIndex + 1).padStart(2, "0")} · {section.title}
+                </h3>
+                <span className={caps + " text-ink/55"}>
+                  {section.keys.length} SITES
+                </span>
+              </div>
+              <div
+                aria-hidden="true"
+                style={captureGrid}
+                className="mt-2.5 grid gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold uppercase tracking-[0.14em] text-ink/50"
+              >
+                <span>SITE</span>
+                <span className="text-center">{unit}</span>
+                <span className="text-center">DONE</span>
+              </div>
+              {section.keys.map((key) => {
+                const site = TAPE_SITES.find((s) => s.key === key)!;
+                const previous = siteHistory(
+                  sessions.filter(
+                    (s) => s.id !== session?.id && s.measured_on < date,
+                  ),
+                  key,
+                ).at(-1);
+                const fieldId = formId + "-" + key;
+                return (
+                  <div
+                    key={key}
+                    style={captureGrid}
+                    className="grid min-w-0 items-center gap-x-2.5 border-b border-ink/15 py-[5px]"
+                  >
+                    <div className="min-w-0">
+                      <button
+                        type="button"
+                        aria-expanded={landmark === key}
+                        aria-controls={fieldId + "-cue"}
+                        onClick={() =>
+                          setLandmark((current) =>
+                            current === key ? null : key,
+                          )
+                        }
+                        className="flex min-h-[35px] w-full items-center justify-between gap-1 text-left text-[13px] font-semibold"
+                      >
+                        <span>{site.label}</span>
+                        <span
+                          aria-hidden="true"
+                          className={
+                            "shrink-0 text-[10px] text-ink/50 " +
+                            (landmark === key ? "rotate-180" : "")
+                          }
+                        >
+                          ⌄
+                        </span>
+                      </button>
+                      {previous && (
+                        <p className="pb-1 text-[10px] leading-snug text-ink/55">
+                          Previous {tapeValue(previous.valueIn, unit)}{" "}
+                          {unit.toUpperCase()} ·{" "}
+                          {shortDateWithYear(previous.date)}
+                        </p>
+                      )}
+                    </div>
+                    <input
+                      id={fieldId}
+                      aria-label={site.label + " (" + unit + ")"}
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="next"
+                      autoComplete="off"
+                      placeholder="—"
+                      value={values[key] ?? ""}
+                      disabled={pending}
+                      onChange={(e) => {
+                        setValues((current) => ({
+                          ...current,
+                          [key]: e.target.value,
+                        }));
+                        setChecked((current) => ({ ...current, [key]: false }));
+                        setError("");
+                        setErrorSite(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" || e.nativeEvent.isComposing)
+                          return;
+                        e.preventDefault();
+                        const fields = Array.from(
+                          e.currentTarget.form?.querySelectorAll<
+                            HTMLInputElement | HTMLTextAreaElement
+                          >('input[inputmode="decimal"], textarea') ?? [],
+                        );
+                        const next =
+                          fields[fields.indexOf(e.currentTarget) + 1];
+                        next?.focus();
+                        next?.scrollIntoView({ block: "center" });
+                      }}
+                      className={
+                        loggingCellClass(checked[key] ? "logged" : "next") +
+                        " min-w-0 max-w-full"
+                      }
+                    />
+                    <LogCheckbox
+                      checkbox
+                      checked={Boolean(checked[key])}
+                      loading={false}
+                      disabled={pending}
+                      ariaLabel={site.label + " complete"}
+                      onClick={() => checkReading(key)}
+                    />
+                    {error && errorSite === key && (
+                      <p
+                        role="alert"
+                        className="col-span-3 py-2 text-xs leading-relaxed"
+                      >
+                        {error}
+                      </p>
+                    )}
+                    {landmark === key && (
+                      <p
+                        id={fieldId + "-cue"}
+                        className="col-span-3 pb-2 pt-1 text-xs leading-relaxed text-ink/70"
+                      >
+                        {site.guidance}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </section>
+          ))}
+          <p className="mt-4 text-xs leading-relaxed text-ink/70">
+            Measure relaxed, before training. Keep the tape snug without
+            compressing skin. Tap a site name for its landmark.
+          </p>
+          <div className="mt-5 min-w-0">
+            <label htmlFor={formId + "-note"} className={caps + " block"}>
+              SESSION NOTE · OPTIONAL
+            </label>
+            <textarea
+              id={formId + "-note"}
+              rows={2}
+              maxLength={500}
+              value={note}
+              disabled={pending}
+              onChange={(e) => setNote(e.target.value)}
+              className="mt-2 w-full min-w-0 max-w-full resize-y border border-ink/40 bg-paper p-3 text-base font-normal tracking-normal focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+            />
+          </div>
+          {session && (
+            <button
+              type="button"
+              disabled={pending}
+              className={caps + " mt-4 min-h-11 underline underline-offset-4"}
+              onClick={() => setDeleteOpen(true)}
+            >
+              DELETE SESSION
+            </button>
+          )}
+        </div>
+        <div role="group" aria-label="Measurement actions" className="mt-6">
+          {error && !errorSite && (
             <p
+              ref={errorRef}
               role="alert"
-              className="max-h-20 overflow-y-auto border-b border-ink/20 px-4 py-3 text-sm leading-relaxed"
+              className="mb-3 border border-ink/30 p-3 text-sm leading-relaxed"
             >
               {error}
             </p>
           )}
-          <div className="grid grid-cols-[1fr_2fr]">
+          <div className="grid grid-cols-[1fr_2fr] gap-2.5">
             <Button
               type="button"
               variant="ghost"
               disabled={pending}
-              className="min-h-14 w-full py-0"
+              className="min-h-[52px] w-full py-0 text-[13px]"
               onClick={close}
             >
               CANCEL
             </Button>
             <Button
               type="submit"
-              form={formId}
               variant="primary"
               disabled={pending}
-              className="min-h-14 w-full py-0"
+              className="min-h-[52px] w-full py-0 text-[13px]"
               aria-label="Complete measurements"
             >
               {pending ? "SAVING." : "COMPLETE"}
             </Button>
           </div>
         </div>
-      }
-      overlays={
-        <>
-          <LeaveConfirm
-            open={leaveHref !== undefined}
-            body="Your measurements haven't been saved."
-            onKeepEditing={() => setLeaveHref(undefined)}
-            onDiscard={() => {
-              const href = leaveHref;
-              setLeaveHref(undefined);
-              onClose();
-              if (href) router.push(href);
-            }}
-          />
-          <BottomSheet
-            open={deleteOpen}
-            onClose={() => {
-              if (!pending) setDeleteOpen(false);
-            }}
-            title="Delete measurements?"
-            subtitle={shortDateWithYear(date) + " · CANNOT BE UNDONE"}
-          >
-            <p className="text-[12.5px] leading-[1.5] text-ink/75">
-              Delete this session and its recorded readings?
-            </p>
-            <div className="mt-6 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setDeleteOpen(false)}
-                className="px-4 py-3 text-[13px] font-semibold text-ink/60"
-              >
-                Keep session
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={deleteSession}
-                className="border-[1.5px] border-accent px-8 py-3 text-[13px] font-bold tracking-[0.08em] text-accent disabled:opacity-40"
-              >
-                {pending ? "DELETING." : "DELETE"}
-              </button>
-            </div>
-          </BottomSheet>
-        </>
-      }
-    >
-      <form id={formId} onSubmit={submit} className="min-w-0">
-        <p className="text-xs leading-relaxed text-ink/70">
-          Check readings as you go. Complete saves every entered value; blank
-          sites are skipped.
-        </p>
-        <div className="mt-4 flex min-w-0 items-end justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <Input
-              label="DATE"
-              type="date"
-              required
-              min="1900-01-01"
-              max={localDayIso()}
-              value={date}
-              disabled={pending}
-              onChange={(e) => setDate(e.target.value)}
-              className="numeral w-full min-w-0 max-w-full appearance-none tracking-normal"
-            />
-          </div>
-          <UnitToggle unit={unit} onChange={changeUnit} disabled={pending} />
-        </div>
-        {sections.map((section, sectionIndex) => (
-          <section
-            key={section.title}
-            aria-label={section.title + " measurements"}
-            className="mt-5 min-w-0"
-          >
-            <div className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5">
-              <h3 className={caps}>
-                {String(sectionIndex + 1).padStart(2, "0")} · {section.title}
-              </h3>
-              <span className={caps + " text-ink/55"}>
-                {section.keys.length} SITES
-              </span>
-            </div>
-            <div
-              aria-hidden="true"
-              style={captureGrid}
-              className="mt-2.5 grid gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold uppercase tracking-[0.14em] text-ink/50"
-            >
-              <span>SITE</span>
-              <span className="text-center">{unit}</span>
-              <span className="text-center">DONE</span>
-            </div>
-            {section.keys.map((key) => {
-              const site = TAPE_SITES.find((s) => s.key === key)!;
-              const previous = siteHistory(
-                sessions.filter(
-                  (s) => s.id !== session?.id && s.measured_on < date,
-                ),
-                key,
-              ).at(-1);
-              const fieldId = formId + "-" + key;
-              return (
-                <div
-                  key={key}
-                  style={captureGrid}
-                  className="grid min-w-0 items-center gap-x-2.5 border-b border-ink/15 py-[5px]"
-                >
-                  <div className="min-w-0">
-                    <button
-                      type="button"
-                      aria-expanded={landmark === key}
-                      aria-controls={fieldId + "-cue"}
-                      onClick={() =>
-                        setLandmark((current) => (current === key ? null : key))
-                      }
-                      className="flex min-h-[35px] w-full items-center justify-between gap-1 text-left text-[13px] font-semibold"
-                    >
-                      <span>{site.label}</span>
-                      <span
-                        aria-hidden="true"
-                        className={
-                          "shrink-0 text-[10px] text-ink/50 " +
-                          (landmark === key ? "rotate-180" : "")
-                        }
-                      >
-                        ⌄
-                      </span>
-                    </button>
-                    {previous && (
-                      <p className="pb-1 text-[10px] leading-snug text-ink/55">
-                        Previous {tapeValue(previous.valueIn, unit)}{" "}
-                        {unit.toUpperCase()} ·{" "}
-                        {shortDateWithYear(previous.date)}
-                      </p>
-                    )}
-                  </div>
-                  <input
-                    id={fieldId}
-                    aria-label={site.label + " (" + unit + ")"}
-                    type="text"
-                    inputMode="decimal"
-                    enterKeyHint="next"
-                    autoComplete="off"
-                    placeholder="—"
-                    value={values[key] ?? ""}
-                    disabled={pending}
-                    onChange={(e) => {
-                      setValues((current) => ({
-                        ...current,
-                        [key]: e.target.value,
-                      }));
-                      setChecked((current) => ({ ...current, [key]: false }));
-                      setError("");
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter" || e.nativeEvent.isComposing)
-                        return;
-                      e.preventDefault();
-                      const fields = Array.from(
-                        e.currentTarget.form?.querySelectorAll<
-                          HTMLInputElement | HTMLTextAreaElement
-                        >('input[inputmode="decimal"], textarea') ?? [],
-                      );
-                      fields[fields.indexOf(e.currentTarget) + 1]?.focus();
-                    }}
-                    className={
-                      loggingCellClass(checked[key] ? "logged" : "next") +
-                      " min-w-0 max-w-full"
-                    }
-                  />
-                  <LogCheckbox
-                    checkbox
-                    checked={Boolean(checked[key])}
-                    loading={false}
-                    disabled={pending}
-                    ariaLabel={site.label + " complete"}
-                    onClick={() => checkReading(key)}
-                  />
-                  {landmark === key && (
-                    <p
-                      id={fieldId + "-cue"}
-                      className="col-span-3 pb-2 pt-1 text-xs leading-relaxed text-ink/70"
-                    >
-                      {site.guidance}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-        ))}
-        <p className="mt-4 text-xs leading-relaxed text-ink/70">
-          Measure relaxed, before training. Keep the tape snug without
-          compressing skin. Tap a site name for its landmark.
-        </p>
-        <div className="mt-5 min-w-0">
-          <label htmlFor={formId + "-note"} className={caps + " block"}>
-            SESSION NOTE · OPTIONAL
-          </label>
-          <textarea
-            id={formId + "-note"}
-            rows={2}
-            maxLength={500}
-            value={note}
-            disabled={pending}
-            onChange={(e) => setNote(e.target.value)}
-            className="mt-2 w-full min-w-0 max-w-full resize-y border border-ink/40 bg-paper p-3 text-base font-normal tracking-normal focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
-          />
-        </div>
-        {session && (
-          <button
-            type="button"
-            disabled={pending}
-            className={caps + " mt-4 min-h-11 underline underline-offset-4"}
-            onClick={() => setDeleteOpen(true)}
-          >
-            DELETE SESSION
-          </button>
-        )}
       </form>
-    </FullScreenEntry>
+      <>
+        <LeaveConfirm
+          open={leaveHref !== undefined}
+          body="Your measurements haven't been saved."
+          onKeepEditing={() => setLeaveHref(undefined)}
+          onDiscard={() => {
+            const href = leaveHref;
+            setLeaveHref(undefined);
+            onClose();
+            if (href) router.push(href);
+          }}
+        />
+        <BottomSheet
+          open={deleteOpen}
+          onClose={() => {
+            if (!pending) setDeleteOpen(false);
+          }}
+          title="Delete measurements?"
+          subtitle={shortDateWithYear(date) + " · CANNOT BE UNDONE"}
+        >
+          <p className="text-[12.5px] leading-[1.5] text-ink/75">
+            Delete this session and its recorded readings?
+          </p>
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setDeleteOpen(false)}
+              className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+            >
+              Keep session
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={deleteSession}
+              className="border-[1.5px] border-accent px-8 py-3 text-[13px] font-bold tracking-[0.08em] text-accent disabled:opacity-40"
+            >
+              {pending ? "DELETING." : "DELETE"}
+            </button>
+          </div>
+        </BottomSheet>
+      </>
+    </>
   );
 }

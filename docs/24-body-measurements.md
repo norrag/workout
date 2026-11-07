@@ -21,9 +21,9 @@ note, IN/CM display and entry. All 12 sites are visible in upper/lower groups.
 Every site is optional; any nonempty subset can be saved. Prior readings are
 dated hints, never prefilled as new observations.
 
-The owner rejected the prior mobile pass. Figures **4.13c–d** in
-design/mockups/body-measurements-workout.html supersede 4.13a–b before code.
-The full-screen logger shares actual DayView cell classes and LogCheckbox:
+The latest owner clarification supersedes the fixed-bar behavior in 4.13a-d.
+Figure **4.13e**, design/mockups/body-measurements-page-flow.html, precedes code.
+The page shares actual DayView cell classes and LogCheckbox:
 35px cells, 15px values, 23px squares and 10px gaps. Widths match workout
 weight/reps cells at every viewport. Landmark chevrons reveal cues only;
 no sites are hidden. Date, units and notes use existing shared controls.
@@ -34,13 +34,18 @@ are skipped. There is no all-sites/all-checked gate, per-row write or queue.
 Errors retain input. Dirty Cancel asks before discarding. Delete session
 uses the themed BottomSheet, Keep session and destructive-outline DELETE.
 
-FullScreenEntry renders in a body portal. Its action bar is position:fixed
-at the visible viewport bottom, flush to the sides, with safe-area padding
-only. It reserves its measured height, including validation messages, outside
-the scrolling fields. Viewport resize/scroll tracks keyboard geometry; Next
-follows all fields. Inner content retains the 512px app cap. Existing sheet
-layout is restored; N47 body-position and root zoom policy are unchanged.
-See [actual-component comparison](reviews/2026-11-07-body-measurements-layout.md).
+The logger replaces the ledger inside the existing app shell. The document
+scrolls, with no form scroller, portal, fixed action bar or body lock. Complete
+and Cancel are the last content in the form: below the fold at top/middle,
+visible at the end above the existing tab bar. Their placement matches the
+actual DayView's inline COMPLETE WORKOUT action, while partial save stays
+independent of checkmarks. The header follows DayHeader's sticky grammar.
+Date is 160 x 35px; units are 88 x 35px. Shared controls expose an opt-in compact
+size; their existing default dimensions are unchanged. Next follows every
+field and scrolls the next input into view. The app's 512px cap, bottom padding,
+N47 body-position and root zoom policy remain intact. Errors appear beside
+the affected checkbox row or at the form end; saved input survives failures.
+See [page-flow evidence](reviews/2026-11-07-body-measurements-page-flow.md).
 
 The save response carries the committed canonical session. The ledger keeps that
 confirmed result visible through a late render carrying the prior snapshot;
@@ -111,7 +116,7 @@ It reproduces the shared fast-redirect/pending-UI failure on unchanged main;
 the measurement flow passes, while N84 remains a repository release blocker.
 
 
-### Current owner-correction checkpoint — 2026-11-07
+### Historical fixed-bar checkpoint - superseded by 4.13e
 
 READY review preview: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
 pinned to ebffc809c6bf3d05be682feea6142b1db1fc436b, public 1.3.0 build override.

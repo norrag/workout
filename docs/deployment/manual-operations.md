@@ -941,3 +941,15 @@ CI 42386443416 passes feature/RLS/integration/drift checks; full smoke is red
 under N84. [Evidence](../reviews/2026-11-07-body-measurements-layout.md).
 Protected fetch reaches app sign-in (200). Chrome sign-in handoff and physical
 iOS checks remain; hosted save/delete is unverified. No merge/promotion.
+
+
+### N96 - document-flow clarification, 2026-11-07
+
+The prior ebffc80 fixed-bar preview is superseded for action placement. Use
+figure 4.13e and [the page-flow evidence](../reviews/2026-11-07-body-measurements-page-flow.md).
+Deploy the feature branch's new UI commit to Preview with deployment-specific
+`NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`. Keep package/registry at
+1.2.1 and preserve the staged connector entry. Record the fresh immutable URL,
+SHA, actual build override and terminal CI after pushing. No new migration or
+production health-data write; the shared production schema status is unchanged.
+Hosted app sign-in and physical-iOS limitations still apply. No merge/promotion.

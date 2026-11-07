@@ -24,6 +24,24 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-07 - N96 clarification: complete at the page end
+
+Figure 4.13e precedes the correction. The owner's explicit clarification
+replaces the fixed-bar interpretation: Complete/Cancel are normal document
+content after all fields, absent at top/middle and visible at the page end.
+Removed FullScreenEntry and its viewport/body-lock scaffolding. The app shell,
+window scrolling, sticky header and BottomNav now match actual DayView behavior.
+Date is 160 x 35px; units are 88 x 35px through opt-in shared compact sizing.
+Partial save, local checklist, all-site groups and themed confirmations remain.
+
+Actual-component local checks pass at 320/360/390/430px, dark theme, short
+viewport and 512px cap, with no page errors. Real DayView rendered with every
+set logged provides the inline completion comparison. Temporary root fixture
+restored and dev server stopped. Hosted signed-in save/delete and physical iOS
+remain unverified; no new schema/data/engine/production changes.
+See [evidence](reviews/2026-11-07-body-measurements-page-flow.md). N96 remains
+in progress on draft #265; final preview/CI checkpoint follows.
+
 ## 2026-11-07 - N96 correction after rejected mobile review
 
 Figures 4.13c–d precede code. The previous pass was not accepted. The new

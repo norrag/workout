@@ -33,6 +33,28 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-11-07 - N96 clarification: actions at document end
+
+- **Change (RETROFIT):** figure 4.13e in
+  design/mockups/body-measurements-page-flow.html supersedes the fixed-bar
+  behavior of 4.13a-d. The owner likes the revised rows and explicitly wants
+  Complete/Cancel visible only at the page end.
+- **Ground truth:** actual DayView renders COMPLETE WORKOUT inline after
+  exercises when its own completion gate is satisfied. Re-rendered the actual
+  component with all sets logged to compare top, middle and bottom positions.
+- **Layout:** replace the ledger with a normal form in AppShell. Window/document
+  scrolling only; actions are its last content, with no fixed/sticky ancestor.
+  Preserve existing BottomNav and sticky DayHeader grammar. Remove the dedicated
+  FullScreenEntry portal/viewport tracker. Date is 160 x 35px, units 88 x 35px;
+  shared compact sizing is opt-in.
+- **Interaction:** any nonempty subset still saves, checked or not. All sites,
+  checklist behavior, themed deletion and discard protection remain. Next
+  scrolls to the next field; validation appears in context and retains input.
+- **Evidence:** reviews/2026-11-07-body-measurements-page-flow.md. Local actual
+  component checks cover 320/360/390/430px, 512px cap, dark theme, short viewport
+  and top/middle/end geometry. Hosted signed-in and physical iOS remain unverified.
+  No schema, engine or release identity change.
+
 ## 2026-11-07 - N96 owner correction: use the workout logger
 
 - **Change (RETROFIT):** 4.13c–d in design/mockups/body-measurements-workout.html

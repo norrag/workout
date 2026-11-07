@@ -299,7 +299,7 @@ export const UG_BODY_DATA: ManualChapter = {
               },
               {
                 kind: "para",
-                text: "Check readings as you go; editing clears a checkmark. Marks track progress locally. Complete and Cancel are fixed at the screen’s bottom while fields scroll. Next advances through fields. Cancel asks before discarding. Delete session opens a themed confirmation; Keep session cancels it.",
+                text: "Check readings as you go; editing clears a checkmark. Marks track progress locally. Complete and Cancel appear after the last field, when you scroll to the bottom. Next advances through fields. Cancel asks before discarding. Delete session opens a themed confirmation; Keep session cancels it.",
               },
               {
                 kind: "para",

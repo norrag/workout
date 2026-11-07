@@ -15,6 +15,25 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-07 - Session 137: N96 action placement clarified
+
+Batch 44 preserves the owner's exact feedback. The revised rows are generally
+liked, but the requested bottom means the end of the page: no fixed, sticky
+or floating actions. Figure 4.13e precedes code; actual DayView with every set
+logged confirms its inline completion placement. Logger now replaces the
+ledger in AppShell with document scrolling. Complete/Cancel follow all fields;
+partial sessions and unchecked values still save. Date/units are 35px high
+(160px/88px wide). The standalone full-screen portal was removed.
+
+Local actual-component top/middle/end, narrow width, compact controls, checklist,
+conversion, Next, dirty Cancel, themed keep/delete and empty validation checks
+pass without page errors. Temporary root fixture restored; no production
+readings or new database change. Guide, claims, design/staging records and
+regression coverage updated. N96 stays in-progress on draft #265. Fresh immutable
+preview and terminal CI evidence follow in
+[the page-flow review](../reviews/2026-11-07-body-measurements-page-flow.md).
+Hosted signed-in actions and physical iOS remain unverified; N84 stays open.
+
 ## 2026-11-07 - Session 136: N96 owner correction, workout-style capture
 
 The owner rejected the prior mobile pass; verbatim feedback is in Batch 43.

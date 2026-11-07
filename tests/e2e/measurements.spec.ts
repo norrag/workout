@@ -148,7 +148,7 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
   await page.getByRole("button", { name: "Keep session", exact: true }).click();
   await expect(deleteDialog).not.toBeVisible();
   await expect(
-    page.getByRole("dialog", { name: "edit measurements", exact: true }),
+    page.getByRole("form", { name: "edit measurements", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "DELETE SESSION", exact: true })
@@ -193,7 +193,7 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow.dialog).toBeLessThanOrEqual(1);
 }
 
-test("mobile measurement entry pins actions and contains scrolling and keyboard focus", async ({
+test("mobile measurements use document flow with actions only at the end", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -203,7 +203,7 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   const local = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const layoutEmail = `tape-layout-${Date.now()}@e2e.test`;
+  const layoutEmail = "tape-layout-" + Date.now() + "@e2e.test";
   const { data, error } = await local.auth.signUp({
     email: layoutEmail,
     password,
@@ -231,206 +231,182 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   await page
     .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
     .click();
-  const dialog = page.getByRole("dialog", {
+  const entry = page.getByRole("form", {
     name: "log measurements",
     exact: true,
   });
-  const scroll = page.getByRole("region", { name: "Measurement fields" });
-  const complete = page.getByRole("button", {
-    name: "Complete measurements",
+  const fields = page.getByRole("region", {
+    name: "Measurement fields",
     exact: true,
   });
-  const cancel = dialog.getByRole("button", { name: "CANCEL", exact: true });
-  await expect(dialog).toBeVisible();
-  await expect.poll(async () => (await dialog.boundingBox())!.y).toBe(0);
-  expect(
-    await dialog.evaluate((el) => el.parentElement === document.body),
-  ).toBe(true);
-  const actions = page.getByRole("group", {
+  const actions = entry.getByRole("group", {
     name: "Measurement actions",
     exact: true,
   });
-  await expect(actions).toHaveCSS("position", "fixed");
-  await expect(dialog.getByRole("checkbox")).toHaveCount(12);
-  const renderedFields = await dialog
-    .locator('input[inputmode="decimal"]')
-    .evaluateAll((fields) =>
-      fields.every(
-        (field) =>
-          field.getClientRects().length > 0 && !field.closest("details"),
+  const complete = entry.getByRole("button", {
+    name: "Complete measurements",
+    exact: true,
+  });
+  const cancel = entry.getByRole("button", { name: "CANCEL", exact: true });
+  await expect(entry).toBeVisible();
+  await expect(fields).toHaveCSS("overflow-y", "visible");
+  await expect(actions).toHaveCSS("position", "static");
+  const anchoredAncestors = await actions.evaluate((el) => {
+    const anchored: string[] = [];
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (["fixed", "sticky"].includes(getComputedStyle(node).position))
+        anchored.push(node.tagName);
+    }
+    return anchored;
+  });
+  expect(anchoredAncestors).toEqual([]);
+  await expect(entry.getByRole("checkbox")).toHaveCount(12);
+  expect(
+    await entry
+      .locator('input[inputmode="decimal"]')
+      .evaluateAll((inputs) =>
+        inputs.every(
+          (input) =>
+            input.getClientRects().length > 0 && !input.closest("details"),
+        ),
       ),
-    );
-  expect(renderedFields).toBe(true);
-
+  ).toBe(true);
   for (const width of [320, 360, 390, 430]) {
     await page.setViewportSize({ width, height: 740 });
-    await expect
-      .poll(async () => (await dialog.boundingBox())!.height)
-      .toBe(740);
-    await expect(complete).toBeInViewport({ ratio: 1 });
-    await scroll.evaluate((el) => {
-      el.scrollTop = 0;
-    });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(complete).not.toBeInViewport();
+    await expect(cancel).not.toBeInViewport();
     await expectNoHorizontalOverflow(page);
-    await testInfo.attach(`measurement-${width}px-top`, {
+    const position = await actions.evaluate(
+      (el) => el.getBoundingClientRect().top + window.scrollY,
+    );
+    await testInfo.attach("measurement-" + width + "px-top", {
       body: await page.screenshot(),
       contentType: "image/png",
     });
-    const before = (await complete.boundingBox())!;
-    await scroll.evaluate((el) => {
-      el.scrollTop = el.scrollHeight;
+    const middle = Math.max(1, Math.floor((position - 740) / 2));
+    await page.evaluate((top) => window.scrollTo(0, top), middle);
+    await expect(complete).not.toBeInViewport();
+    await expect(cancel).not.toBeInViewport();
+    await testInfo.attach("measurement-" + width + "px-middle", {
+      body: await page.screenshot(),
+      contentType: "image/png",
     });
-    await expect
-      .poll(async () => (await complete.boundingBox())!.y)
-      .toBeCloseTo(before.y, 0);
-    const cancelBox = (await cancel.boundingBox())!;
-    expect(cancelBox.y + cancelBox.height).toBeCloseTo(740, 0);
-    const completeBox = (await complete.boundingBox())!;
-    expect(completeBox.y + completeBox.height).toBeCloseTo(740, 0);
-    const actionsBox = (await actions.boundingBox())!;
-    expect(actionsBox.x).toBe(0);
-    expect(actionsBox.width).toBe(width);
+    await page.evaluate(() =>
+      window.scrollTo(0, document.documentElement.scrollHeight),
+    );
     await expect(complete).toBeInViewport({ ratio: 1 });
     await expect(cancel).toBeInViewport({ ratio: 1 });
-    await testInfo.attach(`measurement-${width}px`, {
+    expect(
+      await actions.evaluate(
+        (el) => el.getBoundingClientRect().top + window.scrollY,
+      ),
+    ).toBeCloseTo(position, 0);
+    const completeBox = (await complete.boundingBox())!;
+    const navBox = (await page.getByRole("navigation").boundingBox())!;
+    expect(completeBox.y + completeBox.height).toBeLessThanOrEqual(navBox.y);
+    await expectNoHorizontalOverflow(page);
+    await testInfo.attach("measurement-" + width + "px-bottom", {
       body: await page.screenshot(),
       contentType: "image/png",
     });
+    const date = (await entry
+      .getByLabel("DATE", { exact: true })
+      .boundingBox())!;
+    expect(date.height).toBe(35);
+    expect(date.width).toBe(160);
+    const units = (await entry
+      .getByRole("group", { name: "Measurement units", exact: true })
+      .locator(":scope > div")
+      .boundingBox())!;
+    expect(units.height).toBe(35);
+    expect(units.width).toBe(88);
   }
-
   await page.setViewportSize({ width: 768, height: 740 });
-  await expect
-    .poll(
-      async () => (await scroll.locator(":scope > div").boundingBox())!.width,
-    )
-    .toBe(512);
-
-  await scroll.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  const mobileChestCheck = page.getByRole("checkbox", {
+  expect((await page.getByRole("main").boundingBox())!.width).toBe(512);
+  expect((await entry.boundingBox())!.width).toBe(480);
+  const chest = entry.getByLabel("Chest (in)", { exact: true });
+  const check = entry.getByRole("checkbox", {
     name: "Chest complete",
     exact: true,
   });
-  await mobileChestCheck.click();
-  await expect(mobileChestCheck).not.toBeChecked();
-  await expect(dialog.getByRole("alert")).toHaveText(
+  await check.click();
+  await expect(check).not.toBeChecked();
+  await expect(entry.getByRole("alert")).toHaveText(
     "Enter a measurement before checking this site.",
   );
-  await expect(page.getByLabel("Chest (in)", { exact: true })).toBeFocused();
-  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
-  await mobileChestCheck.click();
-  await expect(mobileChestCheck).toBeChecked();
-  await page.getByLabel("Chest (in)", { exact: true }).fill("40.75");
-  await expect(mobileChestCheck).not.toBeChecked();
-  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
-  await page.getByRole("button", { name: "CM", exact: true }).click();
-  await expect(page.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
+  await expect(chest).toBeFocused();
+  await expect(complete).not.toBeInViewport();
+  await chest.fill("40.5");
+  await check.click();
+  await expect(check).toBeChecked();
+  await chest.fill("40.75");
+  await expect(check).not.toBeChecked();
+  await chest.fill("40.5");
+  await entry.getByRole("button", { name: "CM", exact: true }).click();
+  await expect(entry.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
     "102.87",
   );
-  await page.getByRole("button", { name: "IN", exact: true }).click();
-  await page.getByLabel("Upper arm · left (in)", { exact: true }).fill("14.5");
-  await page
+  await entry.getByRole("button", { name: "IN", exact: true }).click();
+  await entry.getByLabel("Upper arm · left (in)", { exact: true }).fill("14.5");
+  await entry
     .getByLabel("Upper arm · left (in)", { exact: true })
     .press("Enter");
   await expect(
-    page.getByLabel("Upper arm · right (in)", { exact: true }),
+    entry.getByLabel("Upper arm · right (in)", { exact: true }),
   ).toBeFocused();
-  await page.getByLabel("Calf · right (in)", { exact: true }).press("Enter");
-  const note = page.getByLabel("SESSION NOTE · OPTIONAL", { exact: true });
+  await entry.getByLabel("Calf · right (in)", { exact: true }).press("Enter");
+  const note = entry.getByLabel("SESSION NOTE · OPTIONAL", { exact: true });
   await expect(note).toBeFocused();
-  await expect(dialog).toBeVisible();
-  await page.getByLabel("Forearm · right (in)", { exact: true }).fill("11.5");
+  await entry.getByLabel("Forearm · right (in)", { exact: true }).fill("11.5");
   await note.fill("A".repeat(500));
-  await expectNoHorizontalOverflow(page);
-  const smallFonts = await dialog
-    .locator('input:not([inputmode="decimal"]), textarea, select')
-    .evaluateAll((fields) =>
-      fields
-        .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16)
-        .map((el) => el.getAttribute("aria-label") ?? el.tagName),
-    );
-  expect(smallFonts).toEqual([]);
-  const cells = await dialog
+  const cells = await entry
     .locator('input[inputmode="decimal"]')
-    .evaluateAll((fields) =>
-      fields.map((field) => ({
-        height: field.getBoundingClientRect().height,
-        font: getComputedStyle(field).fontSize,
+    .evaluateAll((inputs) =>
+      inputs.map((input) => ({
+        height: input.getBoundingClientRect().height,
+        font: getComputedStyle(input).fontSize,
       })),
     );
   expect(cells).toEqual(
     Array.from({ length: 12 }, () => ({ height: 35, font: "15px" })),
   );
-  const boxSize = await mobileChestCheck.locator("span").boundingBox();
-  expect(boxSize!.width).toBe(23);
-  expect(boxSize!.height).toBe(23);
-
-  // Desktop emulation cannot open an iOS keyboard. Exercise its distinct
-  // visual-viewport resize/offset contract without changing the layout viewport.
-  await page.setViewportSize({ width: 320, height: 740 });
-  await note.focus();
-  await page.evaluate(() => {
-    const visible = window.visualViewport!;
-    Object.defineProperty(visible, "height", {
-      configurable: true,
-      value: 360,
-    });
-    Object.defineProperty(visible, "offsetTop", {
-      configurable: true,
-      value: 24,
-    });
-    visible.dispatchEvent(new Event("resize"));
-  });
-  await expect
-    .poll(async () => {
-      const box = (await cancel.boundingBox())!;
-      return box.y + box.height;
-    })
-    .toBeLessThanOrEqual(384);
-  await expect
-    .poll(async () => {
-      const field = (await note.boundingBox())!;
-      const region = (await scroll.boundingBox())!;
-      return field.y + field.height - (region.y + region.height);
-    })
-    .toBeLessThanOrEqual(1);
+  const square = (await check.locator("span").boundingBox())!;
+  expect(square.width).toBe(23);
+  expect(square.height).toBe(23);
+  await page.setViewportSize({ width: 320, height: 400 });
+  await chest.focus();
+  await expect(complete).not.toBeInViewport();
   await expectNoHorizontalOverflow(page);
-  await testInfo.attach("measurement-simulated-keyboard", {
-    body: await page.screenshot({
-      clip: { x: 0, y: 24, width: 320, height: 360 },
-    }),
-    contentType: "image/png",
-  });
-  await page.evaluate(() => {
-    const visible = window.visualViewport!;
-    Reflect.deleteProperty(visible, "height");
-    Reflect.deleteProperty(visible, "offsetTop");
-    visible.dispatchEvent(new Event("resize"));
-  });
   await cancel.click();
   await expect(
-    page.getByRole("dialog", { name: "Discard changes?" }),
+    page.getByRole("dialog", { name: "Discard changes?", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
-  await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue(
-    "40.5",
-  );
+  await expect(chest).toHaveValue("40.5");
   await expect(
-    page.getByLabel("Forearm · right (in)", { exact: true }),
+    entry.getByLabel("Forearm · right (in)", { exact: true }),
   ).toHaveValue("11.5");
+  await expect(complete).toBeEnabled();
   await complete.click();
-  await expect(dialog).toHaveCount(0);
+  await expect(entry).toHaveCount(0);
   await expect(
     page.getByText("MEASUREMENTS SAVED", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("A".repeat(500), { exact: true })).toBeVisible();
+  const saved = await local
+    .from("measurements")
+    .select("site_key")
+    .eq("user_id", data.user!.id);
+  expect(saved.error).toBeNull();
+  expect(saved.data).toHaveLength(3);
   await expectNoHorizontalOverflow(page);
   await page
     .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
     .click();
   await complete.click();
-  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(entry.getByRole("alert")).toHaveText(
+    "Enter at least one measurement.",
+  );
   await expect(complete).toBeInViewport({ ratio: 1 });
-  await expect(cancel).toBeInViewport({ ratio: 1 });
 });

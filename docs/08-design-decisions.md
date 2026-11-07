@@ -163,3 +163,11 @@ Owner correction (2026-11-07) **rejects and supersedes** 4.13a–b.
 cell dimensions, LogCheckbox, all-site groups and a viewport-fixed edge bar.
 Actual runtime comparison: design/reviews/body-measurements-workout-comparison.html.
 Fictional body-measurements-workout-*.png captures are in design/screenshots/.
+
+Latest owner clarification adds **4.13e**,
+`docs/design/mockups/body-measurements-page-flow.html`, before implementation.
+It supersedes 4.13a-d's action anchoring: Complete/Cancel are normal document
+content after the final field, appearing at the page end like DayView's inline
+completion action. Date/units shrink to 35px. All sites remain optional.
+Runtime top/middle/end and actual-workout evidence is in
+[the page-flow review](reviews/2026-11-07-body-measurements-page-flow.md).

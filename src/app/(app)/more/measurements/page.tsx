@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { releaseActive } from "@/lib/version";
@@ -18,19 +17,6 @@ export default async function MeasurementsPage() {
   const sessions = await getTapeSessions(client, user.id);
   return (
     <div className="min-w-0 max-w-full">
-      <Link
-        href="/more"
-        className="inline-flex min-h-11 items-center text-[10px] font-semibold tracking-[0.12em] text-ink/65"
-      >
-        &lt; MORE
-      </Link>
-      <div className="logotype mt-1 text-[13px] font-semibold">workout</div>
-      <div className="mt-4 border-b-[1.5px] border-ink pb-3">
-        <h1 className="title-display text-4xl">measurements</h1>
-      </div>
-      <p className="mt-4 text-sm leading-relaxed text-ink/70">
-        A monthly tape record, between your workouts and scans.
-      </p>
       <Measurements sessions={sessions} />
     </div>
   );

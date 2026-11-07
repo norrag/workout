@@ -10,15 +10,20 @@ export function SegmentedControl<T extends string>({
   onChange,
   className = "",
   disabled = false,
+  compact = false,
 }: {
   options: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
   className?: string;
   disabled?: boolean;
+  /** Match the 35px logging cells without changing existing controls. */
+  compact?: boolean;
 }) {
   return (
-    <div className={`flex border-[1.5px] border-ink ${className}`}>
+    <div
+      className={`flex border-[1.5px] border-ink ${compact ? "h-[35px]" : ""} ${className}`}
+    >
       {options.map((opt, i) => {
         const active = opt.value === value;
         return (
@@ -28,7 +33,7 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             aria-pressed={active}
             onClick={() => onChange(opt.value)}
-            className={`label-caps min-h-11 flex-1 px-3 text-[10px] transition-colors duration-150 ${
+            className={`label-caps ${compact ? "h-full min-h-0 px-2" : "min-h-11 px-3"} flex-1 text-[10px] transition-colors duration-150 ${
               active
                 ? "bg-ink font-bold text-bg-base"
                 : "font-medium text-ink/55"
