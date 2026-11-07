@@ -24,6 +24,25 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-07 - N96 correction after rejected mobile review
+
+Figures 4.13c–d precede code. The previous pass was not accepted. The new
+body-portal full-screen entry uses a viewport-fixed bottom bar with only
+safe-area padding. Actual DayView and tape cells match width/height/computed
+appearance at 320/360/390/430px. Shared 23px LogCheckbox; all 12 sites visible
+in upper/lower groups. Checks are local and clear on edit; all entered values
+save independently of checks. Delete uses themed confirmation. Experimental
+BottomSheet footer mode removed; original sheet layout restored. The shared
+style extraction preserves workout literals/behavior.
+
+Local fictional checks pass overflow, fixed actions, conversion, checks,
+Next, discard retention, themed-delete cancellation, 512px content cap and
+simulated keyboard geometry. Actual save/delete persistence belongs to local
+Supabase CI. See [layout evidence](reviews/2026-11-07-body-measurements-layout.md).
+Temporary root fixture restored before commit. Hosted signed-in actions and
+physical-iOS behavior remain unverified. No schema, engine, production release
+identity, merge or promotion. Fresh preview and final CI checkpoint follow.
+
 ## 2026-11-06 — N96: monthly body measurements, staged for 1.3.0
 
 Owner preview refinement: figures 4.13a–b precede the mobile update. The form

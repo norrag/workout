@@ -11,7 +11,7 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
   {
     id: "monthly-body-measurements",
     title: "Keep a monthly record of body measurements",
-    body: "Log chest, waist, arms and legs in More. Compare the same sites across dates, review their history, and keep the measurements beside your training and DEXA records.",
+    body: "Log any subset of body measurements in More with the compact rows and checkboxes used for workout logging. Compare the same sites across dates beside your training and DEXA records.",
     area: "stats",
     highlight: true,
     link: {

@@ -916,3 +916,14 @@ across the two anchor-equivalence reads so elapsed milliseconds do not fail
 the assertion. The measurement browser trace also exposed a confirmed write
 being hidden by a stale render; the save response now carries the canonical
 record and the ledger holds that acknowledged snapshot until fresh data arrives.
+
+### N96 - owner correction, 2026-11-07
+
+The 91c4070 preview was rejected for fidelity; it is an earlier checkpoint.
+The correction uses actual workout cells/checks, all-site groups, a viewport-
+fixed edge bar and themed deletion. Deploy only the feature branch with the
+deployment-specific public 1.3.0 override. Keep production/package/registry
+at 1.2.1. No new migration or hosted data changes. Chrome is at GitHub/Vercel
+sign-in; READY/HTTP sign-in are not signed-in UI verification. Physical iOS
+remains unverified. Record the fresh immutable preview and final CI checkpoint
+after the implementation commit. No merge or promotion.

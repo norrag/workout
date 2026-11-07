@@ -157,3 +157,9 @@ separate form scrolling, compact centered numeric cells, and keyboard-visible
 actions. Runtime evidence: `body-measurements-mobile-form.png`,
 `body-measurements-mobile-dark.png`, and
 `body-measurements-mobile-keyboard-simulated.png` in `design/screenshots/`.
+
+Owner correction (2026-11-07) **rejects and supersedes** 4.13a–b.
+**4.13c–d**, design/mockups/body-measurements-workout.html, use actual workout
+cell dimensions, LogCheckbox, all-site groups and a viewport-fixed edge bar.
+Actual runtime comparison: design/reviews/body-measurements-workout-comparison.html.
+Fictional body-measurements-workout-*.png captures are in design/screenshots/.

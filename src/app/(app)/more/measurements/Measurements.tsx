@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { FullScreenEntry } from "@/components/ui/FullScreenEntry";
+import { LogCheckbox } from "@/components/ui/LogCheckbox";
+import { loggingCellClass } from "@/components/ui/logging-styles";
 import { LeaveConfirm } from "@/components/ui/LeaveConfirm";
 import { useNavigationGuard } from "@/components/ui/useNavigationGuard";
 import { GuideLink } from "@/components/ui/GuideLink";
@@ -21,6 +24,7 @@ import {
   siteHistory,
   tapeDelta,
   tapeSessionSchema,
+  tapeReadingSchema,
   tapeValue,
   toInches,
   type TapeSession,
@@ -33,6 +37,11 @@ const caps = "label-caps text-[10px] font-bold";
 const muted = "text-ink/70";
 const action =
   "min-h-11 border-[1.5px] border-ink px-4 py-3 text-xs font-bold tracking-[0.12em]";
+// DayView: (content width - 20px menu - two 44px columns - four 10px gaps) / 2.
+// Give a tape value the exact same width as a workout weight/reps cell.
+const captureGrid = {
+  gridTemplateColumns: "minmax(0, 1fr) calc((100% - 148px) / 2) 44px",
+};
 
 function UnitToggle({
   unit,
@@ -415,6 +424,14 @@ function MeasurementForm({
     JSON.stringify({ date, note, values, unit }),
   );
   const [error, setError] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [landmark, setLandmark] = useState<TapeSiteKey | null>(null);
+  const [checked, setChecked] = useState<Partial<Record<TapeSiteKey, boolean>>>(
+    () =>
+      Object.fromEntries(
+        (session?.readings ?? []).map((r) => [r.site_key, true]),
+      ),
+  );
   const [leaveHref, setLeaveHref] = useState<string | null | undefined>(
     undefined,
   );
@@ -427,6 +444,41 @@ function MeasurementForm({
     if (pending) return;
     if (dirty) setLeaveHref(null);
     else onClose();
+  }
+  function checkReading(key: TapeSiteKey) {
+    if (checked[key]) {
+      setChecked((current) => ({ ...current, [key]: false }));
+      return;
+    }
+    const reading = tapeReadingSchema.safeParse({
+      site_key: key,
+      value_in: toInches(Number(values[key]), unit),
+    });
+    if (!values[key]?.trim() || !reading.success) {
+      setError(
+        reading.success
+          ? "Enter a reading before checking it."
+          : reading.error.issues[0].message,
+      );
+      document.getElementById(`${formId}-${key}`)?.focus();
+      return;
+    }
+    setError("");
+    setChecked((current) => ({ ...current, [key]: true }));
+  }
+  function deleteSession() {
+    startTransition(async () => {
+      try {
+        const result = await removeMeasurements(id);
+        if (result.error) {
+          setDeleteOpen(false);
+          setError(result.error);
+        } else onSaved(unit, { deletedId: id });
+      } catch {
+        setDeleteOpen(false);
+        setError("Couldn't delete. Your session is still here. Try again.");
+      }
+    });
   }
   function changeUnit(next: TapeUnit) {
     if (next === unit) return;
@@ -489,235 +541,308 @@ function MeasurementForm({
       }
     });
   }
-  const groups = [...new Set(TAPE_SITES.map((s) => s.group))];
-  function groupFields(optional: boolean) {
-    return groups
-      .filter(
-        (g) => TAPE_SITES.find((s) => s.group === g)?.optional === optional,
-      )
-      .map((group) => {
-        const sites = TAPE_SITES.filter((s) => s.group === group);
-        return (
-          <fieldset
-            key={group}
-            className="mt-5 min-w-0 border-t-[1.5px] border-ink pt-3"
-          >
-            <legend className={`${caps} pr-2`}>{group}</legend>
-            <p className={`text-xs leading-relaxed ${muted}`}>
-              {sites[0].guidance}
-            </p>
-            <div
-              className={`mt-3 grid gap-3 ${sites.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}
-            >
-              {sites.map((site) => {
-                const previous = siteHistory(
-                  sessions.filter(
-                    (s) => s.id !== session?.id && s.measured_on < date,
-                  ),
-                  site.key,
-                ).at(-1);
-                return (
-                  <label
-                    key={site.key}
-                    className={
-                      sites.length === 2
-                        ? "block min-w-0"
-                        : "grid min-w-0 grid-cols-[minmax(0,1fr)_6rem] items-end gap-x-3"
-                    }
-                  >
-                    <span
-                      className={`${caps} ${muted} block text-center ${sites.length === 1 ? "col-start-2 row-start-1" : ""}`}
-                    >
-                      {"side" in site ? `${site.side.toUpperCase()} · ` : ""}
-                      {unit.toUpperCase()}
-                    </span>
-                    <input
-                      aria-label={`${site.label} (${unit})`}
-                      type="text"
-                      inputMode="decimal"
-                      enterKeyHint="next"
-                      autoComplete="off"
-                      placeholder="—"
-                      value={values[site.key] ?? ""}
-                      disabled={pending}
-                      onChange={(e) =>
-                        setValues((v) => ({ ...v, [site.key]: e.target.value }))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter" || e.nativeEvent.isComposing)
-                          return;
-                        e.preventDefault();
-                        const fields = Array.from(
-                          e.currentTarget.form?.querySelectorAll<
-                            HTMLInputElement | HTMLTextAreaElement
-                          >('input[inputmode="decimal"], textarea') ?? [],
-                        ).filter(
-                          (field) =>
-                            !field.disabled &&
-                            !field.closest("details:not([open])") &&
-                            field.getClientRects().length > 0,
-                        );
-                        fields[fields.indexOf(e.currentTarget) + 1]?.focus();
-                      }}
-                      className={`numeral mt-1 min-h-11 w-full min-w-0 max-w-full border-[1.5px] border-ink bg-paper px-3 text-center text-base font-semibold focus:outline-none focus:ring-1 focus:ring-ink ${sites.length === 1 ? "col-start-2 row-start-2" : ""}`}
-                    />
-                    <span
-                      className={`mt-1 block min-w-0 break-words text-[11px] leading-relaxed ${muted} ${sites.length === 1 ? "col-start-1 row-span-2 row-start-1" : ""}`}
-                    >
-                      {previous
-                        ? `Previous ${tapeValue(previous.valueIn, unit)} ${unit.toUpperCase()} · ${shortDateWithYear(previous.date)}`
-                        : "No previous reading"}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        );
-      });
-  }
+  const sections: { title: string; keys: TapeSiteKey[] }[] = [
+    {
+      title: "Upper body",
+      keys: [
+        "chest",
+        "waist_navel",
+        "upper_arm_left",
+        "upper_arm_right",
+        "forearm_left",
+        "forearm_right",
+        "neck",
+      ],
+    },
+    {
+      title: "Lower body",
+      keys: ["hips", "thigh_left", "thigh_right", "calf_left", "calf_right"],
+    },
+  ];
+  const checkedCount = Object.values(checked).filter(Boolean).length;
   return (
-    <>
-      <BottomSheet
-        open
-        onClose={close}
-        title={session ? "edit measurements" : "log measurements"}
-        fullHeight
-        footer={
-          <div role="group" aria-label="Measurement actions">
-            {error && (
-              <p
-                role="alert"
-                className="mb-3 max-h-16 overflow-y-auto border border-ink p-2 text-sm leading-relaxed"
-              >
-                {error}
-              </p>
-            )}
+    <FullScreenEntry
+      title={session ? "edit measurements" : "log measurements"}
+      onClose={close}
+      header={
+        <>
+          <div className="flex min-h-[35px] items-center justify-between">
+            <span className="logotype text-[13px] font-semibold">workout</span>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="close"
+              className="-mr-2 flex h-11 w-11 items-center justify-center text-xl text-ink/50"
+            >
+              ×
+            </button>
+          </div>
+          <h2 className="title-display mt-3 text-4xl">measurements</h2>
+          <div className="mt-3 flex justify-between gap-2 border-t-[1.5px] border-ink pt-2.5 text-[10px] font-semibold tracking-[0.12em] text-ink/55">
+            <span aria-live="polite">
+              {checkedCount} OF {TAPE_SITES.length} CHECKED
+            </span>
+            <span>MONTHLY TAPE</span>
+          </div>
+          <div aria-hidden="true" className="mt-2.5 h-[3px] bg-ink/15">
+            <div
+              className="h-full bg-accent transition-[width] duration-150"
+              style={{ width: (checkedCount / TAPE_SITES.length) * 100 + "%" }}
+            />
+          </div>
+        </>
+      }
+      footer={
+        <div className="mx-auto w-full max-w-lg">
+          {error && (
+            <p
+              role="alert"
+              className="max-h-20 overflow-y-auto border-b border-ink/20 px-4 py-3 text-sm leading-relaxed"
+            >
+              {error}
+            </p>
+          )}
+          <div className="grid grid-cols-[1fr_2fr]">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              className="min-h-14 w-full py-0"
+              onClick={close}
+            >
+              CANCEL
+            </Button>
             <Button
               type="submit"
               form={formId}
               variant="primary"
               disabled={pending}
-              className="w-full py-4 text-[13px]"
+              className="min-h-14 w-full py-0"
               aria-label="Complete measurements"
             >
-              {pending ? "SAVING…" : "COMPLETE"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={pending}
-              className="min-h-11 w-full text-[11px]"
-              onClick={close}
-            >
-              CANCEL
+              {pending ? "SAVING." : "COMPLETE"}
             </Button>
           </div>
-        }
-      >
-        <form
-          id={formId}
-          onSubmit={submit}
-          className="flex min-h-0 min-w-0 flex-1 flex-col"
-        >
-          <div
-            role="region"
-            aria-label="Measurement fields"
-            className="min-h-0 min-w-0 flex-1 scroll-py-4 overflow-x-hidden overflow-y-auto overscroll-contain pb-4"
+        </div>
+      }
+      overlays={
+        <>
+          <LeaveConfirm
+            open={leaveHref !== undefined}
+            body="Your measurements haven't been saved."
+            onKeepEditing={() => setLeaveHref(undefined)}
+            onDiscard={() => {
+              const href = leaveHref;
+              setLeaveHref(undefined);
+              onClose();
+              if (href) router.push(href);
+            }}
+          />
+          <BottomSheet
+            open={deleteOpen}
+            onClose={() => {
+              if (!pending) setDeleteOpen(false);
+            }}
+            title="Delete measurements?"
+            subtitle={shortDateWithYear(date) + " · CANNOT BE UNDONE"}
           >
-            <p className={`text-sm leading-relaxed ${muted}`}>
-              Measure relaxed, before training. Keep the tape level and snug
-              without compressing the skin. Leave any site blank to skip it.
+            <p className="text-[12.5px] leading-[1.5] text-ink/75">
+              Delete this session and its recorded readings?
             </p>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span className={`${caps} ${muted}`}>ENTRY UNITS</span>
-              <UnitToggle
-                unit={unit}
-                onChange={changeUnit}
-                disabled={pending}
-              />
-            </div>
-            <div className="mt-4 min-w-0">
-              <Input
-                label="DATE"
-                type="date"
-                required
-                min="1900-01-01"
-                max={localDayIso()}
-                value={date}
-                disabled={pending}
-                onChange={(e) => setDate(e.target.value)}
-                className="numeral w-full min-w-0 max-w-full appearance-none tracking-normal"
-              />
-            </div>
-            {groupFields(false)}
-            <details
-              className="mt-5 border-y border-ink/15 py-3"
-              open={
-                session?.readings.some(
-                  (r) => TAPE_SITES.find((s) => s.key === r.site_key)?.optional,
-                ) || undefined
-              }
-            >
-              <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">
-                Hips, calves, neck &amp; forearms
-              </summary>
-              {groupFields(true)}
-            </details>
-            <div className="mt-5 min-w-0">
-              <label htmlFor={`${formId}-note`} className={`${caps} block`}>
-                SESSION NOTE · OPTIONAL
-              </label>
-              <textarea
-                id={`${formId}-note`}
-                rows={2}
-                maxLength={500}
-                value={note}
-                disabled={pending}
-                onChange={(e) => setNote(e.target.value)}
-                className="mt-2 w-full min-w-0 max-w-full resize-y border border-ink/40 bg-paper p-3 text-base font-normal tracking-normal focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
-              />
-            </div>
-            {session && (
+            <div className="mt-6 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 disabled={pending}
-                className={`${caps} mt-4 min-h-11 underline underline-offset-4`}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Delete this measurement session and all its readings? This cannot be undone.",
-                    )
-                  )
-                    return;
-                  startTransition(async () => {
-                    try {
-                      const result = await removeMeasurements(id);
-                      if (result.error) setError(result.error);
-                      else onSaved(unit, { deletedId: id });
-                    } catch {
-                      setError("Couldn't delete. Try again.");
-                    }
-                  });
-                }}
+                onClick={() => setDeleteOpen(false)}
+                className="px-4 py-3 text-[13px] font-semibold text-ink/60"
               >
-                DELETE SESSION
+                Keep session
               </button>
-            )}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={deleteSession}
+                className="border-[1.5px] border-accent px-8 py-3 text-[13px] font-bold tracking-[0.08em] text-accent disabled:opacity-40"
+              >
+                {pending ? "DELETING." : "DELETE"}
+              </button>
+            </div>
+          </BottomSheet>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={submit} className="min-w-0">
+        <p className="text-xs leading-relaxed text-ink/70">
+          Check readings as you go. Complete saves every entered value; blank
+          sites are skipped.
+        </p>
+        <div className="mt-4 flex min-w-0 items-end justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <Input
+              label="DATE"
+              type="date"
+              required
+              min="1900-01-01"
+              max={localDayIso()}
+              value={date}
+              disabled={pending}
+              onChange={(e) => setDate(e.target.value)}
+              className="numeral w-full min-w-0 max-w-full appearance-none tracking-normal"
+            />
           </div>
-        </form>
-      </BottomSheet>
-      <LeaveConfirm
-        open={leaveHref !== undefined}
-        body="Your measurements haven't been saved."
-        onKeepEditing={() => setLeaveHref(undefined)}
-        onDiscard={() => {
-          const href = leaveHref;
-          setLeaveHref(undefined);
-          onClose();
-          if (href) router.push(href);
-        }}
-      />
-    </>
+          <UnitToggle unit={unit} onChange={changeUnit} disabled={pending} />
+        </div>
+        {sections.map((section, sectionIndex) => (
+          <section
+            key={section.title}
+            aria-label={section.title + " measurements"}
+            className="mt-5 min-w-0"
+          >
+            <div className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5">
+              <h3 className={caps}>
+                {String(sectionIndex + 1).padStart(2, "0")} · {section.title}
+              </h3>
+              <span className={caps + " text-ink/55"}>
+                {section.keys.length} SITES
+              </span>
+            </div>
+            <div
+              aria-hidden="true"
+              style={captureGrid}
+              className="mt-2.5 grid gap-2.5 border-b border-ink/25 pb-[5px] text-[9px] font-semibold uppercase tracking-[0.14em] text-ink/50"
+            >
+              <span>SITE</span>
+              <span className="text-center">{unit}</span>
+              <span className="text-center">DONE</span>
+            </div>
+            {section.keys.map((key) => {
+              const site = TAPE_SITES.find((s) => s.key === key)!;
+              const previous = siteHistory(
+                sessions.filter(
+                  (s) => s.id !== session?.id && s.measured_on < date,
+                ),
+                key,
+              ).at(-1);
+              const fieldId = formId + "-" + key;
+              return (
+                <div
+                  key={key}
+                  style={captureGrid}
+                  className="grid min-w-0 items-center gap-x-2.5 border-b border-ink/15 py-[5px]"
+                >
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      aria-expanded={landmark === key}
+                      aria-controls={fieldId + "-cue"}
+                      onClick={() =>
+                        setLandmark((current) => (current === key ? null : key))
+                      }
+                      className="flex min-h-[35px] w-full items-center justify-between gap-1 text-left text-[13px] font-semibold"
+                    >
+                      <span>{site.label}</span>
+                      <span
+                        aria-hidden="true"
+                        className={
+                          "shrink-0 text-[10px] text-ink/50 " +
+                          (landmark === key ? "rotate-180" : "")
+                        }
+                      >
+                        ⌄
+                      </span>
+                    </button>
+                    {previous && (
+                      <p className="pb-1 text-[10px] leading-snug text-ink/55">
+                        Previous {tapeValue(previous.valueIn, unit)}{" "}
+                        {unit.toUpperCase()} ·{" "}
+                        {shortDateWithYear(previous.date)}
+                      </p>
+                    )}
+                  </div>
+                  <input
+                    id={fieldId}
+                    aria-label={site.label + " (" + unit + ")"}
+                    type="text"
+                    inputMode="decimal"
+                    enterKeyHint="next"
+                    autoComplete="off"
+                    placeholder="—"
+                    value={values[key] ?? ""}
+                    disabled={pending}
+                    onChange={(e) => {
+                      setValues((current) => ({
+                        ...current,
+                        [key]: e.target.value,
+                      }));
+                      setChecked((current) => ({ ...current, [key]: false }));
+                      setError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" || e.nativeEvent.isComposing)
+                        return;
+                      e.preventDefault();
+                      const fields = Array.from(
+                        e.currentTarget.form?.querySelectorAll<
+                          HTMLInputElement | HTMLTextAreaElement
+                        >('input[inputmode="decimal"], textarea') ?? [],
+                      );
+                      fields[fields.indexOf(e.currentTarget) + 1]?.focus();
+                    }}
+                    className={
+                      loggingCellClass(checked[key] ? "logged" : "next") +
+                      " min-w-0 max-w-full"
+                    }
+                  />
+                  <LogCheckbox
+                    checkbox
+                    checked={Boolean(checked[key])}
+                    loading={false}
+                    disabled={pending}
+                    ariaLabel={site.label + " complete"}
+                    onClick={() => checkReading(key)}
+                  />
+                  {landmark === key && (
+                    <p
+                      id={fieldId + "-cue"}
+                      className="col-span-3 pb-2 pt-1 text-xs leading-relaxed text-ink/70"
+                    >
+                      {site.guidance}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ))}
+        <p className="mt-4 text-xs leading-relaxed text-ink/70">
+          Measure relaxed, before training. Keep the tape snug without
+          compressing skin. Tap a site name for its landmark.
+        </p>
+        <div className="mt-5 min-w-0">
+          <label htmlFor={formId + "-note"} className={caps + " block"}>
+            SESSION NOTE · OPTIONAL
+          </label>
+          <textarea
+            id={formId + "-note"}
+            rows={2}
+            maxLength={500}
+            value={note}
+            disabled={pending}
+            onChange={(e) => setNote(e.target.value)}
+            className="mt-2 w-full min-w-0 max-w-full resize-y border border-ink/40 bg-paper p-3 text-base font-normal tracking-normal focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+          />
+        </div>
+        {session && (
+          <button
+            type="button"
+            disabled={pending}
+            className={caps + " mt-4 min-h-11 underline underline-offset-4"}
+            onClick={() => setDeleteOpen(true)}
+          >
+            DELETE SESSION
+          </button>
+        )}
+      </form>
+    </FullScreenEntry>
   );
 }

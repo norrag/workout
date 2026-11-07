@@ -43,10 +43,20 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
     .click();
   await page.getByLabel("Chest (in)", { exact: true }).fill("40");
+  await expect(page.getByRole("checkbox")).toHaveCount(12);
+  await expect(page.locator('input[inputmode="decimal"]')).toHaveCount(12);
+  const chestCheck = page.getByRole("checkbox", {
+    name: "Chest complete",
+    exact: true,
+  });
+  await expect(chestCheck).not.toBeChecked();
+  await chestCheck.click();
+  await expect(chestCheck).toBeChecked();
   await page.getByRole("button", { name: "CM", exact: true }).click();
   await expect(page.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
     "101.6",
   );
+  await expect(chestCheck).toBeChecked();
   await page.getByRole("button", { name: "IN", exact: true }).click();
   await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue(
     "40",
@@ -119,6 +129,44 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     .eq("id", data.user!.id)
     .single();
   expect(profile.data).toMatchObject({ bodyweight: null, body_fat_pct: null });
+  // Partial sessions save checked and unchecked entered values. Deletion uses
+  // the app's themed confirmation, never the browser's native prompt.
+  let nativeDialogs = 0;
+  page.on("dialog", async (dialog) => {
+    nativeDialogs += 1;
+    await dialog.dismiss();
+  });
+  await page.getByRole("button").filter({ hasText: "1 FEB '26" }).click();
+  await page
+    .getByRole("button", { name: "DELETE SESSION", exact: true })
+    .click();
+  const deleteDialog = page.getByRole("dialog", {
+    name: "Delete measurements?",
+    exact: true,
+  });
+  await expect(deleteDialog).toBeVisible();
+  await page.getByRole("button", { name: "Keep session", exact: true }).click();
+  await expect(deleteDialog).not.toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "edit measurements", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "DELETE SESSION", exact: true })
+    .click();
+  await deleteDialog
+    .getByRole("button", { name: "DELETE", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByText("SESSION DELETED", { exact: true }),
+  ).toBeVisible();
+  expect(nativeDialogs).toBe(0);
+  const remaining = await client
+    .from("measurements")
+    .select("site_key")
+    .eq("user_id", data.user!.id);
+  expect(remaining.error).toBeNull();
+  expect(remaining.data).toHaveLength(2);
   await page.evaluate(() =>
     document.documentElement.setAttribute("data-theme", "dark"),
   );
@@ -176,6 +224,10 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/workout");
   await page.goto("/more/measurements");
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
+    "content",
+    /maximum-scale=1/,
+  );
   await page
     .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
     .click();
@@ -191,6 +243,24 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   const cancel = dialog.getByRole("button", { name: "CANCEL", exact: true });
   await expect(dialog).toBeVisible();
   await expect.poll(async () => (await dialog.boundingBox())!.y).toBe(0);
+  expect(
+    await dialog.evaluate((el) => el.parentElement === document.body),
+  ).toBe(true);
+  const actions = page.getByRole("group", {
+    name: "Measurement actions",
+    exact: true,
+  });
+  await expect(actions).toHaveCSS("position", "fixed");
+  await expect(dialog.getByRole("checkbox")).toHaveCount(12);
+  const renderedFields = await dialog
+    .locator('input[inputmode="decimal"]')
+    .evaluateAll((fields) =>
+      fields.every(
+        (field) =>
+          field.getClientRects().length > 0 && !field.closest("details"),
+      ),
+    );
+  expect(renderedFields).toBe(true);
 
   for (const width of [320, 360, 390, 430]) {
     await page.setViewportSize({ width, height: 740 });
@@ -214,7 +284,12 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
       .poll(async () => (await complete.boundingBox())!.y)
       .toBeCloseTo(before.y, 0);
     const cancelBox = (await cancel.boundingBox())!;
-    expect(cancelBox.y + cancelBox.height).toBeLessThanOrEqual(740);
+    expect(cancelBox.y + cancelBox.height).toBeCloseTo(740, 0);
+    const completeBox = (await complete.boundingBox())!;
+    expect(completeBox.y + completeBox.height).toBeCloseTo(740, 0);
+    const actionsBox = (await actions.boundingBox())!;
+    expect(actionsBox.x).toBe(0);
+    expect(actionsBox.width).toBe(width);
     await expect(complete).toBeInViewport({ ratio: 1 });
     await expect(cancel).toBeInViewport({ ratio: 1 });
     await testInfo.attach(`measurement-${width}px`, {
@@ -224,11 +299,24 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   }
 
   await page.setViewportSize({ width: 768, height: 740 });
-  await expect.poll(async () => (await dialog.boundingBox())!.width).toBe(512);
+  await expect
+    .poll(
+      async () => (await scroll.locator(":scope > div").boundingBox())!.width,
+    )
+    .toBe(512);
 
   await scroll.evaluate((el) => {
     el.scrollTop = 0;
   });
+  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
+  const mobileChestCheck = page.getByRole("checkbox", {
+    name: "Chest complete",
+    exact: true,
+  });
+  await mobileChestCheck.click();
+  await expect(mobileChestCheck).toBeChecked();
+  await page.getByLabel("Chest (in)", { exact: true }).fill("40.75");
+  await expect(mobileChestCheck).not.toBeChecked();
   await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
   await page.getByRole("button", { name: "CM", exact: true }).click();
   await expect(page.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
@@ -242,24 +330,35 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   await expect(
     page.getByLabel("Upper arm · right (in)", { exact: true }),
   ).toBeFocused();
-  await page.getByLabel("Thigh · right (in)", { exact: true }).press("Enter");
+  await page.getByLabel("Calf · right (in)", { exact: true }).press("Enter");
   const note = page.getByLabel("SESSION NOTE · OPTIONAL", { exact: true });
   await expect(note).toBeFocused();
   await expect(dialog).toBeVisible();
-  await page
-    .getByText("Hips, calves, neck & forearms", { exact: true })
-    .click();
   await page.getByLabel("Forearm · right (in)", { exact: true }).fill("11.5");
   await note.fill("A".repeat(500));
   await expectNoHorizontalOverflow(page);
   const smallFonts = await dialog
-    .locator("input, textarea, select")
+    .locator('input:not([inputmode="decimal"]), textarea, select')
     .evaluateAll((fields) =>
       fields
         .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16)
         .map((el) => el.getAttribute("aria-label") ?? el.tagName),
     );
   expect(smallFonts).toEqual([]);
+  const cells = await dialog
+    .locator('input[inputmode="decimal"]')
+    .evaluateAll((fields) =>
+      fields.map((field) => ({
+        height: field.getBoundingClientRect().height,
+        font: getComputedStyle(field).fontSize,
+      })),
+    );
+  expect(cells).toEqual(
+    Array.from({ length: 12 }, () => ({ height: 35, font: "15px" })),
+  );
+  const boxSize = await mobileChestCheck.locator("span").boundingBox();
+  expect(boxSize!.width).toBe(23);
+  expect(boxSize!.height).toBe(23);
 
   // Desktop emulation cannot open an iOS keyboard. Exercise its distinct
   // visual-viewport resize/offset contract without changing the layout viewport.

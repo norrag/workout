@@ -112,6 +112,16 @@ export type TapeSession = {
 };
 
 const siteKeySchema = z.enum(TAPE_SITES.map((s) => s.key));
+export const tapeReadingSchema = z
+  .object({
+    site_key: siteKeySchema,
+    value_in: z
+      .number()
+      .finite()
+      .positive("Measurements must be above zero.")
+      .max(150, "Check the measurement and unit."),
+  })
+  .strict();
 export const tapeSessionSchema = z
   .object({
     id: z.uuid(),
@@ -121,18 +131,7 @@ export const tapeSessionSchema = z
     input_unit: z.enum(["in", "cm"]),
     note: z.string().trim().max(500, "Keep the note under 500 characters."),
     readings: z
-      .array(
-        z
-          .object({
-            site_key: siteKeySchema,
-            value_in: z
-              .number()
-              .finite()
-              .positive("Measurements must be above zero.")
-              .max(150, "Check the measurement and unit."),
-          })
-          .strict(),
-      )
+      .array(tapeReadingSchema)
       .min(1, "Enter at least one measurement.")
       .max(TAPE_SITES.length)
       .refine(

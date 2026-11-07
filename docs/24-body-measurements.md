@@ -1,6 +1,6 @@
 # 24 — Monthly body measurements
 
-Status: implementation slice for owner review, 2026-11-06. Staged for **1.3.0**.
+Status: owner correction under review, 2026-11-07. Staged for **1.3.0**.
 
 ## Scope and precedence
 
@@ -16,29 +16,31 @@ tokens; do not copy the old prototype's exploratory dark styling.
 
 ## Capture and review
 
-More → Body measurements opens a quiet ledger. One session per calendar date,
-optional note, explicit IN/CM display and entry. The default form shows chest,
-waist **at the navel**, relaxed left/right upper arms and thighs. Hips, calves,
-neck and forearms are optional. No previous value is prefilled as a new reading.
-Previous readings are dated hints. Any nonempty subset can be saved.
+More → Body measurements opens a quiet ledger: one session per date, optional
+note, IN/CM display and entry. All 12 sites are visible in upper/lower groups.
+Every site is optional; any nonempty subset can be saved. Prior readings are
+dated hints, never prefilled as new observations.
 
-The form uses inline landmark cues, decimal keypads and one completion action. Unit
-switches convert entered values rather than reinterpret them. Saving is atomic;
-failed saves retain input. Closing dirty input asks to discard. A session can be
-corrected or explicitly deleted, with confirmation; body data is user-owned
-measurement substrate, like imported scans, rather than immutable training history.
+The owner rejected the prior mobile pass. Figures **4.13c–d** in
+design/mockups/body-measurements-workout.html supersede 4.13a–b before code.
+The full-screen logger shares actual DayView cell classes and LogCheckbox:
+35px cells, 15px values, 23px squares and 10px gaps. Widths match workout
+weight/reps cells at every viewport. Landmark chevrons reveal cues only;
+no sites are hidden. Date, units and notes use existing shared controls.
 
-Owner mobile review amends capture to **Complete / Cancel** in a pinned footer
-(figures **4.13a–b**, `design/mockups/body-measurements-mobile.html`). The fields
-alone scroll vertically. `BottomSheet`'s optional footer mode follows the visible
-viewport above the keyboard, fits the app's 512px maximum width, and keeps focus
-in the scrolling middle on resize. It does not fix the body position (N47), and
-sheets without this footer retain their prior layout. Shared Button/Input/
-SegmentedControl primitives replace parallel local controls. Numeric cells are
-centered and tabular like set logging; all native controls use at least the
-standard 16px input size. Fieldsets/date controls have explicit width constraints,
-long notes wrap, and the existing app viewport/zoom policy is unchanged. Keyboard
-Next moves to the next visible entry, skipping the closed optional section.
+Checkmarks are a local checklist. Editing clears a mark; unit conversion
+preserves it. Complete saves **all entered values, checked or not**; blanks
+are skipped. There is no all-sites/all-checked gate, per-row write or queue.
+Errors retain input. Dirty Cancel asks before discarding. Delete session
+uses the themed BottomSheet, Keep session and destructive-outline DELETE.
+
+FullScreenEntry renders in a body portal. Its action bar is position:fixed
+at the visible viewport bottom, flush to the sides, with safe-area padding
+only. It reserves its measured height, including validation messages, outside
+the scrolling fields. Viewport resize/scroll tracks keyboard geometry; Next
+follows all fields. Inner content retains the 512px app cap. Existing sheet
+layout is restored; N47 body-position and root zoom policy are unchanged.
+See [actual-component comparison](reviews/2026-11-07-body-measurements-layout.md).
 
 The save response carries the committed canonical session. The ledger keeps that
 confirmed result visible through a late render carrying the prior snapshot;

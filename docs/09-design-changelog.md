@@ -33,6 +33,24 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-11-07 - N96 owner correction: use the workout logger
+
+- **Change (RETROFIT):** 4.13c–d in design/mockups/body-measurements-workout.html
+  supersede rejected 4.13a–b. The padded footer and 44px boxes did not match.
+- **Ground truth:** inspect/render actual DayView, SetRow, LogCheckbox,
+  CompleteSheet and BottomNav. Share the literal cell styles without changing
+  workout behavior: 35px cells, 15px values and 23px checkbox visuals.
+- **Layout:** full-screen body portal with a separate viewport-fixed edge bar
+  (Cancel / Complete), safe-area padding only, measured footer reservation.
+  Fields scroll; all 12 sites are visible in upper/lower groups.
+- **Interaction:** local checks clear on edit; all entered values save, checked
+  or not, including partial sessions. Only landmark cues disclose. Delete uses
+  the themed sheet and destructive-outline grammar.
+- **Evidence:** design/reviews/body-measurements-workout-comparison.html and
+  reviews/2026-11-07-body-measurements-layout.md. Width/style comparison passes
+  320–430px. Keyboard geometry is simulated, not physical-iOS evidence.
+  No schema, engine or release-identity change.
+
 ## 2026-08-13 — The AI Manual folds into the Guide (N74 owner amendment)
 
 The dedicated AI Manual proved to be a second information hierarchy for one

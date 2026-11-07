@@ -15,6 +15,24 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-07 - Session 136: N96 owner correction, workout-style capture
+
+The owner rejected the prior mobile pass; verbatim feedback is in Batch 43.
+Reviewed/rendered actual DayView, SetRow, LogCheckbox, CompleteSheet and
+BottomNav. Figures 4.13c–d precede the rebuild: body-portal full-screen entry,
+viewport-fixed edge bar, exact shared 35px/15px cells and 23px checkbox, all-site
+upper/lower groups, landmark-only disclosures and themed deletion. Checks are
+local and clear on edit; every entered value saves regardless of checks, so
+partial capture has no extra gate. Original sheet layout restored.
+
+Local actual-component comparisons and interaction checks pass 320–430px,
+512px cap, both themes and simulated keyboard geometry, with no page errors.
+New CI cases cover partial save, checklist and themed keep/delete behavior
+against disposable local accounts. Guide, claims, design records and staged
+1.3.0 copy updated; connector note preserved. Hosted signed-in actions and
+physical iOS remain unverified. No schema, engine, production release, merge
+or promotion. [Evidence](../reviews/2026-11-07-body-measurements-layout.md).
+
 ## 2026-11-06 — Session 135: N96, monthly tape inside WORKOUT
 
 Owner reviewed the preview and requested closer workout-screen sizing/scrolling,

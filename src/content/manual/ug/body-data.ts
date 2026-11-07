@@ -291,15 +291,15 @@ export const UG_BODY_DATA: ManualChapter = {
               { kind: "heading", text: "Taking body measurements" },
               {
                 kind: "para",
-                text: "More → Body measurements records monthly tape readings: chest, navel waist, relaxed left/right upper arms and thighs, plus optional hips, calves, neck and forearms. Follow each site's placement cue under the same conditions. Keep the tape snug without compressing skin.",
+                text: "More → Body measurements lists all 12 sites in upper- and lower-body groups. Every site is optional. Follow the placement cues under consistent conditions, with snug tape that does not compress skin.",
               },
               {
                 kind: "para",
-                text: "Choose inches or centimetres and a date; unit switches convert entered values. Previous readings are dated hints, never prefilled. Complete saves one session per date. Edit corrects readings; Delete removes the session. Export measurements downloads the full tape history as CSV.",
+                text: "Choose inches or centimetres and a date; switching units converts entered values. Previous readings are dated hints, never prefilled. Complete saves all entered values, including unchecked ones; one site is enough. Edit corrects a session; Export measurements downloads the tape history as CSV.",
               },
               {
                 kind: "para",
-                text: "Complete and Cancel stay below the scrolling fields. Keyboard Next moves to the next visible field. Cancel asks before discarding; Keep editing retains unsaved entries.",
+                text: "Check readings as you go; editing clears a checkmark. Marks track progress locally. Complete and Cancel are fixed at the screen’s bottom while fields scroll. Next advances through fields. Cancel asks before discarding. Delete session opens a themed confirmation; Keep session cancels it.",
               },
               {
                 kind: "para",
