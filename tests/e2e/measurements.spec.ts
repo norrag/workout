@@ -308,11 +308,17 @@ test("mobile measurement entry pins actions and contains scrolling and keyboard 
   await scroll.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
   const mobileChestCheck = page.getByRole("checkbox", {
     name: "Chest complete",
     exact: true,
   });
+  await mobileChestCheck.click();
+  await expect(mobileChestCheck).not.toBeChecked();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Enter a measurement before checking this site.",
+  );
+  await expect(page.getByLabel("Chest (in)", { exact: true })).toBeFocused();
+  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
   await mobileChestCheck.click();
   await expect(mobileChestCheck).toBeChecked();
   await page.getByLabel("Chest (in)", { exact: true }).fill("40.75");

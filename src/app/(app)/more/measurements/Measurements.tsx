@@ -450,15 +450,21 @@ function MeasurementForm({
       setChecked((current) => ({ ...current, [key]: false }));
       return;
     }
+    const entered = values[key]?.trim();
+    if (!entered) {
+      setError("Enter a measurement before checking this site.");
+      document.getElementById(`${formId}-${key}`)?.focus();
+      return;
+    }
     const reading = tapeReadingSchema.safeParse({
       site_key: key,
-      value_in: toInches(Number(values[key]), unit),
+      value_in: toInches(Number(entered), unit),
     });
-    if (!values[key]?.trim() || !reading.success) {
+    if (!reading.success) {
       setError(
-        reading.success
-          ? "Enter a reading before checking it."
-          : reading.error.issues[0].message,
+        Number.isFinite(Number(entered))
+          ? reading.error.issues[0].message
+          : "Enter a valid number.",
       );
       document.getElementById(`${formId}-${key}`)?.focus();
       return;
