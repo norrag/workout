@@ -552,6 +552,7 @@ test("proposed 1.3 modal makes measurements the flagship without acknowledging a
     exact: true,
   });
   await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS("opacity", "1");
   await expect(
     dialog.getByText("FOR REVIEW · NOT RELEASED", { exact: true }),
   ).toBeVisible();
@@ -568,13 +569,62 @@ test("proposed 1.3 modal makes measurements the flagship without acknowledging a
     body: await page.screenshot(),
     contentType: "image/png",
   });
-  await page.setViewportSize({ width: 320, height: 740 });
+  const content = dialog.locator("div.overflow-y-auto");
+  const controls = [
+    dialog.getByRole("button", { name: "Close release notes", exact: true }),
+    dialog.getByRole("link", { name: "VIEW ALL RELEASE NOTES", exact: true }),
+    dialog.getByRole("button", { name: "GOT IT", exact: true }),
+  ];
+  for (const width of [320, 360]) {
+    await page.setViewportSize({ width, height: 740 });
+    await expectNoHorizontalOverflow(page);
+    const bounds = await dialog.boundingBox();
+    expect(bounds?.width).toBe(width - 16);
+    expect(bounds?.height).toBeLessThanOrEqual(640);
+    await expect(dialog.getByRole("heading", { level: 2 })).toHaveCSS(
+      "font-size",
+      "22px",
+    );
+    await expect(
+      dialog.getByText("Keep a monthly record of body measurements", {
+        exact: true,
+      }),
+    ).toHaveCSS("font-size", "18px");
+    const scroll = await content.evaluate(
+      (el) => el.scrollHeight - el.clientHeight,
+    );
+    expect(scroll).toBeLessThanOrEqual(1);
+    for (const control of controls) {
+      await expect(control).toBeInViewport({ ratio: 1 });
+      expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+    if (width === 320) {
+      await testInfo.attach("release-1.3-proposal-narrow-v2", {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+    }
+  }
+  await page.setViewportSize({ width: 320, height: 480 });
   await expectNoHorizontalOverflow(page);
-  await testInfo.attach("release-1.3-proposal-narrow", {
-    body: await page.screenshot(),
-    contentType: "image/png",
+  await content.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
   });
+  await expect(
+    dialog.getByText("Know when your AI tools need a refresh", { exact: true }),
+  ).toBeInViewport();
+  for (const control of controls) {
+    await expect(control).toBeInViewport({ ratio: 1 });
+  }
+  await page.setViewportSize({ width: 375, height: 844 });
+  await expect(dialog.getByRole("heading", { level: 2 })).toHaveCSS(
+    "font-size",
+    "26px",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
+  await content.evaluate((el) => {
+    el.scrollTop = 0;
+  });
   await page.evaluate(() =>
     document.documentElement.setAttribute("data-theme", "dark"),
   );

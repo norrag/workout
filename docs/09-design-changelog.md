@@ -33,6 +33,21 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-11-07 - 1.3 modal: compact narrow-phone layout
+
+- **Change (RETROFIT):** figure 4.7c in design/mockups/release-1.3-narrow.html
+  was rendered before implementation. The owner approved the prior 390px light
+  and dark screenshots, but rejected the tall, cramped 320px treatment.
+- **Scope:** only featured announcements below 375px. Use 8px horizontal
+  gutters, 16px inner padding, 22px header, 18px feature title and 13px feature
+  body. Reduce spacing and omit the redundant introductory phrase. Keep all
+  entry copy and destinations, with two 44px footer actions in one row.
+- **Preservation:** approved-width renderings stay pixel-identical; ordinary
+  dialogs and unfeatured announcements keep their existing layout. Retain
+  focus/close/scroll behavior and a scrollable middle on short viewports.
+- **Approval:** the first two designs are accepted, not the narrow revision,
+  a release or a merge. Capture the actual revised narrow modal for review.
+
 ## 2026-11-07 - N96: automatic checks, typo review and release proposal
 
 Figures 4.13f-g and 4.7b in design/mockups/body-measurements-entry-review.html

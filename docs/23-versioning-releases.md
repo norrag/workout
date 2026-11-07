@@ -752,3 +752,13 @@ or package bump is made. The nonproduction override-only review route
 `/more/whats-new/preview` renders FOR REVIEW / NOT RELEASED and never calls
 the acknowledgment action. Screenshot review is pending owner approval; it
 is not release authorization.
+
+### Narrow-screen amendment and scoped approval - 2026-11-07
+
+Owner approved the 390px light/dark proposal screenshots and rejected the tall
+narrow version. Figure 4.7c compacts featured announcements only below 375px:
+wider usable space, smaller type/spacing and side-by-side footer actions.
+All entry text and destinations remain. Short viewports retain inner scrolling.
+The revised narrow screenshot requires a new review. The proposal still does
+not acknowledge a release. Registry/package stay 1.2.1; staging stays 1.3.0.
+No release, merge or production promotion is authorized by design approval.

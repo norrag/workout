@@ -15,6 +15,19 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-07 - Session 139: N96 narrow release-modal review
+
+Batch 46 records scoped owner approval of the first two (390px light/dark)
+proposal screenshots and rejection of the tall narrow treatment. Figure 4.7c
+precedes a featured-announcement-only correction below 375px. More usable width,
+compact type/spacing and one footer row reduce the 320×740 card from 708px to
+579px without truncating entry text. 44px targets, short-screen scrolling,
+dismissal and zero horizontal overflow pass locally. Pixel hashes for 375,
+390 light/dark and 768px are unchanged. Guide/claims document scrolling.
+No capture/schema/engine/version changes. Draft #265 remains in progress;
+revised narrow approval and fresh CI/preview are pending, not release or merge.
+See [evidence](../reviews/2026-11-07-release-modal-narrow.md).
+
 ## 2026-11-07 - Session 138: N96 entry behavior, connector and release review
 
 Batch 45 captures the owner's exact request. Removed Cancel, named X, auto-check

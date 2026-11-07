@@ -176,3 +176,10 @@ correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
 connector isolation. Hosted signed-in and physical iOS remain unverified.
 No schema change, production health-data write, merge or promotion.
 Detailed evidence: docs/reviews/2026-11-07-body-measurements-followup.md.
+
+### Release proposal: narrow-screen review - 2026-11-07
+
+The owner approved the 390px light/dark proposal designs, then requested a
+less tall narrow layout. Figure 4.7c and [the narrow review](reviews/2026-11-07-release-modal-narrow.md)
+record this bounded correction. Capture, storage and connector behavior are
+unchanged. Narrow revision approval remains pending; no release or merge.

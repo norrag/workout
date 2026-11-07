@@ -176,3 +176,9 @@ Runtime top/middle/end and actual-workout evidence is in
 precede automatic entry checks, confirmable typo review and a proposed 1.3 modal.
 They remove 4.13e's Cancel action, retaining X/discard and document-flow Complete.
 The release proposal is not approved or released. See the dated 09 amendment.
+
+**4.7c**, `design/mockups/release-1.3-narrow.html`, precedes the compact
+below-375px featured-announcement layout. Owner accepted the prior 390px
+light/dark designs, but rejected the tall narrow treatment. Those wider
+renderings stay unchanged. The narrow revision awaits review; this is not
+release or merge approval. See [the narrow review](reviews/2026-11-07-release-modal-narrow.md).

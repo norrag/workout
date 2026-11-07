@@ -24,6 +24,19 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-07 - N96 narrow release-modal refinement
+
+Owner accepted the 390px light/dark proposal designs and rejected the tall
+narrow version. Figure 4.7c precedes the below-375px-only compact treatment.
+Actual-component checks pass at 320/360px and a 320×480 short viewport. The
+320×740 card is 304px wide and 579px tall, down from 708px. All text fits at
+740px; on short screens the body scrolls while 44px actions stay available.
+Local PNG hashes match before/after at 375, 390 light/dark and 768px. Default
+dialogs/history are unchanged. Guide/claims record short-screen scrolling.
+Temporary fixture restored; no data/schema/version changes. Narrow approval
+and fresh CI/preview verification follow in [the review](reviews/2026-11-07-release-modal-narrow.md).
+Draft #265 stays unmerged; package/registry 1.2.1, staged 1.3.0.
+
 ## 2026-11-07 - N96 automatic checks, MCP reads and release proposal
 
 Figures 4.13f-g/4.7b precede code. Cancel removed; X guards discard. Decimal
