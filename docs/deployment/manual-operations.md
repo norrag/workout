@@ -999,3 +999,18 @@ correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
 connector isolation. Hosted signed-in and physical iOS remain unverified.
 No schema change, production health-data write, merge or promotion.
 Detailed evidence: docs/reviews/2026-11-07-body-measurements-followup.md.
+
+### N96 - narrow release proposal review, 2026-11-07
+
+READY immutable preview at UI commit 52cf312087465849a20e3edf9687a2f4ef654ad9:
+https://workout-gfxfjri36-garron-duprees-projects.vercel.app/more/whats-new/preview
+(measurements: same host /more/measurements). Deployment
+dpl_D5KsZjS1U722Bst2QCgMHrSXeXn1 is Preview, target null, with the deployment-only
+1.3.0 build override confirmed in logs. Both protected fetches reach app sign-in;
+hosted signed-in behavior remains unverified. Production remains aed94ce.
+No persistent environment or database changes. Package/registry remain 1.2.1.
+Owner approved the 390px light/dark designs only. Revised narrow screenshot
+approval is pending; no merge/release/promotion. Targeted signed-in CI passes
+four cases directly; RLS setup fails before tests on occupied runner port 54322.
+See [current evidence](../reviews/2026-11-07-release-modal-narrow.md), including
+limits. The final documentation CI terminal result is reported at delivery.

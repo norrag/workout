@@ -45,7 +45,39 @@ focus, escape and close handlers are retained. The new dialog prop defaults
 to false. The signed-in proposal test now checks narrow geometry, full content
 at 740px, 44px targets, short-screen scrolling and the 375px breakpoint.
 
-Signed-in synthetic loopback-Supabase CI, immutable preview identity and the
-review screenshot delivery will be recorded after the implementation commit.
-The existing N84 sign-in/navigation flake remains open. Registry/package stay
-1.2.1, staging 1.3.0. No DB changes, production health-data writes or promotion.
+## Signed-in CI and immutable preview checkpoint
+
+UI commit: `52cf312087465849a20e3edf9687a2f4ef654ad9`.
+READY Preview deployment: `dpl_D5KsZjS1U722Bst2QCgMHrSXeXn1`, target null.
+Build logs confirm `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
+
+- [Release proposal](https://workout-gfxfjri36-garron-duprees-projects.vercel.app/more/whats-new/preview)
+- [Measurements](https://workout-gfxfjri36-garron-duprees-projects.vercel.app/more/measurements)
+- [Revised narrow screenshot](../design/screenshots/release-1.3-proposal-narrow-v2.png)
+- [UI CI run](https://github.com/norrag/workout/actions/runs/42400147173)
+
+Both protected URLs return app sign-in, HTTP 200. That verifies the access
+boundary, not a hosted signed-in save. Production remains READY at
+`aed94cedcf7ec94c81e4f480f5db686b60e9d084` / `dpl_D1Qd93s21sHMp5b4mjPLXMq38e4i`.
+
+The four targeted signed-in synthetic loopback-Supabase cases all pass directly,
+without retries (4.4s, 4.4s, 2.5s, 2.6s). The expanded proposal case checks
+320/360×740 geometry, full content, 44px targets, 320×480 scrolling, the 375px
+breakpoint and no acknowledgment action. Other cases cover capture, corrections,
+partial persistence, document-flow actions, typo review, export and deletion.
+The screenshot above is the actual signed-in CI capture, inspected before
+delivery. The supplemental narrow dark PNG is from the local visual fixture.
+Approved wider screenshots remain untouched.
+
+Checks pass: 2,189 unit tests, one existing pre-build guard skip, 12 post-build
+guards, typecheck, lint and build. Drift passes. The RLS job stops **before any
+RLS/integration test** because Docker cannot bind runner port 54322, already in
+use. Registry rate-limit retries precede it, but are not the terminal error.
+This infrastructure failure does not establish a policy failure or a pass.
+Full smoke is in progress at this documentation checkpoint; terminal results
+and the final documentation commit's CI are reported at delivery.
+
+The revised narrow PNG replaces the existing Library narrow item as version 1;
+approved light/dark Library items are unchanged. Narrow approval remains
+pending. The existing N84 sign-in/navigation flake remains open. Registry/package
+stay 1.2.1, staging 1.3.0. No DB changes, production health-data writes or promotion.

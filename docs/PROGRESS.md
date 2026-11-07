@@ -37,6 +37,13 @@ Temporary fixture restored; no data/schema/version changes. Narrow approval
 and fresh CI/preview verification follow in [the review](reviews/2026-11-07-release-modal-narrow.md).
 Draft #265 stays unmerged; package/registry 1.2.1, staged 1.3.0.
 
+READY preview pinned to 52cf312: https://workout-gfxfjri36-garron-duprees-projects.vercel.app/more/whats-new/preview.
+Deployment-specific override confirmed; protected fetch reaches app sign-in.
+Targeted CI 42400147173: four direct passes, actual narrow capture delivered.
+Checks/drift pass; RLS setup stops before tests on occupied runner port 54322.
+Full smoke and final-doc CI terminal results follow at delivery. No hosted
+signed-in claim; N84 stays open. Wider designs approved, narrow pending.
+
 ## 2026-11-07 - N96 automatic checks, MCP reads and release proposal
 
 Figures 4.13f-g/4.7b precede code. Cancel removed; X guards discard. Decimal

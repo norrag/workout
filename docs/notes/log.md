@@ -28,6 +28,12 @@ No capture/schema/engine/version changes. Draft #265 remains in progress;
 revised narrow approval and fresh CI/preview are pending, not release or merge.
 See [evidence](../reviews/2026-11-07-release-modal-narrow.md).
 
+Checkpoint: READY UI52cf312 preview, four direct targeted signed-in CI passes;
+checks/drift pass. RLS setup stopped before tests on occupied runner port 54322.
+Actual CI narrow PNG replaces the Library narrow item (version 1); approved
+light/dark identities are unchanged. Narrow review stays pending. Full smoke
+and final-doc CI terminal results are reported at delivery.
+
 ## 2026-11-07 - Session 138: N96 entry behavior, connector and release review
 
 Batch 45 captures the owner's exact request. Removed Cancel, named X, auto-check
