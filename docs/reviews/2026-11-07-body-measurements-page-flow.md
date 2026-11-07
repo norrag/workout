@@ -79,3 +79,47 @@ or protected HTTP response at app sign-in is not signed-in UI verification.
 N84's independently reproduced main-branch navigation flakiness stays open;
 do not inflate waits or conflate a passing rerun with a fix. PR #265 stays draft
 and unmerged; no production frontend promotion.
+
+
+## Deployed page-flow checkpoint
+
+READY page-flow preview: https://workout-ih75aupc9-garron-duprees-projects.vercel.app/more/measurements
+UI `157d26f51bdf147e0edfc2a7008ca3264a67422d`; deployment-specific public 1.3.0 override confirmed.
+CI [42390170021](https://github.com/norrag/workout/actions/runs/42390170021)
+is terminal success on attempt 1: checks, 84 RLS, 18 integration and drift pass.
+Both targeted tape cases pass without retries and pass directly again in smoke.
+Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176)
+and progression sign-in (line 217) pass on retry; N84 remains open.
+Hosted signed-in and physical iOS remain unverified; no merge/promotion.
+
+Deployment `dpl_9q8C7wLieTifFinE2t3z3FsEwyfk` is READY, target Preview
+(null), with the exact UI SHA above. Actual build events contain
+`NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`; no persistent environment
+change. Protected measurement fetch returns HTTP 200 at app sign-in, with the
+existing maximum-scale=1 viewport. This is not signed-in save verification.
+Production remains READY at `aed94cedcf7ec94c81e4f480f5db686b60e9d084`
+(deployment `dpl_D1Qd93s21sHMp5b4mjPLXMq38e4i`). Shared hosted schema
+unchanged in this pass. Keep this immutable preview through docs-only commits.
+
+Linux checks: 2,175 unit tests plus 12 built service-worker guards pass; the
+pre-build guard skip is the existing one. Targeted capture and mobile cases
+pass in 4.423s/4.348s with no retries. Their archived report contains 12 mobile
+shots; 390px top/end and 320px middle were visually inspected. Actual local
+account persistence, correction, CSV and themed Keep/Delete all pass. Full
+smoke passes measurement cases directly again (4.1s/4.3s).
+
+The two broad-suite flakes match previously investigated N84 surfaces:
+BodySpec UPDATE PROFILE? remains after KEEP CURRENT for 15s; progression
+waits 90s at sign-in for /workout. Both pass retry 1. Prior unchanged-main
+controls reproduce these transition/navigation classes; see the controlled
+[comparison](2026-11-06-body-measurements-ci.md). This run retained only the
+targeted artifact: the full smoke artifact step uses failure(), so retry-only
+flakes have logs but no downloadable trace here. Do not claim a newly observed
+HTTP redirect timing or a root cause from those logs. No concrete tape regression
+was found; no speculative app change, inflated waits, auth bypass or rerun-to-green.
+
+[Actual-component scroll comparison](../design/reviews/body-measurements-page-flow.html)
+preserves local top/middle/end/workout/dark captures. Final docs-only CI is
+reported in delivery; it does not change the pinned UI. Draft PR #265 remains
+unmerged. Its description update is separately blocked by automatic approval
+review pending explicit publication approval; branch docs and preview are current.

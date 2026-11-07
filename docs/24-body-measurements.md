@@ -125,3 +125,16 @@ measurement cases without retries. Full smoke: 7 passed, 1 failed, 3 flaky;
 N84 remains open. Capture retries after a pre-form sign-in timeout; mobile
 passes directly. Hosted signed-in and physical iOS checks remain unverified.
 No merge/promotion. [Detailed evidence](reviews/2026-11-07-body-measurements-layout.md).
+
+
+### Current document-flow checkpoint - 2026-11-07
+
+READY page-flow preview: https://workout-ih75aupc9-garron-duprees-projects.vercel.app/more/measurements
+UI `157d26f51bdf147e0edfc2a7008ca3264a67422d`; deployment-specific public 1.3.0 override confirmed.
+CI [42390170021](https://github.com/norrag/workout/actions/runs/42390170021)
+is terminal success on attempt 1: checks, 84 RLS, 18 integration and drift pass.
+Both targeted tape cases pass without retries and pass directly again in smoke.
+Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176)
+and progression sign-in (line 217) pass on retry; N84 remains open.
+Hosted signed-in and physical iOS remain unverified; no merge/promotion.
+[Detailed evidence](reviews/2026-11-07-body-measurements-page-flow.md).

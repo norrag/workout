@@ -953,3 +953,19 @@ Deploy the feature branch's new UI commit to Preview with deployment-specific
 SHA, actual build override and terminal CI after pushing. No new migration or
 production health-data write; the shared production schema status is unchanged.
 Hosted app sign-in and physical-iOS limitations still apply. No merge/promotion.
+
+#### Document-flow deployment checkpoint
+
+READY page-flow preview: https://workout-ih75aupc9-garron-duprees-projects.vercel.app/more/measurements
+UI `157d26f51bdf147e0edfc2a7008ca3264a67422d`; deployment-specific public 1.3.0 override confirmed.
+CI [42390170021](https://github.com/norrag/workout/actions/runs/42390170021)
+is terminal success on attempt 1: checks, 84 RLS, 18 integration and drift pass.
+Both targeted tape cases pass without retries and pass directly again in smoke.
+Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176)
+and progression sign-in (line 217) pass on retry; N84 remains open.
+Hosted signed-in and physical iOS remain unverified; no merge/promotion.
+Deployment `dpl_9q8C7wLieTifFinE2t3z3FsEwyfk` is READY Preview at the exact
+UI SHA; actual logs confirm `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
+Protected fetch reaches app sign-in (200). No persistent env change, new migration,
+health-data write or production promotion. Production read remains aed94ce.
+[Detailed evidence](../reviews/2026-11-07-body-measurements-page-flow.md).
