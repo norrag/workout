@@ -522,3 +522,21 @@ is live, so AI Manual ch. 5 §1 documents the **refusal**, which is the real
 transcript. §8 rule 6's ban on invented transcripts is therefore satisfied in
 the strongest way available: nothing was imagined, and the one exchange that
 could not be completed is documented as the refusal it actually returns.
+
+
+## Staged 1.3 - tape measurements (2026-11-07, N96)
+
+`get_body_measurements({ unit?: "in" | "cm", limit?: 1..120, before?: ISO-date })`
+reads the signed-in user's tape sessions and notes. Defaults: inches, 24 sessions.
+Before is exclusive; has_more/next_before page older sessions. Identity comes
+only from resolveSession and its bearer-bound RLS client, with an additional
+owner query filter. There is no user_id argument and no write operation.
+
+Each entered reading returns its same-site/side previous value/date, delta and
+day interval within the returned page. Missing stays missing; the first
+reading has null comparison fields. Dates, units, rounding and caveats travel
+with the result. The envelope units field permits in/cm for this length-only
+tool; existing tools keep default lb. No incompatible old payload change or
+manual generation bump is needed; the served definition changes the catalog hash.
+Registration follows releaseActive("1.3.0"). The larger doc-20 companion and
+any synthesis/prescription coupling remain deferred.

@@ -15,6 +15,24 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-07 - Session 138: N96 entry behavior, connector and release review
+
+Batch 45 captures the owner's exact request. Removed Cancel, named X, auto-check
+valid decimals, clear invalid checks, and review broad-range / large prior
+differences with correction or confirmation. Partial saves remain independent
+of checks. Figures 4.13f-g/4.7b precede implementation. Added staged read-only
+MCP access using verified identity and RLS, bounded paging and explicit units /
+within-page comparison dates. No schema or prescription changes.
+
+Real-renderer proposal screenshots show measurements as the flagship and the
+existing tool-list refresh notice minor. Owner approval and any different
+meaning of tool tips reminder remain pending. Guide/claims reviewed for simple,
+accurate prose. Doc 20's overclaims corrected. T-N96a-d record site notes,
+scanner identity, DEXA change-band validation and future data-first overview
+context. No speculative overview implementation. Local UI checks pass; fixture
+restored. CI/preview checkpoint follows in the follow-up review. N96 remains
+in-progress on draft PR #265; N84 and hosted/iOS verification limits stay open.
+
 ## 2026-11-07 - Session 137: N96 action placement clarified
 
 Batch 44 preserves the owner's exact feedback. The revised rows are generally

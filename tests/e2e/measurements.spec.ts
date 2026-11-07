@@ -13,6 +13,30 @@ const client = createClient(url, key, {
 const email = `tape-e2e-${Date.now()}@e2e.test`;
 const password = "test-password-123";
 
+async function signInSynthetic(page: Page, label: string) {
+  const local = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const address = `${label}-${Date.now()}@e2e.test`;
+  const { data, error } = await local.auth.signUp({ email: address, password });
+  if (error) throw error;
+  const profile = await local
+    .from("profiles")
+    .update({
+      display_name: "Review tester",
+      onboarded_at: new Date().toISOString(),
+      last_seen_version: "9.9.9",
+    })
+    .eq("id", data.user!.id);
+  if (profile.error) throw profile.error;
+  await page.goto("/sign-in");
+  await page.getByLabel("Email", { exact: true }).fill(address);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL("**/workout");
+  return { local, userId: data.user!.id };
+}
+
 test("monthly tape capture, corrections, history, units and privacy export", async ({
   page,
 }) => {
@@ -49,8 +73,6 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     name: "Chest complete",
     exact: true,
   });
-  await expect(chestCheck).not.toBeChecked();
-  await chestCheck.click();
   await expect(chestCheck).toBeChecked();
   await page.getByRole("button", { name: "CM", exact: true }).click();
   await expect(page.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
@@ -78,7 +100,9 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
   await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue("");
   await page.getByLabel("DATE", { exact: true }).fill("2026-02-01");
   await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
-  await page.getByRole("button", { name: "CANCEL", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Close measurements", exact: true })
+    .click();
   await expect(
     page.getByRole("dialog", { name: "Discard changes?" }),
   ).toBeVisible();
@@ -247,7 +271,13 @@ test("mobile measurements use document flow with actions only at the end", async
     name: "Complete measurements",
     exact: true,
   });
-  const cancel = entry.getByRole("button", { name: "CANCEL", exact: true });
+  const close = page.getByRole("button", {
+    name: "Close measurements",
+    exact: true,
+  });
+  await expect(
+    entry.getByRole("button", { name: "CANCEL", exact: true }),
+  ).toHaveCount(0);
   await expect(entry).toBeVisible();
   await expect(fields).toHaveCSS("overflow-y", "visible");
   await expect(actions).toHaveCSS("position", "static");
@@ -275,7 +305,6 @@ test("mobile measurements use document flow with actions only at the end", async
     await page.setViewportSize({ width, height: 740 });
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(complete).not.toBeInViewport();
-    await expect(cancel).not.toBeInViewport();
     await expectNoHorizontalOverflow(page);
     const position = await actions.evaluate(
       (el) => el.getBoundingClientRect().top + window.scrollY,
@@ -287,7 +316,6 @@ test("mobile measurements use document flow with actions only at the end", async
     const middle = Math.max(1, Math.floor((position - 740) / 2));
     await page.evaluate((top) => window.scrollTo(0, top), middle);
     await expect(complete).not.toBeInViewport();
-    await expect(cancel).not.toBeInViewport();
     await testInfo.attach("measurement-" + width + "px-middle", {
       body: await page.screenshot(),
       contentType: "image/png",
@@ -296,7 +324,6 @@ test("mobile measurements use document flow with actions only at the end", async
       window.scrollTo(0, document.documentElement.scrollHeight),
     );
     await expect(complete).toBeInViewport({ ratio: 1 });
-    await expect(cancel).toBeInViewport({ ratio: 1 });
     expect(
       await actions.evaluate(
         (el) => el.getBoundingClientRect().top + window.scrollY,
@@ -338,9 +365,10 @@ test("mobile measurements use document flow with actions only at the end", async
   await expect(chest).toBeFocused();
   await expect(complete).not.toBeInViewport();
   await chest.fill("40.5");
-  await check.click();
   await expect(check).toBeChecked();
   await chest.fill("40.75");
+  await expect(check).toBeChecked();
+  await chest.fill("0");
   await expect(check).not.toBeChecked();
   await chest.fill("40.5");
   await entry.getByRole("button", { name: "CM", exact: true }).click();
@@ -378,7 +406,7 @@ test("mobile measurements use document flow with actions only at the end", async
   await chest.focus();
   await expect(complete).not.toBeInViewport();
   await expectNoHorizontalOverflow(page);
-  await cancel.click();
+  await close.click();
   await expect(
     page.getByRole("dialog", { name: "Discard changes?", exact: true }),
   ).toBeVisible();
@@ -387,6 +415,16 @@ test("mobile measurements use document flow with actions only at the end", async
   await expect(
     entry.getByLabel("Forearm · right (in)", { exact: true }),
   ).toHaveValue("11.5");
+  for (const name of [
+    "Chest complete",
+    "Upper arm · left complete",
+    "Forearm · right complete",
+  ]) {
+    const box = entry.getByRole("checkbox", { name, exact: true });
+    await expect(box).toBeChecked();
+    await box.click();
+    await expect(box).not.toBeChecked();
+  }
   await expect(complete).toBeEnabled();
   await complete.click();
   await expect(entry).toHaveCount(0);
@@ -409,4 +447,149 @@ test("mobile measurements use document flow with actions only at the end", async
     "Enter at least one measurement.",
   );
   await expect(complete).toBeInViewport({ ratio: 1 });
+});
+
+test("automatic checks and typo review allow correction or explicit confirmation", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_RELEASE_OVERRIDE !== "1.3.0",
+    "Requires staged build.",
+  );
+  const { local, userId } = await signInSynthetic(page, "tape-typos");
+  await page.goto("/more/measurements");
+  const open = () =>
+    page
+      .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
+      .click();
+  const complete = () =>
+    page
+      .getByRole("button", { name: "Complete measurements", exact: true })
+      .click();
+  await open();
+  const chest = page.getByLabel("Chest (in)", { exact: true });
+  const checked = page.getByRole("checkbox", {
+    name: "Chest complete",
+    exact: true,
+  });
+  await chest.fill("405");
+  await expect(checked).not.toBeChecked();
+  await complete();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Check the measurement and unit.",
+  );
+  await expect(chest).toBeFocused();
+  await chest.fill("40");
+  await expect(checked).toBeChecked();
+  await page.getByLabel("DATE", { exact: true }).fill("2026-01-01");
+  await complete();
+  await expect(
+    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+  ).toBeVisible();
+  await open();
+  await page.getByLabel("DATE", { exact: true }).fill("2026-02-01");
+  await chest.fill("60");
+  await expect(checked).toBeChecked();
+  await complete();
+  const review = page.getByRole("dialog", {
+    name: "Check these measurements",
+    exact: true,
+  });
+  await expect(review).toBeVisible();
+  await expect(review.getByText(/Previous 40.00 IN/)).toBeVisible();
+  await testInfo.attach("measurement-typo-review", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  const before = await local
+    .from("measurement_sessions")
+    .select("id")
+    .eq("user_id", userId);
+  expect(before.data).toHaveLength(1);
+  await review
+    .getByRole("button", { name: "Edit values", exact: true })
+    .click();
+  await expect(chest).toBeFocused();
+  await chest.fill("41");
+  await complete();
+  await expect(
+    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+  ).toBeVisible();
+  await open();
+  await page.getByLabel("DATE", { exact: true }).fill("2026-03-01");
+  await page.getByLabel("Forearm · left (in)", { exact: true }).fill("1");
+  await complete();
+  await expect(review.getByText(/outside a broad entry range/)).toBeVisible();
+  await review
+    .getByRole("button", { name: "SAVE AS ENTERED", exact: true })
+    .click();
+  await expect(
+    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+  ).toBeVisible();
+  const unusual = await local
+    .from("measurements")
+    .select("value_in")
+    .eq("user_id", userId)
+    .eq("site_key", "forearm_left");
+  expect(unusual.error).toBeNull();
+  expect(unusual.data?.map((row) => Number(row.value_in))).toEqual([1]);
+});
+
+test("proposed 1.3 modal makes measurements the flagship without acknowledging a release", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_RELEASE_OVERRIDE !== "1.3.0",
+    "Requires staged build.",
+  );
+  await signInSynthetic(page, "release-proposal");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/more/whats-new/preview");
+  const dialog = page.getByRole("dialog", {
+    name: "What's new in WORKOUT",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByText("FOR REVIEW · NOT RELEASED", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("Keep a monthly record of body measurements", {
+      exact: true,
+    }),
+  ).toHaveCSS("font-size", "20px");
+  await expect(
+    dialog.getByText("Know when your AI tools need a refresh", { exact: true }),
+  ).toHaveCSS("font-size", "13px");
+  await expectNoHorizontalOverflow(page);
+  await testInfo.attach("release-1.3-proposal-light", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expectNoHorizontalOverflow(page);
+  await testInfo.attach("release-1.3-proposal-narrow", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() =>
+    document.documentElement.setAttribute("data-theme", "dark"),
+  );
+  await testInfo.attach("release-1.3-proposal-dark", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  let actions = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"])
+      actions += 1;
+  });
+  await dialog.getByRole("button", { name: "GOT IT", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await page.goto("/more/measurements");
+  await expect(
+    page.getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true }),
+  ).toBeVisible();
+  expect(actions).toBe(0);
 });

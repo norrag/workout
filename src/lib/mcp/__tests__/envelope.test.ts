@@ -23,10 +23,15 @@ describe("envelope", () => {
     expect(Number.isNaN(Date.parse(e.generated_at))).toBe(false);
   });
 
-  it("always reports units as lb and defaults data_quality to null", () => {
+  it("defaults to workout pounds and null data_quality", () => {
     const e = envelope({});
     expect(e.units).toBe("lb");
     expect(e.data_quality).toBeNull();
+  });
+  it("labels length-only tools without changing existing workout envelopes", () => {
+    expect(envelope({}, { units: "in" }).units).toBe("in");
+    expect(envelope({}, { units: "cm" }).units).toBe("cm");
+    expect(envelope({}).units).toBe("lb");
   });
 });
 
@@ -78,7 +83,9 @@ describe("toolError", () => {
     expect(r.isError).toBe(true);
     const parsed = JSON.parse(r.content[0].text);
     expect(parsed.error.message).toBe("bad");
-    expect((r.structuredContent.error as Record<string, unknown>).message).toBe("bad");
+    expect((r.structuredContent.error as Record<string, unknown>).message).toBe(
+      "bad",
+    );
     // crucially: never the opaque stringified object the SDK would emit
     expect(r.content[0].text).not.toContain("[object Object]");
   });
@@ -86,7 +93,11 @@ describe("toolError", () => {
 
 describe("scaleLegend", () => {
   it("returns only the requested scales (§5.3)", () => {
-    const legend = scaleLegend("overall_fatigue", "effort_rating", "performance_rating");
+    const legend = scaleLegend(
+      "overall_fatigue",
+      "effort_rating",
+      "performance_rating",
+    );
     expect(legend).toEqual({
       overall_fatigue: FEEDBACK_SCALES.overall_fatigue,
       effort_rating: FEEDBACK_SCALES.effort_rating,

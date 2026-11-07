@@ -39,7 +39,9 @@ export type FeedbackScaleKey = keyof typeof FEEDBACK_SCALES;
  * fatigue/effort/performance doesn't ship the joint-pain/pump scales it never
  * reports). Pure. (§5.3)
  */
-export function scaleLegend(...keys: FeedbackScaleKey[]): Record<string, string> {
+export function scaleLegend(
+  ...keys: FeedbackScaleKey[]
+): Record<string, string> {
   const out: Record<string, string> = {};
   for (const k of keys) out[k] = FEEDBACK_SCALES[k];
   return out;
@@ -73,9 +75,12 @@ export function roundTo(n: number | null | undefined, dp = 1): number | null {
 }
 
 /** Round to one decimal place, null-safe — the connector's default precision. */
-export const round1 = (n: number | null | undefined): number | null => roundTo(n, 1);
+export const round1 = (n: number | null | undefined): number | null =>
+  roundTo(n, 1);
 
 export interface EnvelopeOpts {
+  /** Defaults to the workout weight unit; length-only tools state their unit. */
+  units?: "lb" | "in" | "cm";
   /** sample sizes / coverage / caveats that qualify the numbers */
   dataQuality?: Record<string, unknown> | null;
 }
@@ -84,7 +89,7 @@ export interface Envelope<T = unknown> {
   schema_version: number;
   generated_at: string;
   /** the app records weight exclusively in pounds */
-  units: "lb";
+  units: "lb" | "in" | "cm";
   data_quality: Record<string, unknown> | null;
   data: T;
 }
@@ -93,17 +98,22 @@ export function envelope<T>(data: T, opts: EnvelopeOpts = {}): Envelope<T> {
   return {
     schema_version: MCP_SCHEMA_VERSION,
     generated_at: new Date().toISOString(),
-    units: "lb",
+    units: opts.units ?? "lb",
     data_quality: opts.dataQuality ?? null,
     data,
   };
 }
 
 /** Standard MCP tool result: the enveloped payload as text + structured content. */
-export function toolResult(data: Record<string, unknown>, opts: EnvelopeOpts = {}) {
+export function toolResult(
+  data: Record<string, unknown>,
+  opts: EnvelopeOpts = {},
+) {
   const payload = envelope(data, opts);
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify(payload, null, 2) },
+    ],
     structuredContent: payload as unknown as Record<string, unknown>,
   };
 }
@@ -156,7 +166,9 @@ export function toolError(err: unknown) {
   const error = toStructuredError(err);
   const payload = { error };
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify(payload, null, 2) },
+    ],
     structuredContent: payload as unknown as Record<string, unknown>,
     isError: true as const,
   };

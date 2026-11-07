@@ -22,22 +22,25 @@ Every site is optional; any nonempty subset can be saved. Prior readings are
 dated hints, never prefilled as new observations.
 
 The latest owner clarification supersedes the fixed-bar behavior in 4.13a-d.
-Figure **4.13e**, design/mockups/body-measurements-page-flow.html, precedes code.
+Figures **4.13f-g**, design/mockups/body-measurements-entry-review.html,
+precede the latest automatic-check / typo-review correction. Figure 4.13e
+keeps authority over document flow; 4.13f-g remove its Cancel action.
 The page shares actual DayView cell classes and LogCheckbox:
 35px cells, 15px values, 23px squares and 10px gaps. Widths match workout
 weight/reps cells at every viewport. Landmark chevrons reveal cues only;
 no sites are hidden. Date, units and notes use existing shared controls.
 
-Checkmarks are a local checklist. Editing clears a mark; unit conversion
-preserves it. Complete saves **all entered values, checked or not**; blanks
+Checkmarks are local. Valid decimal entries check automatically; invalid or
+empty entries clear their mark. Manual toggling and unit conversion preserve
+the current local checklist choice. Complete saves **all entered values, checked or not**; blanks
 are skipped. There is no all-sites/all-checked gate, per-row write or queue.
-Errors retain input. Dirty Cancel asks before discarding. Delete session
+Errors retain input. The X asks before discarding dirty entries. Delete session
 uses the themed BottomSheet, Keep session and destructive-outline DELETE.
 
 The logger replaces the ledger inside the existing app shell. The document
 scrolls, with no form scroller, portal, fixed action bar or body lock. Complete
-and Cancel are the last content in the form: below the fold at top/middle,
-visible at the end above the existing tab bar. Their placement matches the
+is the last action in the form: below the fold at top/middle,
+visible at the end above the existing tab bar. Its placement matches the
 actual DayView's inline COMPLETE WORKOUT action, while partial save stays
 independent of checkmarks. The header follows DayHeader's sticky grammar.
 Date is 160 x 35px; units are 88 x 35px. Shared controls expose an opt-in compact
@@ -138,3 +141,21 @@ Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176
 and progression sign-in (line 217) pass on retry; N84 remains open.
 Hosted signed-in and physical iOS remain unverified; no merge/promotion.
 [Detailed evidence](reviews/2026-11-07-body-measurements-page-flow.md).
+
+
+## Latest owner amendment - 2026-11-07
+
+Cancel is removed. A valid decimal number checks automatically. Empty/invalid
+entries clear checks; the X keeps discard protection. Positive values up to
+150 in remain the hard boundary. Broad per-site ranges and changes above both
+2 in and 20% of the latest earlier same-site value prompt review. These are
+entry-error heuristics, not clinical ranges or biological limits. Edit values
+returns to the field; Save as entered permits legitimate unusual measurements.
+Neither requires every site or checkmark.
+
+The staged read-only MCP tool returns owner-scoped measurements and same-site
+deltas with dates, units, intervals and explicit within-page baselines. No new
+schema or writes. The proposed 1.3 modal makes measurements the flagship and
+the existing tool-list notice minor. Its staged-only preview cannot acknowledge
+a release; screenshots await owner approval. Per-site notes and data-first
+overview context remain future work. [Evidence](reviews/2026-11-07-body-measurements-followup.md).

@@ -11,9 +11,10 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
   {
     id: "monthly-body-measurements",
     title: "Keep a monthly record of body measurements",
-    body: "Log any subset in More with workout-style rows and checkboxes, compact date and unit controls, and completion after the last field. Compare the same sites across dates beside your training and DEXA records.",
+    body: "Log monthly tape measurements in More. Record any sites and compare dated changes. Your assistant can read the measurements and same-site changes alongside your training and DEXA records.",
     area: "stats",
     highlight: true,
+    featured: true,
     link: {
       label: "Body measurements",
       target: { kind: "app", href: "/more/measurements" },
@@ -21,8 +22,8 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
   },
   {
     id: "connector-tool-list-refresh-notice",
-    title: "WORKOUT flags an assistant's out-of-date tool list",
-    body: "An assistant caches what WORKOUT can do when you connect it and never refreshes on its own, so an older connection can be missing tools. WORKOUT now tells the connections that are behind — and only those — how to refresh.",
+    title: "Know when your AI tools need a refresh",
+    body: "WORKOUT tells older assistant connections when to refresh their tool list.",
     area: "connector",
     highlight: true,
     link: {
@@ -39,4 +40,5 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
 export const UNRELEASED_VERSION = "1.3.0";
 
 /** Set when the staged block has a release-level headline. */
-export const UNRELEASED_HEADLINE: string | undefined = undefined;
+export const UNRELEASED_HEADLINE: string | undefined =
+  "Track size changes between scans";

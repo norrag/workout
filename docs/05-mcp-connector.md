@@ -348,3 +348,21 @@ mcp/
 - Rate limiting per token; payload caps on history queries (paginated).
 - Write tools are draft/append plus a bounded **undo**: the `delete_*` / `discard_engine_params` tools remove only planning artifacts a create produced by mistake and **never delete or edit logged history** — a block/exercise with logged sets (or a referenced/active one, or an in-use params version) is always refused (review §5.8, hard rule #5).
 - Audit log of MCP write operations (`mcp_write_audit`: tool, args hash, timestamp) readable by the owner; param activations always require the explicit-confirm argument.
+
+
+## Staged 1.3 - tape measurements (2026-11-07, N96)
+
+`get_body_measurements({ unit?: "in" | "cm", limit?: 1..120, before?: ISO-date })`
+reads the signed-in user's tape sessions and notes. Defaults: inches, 24 sessions.
+Before is exclusive; has_more/next_before page older sessions. Identity comes
+only from resolveSession and its bearer-bound RLS client, with an additional
+owner query filter. There is no user_id argument and no write operation.
+
+Each entered reading returns its same-site/side previous value/date, delta and
+day interval within the returned page. Missing stays missing; the first
+reading has null comparison fields. Dates, units, rounding and caveats travel
+with the result. The envelope units field permits in/cm for this length-only
+tool; existing tools keep default lb. No incompatible old payload change or
+manual generation bump is needed; the served definition changes the catalog hash.
+Registration follows releaseActive("1.3.0"). The larger doc-20 companion and
+any synthesis/prescription coupling remain deferred.

@@ -9,17 +9,20 @@ type Client = SupabaseClient<Database>;
 export async function getTapeSessions(
   client: Client,
   userId: string,
+  options: { before?: string; limit?: number } = {},
 ): Promise<TapeSession[]> {
   const sessions: TapeSession[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await client
+    let query = client
       .from("measurement_sessions")
       // A single statement snapshot keeps a concurrent correction/deletion
       // from separating a session header from its readings.
       .select("id,measured_on,input_unit,note,measurements(site_key,value_in)")
       .eq("user_id", userId)
-      .order("measured_on", { ascending: false })
-      .range(from, from + 999);
+      .order("measured_on", { ascending: false });
+    if (options.before) query = query.lt("measured_on", options.before);
+    const end = Math.min(from + 999, (options.limit ?? Infinity) - 1);
+    const { data, error } = await query.range(from, end);
     if (error) throw error;
     const rows = (data ?? []) as unknown as Array<{
       id: string;
@@ -42,7 +45,12 @@ export async function getTapeSessions(
         }),
       ),
     );
-    if (!data || data.length < 1000) break;
+    if (
+      !data ||
+      data.length < end - from + 1 ||
+      sessions.length >= (options.limit ?? Infinity)
+    )
+      break;
   }
   return sessions;
 }

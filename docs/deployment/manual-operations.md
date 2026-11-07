@@ -969,3 +969,16 @@ UI SHA; actual logs confirm `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
 Protected fetch reaches app sign-in (200). No persistent env change, new migration,
 health-data write or production promotion. Production read remains aed94ce.
 [Detailed evidence](../reviews/2026-11-07-body-measurements-page-flow.md).
+
+
+### N96 - automatic checks / connector / release proposal
+
+New UI and staged read-only connector need no migration. Keep production data
+and registry at their existing state. Build the new feature commit in Preview
+with deployment-specific `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
+The explicit nonproduction route `/more/whats-new/preview` is a proposal and
+never acknowledges a release. Capture real-renderer screenshots for approval;
+do not promote or create a release registry entry before acceptance. Hosted
+uses shared production, so functional write tests use guarded disposable local
+Supabase accounts in CI. Record fresh immutable preview and terminal CI in the
+[follow-up evidence](../reviews/2026-11-07-body-measurements-followup.md).

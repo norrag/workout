@@ -291,19 +291,52 @@ export const UG_BODY_DATA: ManualChapter = {
               { kind: "heading", text: "Taking body measurements" },
               {
                 kind: "para",
-                text: "More → Body measurements lists all 12 sites in upper- and lower-body groups. Every site is optional. Follow the placement cues under consistent conditions, with snug tape that does not compress skin.",
+                text: "Open More → Body measurements. Choose a date and inches or centimetres. Each of the 12 sites is optional. Measure relaxed, before training, with the same tape placement. Keep the tape snug without pressing the skin.",
               },
               {
                 kind: "para",
-                text: "Choose inches or centimetres and a date; switching units converts entered values. Previous readings are dated hints, never prefilled. Complete saves all entered values, including unchecked ones; one site is enough. Edit corrects a session; Export measurements downloads the tape history as CSV.",
+                text: "Valid numbers check automatically. Complete saves all entered values, including unchecked ones. Blank sites are skipped. For unusual entries, choose Edit values or Save as entered.",
               },
               {
                 kind: "para",
-                text: "Check readings as you go; editing clears a checkmark. Marks track progress locally. Complete and Cancel appear after the last field, when you scroll to the bottom. Next advances through fields. Cancel asks before discarding. Delete session opens a themed confirmation; Keep session cancels it.",
+                text: "Complete appears after the last field. The X asks before discarding unsaved entries. Next moves to the next field. Edit corrects a session. Delete session asks for confirmation.",
               },
               {
                 kind: "para",
-                text: "Latest compares dated sessions and shows their interval; History follows one site and side. Skipped sites stay missing. Placement, breathing or hydration can affect small differences; size alone cannot distinguish muscle from fat. Tape never changes profile, goals or prescriptions. Review workout progress and DEXA alongside it.",
+                text: "Latest compares dated sessions. History follows one site and side. Skipped sites have no change. Export measurements downloads your tape history as CSV.",
+              },
+              {
+                kind: "para",
+                text: "Tape position, breathing and hydration affect readings. Circumference alone cannot distinguish muscle from fat. Compare workout and DEXA records by date. DEXA also has measurement limits. Tape does not change profile, goals or prescriptions.",
+              },
+              {
+                kind: "detail",
+                blocks: [
+                  {
+                    kind: "para",
+                    text: "Tap a site name for its placement cue. Previous readings show their dates. The app does not enter previous readings as new measurements.",
+                  },
+                  {
+                    kind: "para",
+                    text: "Use a positive decimal number, up to 150 in or 381 cm. Invalid or empty entries clear the checkmark. You can also toggle a checkmark yourself. A checkmark does not save a reading. One entered site is enough to save a session.",
+                  },
+                  {
+                    kind: "para",
+                    text: "The app asks you to review values outside broad ranges or far from previous readings. These checks catch entry mistakes. They do not define healthy measurements or limits on progress. Choose Edit values to correct an entry. Choose Save as entered if the measurement is correct.",
+                  },
+                  {
+                    kind: "para",
+                    text: "Switching units converts existing entries. To correct the unit of an entry, first clear its value. Select the correct unit. Enter the measurement again.",
+                  },
+                  {
+                    kind: "para",
+                    text: "If a save fails, the form keeps your entries. Keep session cancels deletion. Latest shows the dates and interval for its comparison.",
+                  },
+                  {
+                    kind: "para",
+                    text: "A connected assistant can read your tape sessions and changes for the same site and side. The results include units, comparison dates and intervals. The first reading in each returned page has no earlier comparison.",
+                  },
+                ],
               },
             ] satisfies ManualBlock[])
           : []),

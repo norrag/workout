@@ -24,6 +24,24 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-07 - N96 automatic checks, MCP reads and release proposal
+
+Figures 4.13f-g/4.7b precede code. Cancel removed; X guards discard. Decimal
+entries auto-check, with confirmable typo review from broad site ranges and
+large earlier same-site changes. Partial/unchecked values still save. New
+read-only staged MCP access includes owner-scoped dated measurements/deltas,
+unit labels and bounded paging. Real token-bound two-account integration tests
+cover isolation. No schema or engine changes.
+
+The 1.3 proposal features measurements and makes the existing tool-list notice
+minor. Explicit review-only route and real-renderer screenshots are prepared;
+owner approval is pending, not assumed. Measurement Guide/claims simplified
+and checked against code; doc 20's overconfident tissue interpretations corrected.
+Per-site notes, transparent overview context and two DEXA accuracy issues remain
+follow-ups. Local actual-component mobile checks pass with no page errors;
+temporary root fixture restored and server stopped. Persistence/connector CI
+and fresh preview follow. [Evidence](reviews/2026-11-07-body-measurements-followup.md).
+
 ## 2026-11-07 - N96 clarification: complete at the page end
 
 Figure 4.13e precedes the correction. The owner's explicit clarification

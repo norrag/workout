@@ -31,6 +31,11 @@ import {
   type TapeUnit,
 } from "@/lib/measure/tape";
 import { removeMeasurements, saveMeasurements } from "./actions";
+import {
+  parseTapeNumber,
+  validTapeEntry,
+  tapeEntryWarnings,
+} from "@/lib/measure/tape-plausibility";
 
 const caps = "label-caps text-[10px] font-bold";
 const muted = "text-ink/70";
@@ -465,6 +470,8 @@ function MeasurementForm({
       errorRef.current?.scrollIntoView({ block: "center" });
   }, [error, errorSite]);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [review, setReview] = useState<TapeSession | null>(null);
+  const reviewEditSite = useRef<TapeSiteKey | null>(null);
   const [landmark, setLandmark] = useState<TapeSiteKey | null>(null);
   const [checked, setChecked] = useState<Partial<Record<TapeSiteKey, boolean>>>(
     () =>
@@ -499,12 +506,12 @@ function MeasurementForm({
     }
     const reading = tapeReadingSchema.safeParse({
       site_key: key,
-      value_in: toInches(Number(entered), unit),
+      value_in: toInches(parseTapeNumber(entered), unit),
     });
     if (!reading.success) {
       setErrorSite(key);
       setError(
-        Number.isFinite(Number(entered))
+        Number.isFinite(parseTapeNumber(entered))
           ? reading.error.issues[0].message
           : "Enter a valid number.",
       );
@@ -535,10 +542,11 @@ function MeasurementForm({
       Object.fromEntries(
         Object.entries(values).map(([key, value]) => [
           key,
-          value?.trim() && Number.isFinite(Number(value))
+          value?.trim() && Number.isFinite(parseTapeNumber(value))
             ? String(
                 Math.round(
-                  fromInches(toInches(Number(value), unit), next) * 10000,
+                  fromInches(toInches(parseTapeNumber(value), unit), next) *
+                    10000,
                 ) / 10000,
               )
             : value,
@@ -551,10 +559,33 @@ function MeasurementForm({
     e.preventDefault();
     setErrorSite(null);
     setError("");
+    const invalid = TAPE_SITES.find(
+      (site) =>
+        values[site.key]?.trim() &&
+        !validTapeEntry(values[site.key]!, site.key, unit),
+    );
+    if (invalid) {
+      const number = parseTapeNumber(values[invalid.key]!);
+      setErrorSite(invalid.key);
+      setError(
+        !Number.isFinite(number)
+          ? "Enter a valid number."
+          : number <= 0
+            ? "Measurements must be above zero."
+            : "Check the measurement and unit.",
+      );
+      document.getElementById(`${formId}-${invalid.key}`)?.focus();
+      return;
+    }
     const readings = TAPE_SITES.flatMap((s) => {
       const value = values[s.key]?.trim();
       return value
-        ? [{ site_key: s.key, value_in: toInches(Number(value), unit) }]
+        ? [
+            {
+              site_key: s.key,
+              value_in: toInches(parseTapeNumber(value), unit),
+            },
+          ]
         : [];
     });
     const parsed = tapeSessionSchema.safeParse({
@@ -578,10 +609,18 @@ function MeasurementForm({
       );
       return;
     }
+    if (tapeEntryWarnings(parsed.data, sessions).length > 0) {
+      setReview(parsed.data);
+      return;
+    }
+    persist(parsed.data);
+  }
+  function persist(next: TapeSession) {
+    setReview(null);
     startTransition(async () => {
       try {
         const result = await saveMeasurements({
-          session: parsed.data,
+          session: next,
           timezoneOffset: new Date().getTimezoneOffset(),
         });
         if (result.error) setError(result.error);
@@ -619,7 +658,7 @@ function MeasurementForm({
             <button
               type="button"
               onClick={close}
-              aria-label="close"
+              aria-label="Close measurements"
               className="-mr-2 flex h-11 w-11 items-center justify-center text-xl text-ink/50"
             >
               ×
@@ -654,8 +693,8 @@ function MeasurementForm({
       >
         <div role="region" aria-label="Measurement fields" className="min-w-0">
           <p className="text-xs leading-relaxed text-ink/70">
-            Check readings as you go. Complete saves every entered value; blank
-            sites are skipped.
+            Valid entries are checked automatically. Complete saves every
+            entered value; blank sites are skipped.
           </p>
           <div className="mt-4 flex min-w-0 items-end justify-between gap-4">
             <div className="w-40 min-w-0 max-w-full">
@@ -746,6 +785,10 @@ function MeasurementForm({
                     <input
                       id={fieldId}
                       aria-label={site.label + " (" + unit + ")"}
+                      aria-invalid={errorSite === key || undefined}
+                      aria-describedby={
+                        errorSite === key ? fieldId + "-error" : undefined
+                      }
                       type="text"
                       inputMode="decimal"
                       enterKeyHint="next"
@@ -754,11 +797,15 @@ function MeasurementForm({
                       value={values[key] ?? ""}
                       disabled={pending}
                       onChange={(e) => {
+                        const nextValue = e.currentTarget.value;
                         setValues((current) => ({
                           ...current,
-                          [key]: e.target.value,
+                          [key]: nextValue,
                         }));
-                        setChecked((current) => ({ ...current, [key]: false }));
+                        setChecked((current) => ({
+                          ...current,
+                          [key]: validTapeEntry(nextValue, key, unit),
+                        }));
                         setError("");
                         setErrorSite(null);
                       }}
@@ -791,6 +838,7 @@ function MeasurementForm({
                     />
                     {error && errorSite === key && (
                       <p
+                        id={fieldId + "-error"}
                         role="alert"
                         className="col-span-3 py-2 text-xs leading-relaxed"
                       >
@@ -849,16 +897,7 @@ function MeasurementForm({
               {error}
             </p>
           )}
-          <div className="grid grid-cols-[1fr_2fr] gap-2.5">
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={pending}
-              className="min-h-[52px] w-full py-0 text-[13px]"
-              onClick={close}
-            >
-              CANCEL
-            </Button>
+          <div>
             <Button
               type="submit"
               variant="primary"
@@ -872,6 +911,74 @@ function MeasurementForm({
         </div>
       </form>
       <>
+        <BottomSheet
+          open={review !== null}
+          onClose={() => setReview(null)}
+          onAfterClose={() => {
+            const key = reviewEditSite.current;
+            reviewEditSite.current = null;
+            if (!key) return;
+            const input = document.getElementById(`${formId}-${key}`);
+            input?.focus();
+            input?.scrollIntoView({ block: "center" });
+          }}
+          title="Check these measurements"
+        >
+          <p className="text-[12.5px] leading-[1.5] text-ink/75">
+            Check the units and tape placement. These checks catch entry
+            mistakes; they do not measure body composition.
+          </p>
+          <ul className="mt-4">
+            {review &&
+              tapeEntryWarnings(review, sessions).map((warning) => (
+                <li
+                  key={warning.siteKey}
+                  className="border-y border-ink/20 py-3 text-xs leading-relaxed"
+                >
+                  <p className="font-semibold">
+                    {TAPE_SITES.find((s) => s.key === warning.siteKey)!.label} —{" "}
+                    {tapeValue(warning.valueIn, unit)} {unit.toUpperCase()}
+                  </p>
+                  {warning.previous && (
+                    <p className="mt-1 text-ink/65">
+                      Previous {tapeValue(warning.previous.valueIn, unit)}{" "}
+                      {unit.toUpperCase()} ·{" "}
+                      {shortDateWithYear(warning.previous.date)}
+                    </p>
+                  )}
+                  <p className="mt-1 text-ink/65">
+                    {warning.reasons.includes("range")
+                      ? "This is outside a broad entry range for this site."
+                      : "This differs substantially from the previous reading."}
+                  </p>
+                </li>
+              ))}
+          </ul>
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                const first = review && tapeEntryWarnings(review, sessions)[0];
+                reviewEditSite.current = first?.siteKey ?? null;
+                setReview(null);
+              }}
+              className="px-4 py-3 text-[13px] font-semibold text-ink/60"
+            >
+              Edit values
+            </button>
+            <Button
+              type="button"
+              disabled={pending}
+              variant="primary"
+              onClick={() => {
+                if (review) persist(review);
+              }}
+            >
+              SAVE AS ENTERED
+            </Button>
+          </div>
+        </BottomSheet>
         <LeaveConfirm
           open={leaveHref !== undefined}
           body="Your measurements haven't been saved."

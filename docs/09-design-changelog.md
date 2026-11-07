@@ -33,6 +33,17 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-11-07 - N96: automatic checks, typo review and release proposal
+
+Figures 4.13f-g and 4.7b in design/mockups/body-measurements-entry-review.html
+were rendered before implementation. Remove Cancel; X retains discard protection.
+Valid numeric entries check automatically. Complete remains normal document
+content. Broad site ranges and large same-site differences prompt themed review
+with Edit values / Save as entered; these are entry heuristics, not clinical
+limits. Partial sessions remain valid. The proposed 1.3 modal makes measurements
+the flagship and the tool-list refresh notice minor; approval is pending.
+No release registry activation, new schema or prescription input.
+
 ## 2026-11-07 - N96 clarification: actions at document end
 
 - **Change (RETROFIT):** figure 4.13e in

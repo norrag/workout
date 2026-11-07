@@ -36,6 +36,7 @@ export function BottomSheet({
   title,
   subtitle,
   fullHeight = false,
+  onAfterClose,
   children,
 }: {
   open: boolean;
@@ -50,6 +51,8 @@ export function BottomSheet({
    * Used for the planner exercise picker (better visibility).
    */
   fullHeight?: boolean;
+  /** Optional follow-up focus after the exit and default focus restoration. */
+  onAfterClose?: () => void;
   children: ReactNode;
 }) {
   const { render, shown } = useSheetTransition(open);
@@ -58,6 +61,15 @@ export function BottomSheet({
   // Escape closes, focus moves in on open / back to the opener on close, and
   // Tab stays inside while open (R18)
   useModalA11y(render, panelRef, onClose);
+  const afterCloseRef = useRef(onAfterClose);
+  const wasRendered = useRef(render);
+  useEffect(() => {
+    afterCloseRef.current = onAfterClose;
+  });
+  useEffect(() => {
+    if (wasRendered.current && !render) afterCloseRef.current?.();
+    wasRendered.current = render;
+  }, [render]);
   if (!render) return null;
   // overscroll-contain: the panel's scroll must never chain to the page (N32)
   const panelClass = fullHeight
@@ -104,7 +116,9 @@ export function BottomSheet({
             {subtitle}
           </p>
         )}
-        <div className={fullHeight ? "mt-5 flex min-h-0 flex-1 flex-col" : "mt-5"}>
+        <div
+          className={fullHeight ? "mt-5 flex min-h-0 flex-1 flex-col" : "mt-5"}
+        >
           {children}
         </div>
       </div>

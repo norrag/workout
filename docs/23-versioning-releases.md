@@ -739,3 +739,16 @@ regardless — they replace a hardcoded string with a CI-enforced identity. Phas
 - **`docs/PROGRESS.md`** keeps the build record; the registry is user-facing copy and is not a substitute for it.
 - **Doc 20** — MEASURE's `surface` reservation, per its §3.4 separation-readiness rules.
 - Workstream **V** ("Versioning & releases") in `docs/notes/` is this work's home; the tracking item is **N80**.
+
+
+## 2026-11-07 - proposed 1.3 announcement review
+
+Figure 4.7b proposes measurements as the single featured entry. The shared
+entry renderer accepts optional featured metadata; only the announcement varies
+its type sizes, and the history keeps the normal renderer and identical copy.
+The existing tool-list refresh notice is a smaller secondary entry. A featured
+entry must be a highlight, with at most one per release. No 1.3 registry file
+or package bump is made. The nonproduction override-only review route
+`/more/whats-new/preview` renders FOR REVIEW / NOT RELEASED and never calls
+the acknowledgment action. Screenshot review is pending owner approval; it
+is not release authorization.

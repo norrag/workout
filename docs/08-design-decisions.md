@@ -171,3 +171,8 @@ content after the final field, appearing at the page end like DayView's inline
 completion action. Date/units shrink to 35px. All sites remain optional.
 Runtime top/middle/end and actual-workout evidence is in
 [the page-flow review](reviews/2026-11-07-body-measurements-page-flow.md).
+
+**4.13f-g** and **4.7b**, `design/mockups/body-measurements-entry-review.html`,
+precede automatic entry checks, confirmable typo review and a proposed 1.3 modal.
+They remove 4.13e's Cancel action, retaining X/discard and document-flow Complete.
+The release proposal is not approved or released. See the dated 09 amendment.
