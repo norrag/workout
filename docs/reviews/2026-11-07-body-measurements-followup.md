@@ -115,3 +115,49 @@ named measurement form; the app's accessible announcer remains intact. No
 auth bypass, longer timeout or blind rerun was introduced. The changed test
 commit receives fresh CI. Approval PNGs for light/dark/narrow are replaced
 with actual signed-in local-Supabase captures, without the dev indicator.
+
+
+## Corrected CI and preview checkpoint
+
+READY review preview: https://workout-ngcfgtf10-garron-duprees-projects.vercel.app/more/measurements
+Release proposal: same host /more/whats-new/preview (not approved or released).
+UI pinned to 8ecfc4d5affcbff823f599a99b2c4fee70b9e0ae; deployment-specific
+public 1.3.0 build override confirmed. Corrected test/document head is
+7dda88c0ecf620b35d8708d120dbedeace004dbf with identical application source.
+CI 42396673985 is terminal success on attempt 1: 2,189 unit tests, 12 built
+guards, 84 RLS, 21 integration and drift pass. Full smoke: 13 direct passes.
+Targeted cases: 3 direct passes / 1 pre-form sign-in retry; all flows pass.
+N84 stays open. Real signed-in local-Supabase tests cover partial save,
+correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
+connector isolation. Hosted signed-in and physical iOS remain unverified.
+No schema change, production health-data write, merge or promotion.
+
+[CI run](https://github.com/norrag/workout/actions/runs/42396673985).
+The targeted typo case times out at sign-in line 36, then passes in 3.0s; it
+passes directly in full smoke in 4.0s. Its first failure precedes the form.
+The earlier capture failures' retained traces show 303 /workout redirects
+after 161/115ms yet remain at sign-in, with React 418; one response remains
+unfinished and the other completes in 77ms. These observations match the
+controlled unchanged-main classes already documented under N84, not a proven
+root cause. The concrete selector error is fixed; the app's route announcer
+and authentication flow are unchanged. No blind rerun or timeout change.
+
+Deployment dpl_8xBTG9ALY9ynzp6zmqcvho5KXBfA is READY Preview (target null).
+Actual build logs confirm NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build.
+Both protected review URLs return app sign-in, HTTP 200. Production remains
+READY at aed94cedcf7ec94c81e4f480f5db686b60e9d084 / deployment
+dpl_D1Qd93s21sHMp5b4mjPLXMq38e4i. Registry/package stay 1.2.1. The hosted
+additive measurement migration already applied in the prior pass is unchanged.
+
+Real signed-in proposal captures (synthetic local account):
+
+- [Light](../design/screenshots/release-1.3-proposal-light.png)
+- [Dark](../design/screenshots/release-1.3-proposal-dark.png)
+- [Narrow mobile](../design/screenshots/release-1.3-proposal-narrow-top.png)
+- [Typo review](../design/screenshots/measurement-typo-review.png)
+
+Light/dark/narrow PNGs are also delivered as Library image files for owner
+review. An explicit design/copy approval request is pending. This does not
+authorize release or promotion. The separate tooltip/tool-list clarification
+is unanswered; the proposal preserves the only existing minor staged entry.
+Final docs-only CI is reported at delivery without changing the pinned UI.

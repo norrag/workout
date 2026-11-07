@@ -159,3 +159,20 @@ schema or writes. The proposed 1.3 modal makes measurements the flagship and
 the existing tool-list notice minor. Its staged-only preview cannot acknowledge
 a release; screenshots await owner approval. Per-site notes and data-first
 overview context remain future work. [Evidence](reviews/2026-11-07-body-measurements-followup.md).
+
+
+### N96 follow-up verification checkpoint - 2026-11-07
+
+READY review preview: https://workout-ngcfgtf10-garron-duprees-projects.vercel.app/more/measurements
+Release proposal: same host /more/whats-new/preview (not approved or released).
+UI pinned to 8ecfc4d5affcbff823f599a99b2c4fee70b9e0ae; deployment-specific
+public 1.3.0 build override confirmed. Corrected test/document head is
+7dda88c0ecf620b35d8708d120dbedeace004dbf with identical application source.
+CI 42396673985 is terminal success on attempt 1: 2,189 unit tests, 12 built
+guards, 84 RLS, 21 integration and drift pass. Full smoke: 13 direct passes.
+Targeted cases: 3 direct passes / 1 pre-form sign-in retry; all flows pass.
+N84 stays open. Real signed-in local-Supabase tests cover partial save,
+correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
+connector isolation. Hosted signed-in and physical iOS remain unverified.
+No schema change, production health-data write, merge or promotion.
+Detailed evidence: docs/reviews/2026-11-07-body-measurements-followup.md.
