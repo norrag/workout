@@ -73,3 +73,38 @@ with a verified signed-in save. No production test identities/readings, schema
 change, merge or promotion is part of this correction. N84's broader smoke
 failures remain tracked separately; final CI/preview status belongs in the
 delivery checkpoint.
+
+
+## Deployed UI checkpoint
+
+Corrected preview: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
+READY deployment dpl_6t341sbHj3sooMVJB32ymNjJ7DBN, pinned to UI commit
+ebffc809c6bf3d05be682feea6142b1db1fc436b. Build events confirm
+NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build; target is Preview.
+Keep this URL pinned through documentation-only follow-ups.
+
+CI [42386443416](https://github.com/norrag/workout/actions/runs/42386443416):
+2,175 unit tests, 12 built service-worker guards, lint/typecheck/build,
+84 RLS, 18 integration and hosted drift pass. Both targeted measurement
+cases pass without retries (4.393/3.400s). The report contains nine mobile
+screenshots; narrow top/bottom captures were inspected.
+
+Full smoke is terminal red: **7 passed, 1 failed, 3 flaky, 0 skipped**.
+BodySpec detail line 141 fails twice. BodySpec Keep current, macro closeout
+and tape capture pass on retry. The tape failure is line 37, sign-in before
+the form opens: HTTP 303 /workout;push after 91ms (receive 76ms), yet the
+trace remains on /sign-in and records React 418. This matches the fresh
+unchanged-main controls in the prior comparison; the warning does not prove
+causation. Tape capture then passes in 3.9s; mobile geometry passes directly
+in 3.3s. N84 remains open. No timeout inflation, bypass or speculative patch.
+
+The actual protected preview returns app sign-in (200), with the served
+viewport width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover.
+Hosted signed-in actions remain unverified pending GitHub/Vercel sign-in;
+physical iOS keyboard/zoom is unverified. Local/CI records are synthetic.
+No schema or production data mutation in this pass. Shared hosted DB status
+is unchanged. Production frontend still uses aed94ce / release 1.2.1.
+No merge or promotion. Draft PR #265 remains under owner review.
+
+
+![Actual workout and tape logger compared with fictional data](../design/screenshots/body-measurements-workout-comparison.png)

@@ -927,3 +927,17 @@ at 1.2.1. No new migration or hosted data changes. Chrome is at GitHub/Vercel
 sign-in; READY/HTTP sign-in are not signed-in UI verification. Physical iOS
 remains unverified. Record the fresh immutable preview and final CI checkpoint
 after the implementation commit. No merge or promotion.
+
+
+#### Corrected N96 deployment checkpoint
+
+READY: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
+Deployment dpl_6t341sbHj3sooMVJB32ymNjJ7DBN is Preview, pinned to
+ebffc809c6bf3d05be682feea6142b1db1fc436b. Build logs confirm
+NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build; no persistent env change.
+Keep this URL pinned through documentation-only commits. Production read
+still shows aed94ce / 1.2.1. Shared hosted database/migration status unchanged.
+CI 42386443416 passes feature/RLS/integration/drift checks; full smoke is red
+under N84. [Evidence](../reviews/2026-11-07-body-measurements-layout.md).
+Protected fetch reaches app sign-in (200). Chrome sign-in handoff and physical
+iOS checks remain; hosted save/delete is unverified. No merge/promotion.

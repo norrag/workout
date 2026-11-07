@@ -43,6 +43,14 @@ Temporary root fixture restored before commit. Hosted signed-in actions and
 physical-iOS behavior remain unverified. No schema, engine, production release
 identity, merge or promotion. Fresh preview and final CI checkpoint follow.
 
+READY review preview: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
+pinned to ebffc809c6bf3d05be682feea6142b1db1fc436b, public 1.3.0 build override.
+CI 42386443416 passes checks, 84 RLS, 18 integration, drift and both targeted
+measurement cases without retries. Full smoke: 7 passed, 1 failed, 3 flaky;
+N84 remains open. Capture retries after a pre-form sign-in timeout; mobile
+passes directly. Hosted signed-in and physical iOS checks remain unverified.
+No merge/promotion. [Detailed evidence](reviews/2026-11-07-body-measurements-layout.md).
+
 ## 2026-11-06 — N96: monthly body measurements, staged for 1.3.0
 
 Owner preview refinement: figures 4.13a–b precede the mobile update. The form
