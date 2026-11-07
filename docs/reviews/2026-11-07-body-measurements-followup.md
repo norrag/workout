@@ -82,7 +82,7 @@ Signed-in local-Supabase browser tests also archive the proposal and assert no
 acknowledgment action. Owner approval remains pending, including clarification
 if “tool tips reminder” means a different feature from the staged tool-list notice.
 
-Per-measurement notes remain TODO T-N96a. The future overview is data-first:
+Per-measurement notes remain TODO T-N96a. The [future data-first direction](2026-11-07-body-records-future-direction.md) records the proposed overview context. The future overview is data-first:
 dated tape/waist/limb values and deltas beside weight, related strength and DEXA,
 with explicit baselines, missingness and uncertainty. No generated verdict,
 score, prescription advice or speculative overview implementation in this pass.
@@ -91,3 +91,27 @@ Fresh preview and CI results follow after the implementation commit. Hosted
 signed-in functionality and physical iOS behavior are not established by the
 local visual fixture. The hosted database is shared production; synthetic
 persistence tests are restricted to loopback Supabase.
+
+## First CI checkpoint and concrete test correction
+
+UI commit 8ecfc4d is READY at
+https://workout-ngcfgtf10-garron-duprees-projects.vercel.app/more/measurements
+with the deployment-specific 1.3.0 build override confirmed. The proposal is at
+the same host's `/more/whats-new/preview`. Both protected fetches reach app
+sign-in (200); this is not hosted signed-in verification.
+
+CI [42395704828](https://github.com/norrag/workout/actions/runs/42395704828)
+passes checks, 84 RLS, all 21 integration cases (including the three real
+two-account connector cases), and drift. Targeted browser results are
+2 passed / 2 failed, so broad smoke did not run. Mobile document flow,
+auto-checks, unchecked partial persistence and the real release-proposal
+renderer pass directly. The proposal made no acknowledgment action.
+
+The capture case failed at sign-in on both attempts before opening the form.
+The typo case's first attempt also failed at sign-in. Its retry exposed a
+concrete test-selector mistake: a global role=alert matched both the form
+error and Next's empty route announcer. The assertion is now scoped to the
+named measurement form; the app's accessible announcer remains intact. No
+auth bypass, longer timeout or blind rerun was introduced. The changed test
+commit receives fresh CI. Approval PNGs for light/dark/narrow are replaced
+with actual signed-in local-Supabase captures, without the dev indicator.

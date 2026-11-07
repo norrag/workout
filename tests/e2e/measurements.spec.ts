@@ -475,9 +475,11 @@ test("automatic checks and typo review allow correction or explicit confirmation
   await chest.fill("405");
   await expect(checked).not.toBeChecked();
   await complete();
-  await expect(page.getByRole("alert")).toHaveText(
-    "Check the measurement and unit.",
-  );
+  await expect(
+    page
+      .getByRole("form", { name: "log measurements", exact: true })
+      .getByRole("alert"),
+  ).toHaveText("Check the measurement and unit.");
   await expect(chest).toBeFocused();
   await chest.fill("40");
   await expect(checked).toBeChecked();
