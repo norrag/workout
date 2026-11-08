@@ -114,6 +114,11 @@ test("quick entry appends a manual point; same-day re-entry replaces it", async 
   const sheet = page.getByRole("dialog", { name: "bodyweight" });
   await sheet.locator("input").fill("204");
   await sheet.getByRole("button", { name: "SAVE" }).click();
+  // Wait for both profile and history writes before navigation can abort them.
+  await expect(sheet).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^BODYWEIGHT \d/ }),
+  ).toContainText("204");
   // the editor row now wears the shared freshness vocabulary
   await expect(
     page.getByText(/AS OF/).filter({ visible: true }).first(),
