@@ -312,6 +312,14 @@ export const UG_BODY_DATA: ManualChapter = {
               {
                 kind: "detail",
                 blocks: [
+                  ...(releaseActive("1.4.0")
+                    ? [
+                        {
+                          kind: "para" as const,
+                          text: "Your connected assistant can log new tape readings or import dated records. Give the date, unit, site and value for each reading. Review the preview before saving. Batches contain up to 100 dates and save together. Exact repeats are skipped. If a date already has different readings, nothing in that batch is saved. Correct existing entries in the app. Unusual values need confirmation.",
+                        },
+                      ]
+                    : []),
                   {
                     kind: "para",
                     text: "Tap a site name for its placement cue. Previous readings show their dates. The app does not enter previous readings as new measurements.",

@@ -366,3 +366,13 @@ tool; existing tools keep default lb. No incompatible old payload change or
 manual generation bump is needed; the served definition changes the catalog hash.
 Registration follows releaseActive("1.3.0"). The larger doc-20 companion and
 any synthesis/prescription coupling remain deferred.
+
+### Tape logging and backlog import (1.4)
+
+`import_body_measurements` accepts 1–100 explicit dated sessions with units and
+site-key/value pairs. Default preview, explicit commit, optional unusual-value
+confirmation. The batch is atomic. Exact date/payload retries are no-ops; existing
+dates with different values, note or input unit reject the batch without replacing
+history. Read back with `get_body_measurements`; corrections stay in the app.
+Owner identity is session-only. This owner-approved append-only fact tool is the
+bounded exception to draft-only writes; no logged training history is changed.
