@@ -27,6 +27,7 @@ export const LINKABLE_ROUTES = [
   "/more/connector",
   "/more/account",
   "/more/bodyspec",
+  "/more/measurements",
   "/more/whats-new",
 ] as const;
 

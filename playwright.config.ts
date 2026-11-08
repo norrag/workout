@@ -8,6 +8,11 @@ import { defineConfig, devices } from "@playwright/test";
  * The app is a phone-first PWA, so the smoke drives a mobile viewport on
  * Chromium (Pixel 7 descriptor — WebKit isn't installed in CI or the
  * sandbox).
+ *
+ * Page-level text/label queries use visible filtering: streamed hidden
+ * fragments can duplicate the active screen. Role-based lookups and dialog
+ * scopes already exclude those fragments. Keep strict matching; intentional
+ * hidden form metadata is still queried explicitly, without visible filtering.
  */
 export default defineConfig({
   testDir: "tests/e2e",

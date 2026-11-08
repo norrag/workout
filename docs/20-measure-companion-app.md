@@ -32,6 +32,10 @@ connector — so each app can be shaped by what it is for.
 
 ---
 
+## 2026-11-06 amendment — bounded tape slice inside WORKOUT
+
+The owner now requests monthly tape capture under More below BodySpec. [Doc 24](24-body-measurements.md) is the build contract for that bounded slice, with figures 4.12–4.15 completed before code. It supersedes the separate-shell/phase-order requirements only for monthly tape inside WORKOUT. The broader companion remains a direction, not a build order. Its privacy, transparent raw facts and engine boundaries still bind.
+
 ## 1. Division of labour
 
 The split is by **fact ownership**, not by screen convenience. Each fact has
@@ -362,35 +366,37 @@ never crosses the seam and never touches the engine.**
 That seal is the whole reason the tiers exist. It means a speculative feature
 can be added without any risk of it reaching a prescription.
 
-### 5.3 The corroboration matrix
+### 5.3 Read the measurements together without assigning tissue changes
 
-Over a window, reduce mass and waist each to ↑ / ↓ / flat, where **flat means
-"inside this instrument's noise band"** — not "unchanged".
+**Accuracy amendment, 2026-11-07.** The former matrix overstated what weight
+and waist can establish. The patterns below are observations, not verdicts.
+A future view should show dated values, baselines, deltas, coverage and units
+so the user can compare the sources. It should not generate a tissue label.
 
-| Mass | Waist | Reading |
+| Weight | Waist | What the readings establish |
 |---|---|---|
-| ↑ | flat | mass added without abdominal fat gain — the productive-gain signature |
-| ↑ | ↑ | gain is running fat-heavy; the rate may be above what the goal wants |
-| ↑ | ↓ | recomposition, or a measurement problem. Rare — check conditions; a scan settles it |
-| ↓ | ↓ | fat loss — the expected cut signature |
-| ↓ | flat | over a long window, more consistent with water/glycogen or lean loss than fat loss; over a short one, suspect water |
-| ↓ | ↑ | contradictory — suspect tape technique or timing before biology |
-| flat | ↓ | recomposition — the outcome scale weight alone cannot see |
-| flat | flat | maintenance, or the window is too short to say |
+| Up | Little observed difference | Weight increased. A waist reading with little difference does not rule out fat gain. |
+| Up | Up | Both increased. These readings do not identify how much muscle, fat or water changed. |
+| Up | Down | The readings moved in different directions. They do not establish recomposition. |
+| Down | Down | Both decreased. The split between fat, lean tissue and water remains uncertain. |
+| Down | Little observed difference | Weight decreased. This does not establish lean loss. |
+| Down | Up | The readings moved in different directions. Check the dates and measurement conditions. |
+| Little observed difference | Down | Waist decreased at similar recorded weight. This does not establish recomposition. |
+| Little observed difference | Little observed difference | The recorded differences are small. They do not prove maintenance or absence of change. |
 
-Two rules sit above the table:
+Little observed difference is descriptive. This project has not established a
+personal tape-measurement error band. Entry plausibility ranges are typo checks,
+not such a band. Do not convert them into confidence thresholds.
 
-- **Window minimums, enforced in code.** Mass needs a minimum weigh-in count
-  across a minimum span; waist needs ≥2 sessions a minimum interval apart.
-  Below either, the output is "not enough data" — never a reading. This ships
-  as `confidence.ts` (§7), not as copy discipline.
-- **DEXA overrides.** When same-scanner scans bracket the window, the
-  composition delta *is* the answer, subject to its LSC band, and the matrix
-  becomes corroboration of the scan rather than a substitute for it.
-
-This is deliberately a small, legible table rather than a model. A user can
-hold all eight rows in their head, and every cell is checkable against the
-three numbers above it — which is what principle 7 asks for.
+- Show counts, exact dates and intervals. If coverage is insufficient, show
+  the available readings and the missing comparison. Do not fill the gaps.
+- DEXA adds composition estimates for its own scan interval. It does not
+  settle an ambiguous tape/weight pattern or provide definitive ground truth.
+  Keep its method, dates, comparability limits and measurement uncertainty visible.
+- Matching scanner-model strings does not establish the same physical machine
+  or cross-calibration. The current implementation and generic change bands
+  need separate accuracy follow-ups; they are not expanded in this tape pass.
+- Preserve the no-composite-score and no-prescription-input boundaries.
 
 ### 5.4 On screen
 
@@ -404,8 +410,8 @@ MASS          176.4 → 172.2 LB    −4.2 LB    −0.53 LB/WK    42 OF 56 DAYS
 WAIST         34.50 → 33.25 IN    −1.25 IN                  3 SESSIONS
 COMPOSITION   APR 3 SCAN          NOT REMEASURED — 119 DAYS
 
-READING       Mass and waist are both down. Consistent with fat loss.
-              A scan would confirm the split.
+OBSERVATION   Recorded mass and waist are both down.
+              Tissue changes remain uncertain.
 
 MACRO         CUT · CONTRACT −0.4 TO −0.8 LB/WK · MEASURED −0.53 · ON PACE
 ```

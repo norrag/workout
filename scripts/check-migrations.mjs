@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+// Run with Node: npm run db:check.
 /**
  * Migration drift guard.
  *

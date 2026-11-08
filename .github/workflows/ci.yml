@@ -67,7 +67,9 @@ jobs:
         with:
           version: latest
       - name: Start local Supabase (applies migrations + seed)
-        run: supabase start
+        # Email confirmations are disabled; the unused mail viewer was colliding
+        # on port 54324 before any database tests could run.
+        run: supabase start --exclude mailpit
       - name: RLS policy tests
         run: npm run test:rls
       - name: Write-pipeline integration tests
@@ -76,6 +78,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     env:
+      # Exercise the staged block as well as shipped behavior. Production ignores it.
+      NEXT_PUBLIC_RELEASE_OVERRIDE: 1.3.0
       # the well-known static local-dev credentials (`supabase start`) — the
       # same public demo JWTs the RLS/integration suites default to
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
@@ -92,13 +96,26 @@ jobs:
         with:
           version: latest
       - name: Start local Supabase (applies migrations + seed)
-        run: supabase start
+        run: supabase start --exclude mailpit
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Build (against the local stack)
         run: npm run build
-      - name: E2E smoke
-        run: npm run test:e2e
+      - name: Sign-in hydration regression
+        run: npx playwright test tests/e2e/auth-hydration.spec.ts --repeat-each=4
+      - name: Measurements E2E (staged release)
+        run: npx playwright test tests/e2e/measurements.spec.ts
+      - name: Archive measurement mobile report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: measurements-mobile-report
+          path: playwright-report/
+          retention-days: 7
+      - name: Navigation and workout smoke (three fresh runs, no retries)
+        # N84 was timing-sensitive. Repeat the real flows, including writes,
+        # rather than let a retry hide a stalled router transition.
+        run: npm run test:e2e -- --repeat-each=3 --retries=0
       - name: Upload Playwright traces on failure
         if: failure()
         uses: actions/upload-artifact@v7

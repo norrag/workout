@@ -60,20 +60,34 @@ function EntryMedia({ media }: { media: NonNullable<ReleaseEntry["media"]> }) {
   );
 }
 
-export function ReleaseEntryList({ entries }: { entries: ReleaseEntry[] }) {
+export function ReleaseEntryList({
+  entries,
+  announcement = false,
+}: {
+  entries: ReleaseEntry[];
+  announcement?: boolean;
+}) {
+  const hasFeatured = announcement && entries.some((entry) => entry.featured);
+  const firstMinor = entries.findIndex((entry) => !entry.featured);
   return (
     <ul>
-      {entries.map((entry) => (
+      {entries.map((entry, index) => (
         <li key={entry.id} className="border-b border-ink/15 py-4 first:pt-3">
-          {entry.area && (
+          {(entry.area || (hasFeatured && index === firstMinor)) && (
             <div className="text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
-              {entry.area.toUpperCase()}
+              {hasFeatured && index === firstMinor
+                ? "ALSO INCLUDED"
+                : entry.area?.toUpperCase()}
             </div>
           )}
-          <div className="mt-0.5 text-[15px] font-bold tracking-[-0.01em]">
+          <div
+            className={`mt-0.5 tracking-[-0.01em] ${hasFeatured ? (entry.featured ? "text-xl font-extrabold leading-tight" : "text-[13px] font-bold") : "text-[15px] font-bold"}`}
+          >
             {entry.title}
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-ink/70">
+          <p
+            className={`mt-1 leading-relaxed text-ink/70 ${hasFeatured && !entry.featured ? "text-xs" : "text-sm"}`}
+          >
             {entry.body}
           </p>
           {entry.media && <EntryMedia media={entry.media} />}

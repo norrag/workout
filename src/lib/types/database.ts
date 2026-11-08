@@ -862,6 +862,22 @@ export type VBodyCompHistoryRow = {
 export type Database = {
   public: {
     Tables: {
+      measurement_sites: Table<{ key: string; display_order: number }>;
+      measurement_sessions: Table<{
+        id: string;
+        user_id: string;
+        measured_on: string;
+        input_unit: "in" | "cm";
+        note: string;
+        created_at: string;
+        updated_at: string;
+      }>;
+      measurements: Table<{
+        session_id: string;
+        user_id: string;
+        site_key: string;
+        value_in: number;
+      }>;
       profiles: Table<ProfileRow>;
       muscle_groups: Table<MuscleGroupRow>;
       exercises: Table<ExerciseRow>;
@@ -932,6 +948,16 @@ export type Database = {
       v_anchor_candidate_sets: { Row: VAnchorCandidateSetRow; Relationships: [] };
     };
     Functions: {
+      save_measurement_session: {
+        Args: {
+          p_id: string;
+          p_measured_on: string;
+          p_input_unit: string;
+          p_note: string;
+          p_readings: unknown;
+        };
+        Returns: undefined;
+      };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       // R3 write integrity: atomic multi-statement writes live in the DB so a
       // mid-flight failure can never half-apply (20260702000005).

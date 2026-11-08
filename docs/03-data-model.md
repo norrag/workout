@@ -316,3 +316,8 @@ Unified grant table for custom content:
 - **Exercise page (3.1a/3.1b):** `v_exercise_overview` — lifetime aggregates per user/exercise: last performed (date + W·D), all-time bests (weight PR, est. 1RM, volume PR, best session volume), est. 1RM by meso across the current macro, times trained, total volume, first logged. History tab groups `v_exercise_history` rows by meso.
 - **Macrocycle stats (2.2):** `v_macro_summary` — rolled up across the macro's mesos: est. strength on key lifts (% vs macro start), total volume, sessions logged, adherence. The Overview's `FULL ›` link expands the same rollup.
 - Shared views for MCP/stats: `v_exercise_history`, `v_meso_summary`, `v_meso_week_sets`, `v_exercise_prs`, `v_exercise_overview`, `v_macro_summary` — so MCP tools and the stats screens share one definition of "progress."
+
+
+## Monthly tape measurements (doc 24, N96, staged 1.3.0)
+
+measurement_sites is an authenticated-read-only stock vocabulary keyed by landmark and side. measurement_sessions holds owner/date/input-unit/note/timestamps (one per owner/day); measurements stores session/owner/site/canonical value_in. Every table has RLS. Composite session/owner FK prevents cross-owner attachment, and save_measurement_session uses invoker rights and auth.uid() for atomic replacement. Owner correction/deletion is allowed, as for other user-owned body data; profile deletion cascades. No engine/profile inputs change. Migration: 20261106191837_body_measurements.sql.

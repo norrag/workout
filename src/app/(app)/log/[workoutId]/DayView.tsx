@@ -18,6 +18,7 @@ import { AnchoredMenu, MenuGroup, MenuRow } from "@/components/ui/AnchoredMenu";
 import { SnapSlider } from "@/components/ui/SnapSlider";
 import { InfoDot } from "@/components/ui/InfoDot";
 import { LogCheckbox } from "@/components/ui/LogCheckbox";
+import { loggingCellClass } from "@/components/ui/logging-styles";
 import { PencilGlyph } from "@/components/ui/PencilGlyph";
 import { useToast } from "@/components/ui/Toast";
 import { FetchRetry } from "@/components/ui/FetchRetry";
@@ -2110,16 +2111,7 @@ function SetRow({
   }, [plannedWeight, we.bodyweight]);
 
   // denser rows (09 §5), scaled +10% per N26: 35px box, 15px value, 23px log box
-  const cellBase =
-    "h-[35px] w-full text-center text-[15px] focus:outline-none numeral";
-  const cell =
-    state === "logged"
-      ? `${cellBase} border border-ink/30 bg-ink/5 font-semibold`
-      : state === "next"
-        ? `${cellBase} border-[1.5px] border-ink bg-paper font-semibold`
-        : state === "skipped"
-          ? `${cellBase} border border-ink/15 font-medium text-ink/30 line-through`
-          : `${cellBase} border border-ink/25 font-medium text-ink/45`;
+  const cell = loggingCellClass(state);
 
   // persist an edited planned weight for this unlogged set; the server scopes
   // it to just this set or every unlogged set per the auto-match setting

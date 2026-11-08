@@ -33,6 +33,83 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-11-08 - restore the approved regular 1.3 modal
+
+Owner rejects the narrow variant and requests the first regular design with
+smaller type. **RETROFIT:** restore figure 4.7b's approved regular light/dark
+renderer at every width. Remove the below-375px variant and its special gutters,
+type and horizontal footer. Keep normal internal scrolling on short/narrow
+viewports. Do not produce another narrow design. Figure 4.7c and its screenshots
+are rejected history, not an active target. Local pixel hashes match the four
+pre-narrow baselines; 320×740/480 keep 44px controls and scrollable notes.
+Design choice is settled; release/merge still requires owner approval.
+
+## 2026-11-07 - 1.3 modal: compact narrow-phone layout
+
+- **Change (RETROFIT):** figure 4.7c in design/mockups/release-1.3-narrow.html
+  was rendered before implementation. The owner approved the prior 390px light
+  and dark screenshots, but rejected the tall, cramped 320px treatment.
+- **Scope:** only featured announcements below 375px. Use 8px horizontal
+  gutters, 16px inner padding, 22px header, 18px feature title and 13px feature
+  body. Reduce spacing and omit the redundant introductory phrase. Keep all
+  entry copy and destinations, with two 44px footer actions in one row.
+- **Preservation:** approved-width renderings stay pixel-identical; ordinary
+  dialogs and unfeatured announcements keep their existing layout. Retain
+  focus/close/scroll behavior and a scrollable middle on short viewports.
+- **Approval:** the first two designs are accepted, not the narrow revision,
+  a release or a merge. Capture the actual revised narrow modal for review.
+
+## 2026-11-07 - N96: automatic checks, typo review and release proposal
+
+Figures 4.13f-g and 4.7b in design/mockups/body-measurements-entry-review.html
+were rendered before implementation. Remove Cancel; X retains discard protection.
+Valid numeric entries check automatically. Complete remains normal document
+content. Broad site ranges and large same-site differences prompt themed review
+with Edit values / Save as entered; these are entry heuristics, not clinical
+limits. Partial sessions remain valid. The proposed 1.3 modal makes measurements
+the flagship and the tool-list refresh notice minor; approval is pending.
+No release registry activation, new schema or prescription input.
+
+## 2026-11-07 - N96 clarification: actions at document end
+
+- **Change (RETROFIT):** figure 4.13e in
+  design/mockups/body-measurements-page-flow.html supersedes the fixed-bar
+  behavior of 4.13a-d. The owner likes the revised rows and explicitly wants
+  Complete/Cancel visible only at the page end.
+- **Ground truth:** actual DayView renders COMPLETE WORKOUT inline after
+  exercises when its own completion gate is satisfied. Re-rendered the actual
+  component with all sets logged to compare top, middle and bottom positions.
+- **Layout:** replace the ledger with a normal form in AppShell. Window/document
+  scrolling only; actions are its last content, with no fixed/sticky ancestor.
+  Preserve existing BottomNav and sticky DayHeader grammar. Remove the dedicated
+  FullScreenEntry portal/viewport tracker. Date is 160 x 35px, units 88 x 35px;
+  shared compact sizing is opt-in.
+- **Interaction:** any nonempty subset still saves, checked or not. All sites,
+  checklist behavior, themed deletion and discard protection remain. Next
+  scrolls to the next field; validation appears in context and retains input.
+- **Evidence:** reviews/2026-11-07-body-measurements-page-flow.md. Local actual
+  component checks cover 320/360/390/430px, 512px cap, dark theme, short viewport
+  and top/middle/end geometry. Hosted signed-in and physical iOS remain unverified.
+  No schema, engine or release identity change.
+
+## 2026-11-07 - N96 owner correction: use the workout logger
+
+- **Change (RETROFIT):** 4.13c–d in design/mockups/body-measurements-workout.html
+  supersede rejected 4.13a–b. The padded footer and 44px boxes did not match.
+- **Ground truth:** inspect/render actual DayView, SetRow, LogCheckbox,
+  CompleteSheet and BottomNav. Share the literal cell styles without changing
+  workout behavior: 35px cells, 15px values and 23px checkbox visuals.
+- **Layout:** full-screen body portal with a separate viewport-fixed edge bar
+  (Cancel / Complete), safe-area padding only, measured footer reservation.
+  Fields scroll; all 12 sites are visible in upper/lower groups.
+- **Interaction:** local checks clear on edit; all entered values save, checked
+  or not, including partial sessions. Only landmark cues disclose. Delete uses
+  the themed sheet and destructive-outline grammar.
+- **Evidence:** design/reviews/body-measurements-workout-comparison.html and
+  reviews/2026-11-07-body-measurements-layout.md. Width/style comparison passes
+  320–430px. Keyboard geometry is simulated, not physical-iOS evidence.
+  No schema, engine or release-identity change.
+
 ## 2026-08-13 — The AI Manual folds into the Guide (N74 owner amendment)
 
 The dedicated AI Manual proved to be a second information hierarchy for one
@@ -69,6 +146,46 @@ chapter in the main Guide, while connection remains a task on its setup page.
 ---
 
 ## Entries
+
+## 2026-11-06 — Monthly body measurements inside More (N96)
+
+**Owner mobile-review amendment (same day; `RETROFIT`, before code).** Figures
+**4.13a–b** in `design/mockups/body-measurements-mobile.html` amend the entry
+sheet: pinned **Complete / Cancel** footer, independent vertical form scroll,
+visible-viewport sizing above the keyboard, and the app's centered paper numeric
+cells. Reuse `BottomSheet`, `Button` and `SegmentedControl`. Keep all native
+form controls at least the standard 16px input size; contain fieldset/date/grid
+intrinsic widths and wrap long notes rather than widening the page. Preserve
+the existing root viewport and zoom policy. The panel follows the app's 512px
+maximum width. Core/optional site groups, unit conversion, dirty discard and
+save/error behavior remain the same. Numeric Next moves to the next visible
+field, rather than prematurely completing the session. Header and footer are
+outside the scrolling middle. No database or engine change.
+
+- **Change.** Add `Body measurements · LOG >` directly below BodySpec in More
+  (4.4), opening the ledger in figures **4.12–4.15** of
+  `docs/design/mockups/body-measurements.html`. The mockup pass preceded code.
+  Defaults: chest, navel waist, relaxed arms/thighs; optional hips, calves,
+  neck/forearms. A date and any nonempty subset form one session.
+- **Rationale.** The owner's current request is an unobtrusive monthly tape
+  feature inside WORKOUT. Doc 24 narrows this slice; N66's separate MEASURE
+  shell and daily-scale/synthesis roadmap remain deferred.
+- **Structure.** Existing full-height `BottomSheet` supplies its 26px title,
+  close control, scroll region and focus trap. Input rows use paper, 1px rules,
+  square edges, paired left/right fields, decimal keypad and dated previous-value
+  hints; one ink Save. `LeaveConfirm` guards dirty dismissal/navigation.
+  Latest has explicit comparison-date and IN/CM controls. History contains a
+  site selector, raw dates/values/deltas, then editable sessions. Use the
+  shipped theme tokens in light, dark and system, without new accent uses.
+- **Honesty.** No inferred fat/muscle score, no interpolation, no threshold
+  pretending to know individual tape error. Every delta names its dates,
+  interval and paired readings; context links open existing cycles/DEXA.
+- **Affected figures.** 4.4, new 4.12–4.15. Mockup and rendered screenshot are
+  saved in `docs/design/`; doc 24 is the implementation contract.
+- **Impact.** `NET-NEW`, `DATA`. Three additive owner-RLS tables, one invoker
+  save transaction, user-owned correction/deletion and CSV export. Route,
+  More row and mutations are staged behind literal `releaseActive("1.3.0")`.
+
 
 ## 2026-08-30 — The plate tray (N89)
 

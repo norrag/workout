@@ -26,6 +26,8 @@ export function LogCheckbox({
   loading,
   error = false,
   readOnly = false,
+  checkbox = false,
+  disabled = false,
   ariaLabel,
   onClick,
 }: {
@@ -33,6 +35,10 @@ export function LogCheckbox({
   loading: boolean;
   error?: boolean;
   readOnly?: boolean;
+  /** Opt-in checkbox semantics for a local completion checklist. Existing
+   * workout log buttons retain their role, dimensions and write behavior. */
+  checkbox?: boolean;
+  disabled?: boolean;
   ariaLabel: string;
   onClick?: () => void;
 }) {
@@ -74,6 +80,9 @@ export function LogCheckbox({
     return (
       <button
         type="button"
+        role={checkbox ? "checkbox" : undefined}
+        aria-checked={checkbox ? true : undefined}
+        disabled={disabled}
         aria-label={ariaLabel}
         onClick={onClick}
         className={TARGET}
@@ -86,6 +95,9 @@ export function LogCheckbox({
   return (
     <button
       type="button"
+      role={checkbox ? "checkbox" : undefined}
+      aria-checked={checkbox ? false : undefined}
+      disabled={disabled}
       aria-label={ariaLabel}
       onClick={onClick}
       className={TARGET}

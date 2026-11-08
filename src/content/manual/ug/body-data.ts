@@ -41,6 +41,8 @@
 // Claims: `C-body-01` onward.
 
 import type { ManualChapter } from "../types";
+import { releaseActive } from "@/lib/version";
+import type { ManualBlock } from "../types";
 
 export const UG_BODY_DATA: ManualChapter = {
   manual: "ug",
@@ -284,6 +286,60 @@ export const UG_BODY_DATA: ManualChapter = {
         "prescription",
       ],
       blocks: [
+        ...(releaseActive("1.3.0")
+          ? ([
+              { kind: "heading", text: "Taking body measurements" },
+              {
+                kind: "para",
+                text: "Open More → Body measurements. Choose a date and inches or centimetres. Each of the 12 sites is optional. Measure relaxed, before training, with the same tape placement. Keep the tape snug without pressing the skin.",
+              },
+              {
+                kind: "para",
+                text: "Valid numbers check automatically. Complete saves all entered values, including unchecked ones. Blank sites are skipped. For unusual entries, choose Edit values or Save as entered.",
+              },
+              {
+                kind: "para",
+                text: "Complete appears after the last field. The X asks before discarding unsaved entries. Next moves to the next field. Edit corrects a session. Delete session asks for confirmation.",
+              },
+              {
+                kind: "para",
+                text: "Latest compares dated sessions. History follows one site and side. Skipped sites have no change. Export measurements downloads your tape history as CSV.",
+              },
+              {
+                kind: "para",
+                text: "Tape position, breathing and hydration affect readings. Circumference alone cannot distinguish muscle from fat. Compare workout and DEXA records by date. DEXA also has measurement limits. Tape does not change profile, goals or prescriptions.",
+              },
+              {
+                kind: "detail",
+                blocks: [
+                  {
+                    kind: "para",
+                    text: "Tap a site name for its placement cue. Previous readings show their dates. The app does not enter previous readings as new measurements.",
+                  },
+                  {
+                    kind: "para",
+                    text: "Use a positive decimal number, up to 150 in or 381 cm. Invalid or empty entries clear the checkmark. You can also toggle a checkmark yourself. A checkmark does not save a reading. One entered site is enough to save a session.",
+                  },
+                  {
+                    kind: "para",
+                    text: "The app asks you to review values outside broad ranges or far from previous readings. These checks catch entry mistakes. They do not define healthy measurements or limits on progress. Choose Edit values to correct an entry. Choose Save as entered if the measurement is correct.",
+                  },
+                  {
+                    kind: "para",
+                    text: "Switching units converts existing entries. To correct the unit of an entry, first clear its value. Select the correct unit. Enter the measurement again.",
+                  },
+                  {
+                    kind: "para",
+                    text: "If a save fails, the form keeps your entries. Keep session cancels deletion. Latest shows the dates and interval for its comparison.",
+                  },
+                  {
+                    kind: "para",
+                    text: "A connected assistant can read your tape sessions and changes for the same site and side. The results include units, comparison dates and intervals. The first reading in each returned page has no earlier comparison.",
+                  },
+                ],
+              },
+            ] satisfies ManualBlock[])
+          : []),
         {
           kind: "para",
           text: [

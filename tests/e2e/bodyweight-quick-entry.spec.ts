@@ -49,8 +49,14 @@ test("quick entry appends a manual point; same-day re-entry replaces it", async 
 }) => {
   // ---- sign in through the UI ----
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
 
@@ -71,19 +77,28 @@ test("quick entry appends a manual point; same-day re-entry replaces it", async 
 
   // ---- first entry: prefilled from the profile scalar, saved as manual ----
   await row.click();
-  const weight = page.getByLabel("bodyweight in pounds");
+  const weight = page
+    .getByLabel("bodyweight in pounds")
+    .filter({ visible: true });
   await expect(weight).toHaveValue("200");
   await weight.fill("202.5");
   await page.getByRole("button", { name: "SAVE" }).click();
   await expect(row).toContainText("202.5");
 
   // the profile scalar is untouched — the quick entry never writes it
-  await expect(page.getByText(/200 LB · AS OF/)).toBeVisible();
+  await expect(
+    page.getByText(/200 LB · AS OF/).filter({ visible: true }),
+  ).toBeVisible();
 
   // ---- same-day re-entry replaces the day's manual point (latest wins) ----
   await row.click();
-  await expect(page.getByLabel("bodyweight in pounds")).toHaveValue("202.5");
-  await page.getByLabel("bodyweight in pounds").fill("203");
+  await expect(
+    page.getByLabel("bodyweight in pounds").filter({ visible: true }),
+  ).toHaveValue("202.5");
+  await page
+    .getByLabel("bodyweight in pounds")
+    .filter({ visible: true })
+    .fill("203");
   await page.getByRole("button", { name: "SAVE" }).click();
   await expect(row).toContainText("203");
   await expect(row).not.toContainText("202.5");
@@ -100,7 +115,9 @@ test("quick entry appends a manual point; same-day re-entry replaces it", async 
   await sheet.locator("input").fill("204");
   await sheet.getByRole("button", { name: "SAVE" }).click();
   // the editor row now wears the shared freshness vocabulary
-  await expect(page.getByText(/AS OF/).first()).toBeVisible();
+  await expect(
+    page.getByText(/AS OF/).filter({ visible: true }).first(),
+  ).toBeVisible();
 
   await page.goto("/more");
   await expect(

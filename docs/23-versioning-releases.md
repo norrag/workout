@@ -739,3 +739,41 @@ regardless — they replace a hardcoded string with a CI-enforced identity. Phas
 - **`docs/PROGRESS.md`** keeps the build record; the registry is user-facing copy and is not a substitute for it.
 - **Doc 20** — MEASURE's `surface` reservation, per its §3.4 separation-readiness rules.
 - Workstream **V** ("Versioning & releases") in `docs/notes/` is this work's home; the tracking item is **N80**.
+
+
+## 2026-11-07 - proposed 1.3 announcement review
+
+Figure 4.7b proposes measurements as the single featured entry. The shared
+entry renderer accepts optional featured metadata; only the announcement varies
+its type sizes, and the history keeps the normal renderer and identical copy.
+The existing tool-list refresh notice is a smaller secondary entry. A featured
+entry must be a highlight, with at most one per release. No 1.3 registry file
+or package bump is made. The nonproduction override-only review route
+`/more/whats-new/preview` renders FOR REVIEW / NOT RELEASED and never calls
+the acknowledgment action. Screenshot review is pending owner approval; it
+is not release authorization.
+
+### Narrow-screen amendment and scoped approval - 2026-11-07
+
+Owner approved the 390px light/dark proposal screenshots and rejected the tall
+narrow version. Figure 4.7c compacts featured announcements only below 375px:
+wider usable space, smaller type/spacing and side-by-side footer actions.
+All entry text and destinations remain. Short viewports retain inner scrolling.
+The revised narrow screenshot requires a new review. The proposal still does
+not acknowledge a release. Registry/package stay 1.2.1; staging stays 1.3.0.
+No release, merge or production promotion is authorized by design approval.
+
+
+### 2026-11-08 - staged verification correction
+
+The branch includes a bounded sign-in hydration correction while validating
+1.3.0. It changes hidden form-node order only, without changing the approved
+announcement copy/layout or cutting a release. Package/registry remain 1.2.1.
+Production/navigation verification is recorded in reviews/2026-11-08-navigation-hydration.md.
+
+### 2026-11-08 - owner selects the regular announcement
+
+The owner rejects the narrow variant and selects the first approved regular
+design with smaller type. Restore figure 4.7b at all widths; no new narrow design.
+Historical 4.7c screenshots are rejected history. Keep the existing scroll region
+on constrained viewports. This settles the design choice, not release or merge.

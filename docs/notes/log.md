@@ -15,6 +15,234 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-08 - Session 142: N84 queue root cause and supported correction
+
+The synthetic production-build failure is now explained at the queue/render
+boundary, not by a slow response or hydration alone. Official Next PR #95439
+contains the same correction; 15.5.29 lacks it, 16.4.5 contains it. The isolated
+16.4.5 build passes 80/80 fresh mobile navigation contexts. Pin runtime/analyzer,
+retain webpack/Serwist and existing React/lint rules; required generated types
+and JSX settings follow the version-matched guide. See the [full record](../reviews/2026-11-08-navigation-queue.md).
+A Windows-only migration CLI hashbang import failure reproduces on the old
+baseline too; ordinary comment fixes it, and all 12 helper tests pass. No logic
+change. CI repeats real-stack smoke three times with retries disabled; N84 remains
+in progress until terminal checks. Regular approved modal and future roadmap stay
+as chosen in Session 141. Hosted preview access and PR-body publication were denied
+by automatic review; concrete requests remain pending. Do not retry indirectly.
+No production merge, promotion, persistent env change or hosted test data.
+
+Checkpoint: UI 7fffacb / CI 42440446611 is fully green: 42/42 broad cases,
+three fresh repetitions with retries disabled; four hydration regressions and
+four targeted measurement cases direct. Checks/drift, 84 RLS and 21 integration
+pass. Current CI light/dark release PNGs are byte-identical to approved regular
+assets. Normal hosted browser access still requires Vercel/GitHub sign-in;
+no share link or hosted data created. Exact detailed PR-body publication was
+denied and stays local pending approval. Final documentation CI follows at
+delivery. N84 correction verified on draft, not shipped; no merge/release.
+
+
+Final-head check: e58b8f2 / CI 42440932857 has 39/42 broad passes; three macrocycle
+text assertions also match hidden streamed content outside the active main.
+Navigation, tape, checks/drift/RLS/integration pass. Assertions are now scoped to
+the active main without reducing their requirements or enabling retries. The
+[queue record](../reviews/2026-11-08-navigation-queue.md)
+records the evidence; final corrected-head CI is reported at delivery.
+
+Follow-up: b9409a0 / CI 42441481966 is 41/42; macrocycle passes, one progression
+weight selector matches the same hidden streamed input (both values correct).
+A consistent visible-control policy now covers page-level text/labels; strict
+matching, hidden metadata checks, database checks and all expectations remain.
+Only tests/documentation changed. Final-head CI follows at delivery.
+
+## 2026-11-08 - Session 141: owner release-readiness direction and roadmap
+
+Batch 48 expands the goal to correcting all test failures before presenting a
+release-ready result; do not merge without approval. The owner rejects the
+narrow modal and chooses the approved regular smaller-type design. Restored
+the exact pre-narrow renderer after checking figure 4.7b and approved screenshots.
+Four local baseline PNG hashes match; 320px/short-view scrolling and 44px actions
+pass. No second narrow design is produced. Old narrow artifacts remain history.
+
+Added the [future-work review and phased roadmap](../reviews/2026-11-08-body-records-roadmap.md):
+source audit, primary research, explicit dates/baselines/coverage, comparison
+contract, data quality, UI direction, phased dependencies and acceptance cases.
+No speculative analytics implementation. N84 remains active: sign-in mismatch
+fixed, but shared navigation still fails without page errors. A separate local
+production worktree with a synthetic API reproduces BodySpec navigation once
+in 12 fast trials; no real Supabase or health data is needed for that failure.
+Further controlled tracing continues. Do not call the release ready yet.
+
+## 2026-11-08 - Session 140: N84/N96 navigation and persistence verification
+
+Reproduced the unchanged sign-in page hydration mismatch in eight fresh local
+contexts, before any auth-provider request. The leading RedirectField Suspense
+boundary encounters SSR action metadata; moving only that hidden boundary below
+Email removes all eight mismatches. New local browser regression passes both
+plain and return-path sign-in with locally rejected credentials. Visible layout,
+auth checks, timeouts, service worker and dependencies stay unchanged. CI repeats
+the regression four times and retains real signed-in smoke/persistence cases.
+Guide/claims record the sign-in destination. Production/navigation and mobile
+verification follow in [evidence](../reviews/2026-11-08-navigation-hydration.md).
+No claim that N84 is closed. Draft #265 stays unmerged; wider modal approved,
+narrow pending. No production data or schema changes. Batch 47 preserves scope.
+
+
+Production checkpoint at UI commit 51b0930 / CI run 42436607712: four hydration regressions
+pass, as do 2,189 unit tests and 12 built guards, 84 RLS and 21 integration tests. Measurement
+capture/correction/export/deletion and mobile flow pass directly. Two other
+scenarios pass after pre-form sign-in retries. Those retained traces contain no
+page errors yet still stall after fast 303 redirects, proving React 418 is not
+necessary for N84. No claim that all navigation failures are resolved. READY
+preview is pinned to UI commit 51b0930 with the 1.3.0 override. Hosted browser testing is blocked
+at Vercel protection; the temporary public-link request was denied and not
+retried. Approval pending, no hosted test data created. Full/final CI terminal
+results are reported at delivery.
+
+## 2026-11-07 - Session 139: N96 narrow release-modal review
+
+Batch 46 records scoped owner approval of the first two (390px light/dark)
+proposal screenshots and rejection of the tall narrow treatment. Figure 4.7c
+precedes a featured-announcement-only correction below 375px. More usable width,
+compact type/spacing and one footer row reduce the 320×740 card from 708px to
+579px without truncating entry text. 44px targets, short-screen scrolling,
+dismissal and zero horizontal overflow pass locally. Pixel hashes for 375,
+390 light/dark and 768px are unchanged. Guide/claims document scrolling.
+No capture/schema/engine/version changes. Draft #265 remains in progress;
+revised narrow approval and fresh CI/preview are pending, not release or merge.
+See [evidence](../reviews/2026-11-07-release-modal-narrow.md).
+
+Checkpoint: READY UI52cf312 preview, four direct targeted signed-in CI passes;
+checks/drift pass. RLS setup stopped before tests on occupied runner port 54322.
+Actual CI narrow PNG replaces the Library narrow item (version 1); approved
+light/dark identities are unchanged. Narrow review stays pending. Full smoke
+and final-doc CI terminal results are reported at delivery.
+
+## 2026-11-07 - Session 138: N96 entry behavior, connector and release review
+
+Batch 45 captures the owner's exact request. Removed Cancel, named X, auto-check
+valid decimals, clear invalid checks, and review broad-range / large prior
+differences with correction or confirmation. Partial saves remain independent
+of checks. Figures 4.13f-g/4.7b precede implementation. Added staged read-only
+MCP access using verified identity and RLS, bounded paging and explicit units /
+within-page comparison dates. No schema or prescription changes.
+
+Real-renderer proposal screenshots show measurements as the flagship and the
+existing tool-list refresh notice minor. Owner approval and any different
+meaning of tool tips reminder remain pending. Guide/claims reviewed for simple,
+accurate prose. Doc 20's overclaims corrected. T-N96a-d record site notes,
+scanner identity, DEXA change-band validation and future data-first overview
+context. No speculative overview implementation. Local UI checks pass; fixture
+restored. CI/preview checkpoint follows in the follow-up review. N96 remains
+in-progress on draft PR #265; N84 and hosted/iOS verification limits stay open.
+
+
+READY review preview: https://workout-ngcfgtf10-garron-duprees-projects.vercel.app/more/measurements
+Release proposal: same host /more/whats-new/preview (not approved or released).
+UI pinned to 8ecfc4d5affcbff823f599a99b2c4fee70b9e0ae; deployment-specific
+public 1.3.0 build override confirmed. Corrected test/document head is
+7dda88c0ecf620b35d8708d120dbedeace004dbf with identical application source.
+CI 42396673985 is terminal success on attempt 1: 2,189 unit tests, 12 built
+guards, 84 RLS, 21 integration and drift pass. Full smoke: 13 direct passes.
+Targeted cases: 3 direct passes / 1 pre-form sign-in retry; all flows pass.
+N84 stays open. Real signed-in local-Supabase tests cover partial save,
+correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
+connector isolation. Hosted signed-in and physical iOS remain unverified.
+No schema change, production health-data write, merge or promotion.
+
+## 2026-11-07 - Session 137: N96 action placement clarified
+
+Batch 44 preserves the owner's exact feedback. The revised rows are generally
+liked, but the requested bottom means the end of the page: no fixed, sticky
+or floating actions. Figure 4.13e precedes code; actual DayView with every set
+logged confirms its inline completion placement. Logger now replaces the
+ledger in AppShell with document scrolling. Complete/Cancel follow all fields;
+partial sessions and unchecked values still save. Date/units are 35px high
+(160px/88px wide). The standalone full-screen portal was removed.
+
+Local actual-component top/middle/end, narrow width, compact controls, checklist,
+conversion, Next, dirty Cancel, themed keep/delete and empty validation checks
+pass without page errors. Temporary root fixture restored; no production
+readings or new database change. Guide, claims, design/staging records and
+regression coverage updated. N96 stays in-progress on draft #265. Fresh immutable
+preview and terminal CI evidence follow in
+[the page-flow review](../reviews/2026-11-07-body-measurements-page-flow.md).
+Hosted signed-in actions and physical iOS remain unverified; N84 stays open.
+Open-PR register reconciled to all seven current PRs, including dependency
+updates #263/#264 and the currently-open #190; no unrelated branch changed.
+
+READY page-flow preview: https://workout-ih75aupc9-garron-duprees-projects.vercel.app/more/measurements
+UI `157d26f51bdf147e0edfc2a7008ca3264a67422d`; deployment-specific public 1.3.0 override confirmed.
+CI [42390170021](https://github.com/norrag/workout/actions/runs/42390170021)
+is terminal success on attempt 1: checks, 84 RLS, 18 integration and drift pass.
+Both targeted tape cases pass without retries and pass directly again in smoke.
+Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176)
+and progression sign-in (line 217) pass on retry; N84 remains open.
+Hosted signed-in and physical iOS remain unverified; no merge/promotion.
+
+## 2026-11-07 - Session 136: N96 owner correction, workout-style capture
+
+The owner rejected the prior mobile pass; verbatim feedback is in Batch 43.
+Reviewed/rendered actual DayView, SetRow, LogCheckbox, CompleteSheet and
+BottomNav. Figures 4.13c–d precede the rebuild: body-portal full-screen entry,
+viewport-fixed edge bar, exact shared 35px/15px cells and 23px checkbox, all-site
+upper/lower groups, landmark-only disclosures and themed deletion. Checks are
+local and clear on edit; every entered value saves regardless of checks, so
+partial capture has no extra gate. Original sheet layout restored.
+
+Local actual-component comparisons and interaction checks pass 320–430px,
+512px cap, both themes and simulated keyboard geometry, with no page errors.
+New CI cases cover partial save, checklist and themed keep/delete behavior
+against disposable local accounts. Guide, claims, design records and staged
+1.3.0 copy updated; connector note preserved. Hosted signed-in actions and
+physical iOS remain unverified. No schema, engine, production release, merge
+or promotion. [Evidence](../reviews/2026-11-07-body-measurements-layout.md).
+
+READY review preview: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
+pinned to ebffc809c6bf3d05be682feea6142b1db1fc436b, public 1.3.0 build override.
+CI 42386443416 passes checks, 84 RLS, 18 integration, drift and both targeted
+measurement cases without retries. Full smoke: 7 passed, 1 failed, 3 flaky;
+N84 remains open. Capture retries after a pre-form sign-in timeout; mobile
+passes directly. Hosted signed-in and physical iOS checks remain unverified.
+No merge/promotion. [Detailed evidence](../reviews/2026-11-07-body-measurements-layout.md).
+
+## 2026-11-06 — Session 135: N96, monthly tape inside WORKOUT
+
+Owner reviewed the preview and requested closer workout-screen sizing/scrolling,
+bottom-locked Complete/Cancel, no unintended horizontal overflow/zoom, and reuse
+of established logging controls. Mobile amendment figures 4.13a–b precede code.
+Added an opt-in pinned sheet footer that tracks the visible keyboard viewport;
+reused shared buttons, date input and segmented controls; centered/bounded tape
+cells, raised native controls to 16px, separated the note label and added Next
+focus movement. Local fictional mobile fixtures pass widths 320–430, both
+themes, 500-character input and simulated keyboard geometry, with no overflow.
+Guide/claims and the design contract are updated. New CI geometry coverage
+also checks actual save/long-note rendering; targeted mobile reports are archived
+before full smoke can overwrite them. No database or engine change.
+
+Mobile verification: UI commit `91c4070`, READY preview
+https://workout-bexg3c51j-garron-duprees-projects.vercel.app. CI run
+`42306128963` passes both tape cases in isolation and full smoke without retries;
+checks, 84 RLS, 18 integration and hosted drift pass. Full smoke remains red on
+N84's BodySpec navigation wait (nine passed, one flaky, one failed). Actual
+preview HTTP reaches app sign-in; desktop interactive QA awaits GitHub/Vercel
+sign-in, and physical iOS keyboard/zoom is not verified. The preview stays pinned
+to the UI commit through later documentation-only commits.
+
+Earlier checkpoint: draft PR #265; the first hosted confirmation expired without execution, then renewed native approval succeeded on 2026-11-06. Migration `body_measurements` is applied to the shared production database as version `20261106202459`; verified tables/sites/RLS/FKs/grants/invoker execution, with no new security advisor findings. Hosted drift now passes. At d66b853 / CI run 42286972237, Linux unit/build checks, 84 RLS, 18 integration and the isolated tape E2E pass. Full smoke passes tape again but retains N84's BodySpec navigation timeout at line 141 (seven passed, two flaky, one failed). READY review preview: https://workout-8wzfaqud5-garron-duprees-projects.vercel.app, pinned to d66b853 with a deployment-specific 1.3.0 override. Protected fetch reaches sign-in; hosted signed-in logging remains for owner review because browser navigation failed, then Computer Use stopped because it could not verify the active URL to enforce access rules. No production test identities/readings were created. Production frontend/package remain 1.2.1; no merge or promotion.
+
+The first browser trace showed the second write acknowledged while the view retained the earlier snapshot; the save now returns the committed record and an acknowledgment overlay bridges stale renders. CI omits the unused mail viewer and freezes the anchor test clock; neither changes app engine behavior.
+
+Failure attribution follow-up: [controlled comparison](../reviews/2026-11-06-body-measurements-ci.md), CI run 42291048440, explicitly checks out current main aed94ce with its own schema/seed. Both the shipped and staged baselines reproduce the pending UI independently of tape code/schema. Shipped main fails prescribed-progression line 220 on both attempts after fast HTTP 303 redirects; staged main has the same sign-in hang. Feature tape passes in isolation/full smoke and prescribed progression passes on the repeat. N84 remains unresolved; no timeout inflation, bypass or speculative application patch. Temporary baseline jobs are removed after collecting the evidence; the draft stays unmerged.
+
+
+- Reviewed AGENTS, product/architecture/data/design precedence, N66/doc 20, BodySpec and bodyweight paths, release runbook, Guide contracts, current code and recent history. Current owner request narrows the companion topology for this slice; doc 24 records that decision.
+- Phase 0 mockups and runtime captures use fictional data. More gets a quiet row below BodySpec; grouped tape capture, raw comparisons/history, correction/deletion and CSV follow the ledger system.
+- Three additive RLS tables and SECURITY INVOKER atomic save, authenticated query layer, boundary validation; no profile or engine writes.
+- Literal 1.3.0 gates, staged release note (preserving the connector notice), gated Guide prose and claims. Shipped registry/package remain 1.2.1.
+- Reconciled merged rows N52/N87/N88/N89/N90 into archive and current open-PR register (#259/#212/#48). Hosted migration chain and active v27 checked; no training/health data read. N91 retains its runbook follow-ups.
+- Validation at this checkpoint: typecheck/lint/build pass; 2,164 unit tests pass excluding the unchanged migration-script suite whose import fails on Windows. Linux CI will check it. Local mobile fixture checks latest/form/keep-discard/history/light-dark, with no real user records. RLS and full E2E tests target only local Supabase.
+- Vercel env metadata read returns 403; CLI has no login. No persistent env change or production promotion. A deployment-specific preview build override will be attempted after the branch is ready. Hosted migration still pending database tests.
+
 ## 2026-09-12 — Session 134: N91 — the connector can tell who is holding a stale tool list
 
 **Owner:** *"ChatGPT appears to keep a frozen snapshot of an MCP connector's

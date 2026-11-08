@@ -28,6 +28,8 @@
 ### A1 — Next.js App Router on Vercel
 Single deployable serves the PWA UI, API route handlers, and the MCP endpoint. Server Components fetch via the user's RLS-scoped Supabase client; mutations go through server actions or route handlers.
 
+**Runtime correction, 2026-11-08 (N84, staged 1.3.0):** Next.js and its bundle analyzer are pinned to 16.4.5. This includes the upstream navigation-queue correction identified in [the investigation](reviews/2026-11-08-navigation-queue.md). Both `dev` and `build` explicitly select webpack to retain Serwist; Cache Components and React Compiler remain disabled. React stays at the existing locked 19.2.7. Lint remains a separate required CI command with the existing ESLint rules. Legacy Edge middleware retains its session-refresh, public-route and root-rewrite behavior; its deprecated filename is not blindly renamed to Node proxy. Version-matched framework guidance ships under `node_modules/next/dist/docs/`.
+
 ### A2 — Supabase as the only backend
 Postgres is the source of truth. **All authorization is RLS** — the browser client uses the anon key with the user's JWT; there is no trusted middle tier for normal app traffic. The service-role key is used only server-side (MCP server, engine batch jobs) and always paired with explicit `user_id` scoping.
 

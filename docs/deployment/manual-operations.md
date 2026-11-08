@@ -835,3 +835,199 @@ In PRs and PROGRESS entries, remaining human steps are listed under a
 **"Remaining / external"** heading with exact values. Cross-check this file if a
 deploy or feature "doesn't work" despite green CI — it's usually an unset env
 var or an un-toggled dashboard flag.
+
+
+### N96 — monthly tape preview (2026-11-06)
+
+- Migration `20261106191837_body_measurements.sql` is append-only and additive. **Applied after renewed Supabase confirmation on 2026-11-06**, hosted version `20261106202459`, name `body_measurements`. Verified three tables, 12 stock sites, RLS, ownership FKs, grants and invoker execution; security advisors added no measurement findings. Hosted migration drift now passes. No existing data or engine parameters changed.
+- Hosted project workout (juqvbiymmdcggctdqoiq) has **no development branches**. A Vercel Preview must not be described as a separate database. New tables are owner-private; validation uses synthetic local test accounts, never the owner's health records.
+- Preview override is NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0, Preview only. Connector environment-list request returned 403 and CLI has no login. No persistent env update occurred. A deployment-specific build command can set the same public flag without altering project settings if deployment permission permits; otherwise a human must set the Preview variable and redeploy the feature branch.
+- Keep production registry/package 1.2.1. No release registry change, merge, production env update, alias promotion or production deploy is authorized in this review slice.
+
+Checkpoint: draft [PR #265](https://github.com/norrag/workout/pull/265).
+Deployment `dpl_9qFrN3wWq9wqmVnro6ZBSLpUKj8g` is READY at
+https://workout-hytwv8jta-garron-duprees-projects.vercel.app, pinned to commit
+`01112b425c6f03a5a2a94c75677f88f6dfc21239`. Its deployment-specific build
+command sets `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0` without changing project env
+or persistent build settings. Database migration is still pending; this URL is
+not yet a verified functional preview. CI first run applied the migration to a
+fresh local DB successfully, but the RLS runner hit a mail-viewer port collision
+before tests, while Linux unit CI caught claim-ledger formatting, corrected in
+the follow-up. No hosted mutation was attempted.
+
+Later checkpoint: the second Linux run passed **all 84 RLS tests**, including
+the seven measurement cases (own/cross-user/anonymous, ownership forgery,
+rollback, same-day idempotency and deletion cascade). Hosted `apply_migration`
+was attempted **once** after those tests. It returned `status: expired` because
+the required confirmation expired; **it did not execute**. `to_regclass` for
+both new tables returned null afterward. A renewed Supabase confirmation is
+required; do not use raw SQL or another transport to bypass it.
+
+Final checkpoint: the renewed native Supabase confirmation succeeded; the
+migration is now applied to the **shared production database** as recorded above.
+No production frontend release occurred. The latest READY review deployment is
+`dpl_AYoizvtVugoM6ooTFWH77Guvd8an`, pinned to `d66b853c123b391e6a9feab220fe25d003de9990`:
+https://workout-8wzfaqud5-garron-duprees-projects.vercel.app.
+The public build override is still deployment-specific, not a project env change.
+Protected fetch of `/more/measurements` returns the app sign-in form (HTTP 200).
+Hosted signed-in logging remains an owner review check: browser navigation failed,
+then Computer Use stopped because it could not verify the active browser URL to
+enforce access rules. No fake production health readings or test identities were
+created. CI run `42286972237` at the deployed
+application commit passed checks, 84 RLS, 18 integration, targeted tape E2E and
+hosted drift. Full smoke passed tape but failed the pre-existing N84 BodySpec
+navigation wait at line 141 (seven passed, two flaky, one failed).
+
+Follow-up [controlled comparison](../reviews/2026-11-06-body-measurements-ci.md),
+run `42291048440`, reproduces the same fast-redirect/pending-UI failures on
+unchanged current main with **both shipped and staged settings**. Shipped main
+fails the exact prescribed-progression line-220 wait on both attempts. No tape
+regression was found; N84's shared transition root cause remains unresolved.
+This supports feature attribution, not an all-green or release-ready claim.
+
+Owner mobile review adds a new preview revision (pinned Complete/Cancel,
+contained field scroll and width, standard inputs, visible-keyboard viewport).
+The earlier `d66b853` preview above does **not** include these refinements.
+READY mobile-review preview:
+https://workout-bexg3c51j-garron-duprees-projects.vercel.app,
+deployment `dpl_Gw8RrgeyamQ9zsmoEKbjuMnnh3Wm`, pinned to UI commit
+`91c4070b7ac764c5022dadc88b213e04511ad88a`. Later documentation-only commits do
+not change that UI. [PR #265](https://github.com/norrag/workout/pull/265) records
+current verification. It still uses
+the deployment-specific public 1.3.0 build override; no persistent project env,
+production frontend, database schema or engine change is part of this pass.
+Local mobile fixtures are fictional and the temporary entry page is restored.
+The CI measurement report is archived separately before full smoke replaces it.
+Real-device iOS keyboard/zoom behavior and hosted signed-in actions require
+separate evidence; browser-width tests and simulated keyboard geometry do not
+establish those outcomes.
+
+Current hosted check: Vercel READY/Git SHA verified; protected HTTP fetch of
+`/more/measurements` returns app sign-in (200). Browser navigation now works but
+stops at GitHub/Vercel sign-in; the saved-login control did not open, so a user
+sign-in handoff is pending. No hosted measurement action was performed. CI run
+`42306128963` passes both measurement cases twice without retries (targeted and
+full smoke), checks/RLS/integration/drift. Overall CI remains red on N84's
+BodySpec line-141 wait; progression sign-in passed on retry.
+
+CI follow-up fixes only test infrastructure outside the tape slice: omit the
+unused mail viewer (confirmations are disabled locally), and freeze Date.now
+across the two anchor-equivalence reads so elapsed milliseconds do not fail
+the assertion. The measurement browser trace also exposed a confirmed write
+being hidden by a stale render; the save response now carries the canonical
+record and the ledger holds that acknowledged snapshot until fresh data arrives.
+
+### N96 - owner correction, 2026-11-07
+
+The 91c4070 preview was rejected for fidelity; it is an earlier checkpoint.
+The correction uses actual workout cells/checks, all-site groups, a viewport-
+fixed edge bar and themed deletion. Deploy only the feature branch with the
+deployment-specific public 1.3.0 override. Keep production/package/registry
+at 1.2.1. No new migration or hosted data changes. Chrome is at GitHub/Vercel
+sign-in; READY/HTTP sign-in are not signed-in UI verification. Physical iOS
+remains unverified. Record the fresh immutable preview and final CI checkpoint
+after the implementation commit. No merge or promotion.
+
+
+#### Corrected N96 deployment checkpoint
+
+READY: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
+Deployment dpl_6t341sbHj3sooMVJB32ymNjJ7DBN is Preview, pinned to
+ebffc809c6bf3d05be682feea6142b1db1fc436b. Build logs confirm
+NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build; no persistent env change.
+Keep this URL pinned through documentation-only commits. Production read
+still shows aed94ce / 1.2.1. Shared hosted database/migration status unchanged.
+CI 42386443416 passes feature/RLS/integration/drift checks; full smoke is red
+under N84. [Evidence](../reviews/2026-11-07-body-measurements-layout.md).
+Protected fetch reaches app sign-in (200). Chrome sign-in handoff and physical
+iOS checks remain; hosted save/delete is unverified. No merge/promotion.
+
+
+### N96 - document-flow clarification, 2026-11-07
+
+The prior ebffc80 fixed-bar preview is superseded for action placement. Use
+figure 4.13e and [the page-flow evidence](../reviews/2026-11-07-body-measurements-page-flow.md).
+Deploy the feature branch's new UI commit to Preview with deployment-specific
+`NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`. Keep package/registry at
+1.2.1 and preserve the staged connector entry. Record the fresh immutable URL,
+SHA, actual build override and terminal CI after pushing. No new migration or
+production health-data write; the shared production schema status is unchanged.
+Hosted app sign-in and physical-iOS limitations still apply. No merge/promotion.
+
+#### Document-flow deployment checkpoint
+
+READY page-flow preview: https://workout-ih75aupc9-garron-duprees-projects.vercel.app/more/measurements
+UI `157d26f51bdf147e0edfc2a7008ca3264a67422d`; deployment-specific public 1.3.0 override confirmed.
+CI [42390170021](https://github.com/norrag/workout/actions/runs/42390170021)
+is terminal success on attempt 1: checks, 84 RLS, 18 integration and drift pass.
+Both targeted tape cases pass without retries and pass directly again in smoke.
+Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176)
+and progression sign-in (line 217) pass on retry; N84 remains open.
+Hosted signed-in and physical iOS remain unverified; no merge/promotion.
+Deployment `dpl_9q8C7wLieTifFinE2t3z3FsEwyfk` is READY Preview at the exact
+UI SHA; actual logs confirm `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
+Protected fetch reaches app sign-in (200). No persistent env change, new migration,
+health-data write or production promotion. Production read remains aed94ce.
+[Detailed evidence](../reviews/2026-11-07-body-measurements-page-flow.md).
+
+
+### N96 - automatic checks / connector / release proposal
+
+New UI and staged read-only connector need no migration. Keep production data
+and registry at their existing state. Build the new feature commit in Preview
+with deployment-specific `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
+The explicit nonproduction route `/more/whats-new/preview` is a proposal and
+never acknowledges a release. Capture real-renderer screenshots for approval;
+do not promote or create a release registry entry before acceptance. Hosted
+uses shared production, so functional write tests use guarded disposable local
+Supabase accounts in CI. Record fresh immutable preview and terminal CI in the
+[follow-up evidence](../reviews/2026-11-07-body-measurements-followup.md).
+
+
+### N96 follow-up verification checkpoint - 2026-11-07
+
+READY review preview: https://workout-ngcfgtf10-garron-duprees-projects.vercel.app/more/measurements
+Release proposal: same host /more/whats-new/preview (not approved or released).
+UI pinned to 8ecfc4d5affcbff823f599a99b2c4fee70b9e0ae; deployment-specific
+public 1.3.0 build override confirmed. Corrected test/document head is
+7dda88c0ecf620b35d8708d120dbedeace004dbf with identical application source.
+CI 42396673985 is terminal success on attempt 1: 2,189 unit tests, 12 built
+guards, 84 RLS, 21 integration and drift pass. Full smoke: 13 direct passes.
+Targeted cases: 3 direct passes / 1 pre-form sign-in retry; all flows pass.
+N84 stays open. Real signed-in local-Supabase tests cover partial save,
+correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
+connector isolation. Hosted signed-in and physical iOS remain unverified.
+No schema change, production health-data write, merge or promotion.
+Detailed evidence: docs/reviews/2026-11-07-body-measurements-followup.md.
+
+### N96 - narrow release proposal review, 2026-11-07
+
+READY immutable preview at UI commit 52cf312087465849a20e3edf9687a2f4ef654ad9:
+https://workout-gfxfjri36-garron-duprees-projects.vercel.app/more/whats-new/preview
+(measurements: same host /more/measurements). Deployment
+dpl_D5KsZjS1U722Bst2QCgMHrSXeXn1 is Preview, target null, with the deployment-only
+1.3.0 build override confirmed in logs. Both protected fetches reach app sign-in;
+hosted signed-in behavior remains unverified. Production remains aed94ce.
+No persistent environment or database changes. Package/registry remain 1.2.1.
+Owner approved the 390px light/dark designs only. Revised narrow screenshot
+approval is pending; no merge/release/promotion. Targeted signed-in CI passes
+four cases directly; RLS setup fails before tests on occupied runner port 54322.
+See [current evidence](../reviews/2026-11-07-release-modal-narrow.md), including
+limits. The final documentation CI terminal result is reported at delivery.
+
+
+### N96 / N84 — hydration correction preview, 2026-11-08
+
+READY preview: https://workout-hefgj121o-garron-duprees-projects.vercel.app/more/measurements
+(proposal: same host /more/whats-new/preview). UI commit 51b093097a792dd490d5c79f91ef9c0d4d6b0213;
+deployment dpl_GDfifkP9bS4UPCCow8yAG6yask3a, Preview/target null. Logs confirm
+the deployment-only 1.3.0 build override. No production promotion, persistent
+environment update or new DB migration. Package/registry remain 1.2.1.
+
+Hosted browser access stops at Vercel sign-in. Automatic approval review denied
+creating an anyone-with-link temporary share URL because that audience was not
+explicitly authorized. It did not execute and has not been retried. A scoped
+approval request is pending; keep protection unchanged and use no indirect
+share-creating fetch. Signed-in save/delete/mobile checks pass on synthetic
+loopback CI; hosted write and physical iOS verification remain open. See
+[the verification review](../reviews/2026-11-08-navigation-hydration.md).

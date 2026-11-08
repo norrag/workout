@@ -20,9 +20,12 @@ import { acknowledgeReleases } from "@/app/(app)/more/actions";
 export function WhatsNewModal({
   releases,
   workoutStatus,
+  proposal = false,
 }: {
   releases: Release[];
   workoutStatus: ActiveWorkoutStatus | null;
+  /** Review-only rendering; never marks any release seen. */
+  proposal?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const { pending } = useSetLogQueue();
@@ -41,22 +44,23 @@ export function WhatsNewModal({
 
   const acknowledge = useCallback(() => {
     setDismissed(true);
+    if (proposal) return;
     startTransition(() => {
       void acknowledgeReleases();
     });
-  }, []);
+  }, [proposal]);
 
   // Following either a feature link or the complete-notes link acknowledges
   // the release; it must not be waiting when the reader returns.
   useEffect(() => {
-    if (!open) return;
+    if (!open || proposal) return;
     const onNavigate = (event: MouseEvent) => {
       const target = (event.target as HTMLElement | null)?.closest("a");
       if (target) acknowledge();
     };
     document.addEventListener("click", onNavigate, true);
     return () => document.removeEventListener("click", onNavigate, true);
-  }, [acknowledge, open]);
+  }, [acknowledge, open, proposal]);
 
   if (highlights.length === 0) return null;
 
@@ -79,7 +83,7 @@ export function WhatsNewModal({
           <div>
             <p className="label-caps flex items-center gap-2 text-[10px] font-bold text-accent">
               <span aria-hidden>■</span>
-              New version released
+              {proposal ? "New version preview" : "New version released"}
             </p>
             <h2 className="mt-2 text-[26px] font-extrabold leading-[1.05] tracking-[-0.025em]">
               What&apos;s new in WORKOUT
@@ -96,18 +100,23 @@ export function WhatsNewModal({
         </div>
 
         <p className="mt-3 text-sm leading-relaxed text-ink/70">
-          <span className="font-bold text-ink">Version {span}</span> is here.
+          <span className="font-bold text-ink">
+            {proposal ? "Proposed version" : "Version"} {span}
+          </span>
+          {proposal ? "." : " is here."}
           {newest.headline ? ` ${newest.headline}.` : ""} Here are the
           highlights.
         </p>
         <p className="mt-1 text-[9.5px] font-semibold tracking-[0.1em] text-ink/45">
-          {releaseDateLabel(newest.date)}
+          {proposal
+            ? "FOR REVIEW · NOT RELEASED"
+            : releaseDateLabel(newest.date)}
         </p>
       </header>
 
       <div className="mx-5 mt-4 min-h-0 overflow-y-auto overscroll-contain border-t-[1.5px] border-ink sm:mx-6">
         <div className="pb-1">
-          <ReleaseEntryList entries={highlights} />
+          <ReleaseEntryList entries={highlights} announcement />
         </div>
       </div>
 

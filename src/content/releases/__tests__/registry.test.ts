@@ -37,6 +37,19 @@ describe("version identity", () => {
 // ---------------------------------------------------------------------------
 
 describe("registry invariants (§5.3)", () => {
+  it("allows one flagship and requires it to be an announced highlight", () => {
+    for (const entries of [
+      ...RELEASES.map((release) => release.entries),
+      UNRELEASED_ENTRIES,
+    ]) {
+      const featured = entries.filter((entry) => entry.featured);
+      expect(featured.length).toBeLessThanOrEqual(1);
+      for (const entry of featured) expect(entry.highlight).toBe(true);
+    }
+    expect(UNRELEASED_ENTRIES.find((entry) => entry.featured)?.id).toBe(
+      "monthly-body-measurements",
+    );
+  });
   it("has at least one release", () => {
     expect(RELEASES.length).toBeGreaterThan(0);
   });
@@ -212,9 +225,10 @@ describe("content contracts (§5.2)", () => {
     // the recording carries the entry's whole demonstration; a reader who
     // cannot see it is owed the same account
     for (const { where, media } of allMedia) {
-      expect(media.alt.trim().length, `${where} needs alt text`).toBeGreaterThan(
-        20,
-      );
+      expect(
+        media.alt.trim().length,
+        `${where} needs alt text`,
+      ).toBeGreaterThan(20);
       expect(media.alt.length, `${where} alt`).toBeLessThanOrEqual(
         CONTENT_LIMITS.mediaAlt,
       );

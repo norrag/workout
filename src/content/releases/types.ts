@@ -54,6 +54,8 @@ export interface ReleaseEntry {
    * Every release entry remains visible in full under More → What's new.
    */
   highlight?: boolean;
+  /** Optional flagship in the announcement; minor entries keep quieter type. */
+  featured?: boolean;
   area?: ReleaseArea;
 }
 

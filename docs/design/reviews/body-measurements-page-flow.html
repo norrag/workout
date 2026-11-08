@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WORKOUT - measurement page-flow verification</title>
+<style>
+body{margin:24px;background:#e4dfd3;color:#17140f;font:15px Arial,sans-serif;line-height:1.5}h1{font-size:28px}p{max-width:1050px}.grid{display:flex;flex-wrap:wrap;gap:24px}figure{margin:0;width:390px}figcaption{font-size:12px;font-weight:700;margin:12px 0}img{width:100%;height:auto;display:block}code{font-size:13px}
+</style>
+<h1>measurement actions at document end</h1>
+<p>Owner clarification, 7 November 2026. Actual components rendered at 390 x 740 with fictional data. The measurement form uses document scrolling and AppShell. Complete/Cancel occur after the last field, with no fixed or sticky ancestor. They are absent at top/middle and visible at the end, above BottomNav. The actual all-sets-logged DayView shows the same inline completion placement. Measurement save does not require all sites or checks.</p>
+<p>Date: 160 x 35px. Units: 88 x 35px. Workout and measurement numeric cells: 105 x 35px at this viewport, 15px text. See <a href="../../reviews/2026-11-07-body-measurements-page-flow.md">the review</a> for 320/360/430px checks, CI and verification limits. These are local fixtures; they do not establish hosted signed-in persistence or physical iOS behavior.</p>
+<div class="grid">
+<figure><figcaption>MEASUREMENTS / TOP - actions below fold</figcaption><img alt="Measurement page top with compact date, units and upper-body rows, without completion actions" src="../screenshots/body-measurements-flow-top.png"></figure>
+<figure><figcaption>MEASUREMENTS / MIDDLE - actions below fold</figcaption><img alt="Measurement page middle with upper and lower rows, without completion actions" src="../screenshots/body-measurements-flow-middle.png"></figure>
+<figure><figcaption>MEASUREMENTS / END - inline Cancel and Complete</figcaption><img alt="Measurement page end with Cancel and Complete beneath the note" src="../screenshots/body-measurements-flow-bottom.png"></figure>
+<figure><figcaption>ACTUAL DAYVIEW / END - inline Complete Workout</figcaption><img alt="Actual workout page end with Complete Workout beneath logged sets" src="../screenshots/body-measurements-flow-workout.png"></figure>
+<figure><figcaption>MEASUREMENTS / DARK - same document flow</figcaption><img alt="Dark measurement page end with actions beneath fields" src="../screenshots/body-measurements-flow-dark.png"></figure>
+</div>
+</html>

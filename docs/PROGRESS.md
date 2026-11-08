@@ -24,6 +24,214 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-08 - N84 supported navigation-queue correction
+
+Reproduced the old-build stall without a real database and inspected the paused
+router: the queue had the completed destination while React still rendered the
+old page. Publishing that already-completed state once resolved the diagnostic.
+Official Next PR #95439 fixes this mechanism. Pin Next/analyzer 16.4.5, retain
+webpack/Serwist, existing React and lint rules; apply required TypeScript changes.
+The isolated build, lint and typecheck pass; 80/80 fresh untraced synthetic mobile
+navigation sequences pass with no errors. A baseline Windows migration-helper
+import failure is also corrected without changing drift logic. Full real-stack CI
+now repeats all smoke flows three times with no retries; terminal results remain
+to be checked. [Evidence and compatibility](reviews/2026-11-08-navigation-queue.md).
+No release/merge, new migration or new modal design. Draft #265 stays draft.
+
+Verified UI checkpoint: 7fffacb / CI 42440446611 fully green. Broad mobile
+smoke 42/42 (three fresh repetitions, retries disabled); four hydration and
+four targeted tape cases direct. Checks/drift, 84 RLS and 21 integration pass.
+Approved regular light/dark PNGs byte-match current CI captures. READY preview:
+https://workout-liukaeox1-garron-duprees-projects.vercel.app/more/measurements.
+N84 correction is verified on draft #265, not shipped. Hosted/iOS verification
+and detailed PR-body publication remain blocked as recorded in the review.
+Final documentation-head checks are reported at delivery; no merge/release.
+
+
+Final-head check: e58b8f2 / CI 42440932857 has 39/42 broad passes; three macrocycle
+text assertions also match hidden streamed content outside the active main.
+Navigation, tape, checks/drift/RLS/integration pass. Assertions are now scoped to
+the active main without reducing their requirements or enabling retries. The
+[queue record](reviews/2026-11-08-navigation-queue.md)
+records the evidence; final corrected-head CI is reported at delivery.
+
+Follow-up: b9409a0 / CI 42441481966 is 41/42; macrocycle passes, one progression
+weight selector matches the same hidden streamed input (both values correct).
+A consistent visible-control policy now covers page-level text/labels; strict
+matching, hidden metadata checks, database checks and all expectations remain.
+Only tests/documentation changed. Final-head CI follows at delivery.
+
+## 2026-11-08 - owner release-readiness follow-up
+
+Restored the approved regular 1.3 modal at every width, per the owner's rejection
+of the narrow variant. Exact approved baseline pixels and constrained-viewport
+scroll/44px controls pass locally. No new narrow design. Added a thorough
+[research-backed future roadmap](reviews/2026-11-08-body-records-roadmap.md) for
+transparent measurements/strength/weight/DEXA comparison; future work only.
+The goal is all tests corrected and the feature release-ready before approval;
+N84 remains active, PR remains draft and unmerged. Local synthetic API probing
+has reproduced BodySpec navigation without a real database; tracing continues.
+
+## 2026-11-08 - N84/N96 sign-in hydration investigation
+
+A concrete sign-in mismatch reproduces locally without a DB: eight of eight
+loads fail at the leading Suspense boundary versus SSR action metadata. Moving
+the hidden boundary below Email removes eight of eight mismatches. Local action
+validation / return-path regression passes; production-build and full signed-in
+verification follow. No auth/security or visible layout change; Guide/claims
+updated. No version, schema or approved-modal change. [Evidence](reviews/2026-11-08-navigation-hydration.md).
+
+
+Production checkpoint at UI commit 51b0930 / CI run 42436607712: four hydration regressions
+pass, as do 2,189 unit tests and 12 built guards, 84 RLS and 21 integration tests. Measurement
+capture/correction/export/deletion and mobile flow pass directly. Two other
+scenarios pass after pre-form sign-in retries. Those retained traces contain no
+page errors yet still stall after fast 303 redirects, proving React 418 is not
+necessary for N84. No claim that all navigation failures are resolved. READY
+preview is pinned to UI commit 51b0930 with the 1.3.0 override. Hosted browser testing is blocked
+at Vercel protection; the temporary public-link request was denied and not
+retried. Approval pending, no hosted test data created. Full/final CI terminal
+results are reported at delivery.
+
+## 2026-11-07 - N96 narrow release-modal refinement
+
+Owner accepted the 390px light/dark proposal designs and rejected the tall
+narrow version. Figure 4.7c precedes the below-375px-only compact treatment.
+Actual-component checks pass at 320/360px and a 320×480 short viewport. The
+320×740 card is 304px wide and 579px tall, down from 708px. All text fits at
+740px; on short screens the body scrolls while 44px actions stay available.
+Local PNG hashes match before/after at 375, 390 light/dark and 768px. Default
+dialogs/history are unchanged. Guide/claims record short-screen scrolling.
+Temporary fixture restored; no data/schema/version changes. Narrow approval
+and fresh CI/preview verification follow in [the review](reviews/2026-11-07-release-modal-narrow.md).
+Draft #265 stays unmerged; package/registry 1.2.1, staged 1.3.0.
+
+READY preview pinned to 52cf312: https://workout-gfxfjri36-garron-duprees-projects.vercel.app/more/whats-new/preview.
+Deployment-specific override confirmed; protected fetch reaches app sign-in.
+Targeted CI 42400147173: four direct passes, actual narrow capture delivered.
+Checks/drift pass; RLS setup stops before tests on occupied runner port 54322.
+Full smoke and final-doc CI terminal results follow at delivery. No hosted
+signed-in claim; N84 stays open. Wider designs approved, narrow pending.
+
+## 2026-11-07 - N96 automatic checks, MCP reads and release proposal
+
+Figures 4.13f-g/4.7b precede code. Cancel removed; X guards discard. Decimal
+entries auto-check, with confirmable typo review from broad site ranges and
+large earlier same-site changes. Partial/unchecked values still save. New
+read-only staged MCP access includes owner-scoped dated measurements/deltas,
+unit labels and bounded paging. Real token-bound two-account integration tests
+cover isolation. No schema or engine changes.
+
+The 1.3 proposal features measurements and makes the existing tool-list notice
+minor. Explicit review-only route and real-renderer screenshots are prepared;
+owner approval is pending, not assumed. Measurement Guide/claims simplified
+and checked against code; doc 20's overconfident tissue interpretations corrected.
+Per-site notes, transparent overview context and two DEXA accuracy issues remain
+follow-ups. Local actual-component mobile checks pass with no page errors;
+temporary root fixture restored and server stopped. Persistence/connector CI
+and fresh preview follow. [Evidence](reviews/2026-11-07-body-measurements-followup.md).
+
+
+READY review preview: https://workout-ngcfgtf10-garron-duprees-projects.vercel.app/more/measurements
+Release proposal: same host /more/whats-new/preview (not approved or released).
+UI pinned to 8ecfc4d5affcbff823f599a99b2c4fee70b9e0ae; deployment-specific
+public 1.3.0 build override confirmed. Corrected test/document head is
+7dda88c0ecf620b35d8708d120dbedeace004dbf with identical application source.
+CI 42396673985 is terminal success on attempt 1: 2,189 unit tests, 12 built
+guards, 84 RLS, 21 integration and drift pass. Full smoke: 13 direct passes.
+Targeted cases: 3 direct passes / 1 pre-form sign-in retry; all flows pass.
+N84 stays open. Real signed-in local-Supabase tests cover partial save,
+correction/confirmation, export/deletion, modal non-acknowledgment and two-owner
+connector isolation. Hosted signed-in and physical iOS remain unverified.
+No schema change, production health-data write, merge or promotion.
+
+## 2026-11-07 - N96 clarification: complete at the page end
+
+Figure 4.13e precedes the correction. The owner's explicit clarification
+replaces the fixed-bar interpretation: Complete/Cancel are normal document
+content after all fields, absent at top/middle and visible at the page end.
+Removed FullScreenEntry and its viewport/body-lock scaffolding. The app shell,
+window scrolling, sticky header and BottomNav now match actual DayView behavior.
+Date is 160 x 35px; units are 88 x 35px through opt-in shared compact sizing.
+Partial save, local checklist, all-site groups and themed confirmations remain.
+
+Actual-component local checks pass at 320/360/390/430px, dark theme, short
+viewport and 512px cap, with no page errors. Real DayView rendered with every
+set logged provides the inline completion comparison. Temporary root fixture
+restored and dev server stopped. Hosted signed-in save/delete and physical iOS
+remain unverified; no new schema/data/engine/production changes.
+See [evidence](reviews/2026-11-07-body-measurements-page-flow.md). N96 remains
+in progress on draft #265; final preview/CI checkpoint follows.
+
+READY page-flow preview: https://workout-ih75aupc9-garron-duprees-projects.vercel.app/more/measurements
+UI `157d26f51bdf147e0edfc2a7008ca3264a67422d`; deployment-specific public 1.3.0 override confirmed.
+CI [42390170021](https://github.com/norrag/workout/actions/runs/42390170021)
+is terminal success on attempt 1: checks, 84 RLS, 18 integration and drift pass.
+Both targeted tape cases pass without retries and pass directly again in smoke.
+Full smoke: 9 passed, 2 flaky, 0 failed/skipped. BodySpec Keep current (line 176)
+and progression sign-in (line 217) pass on retry; N84 remains open.
+Hosted signed-in and physical iOS remain unverified; no merge/promotion.
+
+## 2026-11-07 - N96 correction after rejected mobile review
+
+Figures 4.13c–d precede code. The previous pass was not accepted. The new
+body-portal full-screen entry uses a viewport-fixed bottom bar with only
+safe-area padding. Actual DayView and tape cells match width/height/computed
+appearance at 320/360/390/430px. Shared 23px LogCheckbox; all 12 sites visible
+in upper/lower groups. Checks are local and clear on edit; all entered values
+save independently of checks. Delete uses themed confirmation. Experimental
+BottomSheet footer mode removed; original sheet layout restored. The shared
+style extraction preserves workout literals/behavior.
+
+Local fictional checks pass overflow, fixed actions, conversion, checks,
+Next, discard retention, themed-delete cancellation, 512px content cap and
+simulated keyboard geometry. Actual save/delete persistence belongs to local
+Supabase CI. See [layout evidence](reviews/2026-11-07-body-measurements-layout.md).
+Temporary root fixture restored before commit. Hosted signed-in actions and
+physical-iOS behavior remain unverified. No schema, engine, production release
+identity, merge or promotion. Fresh preview and final CI checkpoint follow.
+
+READY review preview: https://workout-873r403rx-garron-duprees-projects.vercel.app/more/measurements
+pinned to ebffc809c6bf3d05be682feea6142b1db1fc436b, public 1.3.0 build override.
+CI 42386443416 passes checks, 84 RLS, 18 integration, drift and both targeted
+measurement cases without retries. Full smoke: 7 passed, 1 failed, 3 flaky;
+N84 remains open. Capture retries after a pre-form sign-in timeout; mobile
+passes directly. Hosted signed-in and physical iOS checks remain unverified.
+No merge/promotion. [Detailed evidence](reviews/2026-11-07-body-measurements-layout.md).
+
+## 2026-11-06 — N96: monthly body measurements, staged for 1.3.0
+
+Owner preview refinement: figures 4.13a–b precede the mobile update. The form
+now uses the shared sheet's optional pinned footer and standard Button/Input/
+SegmentedControl primitives, centered numeric cells, and 16px native controls.
+Only fields scroll, with explicit minimum-width constraints and long-note
+wrapping. Complete saves; Cancel retains the existing discard guard. Keyboard
+Next advances through visible fields. The footer follows VisualViewport size/
+offset above the keyboard; no root viewport or body-position policy changes.
+Existing sheet layout is preserved when no footer is supplied. Local fictional
+fixture checks pass at 320/360/390/430px, with light/dark captures, independent
+scrolling, units, focus and simulated keyboard geometry (360px high, offset 24).
+These are not physical-iOS keyboard/zoom tests. Temporary fixture entry page
+was restored before commit. No schema, release identity or engine changes.
+
+Mobile verification at UI commit `91c4070b7ac764c5022dadc88b213e04511ad88a`,
+[CI run 42306128963](https://github.com/norrag/workout/actions/runs/42306128963):
+both measurement scenarios pass without retries in the targeted run (4.5/4.2s)
+and full smoke (4.2/3.8s), including actual long-note saving and mobile geometry.
+Checks, 84 RLS, 18 integration and hosted drift pass. Full smoke finishes with
+nine passed, one flaky (progression sign-in) and the existing N84 BodySpec
+line-141 navigation failure. The report/screenshots are archived separately.
+
+Design/build contract: [24-body-measurements.md](24-body-measurements.md), figures 4.12–4.15. More → Body measurements, paired tape logging, dated comparisons/history, edit/delete and CSV. Three additive owner-RLS tables + invoker atomic save; no engine/profile changes. Guide and claims update with the feature. Registry/package stay 1.2.1 and all entry/mutation surfaces are gated for 1.3.0.
+
+Validation at code commit 0f8fc306694e2462d7781d4f026cf10169817f8e (CI run 42285038309): Linux checks (unit/lint/typecheck/build) pass; all 84 RLS and 18 write-pipeline integration tests pass; the targeted measurement E2E passes capture, unit conversion, keep/discard, consecutive saves, comparisons/history, edit and CSV. Local mobile captures cover both themes. Temporary fixtures are removed. The broader smoke run also passed the tape test, but finished with the existing N84 BodySpec navigation timeout (bodyspec-integration.spec.ts:141); three other legacy navigation cases passed on retry.
+
+Earlier verification at application commit d66b853 / CI run 42286972237: checks, all 84 RLS and 18 integration tests, and targeted tape E2E pass. Full smoke passes tape again but retains N84's BodySpec navigation wait at line 141 (seven passed, two flaky, one failed). After renewed native Supabase approval, the additive migration applied to the shared production database as version 20261106202459; all tables/sites/policies/FKs/grants and invoker execution verified, with no new security advisor findings. Hosted migration drift now passes.
+
+Follow-up attribution: [controlled main/feature CI comparison](reviews/2026-11-06-body-measurements-ci.md), run 42291048440. Unchanged current main reproduces the issue with both the shipped 1.2.1 and staged 1.3.0 settings. The shipped baseline fails prescribed-progression line 220 on both attempts after a fast HTTP 303 redirect; the staged baseline has the same sign-in/pending-UI signature. Tape passes alone and in full smoke; prescribed progression passes on the feature repeat. No concrete tape regression found, but the shared action/RSC transition root cause is unresolved under N84; this is not an all-green or release-ready repository. Temporary baseline jobs are removed after evidence collection.
+
+Remaining / external: owner signed-in review of the READY mobile preview, https://workout-bexg3c51j-garron-duprees-projects.vercel.app (UI 91c4070, deployment dpl_Gw8RrgeyamQ9zsmoEKbjuMnnh3Wm). Protected fetch reaches app sign-in; interactive QA now awaits desktop GitHub/Vercel sign-in after the saved-login control did not open. Hosted saves and physical-iOS keyboard/zoom remain unverified. No fake hosted health records were created. Preview uses deployment-specific NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0; project env is unchanged. Production frontend remains main aed94ce, version 1.2.1. Draft PR #265 stays unmerged. Later documentation-only commits leave the preview UI unchanged.
+
 ## 2026-08-30 — Release 1.2.1: "last session" means the session, not the ask (N90)
 
 A fix release (doc 23 §4.1): no headline, no highlights, no modal — the

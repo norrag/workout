@@ -16,7 +16,7 @@
  * exercise with more recent sets than the OLD global cap, one cold exercise
  * whose (older, but perfectly good) history sits entirely behind them.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { getExerciseE1rmAnchors } from "@/lib/queries/anchors";
@@ -67,7 +67,8 @@ beforeAll(async () => {
     .eq("load_type", "external")
     .limit(2);
   if (exError) throw exError;
-  if (!exercises || exercises.length < 2) throw new Error("seed data missing stock exercises");
+  if (!exercises || exercises.length < 2)
+    throw new Error("seed data missing stock exercises");
   hotExerciseId = exercises[0].id;
   coldExerciseId = exercises[1].id;
 
@@ -110,7 +111,11 @@ beforeAll(async () => {
   if (microError) throw microError;
 
   // one COMPLETED workout per exercise — the view only ranks completed work
-  const makeSession = async (exerciseId: string, dayNumber: number, daysAgo: number) => {
+  const makeSession = async (
+    exerciseId: string,
+    dayNumber: number,
+    daysAgo: number,
+  ) => {
     const performedAt = new Date(Date.now() - daysAgo * DAY_MS).toISOString();
     const { data: workout, error: workoutError } = await service
       .from("workouts")
@@ -181,11 +186,17 @@ beforeAll(async () => {
   });
 
   const rows = [
-    ...Array.from({ length: 3 }, (_, i) => set(cold, coldExerciseId, i + 1, 100)),
-    ...Array.from({ length: HOT_SETS }, (_, i) => set(hot, hotExerciseId, i + 1, 50)),
+    ...Array.from({ length: 3 }, (_, i) =>
+      set(cold, coldExerciseId, i + 1, 100),
+    ),
+    ...Array.from({ length: HOT_SETS }, (_, i) =>
+      set(hot, hotExerciseId, i + 1, 50),
+    ),
   ];
   for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await service.from("logged_sets").insert(rows.slice(i, i + 500));
+    const { error } = await service
+      .from("logged_sets")
+      .insert(rows.slice(i, i + 500));
     if (error) throw error;
   }
 });
@@ -208,21 +219,38 @@ describe("getExerciseE1rmAnchors: the bound is per exercise, not per call", () =
   });
 
   it("gives the cold exercise the same anchor it gets when fetched alone", async () => {
-    const batched = await getExerciseE1rmAnchors(
-      user,
-      userId,
-      [hotExerciseId, coldExerciseId],
-      params,
-    );
-    const alone = await getExerciseE1rmAnchors(user, userId, [coldExerciseId], params);
+    // ageDays is derived from wall time. The two queries must share the same
+    // instant to compare the whole anchor rather than elapsed milliseconds.
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now());
+    try {
+      const batched = await getExerciseE1rmAnchors(
+        user,
+        userId,
+        [hotExerciseId, coldExerciseId],
+        params,
+      );
+      const alone = await getExerciseE1rmAnchors(
+        user,
+        userId,
+        [coldExerciseId],
+        params,
+      );
 
-    // batch width must not be an input to the answer — re-seeding one exercise
-    // on its own is exactly how the defect used to "fix itself"
-    expect(batched.get(coldExerciseId)).toEqual(alone.get(coldExerciseId));
+      // batch width must not be an input to the answer — re-seeding one exercise
+      // on its own is exactly how the defect used to "fix itself"
+      expect(batched.get(coldExerciseId)).toEqual(alone.get(coldExerciseId));
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("keeps the anchor sourced from the cold exercise's own history", async () => {
-    const anchors = await getExerciseE1rmAnchors(user, userId, [coldExerciseId], params);
+    const anchors = await getExerciseE1rmAnchors(
+      user,
+      userId,
+      [coldExerciseId],
+      params,
+    );
     const anchor = anchors.get(coldExerciseId)!;
     // 100 lb × 10 @ 2 RIR — an old set is still a real measurement (the module
     // deliberately has no recency floor); it must not be silently discarded

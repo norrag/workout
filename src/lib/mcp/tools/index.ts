@@ -2,6 +2,8 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { registerGetCurrentState } from "./get-current-state";
 import { registerReadTools } from "./read";
+import { registerMeasurementTools } from "./measurements";
+import { releaseActive } from "@/lib/version";
 import { registerCoachingTools } from "./coaching";
 import { registerWriteTools } from "./write";
 import { registerAuthoringTools } from "./authoring";
@@ -76,6 +78,7 @@ export function registerTools(server: McpServer) {
   const guarded = withErrorHandling(server);
   registerGetCurrentState(guarded);
   registerReadTools(guarded);
+  if (releaseActive("1.3.0")) registerMeasurementTools(guarded);
   registerCoachingTools(guarded);
   registerWriteTools(guarded);
   registerAuthoringTools(guarded);

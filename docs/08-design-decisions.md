@@ -143,3 +143,46 @@ renumbering).
 >
 > The Volume stats tab (old 4.1) was removed; Balance→4.1, Performance→4.2. There is no 4.3.
 > Old 2.2 "Meso detail — RIR ramp" is gone — the planner board (2.5) is the single meso surface.
+
+### Monthly tape figures (2026-11-06, doc 24)
+
+`docs/design/mockups/body-measurements.html` extends the More/profile ledger:
+4.12 entry and empty state, 4.13 log/edit sheet, 4.14 latest/comparison, 4.15
+history in dark theme. See the dated 09 entry and doc 24 for the bounded
+WORKOUT slice, which leaves the larger MEASURE companion deferred.
+
+Owner mobile review adds **4.13a–b** in
+`docs/design/mockups/body-measurements-mobile.html`: pinned Complete/Cancel,
+separate form scrolling, compact centered numeric cells, and keyboard-visible
+actions. Runtime evidence: `body-measurements-mobile-form.png`,
+`body-measurements-mobile-dark.png`, and
+`body-measurements-mobile-keyboard-simulated.png` in `design/screenshots/`.
+
+Owner correction (2026-11-07) **rejects and supersedes** 4.13a–b.
+**4.13c–d**, design/mockups/body-measurements-workout.html, use actual workout
+cell dimensions, LogCheckbox, all-site groups and a viewport-fixed edge bar.
+Actual runtime comparison: design/reviews/body-measurements-workout-comparison.html.
+Fictional body-measurements-workout-*.png captures are in design/screenshots/.
+
+Latest owner clarification adds **4.13e**,
+`docs/design/mockups/body-measurements-page-flow.html`, before implementation.
+It supersedes 4.13a-d's action anchoring: Complete/Cancel are normal document
+content after the final field, appearing at the page end like DayView's inline
+completion action. Date/units shrink to 35px. All sites remain optional.
+Runtime top/middle/end and actual-workout evidence is in
+[the page-flow review](reviews/2026-11-07-body-measurements-page-flow.md).
+
+**4.13f-g** and **4.7b**, `design/mockups/body-measurements-entry-review.html`,
+precede automatic entry checks, confirmable typo review and a proposed 1.3 modal.
+They remove 4.13e's Cancel action, retaining X/discard and document-flow Complete.
+The release proposal is not approved or released. See the dated 09 amendment.
+
+**4.7c**, `design/mockups/release-1.3-narrow.html`, precedes the compact
+below-375px featured-announcement layout. Owner accepted the prior 390px
+light/dark designs, but rejected the tall narrow treatment. Those wider
+renderings stay unchanged. The narrow revision awaits review; this is not
+release or merge approval. See [the narrow review](reviews/2026-11-07-release-modal-narrow.md).
+
+Owner decision 2026-11-08 **rejects 4.7c**. Restore approved regular **4.7b** at
+all widths, with existing scroll behavior. Do not create a new narrow design.
+The latest dated 09 amendment takes precedence over the historical note above.

@@ -161,6 +161,10 @@ export const UG_WHAT_WORKOUT_IS: ManualChapter = {
           kind: "para",
           text: "The Workout page shows the workout you are due to do next. Open the app and it is already in front of you — this is the screen you will spend most of your time on.",
         },
+        {
+          kind: "para",
+          text: "After sign-in, the app opens Workout. A sign-in link can return you to another page.",
+        },
         { kind: "heading", text: "What is on it" },
         {
           kind: "list",
