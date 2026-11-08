@@ -22,9 +22,6 @@ export default function SignInPage() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <Suspense fallback={null}>
-        <RedirectField />
-      </Suspense>
       <Input
         label="Email"
         name="email"
@@ -32,6 +29,11 @@ export default function SignInPage() {
         autoComplete="email"
         required
       />
+      {/* React emits action metadata before form children during SSR. Keep a
+          host element before this boundary so hydration can skip those fields. */}
+      <Suspense fallback={null}>
+        <RedirectField />
+      </Suspense>
       <Input
         label="Password"
         name="password"

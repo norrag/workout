@@ -15,6 +15,20 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-08 - Session 140: N84/N96 navigation and persistence verification
+
+Reproduced the unchanged sign-in page hydration mismatch in eight fresh local
+contexts, before any auth-provider request. The leading RedirectField Suspense
+boundary encounters SSR action metadata; moving only that hidden boundary below
+Email removes all eight mismatches. New local browser regression passes both
+plain and return-path sign-in with locally rejected credentials. Visible layout,
+auth checks, timeouts, service worker and dependencies stay unchanged. CI repeats
+the regression four times and retains real signed-in smoke/persistence cases.
+Guide/claims record the sign-in destination. Production/navigation and mobile
+verification follow in [evidence](../reviews/2026-11-08-navigation-hydration.md).
+No claim that N84 is closed. Draft #265 stays unmerged; wider modal approved,
+narrow pending. No production data or schema changes. Batch 47 preserves scope.
+
 ## 2026-11-07 - Session 139: N96 narrow release-modal review
 
 Batch 46 records scoped owner approval of the first two (390px light/dark)

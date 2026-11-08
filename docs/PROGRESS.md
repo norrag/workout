@@ -24,6 +24,15 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-08 - N84/N96 sign-in hydration investigation
+
+A concrete sign-in mismatch reproduces locally without a DB: eight of eight
+loads fail at the leading Suspense boundary versus SSR action metadata. Moving
+the hidden boundary below Email removes eight of eight mismatches. Local action
+validation / return-path regression passes; production-build and full signed-in
+verification follow. No auth/security or visible layout change; Guide/claims
+updated. No version, schema or approved-modal change. [Evidence](reviews/2026-11-08-navigation-hydration.md).
+
 ## 2026-11-07 - N96 narrow release-modal refinement
 
 Owner accepted the 390px light/dark proposal designs and rejected the tall

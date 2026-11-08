@@ -34,6 +34,13 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
       },
     },
   },
+  {
+    id: "sign-in-form-hydration",
+    title: "Sign in without a page reset",
+    body: "Fixed an error that could reset the sign-in form while the page opened.",
+    area: "app",
+    highlight: false,
+  },
 ];
 
 /** The next feature release under construction. */

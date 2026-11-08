@@ -101,6 +101,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Build (against the local stack)
         run: npm run build
+      - name: Sign-in hydration regression
+        run: npx playwright test tests/e2e/auth-hydration.spec.ts --repeat-each=4
       - name: Measurements E2E (staged release)
         run: npx playwright test tests/e2e/measurements.spec.ts
       - name: Archive measurement mobile report

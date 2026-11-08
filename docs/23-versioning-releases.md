@@ -762,3 +762,11 @@ All entry text and destinations remain. Short viewports retain inner scrolling.
 The revised narrow screenshot requires a new review. The proposal still does
 not acknowledge a release. Registry/package stay 1.2.1; staging stays 1.3.0.
 No release, merge or production promotion is authorized by design approval.
+
+
+### 2026-11-08 - staged verification correction
+
+The branch includes a bounded sign-in hydration correction while validating
+1.3.0. It changes hidden form-node order only, without changing the approved
+announcement copy/layout or cutting a release. Package/registry remain 1.2.1.
+Production/navigation verification is recorded in reviews/2026-11-08-navigation-hydration.md.
