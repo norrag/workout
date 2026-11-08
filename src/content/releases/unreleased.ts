@@ -5,7 +5,7 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
   {
     id: "measurement-backlog-import",
     title: "Log measurements with your assistant",
-    body: "Ask your assistant to log new tape readings or import dated records. Preview the values before saving. Exact repeats are skipped and existing dates are protected.",
+    body: "Ask your assistant to log new tape readings or import dated records. Preview the values before saving. Identical records are skipped and existing dates are protected.",
     area: "connector",
     highlight: true,
     link: {
