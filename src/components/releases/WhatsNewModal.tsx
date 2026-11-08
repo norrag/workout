@@ -7,6 +7,7 @@ import { FloatingDialog } from "@/components/ui/FloatingDialog";
 import { useSetLogQueue } from "@/components/logging/SetLogQueueProvider";
 import { ReleaseEntryList, releaseDateLabel } from "./ReleaseEntryList";
 import { suppressWhatsNew, type ActiveWorkoutStatus } from "@/lib/version";
+import { releaseAnnouncement } from "@/lib/version/announcement";
 import type { Release } from "@/content/releases/types";
 import { acknowledgeReleases } from "@/app/(app)/more/actions";
 
@@ -32,9 +33,7 @@ export function WhatsNewModal({
   const [dismissed, setDismissed] = useState(false);
   const [, startTransition] = useTransition();
 
-  const highlights = [...releases]
-    .reverse()
-    .flatMap((release) => release.entries);
+  const { highlights, headline } = releaseAnnouncement(releases);
   const suppressed = suppressWhatsNew({
     pathname,
     workoutStatus,
@@ -104,8 +103,7 @@ export function WhatsNewModal({
             {proposal ? "Proposed version" : "Version"} {span}
           </span>
           {proposal ? "." : " is here."}
-          {newest.headline ? ` ${newest.headline}.` : ""} Here are the
-          highlights.
+          {headline ? ` ${headline}.` : ""} Here are the highlights.
         </p>
         <p className="mt-1 text-[9.5px] font-semibold tracking-[0.1em] text-ink/45">
           {proposal
