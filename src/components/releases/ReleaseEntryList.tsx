@@ -14,13 +14,7 @@ import { guideSectionRoute } from "@/content/releases/links";
  * page belongs to the release header, not to an entry.
  */
 
-function EntryLink({
-  link,
-  compactNarrow = false,
-}: {
-  link: NonNullable<ReleaseEntry["link"]>;
-  compactNarrow?: boolean;
-}) {
+function EntryLink({ link }: { link: NonNullable<ReleaseEntry["link"]> }) {
   const href =
     link.target.kind === "app"
       ? link.target.href
@@ -29,7 +23,7 @@ function EntryLink({
   return (
     <Link
       href={href}
-      className={`mt-2.5 inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink/55 ${compactNarrow ? "max-[374px]:mt-2" : ""}`}
+      className="mt-2.5 inline-block text-[9.5px] font-semibold tracking-[0.1em] text-ink/55"
     >
       {link.label.toUpperCase()} ›
     </Link>
@@ -78,10 +72,7 @@ export function ReleaseEntryList({
   return (
     <ul>
       {entries.map((entry, index) => (
-        <li
-          key={entry.id}
-          className={`border-b border-ink/15 py-4 first:pt-3 ${hasFeatured ? "max-[374px]:py-3 max-[374px]:first:pt-2" : ""}`}
-        >
+        <li key={entry.id} className="border-b border-ink/15 py-4 first:pt-3">
           {(entry.area || (hasFeatured && index === firstMinor)) && (
             <div className="text-[9.5px] font-semibold tracking-[0.12em] text-ink/45">
               {hasFeatured && index === firstMinor
@@ -90,19 +81,17 @@ export function ReleaseEntryList({
             </div>
           )}
           <div
-            className={`mt-0.5 tracking-[-0.01em] ${hasFeatured ? (entry.featured ? "text-xl font-extrabold leading-tight max-[374px]:text-lg" : "text-[13px] font-bold") : "text-[15px] font-bold"}`}
+            className={`mt-0.5 tracking-[-0.01em] ${hasFeatured ? (entry.featured ? "text-xl font-extrabold leading-tight" : "text-[13px] font-bold") : "text-[15px] font-bold"}`}
           >
             {entry.title}
           </div>
           <p
-            className={`mt-1 leading-relaxed text-ink/70 ${hasFeatured ? (entry.featured ? "text-sm max-[374px]:text-[13px] max-[374px]:leading-5" : "text-xs max-[374px]:leading-normal") : "text-sm"}`}
+            className={`mt-1 leading-relaxed text-ink/70 ${hasFeatured && !entry.featured ? "text-xs" : "text-sm"}`}
           >
             {entry.body}
           </p>
           {entry.media && <EntryMedia media={entry.media} />}
-          {entry.link && (
-            <EntryLink link={entry.link} compactNarrow={hasFeatured} />
-          )}
+          {entry.link && <EntryLink link={entry.link} />}
         </li>
       ))}
     </ul>

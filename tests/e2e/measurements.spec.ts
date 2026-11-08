@@ -579,30 +579,20 @@ test("proposed 1.3 modal makes measurements the flagship without acknowledging a
     await page.setViewportSize({ width, height: 740 });
     await expectNoHorizontalOverflow(page);
     const bounds = await dialog.boundingBox();
-    expect(bounds?.width).toBe(width - 16);
-    expect(bounds?.height).toBeLessThanOrEqual(640);
+    expect(bounds?.width).toBe(width - 32);
+    expect(bounds?.height).toBeLessThanOrEqual(708);
     await expect(dialog.getByRole("heading", { level: 2 })).toHaveCSS(
       "font-size",
-      "22px",
+      "26px",
     );
     await expect(
       dialog.getByText("Keep a monthly record of body measurements", {
         exact: true,
       }),
-    ).toHaveCSS("font-size", "18px");
-    const scroll = await content.evaluate(
-      (el) => el.scrollHeight - el.clientHeight,
-    );
-    expect(scroll).toBeLessThanOrEqual(1);
+    ).toHaveCSS("font-size", "20px");
     for (const control of controls) {
       await expect(control).toBeInViewport({ ratio: 1 });
       expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-    }
-    if (width === 320) {
-      await testInfo.attach("release-1.3-proposal-narrow-v2", {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
     }
   }
   await page.setViewportSize({ width: 320, height: 480 });
@@ -611,7 +601,7 @@ test("proposed 1.3 modal makes measurements the flagship without acknowledging a
     el.scrollTop = el.scrollHeight;
   });
   await expect(
-    dialog.getByText("Know when your AI tools need a refresh", { exact: true }),
+    dialog.getByRole("link", { name: /HOW TO REFRESH/ }),
   ).toBeInViewport();
   for (const control of controls) {
     await expect(control).toBeInViewport({ ratio: 1 });

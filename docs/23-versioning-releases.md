@@ -770,3 +770,10 @@ The branch includes a bounded sign-in hydration correction while validating
 1.3.0. It changes hidden form-node order only, without changing the approved
 announcement copy/layout or cutting a release. Package/registry remain 1.2.1.
 Production/navigation verification is recorded in reviews/2026-11-08-navigation-hydration.md.
+
+### 2026-11-08 - owner selects the regular announcement
+
+The owner rejects the narrow variant and selects the first approved regular
+design with smaller type. Restore figure 4.7b at all widths; no new narrow design.
+Historical 4.7c screenshots are rejected history. Keep the existing scroll region
+on constrained viewports. This settles the design choice, not release or merge.

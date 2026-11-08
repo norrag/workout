@@ -31,14 +31,11 @@ export function FloatingDialog({
   open,
   onClose,
   label,
-  narrowGutters = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   label: string;
-  /** Opt-in 8px horizontal gutters below 375px; normal dialogs stay unchanged. */
-  narrowGutters?: boolean;
   children: ReactNode;
 }) {
   const { render, shown } = useDialogTransition(open);
@@ -51,7 +48,7 @@ export function FloatingDialog({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 ${narrowGutters ? "max-[374px]:px-2" : ""}`}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
       onTouchStart={(event) => event.stopPropagation()}
       onTouchMove={(event) => event.stopPropagation()}
       onTouchEnd={(event) => event.stopPropagation()}

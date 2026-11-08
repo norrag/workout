@@ -33,6 +33,17 @@ each session. In it, for every discrete change include:
 | `DATA` | Implies a data-model or query requirement — check [03-data-model.md](03-data-model.md). |
 | `NO-CODE` | Mockup/spec clarification only; no engineering action. |
 
+## 2026-11-08 - restore the approved regular 1.3 modal
+
+Owner rejects the narrow variant and requests the first regular design with
+smaller type. **RETROFIT:** restore figure 4.7b's approved regular light/dark
+renderer at every width. Remove the below-375px variant and its special gutters,
+type and horizontal footer. Keep normal internal scrolling on short/narrow
+viewports. Do not produce another narrow design. Figure 4.7c and its screenshots
+are rejected history, not an active target. Local pixel hashes match the four
+pre-narrow baselines; 320×740/480 keep 44px controls and scrollable notes.
+Design choice is settled; release/merge still requires owner approval.
+
 ## 2026-11-07 - 1.3 modal: compact narrow-phone layout
 
 - **Change (RETROFIT):** figure 4.7c in design/mockups/release-1.3-narrow.html

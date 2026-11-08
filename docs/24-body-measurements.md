@@ -194,3 +194,12 @@ stall without hydration errors. Hosted sign-in/save/delete is blocked by preview
 protection and remains unverified. [Current evidence](reviews/2026-11-08-navigation-hydration.md)
 records the exact commit, READY preview and limits. Wider modal designs approved;
 narrow revision pending. Draft #265 stays unmerged.
+
+### Owner amendment - regular modal and release readiness, 2026-11-08
+
+The narrow modal is rejected. The approved regular smaller-type 4.7b design is
+restored at every width, with ordinary internal scrolling; no new narrow variant.
+All test failures must be corrected before calling this release-ready. Do not
+merge until owner approval. The [future-work proposal and roadmap](reviews/2026-11-08-body-records-roadmap.md)
+expands T-N96d with evidence, source contracts, phases and acceptance criteria.
+It is planning only; the current release remains monthly capture and read access.

@@ -15,6 +15,24 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-08 - Session 141: owner release-readiness direction and roadmap
+
+Batch 48 expands the goal to correcting all test failures before presenting a
+release-ready result; do not merge without approval. The owner rejects the
+narrow modal and chooses the approved regular smaller-type design. Restored
+the exact pre-narrow renderer after checking figure 4.7b and approved screenshots.
+Four local baseline PNG hashes match; 320px/short-view scrolling and 44px actions
+pass. No second narrow design is produced. Old narrow artifacts remain history.
+
+Added the [future-work review and phased roadmap](../reviews/2026-11-08-body-records-roadmap.md):
+source audit, primary research, explicit dates/baselines/coverage, comparison
+contract, data quality, UI direction, phased dependencies and acceptance cases.
+No speculative analytics implementation. N84 remains active: sign-in mismatch
+fixed, but shared navigation still fails without page errors. A separate local
+production worktree with a synthetic API reproduces BodySpec navigation once
+in 12 fast trials; no real Supabase or health data is needed for that failure.
+Further controlled tracing continues. Do not call the release ready yet.
+
 ## 2026-11-08 - Session 140: N84/N96 navigation and persistence verification
 
 Reproduced the unchanged sign-in page hydration mismatch in eight fresh local

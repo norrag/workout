@@ -24,6 +24,17 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-08 - owner release-readiness follow-up
+
+Restored the approved regular 1.3 modal at every width, per the owner's rejection
+of the narrow variant. Exact approved baseline pixels and constrained-viewport
+scroll/44px controls pass locally. No new narrow design. Added a thorough
+[research-backed future roadmap](reviews/2026-11-08-body-records-roadmap.md) for
+transparent measurements/strength/weight/DEXA comparison; future work only.
+The goal is all tests corrected and the feature release-ready before approval;
+N84 remains active, PR remains draft and unmerged. Local synthetic API probing
+has reproduced BodySpec navigation without a real database; tracing continues.
+
 ## 2026-11-08 - N84/N96 sign-in hydration investigation
 
 A concrete sign-in mismatch reproduces locally without a DB: eight of eight

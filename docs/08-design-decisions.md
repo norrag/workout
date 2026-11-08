@@ -182,3 +182,7 @@ below-375px featured-announcement layout. Owner accepted the prior 390px
 light/dark designs, but rejected the tall narrow treatment. Those wider
 renderings stay unchanged. The narrow revision awaits review; this is not
 release or merge approval. See [the narrow review](reviews/2026-11-07-release-modal-narrow.md).
+
+Owner decision 2026-11-08 **rejects 4.7c**. Restore approved regular **4.7b** at
+all widths, with existing scroll behavior. Do not create a new narrow design.
+The latest dated 09 amendment takes precedence over the historical note above.
