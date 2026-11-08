@@ -224,3 +224,9 @@ Navigation, tape, checks/drift/RLS/integration pass. Assertions are now scoped t
 the active main without reducing their requirements or enabling retries. The
 [queue record](reviews/2026-11-08-navigation-queue.md)
 records the evidence; final corrected-head CI is reported at delivery.
+
+The next check (b9409a0 / CI 42441481966) is 41/42: macrocycle passes; one workout
+input matches a hidden streamed duplicate. A consistent visible-control policy
+now corrects the same class across the suite. Expected values, strict matching,
+hidden metadata and persistence checks remain. No application change. Final-head
+CI follows at delivery; see the queue review for the complete qualification.

@@ -49,8 +49,14 @@ async function setLastSeen(version: string) {
 
 async function signIn(page: Page) {
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
 }
@@ -81,7 +87,9 @@ test.beforeAll(async () => {
 
   const { data: links, error: linkError } = await supabase
     .from("exercise_muscle_groups")
-    .select("exercise_id, muscle_group_id, exercise:exercises(user_id, load_type)")
+    .select(
+      "exercise_id, muscle_group_id, exercise:exercises(user_id, load_type)",
+    )
     .eq("role", "primary")
     .limit(100);
   if (linkError) throw linkError;
@@ -90,7 +98,9 @@ test.beforeAll(async () => {
       user_id: string | null;
       load_type: string | null;
     };
-    return ex && ex.user_id === null && (ex.load_type ?? "external") === "external";
+    return (
+      ex && ex.user_id === null && (ex.load_type ?? "external") === "external"
+    );
   });
   if (!stock) throw new Error("seed data missing a stock external exercise");
 
@@ -146,7 +156,9 @@ test("shows once for a returning user and does not reappear after dismissal", as
   await page.goto(`/cycles/meso/${mesoId}`);
   await page.getByRole("button", { name: "START MESOCYCLE" }).click();
   await page.waitForURL("**/workout");
-  await expect(page.getByText("W1·D1").first()).toBeVisible();
+  await expect(
+    page.getByText("W1·D1").filter({ visible: true }).first(),
+  ).toBeVisible();
 
   // now fall behind the deployed version: the workout is `planned`, which is
   // the ordinary landing state and the right moment to interrupt
@@ -181,16 +193,20 @@ test("is absent on the Workout tab once a set has been logged", async ({
   // log a set while caught up: `logSet` flips the workout planned → in_progress
   await setLastSeen("9.9.9");
   await signIn(page);
-  await page.getByLabel("set 1 weight").fill("100");
-  await page.getByLabel("set 1 reps").fill("8");
+  await page.getByLabel("set 1 weight").filter({ visible: true }).fill("100");
+  await page.getByLabel("set 1 reps").filter({ visible: true }).fill("8");
   await page.getByRole("button", { name: "log set 1" }).click();
-  await expect(page.getByRole("button", { name: "uncheck set 1" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "uncheck set 1" }),
+  ).toBeVisible();
 
   // fall behind again; a fresh load of the Workout tab must stay silent —
   // this user is training, not browsing
   await setLastSeen(BEHIND);
   await page.reload();
-  await expect(page.getByText("W1·D1").first()).toBeVisible();
+  await expect(
+    page.getByText("W1·D1").filter({ visible: true }).first(),
+  ).toBeVisible();
   await expect(dismissButton(page)).toBeHidden();
 });
 

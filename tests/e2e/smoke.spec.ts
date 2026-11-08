@@ -49,7 +49,9 @@ test.beforeAll(async () => {
   // one stock external-load exercise + its primary muscle group (seed data)
   const { data: links, error: linkError } = await supabase
     .from("exercise_muscle_groups")
-    .select("exercise_id, muscle_group_id, exercise:exercises(user_id, load_type)")
+    .select(
+      "exercise_id, muscle_group_id, exercise:exercises(user_id, load_type)",
+    )
     .eq("role", "primary")
     .limit(100);
   if (linkError) throw linkError;
@@ -58,7 +60,9 @@ test.beforeAll(async () => {
       user_id: string | null;
       load_type: string | null;
     };
-    return ex && ex.user_id === null && (ex.load_type ?? "external") === "external";
+    return (
+      ex && ex.user_id === null && (ex.load_type ?? "external") === "external"
+    );
   });
   if (!stock) throw new Error("seed data missing a stock external exercise");
 
@@ -116,13 +120,24 @@ test("sign in → start meso → log workout with feedback → complete → next
     if (msg.type() === "error") console.log("[browser:error]", msg.text());
   });
   page.on("requestfailed", (req) => {
-    console.log("[requestfailed]", req.method(), req.url(), req.failure()?.errorText);
+    console.log(
+      "[requestfailed]",
+      req.method(),
+      req.url(),
+      req.failure()?.errorText,
+    );
   });
 
   // ---- sign in through the UI ----
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
 
@@ -132,21 +147,25 @@ test("sign in → start meso → log workout with feedback → complete → next
   await page.waitForURL("**/workout");
 
   // W1·D1 day view with the seeded exercise's 2-set grid
-  await expect(page.getByText("W1·D1").first()).toBeVisible();
+  await expect(
+    page.getByText("W1·D1").filter({ visible: true }).first(),
+  ).toBeVisible();
 
   // ---- log set 1 (deferred seed: enter a starting weight) ----
   // Blurring the weight field fires a background planned-weight persist,
   // during which the LOG checkbox is a "saving" status span (whose label
   // substring-matches getByLabel). Click via role=button so Playwright waits
   // for the real, actionable control to come back.
-  await page.getByLabel("set 1 weight").fill("100");
-  await page.getByLabel("set 1 reps").fill("8");
+  await page.getByLabel("set 1 weight").filter({ visible: true }).fill("100");
+  await page.getByLabel("set 1 reps").filter({ visible: true }).fill("8");
   await page.getByRole("button", { name: "log set 1" }).click();
-  await expect(page.getByRole("button", { name: "uncheck set 1" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "uncheck set 1" }),
+  ).toBeVisible();
 
   // ---- log set 2 (row becomes editable after set 1 confirms) ----
-  await page.getByLabel("set 2 weight").fill("100");
-  await page.getByLabel("set 2 reps").fill("8");
+  await page.getByLabel("set 2 weight").filter({ visible: true }).fill("100");
+  await page.getByLabel("set 2 reps").filter({ visible: true }).fill("8");
   await page.getByRole("button", { name: "log set 2" }).click();
 
   // ---- exercise feedback auto-prompts after the exercise's last set ----
@@ -160,7 +179,9 @@ test("sign in → start meso → log workout with feedback → complete → next
   await expect(feedback).not.toBeVisible();
 
   // ---- complete the workout ----
-  await expect(page.getByRole("button", { name: "uncheck set 2" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "uncheck set 2" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "COMPLETE WORKOUT" }).click();
   const completeSheet = page.getByRole("dialog", { name: /complete/i });
   await expect(completeSheet).toBeVisible();
@@ -170,5 +191,7 @@ test("sign in → start meso → log workout with feedback → complete → next
 
   // ---- the engine generated week 2's counterpart; we land on it ----
   await page.waitForURL("**/log/**");
-  await expect(page.getByText("W2·D1").first()).toBeVisible();
+  await expect(
+    page.getByText("W2·D1").filter({ visible: true }).first(),
+  ).toBeVisible();
 });

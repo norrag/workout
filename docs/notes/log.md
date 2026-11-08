@@ -48,6 +48,12 @@ the active main without reducing their requirements or enabling retries. The
 [queue record](../reviews/2026-11-08-navigation-queue.md)
 records the evidence; final corrected-head CI is reported at delivery.
 
+Follow-up: b9409a0 / CI 42441481966 is 41/42; macrocycle passes, one progression
+weight selector matches the same hidden streamed input (both values correct).
+A consistent visible-control policy now covers page-level text/labels; strict
+matching, hidden metadata checks, database checks and all expectations remain.
+Only tests/documentation changed. Final-head CI follows at delivery.
+
 ## 2026-11-08 - Session 141: owner release-readiness direction and roadmap
 
 Batch 48 expands the goal to correcting all test failures before presenting a

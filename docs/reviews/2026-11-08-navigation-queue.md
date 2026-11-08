@@ -95,3 +95,23 @@ correction, distinct from the already-verified queue fix.
 The final commit includes this record and the selector correction. Its complete
 CI result is checked through terminal status and reported at delivery. Keep the
 PR draft; do not claim the failed documentation checkpoint was fully green.
+
+## Complete visible-control policy
+
+CI [42441481966](https://github.com/norrag/workout/actions/runs/42441481966)
+passes checks/drift, 84 RLS, 21 integration, four auth repeats and all targeted
+measurement cases; broad smoke is 41/42. All macrocycle repetitions now pass.
+One progression case encounters the same hidden-fragment class at `set 1 weight`:
+both matched inputs hold the correct `105`, but one is outside the accessible
+screen. It fails in 2.6s on strict ambiguity, not on wrong data or navigation.
+
+Apply visible filtering consistently to page-level user-facing text and label
+lookups throughout the eight smoke files, rather than fixing one ambiguous
+label per run. Sign-in controls use their visible accessible labels too. Role
+and dialog scopes remain intact. Explicit hidden redirect-metadata assertions,
+viewport metadata, document theme/style checks and persisted database assertions
+are unchanged. A real pair of visible matching controls still fails strict
+matching. Expected values, absence checks and the complete 42-case no-retry
+workflow are retained. The policy is documented in `playwright.config.ts`.
+This changes tests only; application source remains identical to UI 7fffacb.
+Final corrected-head CI is reported at delivery; no merge or release.

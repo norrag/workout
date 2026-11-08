@@ -119,8 +119,14 @@ test("end macrocycle from the header menu → completed Overview renders the ret
 
   // ---- sign in through the UI ----
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
 

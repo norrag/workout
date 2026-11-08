@@ -67,7 +67,9 @@ test.beforeAll(async () => {
   // one stock external-load exercise + its primary muscle group (seed data)
   const { data: links, error: linkError } = await supabase
     .from("exercise_muscle_groups")
-    .select("exercise_id, muscle_group_id, exercise:exercises(user_id, load_type)")
+    .select(
+      "exercise_id, muscle_group_id, exercise:exercises(user_id, load_type)",
+    )
     .eq("role", "primary")
     .limit(100);
   if (linkError) throw linkError;
@@ -76,7 +78,9 @@ test.beforeAll(async () => {
       user_id: string | null;
       load_type: string | null;
     };
-    return ex && ex.user_id === null && (ex.load_type ?? "external") === "external";
+    return (
+      ex && ex.user_id === null && (ex.load_type ?? "external") === "external"
+    );
   });
   if (!stock) throw new Error("seed data missing a stock external exercise");
 
@@ -211,34 +215,49 @@ test("earned prescription renders; weight edit re-derives reps off the target an
 
   // ---- sign in and start the meso through the UI ----
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
   await page.goto(`/cycles/meso/${mesoId}`);
   await page.getByRole("button", { name: "START MESOCYCLE" }).click();
   await page.waitForURL("**/workout");
-  await expect(page.getByText("W1·D1").first()).toBeVisible();
+  await expect(
+    page.getByText("W1·D1").filter({ visible: true }).first(),
+  ).toBeVisible();
 
   // ---- fabricate the earned decision, then re-read the day ----
   await fabricateEarnedPrescription();
   await page.reload();
 
   // 1. the earned prescription renders in the set row (prefill flow-through)
-  const weightCell = page.getByLabel("set 1 weight");
+  const weightCell = page.getByLabel("set 1 weight").filter({ visible: true });
   await expect(weightCell).toHaveValue(String(PRESCRIBED_WEIGHT));
 
   // 2. the live predictor prices off the recorded target anchor: this user
   // has NO logged history (measured anchor null), so reps can only re-derive
   // from A*. Lighter weight ⇒ strictly more predicted reps.
   const repsAtPrescribed = Number(
-    await page.getByLabel("set 1 reps").inputValue(),
+    await page.getByLabel("set 1 reps").filter({ visible: true }).inputValue(),
   );
   expect(Number.isFinite(repsAtPrescribed)).toBe(true);
   await weightCell.fill("85");
   await weightCell.blur();
   await expect
-    .poll(async () => Number(await page.getByLabel("set 1 reps").inputValue()))
+    .poll(async () =>
+      Number(
+        await page
+          .getByLabel("set 1 reps")
+          .filter({ visible: true })
+          .inputValue(),
+      ),
+    )
     .toBeGreaterThan(repsAtPrescribed);
 
   // Focusing the reps cell blurs the weight cell, whose handler ASYNCHRONOUSLY
@@ -248,7 +267,9 @@ test("earned prescription renders; weight edit re-derives reps off the target an
   // ("11" + "8" → reps 118 → the server rejects > 100 and the set never logs).
   // A human can't type inside that window; retry until the fill sticks.
   const fillReps = async (setNumber: number, value: number) => {
-    const repsCell = page.getByLabel(`set ${setNumber} reps`);
+    const repsCell = page
+      .getByLabel(`set ${setNumber} reps`)
+      .filter({ visible: true });
     await expect(async () => {
       await repsCell.fill(String(value));
       await expect(repsCell).toHaveValue(String(value));
@@ -261,18 +282,36 @@ test("earned prescription renders; weight edit re-derives reps off the target an
   await weightCell.fill(String(PRESCRIBED_WEIGHT));
   await weightCell.blur();
   await expect
-    .poll(async () => Number(await page.getByLabel("set 1 reps").inputValue()))
+    .poll(async () =>
+      Number(
+        await page
+          .getByLabel("set 1 reps")
+          .filter({ visible: true })
+          .inputValue(),
+      ),
+    )
     .toBe(repsAtPrescribed);
   await fillReps(1, PRESCRIBED_REPS);
   await page.getByRole("button", { name: "log set 1" }).click();
-  await expect(page.getByRole("button", { name: "uncheck set 1" })).toBeVisible();
-  await expect(page.getByLabel("met prescription")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "uncheck set 1" }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("met prescription").filter({ visible: true }),
+  ).toBeVisible();
 
   // 3b. log set 2 short ⇒ `under`
-  await page.getByLabel("set 2 weight").fill(String(PRESCRIBED_WEIGHT));
-  await page.getByLabel("set 2 weight").blur();
+  await page
+    .getByLabel("set 2 weight")
+    .filter({ visible: true })
+    .fill(String(PRESCRIBED_WEIGHT));
+  await page.getByLabel("set 2 weight").filter({ visible: true }).blur();
   await fillReps(2, PRESCRIBED_REPS - 2);
   await page.getByRole("button", { name: "log set 2" }).click();
-  await expect(page.getByRole("button", { name: "uncheck set 2" })).toBeVisible();
-  await expect(page.getByLabel("below prescription")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "uncheck set 2" }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("below prescription").filter({ visible: true }),
+  ).toBeVisible();
 });

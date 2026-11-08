@@ -30,8 +30,14 @@ async function signInSynthetic(page: Page, label: string) {
     .eq("id", data.user!.id);
   if (profile.error) throw profile.error;
   await page.goto("/sign-in");
-  await page.getByLabel("Email", { exact: true }).fill(address);
-  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(address);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/workout");
   return { local, userId: data.user!.id };
@@ -55,51 +61,82 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     })
     .eq("id", data.user!.id);
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(email);
-  await page.locator('input[name="password"]').fill(password);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(email);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/workout");
   await page.goto("/more");
   await page.getByRole("link", { name: "Body measurements" }).click();
-  await expect(page.getByText("NO MEASUREMENTS YET")).toBeVisible();
+  await expect(
+    page.getByText("NO MEASUREMENTS YET").filter({ visible: true }),
+  ).toBeVisible();
 
   await page
     .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
     .click();
-  await page.getByLabel("Chest (in)", { exact: true }).fill("40");
+  await page
+    .getByLabel("Chest (in)", { exact: true })
+    .filter({ visible: true })
+    .fill("40");
   await expect(page.getByRole("checkbox")).toHaveCount(12);
-  await expect(page.locator('input[inputmode="decimal"]')).toHaveCount(12);
+  await expect(
+    page.locator('input[inputmode="decimal"]').filter({ visible: true }),
+  ).toHaveCount(12);
   const chestCheck = page.getByRole("checkbox", {
     name: "Chest complete",
     exact: true,
   });
   await expect(chestCheck).toBeChecked();
   await page.getByRole("button", { name: "CM", exact: true }).click();
-  await expect(page.getByLabel("Chest (cm)", { exact: true })).toHaveValue(
-    "101.6",
-  );
+  await expect(
+    page.getByLabel("Chest (cm)", { exact: true }).filter({ visible: true }),
+  ).toHaveValue("101.6");
   await expect(chestCheck).toBeChecked();
   await page.getByRole("button", { name: "IN", exact: true }).click();
-  await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue(
-    "40",
-  );
-  await page.getByLabel("DATE", { exact: true }).fill("2026-01-01");
-  await page.getByLabel("Waist · navel (in)", { exact: true }).fill("34");
+  await expect(
+    page.getByLabel("Chest (in)", { exact: true }).filter({ visible: true }),
+  ).toHaveValue("40");
+  await page
+    .getByLabel("DATE", { exact: true })
+    .filter({ visible: true })
+    .fill("2026-01-01");
+  await page
+    .getByLabel("Waist · navel (in)", { exact: true })
+    .filter({ visible: true })
+    .fill("34");
   await page
     .getByRole("button", { name: "Complete measurements", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+    page
+      .getByText("MEASUREMENTS SAVED", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByText("40.00", { exact: false }).first()).toBeVisible();
+  await expect(
+    page.getByText("40.00", { exact: false }).filter({ visible: true }).first(),
+  ).toBeVisible();
 
   await page
     .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
     .click();
-  await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue("");
-  await page.getByLabel("DATE", { exact: true }).fill("2026-02-01");
-  await page.getByLabel("Chest (in)", { exact: true }).fill("40.5");
+  await expect(
+    page.getByLabel("Chest (in)", { exact: true }).filter({ visible: true }),
+  ).toHaveValue("");
+  await page
+    .getByLabel("DATE", { exact: true })
+    .filter({ visible: true })
+    .fill("2026-02-01");
+  await page
+    .getByLabel("Chest (in)", { exact: true })
+    .filter({ visible: true })
+    .fill("40.5");
   await page
     .getByRole("button", { name: "Close measurements", exact: true })
     .click();
@@ -107,25 +144,37 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     page.getByRole("dialog", { name: "Discard changes?" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
-  await expect(page.getByLabel("Chest (in)", { exact: true })).toHaveValue(
-    "40.5",
-  );
+  await expect(
+    page.getByLabel("Chest (in)", { exact: true }).filter({ visible: true }),
+  ).toHaveValue("40.5");
   await page
     .getByRole("button", { name: "Complete measurements", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByText("+0.50 IN · 2 readings", { exact: true }),
+    page
+      .getByText("+0.50 IN · 2 readings", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByText("2 sites · recorded in inches")).toHaveCount(0);
+  await expect(
+    page.getByText("2 sites · recorded in inches").filter({ visible: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "history", exact: true }).click();
-  await expect(page.getByText("2 READINGS · RAW DATED VALUES")).toBeVisible();
+  await expect(
+    page.getByText("2 READINGS · RAW DATED VALUES").filter({ visible: true }),
+  ).toBeVisible();
   await page
     .getByLabel("Measurement site", { exact: true })
+    .filter({ visible: true })
     .selectOption("waist_navel");
-  await expect(page.getByText("1 READING · RAW DATED VALUES")).toBeVisible();
+  await expect(
+    page.getByText("1 READING · RAW DATED VALUES").filter({ visible: true }),
+  ).toBeVisible();
   await page.getByRole("button").filter({ hasText: "1 FEB '26" }).click();
-  await page.getByLabel("Chest (in)", { exact: true }).fill("41");
+  await page
+    .getByLabel("Chest (in)", { exact: true })
+    .filter({ visible: true })
+    .fill("41");
   await page
     .getByRole("button", { name: "Complete measurements", exact: true })
     .click();
@@ -182,7 +231,9 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByText("SESSION DELETED", { exact: true }),
+    page
+      .getByText("SESSION DELETED", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
   expect(nativeDialogs).toBe(0);
   const remaining = await client
@@ -243,8 +294,14 @@ test("mobile measurements use document flow with actions only at the end", async
     .eq("id", data.user!.id);
   if (profile.error) throw profile.error;
   await page.goto("/sign-in");
-  await page.getByLabel("Email", { exact: true }).fill(layoutEmail);
-  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(layoutEmail);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/workout");
   await page.goto("/more/measurements");
@@ -429,9 +486,13 @@ test("mobile measurements use document flow with actions only at the end", async
   await complete.click();
   await expect(entry).toHaveCount(0);
   await expect(
-    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+    page
+      .getByText("MEASUREMENTS SAVED", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByText("A".repeat(500), { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("A".repeat(500), { exact: true }).filter({ visible: true }),
+  ).toBeVisible();
   const saved = await local
     .from("measurements")
     .select("site_key")
@@ -467,7 +528,9 @@ test("automatic checks and typo review allow correction or explicit confirmation
       .getByRole("button", { name: "Complete measurements", exact: true })
       .click();
   await open();
-  const chest = page.getByLabel("Chest (in)", { exact: true });
+  const chest = page
+    .getByLabel("Chest (in)", { exact: true })
+    .filter({ visible: true });
   const checked = page.getByRole("checkbox", {
     name: "Chest complete",
     exact: true,
@@ -483,13 +546,21 @@ test("automatic checks and typo review allow correction or explicit confirmation
   await expect(chest).toBeFocused();
   await chest.fill("40");
   await expect(checked).toBeChecked();
-  await page.getByLabel("DATE", { exact: true }).fill("2026-01-01");
+  await page
+    .getByLabel("DATE", { exact: true })
+    .filter({ visible: true })
+    .fill("2026-01-01");
   await complete();
   await expect(
-    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+    page
+      .getByText("MEASUREMENTS SAVED", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
   await open();
-  await page.getByLabel("DATE", { exact: true }).fill("2026-02-01");
+  await page
+    .getByLabel("DATE", { exact: true })
+    .filter({ visible: true })
+    .fill("2026-02-01");
   await chest.fill("60");
   await expect(checked).toBeChecked();
   await complete();
@@ -515,18 +586,28 @@ test("automatic checks and typo review allow correction or explicit confirmation
   await chest.fill("41");
   await complete();
   await expect(
-    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+    page
+      .getByText("MEASUREMENTS SAVED", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
   await open();
-  await page.getByLabel("DATE", { exact: true }).fill("2026-03-01");
-  await page.getByLabel("Forearm · left (in)", { exact: true }).fill("1");
+  await page
+    .getByLabel("DATE", { exact: true })
+    .filter({ visible: true })
+    .fill("2026-03-01");
+  await page
+    .getByLabel("Forearm · left (in)", { exact: true })
+    .filter({ visible: true })
+    .fill("1");
   await complete();
   await expect(review.getByText(/outside a broad entry range/)).toBeVisible();
   await review
     .getByRole("button", { name: "SAVE AS ENTERED", exact: true })
     .click();
   await expect(
-    page.getByText("MEASUREMENTS SAVED", { exact: true }),
+    page
+      .getByText("MEASUREMENTS SAVED", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
   const unusual = await local
     .from("measurements")

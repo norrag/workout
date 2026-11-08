@@ -107,8 +107,14 @@ test("More row → integration screen → scan list → detail ledger", async ({
   page,
 }) => {
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
 
@@ -123,10 +129,16 @@ test("More row → integration screen → scan list → detail ledger", async ({
   // disconnected + unconfigured environment ⇒ the NOT AVAILABLE line, and
   // no connection/disconnect sections
   await expect(
-    page.getByText("NOT AVAILABLE IN THIS ENVIRONMENT"),
+    page
+      .getByText("NOT AVAILABLE IN THIS ENVIRONMENT")
+      .filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByText("SYNC NOW")).toHaveCount(0);
-  await expect(page.getByText("DISCONNECT BODYSPEC")).toHaveCount(0);
+  await expect(
+    page.getByText("SYNC NOW").filter({ visible: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("DISCONNECT BODYSPEC").filter({ visible: true }),
+  ).toHaveCount(0);
 
   // imported scans render even without a live connection (they persist
   // through a disconnect unless purged, doc 15 §2.3) — newest first
@@ -139,41 +151,72 @@ test("More row → integration screen → scan list → detail ledger", async ({
   // …and the detail ledger renders straight off body_scans
   await scanRow.click();
   await page.waitForURL("**/more/bodyspec/*");
-  await expect(page.getByText("COMPOSITION")).toBeVisible();
-  await expect(page.getByText("132.28 LB")).toBeVisible();
-  await expect(page.getByText("TRUNK")).toBeVisible();
+  await expect(
+    page.getByText("COMPOSITION").filter({ visible: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("132.28 LB").filter({ visible: true }),
+  ).toBeVisible();
+  await expect(page.getByText("TRUNK").filter({ visible: true })).toBeVisible();
   // percentile rows state flat ledger copy (doc 15 §6.2)
-  await expect(page.getByText("APPENDICULAR LMI")).toBeVisible();
-  await expect(page.getByText("85TH · 8.5")).toBeVisible();
+  await expect(
+    page.getByText("APPENDICULAR LMI").filter({ visible: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("85TH · 8.5").filter({ visible: true }),
+  ).toBeVisible();
 
   // 5b: the VS PREVIOUS SCAN section reads v_body_comp_history — a same-
   // machine pair, so deltas render, sub-LSC ones stated as in-range
-  await expect(page.getByText("VS PREVIOUS SCAN")).toBeVisible();
-  await expect(page.getByText("+1.78 LB")).toBeVisible();
   await expect(
-    page.getByText("WITHIN MEASUREMENT RANGE").first(),
+    page.getByText("VS PREVIOUS SCAN").filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByText(/DIFFERENT SCANNER/)).toHaveCount(0);
+  await expect(
+    page.getByText("+1.78 LB").filter({ visible: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByText("WITHIN MEASUREMENT RANGE")
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/DIFFERENT SCANNER/).filter({ visible: true }),
+  ).toHaveCount(0);
 });
 
 test("5b: the profile-update proposal is consented and resolves permanently", async ({
   page,
 }) => {
   await page.goto("/sign-in");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
+  await page
+    .getByLabel("Email", { exact: true })
+    .filter({ visible: true })
+    .fill(EMAIL);
+  await page
+    .getByLabel("Password", { exact: true })
+    .filter({ visible: true })
+    .fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/workout");
 
   // the newest unresolved scan proposes its measured values — the import
   // itself wrote nothing to the profile (doc 15 §2.3, never silent)
   await page.goto("/more/bodyspec");
-  await expect(page.getByText(/UPDATE PROFILE\?/)).toBeVisible();
-  await expect(page.getByText("184.5 LB")).toBeVisible();
+  await expect(
+    page.getByText(/UPDATE PROFILE\?/).filter({ visible: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("184.5 LB").filter({ visible: true }),
+  ).toBeVisible();
 
   // keep current ⇒ the resolution is per-scan and permanent — no nagging
   await page.getByRole("button", { name: "KEEP CURRENT" }).click();
-  await expect(page.getByText(/UPDATE PROFILE\?/)).toHaveCount(0);
+  await expect(
+    page.getByText(/UPDATE PROFILE\?/).filter({ visible: true }),
+  ).toHaveCount(0);
   await page.reload();
-  await expect(page.getByText(/UPDATE PROFILE\?/)).toHaveCount(0);
+  await expect(
+    page.getByText(/UPDATE PROFILE\?/).filter({ visible: true }),
+  ).toHaveCount(0);
 });
