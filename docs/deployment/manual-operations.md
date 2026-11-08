@@ -1014,3 +1014,20 @@ approval is pending; no merge/release/promotion. Targeted signed-in CI passes
 four cases directly; RLS setup fails before tests on occupied runner port 54322.
 See [current evidence](../reviews/2026-11-07-release-modal-narrow.md), including
 limits. The final documentation CI terminal result is reported at delivery.
+
+
+### N96 / N84 — hydration correction preview, 2026-11-08
+
+READY preview: https://workout-hefgj121o-garron-duprees-projects.vercel.app/more/measurements
+(proposal: same host /more/whats-new/preview). UI commit 51b093097a792dd490d5c79f91ef9c0d4d6b0213;
+deployment dpl_GDfifkP9bS4UPCCow8yAG6yask3a, Preview/target null. Logs confirm
+the deployment-only 1.3.0 build override. No production promotion, persistent
+environment update or new DB migration. Package/registry remain 1.2.1.
+
+Hosted browser access stops at Vercel sign-in. Automatic approval review denied
+creating an anyone-with-link temporary share URL because that audience was not
+explicitly authorized. It did not execute and has not been retried. A scoped
+approval request is pending; keep protection unchanged and use no indirect
+share-creating fetch. Signed-in save/delete/mobile checks pass on synthetic
+loopback CI; hosted write and physical iOS verification remain open. See
+[the verification review](../reviews/2026-11-08-navigation-hydration.md).

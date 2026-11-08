@@ -183,3 +183,14 @@ The owner approved the 390px light/dark proposal designs, then requested a
 less tall narrow layout. Figure 4.7c and [the narrow review](reviews/2026-11-07-release-modal-narrow.md)
 record this bounded correction. Capture, storage and connector behavior are
 unchanged. Narrow revision approval remains pending; no release or merge.
+
+
+### 2026-11-08 verification continuation
+
+The sign-in hydration defect is corrected without changing capture or the
+announcement design. Fresh signed-in loopback tests directly verify persisted
+save/correction/deletion and mobile document flow. N84 navigation can still
+stall without hydration errors. Hosted sign-in/save/delete is blocked by preview
+protection and remains unverified. [Current evidence](reviews/2026-11-08-navigation-hydration.md)
+records the exact commit, READY preview and limits. Wider modal designs approved;
+narrow revision pending. Draft #265 stays unmerged.

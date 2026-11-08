@@ -47,3 +47,38 @@ on CI's loopback Supabase. Hosted preview fetches alone establish only the sign-
 boundary; hosted signed-in save/delete and physical iOS must be reported separately.
 Wider modal designs stay approved, narrow revision pending. Data-first future
 measurements/strength/DEXA direction stays deferred. No database or release change.
+
+## First production-build checkpoint
+
+UI commit `51b093097a792dd490d5c79f91ef9c0d4d6b0213`, CI
+[42436607712](https://github.com/norrag/workout/actions/runs/42436607712).
+Four repeated production-build hydration regressions pass. Checks pass: typecheck,
+lint, 2,189 unit tests, 12 built guards and drift. All 84 RLS and 21 integration
+tests pass. The staged manifest records this fix as a non-highlight; the
+approved announcement renderer, copy and screenshot assets are unchanged.
+
+Targeted measurement cases all pass: capture/correction/export/themed deletion
+and mobile document flow pass directly (4.3s each). Typo-review and proposal
+cases pass after pre-form sign-in retries (about 3s on retry). The capture case
+checks persisted rows with the signed-in client before and after deletion, not
+only a toast. All accounts/data belong to disposable loopback Supabase.
+
+The two failed sign-in traces now contain **no page errors**. They still receive
+303 `/workout;push` after 115/127ms and remain on sign-in; the second response
+has a 91ms receive interval. Thus React 418 is **not necessary** for the pending
+navigation failure. This corrects a potential causal overreading of the older
+traces. The hydration defect is fixed; N84's separate action/RSC transition
+failure remains unresolved. Full smoke terminal results follow at delivery.
+
+READY Preview: https://workout-hefgj121o-garron-duprees-projects.vercel.app/more/measurements
+(proposal: same host `/more/whats-new/preview`). Deployment
+`dpl_GDfifkP9bS4UPCCow8yAG6yask3a`, target null, exact UI commit above. Build
+logs confirm `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`. Package/registry
+remain 1.2.1. No persistent environment change or new migration.
+
+Hosted browser access reaches Vercel sign-in. Automatic approval review **denied**
+creating a temporary anyone-with-link preview share URL: the user authorized
+deployment review but had not explicitly authorized that audience. The action
+did not execute and was not retried. A scoped approval request is pending;
+no indirect fetch or protection change is used. No hosted test account or rows
+were created. Hosted signed-in save/delete and physical iOS remain unverified.

@@ -29,6 +29,18 @@ verification follow in [evidence](../reviews/2026-11-08-navigation-hydration.md)
 No claim that N84 is closed. Draft #265 stays unmerged; wider modal approved,
 narrow pending. No production data or schema changes. Batch 47 preserves scope.
 
+
+Production checkpoint at UI commit 51b0930 / CI run 42436607712: four hydration regressions
+pass, as do 2,189 unit tests and 12 built guards, 84 RLS and 21 integration tests. Measurement
+capture/correction/export/deletion and mobile flow pass directly. Two other
+scenarios pass after pre-form sign-in retries. Those retained traces contain no
+page errors yet still stall after fast 303 redirects, proving React 418 is not
+necessary for N84. No claim that all navigation failures are resolved. READY
+preview is pinned to UI commit 51b0930 with the 1.3.0 override. Hosted browser testing is blocked
+at Vercel protection; the temporary public-link request was denied and not
+retried. Approval pending, no hosted test data created. Full/final CI terminal
+results are reported at delivery.
+
 ## 2026-11-07 - Session 139: N96 narrow release-modal review
 
 Batch 46 records scoped owner approval of the first two (390px light/dark)
