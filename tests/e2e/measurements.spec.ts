@@ -618,16 +618,21 @@ test("automatic checks and typo review allow correction or explicit confirmation
   expect(unusual.data?.map((row) => Number(row.value_in))).toEqual([1]);
 });
 
-test("proposed 1.3 modal makes measurements the flagship without acknowledging a release", async ({
+test("released 1.3 modal makes measurements the flagship and acknowledges the release", async ({
   page,
 }, testInfo) => {
   test.skip(
     process.env.NEXT_PUBLIC_RELEASE_OVERRIDE !== "1.3.0",
     "Requires staged build.",
   );
-  await signInSynthetic(page, "release-proposal");
+  const { local, userId } = await signInSynthetic(page, "release-announcement");
+  const primed = await local
+    .from("profiles")
+    .update({ last_seen_version: "1.2.1" })
+    .eq("id", userId);
+  if (primed.error) throw primed.error;
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/more/whats-new/preview");
+  await page.goto("/more");
   const dialog = page.getByRole("dialog", {
     name: "What's new in WORKOUT",
     exact: true,
@@ -636,7 +641,7 @@ test("proposed 1.3 modal makes measurements the flagship without acknowledging a
   await expect(dialog).toHaveCSS("opacity", "1");
   await expect(
     dialog.getByText("FOR REVIEW · NOT RELEASED", { exact: true }),
-  ).toBeVisible();
+  ).not.toBeVisible();
   await expect(
     dialog.getByText("Keep a monthly record of body measurements", {
       exact: true,
@@ -714,5 +719,11 @@ test("proposed 1.3 modal makes measurements the flagship without acknowledging a
   await expect(
     page.getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true }),
   ).toBeVisible();
-  expect(actions).toBe(0);
+  expect(actions).toBe(1);
+  const acknowledged = await local
+    .from("profiles")
+    .select("last_seen_version")
+    .eq("id", userId)
+    .single();
+  expect(acknowledged.data?.last_seen_version).toBe("1.3.0");
 });

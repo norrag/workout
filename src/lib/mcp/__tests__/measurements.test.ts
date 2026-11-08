@@ -138,21 +138,17 @@ describe("measurement connector", () => {
       next_before: "2026-03-01",
     });
   });
-  it("is absent before 1.3 and from production even with an override", () => {
-    vi.stubEnv("NEXT_PUBLIC_RELEASE_OVERRIDE", "1.2.1");
+  it("is available in released production without a preview override", () => {
+    vi.stubEnv("NEXT_PUBLIC_RELEASE_OVERRIDE", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", "production");
     let capture = captureServer();
     registerTools(capture.server);
-    expect(capture.tools.has(GET_BODY_MEASUREMENTS)).toBe(false);
-    vi.stubEnv("NEXT_PUBLIC_RELEASE_OVERRIDE", "1.3.0");
-    vi.stubEnv("VERCEL_ENV", "preview");
-    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", "preview");
+    expect(capture.tools.has(GET_BODY_MEASUREMENTS)).toBe(true);
+    // A stale preview setting must never hide a shipped tool.
+    vi.stubEnv("NEXT_PUBLIC_RELEASE_OVERRIDE", "1.2.1");
     capture = captureServer();
     registerTools(capture.server);
     expect(capture.tools.has(GET_BODY_MEASUREMENTS)).toBe(true);
-    vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", "production");
-    capture = captureServer();
-    registerTools(capture.server);
-    expect(capture.tools.has(GET_BODY_MEASUREMENTS)).toBe(false);
   });
 });

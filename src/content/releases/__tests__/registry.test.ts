@@ -46,9 +46,11 @@ describe("registry invariants (§5.3)", () => {
       expect(featured.length).toBeLessThanOrEqual(1);
       for (const entry of featured) expect(entry.highlight).toBe(true);
     }
-    expect(UNRELEASED_ENTRIES.find((entry) => entry.featured)?.id).toBe(
-      "monthly-body-measurements",
-    );
+    expect(
+      RELEASES.find((release) => release.version === "1.3.0")?.entries.find(
+        (entry) => entry.featured,
+      )?.id,
+    ).toBe("monthly-body-measurements");
   });
   it("has at least one release", () => {
     expect(RELEASES.length).toBeGreaterThan(0);
