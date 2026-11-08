@@ -289,6 +289,14 @@ export const UG_BODY_DATA: ManualChapter = {
         ...(releaseActive("1.3.0")
           ? ([
               { kind: "heading", text: "Taking body measurements" },
+              ...(releaseActive("1.4.0")
+                ? [
+                    {
+                      kind: "para" as const,
+                      text: "Your connected assistant can log new tape readings or import dated records. Give the date, unit, site and value for each reading. Review the preview before saving. Batches contain up to 100 dates and save together. Exact repeats are skipped. If a date already has different readings, nothing in that batch is saved. Correct existing entries in the app. Unusual values need confirmation.",
+                    },
+                  ]
+                : []),
               {
                 kind: "para",
                 text: "Open More → Body measurements. Choose a date and inches or centimetres. Each of the 12 sites is optional. Measure relaxed, before training, with the same tape placement. Keep the tape snug without pressing the skin.",

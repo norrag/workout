@@ -230,3 +230,25 @@ input matches a hidden streamed duplicate. A consistent visible-control policy
 now corrects the same class across the suite. Expected values, strict matching,
 hidden metadata and persistence checks remain. No application change. Final-head
 CI follows at delivery; see the queue review for the complete qualification.
+
+## Owner amendment: MCP logging and backlog imports (2026-11-08)
+
+The owner requests new and backdated measurements through MCP. The bounded
+`import_body_measurements` exception appends facts, not training plans. It never
+replaces existing sessions. A batch of 1–100 explicit dates uses one transaction;
+identical retries skip existing dates, while a different note, unit or reading
+on an existing date rejects the entire batch. Correct that date in the app.
+
+The default is a no-write preview. `commit:true` saves the reviewed values.
+Optional `confirm_unusual_values:true` acknowledges the same typo heuristics as
+the app. History and candidate dates are compared chronologically, by site/side.
+Missing dates or readings are never invented. Explicit local UTC offset controls
+today at the MCP boundary; SQL permits tomorrow UTC to accommodate world time zones.
+Units convert to canonical inches rounded to four decimals. The database assigns
+IDs and derives the owner from auth.uid(); invoker RLS and grants still apply.
+The per-owner import lock serializes repeat imports; unique date constraints and
+row locks protect app-write races. Preview is advisory; commit revalidates.
+Audit contains an argument hash and count, never raw measurements or notes.
+
+No production data writes are part of development. New migration must pass CI
+and be applied before activating the 1.4 tool. User authorized release on completion.
