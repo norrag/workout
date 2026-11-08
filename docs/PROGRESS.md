@@ -47,6 +47,14 @@ N84 correction is verified on draft #265, not shipped. Hosted/iOS verification
 and detailed PR-body publication remain blocked as recorded in the review.
 Final documentation-head checks are reported at delivery; no merge/release.
 
+
+Final-head check: e58b8f2 / CI 42440932857 has 39/42 broad passes; three macrocycle
+text assertions also match hidden streamed content outside the active main.
+Navigation, tape, checks/drift/RLS/integration pass. Assertions are now scoped to
+the active main without reducing their requirements or enabling retries. The
+[queue record](reviews/2026-11-08-navigation-queue.md)
+records the evidence; final corrected-head CI is reported at delivery.
+
 ## 2026-11-08 - owner release-readiness follow-up
 
 Restored the approved regular 1.3 modal at every width, per the owner's rejection

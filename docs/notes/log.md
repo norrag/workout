@@ -40,6 +40,14 @@ no share link or hosted data created. Exact detailed PR-body publication was
 denied and stays local pending approval. Final documentation CI follows at
 delivery. N84 correction verified on draft, not shipped; no merge/release.
 
+
+Final-head check: e58b8f2 / CI 42440932857 has 39/42 broad passes; three macrocycle
+text assertions also match hidden streamed content outside the active main.
+Navigation, tape, checks/drift/RLS/integration pass. Assertions are now scoped to
+the active main without reducing their requirements or enabling retries. The
+[queue record](../reviews/2026-11-08-navigation-queue.md)
+records the evidence; final corrected-head CI is reported at delivery.
+
 ## 2026-11-08 - Session 141: owner release-readiness direction and roadmap
 
 Batch 48 expands the goal to correcting all test failures before presenting a

@@ -101,11 +101,20 @@ test.beforeAll(async () => {
 test("end macrocycle from the header menu → completed Overview renders the retrospective", async ({
   page,
 }) => {
+  // Assert the active app view. Streaming can temporarily retain duplicate
+  // text outside its main landmark; those hidden fragments are not the screen.
+  // Role lookup excludes hidden main landmarks and keeps strict matching.
+  const content = page.getByRole("main");
   page.on("console", (msg) => {
     if (msg.type() === "error") console.log("[browser:error]", msg.text());
   });
   page.on("requestfailed", (req) => {
-    console.log("[requestfailed]", req.method(), req.url(), req.failure()?.errorText);
+    console.log(
+      "[requestfailed]",
+      req.method(),
+      req.url(),
+      req.failure()?.errorText,
+    );
   });
 
   // ---- sign in through the UI ----
@@ -117,8 +126,8 @@ test("end macrocycle from the header menu → completed Overview renders the ret
 
   // ---- the active macro Overview: live "to date" framing, ACTIVE badge ----
   await page.goto(`/cycles/macro/${macroId}`);
-  await expect(page.getByText("MACROCYCLE STATS · TO DATE")).toBeVisible();
-  await expect(page.getByText("ACTIVE", { exact: true })).toBeVisible();
+  await expect(content.getByText("MACROCYCLE STATS · TO DATE")).toBeVisible();
+  await expect(content.getByText("ACTIVE", { exact: true })).toBeVisible();
 
   // ---- ⋮ → End macrocycle → confirm sheet ----
   await page.getByRole("button", { name: "macrocycle options" }).click();
@@ -129,29 +138,39 @@ test("end macrocycle from the header menu → completed Overview renders the ret
   await confirm.getByRole("button", { name: "END MACROCYCLE" }).click();
 
   // ---- the macro completed: badge flips, retrospective replaces "to date" ----
-  await expect(page.getByText("COMPLETE", { exact: true })).toBeVisible();
-  await expect(page.getByText("RETROSPECTIVE", { exact: true })).toBeVisible();
-  await expect(page.getByText("MACROCYCLE STATS · TO DATE")).not.toBeVisible();
+  await expect(content.getByText("COMPLETE", { exact: true })).toBeVisible();
+  await expect(
+    content.getByText("RETROSPECTIVE", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    content.getByText("MACROCYCLE STATS · TO DATE"),
+  ).not.toBeVisible();
 
   // strength verdict vs the stored contract: nothing was ever logged, so the
   // honest verdict is insufficient data (never a proxy grade)
-  await expect(page.getByText("INSUFFICIENT DATA")).toBeVisible();
+  await expect(content.getByText("INSUFFICIENT DATA")).toBeVisible();
   // every block was ended: the planned block and both placeholders abandoned
-  await expect(page.getByText("3 ABANDONED")).toBeVisible();
+  await expect(content.getByText("3 ABANDONED")).toBeVisible();
 
   // the timeline shows the abandoned outcome and no planning affordance remains
-  await expect(page.getByText("+ PLAN")).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "END MACROCYCLE" })).not.toBeVisible();
+  await expect(content.getByText("+ PLAN")).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "END MACROCYCLE" }),
+  ).not.toBeVisible();
 
   // ---- ending is once-only: the menu no longer offers it ----
   await page.getByRole("button", { name: "macrocycle options" }).click();
-  await expect(page.getByRole("menuitem", { name: "Edit macrocycle" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "End macrocycle" })).not.toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Edit macrocycle" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "End macrocycle" }),
+  ).not.toBeVisible();
 
   // ---- create-flow priming (doc 17 §5): a completed prior block exists, but
   // nothing was ever logged — no measurable rate, so the line honestly stays
   // away (it renders only off a gradable ≥28-day logged span) ----
   await page.goto("/cycles/new");
-  await expect(page.getByText("PLAN", { exact: true })).toBeVisible();
-  await expect(page.getByText("LAST BLOCK MEASURED")).not.toBeVisible();
+  await expect(content.getByText("PLAN", { exact: true })).toBeVisible();
+  await expect(content.getByText("LAST BLOCK MEASURED")).not.toBeVisible();
 });

@@ -72,3 +72,26 @@ metadata blocker does not undo the verified code or authorize merge/release.
 
 Final documentation-head CI is checked separately and reported at delivery.
 No claim of production deployment, hosted signed-in verification, or iPhone testing.
+
+## Final-head selector correction
+
+Documentation checkpoint e58b8f2 / CI
+[42440932857](https://github.com/norrag/workout/actions/runs/42440932857)
+passes checks, drift, 84 RLS, 21 integration, all four sign-in regressions and
+all four targeted tape cases. Broad no-retry smoke is 39/42. The three failures
+are the three repetitions of macrocycle closeout, with strict text ambiguity at
+`PLAN` (twice) and `MACROCYCLE STATS · TO DATE` (once). They fail in 1.8–3.7s,
+not on stalled navigation or pending actions.
+
+Each retained error lists one match under the active `main` landmark and a
+second outside it; the accessibility snapshot exposes only the correct active
+screen. Unscoped text assertions can see hidden streamed fragments. Scope the
+macrocycle's screen assertions to `page.getByRole("main")`, retaining strict
+matching, every expected value and all absence checks. Dialog assertions stay
+scoped to their actual dialog. No `.first()`, ignored error, timeout increase,
+retry or product behavior change is used. This is a browser-test compatibility
+correction, distinct from the already-verified queue fix.
+
+The final commit includes this record and the selector correction. Its complete
+CI result is checked through terminal status and reported at delivery. Keep the
+PR draft; do not claim the failed documentation checkpoint was fully green.

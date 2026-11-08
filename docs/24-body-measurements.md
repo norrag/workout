@@ -217,3 +217,10 @@ preserved and no hosted test data was created. The prepared detailed PR body
 requires approval after automatic review denied publication. Final documentation
 CI is reported at delivery. Draft #265 is not merged; package/registry remain
 1.2.1 and the feature remains staged 1.3.0. Owner approval is required to release.
+
+Final-head check: e58b8f2 / CI 42440932857 has 39/42 broad passes; three macrocycle
+text assertions also match hidden streamed content outside the active main.
+Navigation, tape, checks/drift/RLS/integration pass. Assertions are now scoped to
+the active main without reducing their requirements or enabling retries. The
+[queue record](reviews/2026-11-08-navigation-queue.md)
+records the evidence; final corrected-head CI is reported at delivery.
