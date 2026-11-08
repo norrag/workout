@@ -165,6 +165,14 @@ test("shows once for a returning user and does not reappear after dismissal", as
   await setLastSeen(BEHIND);
   await page.reload();
   await expect(dismissButton(page)).toBeVisible();
+  const announcement = page.getByRole("dialog", {
+    name: "What's new in WORKOUT",
+  });
+  await expect(announcement).toContainText("Track size changes between scans");
+  await expect(announcement.locator("li").first()).toContainText(
+    "Keep a monthly record of body measurements",
+  );
+  await expect(announcement).toContainText("Add new or past measurements");
 
   await dismissButton(page).click();
   await expect(dismissButton(page)).toBeHidden();

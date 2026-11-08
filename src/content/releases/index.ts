@@ -5,6 +5,7 @@ import { RELEASE_1_2_0 } from "./1.2.0";
 import { RELEASE_1_2_1 } from "./1.2.1";
 import { RELEASE_1_3_0 } from "./1.3.0";
 import { RELEASE_1_4_0 } from "./1.4.0";
+import { RELEASE_1_4_1 } from "./1.4.1";
 import type { Release } from "./types";
 
 export type {
@@ -32,6 +33,7 @@ export const RELEASES: readonly Release[] = Object.freeze(
     RELEASE_1_2_1,
     RELEASE_1_3_0,
     RELEASE_1_4_0,
+    RELEASE_1_4_1,
   ].sort((a, b) => compare(a.version, b.version)),
 );
 
