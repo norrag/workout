@@ -1,3 +1,4 @@
+import { CURRENT_VERSION } from "../../src/content/releases";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
@@ -725,5 +726,5 @@ test("released 1.3 modal makes measurements the flagship and acknowledges the re
     .select("last_seen_version")
     .eq("id", userId)
     .single();
-  expect(acknowledged.data?.last_seen_version).toBe("1.3.0");
+  expect(acknowledged.data?.last_seen_version).toBe(CURRENT_VERSION);
 });
