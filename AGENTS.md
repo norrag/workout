@@ -2,6 +2,8 @@
 
 WORKOUT is a PWA-first workout tracker built on periodized training cycles (macro/meso/micro) with an RIR-based dynamic progression engine. **Read `docs/` before implementing anything** — the build is spec-driven:
 
+Next.js framework changes must use the version-matched guidance in `node_modules/next/dist/docs/` (upgrade guide: `01-app/02-guides/upgrading/version-16.md`). Development and builds explicitly use webpack for the existing Serwist integration. See the N84 framework record in `docs/reviews/2026-11-08-navigation-queue.md`.
+
 - `docs/01-product-spec.md` — what we're building and why; out-of-scope list is binding
 - `docs/02-architecture.md` — stack decisions and target repo structure
 - `docs/03-data-model.md` — schema, RLS strategy, naming conventions

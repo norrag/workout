@@ -112,8 +112,10 @@ jobs:
           name: measurements-mobile-report
           path: playwright-report/
           retention-days: 7
-      - name: E2E smoke
-        run: npm run test:e2e
+      - name: Navigation and workout smoke (three fresh runs, no retries)
+        # N84 was timing-sensitive. Repeat the real flows, including writes,
+        # rather than let a retry hide a stalled router transition.
+        run: npm run test:e2e -- --repeat-each=3 --retries=0
       - name: Upload Playwright traces on failure
         if: failure()
         uses: actions/upload-artifact@v7

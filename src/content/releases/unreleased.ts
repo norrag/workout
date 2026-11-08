@@ -41,6 +41,13 @@ export const UNRELEASED_ENTRIES: ReleaseEntry[] = [
     area: "app",
     highlight: false,
   },
+  {
+    id: "navigation-queue-correction",
+    title: "Keep navigation moving after an action",
+    body: "Fixed a framework issue that could leave a page waiting after sign-in or another action.",
+    area: "app",
+    highlight: false,
+  },
 ];
 
 /** The next feature release under construction. */

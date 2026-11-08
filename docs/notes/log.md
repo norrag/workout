@@ -15,6 +15,22 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-08 - Session 142: N84 queue root cause and supported correction
+
+The synthetic production-build failure is now explained at the queue/render
+boundary, not by a slow response or hydration alone. Official Next PR #95439
+contains the same correction; 15.5.29 lacks it, 16.4.5 contains it. The isolated
+16.4.5 build passes 80/80 fresh mobile navigation contexts. Pin runtime/analyzer,
+retain webpack/Serwist and existing React/lint rules; required generated types
+and JSX settings follow the version-matched guide. See the [full record](../reviews/2026-11-08-navigation-queue.md).
+A Windows-only migration CLI hashbang import failure reproduces on the old
+baseline too; ordinary comment fixes it, and all 12 helper tests pass. No logic
+change. CI repeats real-stack smoke three times with retries disabled; N84 remains
+in progress until terminal checks. Regular approved modal and future roadmap stay
+as chosen in Session 141. Hosted preview access and PR-body publication were denied
+by automatic review; concrete requests remain pending. Do not retry indirectly.
+No production merge, promotion, persistent env change or hosted test data.
+
 ## 2026-11-08 - Session 141: owner release-readiness direction and roadmap
 
 Batch 48 expands the goal to correcting all test failures before presenting a

@@ -24,6 +24,20 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-08 - N84 supported navigation-queue correction
+
+Reproduced the old-build stall without a real database and inspected the paused
+router: the queue had the completed destination while React still rendered the
+old page. Publishing that already-completed state once resolved the diagnostic.
+Official Next PR #95439 fixes this mechanism. Pin Next/analyzer 16.4.5, retain
+webpack/Serwist, existing React and lint rules; apply required TypeScript changes.
+The isolated build, lint and typecheck pass; 80/80 fresh untraced synthetic mobile
+navigation sequences pass with no errors. A baseline Windows migration-helper
+import failure is also corrected without changing drift logic. Full real-stack CI
+now repeats all smoke flows three times with no retries; terminal results remain
+to be checked. [Evidence and compatibility](reviews/2026-11-08-navigation-queue.md).
+No release/merge, new migration or new modal design. Draft #265 stays draft.
+
 ## 2026-11-08 - owner release-readiness follow-up
 
 Restored the approved regular 1.3 modal at every width, per the owner's rejection
