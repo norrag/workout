@@ -1,6 +1,6 @@
 # N84 — navigation queue investigation and correction
 
-**Status:** supported framework correction on draft PR #265; full CI verification follows. No production merge or release approval. This extends the [hydration investigation](2026-11-08-navigation-hydration.md), which fixed a separate sign-in mismatch but did not explain the remaining stalls.
+**Status:** supported framework correction verified on draft PR #265; not merged or released. No production merge or release approval. This extends the [hydration investigation](2026-11-08-navigation-hydration.md), which fixed a separate sign-in mismatch but did not explain the remaining stalls.
 
 ## Reproduction and causal evidence
 
@@ -36,3 +36,39 @@ CI builds with the real disposable loopback Supabase stack, applies the full sch
 Record terminal results against the exact final commit at delivery; do not close N84 based only on the synthetic probe. Package/registry remain 1.2.1, staged release 1.3.0. The approved regular modal remains the only proposal renderer. This correction does not add an analysis feature or change prescriptions.
 
 Hosted preview signed-in testing is separately blocked by deployment protection and the denied temporary share-link action. Do not create a share URL through another tool, disable protection, or claim hosted save/delete verified. The local/CI evidence does not establish physical iOS behavior. Draft #265 remains unmerged until owner approval.
+
+## Verified UI checkpoint
+
+UI commit `7fffacb4d8ddb3f56f2335e2dd9ad4bfa2b1ca54`, terminal CI
+[42440446611](https://github.com/norrag/workout/actions/runs/42440446611):
+
+- Checks and drift pass. CI runs 2,189 unit tests before a build; its one deferred
+  built-worker assertion then runs with all 12 performance guards after the build.
+  Locally all 2,190 unit cases and all 12 built guards pass.
+- All 84 RLS and 21 write-pipeline integration tests pass against disposable local
+  Supabase. No production health records are involved.
+- All four repeated sign-in regressions and four targeted measurement cases pass
+  directly, without retries or skipped cases.
+- Broad mobile smoke passes **42/42**, three fresh repetitions, retries disabled,
+  no failures, flakes or skipped cases. It covers persisted capture, corrections,
+  partial sessions, CSV, deletion, plausibility confirmation, document scrolling,
+  BodySpec consent, bodyweight edits, mesocycle start, logging and progression.
+- CI's 390px light/dark modal PNGs are byte-identical to the approved regular
+  screenshot files (`release-1.3-proposal-light.png` / `-dark.png`).
+
+READY Preview: https://workout-liukaeox1-garron-duprees-projects.vercel.app/more/measurements
+(proposal: same host `/more/whats-new/preview`). Deployment
+`dpl_3g9gApARefGCn7KcB3DKPP5HVLaT`, target null, exact UI commit above. Build
+logs confirm Next 16.4.5, webpack, and `NEXT_PUBLIC_RELEASE_OVERRIDE=1.3.0 npm run build`.
+This is a build-specific override, not a persistent project-env change.
+
+Normal browser access reaches Vercel and then GitHub sign-in without an existing
+authenticated session. Hosted save/delete and physical iOS remain unverified.
+The share-link action remains denied/pending approval, with no indirect retry.
+No hosted account or test records were created. Automatic review also denied
+publishing the concrete detailed PR description; the prepared text remains local.
+The PR stays draft, with its old body, until that publication is approved. This
+metadata blocker does not undo the verified code or authorize merge/release.
+
+Final documentation-head CI is checked separately and reported at delivery.
+No claim of production deployment, hosted signed-in verification, or iPhone testing.

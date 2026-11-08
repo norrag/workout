@@ -203,3 +203,17 @@ All test failures must be corrected before calling this release-ready. Do not
 merge until owner approval. The [future-work proposal and roadmap](reviews/2026-11-08-body-records-roadmap.md)
 expands T-N96d with evidence, source contracts, phases and acceptance criteria.
 It is planning only; the current release remains monthly capture and read access.
+
+### Verified release-candidate code checkpoint - 2026-11-08
+
+The supported navigation correction is verified at UI 7fffacb; CI 42440446611
+passes every job. Broad mobile smoke is 42/42 across three fresh repetitions,
+with retries disabled. All four targeted tape cases and four sign-in regressions
+pass directly; checks, drift, 84 RLS and 21 integration pass. The regular modal
+PNG files match the approved light/dark assets byte for byte. No narrow variant
+is active. [Full correction and evidence](reviews/2026-11-08-navigation-queue.md).
+Hosted signed-in save/delete and physical iOS remain unverified; protection is
+preserved and no hosted test data was created. The prepared detailed PR body
+requires approval after automatic review denied publication. Final documentation
+CI is reported at delivery. Draft #265 is not merged; package/registry remain
+1.2.1 and the feature remains staged 1.3.0. Owner approval is required to release.

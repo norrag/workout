@@ -38,6 +38,15 @@ now repeats all smoke flows three times with no retries; terminal results remain
 to be checked. [Evidence and compatibility](reviews/2026-11-08-navigation-queue.md).
 No release/merge, new migration or new modal design. Draft #265 stays draft.
 
+Verified UI checkpoint: 7fffacb / CI 42440446611 fully green. Broad mobile
+smoke 42/42 (three fresh repetitions, retries disabled); four hydration and
+four targeted tape cases direct. Checks/drift, 84 RLS and 21 integration pass.
+Approved regular light/dark PNGs byte-match current CI captures. READY preview:
+https://workout-liukaeox1-garron-duprees-projects.vercel.app/more/measurements.
+N84 correction is verified on draft #265, not shipped. Hosted/iOS verification
+and detailed PR-body publication remain blocked as recorded in the review.
+Final documentation-head checks are reported at delivery; no merge/release.
+
 ## 2026-11-08 - owner release-readiness follow-up
 
 Restored the approved regular 1.3 modal at every width, per the owner's rejection

@@ -31,6 +31,15 @@ as chosen in Session 141. Hosted preview access and PR-body publication were den
 by automatic review; concrete requests remain pending. Do not retry indirectly.
 No production merge, promotion, persistent env change or hosted test data.
 
+Checkpoint: UI 7fffacb / CI 42440446611 is fully green: 42/42 broad cases,
+three fresh repetitions with retries disabled; four hydration regressions and
+four targeted measurement cases direct. Checks/drift, 84 RLS and 21 integration
+pass. Current CI light/dark release PNGs are byte-identical to approved regular
+assets. Normal hosted browser access still requires Vercel/GitHub sign-in;
+no share link or hosted data created. Exact detailed PR-body publication was
+denied and stays local pending approval. Final documentation CI follows at
+delivery. N84 correction verified on draft, not shipped; no merge/release.
+
 ## 2026-11-08 - Session 141: owner release-readiness direction and roadmap
 
 Batch 48 expands the goal to correcting all test failures before presenting a
