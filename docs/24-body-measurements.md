@@ -237,7 +237,7 @@ The owner requests new and backdated measurements through MCP. The bounded
 `import_body_measurements` exception appends facts, not training plans. It never
 replaces existing sessions. A batch of 1–100 explicit dates uses one transaction;
 identical retries skip existing dates, while a different note, unit or reading
-on an existing date rejects the entire batch. Correct that date in the app.
+on an existing date rejects the entire batch. Use the previewed update tool to correct that date.
 
 The default is a no-write preview. `commit:true` saves the reviewed values.
 Optional `confirm_unusual_values:true` acknowledges the same typo heuristics as
@@ -252,3 +252,24 @@ Audit contains an argument hash and count, never raw measurements or notes.
 
 No production data writes are part of development. New migration must pass CI
 and be applied before activating the 1.4 tool. User authorized release on completion.
+
+
+## Owner amendment: MCP measurement corrections and deletion (2026-11-09)
+
+The owner authorized `update_body_measurements` and `delete_body_measurements`,
+deployed within the existing version. Both are owner-scoped exceptions to
+draft-only planning: they change tape facts only, never training or other body
+data. Default preview is read-only. Commits require the unmodified canonical
+`expected_session` from a fresh preview; changed records reject atomically.
+
+Updates preserve omitted fields. A supplied readings array replaces the whole
+site list, and preview lists removed sites. Units are explicit or retain the
+recorded unit; changing unit alone preserves physical readings. Date conflicts
+reject. Shared date/value validation and unusual-value review still apply.
+
+Deletion targets one session, including its readings. The assistant must show
+the exact preview and obtain action-time confirmation of permanent deletion
+before setting both `commit:true` and `confirm_delete:true`. There is no bulk
+delete or undo. Missing/foreign IDs are indistinguishable errors, never success.
+The invoker RPC locks the owner row, checks the snapshot, and commits atomically.
+No actual user data was modified during verification.

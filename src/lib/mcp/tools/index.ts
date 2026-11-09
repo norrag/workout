@@ -1,3 +1,4 @@
+import { registerMeasurementMutations } from "./measurement-mutate";
 import { registerMeasurementImport } from "./measurement-import";
 import "server-only";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -80,7 +81,10 @@ export function registerTools(server: McpServer) {
   registerGetCurrentState(guarded);
   registerReadTools(guarded);
   if (releaseActive("1.3.0")) registerMeasurementTools(guarded);
-  if (releaseActive("1.4.0")) registerMeasurementImport(guarded);
+  if (releaseActive("1.4.0")) {
+    registerMeasurementImport(guarded);
+    registerMeasurementMutations(guarded);
+  }
   registerCoachingTools(guarded);
   registerWriteTools(guarded);
   registerAuthoringTools(guarded);

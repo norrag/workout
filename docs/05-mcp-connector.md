@@ -373,6 +373,27 @@ any synthesis/prescription coupling remain deferred.
 site-key/value pairs. Default preview, explicit commit, optional unusual-value
 confirmation. The batch is atomic. Exact date/payload retries are no-ops; existing
 dates with different values, note or input unit reject the batch without replacing
-history. Read back with `get_body_measurements`; corrections stay in the app.
+history. Read back with `get_body_measurements`; use the update tool for corrections.
 Owner identity is session-only. This owner-approved append-only fact tool is the
 bounded exception to draft-only writes; no logged training history is changed.
+
+
+## Owner amendment: MCP measurement corrections and deletion (2026-11-09)
+
+The owner authorized `update_body_measurements` and `delete_body_measurements`,
+deployed within the existing version. Both are owner-scoped exceptions to
+draft-only planning: they change tape facts only, never training or other body
+data. Default preview is read-only. Commits require the unmodified canonical
+`expected_session` from a fresh preview; changed records reject atomically.
+
+Updates preserve omitted fields. A supplied readings array replaces the whole
+site list, and preview lists removed sites. Units are explicit or retain the
+recorded unit; changing unit alone preserves physical readings. Date conflicts
+reject. Shared date/value validation and unusual-value review still apply.
+
+Deletion targets one session, including its readings. The assistant must show
+the exact preview and obtain action-time confirmation of permanent deletion
+before setting both `commit:true` and `confirm_delete:true`. There is no bulk
+delete or undo. Missing/foreign IDs are indistinguishable errors, never success.
+The invoker RPC locks the owner row, checks the snapshot, and commits atomically.
+No actual user data was modified during verification.

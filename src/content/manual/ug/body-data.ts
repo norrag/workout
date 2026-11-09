@@ -316,7 +316,7 @@ export const UG_BODY_DATA: ManualChapter = {
                     ? [
                         {
                           kind: "para" as const,
-                          text: "Your connected assistant can log new tape readings or import dated records. Give the date, unit, site and value for each reading. Review the preview before saving. Batches contain up to 100 dates and save together. Exact repeats are skipped. If a date already has different readings, nothing in that batch is saved. Correct existing entries in the app. Unusual values need confirmation.",
+                          text: "Your connected assistant can log new tape readings or import dated records. Give the date, unit, site and value for each reading. Review the preview before saving. Batches contain up to 100 dates and save together. Exact repeats are skipped. If a date already has different readings, nothing in that batch is saved. Ask your assistant to preview corrections or deletion of one session. Check the date and readings before you confirm. Deletion is permanent. Unusual values need confirmation.",
                         },
                       ]
                     : []),
