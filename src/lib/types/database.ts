@@ -948,6 +948,17 @@ export type Database = {
       v_anchor_candidate_sets: { Row: VAnchorCandidateSetRow; Relationships: [] };
     };
     Functions: {
+      mutate_measurement_session: {
+        Args: {
+          p_id: string;
+          p_expected: unknown;
+          p_replacement?: unknown;
+          p_commit?: boolean;
+          p_delete?: boolean;
+          p_confirm_delete?: boolean;
+        };
+        Returns: unknown;
+      };
       import_measurement_sessions: {
         Args: { p_sessions: unknown; p_commit?: boolean };
         Returns: unknown;
