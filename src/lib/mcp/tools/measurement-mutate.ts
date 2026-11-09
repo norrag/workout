@@ -127,17 +127,20 @@ export function registerMeasurementMutations(server: McpServer) {
         preview.warnings.length &&
         !args.confirm_unusual_values
       )
-        return toolResult({
-          ok: false,
-          error: {
-            code: "REVIEW_VALUES",
-            message: "Review unusual values before saving.",
+        return toolResult(
+          {
+            ok: false,
+            error: {
+              code: "REVIEW_VALUES",
+              message: "Review unusual values before saving.",
+            },
+            ...preview,
+            expected_session: expected,
+            proposed_session: replacement,
+            removed_sites,
           },
-          ...preview,
-          expected_session: expected,
-          proposed_session: replacement,
-          removed_sites,
-        });
+          { units: "in" },
+        );
       const result = await mutateTapeSession(client, {
         id: args.session_id,
         expected,

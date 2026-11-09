@@ -37,15 +37,18 @@ export function registerMeasurementImport(server: McpServer) {
         preview.warnings.length &&
         !args.confirm_unusual_values
       ) {
-        return toolResult({
-          ok: false,
-          error: {
-            code: "REVIEW_VALUES",
-            message:
-              "Review unusual values, then confirm or correct them. Nothing saved.",
+        return toolResult(
+          {
+            ok: false,
+            error: {
+              code: "REVIEW_VALUES",
+              message:
+                "Review unusual values, then confirm or correct them. Nothing saved.",
+            },
+            ...preview,
           },
-          ...preview,
-        });
+          { units: "in" },
+        );
       }
       const result = await importTapeSessions(client, sessions, args.commit);
       if (args.commit && result.sessions.some((s) => s.status === "inserted"))

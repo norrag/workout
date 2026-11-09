@@ -205,4 +205,48 @@ describe("measurement edit/delete tools", () => {
       ).rejects.toThrow();
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
+  it("interprets readings in the existing recorded cm unit", async () => {
+    setup();
+    mocks.history.mockResolvedValue([{ ...current, input_unit: "cm" }]);
+    await tool().handler(
+      {
+        session_id: id,
+        changes: { readings: [{ site_key: "chest", value: 101.6 }] },
+      },
+      auth(),
+    );
+    expect(mocks.mutate.mock.calls[0][1].replacement.readings[0].value_in).toBe(
+      40,
+    );
+  });
+  it("blocks unusual commits until confirmation and labels warnings in inches", async () => {
+    setup("updated");
+    const input = {
+      session_id: id,
+      expected_session: current,
+      changes: { readings: [{ site_key: "chest", value: 120 }] },
+      commit: true,
+    };
+    const r = (await tool().handler(input, auth())) as {
+      structuredContent: { units: string; data: { error: { code: string } } };
+    };
+    expect(r.structuredContent.units).toBe("in");
+    expect(r.structuredContent.data.error.code).toBe("REVIEW_VALUES");
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    await tool().handler({ ...input, confirm_unusual_values: true }, auth());
+    expect(mocks.mutate).toHaveBeenCalledOnce();
+  });
+  it("does not audit an unchanged retry", async () => {
+    setup("unchanged");
+    await tool().handler(
+      {
+        session_id: id,
+        expected_session: current,
+        changes: { note: "keep this" },
+        commit: true,
+      },
+      auth(),
+    );
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
 });
