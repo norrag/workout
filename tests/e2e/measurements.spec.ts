@@ -765,7 +765,7 @@ test("shoulder-only capture, unit conversion, persisted edit, history and CSV", 
     exact: true,
   });
   await expect(edit.getByLabel("Shoulders (in)", { exact: true })).toHaveValue(
-    "48",
+    "48.00",
   );
   await edit.getByLabel("Shoulders (in)", { exact: true }).fill("48.5");
   await edit
