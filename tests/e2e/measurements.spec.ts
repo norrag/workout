@@ -85,10 +85,10 @@ test("monthly tape capture, corrections, history, units and privacy export", asy
     .getByLabel("Chest (in)", { exact: true })
     .filter({ visible: true })
     .fill("40");
-  await expect(page.getByRole("checkbox")).toHaveCount(12);
+  await expect(page.getByRole("checkbox")).toHaveCount(13);
   await expect(
     page.locator('input[inputmode="decimal"]').filter({ visible: true }),
-  ).toHaveCount(12);
+  ).toHaveCount(13);
   const chestCheck = page.getByRole("checkbox", {
     name: "Chest complete",
     exact: true,
@@ -348,7 +348,7 @@ test("mobile measurements use document flow with actions only at the end", async
     return anchored;
   });
   expect(anchoredAncestors).toEqual([]);
-  await expect(entry.getByRole("checkbox")).toHaveCount(12);
+  await expect(entry.getByRole("checkbox")).toHaveCount(13);
   expect(
     await entry
       .locator('input[inputmode="decimal"]')
@@ -455,7 +455,7 @@ test("mobile measurements use document flow with actions only at the end", async
       })),
     );
   expect(cells).toEqual(
-    Array.from({ length: 12 }, () => ({ height: 35, font: "15px" })),
+    Array.from({ length: 13 }, () => ({ height: 35, font: "15px" })),
   );
   const square = (await check.locator("span").boundingBox())!;
   expect(square.width).toBe(23);
@@ -727,4 +727,69 @@ test("released 1.3 modal makes measurements the flagship and acknowledges the re
     .eq("id", userId)
     .single();
   expect(acknowledged.data?.last_seen_version).toBe(CURRENT_VERSION);
+});
+
+test("shoulder-only capture, unit conversion, persisted edit, history and CSV", async ({
+  page,
+}, testInfo) => {
+  const { local, userId } = await signInSynthetic(page, "shoulder-review");
+  await page.goto("/more/measurements");
+  await page
+    .getByRole("button", { name: "+ LOG MEASUREMENTS", exact: true })
+    .click();
+  const form = page.getByRole("form", {
+    name: "log measurements",
+    exact: true,
+  });
+  await expect(form.getByRole("checkbox")).toHaveCount(13);
+  await form.getByText("Shoulders", { exact: true }).click();
+  await expect(form.getByText(/widest part of both deltoids/)).toBeVisible();
+  await form.getByLabel("DATE", { exact: true }).fill("2020-01-01");
+  await form.getByLabel("Shoulders (in)", { exact: true }).fill("48");
+  await expect(
+    form.getByRole("checkbox", { name: "Shoulders complete", exact: true }),
+  ).toBeChecked();
+  await form.getByRole("button", { name: "CM", exact: true }).click();
+  await expect(form.getByLabel("Shoulders (cm)", { exact: true })).toHaveValue(
+    "121.92",
+  );
+  await form.getByRole("button", { name: "IN", exact: true }).click();
+  await form
+    .getByRole("button", { name: "Complete measurements", exact: true })
+    .click();
+  await expect(form).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button").filter({ hasText: "1 JAN '20" }).click();
+  const edit = page.getByRole("form", {
+    name: "edit measurements",
+    exact: true,
+  });
+  await expect(edit.getByLabel("Shoulders (in)", { exact: true })).toHaveValue(
+    "48",
+  );
+  await edit.getByLabel("Shoulders (in)", { exact: true }).fill("48.5");
+  await edit
+    .getByRole("button", { name: "Complete measurements", exact: true })
+    .click();
+  await expect(edit).toHaveCount(0);
+  const rows = await local
+    .from("measurements")
+    .select("site_key,value_in")
+    .eq("user_id", userId);
+  expect(rows.error).toBeNull();
+  expect(rows.data).toEqual([{ site_key: "shoulders", value_in: 48.5 }]);
+  await page.getByRole("button", { name: "HISTORY", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Measurement site", exact: true })
+    .selectOption("shoulders");
+  await expect(
+    page.getByText("1 READING · RAW DATED VALUES").filter({ visible: true }),
+  ).toBeVisible();
+  const csv = await page.request.get("/more/measurements/export");
+  expect(csv.ok()).toBe(true);
+  expect(await csv.text()).toContain("2020-01-01,shoulders,48.5,in,");
+  await testInfo.attach("shoulder-circumference-saved", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
 });

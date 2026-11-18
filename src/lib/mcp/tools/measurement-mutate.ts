@@ -39,7 +39,7 @@ export const measurementUpdateArgs = z
               .strict(),
           )
           .min(1)
-          .max(12)
+          .max(TAPE_SITES.length)
           .optional(),
       })
       .strict()

@@ -186,3 +186,5 @@ release or merge approval. See [the narrow review](reviews/2026-11-07-release-mo
 Owner decision 2026-11-08 **rejects 4.7c**. Restore approved regular **4.7b** at
 all widths, with existing scroll behavior. Do not create a new narrow design.
 The latest dated 09 amendment takes precedence over the historical note above.
+
+**4.13h**, `design/mockups/body-measurements-shoulders.html`, adds the shoulder row to the established measurement entry pattern (owner, 2026-11-18). Layout and controls are unchanged; see the dated 09 amendment.

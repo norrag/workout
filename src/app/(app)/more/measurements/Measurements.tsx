@@ -635,6 +635,7 @@ function MeasurementForm({
       title: "Upper body",
       keys: [
         "chest",
+        "shoulders",
         "waist_navel",
         "upper_arm_left",
         "upper_arm_right",

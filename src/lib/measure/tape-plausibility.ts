@@ -12,6 +12,7 @@ export const TAPE_ENTRY_RANGES_IN: Record<
   readonly [number, number]
 > = {
   chest: [20, 80],
+  shoulders: [25, 100],
   waist_navel: [18, 90],
   hips: [20, 90],
   upper_arm_left: [5, 30],

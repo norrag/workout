@@ -7,6 +7,15 @@ ongoing design sessions **after** the June 2026 mockup round captured in
 takes precedence). Figure numbers (1.1–4.5) refer to the mockup index in 08 §5 and the visual
 source file `workout - App Screens v2.dc.html`.
 
+## 2026-11-18 — shoulder circumference (T-N96e)
+
+Figure 4.13h in `design/mockups/body-measurements-shoulders.html` precedes code.
+Add Shoulders after Chest in Upper body, using the same 35px cells, completion
+checkbox and disclosure cue. All 13 sites remain optional; controls, page flow,
+themes and Complete placement retain the existing pattern. No new modal or
+announcement. Circumference includes both deltoids and upper chest/back; it is
+not skeletal shoulder width. See the [implementation record](reviews/2026-11-18-shoulder-circumference.md).
+
 > **Why this file exists.** 08 is the settled baseline. Designers keep iterating in separate
 > design sessions, and those changes have to reach the production build (Next.js + Tailwind,
 > see [07-implementation-plan.md](07-implementation-plan.md) / [PROGRESS.md](../PROGRESS.md))

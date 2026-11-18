@@ -24,6 +24,17 @@ Running log of implementation state against [07-implementation-plan.md](07-imple
 > failure is gone and three others stand, varying between runs. All three are
 > tracked in [`notes/backlog.md`](notes/backlog.md).
 
+## 2026-11-18 — shoulder circumference
+
+T-N96e adds optional `shoulders` throughout capture, comparisons, export and
+MCP import/edit. Figure 4.13h precedes the existing-pattern row; guide and claims
+explain placement and circumference-versus-width. New migration seeds the site
+and raises every writer cap to 13 without backfill. Owner authorizes production
+at unchanged 1.4.1 with no notification. Branch `feature/shoulder-circumference`
+starts from verified main/production 2db22dd, after completed PRs #265–270.
+Local full unit tests and typecheck pass; database-backed CI and deployment
+results follow at delivery. [Record](reviews/2026-11-18-shoulder-circumference.md).
+
 ## 2026-11-08 - N84 supported navigation-queue correction
 
 Reproduced the old-build stall without a real database and inspected the paused

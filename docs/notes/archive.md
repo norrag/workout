@@ -771,3 +771,11 @@ each spawned a follow-up task where open work remained.
 | ID | From | Title | Type | Resolution |
 |----|------|-------|------|------------|
 | T-A3 | S4 | Confirm active `weight_selection`; surface the legacy fallback | Q→B | **resolved.** Fallback is moot under the active rep-window engine (reached only via no-anchor, not confidence); the legacy-path cleanup folded into workstream **I** (T-I4). |
+
+### N84 — reconciled 2026-11-18
+
+Navigation correction shipped in PR #265. Subsequent PRs #266–270 are complete; current main/production is 2db22dd at 1.4.1. Historical diagnosis and failed checkpoints remain in dated review/log files.
+
+### N96 — reconciled 2026-11-18
+
+Monthly measurements shipped in PR #265 and release #266 (1.3.0); dated import shipped #267–268 (1.4.0), update/delete #270. The old draft/gating status is historical. T-N96a–e remain independent follow-ups as applicable.
