@@ -759,7 +759,7 @@ test("shoulder-only capture, unit conversion, persisted edit, history and CSV", 
     .click();
   await expect(form).toHaveCount(0);
   await page.reload();
-  await page.getByRole("button").filter({ hasText: "1 JAN '20" }).click();
+  await page.getByRole("button", { name: "EDIT >", exact: true }).click();
   const edit = page.getByRole("form", {
     name: "edit measurements",
     exact: true,

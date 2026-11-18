@@ -27,3 +27,5 @@ delivery. Production schema must precede the frontend rollout. No notification o
 release-registry entry is added, per the explicit owner exception.
 
 Production migration applied successfully as hosted version `20261118221217` (`shoulder_circumference`). All three functions retain invoker rights, authenticated execution and no anonymous execution, with 13-reading caps. The original fresh-stack RLS/integration job passed before application. A new browser assertion used uppercase HISTORY while the established accessible label is lowercase history; corrected that test label without a product change. Final corrected-head CI and production frontend verification follow at delivery.
+
+Retained UI evidence confirms shoulder capture and hard reload succeeded. The new test then tried a date-row button while still in Latest view; Latest uses the established `EDIT >` action, while dated row buttons belong to History. Corrected that test interaction to match the real workflow. The frontend implementation is unchanged.
