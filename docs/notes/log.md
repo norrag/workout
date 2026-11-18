@@ -15,6 +15,22 @@ Append a dated entry whenever a session moves work. Newest first.
 > date matters, take it from the PR's merge timestamp or a DB row, not from the
 > heading.** Sessions are numbered from 93 onward; **120 was never used.**
 
+## 2026-11-18 — Session 143: shoulder circumference
+
+Reconciled the relevant stale N84/N96 active rows and old #265 register entry to archive: PRs #265–270 are merged and main is 1.4.1. Historical dated records are retained.
+
+Delegated owner intake adds T-N96e: all-around deltoid circumference distinct from
+chest, including chest/back; no skeletal-width claim. Full production rollout and
+additive migration authorized, no notification or special version bump. Latest
+main is 2db22dd, production 1.4.1; PRs #265–270 are complete, so their old draft
+and release-gate entries are historical. Figure 4.13h precedes the row change.
+Shared vocabulary, SQL writer caps, connector parsers, guide/claims and synthetic
+coverage include all 13 sites; old data is not backfilled. Source changes remain
+on `feature/shoulder-circumference` until checks/review. See the [record](../reviews/2026-11-18-shoulder-circumference.md).
+
+
+Checkpoint: PR #271 implements T-N96e; hosted migration `20261118221217` is applied on shared production. Catalog has 13 sites; all three writers retain invoker/authenticated-only execution, cap 13 and unchanged RLS. Fresh-stack RLS/integration and local build/type/lint/built guards pass. The final browser-test control-label correction and full CI/main deployment results are reported with exact SHAs at delivery. Production measurements were not test data; no version/announcement files changed.
+
 ## 2026-11-08 - Session 142: N84 queue root cause and supported correction
 
 The synthetic production-build failure is now explained at the queue/render

@@ -27,7 +27,7 @@ export const measurementImportArgs = z
                   .strict(),
               )
               .min(1)
-              .max(12),
+              .max(TAPE_SITES.length),
           })
           .strict(),
       )

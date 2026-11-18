@@ -1093,7 +1093,7 @@ All rows below document the gated prose in ug/body-data#what-body-data-changes, 
 
 | Claim | Section | Verified behavior | Source of truth | Checked |
 |---|---|---|---|---|
-| `C-tape-01` | `ug/body-data#what-body-data-changes` | More below BodySpec opens monthly tape sessions; all 12 sites visible in upper/lower groups; landmark disclosures, dated hints; any nonempty subset allowed | `measure/tape.ts::TAPE_SITES`; `more/page.tsx`; `measurements/Measurements.tsx` | ✓ 2026-11-07 |
+| `C-tape-01` | `ug/body-data#what-body-data-changes` | More below BodySpec opens monthly tape sessions; all 13 sites visible in upper/lower groups; landmark disclosures, dated hints; any nonempty subset allowed | `measure/tape.ts::TAPE_SITES`; `more/page.tsx`; `measurements/Measurements.tsx` | ✓ 2026-11-18 |
 | `C-tape-02` | `ug/body-data#what-body-data-changes` | Inches/cm, one session per date; Complete saves all entered values, checked or not; correction, themed confirmed deletion, full CSV; errors retain input | `tapeSessionSchema`; `queries/measure/tape.ts`; `save_measurement_session`; `measurements/actions.ts`; `MeasurementForm::submit/deleteSession`; `export/route.ts` | ✓ 2026-11-07 |
 | `C-tape-06` | `ug/body-data#what-body-data-changes` | Complete alone at document end; X confirms discard; compact date/units; valid decimal entries auto-check, invalid/empty clear, manual toggles remain; Next follows fields | `Measurements.tsx::MeasurementForm`; `tape-plausibility.ts::validTapeEntry`; `LogCheckbox/LeaveConfirm` | ✓ 2026-11-07 |
 | `C-tape-03` | `ug/body-data#what-body-data-changes` | Latest compares two selected sessions; history follows same site/side, dates and interval; missing stays missing | `compareTapeSessions`; `siteHistory`; `Measurements.tsx` | ✓ 2026-11-06 |
@@ -1103,3 +1103,5 @@ All rows below document the gated prose in ug/body-data#what-body-data-changes, 
 | `C-tape-08` | `ug/body-data#what-body-data-changes` | Positive decimal values up to 150 in/381 cm; broad ranges/large prior differences prompt correction or Save as entered; no clinical or growth claim | `tapeReadingSchema`; `parseTapeNumber/tapeEntryWarnings`; `MeasurementForm::submit/persist` | ✓ 2026-11-07 |
 
 Rechecked C-body-20/21: no profile/engine input path changed.
+
+| `C-tape-09` | `ug/body-data#what-body-data-changes` | Shoulders is optional circumference around both deltoids, upper chest/back; relaxed posture and level tape; not shoulder width; no historical backfill | `TAPE_SITES`; `Measurements.tsx::sections`; `20261118215712_shoulder_circumference.sql` | ✓ 2026-11-18 |

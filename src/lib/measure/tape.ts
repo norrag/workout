@@ -98,6 +98,14 @@ export const TAPE_SITES = [
     guidance: "Around the widest part, arm relaxed and palm facing forward.",
     optional: true,
   },
+  {
+    key: "shoulders",
+    label: "Shoulders",
+    group: "Shoulders",
+    guidance:
+      "Stand tall, arms relaxed at your sides. Tape around the widest part of both deltoids, upper chest and back. Keep it level; do not flex or flare your back. Use the same posture each time.",
+    optional: false,
+  },
 ] as const;
 
 export type TapeSiteKey = (typeof TAPE_SITES)[number]["key"];

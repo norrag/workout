@@ -17,7 +17,7 @@ tokens; do not copy the old prototype's exploratory dark styling.
 ## Capture and review
 
 More → Body measurements opens a quiet ledger: one session per date, optional
-note, IN/CM display and entry. All 12 sites are visible in upper/lower groups.
+note, IN/CM display and entry. All 13 sites are visible in upper/lower groups.
 Every site is optional; any nonempty subset can be saved. Prior readings are
 dated hints, never prefilled as new observations.
 
@@ -273,3 +273,7 @@ before setting both `commit:true` and `confirm_delete:true`. There is no bulk
 delete or undo. Missing/foreign IDs are indistinguishable errors, never success.
 The invoker RPC locks the owner row, checks the snapshot, and commits atomically.
 No actual user data was modified during verification.
+
+## Shoulder circumference amendment — 2026-11-18
+
+Shoulders is a thirteenth optional site (`shoulders`), visible after Chest in Upper body. Tape passes around both deltoids and the upper chest/back, with arms relaxed and consistent posture. This is circumference, not skeletal width. Existing history is left sparse: no shoulder reading or baseline is invented. Entry, site history, dated deltas, CSV, MCP read/log/import/update/delete use the same shared vocabulary. The append-only migration adds only the catalog site and raises all three existing RPC reading caps to 13; RLS, permissions and compare-and-swap safeguards stay intact. The owner requests immediate deployment at 1.4.1, no special version bump or notification. This overrides the ordinary announcement/version process for this catalog extension. [Record](reviews/2026-11-18-shoulder-circumference.md).

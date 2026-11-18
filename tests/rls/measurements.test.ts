@@ -55,7 +55,7 @@ describe("measurement ownership and atomicity", () => {
   it("stock sites are authenticated read-only; anonymous cannot read or call the RPC", async () => {
     expect(
       (await alice.from("measurement_sites").select("*")).data,
-    ).toHaveLength(12);
+    ).toHaveLength(13);
     expect(
       (
         await alice

@@ -291,7 +291,7 @@ export const UG_BODY_DATA: ManualChapter = {
               { kind: "heading", text: "Taking body measurements" },
               {
                 kind: "para",
-                text: "Open More → Body measurements. Choose a date and inches or centimetres. Each of the 12 sites is optional. Measure relaxed, before training, with the same tape placement. Keep the tape snug without pressing the skin.",
+                text: "Open More → Body measurements. Choose the date and unit. All 13 sites are optional. Measure relaxed with consistent tape placement; keep it snug without pressing skin. For Shoulders, keep arms relaxed and tape level around both deltoids, upper chest and back. Do not flex or flare your back. This is circumference, not shoulder width.",
               },
               {
                 kind: "para",
