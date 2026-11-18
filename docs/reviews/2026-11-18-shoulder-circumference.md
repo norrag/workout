@@ -25,3 +25,5 @@ conversion, reload, correction and history. No real measurements are test data.
 Local unit/type/lint/build and terminal CI/deployment evidence are reported at
 delivery. Production schema must precede the frontend rollout. No notification or
 release-registry entry is added, per the explicit owner exception.
+
+Production migration applied successfully as hosted version `20261118221217` (`shoulder_circumference`). All three functions retain invoker rights, authenticated execution and no anonymous execution, with 13-reading caps. The original fresh-stack RLS/integration job passed before application. A new browser assertion used uppercase HISTORY while the established accessible label is lowercase history; corrected that test label without a product change. Final corrected-head CI and production frontend verification follow at delivery.

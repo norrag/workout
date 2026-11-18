@@ -778,7 +778,7 @@ test("shoulder-only capture, unit conversion, persisted edit, history and CSV", 
     .eq("user_id", userId);
   expect(rows.error).toBeNull();
   expect(rows.data).toEqual([{ site_key: "shoulders", value_in: 48.5 }]);
-  await page.getByRole("button", { name: "HISTORY", exact: true }).click();
+  await page.getByRole("button", { name: "history", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Measurement site", exact: true })
     .selectOption("shoulders");
