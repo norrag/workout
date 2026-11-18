@@ -35,6 +35,9 @@ starts from verified main/production 2db22dd, after completed PRs #265–270.
 Local full unit tests and typecheck pass; database-backed CI and deployment
 results follow at delivery. [Record](reviews/2026-11-18-shoulder-circumference.md).
 
+
+Checkpoint: PR #271 implements T-N96e; hosted migration `20261118221217` is applied on shared production. Catalog has 13 sites; all three writers retain invoker/authenticated-only execution, cap 13 and unchanged RLS. Fresh-stack RLS/integration and local build/type/lint/built guards pass. The final browser-test control-label correction and full CI/main deployment results are reported with exact SHAs at delivery. Production measurements were not test data; no version/announcement files changed.
+
 ## 2026-11-08 - N84 supported navigation-queue correction
 
 Reproduced the old-build stall without a real database and inspected the paused

@@ -75,7 +75,7 @@ in [`CLAUDE.md`](./CLAUDE.md). Type: `Q` question · `B` bug · `F` feature ·
 
 | ID | Scope | Status |
 |---|---|---|
-| T-N96e | Add optional shoulder circumference across entry, history/deltas, CSV and MCP import/edit. Consistent relaxed placement; no backfill or tissue/width inference. | in-progress (PR #271) on `feature/shoulder-circumference`; current main/production 2db22dd / 1.4.1; owner authorizes production rollout, no modal/version bump. |
+| T-N96e | Add optional shoulder circumference across entry, history/deltas, CSV and MCP import/edit. Consistent relaxed placement; no backfill or tissue/width inference. | done (PR #271; implementation complete, frontend rollout pending final CI) on `feature/shoulder-circumference`; current main/production 2db22dd / 1.4.1; owner authorizes production rollout, no modal/version bump. |
 
 ## Open pull requests
 
