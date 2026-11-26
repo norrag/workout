@@ -22,6 +22,7 @@ Run: python3 scripts/import-exercise-library.py
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import pathlib
 
@@ -176,7 +177,7 @@ def write_seed(rows):
 -- Stock rows have user_id null and are written only here (service context).
 -- The stock exercise library is generated from the user-provided export
 -- (docs/data/exercises_all_20260615.csv) by scripts/import-exercise-library.py;
--- regenerate both this file and the import migration with that script.
+-- regenerate the seed with that script; the old import migration is historical.
 
 -- ---------------------------------------------------------------------------
 -- muscle groups
@@ -199,9 +200,13 @@ on conflict (name) do nothing;
 
 def main():
     rows, csv_equip = load_rows()
-    write_migration(rows, csv_equip)
+    parser = argparse.ArgumentParser(description="Regenerate the stock exercise seed, preserving post-import corrections.")
+    parser.add_argument("--regenerate-historical-import", action="store_true", help="Also regenerate the historical destructive import SQL file; never run it against production.")
+    args = parser.parse_args()
+    if args.regenerate_historical_import:
+        write_migration(rows, csv_equip)
     write_seed(rows)
-    print(f"{len(rows)} exercises -> {MIGRATION.relative_to(ROOT)} and {SEED.relative_to(ROOT)}")
+    print(f"{len(rows)} exercises -> {SEED.relative_to(ROOT)}")
     print("csv equipment vocabulary:", csv_equip)
 
 
